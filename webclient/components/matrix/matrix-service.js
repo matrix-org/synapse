@@ -111,6 +111,15 @@ angular.module('matrixService', [])
             });
         },
 
+        joinAlias: function(room_alias) {
+            var path = "/join/$room_alias";
+            room_alias = encodeURIComponent(room_alias);
+
+            path = path.replace("$room_alias", room_alias);
+
+            return doRequest("PUT", path, undefined, {});
+        },
+
         // Invite a user to a room
         invite: function(room_id, user_id) {
             // The REST path spec

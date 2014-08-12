@@ -18,6 +18,10 @@ angular.module('RoomsController', ['matrixService'])
         room_id: "",
     };
 
+    $scope.joinAlias = {
+        room_alias: "",
+    };
+
     $scope.newProfileInfo = {
         name: matrixService.config().displayName,
         avatar: matrixService.config().avatarUrl
@@ -99,6 +103,22 @@ angular.module('RoomsController', ['matrixService'])
                 }
 
                 $location.path("room/" + room_id);
+            },
+            function(reason) {
+                $scope.feedback = "Can't join room: " + reason;
+            }
+        );
+    };
+
+    $scope.joinAlias = function(room_alias) {
+        matrixService.joinAlias(room_alias).then(
+            function(response) {
+                if (response.hasOwnProperty("room_id")) {
+                    $location.path("room/" + response.room_id);
+                    return;
+                } else {
+                    // TODO (erikj): Do something here?
+                }
             },
             function(reason) {
                 $scope.feedback = "Can't join room: " + reason;
