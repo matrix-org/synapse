@@ -96,6 +96,11 @@ class TwistedHttpServer(HttpServer, resource.Resource):
             path.
         """
         try:
+            # Just say yes to OPTIONS.
+            if request.method == "OPTIONS":
+                self._send_response(request, 200, {})
+                return
+
             # Loop through all the registered callbacks to check if the method
             # and path regex match
             for path_entry in self.path_regexs.get(request.method, []):
