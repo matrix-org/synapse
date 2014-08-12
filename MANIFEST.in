@@ -1,0 +1,3 @@
+recursive-include docs *
+recursive-include tests *.py
+recursive-include synapse/persistence/schema *.sql

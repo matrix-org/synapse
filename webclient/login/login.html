@@ -1,0 +1,51 @@
+<div ng-controller="LoginController" class="login">
+    <div class="page">
+
+    {{ feedback }}
+        
+    <h3>Register for an account:</h3>
+    <form novalidate>
+        <input id="desired_user_name" size="70" type="text" auto-focus ng-model="account.desired_user_name" placeholder="User name (ex:bob)"/>
+        <br/>
+        <input id="pwd1" size="70" type="password" auto-focus ng-model="account.pwd1" placeholder="Type a password"/>
+        <br/>
+        <input id="pwd2" size="70" type="password" auto-focus ng-model="account.pwd2" placeholder="Re-type your password"/>
+        <br/>
+        <!-- New user registration -->
+        <div>
+            <br/>
+            <button ng-click="register()" ng-disabled="!account.desired_user_name || !account.homeserver || !account.identityServer || !account.pwd1 || !account.pwd2">Register</button>
+        </div>
+    </form>
+
+    <h3>Got an account?</h3>
+    <form novalidate>
+        <!-- Login with an registered user -->
+        <div>
+            <input id="user_id" size="70" type="text" auto-focus ng-model="account.user_id" placeholder="User ID (ex:@bob:localhost)"/>
+            <br />
+            <input id="password" size="70" type="password" ng-model="account.password" placeholder="Password"/><br />
+            <br/>
+            <button ng-click="login()" ng-disabled="!account.user_id || !account.password || !account.homeserver || !account.identityServer">Login</button>
+        </div>
+       
+    </form>
+
+    <h3>Servers</h3>
+    <form novalidate>
+        <div>
+        Home Server: 
+        <input id="homeserver" size="57" type="text" ng-model="account.homeserver" placeholder="Home server URL (ex: http://localhost:8080)"/>
+        </div>
+        <br />
+        <div>
+        Identity Server: 
+        <input id="identityServer" size="56" type="text" ng-model="account.identityServer" placeholder="Identity server URL (ex: http://localhost:8090)"/>
+        </div>
+        <br />
+    </form>
+    <br/>
+    
+
+    </div>
+</div>

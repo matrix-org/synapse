@@ -1,0 +1,12 @@
+Basic Usage
+-----------
+
+The Synapse web client needs to be hosted by a basic HTTP server.
+
+You can use the Python simple HTTP server::
+
+    $ python -m SimpleHTTPServer
+
+Then, open this URL in a WEB browser::
+
+    http://127.0.0.1:8000/

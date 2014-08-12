@@ -1,0 +1,22 @@
+Requires you to have done:
+    python setup.py develop
+
+
+The demo start.sh will start three synapse servers on ports 8080, 8081 and 8082, with host names localhost:$port. This can be easily changed to `hostname`:$port in start.sh if required. 
+It will also start a web server on port 8000 pointed at the webclient.
+
+stop.sh will stop the synapse servers and the webclient.
+
+clean.sh will delete the databases and log files.
+
+To start a completely new set of servers, run:
+
+    ./demo/stop.sh; ./demo/clean.sh && ./demo/start.sh
+
+
+Logs and sqlitedb will be stored in demo/808{0,1,2}.{log,db}
+
+
+
+Also note that when joining a public room on a differnt HS via "#foo:bar.net", then you are (in the current impl) joining a room with room_id "foo". This means that it won't work if your HS already has a room with that name.
+

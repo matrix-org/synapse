@@ -1,0 +1,80 @@
+<div ng-controller="RoomsController" class="rooms">
+
+    <div class="page">
+        
+    <div>
+        <form>
+            <input size="40" ng-model="newProfileInfo.name" ng-enter="setDisplayName(newProfileInfo.name)" />
+            <button ng-disabled="!newProfileInfo.name" ng-click="setDisplayName(newProfileInfo.name)">Update Name</button>    
+        </form>
+    </div>
+    <div>
+        <form>
+            <input size="40" ng-model="newProfileInfo.avatar" ng-enter="setAvatar(newProfileInfo.avatar)" />
+            <button ng-disabled="!newProfileInfo.avatar" ng-click="setAvatar(newProfileInfo.avatar)">Update Avatar</button>    
+        </form>
+    </div>
+    <br/>
+
+    <div>
+        <form>
+            <input size="40" ng-model="linkedEmails.linkNewEmail" ng-enter="linkEmail(linkedEmails.linkNewEmail)" />
+            <button ng-disabled="!linkedEmails.linkNewEmail" ng-click="linkEmail(linkedEmails.linkNewEmail)">
+                Link Email
+            </button>
+            {{ emailFeedback }}    
+        </form>
+        <form ng-hide="!linkedEmails.emailBeingAuthed">
+            Enter validation token for {{ linkedEmails.emailBeingAuthed }}:
+            <br />
+            <input size="20" ng-model="linkedEmails.emailCode" ng-enter="submitEmailCode(linkedEmails.emailCode)" />
+            <button ng-disabled="!linkedEmails.emailCode || !linkedEmails.linkNewEmail" ng-click="submitEmailCode(linkedEmails.emailCode)">
+                Submit Code
+            </button>   
+        </form>
+        Linked emails:
+        <table>
+            <tr ng-repeat="(address, info) in linkedEmails.linkedEmailList">
+                <td>{{address}}</td>
+            </tr>
+        </table>
+    </div>
+    <br/>
+    
+    <h3>My rooms</h3>
+    
+    <div class="rooms" ng-repeat="room in rooms">
+        <div>
+            <a href="#/room/{{ room.room_id }}" >{{ room.room_alias }}</a>
+        </div>
+    </div>
+    <br/>
+
+    <h3>Public rooms</h3>
+    
+    <div class="public_rooms" ng-repeat="room in public_rooms">
+        <div>
+            <a href="#/room/{{ room.room_id }}" >{{ room.room_alias }}</a>
+        </div>
+    </div>
+    <br/>
+    
+    <div>
+        <form>
+            <input size="40" ng-model="newRoom.room_id" ng-enter="createNewRoom(newRoom.room_id, newRoom.private)" placeholder="(e.g. foo_channel)"/>
+            <input type="checkbox" ng-model="newRoom.private">private
+            <button ng-disabled="!newRoom.room_id" ng-click="createNewRoom(newRoom.room_id, newRoom.private)">Create room</button>    
+        </form>
+    </div>
+    <div>
+        <form>
+            <input size="40" ng-model="goToRoom.room_id" ng-enter="goToRoom(goToRoom.room_id)" placeholder="(e.g. #foo_channe:example.org)"/>
+            <button ng-disabled="!goToRoom.room_id" ng-click="goToRoom(goToRoom.room_id)">Go to room</button>    
+        </form>
+    </div>
+    <br/>
+    
+    {{ feedback }}
+
+    </div>    
+</div>

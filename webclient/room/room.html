@@ -1,0 +1,76 @@
+<div ng-controller="RoomController" data-ng-init="onInit()" class="room">
+
+    <div class="page">
+
+    <div class="roomName">
+        {{ room_alias || room_id }}
+    </div>
+    
+    <table class="usersTable">
+        <tr ng-repeat="(name, info) in members">
+            <td class="userAvatar">
+                <img class="userAvatarImage" ng-src="{{info.avatar_url || 'img/default-profile.jpg'}}" width="80" height="80"/>
+                <img class="userAvatarGradient" src="img/gradient.png" width="80" height="24"/>
+                <div class="userName">{{ info.displayname || name }}</div>
+            </td>
+            <td class="userPresence" ng-class="info.presenceState === 'online' ? 'online' : (info.presenceState === 'away' ? 'away' : '')" />
+    </table>
+    
+    <div class="messageTableWrapper">
+        <table class="messageTable">
+            <tr ng-repeat="msg in messages" ng-class="msg.user_id === state.user_id ? 'mine' : ''">
+                <td class="leftBlock">
+                    <div class="sender" ng-hide="messages[$index - 1].user_id === msg.user_id">{{ members[msg.user_id].displayname || msg.user_id }}</div>
+                    <div class="timestamp">{{ msg.content.hsob_ts | date:'HH:mm:ss' }}</div>
+                </td>
+                <td class="avatar">
+                    <img ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
+                         ng-hide="messages[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
+                </td>
+                <td ng-class="!msg.content.membership_target ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : ''">
+                    <div class="bubble">
+                        {{ msg.content.msgtype === "m.emote" ? ("* " + (members[msg.user_id].displayname || msg.user_id) + " ") : "" }}
+                        {{ msg.content.body }}
+                    </div>
+                </td>
+                <td class="rightBlock">
+                    <img ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
+                         ng-hide="messages[$index - 1].user_id === msg.user_id || msg.user_id !== state.user_id"/>
+                </td>
+            </tr>
+        </table>
+    </div>
+    
+    </div>
+
+    <div class="controlPanel">
+        <div class="controls">
+            <table class="inputBarTable">
+                <tr>
+                    <td width="1">
+                        {{ state.user_id }} 
+                    </td>
+                    <td width="*">
+                        <input class="mainInput" ng-model="textInput" ng-enter="send()" ng-focus="true"/>
+                    </td>
+                    <td width="1">
+                        <button ng-click="send()">Send</button>
+                    </td>
+                    <td width="1">
+                        {{ feedback }}
+                    </td>
+                </tr>
+            </table>
+
+            <span>
+               Invite a user: 
+                    <input ng-model="userIDToInvite" size="32" type="text" placeholder="User ID (ex:@user:homeserver)"/>     
+                    <button ng-click="inviteUser(userIDToInvite)">Invite</button>
+            </span>
+            <button ng-click="leaveRoom()">Leave</button>
+        </div>
+    </div>
+    
+    
+
+ </div>
