@@ -1,7 +1,7 @@
 About
 =====
 
-Matrix is an ambitious new ecosystem for open federated Instant Messaging and VoIP[1]_.
+Matrix is an ambitious new ecosystem for open federated Instant Messaging and VoIP[1].
 
 Matrix specifies a set of pragmatic RESTful HTTP JSON APIs as an open standard, providing:
 
@@ -10,7 +10,7 @@ Matrix specifies a set of pragmatic RESTful HTTP JSON APIs as an open standard, 
     - Eventually-consistent cryptographically secure synchronisation of room 
 	  state across a global open network of federated servers and services
     - Sending and receiving extensible messages in a room with (optional)
-      end-to-end encryption[2]_
+      end-to-end encryption[2]
     - Inviting, joining, leaving, kicking, banning room members
     - Managing user accounts (registration, login, logout)
     - Using 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
@@ -44,8 +44,9 @@ We'd like to invite you to take a look at the Matrix spec, try to run a homeserv
 
 Thanks for trying Matrix!
 
-.. [1] VoIP currently in development
-.. [2] End-to-end encryption is currently in development
+[1] VoIP currently in development
+
+[2] End-to-end encryption is currently in development
 
 
 Directory Structure
