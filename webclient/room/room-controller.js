@@ -33,7 +33,8 @@ angular.module('RoomController', [])
                         }
                         $scope.messages.push(chunk);
                         $timeout(function() {
-                            window.scrollTo(0, document.body.scrollHeight);
+                            var objDiv = document.getElementsByClassName("messageTableWrapper")[0];
+                            objDiv.scrollTop = objDiv.scrollHeight;
                         },0);
                     }
                     else if (chunk.room_id == $scope.room_id && chunk.type == "m.room.member") {

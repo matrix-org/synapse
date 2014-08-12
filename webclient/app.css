@@ -52,11 +52,16 @@ h1 {
 
 /*** Participant list ***/
 
-.usersTable {
+.usersTableWrapper {
     float: right;
     width: 120px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.usersTable {
+    width: 100%;
     border-collapse: collapse;
-    margin-bottom: 150px;
 }
 
 .usersTable td {
@@ -105,18 +110,29 @@ h1 {
     background-color: #FFCC00;
 }
 
+/*** Room page  ***/
+
+/* Limit the height of the page content to 100% of the viewport height minus the
+   height of the header and the footer.
+   The two divs containing the messages list and the users list will then scroll-
+   overflow separetely. 
+  */
+.room .page {
+    height: calc(100vh - 198px); 
+}
 
 /*** Message table ***/
 
 .messageTableWrapper {
     width: auto;
+    height: 100%;
     margin-right: 140px;
+    overflow-y: auto;
 }
 
 .messageTable {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 100px;
 }
         
 .messageTable td {
