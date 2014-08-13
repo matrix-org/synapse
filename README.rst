@@ -297,3 +297,9 @@ sphinxcontrib-napoleon::
 Building internal API documentation::
 
     $ python setup.py build_sphinx
+
+Troubleshooting
+===============
+
+fatal error: sodium.h: No such file or directory
+    There is a bug in PyNaCl 0.2.3 which can cause the module to fail to import. The bug is fixed in HEAD so you can work around it by checking PyNaCl out of git directly (https://github.com/pyca/pynacl) and installing it. Installing PyNaCl using pip may also work (remember to remove any other versions installed by setuputils in, for example, ~/.local/lib).
