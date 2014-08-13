@@ -69,11 +69,14 @@ angular.module('RoomController', [])
                 }
             }, function(response) {
                 $scope.feedback = "Can't stream: " + JSON.stringify(response);
+                if (response.status == 403) {
+                    $scope.stopPoll = true;
+                }
                 if ($scope.stopPoll) {
                     console.log("Stopping polling.");
                 }
                 else {
-                    $timeout(shortPoll, 2000);
+                    $timeout(shortPoll, 5000);
                 }
             });
     };
