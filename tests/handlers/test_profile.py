@@ -37,13 +37,18 @@ class ProfileTestCase(unittest.TestCase):
     """ Tests profile management. """
 
     def setUp(self):
-        self.mock_client = Mock(spec=[
-            "get_json",
+        self.mock_federation = Mock(spec=[
+            "make_query",
         ])
+
+        self.query_handlers = {}
+        def register_query_handler(query_type, handler):
+            self.query_handlers[query_type] = handler
+        self.mock_federation.register_query_handler = register_query_handler
 
         hs = HomeServer("test",
                 db_pool=None,
-                http_client=self.mock_client,
+                http_client=None,
                 datastore=Mock(spec=[
                     "get_profile_displayname",
                     "set_profile_displayname",
@@ -52,6 +57,7 @@ class ProfileTestCase(unittest.TestCase):
                 ]),
                 handlers=None,
                 http_server=Mock(),
+                replication_layer=self.mock_federation,
             )
         hs.handlers = ProfileHandlers(hs)
 
@@ -93,17 +99,30 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_other_name(self):
-        self.mock_client.get_json.return_value = defer.succeed(
-                {"displayname": "Alice"})
+        self.mock_federation.make_query.return_value = defer.succeed(
+            {"displayname": "Alice"}
+        )
 
         displayname = yield self.handler.get_displayname(self.alice)
 
         self.assertEquals(displayname, "Alice")
-        self.mock_client.get_json.assert_called_with(
+        self.mock_federation.make_query.assert_called_with(
             destination="remote",
-            path="/matrix/client/api/v1/profile/@alice:remote/displayname"
-                "?local_only=1"
+            query_type="profile",
+            args={"user_id": "@alice:remote", "field": "displayname"}
         )
+
+    @defer.inlineCallbacks
+    def test_incoming_fed_query(self):
+        mocked_get = self.datastore.get_profile_displayname
+        mocked_get.return_value = defer.succeed("Caroline")
+
+        response = yield self.query_handlers["profile"](
+            {"user_id": "@caroline:test", "field": "displayname"}
+        )
+
+        self.assertEquals({"displayname": "Caroline"}, response)
+        mocked_get.assert_called_with("caroline")
 
     @defer.inlineCallbacks
     def test_get_my_avatar(self):

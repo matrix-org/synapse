@@ -43,6 +43,9 @@ class MockReplication(object):
     def register_edu_handler(self, edu_type, handler):
         self.edu_handlers[edu_type] = handler
 
+    def register_query_handler(self, query_type, handler):
+        pass
+
     def received_edu(self, origin, edu_type, content):
         self.edu_handlers[edu_type](origin, content)
 

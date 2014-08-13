@@ -26,15 +26,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-PREFIX = "/matrix/client/api/v1"
-
 
 class ProfileHandler(BaseHandler):
 
     def __init__(self, hs):
         super(ProfileHandler, self).__init__(hs)
 
-        self.client = hs.get_http_client()
+        self.federation = hs.get_replication_layer()
+        self.federation.register_query_handler(
+            "profile", self.on_profile_query
+        )
 
         distributor = hs.get_distributor()
         self.distributor = distributor
@@ -57,17 +58,14 @@ class ProfileHandler(BaseHandler):
 
             defer.returnValue(displayname)
         elif not local_only:
-            # TODO(paul): This should use the server-server API to ask another
-            # HS. For now we'll just have it use the http client to talk to the
-            # other HS's REST client API
-            path = PREFIX + "/profile/%s/displayname?local_only=1" % (
-                target_user.to_string()
-            )
-
             try:
-                result = yield self.client.get_json(
+                result = yield self.federation.make_query(
                     destination=target_user.domain,
-                    path=path
+                    query_type="profile",
+                    args={
+                        "user_id": target_user.to_string(),
+                        "field": "displayname",
+                    }
                 )
             except CodeMessageException as e:
                 if e.code != 404:
@@ -76,8 +74,8 @@ class ProfileHandler(BaseHandler):
                 raise
             except:
                 logger.exception("Failed to get displayname")
-
-            defer.returnValue(result["displayname"])
+            else:
+                defer.returnValue(result["displayname"])
         else:
             raise SynapseError(400, "User is not hosted on this Home Server")
 
@@ -110,18 +108,14 @@ class ProfileHandler(BaseHandler):
 
             defer.returnValue(avatar_url)
         elif not local_only:
-            # TODO(paul): This should use the server-server API to ask another
-            # HS. For now we'll just have it use the http client to talk to the
-            # other HS's REST client API
-            destination = target_user.domain
-            path = PREFIX + "/profile/%s/avatar_url?local_only=1" % (
-                target_user.to_string(),
-            )
-
             try:
-                result = yield self.client.get_json(
-                    destination=destination,
-                    path=path
+                result = yield self.federation.make_query(
+                    destination=target_user.domain,
+                    query_type="profile",
+                    args={
+                        "user_id": target_user.to_string(),
+                        "field": "avatar_url",
+                    }
                 )
             except CodeMessageException as e:
                 if e.code != 404:
@@ -168,3 +162,25 @@ class ProfileHandler(BaseHandler):
         state["avatar_url"] = avatar_url
 
         defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def on_profile_query(self, args):
+        user = self.hs.parse_userid(args["user_id"])
+        if not user.is_mine:
+            raise SynapseError(400, "User is not hosted on this Home Server")
+
+        just_field = args.get("field", None)
+
+        response = {}
+
+        if just_field is None or just_field == "displayname":
+            response["displayname"] = yield self.store.get_profile_displayname(
+                user.localpart
+            )
+
+        if just_field is None or just_field == "avatar_url":
+            response["avatar_url"] = yield self.store.get_profile_avatar_url(
+                user.localpart
+            )
+
+        defer.returnValue(response)
