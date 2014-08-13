@@ -187,6 +187,14 @@ h1 {
     border: 0px ! important;
 }
 
+.image {
+    display: block;
+    max-width:320px;
+    max-height:320px;
+    width: auto;
+    height: auto;
+}
+
 .bubble {
     padding: 6px;
     padding-left: 1em;
