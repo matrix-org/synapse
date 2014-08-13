@@ -43,7 +43,7 @@ h1 {
 }
 
 .inputBarTable tr td {
-    padding: 4px;
+    padding: 1px 4px;
 }
 
 .mainInput {
@@ -106,7 +106,7 @@ h1 {
     background-color: #38AF00;
 }
 
-.away {
+.unavailable {
     background-color: #FFCC00;
 }
 
@@ -118,7 +118,7 @@ h1 {
    overflow separetely. 
   */
 .room .page {
-    height: calc(100vh - 198px); 
+    height: calc(100vh - 220px); 
 }
 
 /*** Message table ***/
@@ -185,6 +185,14 @@ h1 {
 .emote {
     background-color: #fff ! important;
     border: 0px ! important;
+}
+
+.image {
+    display: block;
+    max-width:320px;
+    max-height:320px;
+    width: auto;
+    height: auto;
 }
 
 .bubble {

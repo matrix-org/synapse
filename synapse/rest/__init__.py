@@ -13,9 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from . import (
-    room, events, register, profile, public, presence, im, directory
+    room, events, register, login, profile, public, presence, im, directory,
+    webclient
 )
+
 
 class RestServletFactory(object):
 
@@ -35,10 +38,13 @@ class RestServletFactory(object):
         room.register_servlets(hs, http_server)
         events.register_servlets(hs, http_server)
         register.register_servlets(hs, http_server)
+        login.register_servlets(hs, http_server)
         profile.register_servlets(hs, http_server)
         public.register_servlets(hs, http_server)
         presence.register_servlets(hs, http_server)
         im.register_servlets(hs, http_server)
         directory.register_servlets(hs, http_server)
 
-
+    def register_web_client(self, hs):
+        http_server = hs.get_http_server()
+        webclient.register_servlets(hs, http_server)

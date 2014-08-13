@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Contains constants from the specification."""
 
 
@@ -36,7 +37,7 @@ class Feedback(object):
 
 class PresenceState(object):
     """Represents the presence state of a user."""
-    OFFLINE = 0
-    BUSY = 1
-    ONLINE = 2
-    FREE_FOR_CHAT = 3
+    OFFLINE = u"offline"
+    UNAVAILABLE = u"unavailable"
+    ONLINE = u"online"
+    FREE_FOR_CHAT = u"free_for_chat"

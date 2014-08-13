@@ -116,9 +116,13 @@ federation.]]
 Protocol URLs
 =============
 
+All these URLs are namespaced within a prefix of 
+
+  /matrix/federation/v1/...
+
 For active pushing of messages representing live activity "as it happens":
 
-  PUT /send/:transaction_id/
+  PUT .../send/:transaction_id/
     Body: JSON encoding of a single Transaction
 
     Response: [[TODO(paul): I don't actually understand what
@@ -132,7 +136,7 @@ For active pushing of messages representing live activity "as it happens":
 
 To fetch a particular PDU:
 
-  GET /pdu/:origin/:pdu_id/
+  GET .../pdu/:origin/:pdu_id/
 
     Response: JSON encoding of a single Transaction containing one PDU
 
@@ -142,7 +146,7 @@ To fetch a particular PDU:
 
 To fetch all the state of a given context:
 
-  GET /state/:context/
+  GET .../state/:context/
 
     Response: JSON encoding of a single Transaction containing multiple PDUs
 
@@ -153,7 +157,7 @@ To fetch all the state of a given context:
 
 To paginate events on a given context:
 
-  GET /paginate/:context/
+  GET .../paginate/:context/
     Query args: v, limit
 
     Response: JSON encoding of a single Transaction containing multiple PDUs
@@ -167,7 +171,7 @@ To paginate events on a given context:
 
 To stream events all the events:
 
-  GET /pull/
+  GET .../pull/
     Query args: origin, v
 
   Response: JSON encoding of a single Transaction consisting of multiple PDUs

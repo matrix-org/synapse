@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Copyright 2014 matrix.org
 #
@@ -12,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#!/usr/bin/env python
 
 from synapse.storage import read_schema
 
@@ -88,12 +88,11 @@ def setup_logging(verbosity=0, filename=None, config_path=None):
             '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
         )
 
-        if not verbosity or verbosity == 0:
-            level = logging.WARNING
-        elif verbosity == 1:
-            level = logging.INFO
-        else:
+        level = logging.INFO
+        if verbosity:
             level = logging.DEBUG
+
+        # FIXME: we need a logging.WARN for a -q quiet option
 
         logging.basicConfig(level=level, filename=filename, format=log_format)
     else:
@@ -126,6 +125,8 @@ def setup():
     parser.add_argument('--pid-file', dest="pid", help="When running as a "
                         "daemon, the file to store the pid in",
                         default="hs.pid")
+    parser.add_argument("-w", "--webclient", dest="webclient",
+                        action="store_true", help="Host the web client.")
     args = parser.parse_args()
 
     verbosity = int(args.verbose) if args.verbose else None

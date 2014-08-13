@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from syutil.jsonutil import (
     encode_canonical_json, encode_pretty_printed_json
 )

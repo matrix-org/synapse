@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 # This file provides some classes for setting up (partially-populated)
 # homeservers; either as a full homeserver as a real application, or a small
 # partial one for unit test mocking.
@@ -171,6 +172,10 @@ class HomeServer(BaseHomeServer):
         return Distributor()
 
     def register_servlets(self):
-        """Simply building the ServletFactory is sufficient to have it
-        register."""
-        self.get_rest_servlet_factory()
+        """ Register all servlets associated with this HomeServer.
+
+        Args:
+            host_web_client (bool): True to host the web client as well.
+        """
+        # Simply building the ServletFactory is sufficient to have it register
+        factory = self.get_rest_servlet_factory()

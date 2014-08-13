@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """The transport layer is responsible for both sending transactions to remote
 home servers and receiving a variety of requests from other home servers.
 
@@ -30,6 +31,9 @@ import re
 
 
 logger = logging.getLogger(__name__)
+
+
+PREFIX = "/matrix/federation/v1"
 
 
 class TransportLayer(object):
@@ -83,9 +87,9 @@ class TransportLayer(object):
         logger.debug("get_context_state dest=%s, context=%s",
                      destination, context)
 
-        path = "/state/%s/" % context
+        subpath = "/state/%s/" % context
 
-        return self._do_request_for_transaction(destination, path)
+        return self._do_request_for_transaction(destination, subpath)
 
     @log_function
     def get_pdu(self, destination, pdu_origin, pdu_id):
@@ -103,9 +107,9 @@ class TransportLayer(object):
         logger.debug("get_pdu dest=%s, pdu_origin=%s, pdu_id=%s",
                      destination, pdu_origin, pdu_id)
 
-        path = "/pdu/%s/%s/" % (pdu_origin, pdu_id)
+        subpath = "/pdu/%s/%s/" % (pdu_origin, pdu_id)
 
-        return self._do_request_for_transaction(destination, path)
+        return self._do_request_for_transaction(destination, subpath)
 
     @log_function
     def paginate(self, dest, context, pdu_tuples, limit):
@@ -129,14 +133,14 @@ class TransportLayer(object):
         if not pdu_tuples:
             return
 
-        path = "/paginate/%s/" % context
+        subpath = "/paginate/%s/" % context
 
         args = {"v": ["%s,%s" % (i, o) for i, o in pdu_tuples]}
         args["limit"] = limit
 
         return self._do_request_for_transaction(
             dest,
-            path,
+            subpath,
             args=args,
         )
 
@@ -165,7 +169,7 @@ class TransportLayer(object):
 
         code, response = yield self.client.put_json(
             transaction.destination,
-            path="/send/%s/" % transaction.transaction_id,
+            path=PREFIX + "/send/%s/" % transaction.transaction_id,
             data=data
         )
 
@@ -188,7 +192,7 @@ class TransportLayer(object):
         # This is when someone is trying to send us a bunch of data.
         self.server.register_path(
             "PUT",
-            re.compile("^/send/([^/]*)/$"),
+            re.compile("^" + PREFIX + "/send/([^/]*)/$"),
             self._on_send_request
         )
 
@@ -206,7 +210,7 @@ class TransportLayer(object):
         # This is for when someone asks us for everything since version X
         self.server.register_path(
             "GET",
-            re.compile("^/pull/$"),
+            re.compile("^" + PREFIX + "/pull/$"),
             lambda request: handler.on_pull_request(
                 request.args["origin"][0],
                 request.args["v"]
@@ -217,7 +221,7 @@ class TransportLayer(object):
         # data_id pair.
         self.server.register_path(
             "GET",
-            re.compile("^/pdu/([^/]*)/([^/]*)/$"),
+            re.compile("^" + PREFIX + "/pdu/([^/]*)/([^/]*)/$"),
             lambda request, pdu_origin, pdu_id: handler.on_pdu_request(
                 pdu_origin, pdu_id
             )
@@ -226,7 +230,7 @@ class TransportLayer(object):
         # This is when someone asks for all data for a given context.
         self.server.register_path(
             "GET",
-            re.compile("^/state/([^/]*)/$"),
+            re.compile("^" + PREFIX + "/state/([^/]*)/$"),
             lambda request, context: handler.on_context_state_request(
                 context
             )
@@ -234,7 +238,7 @@ class TransportLayer(object):
 
         self.server.register_path(
             "GET",
-            re.compile("^/paginate/([^/]*)/$"),
+            re.compile("^" + PREFIX + "/paginate/([^/]*)/$"),
             lambda request, context: self._on_paginate_request(
                 context, request.args["v"],
                 request.args["limit"]
@@ -243,7 +247,7 @@ class TransportLayer(object):
 
         self.server.register_path(
             "GET",
-            re.compile("^/context/([^/]*)/$"),
+            re.compile("^" + PREFIX + "/context/([^/]*)/$"),
             lambda request, context: handler.on_context_pdus_request(context)
         )
 
@@ -299,7 +303,7 @@ class TransportLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def _do_request_for_transaction(self, destination, path, args={}):
+    def _do_request_for_transaction(self, destination, subpath, args={}):
         """
         Args:
             destination (str)
@@ -312,7 +316,7 @@ class TransportLayer(object):
 
         data = yield self.client.get_json(
             destination,
-            path=path,
+            path=PREFIX + subpath,
             args=args,
         )
 

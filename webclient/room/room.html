@@ -14,7 +14,7 @@
                     <img class="userAvatarGradient" src="img/gradient.png" width="80" height="24"/>
                     <div class="userName">{{ info.displayname || name }}</div>
                 </td>
-                <td class="userPresence" ng-class="info.presenceState === 'online' ? 'online' : (info.presenceState === 'away' ? 'away' : '')" />
+                <td class="userPresence" ng-class="info.presenceState === 'online' ? 'online' : (info.presenceState === 'unavailable' ? 'unavailable' : '')" />
         </table>
     </div>
     
@@ -32,7 +32,8 @@
                 <td ng-class="!msg.content.membership_target ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : ''">
                     <div class="bubble">
                         {{ msg.content.msgtype === "m.emote" ? ("* " + (members[msg.user_id].displayname || msg.user_id) + " ") : "" }}
-                        {{ msg.content.body }}
+                        {{ msg.content.msgtype === "m.text" ? msg.content.body : "" }}
+                        <img class="image" ng-hide='msg.content.msgtype !== "m.image"' src="{{ msg.content.url }}" alt="{{ msg.content.body }}"/>
                     </div>
                 </td>
                 <td class="rightBlock">
@@ -60,6 +61,18 @@
                     </td>
                     <td width="1">
                         {{ feedback }}
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                    </td>
+                    <td>
+                        <input class="mainInput" ng-model="imageURLToSend" ng-enter="sendImage()" placeholder="Image URL"/>
+                    </td>
+                    <td  width="100px">
+                        <button ng-click="sendImage(imageURLToSend)">Send Image</button>
+                    </td>
+                    <td>
                     </td>
                 </tr>
             </table>

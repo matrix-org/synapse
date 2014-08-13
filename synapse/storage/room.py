@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from twisted.internet import defer
 
 from sqlite3 import IntegrityError
@@ -92,7 +93,10 @@ class RoomStore(SQLBaseStore):
         latest_topic = ("SELECT max(room_data.id) FROM room_data WHERE "
                         + "room_data.type = ? GROUP BY room_id")
 
-        query = ("SELECT rooms.*, room_data.content FROM rooms LEFT JOIN "
+        query = ("SELECT rooms.*, room_data.content, room_alias FROM rooms "
+                 + "LEFT JOIN "
+                 + "room_aliases ON room_aliases.room_id = rooms.room_id "
+                 + "LEFT JOIN "
                  + "room_data ON rooms.room_id = room_data.room_id WHERE "
                  + "(room_data.id IN (" + latest_topic + ") "
                  + "OR room_data.id IS NULL) AND rooms.is_public = ?")
@@ -102,7 +106,7 @@ class RoomStore(SQLBaseStore):
         )
 
         # return only the keys the specification expects
-        ret_keys = ["room_id", "topic"]
+        ret_keys = ["room_id", "topic", "room_alias"]
 
         # extract topic from the json (icky) FIXME
         for i, room_row in enumerate(res):
