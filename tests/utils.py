@@ -95,6 +95,16 @@ class MockHttpServer(HttpServer):
         self.callbacks.append((method, path_pattern, callback))
 
 
+class MockClock(object):
+    now = 1000
+
+    def time(self):
+        return self.now
+
+    def time_msec(self):
+        return self.time() * 1000
+
+
 class MemoryDataStore(object):
 
     class RoomMember(namedtuple(

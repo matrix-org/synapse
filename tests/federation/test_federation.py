@@ -20,7 +20,7 @@ from twisted.trial import unittest
 from mock import Mock
 import logging
 
-from ..utils import MockHttpServer
+from ..utils import MockHttpServer, MockClock
 
 from synapse.server import HomeServer
 from synapse.federation import initialize_http_replication
@@ -46,16 +46,6 @@ def make_pdu(prev_pdus=[], **kwargs):
     pdu_fields.update(kwargs)
 
     return PduTuple(PduEntry(**pdu_fields), prev_pdus)
-
-
-class MockClock(object):
-    now = 1000
-
-    def time(self):
-        return self.now
-
-    def time_msec(self):
-        return self.time() * 1000
 
 
 class FederationTestCase(unittest.TestCase):
