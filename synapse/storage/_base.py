@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 class SQLBaseStore(object):
 
     def __init__(self, hs):
+        self.hs = hs
         self._db_pool = hs.get_db_pool()
 
     def cursor_to_dict(self, cursor):
