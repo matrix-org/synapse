@@ -104,6 +104,10 @@ class MockClock(object):
     def time_msec(self):
         return self.time() * 1000
 
+    # For unit testing
+    def advance_time(self, secs):
+        self.now += secs
+
 
 class MemoryDataStore(object):
 
