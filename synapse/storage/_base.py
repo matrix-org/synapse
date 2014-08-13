@@ -29,6 +29,7 @@ class SQLBaseStore(object):
     def __init__(self, hs):
         self.hs = hs
         self._db_pool = hs.get_db_pool()
+        self._clock = hs.get_clock()
 
     def cursor_to_dict(self, cursor):
         """Converts a SQL cursor into an list of dicts.

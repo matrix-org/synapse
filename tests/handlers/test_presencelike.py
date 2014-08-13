@@ -22,6 +22,8 @@ from twisted.internet import defer
 from mock import Mock, call, ANY
 import logging
 
+from ..utils import MockClock
+
 from synapse.server import HomeServer
 from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler
@@ -60,6 +62,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
     def setUp(self):
         hs = HomeServer("test",
+                clock=MockClock(),
                 db_pool=None,
                 datastore=Mock(spec=[
                     "set_presence_state",
@@ -156,10 +159,14 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 observer_user=self.u_apple, accepted=True)
 
         self.assertEquals([
-                {"observed_user": self.u_banana, "state": ONLINE,
-                    "displayname": "Frank", "avatar_url": "http://foo"},
-                {"observed_user": self.u_clementine, "state": OFFLINE}],
-            presence)
+            {"observed_user": self.u_banana,
+                "state": ONLINE,
+                "mtime_age": 0,
+                "displayname": "Frank",
+                "avatar_url": "http://foo"},
+            {"observed_user": self.u_clementine,
+                "state": OFFLINE}],
+        presence)
 
         self.mock_update_client.assert_has_calls([
             call(observer_user=self.u_apple,
@@ -171,9 +178,12 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         ], any_order=True)
 
         statuscache = self.mock_update_client.call_args[1]["statuscache"]
-        self.assertEquals({"state": ONLINE,
-                           "displayname": "Frank",
-                           "avatar_url": "http://foo"}, statuscache.state)
+        self.assertEquals({
+            "state": ONLINE,
+            "mtime": 1000000, # MockClock
+            "displayname": "Frank",
+            "avatar_url": "http://foo",
+        }, statuscache.state)
 
         self.mock_update_client.reset_mock()
 
@@ -193,9 +203,12 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         ], any_order=True)
 
         statuscache = self.mock_update_client.call_args[1]["statuscache"]
-        self.assertEquals({"state": ONLINE,
-                           "displayname": "I am an Apple",
-                           "avatar_url": "http://foo"}, statuscache.state)
+        self.assertEquals({
+            "state": ONLINE,
+            "mtime": 1000000, # MockClock
+            "displayname": "I am an Apple",
+            "avatar_url": "http://foo",
+        }, statuscache.state)
 
     @defer.inlineCallbacks
     def test_push_remote(self):
@@ -220,6 +233,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                     "push": [
                         {"user_id": "@apple:test",
                          "state": "online",
+                         "mtime_age": 0,
                          "displayname": "Frank",
                          "avatar_url": "http://foo"},
                     ],
