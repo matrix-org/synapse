@@ -89,11 +89,11 @@ def setup_logging(verbosity=0, filename=None, config_path=None):
         )
 
         if not verbosity or verbosity == 0:
-            level = logging.WARNING
-        elif verbosity == 1:
             level = logging.INFO
-        else:
+        elif verbosity == 1:
             level = logging.DEBUG
+
+        # FIXME: we need a logging.WARN for a -q quiet option
 
         logging.basicConfig(level=level, filename=filename, format=log_format)
     else:
