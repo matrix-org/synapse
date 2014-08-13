@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from . import (
-    room, events, register, profile, public, presence, im, directory
+    room, events, register, login, profile, public, presence, im, directory
 )
 
 class RestServletFactory(object):
@@ -35,10 +35,9 @@ class RestServletFactory(object):
         room.register_servlets(hs, http_server)
         events.register_servlets(hs, http_server)
         register.register_servlets(hs, http_server)
+        login.register_servlets(hs, http_server)
         profile.register_servlets(hs, http_server)
         public.register_servlets(hs, http_server)
         presence.register_servlets(hs, http_server)
         im.register_servlets(hs, http_server)
         directory.register_servlets(hs, http_server)
-
-
