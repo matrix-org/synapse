@@ -35,16 +35,10 @@ class ClientDirectoryServer(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_alias):
-        # TODO(erikj): Handle request
-        local_only = "local_only" in request.args
-
         room_alias = self.hs.parse_roomalias(urllib.unquote(room_alias))
 
         dir_handler = self.handlers.directory_handler
-        res = yield dir_handler.get_association(
-            room_alias,
-            local_only=local_only
-        )
+        res = yield dir_handler.get_association(room_alias)
 
         defer.returnValue((200, res))
 
