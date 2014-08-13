@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 
 from twisted.internet import defer
@@ -20,6 +19,8 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 
 import collections
+import json
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class SQLBaseStore(object):
 
     def __init__(self, hs):
         self._db_pool = hs.get_db_pool()
+        self.event_factory = hs.get_event_factory()
 
     def cursor_to_dict(self, cursor):
         """Converts a SQL cursor into an list of dicts.
@@ -62,6 +64,9 @@ class SQLBaseStore(object):
             cursor = txn.execute(query, args)
             return decoder(cursor)
         return self._db_pool.runInteraction(interaction)
+
+    def _execut_query(self, query, *args):
+        return self._execute(self.cursor_to_dict, *args)
 
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
@@ -278,6 +283,16 @@ class SQLBaseStore(object):
             return max_id
 
         return self._db_pool.runInteraction(func)
+
+    def _parse_event_from_row(self, row_dict):
+        d = copy.deepcopy({k: v for k, v in row.items() if v})
+        d.update(json.loads(row["unrecognized_keys"]))
+        del d["unrecognized_keys"]
+
+        return self.event_factory.create_event(
+            etype=d["type"],
+            **d
+        )
 
 
 class Table(object):

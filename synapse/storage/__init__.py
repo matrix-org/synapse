@@ -46,50 +46,83 @@ class DataStore(RoomDataStore, RoomMemberStore, MessageStore, RoomStore,
         self.event_factory = hs.get_event_factory()
         self.hs = hs
 
+    @defer.inlineCallbacks
     def persist_event(self, event):
-        if event.type == MessageEvent.TYPE:
-            return self.store_message(
-                user_id=event.user_id,
-                room_id=event.room_id,
-                msg_id=event.msg_id,
-                content=json.dumps(event.content)
-            )
-        elif event.type == RoomMemberEvent.TYPE:
-            return self.store_room_member(
-                user_id=event.target_user_id,
-                sender=event.user_id,
-                room_id=event.room_id,
-                content=event.content,
-                membership=event.content["membership"]
-            )
+        if event.type == RoomMemberEvent.TYPE:
+            yield self._store_room_member(event)
         elif event.type == FeedbackEvent.TYPE:
-            return self.store_feedback(
-                room_id=event.room_id,
-                msg_id=event.msg_id,
-                msg_sender_id=event.msg_sender_id,
-                fb_sender_id=event.user_id,
-                fb_type=event.feedback_type,
-                content=json.dumps(event.content)
-            )
-        elif event.type == RoomTopicEvent.TYPE:
-            return self.store_room_data(
-                room_id=event.room_id,
-                etype=event.type,
-                state_key=event.state_key,
-                content=json.dumps(event.content)
-            )
+            yield self._store_feedback(event)
         elif event.type == RoomConfigEvent.TYPE:
-            if "visibility" in event.content:
-                visibility = event.content["visibility"]
-                return self.store_room_config(
-                    room_id=event.room_id,
-                    visibility=visibility
-                )
+            yield self._store_room_config(event)
 
+        self._store_event(event)
+
+    @defer.inlineCallbacks
+    def get_event(self, event_id):
+        events_dict = yield self._simple_select_one(
+            "events",
+            {"event_id": event_id},
+            [
+                "event_id",
+                "type",
+                "sender",
+                "room_id",
+                "content",
+                "unrecognized_keys"
+            ],
+        )
+
+        event = self._parse_event_from_row(events_dict)
+        defer.returnValue(event)
+
+    @defer.inlineCallbacks
+    def _store_event(self, event):
+        vals = {
+            "event_id": event.event_id,
+            "event_type", event.type,
+            "sender": event.user_id,
+            "room_id": event.room_id,
+            "content": event.content,
+        }
+
+        unrec = {k: v for k, v in event.get_full_dict() if k not in vals.keys()}
+        val["unrecognized_keys"] = unrec
+
+        yield self._simple_insert("events", vals)
+
+        if hasattr(event, "state_key"):
+            vals = {
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "event_type": event.event_type,
+                "state_key": event.state_key,
+            }
+
+            if hasattr(event, "prev_state"):
+                vals["prev_state"] = event.prev_state
+
+            yield self._simple_insert("state_events", vals)
+
+            # TODO (erikj): We also need to update the current state table?
+
+    @defer.inlineCallbacks
+    def get_current_state(room_id, event_type=None, state_key="")
+        sql = (
+            "SELECT e.* FROM events as e"
+            "INNER JOIN current_state as c ON e.event_id = c.event_id "
+            "INNER JOIN state_events as s ON e.event_id = s.event_id "
+            "WHERE c.room_id = ? "
+        )
+
+        if event_type:
+            sql += " s.type = ? AND s.state_key = ? "
+            args = (room_id, event_type, state_key)
         else:
-            raise NotImplementedError(
-                "Don't know how to persist type=%s" % event.type
-            )
+            args = (room_id, )
+
+        results = yield self._execute_query(sql, *args)
+
+        defer.returnValue(
 
 
 def schema_path(schema):

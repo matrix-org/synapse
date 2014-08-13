@@ -16,8 +16,8 @@
 CREATE TABLE IF NOT EXISTS events(
     ordering INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,
-    sender TEXT,
+    type TEXT NOT NULL,
+--    sender TEXT,
     room_id TEXT,
     content TEXT,
     unrecognized_keys TEXT
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS events(
 CREATE TABLE IF NOT EXISTS state_events(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,
+    type TEXT NOT NULL,
     state_key TEXT NOT NULL,
     prev_state TEXT
 );
@@ -47,9 +47,8 @@ CREATE TABLE IF NOT EXISTS room_memberships(
 CREATE TABLE IF NOT EXISTS feedback(
     event_id TEXT NOT NULL,
     feedback_type TEXT,
-    fb_sender_id TEXT,
-    room_id TEXT,
-    content TEXT
+    target_event_id TEXT,sudo
+    room_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS rooms(
