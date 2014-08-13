@@ -23,7 +23,7 @@
             <tr ng-repeat="msg in messages" ng-class="msg.user_id === state.user_id ? 'mine' : ''">
                 <td class="leftBlock">
                     <div class="sender" ng-hide="messages[$index - 1].user_id === msg.user_id">{{ members[msg.user_id].displayname || msg.user_id }}</div>
-                    <div class="timestamp">{{ msg.content.hsob_ts | date:'HH:mm:ss' }}</div>
+                    <div class="timestamp">{{ msg.content.hsob_ts | date:'MMM d HH:mm:ss' }}</div>
                 </td>
                 <td class="avatar">
                     <img ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
