@@ -50,14 +50,14 @@ class ProfileHandler(BaseHandler):
         self.store.create_profile(user.localpart)
 
     @defer.inlineCallbacks
-    def get_displayname(self, target_user, local_only=False):
+    def get_displayname(self, target_user):
         if target_user.is_mine:
             displayname = yield self.store.get_profile_displayname(
                 target_user.localpart
             )
 
             defer.returnValue(displayname)
-        elif not local_only:
+        else:
             try:
                 result = yield self.federation.make_query(
                     destination=target_user.domain,
@@ -76,8 +76,6 @@ class ProfileHandler(BaseHandler):
                 logger.exception("Failed to get displayname")
             else:
                 defer.returnValue(result["displayname"])
-        else:
-            raise SynapseError(400, "User is not hosted on this Home Server")
 
     @defer.inlineCallbacks
     def set_displayname(self, target_user, auth_user, new_displayname):
@@ -100,14 +98,14 @@ class ProfileHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def get_avatar_url(self, target_user, local_only=False):
+    def get_avatar_url(self, target_user):
         if target_user.is_mine:
             avatar_url = yield self.store.get_profile_avatar_url(
                 target_user.localpart
             )
 
             defer.returnValue(avatar_url)
-        elif not local_only:
+        else:
             try:
                 result = yield self.federation.make_query(
                     destination=target_user.domain,
@@ -125,8 +123,6 @@ class ProfileHandler(BaseHandler):
                 logger.exception("Failed to get avatar_url")
 
             defer.returnValue(result["avatar_url"])
-        else:
-            raise SynapseError(400, "User is not hosted on this Home Server")
 
     @defer.inlineCallbacks
     def set_avatar_url(self, target_user, auth_user, new_avatar_url):

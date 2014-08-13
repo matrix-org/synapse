@@ -30,7 +30,6 @@ class ProfileDisplaynameRestServlet(RestServlet):
 
         displayname = yield self.handlers.profile_handler.get_displayname(
             user,
-            local_only="local_only" in request.args
         )
 
         defer.returnValue((200, {"displayname": displayname}))
@@ -64,7 +63,6 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
         avatar_url = yield self.handlers.profile_handler.get_avatar_url(
             user,
-            local_only="local_only" in request.args
         )
 
         defer.returnValue((200, {"avatar_url": avatar_url}))
