@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """This module contains classes for authenticating the user."""
+
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
