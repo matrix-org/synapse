@@ -4,13 +4,18 @@ Quick Start
 Matrix is an ambitious new ecosystem for open federated Instant Messaging and
 VoIP[1].  The basics you need to know to get up and running are:
 
-    - Chatrooms look like ``#matrix:matrix.org`` or ``#test:localhost:8080``
+    - Chatrooms are distributed and do not exist on any single server.  Rooms 
+      can be found using names like ``#matrix:matrix.org`` or 
+      ``#test:localhost:8080`` or they can be ephemeral.
     
     - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
       you will normally refer to yourself and others using a 3PID: email
       address, phone number, etc rather than manipulating matrix user IDs)
-      
-      <ascii diagram showing trapezium>
+
+The overall architecture is::
+
+      client <----> homeserver <=================> homeserver  <-----> client
+                e.g. matrix.org:8080        e.g. mydomain.net:8080
 
 To get up and running:
       
@@ -26,7 +31,7 @@ To get up and running:
       in your web browser (a recent Chrome, Safari or Firefox for now,
       please...)
              
-    - To quickly run a **public** homeserver that can exchange messages with 
+    - To make the homeserver **public** and let it exchange messages with 
       other homeservers and participate in the overall Matrix federation, open 
       up port 8080 and run ``python synapse/app/homeserver.py --host 
       machine.my.domain.name``.  Then come join ``#matrix:matrix.org`` and
