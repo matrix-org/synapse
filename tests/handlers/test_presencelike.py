@@ -29,7 +29,7 @@ from synapse.handlers.profile import ProfileHandler
 
 
 OFFLINE = PresenceState.OFFLINE
-BUSY = PresenceState.BUSY
+UNAVAILABLE = PresenceState.UNAVAILABLE
 ONLINE = PresenceState.ONLINE
 
 
@@ -125,12 +125,12 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         yield self.handlers.presence_handler.set_state(
                 target_user=self.u_apple, auth_user=self.u_apple,
-                state={"state": BUSY, "status_msg": "Away"})
+                state={"state": UNAVAILABLE, "status_msg": "Away"})
 
         mocked_set.assert_called_with("apple",
-                {"state": 1, "status_msg": "Away"})
+                {"state": UNAVAILABLE, "status_msg": "Away"})
         self.mock_start.assert_called_with(self.u_apple,
-                state={"state": 1, "status_msg": "Away",
+                state={"state": UNAVAILABLE, "status_msg": "Away",
                        "displayname": "Frank",
                        "avatar_url": "http://foo"})
 
@@ -220,7 +220,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 content={
                     "push": [
                         {"user_id": "@apple:test",
-                         "state": 2,
+                         "state": "online",
                          "displayname": "Frank",
                          "avatar_url": "http://foo"},
                     ],
@@ -238,7 +238,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 "remote", "m.presence", {
                     "push": [
                         {"user_id": "@potato:remote",
-                         "state": 2,
+                         "state": "online",
                          "displayname": "Frank",
                          "avatar_url": "http://foo"},
                     ],

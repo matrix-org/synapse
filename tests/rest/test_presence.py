@@ -31,7 +31,7 @@ logging.getLogger().addHandler(logging.NullHandler())
 
 
 OFFLINE = PresenceState.OFFLINE
-BUSY = PresenceState.BUSY
+UNAVAILABLE = PresenceState.UNAVAILABLE
 ONLINE = PresenceState.ONLINE
 
 
@@ -69,7 +69,7 @@ class PresenceStateTestCase(unittest.TestCase):
     def test_get_my_status(self):
         mocked_get = self.mock_handler.get_state
         mocked_get.return_value = defer.succeed(
-                {"state": 2, "status_msg": "Available"})
+                {"state": ONLINE, "status_msg": "Available"})
 
         (code, response) = yield self.mock_server.trigger("GET",
                 "/presence/%s/status" % (myid), None)
@@ -87,12 +87,12 @@ class PresenceStateTestCase(unittest.TestCase):
 
         (code, response) = yield self.mock_server.trigger("PUT",
                 "/presence/%s/status" % (myid),
-                '{"state": 1, "status_msg": "Away"}')
+                '{"state": "unavailable", "status_msg": "Away"}')
 
         self.assertEquals(200, code)
         mocked_set.assert_called_with(target_user=self.u_apple,
                 auth_user=self.u_apple,
-                state={"state": 1, "status_msg": "Away"})
+                state={"state": UNAVAILABLE, "status_msg": "Away"})
 
 
 class PresenceListTestCase(unittest.TestCase):
@@ -234,7 +234,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         # I'll already get my own presence state change
         self.assertEquals({"start": "0", "end": "1", "chunk": [
             {"type": "m.presence",
-             "content": {"user_id": "@apple:test", "state": 2}},
+             "content": {"user_id": "@apple:test", "state": ONLINE}},
         ]}, response)
 
         self.mock_datastore.set_presence_state.return_value = defer.succeed(
@@ -251,5 +251,5 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         self.assertEquals(200, code)
         self.assertEquals({"start": "1", "end": "2", "chunk": [
             {"type": "m.presence",
-             "content": {"user_id": "@banana:test", "state": 2}},
+             "content": {"user_id": "@banana:test", "state": ONLINE}},
         ]}, response)

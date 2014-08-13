@@ -123,17 +123,14 @@ angular.module('RoomController', [])
         var member = $scope.members[chunk.content.user_id];
 
         if ("state" in chunk.content) {
-            var ONLINE = 2;
-            var AWAY = 1;
-            var OFFLINE = 0;
-            if (chunk.content.state === ONLINE) {
+            if (chunk.content.state === "online") {
                 member.presenceState = "online";
             }
-            else if (chunk.content.state === OFFLINE) {
+            else if (chunk.content.state === "offline") {
                 member.presenceState = "offline";
             }
-            else if (chunk.content.state === AWAY) {
-                member.presenceState = "away";
+            else if (chunk.content.state === "unavailable") {
+                member.presenceState = "unavailable";
             }
         }
 
