@@ -51,9 +51,11 @@ https://github.com/matrix-org/synapse/issues or at matrix@matrix.org.
 
 Thanks for trying Matrix!
 
-.. [1] VoIP currently in development
-.. [2] Cryptographic signing of messages isn't turned on yet
-.. [3] End-to-end encryption is currently in development
+[1] VoIP currently in development
+
+[2] Cryptographic signing of messages isn't turned on yet
+
+[3] End-to-end encryption is currently in development
 
 Quick Start
 ===========
