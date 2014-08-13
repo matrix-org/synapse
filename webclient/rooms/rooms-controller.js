@@ -55,9 +55,15 @@ angular.module('RoomsController', ['matrixService'])
         for (var i=0; i<data.length; i++) {
             var alias = matrixService.getRoomIdToAliasMapping(data[i].room_id);
             if (alias) {
+                // use the existing alias from storage
                 data[i].room_alias = alias;
             }
+            else if (data[i].room_alias) {
+                // save the mapping
+                matrixService.createRoomIdToAliasMapping(data[i].room_id, data[i].room_alias);
+            }
             else {
+                // last resort use the room id
                 data[i].room_alias = data[i].room_id;
             }
         }
