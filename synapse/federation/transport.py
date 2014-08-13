@@ -180,6 +180,19 @@ class TransportLayer(object):
 
         defer.returnValue((code, response))
 
+    @defer.inlineCallbacks
+    @log_function
+    def make_query(self, destination, query_type, args):
+        path = PREFIX + "/query/%s" % query_type
+
+        response = yield self.client.get_json(
+            destination=destination,
+            path=path,
+            args=args
+        )
+
+        defer.returnValue(response)
+
     @log_function
     def register_received_handler(self, handler):
         """ Register a handler that will be fired when we receive data.
@@ -249,6 +262,15 @@ class TransportLayer(object):
             "GET",
             re.compile("^" + PREFIX + "/context/([^/]*)/$"),
             lambda request, context: handler.on_context_pdus_request(context)
+        )
+
+        # This is when we receive a server-server Query
+        self.server.register_path(
+            "GET",
+            re.compile("^" + PREFIX + "/query/([^/]*)$"),
+            lambda request, query_type: handler.on_query_request(
+                query_type, {k: v[0] for k, v in request.args.items()}
+            )
         )
 
     @defer.inlineCallbacks
@@ -456,3 +478,6 @@ class TransportRequestHandler(object):
             of what went wrong.
         """
         pass
+
+    def on_query_request(self):
+        """ Called on a GET /query/<query_type> request. """

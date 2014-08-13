@@ -62,6 +62,7 @@ class FederationTestCase(unittest.TestCase):
     def setUp(self):
         self.mock_http_server = MockHttpServer()
         self.mock_http_client = Mock(spec=[
+            "get_json",
             "put_json",
         ])
         self.mock_persistence = Mock(spec=[
@@ -252,4 +253,41 @@ class FederationTestCase(unittest.TestCase):
 
         recv_observer.assert_called_with(
                 "remote", {"testing": "reply here"}
+        )
+
+    @defer.inlineCallbacks
+    def test_send_query(self):
+        self.mock_http_client.get_json.return_value = defer.succeed(
+            {"your": "response"}
+        )
+
+        response = yield self.federation.make_query(
+            destination="remote",
+            query_type="a-question",
+            args={"one": "1", "two": "2"}
+        )
+
+        self.assertEquals({"your": "response"}, response)
+
+        self.mock_http_client.get_json.assert_called_with(
+            destination="remote",
+            path="/matrix/federation/v1/query/a-question",
+            args={"one": "1", "two": "2"}
+        )
+
+    @defer.inlineCallbacks
+    def test_recv_query(self):
+        recv_handler = Mock()
+        recv_handler.return_value = defer.succeed({"another": "response"})
+
+        self.federation.register_query_handler("a-question", recv_handler)
+
+        code, response = yield self.mock_http_server.trigger("GET",
+            "/matrix/federation/v1/query/a-question?three=3&four=4", None)
+
+        self.assertEquals(200, code)
+        self.assertEquals({"another": "response"}, response)
+
+        recv_handler.assert_called_with(
+            {"three": "3", "four": "4"}
         )
