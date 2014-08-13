@@ -16,7 +16,6 @@
 
 from twisted.internet import defer
 
-from synapse.types import RoomAlias, RoomID
 from base import RestServlet, client_path_pattern
 
 import json
@@ -39,12 +38,11 @@ class ClientDirectoryServer(RestServlet):
         # TODO(erikj): Handle request
         local_only = "local_only" in request.args
 
-        room_alias = urllib.unquote(room_alias)
-        room_alias_obj = RoomAlias.from_string(room_alias, self.hs)
+        room_alias = self.hs.parse_roomalias(urllib.unquote(room_alias))
 
         dir_handler = self.handlers.directory_handler
         res = yield dir_handler.get_association(
-            room_alias_obj,
+            room_alias,
             local_only=local_only
         )
 
@@ -57,10 +55,9 @@ class ClientDirectoryServer(RestServlet):
 
         logger.debug("Got content: %s", content)
 
-        room_alias = urllib.unquote(room_alias)
-        room_alias_obj = RoomAlias.from_string(room_alias, self.hs)
+        room_alias = self.hs.parse_roomalias(urllib.unquote(room_alias))
 
-        logger.debug("Got room name: %s", room_alias_obj.to_string())
+        logger.debug("Got room name: %s", room_alias.to_string())
 
         room_id = content["room_id"]
         servers = content["servers"]
@@ -75,7 +72,7 @@ class ClientDirectoryServer(RestServlet):
 
         try:
             yield dir_handler.create_association(
-                room_alias_obj, room_id, servers
+                room_alias, room_id, servers
             )
         except:
             logger.exception("Failed to create association")
