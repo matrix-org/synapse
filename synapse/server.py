@@ -171,7 +171,13 @@ class HomeServer(BaseHomeServer):
     def build_distributor(self):
         return Distributor()
 
-    def register_servlets(self):
-        """Simply building the ServletFactory is sufficient to have it
-        register."""
-        self.get_rest_servlet_factory()
+    def register_servlets(self, host_web_client):
+        """ Register all servlets associated with this HomeServer.
+
+        Args:
+            host_web_client (bool): True to host the web client as well.
+        """
+        # Simply building the ServletFactory is sufficient to have it register
+        factory = self.get_rest_servlet_factory()
+        if host_web_client:
+            factory.register_web_client(self)

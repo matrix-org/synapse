@@ -126,6 +126,8 @@ def setup():
     parser.add_argument('--pid-file', dest="pid", help="When running as a "
                         "daemon, the file to store the pid in",
                         default="hs.pid")
+    parser.add_argument("-w", "--webclient", dest="webclient",
+                        action="store_true", help="Host the web client.")
     args = parser.parse_args()
 
     verbosity = int(args.verbose) if args.verbose else None
@@ -147,7 +149,7 @@ def setup():
     # the replication layer
     hs.get_federation()
 
-    hs.register_servlets()
+    hs.register_servlets(host_web_client=args.webclient)
 
     hs.get_http_server().start_listening(args.port)
 

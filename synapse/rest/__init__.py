@@ -15,8 +15,10 @@
 
 
 from . import (
-    room, events, register, login, profile, public, presence, im, directory
+    room, events, register, login, profile, public, presence, im, directory,
+    webclient
 )
+
 
 class RestServletFactory(object):
 
@@ -42,3 +44,7 @@ class RestServletFactory(object):
         presence.register_servlets(hs, http_server)
         im.register_servlets(hs, http_server)
         directory.register_servlets(hs, http_server)
+
+    def register_web_client(self, hs):
+        http_server = hs.get_http_server()
+        webclient.register_servlets(hs, http_server)

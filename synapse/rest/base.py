@@ -30,48 +30,6 @@ def client_path_pattern(path_regex):
     return re.compile("^/matrix/client/api/v1" + path_regex)
 
 
-class RestServletFactory(object):
-
-    """ A factory for creating REST servlets.
-
-    These REST servlets represent the entire client-server REST API. Generally
-    speaking, they serve as wrappers around events and the handlers that
-    process them.
-
-    See synapse.api.events for information on synapse events.
-    """
-
-    def __init__(self, hs):
-        http_server = hs.get_http_server()
-
-        # You get import errors if you try to import before the classes in this
-        # file are defined, hence importing here instead.
-
-        import room
-        room.register_servlets(hs, http_server)
-
-        import events
-        events.register_servlets(hs, http_server)
-
-        import register
-        register.register_servlets(hs, http_server)
-
-        import profile
-        profile.register_servlets(hs, http_server)
-
-        import public
-        public.register_servlets(hs, http_server)
-
-        import presence
-        presence.register_servlets(hs, http_server)
-
-        import im
-        im.register_servlets(hs, http_server)
-
-        import login
-        login.register_servlets(hs, http_server)
-
-
 class RestServlet(object):
 
     """ A Synapse REST Servlet.
