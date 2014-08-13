@@ -55,10 +55,9 @@ class HttpClient(object):
                 the request body. This will be encoded as JSON.
 
         Returns:
-            Deferred: Succeeds when we get *any* HTTP response.
-
-            The result of the deferred is a tuple of `(code, response)`,
-            where `response` is a dict representing the decoded JSON body.
+            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            will be the decoded JSON body. On a 4xx or 5xx error response a
+            CodeMessageException is raised.
         """
         pass
 
