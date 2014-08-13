@@ -63,6 +63,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 db_pool=None,
                 datastore=Mock(spec=[
                     "set_presence_state",
+                    "is_presence_visible",
 
                     "set_profile_displayname",
                 ]),
@@ -83,6 +84,10 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
             return defer.succeed("Frank")
         self.datastore.get_profile_displayname = get_profile_displayname
 
+        def is_presence_visible(*args, **kwargs):
+            return defer.succeed(False)
+        self.datastore.is_presence_visible = is_presence_visible
+
         def get_profile_avatar_url(user_localpart):
             return defer.succeed("http://foo")
         self.datastore.get_profile_avatar_url = get_profile_avatar_url
@@ -96,14 +101,9 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         self.handlers = hs.get_handlers()
 
-        self.mock_start = Mock()
-        self.mock_stop = Mock()
-
         self.mock_update_client = Mock()
         self.mock_update_client.return_value = defer.succeed(None)
 
-        self.handlers.presence_handler.start_polling_presence = self.mock_start
-        self.handlers.presence_handler.stop_polling_presence = self.mock_stop
         self.handlers.presence_handler.push_update_to_clients = (
                 self.mock_update_client)
 
@@ -132,10 +132,6 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         mocked_set.assert_called_with("apple",
                 {"state": UNAVAILABLE, "status_msg": "Away"})
-        self.mock_start.assert_called_with(self.u_apple,
-                state={"state": UNAVAILABLE, "status_msg": "Away",
-                       "displayname": "Frank",
-                       "avatar_url": "http://foo"})
 
     @defer.inlineCallbacks
     def test_push_local(self):
