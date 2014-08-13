@@ -166,9 +166,13 @@ class Notifier(object):
         """
         logger.debug("%s is listening for events.", user_id)
 
-        if len(self.stored_event_listeners[user_id][stream_id]["chunk"]) > 0:
-            logger.debug("%s returning existing chunk.", user_id)
-            return self.stored_event_listeners[user_id][stream_id]
+        try:
+            streams = self.stored_event_listeners[user_id][stream_id]["chunk"]
+            if streams:
+                logger.debug("%s returning existing chunk.", user_id)
+                return streams
+        except KeyError:
+            return None
 
         reactor.callLater(
             (timeout / 1000.0), self._timeout, user_id, stream_id
