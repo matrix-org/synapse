@@ -148,7 +148,7 @@ def setup():
     # the replication layer
     hs.get_federation()
 
-    hs.register_servlets(host_web_client=args.webclient)
+    hs.register_servlets()
 
     hs.get_http_server().start_listening(args.port)
 
