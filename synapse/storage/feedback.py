@@ -28,6 +28,7 @@ class FeedbackStore(SQLBaseStore):
             "feedback_type": event.feedback_type,
             "room_id": event.room_id,
             "target_event_id": event.target_event,
+            "sender": event.user_id,
         })
 
     @defer.inlineCallback

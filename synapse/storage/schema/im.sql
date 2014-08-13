@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS room_memberships(
 CREATE TABLE IF NOT EXISTS feedback(
     event_id TEXT NOT NULL,
     feedback_type TEXT,
-    target_event_id TEXT,sudo
+    target_event_id TEXT,
+    sender TEXT,
     room_id TEXT
 );
 
