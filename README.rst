@@ -1,16 +1,52 @@
-About
-=====
+Quick Start
+===========
 
 Matrix is an ambitious new ecosystem for open federated Instant Messaging and
-VoIP[1].
+VoIP[1].  The basics you need to know to get up and running are:
 
-Matrix specifies a set of pragmatic RESTful HTTP JSON APIs as an open standard,
-providing:
+    - Chatrooms are distributed and do not exist on any single server.  Rooms 
+      can be found using names like ``#matrix:matrix.org`` or 
+      ``#test:localhost:8080`` or they can be ephemeral.
+    
+    - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
+      you will normally refer to yourself and others using a 3PID: email
+      address, phone number, etc rather than manipulating matrix user IDs)
+
+The overall architecture is::
+
+      client <----> homeserver <=================> homeserver  <-----> client
+                e.g. matrix.org:8080        e.g. mydomain.net:8080
+
+To get up and running:
+      
+    - To simply play with an **existing** homeserver you can
+      just go straight to http://matrix.org/alpha.
+    
+    - To run your own **private** homeserver on localhost:8080, install synapse 
+      with ``python setup.py develop --user`` and then run one with
+      ``python synapse/app/homeserver.py``
+      
+    - To run your own webclient:
+      ``cd webclient; python -m SimpleHTTPServer`` and hit http://localhost:8000
+      in your web browser (a recent Chrome, Safari or Firefox for now,
+      please...)
+             
+    - To make the homeserver **public** and let it exchange messages with 
+      other homeservers and participate in the overall Matrix federation, open 
+      up port 8080 and run ``python synapse/app/homeserver.py --host 
+      machine.my.domain.name``.  Then come join ``#matrix:matrix.org`` and
+      say hi! :)
+    
+About Matrix
+============
+
+Matrix specifies a set of pragmatic RESTful HTTP JSON APIs for VoIP and IM as an
+open standard, providing:
 
     - Creating and managing fully distributed chat rooms with no
       single points of control or failure
     - Eventually-consistent cryptographically secure[2] synchronisation of room 
-	  state across a global open network of federated servers and services
+      state across a global open network of federated servers and services
     - Sending and receiving extensible messages in a room with (optional)
       end-to-end encryption[3]
     - Inviting, joining, leaving, kicking, banning room members
@@ -57,74 +93,6 @@ Thanks for trying Matrix!
 
 [3] End-to-end encryption is currently in development
 
-Quick Start
-===========
-
-The basics you need to know about Matrix are:
-
-    - Chatrooms look like ``#matrix:matrix.org`` or ``#test:localhost:8080``
-    
-    - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
-      you will normally refer to yourself and others using a 3PID: email
-      address, phone number, etc rather than manipulating matrix user IDs)
-      
-    - To simply play with an **existing** homeserver (e.g. matrix.org), you can
-      just go straight to http://matrix.org/alpha, specify a homeserver 
-      (defaults to matrix.org) and sign up and use it. (Sign-up security is
-      currently work-in-progress)
-    
-    - To run your own **private** homeserver on localhost:8080, install synapse 
-      with ``python setup.py develop --user`` and then run one with
-      ``python synapse/app/homeserver.py``
-      
-    - To run your own webclient:
-      ``cd webclient; python -m SimpleHTTPServer`` and hit http://localhost:8000
-      in your web browser (a recent Chrome, Safari or Firefox for now,
-      please...)
-       
-    - For now, register some accounts like ``@testing:localhost:8080`` from 
-      different browsers, join a room like ``#test:localhost:8080`` and have a 
-      play.
-      
-    - To quickly run a **public** homeserver that can exchange messages with 
-      other homeservers and participate in the overall Matrix federation, open 
-      up port 8080 and run ``python synapse/app/homeserver.py --host 
-      machine.my.domain.name``.  Then come join ``#matrix:matrix.org`` and
-      say hi! :)
-    
-
-Directory Structure
-===================
-
-::
-
-    .
-    ├── cmdclient           Basic CLI python Matrix client
-    ├── demo                Scripts for running standalone Matrix demos
-    ├── docs                All doc, including the draft Matrix API spec
-    │   ├── client-server       The client-server Matrix API spec
-    │   ├── model               Domain-specific elements of the Matrix API spec
-    │   ├── server-server       The server-server model of the Matrix API spec
-    │   └── sphinx              The internal API doc of the Synapse homeserver
-    ├── experiments         Early experiments of using Synapse's internal APIs
-    ├── graph               Visualisation of Matrix's distributed message store 
-    ├── synapse             The reference Matrix homeserver implementation
-    │   ├── api                 Common building blocks for the APIs
-    │   │   ├── events              Definition of state representation Events 
-    │   │   └── streams             Definition of streamable Event objects
-    │   ├── app                 The __main__ entry point for the homeserver
-    │   ├── crypto              The PKI client/server used for secure federation
-    │   │   └── resource            PKI helper objects (e.g. keys)
-    │   ├── federation          Server-server state replication logic
-    │   ├── handlers            The main business logic of the homeserver
-    │   ├── http                Wrappers around Twisted's HTTP server & client
-    │   ├── rest                Servlet-style RESTful API
-    │   ├── storage             Persistence subsystem (currently only sqlite3)
-    │   │   └── schema              sqlite persistence schema
-    │   └── util                Synapse-specific utilities
-    ├── tests               Unit tests for the Synapse homeserver
-    └── webclient           Basic AngularJS Matrix web client
-
 
 Homeserver Installation
 =======================
@@ -151,6 +119,12 @@ may need to also run:
 
     $ sudo apt-get install python-pip
     $ sudo pip install --upgrade setuptools
+    
+If you get errors about ``sodium.h`` being missing, you may also need to
+manually install a newer PyNaCl via pip as setuptools installs an old one. Or
+you can check PyNaCl out of git directly (https://github.com/pyca/pynacl) and
+installing it. Installing PyNaCl using pip may also work (remember to remove any
+other versions installed by setuputils in, for example, ~/.local/lib).
 
 This will run a process of downloading and installing into your
 user's .local/lib directory all of the required dependencies that are
@@ -168,8 +142,8 @@ This should end with a 'PASSED' result::
     PASSED (successes=143)
 
 
-Running The Synapse Homeserver
-==============================
+Setting up Federation
+=====================
 
 In order for other homeservers to send messages to your server, it will need to
 be publicly visible on the internet, and they will need to know its host name.
@@ -215,7 +189,7 @@ Running a Demo Federation of Homeservers
 
 If you want to get up and running quickly with a trio of homeservers in a
 private federation (``localhost:8080``, ``localhost:8081`` and
-``localhost:8082``) which you can then point a demo webclient at, simply run::
+``localhost:8082``) which you can then access through the webclient running at http://localhost:8080.  Simply run::
 
     $ demo/start.sh
 
@@ -279,8 +253,8 @@ as the primary means of identity and E2E encryption is not complete. As such,
 we're not yet running an identity server in public.
 
 
-How does it all work?!
-======================
+Where's the spec?!
+==================
 
 For now, please go spelunking in the ``docs/`` directory to find out.
 
@@ -297,3 +271,4 @@ sphinxcontrib-napoleon::
 Building internal API documentation::
 
     $ python setup.py build_sphinx
+

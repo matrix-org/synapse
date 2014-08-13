@@ -96,7 +96,7 @@ class FederationTestCase(unittest.TestCase):
 
         # Empty context initially
         (code, response) = yield self.mock_http_server.trigger("GET",
-                "/state/my-context/", None)
+                "/matrix/federation/v1/state/my-context/", None)
         self.assertEquals(200, code)
         self.assertFalse(response["pdus"])
 
@@ -121,7 +121,7 @@ class FederationTestCase(unittest.TestCase):
         )
 
         (code, response) = yield self.mock_http_server.trigger("GET",
-                "/state/my-context/", None)
+                "/matrix/federation/v1/state/my-context/", None)
         self.assertEquals(200, code)
         self.assertEquals(1, len(response["pdus"]))
 
@@ -132,7 +132,7 @@ class FederationTestCase(unittest.TestCase):
         )
 
         (code, response) = yield self.mock_http_server.trigger("GET",
-                "/pdu/red/abc123def456/", None)
+                "/matrix/federation/v1/pdu/red/abc123def456/", None)
         self.assertEquals(404, code)
 
         # Now insert such a PDU
@@ -151,7 +151,7 @@ class FederationTestCase(unittest.TestCase):
         )
 
         (code, response) = yield self.mock_http_server.trigger("GET",
-                "/pdu/red/abc123def456/", None)
+                "/matrix/federation/v1/pdu/red/abc123def456/", None)
         self.assertEquals(200, code)
         self.assertEquals(1, len(response["pdus"]))
         self.assertEquals("m.text", response["pdus"][0]["pdu_type"])
@@ -177,7 +177,7 @@ class FederationTestCase(unittest.TestCase):
 
         self.mock_http_client.put_json.assert_called_with(
                 "remote",
-                path="/send/1000000/",
+                path="/matrix/federation/v1/send/1000000/",
                 data={
                     "ts": 1000000,
                     "origin": "test",
@@ -212,7 +212,7 @@ class FederationTestCase(unittest.TestCase):
         # MockClock ensures we can guess these timestamps
         self.mock_http_client.put_json.assert_called_with(
                 "remote",
-                path="/send/1000000/",
+                path="/matrix/federation/v1/send/1000000/",
                 data={
                     "origin": "test",
                     "ts": 1000000,
@@ -234,7 +234,8 @@ class FederationTestCase(unittest.TestCase):
 
         self.federation.register_edu_handler("m.test", recv_observer)
 
-        yield self.mock_http_server.trigger("PUT", "/send/1001000/",
+        yield self.mock_http_server.trigger("PUT",
+                "/matrix/federation/v1/send/1001000/",
                 """{
                     "origin": "remote",
                     "ts": 1001000,

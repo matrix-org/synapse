@@ -88,9 +88,8 @@ def setup_logging(verbosity=0, filename=None, config_path=None):
             '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
         )
 
-        if not verbosity or verbosity == 0:
-            level = logging.INFO
-        elif verbosity == 1:
+        level = logging.INFO
+        if verbosity:
             level = logging.DEBUG
 
         # FIXME: we need a logging.WARN for a -q quiet option
