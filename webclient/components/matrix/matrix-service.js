@@ -197,6 +197,17 @@ angular.module('matrixService', [])
             return this.sendMessage(room_id, msg_id, content);
         },
 
+        // Send an image message
+        sendImageMessage: function(room_id, image_url, image_alt, msg_id) {
+            var content = {
+                 msgtype: "m.image",
+                 url: image_url,
+                 body: image_alt
+            };
+
+            return this.sendMessage(room_id, msg_id, content);
+        },
+
         // Send an emote message
         sendEmoteMessage: function(room_id, body, msg_id) {
             var content = {

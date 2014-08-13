@@ -27,7 +27,8 @@ angular.module('RoomController', [])
     $scope.messages = [];
     $scope.members = {};
     $scope.stopPoll = false;
-    
+
+    $scope.imageURLToSend = "";
     $scope.userIDToInvite = "";
 
     var shortPoll = function() {
@@ -221,6 +222,16 @@ angular.module('RoomController', [])
             },
             function(reason) {
                 $scope.feedback = "Failed to leave room: " + reason;
+            });
+    };
+
+    $scope.sendImage = function(url) {
+        matrixService.sendImageMessage($scope.room_id, url).then(
+            function() {
+                console.log("Image sent");
+            },
+            function(reason) {
+                $scope.feedback = "Failed to send image: " + reason;
             });
     };
 

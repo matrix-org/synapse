@@ -63,6 +63,18 @@
                         {{ feedback }}
                     </td>
                 </tr>
+                <tr>
+                    <td>
+                    </td>
+                    <td>
+                        <input class="mainInput" ng-model="imageURLToSend" ng-enter="sendImage()" placeholder="Image URL"/>
+                    </td>
+                    <td  width="100px">
+                        <button ng-click="sendImage(imageURLToSend)">Send Image</button>
+                    </td>
+                    <td>
+                    </td>
+                </tr>
             </table>
 
             <span>
