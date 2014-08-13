@@ -168,7 +168,7 @@ class PduStore(SQLBaseStore):
 
         return self._get_pdu_tuples(txn, txn.fetchall())
 
-    def get_pagination(self, context, pdu_list, limit):
+    def get_backfill(self, context, pdu_list, limit):
         """Get a list of Pdus for a given topic that occured before (and
         including) the pdus in pdu_list. Return a list of max size `limit`.
 
@@ -182,12 +182,12 @@ class PduStore(SQLBaseStore):
             list: A list of PduTuples
         """
         return self._db_pool.runInteraction(
-            self._get_paginate, context, pdu_list, limit
+            self._get_backfill, context, pdu_list, limit
         )
 
-    def _get_paginate(self, txn, context, pdu_list, limit):
+    def _get_backfill(self, txn, context, pdu_list, limit):
         logger.debug(
-            "paginate: %s, %s, %s",
+            "backfill: %s, %s, %s",
             context, repr(pdu_list), limit
         )
 
@@ -213,7 +213,7 @@ class PduStore(SQLBaseStore):
             new_front = []
             for pdu_id, origin in front:
                 logger.debug(
-                    "_paginate_interaction: i=%s, o=%s",
+                    "_backfill_interaction: i=%s, o=%s",
                     pdu_id, origin
                 )
 
@@ -224,7 +224,7 @@ class PduStore(SQLBaseStore):
 
                 for row in txn.fetchall():
                     logger.debug(
-                        "_paginate_interaction: got i=%s, o=%s",
+                        "_backfill_interaction: got i=%s, o=%s",
                         *row
                     )
                     new_front.append(row)
@@ -262,7 +262,7 @@ class PduStore(SQLBaseStore):
 
     def update_min_depth_for_context(self, context, depth):
         """Update the minimum `depth` of the given context, which is the line
-        where we stop paginating backwards on.
+        on which we stop backfilling backwards.
 
         Args:
             context (str)
@@ -320,9 +320,9 @@ class PduStore(SQLBaseStore):
         return [(row[0], row[1], row[2]) for row in results]
 
     def get_oldest_pdus_in_context(self, context):
-        """Get a list of Pdus that we paginated beyond yet (and haven't seen).
-        This list is used when we want to paginate backwards and is the list we
-        send to the remote server.
+        """Get a list of Pdus that we haven't backfilled beyond yet (and haven't    
+        seen). This list is used when we want to backfill backwards and is the 
+        list we send to the remote server.
 
         Args:
             txn

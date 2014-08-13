@@ -118,7 +118,7 @@ class ReplicationLayer(object):
         *Note:* The home server should always call `send_pdu` even if it knows
         that it does not need to be replicated to other home servers. This is
         in case e.g. someone else joins via a remote home server and then
-        paginates.
+        backfills.
 
         TODO: Figure out when we should actually resolve the deferred.
 
@@ -179,13 +179,13 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def paginate(self, dest, context, limit):
+    def backfill(self, dest, context, limit):
         """Requests some more historic PDUs for the given context from the
         given destination server.
 
         Args:
             dest (str): The remote home server to ask.
-            context (str): The context to paginate back on.
+            context (str): The context to backfill.
             limit (int): The maximum number of PDUs to return.
 
         Returns:
@@ -193,16 +193,16 @@ class ReplicationLayer(object):
         """
         extremities = yield self.store.get_oldest_pdus_in_context(context)
 
-        logger.debug("paginate extrem=%s", extremities)
+        logger.debug("backfill extrem=%s", extremities)
 
         # If there are no extremeties then we've (probably) reached the start.
         if not extremities:
             return
 
-        transaction_data = yield self.transport_layer.paginate(
+        transaction_data = yield self.transport_layer.backfill(
             dest, context, extremities, limit)
 
-        logger.debug("paginate transaction_data=%s", repr(transaction_data))
+        logger.debug("backfill transaction_data=%s", repr(transaction_data))
 
         transaction = Transaction(**transaction_data)
 
@@ -281,9 +281,9 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def on_paginate_request(self, context, versions, limit):
+    def on_backfill_request(self, context, versions, limit):
 
-        pdus = yield self.pdu_actions.paginate(context, versions, limit)
+        pdus = yield self.pdu_actions.backfill(context, versions, limit)
 
         defer.returnValue((200, self._transaction_from_pdus(pdus).get_dict()))
 
@@ -427,7 +427,7 @@ class ReplicationLayer(object):
         # Get missing pdus if necessary.
         is_new = yield self.pdu_actions.is_new(pdu)
         if is_new and not pdu.outlier:
-            # We only paginate backwards to the min depth.
+            # We only backfill backwards to the min depth.
             min_depth = yield self.store.get_min_depth_for_context(pdu.context)
 
             if min_depth and pdu.depth > min_depth:

@@ -112,7 +112,7 @@ class TransportLayer(object):
         return self._do_request_for_transaction(destination, subpath)
 
     @log_function
-    def paginate(self, dest, context, pdu_tuples, limit):
+    def backfill(self, dest, context, pdu_tuples, limit):
         """ Requests `limit` previous PDUs in a given context before list of
         PDUs.
 
@@ -126,14 +126,14 @@ class TransportLayer(object):
             Deferred: Results in a dict received from the remote homeserver.
         """
         logger.debug(
-            "paginate dest=%s, context=%s, pdu_tuples=%s, limit=%s",
+            "backfill dest=%s, context=%s, pdu_tuples=%s, limit=%s",
             dest, context, repr(pdu_tuples), str(limit)
         )
 
         if not pdu_tuples:
             return
 
-        subpath = "/paginate/%s/" % context
+        subpath = "/backfill/%s/" % context
 
         args = {"v": ["%s,%s" % (i, o) for i, o in pdu_tuples]}
         args["limit"] = limit
@@ -251,8 +251,8 @@ class TransportLayer(object):
 
         self.server.register_path(
             "GET",
-            re.compile("^" + PREFIX + "/paginate/([^/]*)/$"),
-            lambda request, context: self._on_paginate_request(
+            re.compile("^" + PREFIX + "/backfill/([^/]*)/$"),
+            lambda request, context: self._on_backfill_request(
                 context, request.args["v"],
                 request.args["limit"]
             )
@@ -352,7 +352,7 @@ class TransportLayer(object):
         defer.returnValue(data)
 
     @log_function
-    def _on_paginate_request(self, context, v_list, limits):
+    def _on_backfill_request(self, context, v_list, limits):
         if not limits:
             return defer.succeed(
                 (400, {"error": "Did not include limit param"})
@@ -362,7 +362,7 @@ class TransportLayer(object):
 
         versions = [v.split(",", 1) for v in v_list]
 
-        return self.request_handler.on_paginate_request(
+        return self.request_handler.on_backfill_request(
             context, versions, limit)
 
 
@@ -371,14 +371,14 @@ class TransportReceivedHandler(object):
     """
     def on_incoming_transaction(self, transaction):
         """ Called on PUT /send/<transaction_id>, or on response to a request
-        that we sent (e.g. a pagination request)
+        that we sent (e.g. a backfill request)
 
         Args:
             transaction (synapse.transaction.Transaction): The transaction that
                 was sent to us.
 
         Returns:
-            twisted.internet.defer.Deferred: A deferred that get's fired when
+            twisted.internet.defer.Deferred: A deferred that gets fired when
             the transaction has finished being processed.
 
             The result should be a tuple in the form of
@@ -438,14 +438,14 @@ class TransportRequestHandler(object):
     def on_context_state_request(self, context):
         """ Called on GET /state/<context>/
 
-        Get's hit when someone wants all the *current* state for a given
+        Gets hit when someone wants all the *current* state for a given
         contexts.
 
         Args:
             context (str): The name of the context that we're interested in.
 
         Returns:
-            twisted.internet.defer.Deferred: A deferred that get's fired when
+            twisted.internet.defer.Deferred: A deferred that gets fired when
             the transaction has finished being processed.
 
             The result should be a tuple in the form of
@@ -457,20 +457,20 @@ class TransportRequestHandler(object):
         """
         pass
 
-    def on_paginate_request(self, context, versions, limit):
-        """ Called on GET /paginate/<context>/?v=...&limit=...
+    def on_backfill_request(self, context, versions, limit):
+        """ Called on GET /backfill/<context>/?v=...&limit=...
 
-        Get's hit when we want to paginate backwards on a given context from
+        Gets hit when we want to backfill backwards on a given context from
         the given point.
 
         Args:
-            context (str): The context to paginate on
-            versions (list): A list of 2-tuple's representing where to paginate
+            context (str): The context to backfill
+            versions (list): A list of 2-tuples representing where to backfill
                 from, in the form `(pdu_id, origin)`
             limit (int): How many pdus to return.
 
         Returns:
-            Deferred: Resultsin a tuple in the form of
+            Deferred: Results in a tuple in the form of
             `(response_code, respond_body)`, where `response_body` is a python
             dict that will get serialized to JSON.
 

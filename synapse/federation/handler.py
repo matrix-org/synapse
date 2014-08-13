@@ -75,8 +75,8 @@ class FederationEventHandler(object):
     @log_function
     @defer.inlineCallbacks
     def backfill(self, room_id, limit):
-        # TODO: Work out which destinations to ask for pagination
-        # self.replication_layer.paginate(dest, room_id, limit)
+        # TODO: Work out which destinations to ask for backfill
+        # self.replication_layer.backfill(dest, room_id, limit)
         pass
 
     @log_function
