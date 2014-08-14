@@ -19,6 +19,7 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 
 import collections
+import copy
 import json
 
 
@@ -59,7 +60,7 @@ class SQLBaseStore(object):
             The result of decoder(results)
         """
         logger.debug(
-            "[SQL] %s  Args=%s Func=%s", query, args, decoder.__name__
+            "[SQL] %s  Args=%s Func=%s", query, args, decoder.__name__ if decoder else None
         )
 
         def interaction(txn):
@@ -72,7 +73,7 @@ class SQLBaseStore(object):
         return self._db_pool.runInteraction(interaction)
 
     def _execute_and_decode(self, query, *args):
-        return self._execute(self.cursor_to_dict, *args)
+        return self._execute(self.cursor_to_dict, query, *args)
 
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
@@ -291,8 +292,8 @@ class SQLBaseStore(object):
         return self._db_pool.runInteraction(func)
 
     def _parse_event_from_row(self, row_dict):
-        d = copy.deepcopy({k: v for k, v in row.items() if v})
-        d.update(json.loads(json.loads(row["unrecognized_keys"])))
+        d = copy.deepcopy({k: v for k, v in row_dict.items() if v})
+        d.update(json.loads(json.loads(row_dict["unrecognized_keys"])))
         d["content"] = json.loads(d["content"])
         del d["unrecognized_keys"]
 

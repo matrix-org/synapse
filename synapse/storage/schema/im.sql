@@ -30,9 +30,9 @@ CREATE TABLE IF NOT EXISTS state_events(
     prev_state TEXT
 );
 
-CREATE TABLE IF NOT EXISTS current_state(
+CREATE TABLE IF NOT EXISTS current_state_events(
     event_id TEXT NOT NULL,
-    room_id TEXT NOT NULL,
+    room_id TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS room_memberships(

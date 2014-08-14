@@ -201,7 +201,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_feedback(self, event_id):
-        yield self.auth.check_joined_room(room_id, user_id)
+        # yield self.auth.check_joined_room(room_id, user_id)
 
         # Pull out the feedback from the db
         fb = yield self.store.get_feedback(event_id)
@@ -690,13 +690,7 @@ class RoomMemberHandler(BaseHandler):
     @defer.inlineCallbacks
     def _do_local_membership_update(self, event, membership, broadcast_msg):
         # store membership
-        store_id = yield self.store.store_room_member(
-            user_id=event.target_user_id,
-            sender=event.user_id,
-            room_id=event.room_id,
-            content=event.content,
-            membership=membership
-        )
+        store_id = yield self.store.persist_event(event)
 
         # Send a PDU to all hosts who have joined the room.
         destinations = yield self.store.get_joined_hosts_for_room(

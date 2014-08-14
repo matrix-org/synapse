@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
 
 from synapse.api.events.room import (
     RoomMemberEvent, MessageEvent, RoomTopicEvent, FeedbackEvent,
@@ -52,7 +53,7 @@ class DataStore(RoomMemberStore, RoomStore,
         elif event.type == RoomConfigEvent.TYPE:
             yield self._store_room_config(event)
 
-        self._store_event(event)
+        yield self._store_event(event)
 
     @defer.inlineCallbacks
     def get_event(self, event_id):
@@ -76,14 +77,13 @@ class DataStore(RoomMemberStore, RoomStore,
     def _store_event(self, event):
         vals = {
             "event_id": event.event_id,
-            "event_type": event.type,
-            "sender": event.user_id,
+            "type": event.type,
             "room_id": event.room_id,
             "content": json.dumps(event.content),
         }
 
-        unrec = {k: v for k, v in event.get_full_dict() if k not in vals.keys()}
-        val["unrecognized_keys"] = json.dumps(unrec)
+        unrec = {k: v for k, v in event.get_full_dict().items() if k not in vals.keys()}
+        vals["unrecognized_keys"] = json.dumps(unrec)
 
         yield self._simple_insert("events", vals)
 
@@ -91,7 +91,7 @@ class DataStore(RoomMemberStore, RoomStore,
             vals = {
                 "event_id": event.event_id,
                 "room_id": event.room_id,
-                "event_type": event.event_type,
+                "type": event.type,
                 "state_key": event.state_key,
             }
 
@@ -103,16 +103,16 @@ class DataStore(RoomMemberStore, RoomStore,
             # TODO (erikj): We also need to update the current state table?
 
     @defer.inlineCallbacks
-    def get_current_state(room_id, event_type=None, state_key=""):
+    def get_current_state(self, room_id, event_type=None, state_key=""):
         sql = (
-            "SELECT e.* FROM events as e"
-            "INNER JOIN current_state as c ON e.event_id = c.event_id "
+            "SELECT e.* FROM events as e "
+            "INNER JOIN current_state_events as c ON e.event_id = c.event_id "
             "INNER JOIN state_events as s ON e.event_id = s.event_id "
             "WHERE c.room_id = ? "
         )
 
         if event_type:
-            sql += " s.type = ? AND s.state_key = ? "
+            sql += " AND s.type = ? AND s.state_key = ? "
             args = (room_id, event_type, state_key)
         else:
             args = (room_id, )

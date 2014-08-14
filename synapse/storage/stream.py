@@ -13,12 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
 
 from ._base import SQLBaseStore
-from .message import MessagesTable
-from .feedback import FeedbackTable
-from .roomdata import RoomDataTable
-from .roommember import RoomMemberTable
 
 from synapse.api.constants import Membership
 
@@ -40,13 +37,13 @@ class StreamStore(SQLBaseStore):
 
         current_room_membership_sql = (
             "SELECT m.room_id FROM room_memberships as m "
-            "INNER JOIN current_state as c ON m.event_id = c.event_id "
+            "INNER JOIN current_state_events as c ON m.event_id = c.event_id "
             "WHERE m.user_id = ?"
         )
 
         invites_sql = (
             "SELECT m.event_id FROM room_membershipas as m "
-            "INNER JOIN current_state as c ON m.event_id = c.event_id "
+            "INNER JOIN current_state_events as c ON m.event_id = c.event_id "
             "WHERE m.user_id = ? AND m.membership = ?"
         )
 
@@ -71,4 +68,4 @@ class StreamStore(SQLBaseStore):
             user_id, user_id, Membership.INVITE
         )
 
-        defer.returnValue([self._parse_event_from_row(r) for r in results])
+        defer.returnValue([self._parse_event_from_row(r) for r in rows])

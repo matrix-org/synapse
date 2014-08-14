@@ -54,13 +54,13 @@ class RoomMemberStore(SQLBaseStore):
                 "INSERT OR IGNORE INTO room_hosts (room_id, host) "
                 "VALUES (?, ?)"
             )
-            yield self._execute(None, sql, room_id, domain)
+            yield self._execute(None, sql, event.room_id, domain)
         else:
             sql = (
                 "DELETE FROM room_hosts WHERE room_id = ? AND host = ?"
             )
 
-            yield self._execute(None, sql, room_id, domain)
+            yield self._execute(None, sql, event.room_id, domain)
 
 
     def get_room_member(self, user_id, room_id):
@@ -72,10 +72,10 @@ class RoomMemberStore(SQLBaseStore):
         Returns:
             Deferred: Results in a MembershipEvent or None.
         """
-        return self._get_members_by_dict(
-            room_id=room_id,
-            user_id=user_id
-        )
+        return self._get_members_by_dict({
+            "e.room_id": room_id,
+            "m.user_id": user_id,
+        })
 
     def get_room_members(self, room_id, membership=None):
         """Retrieve the current room member list for a room.
@@ -89,11 +89,11 @@ class RoomMemberStore(SQLBaseStore):
             list of namedtuples representing the members in this room.
         """
 
-        where = {"room_id": room_id}
+        where = {"m.room_id": room_id}
         if membership:
-            where["membership"] = membership
+            where["m.membership"] = membership
 
-        return self._get_members_by_dict(**membership)
+        return self._get_members_by_dict(where)
 
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         """ Get all the rooms for this user where the membership for this user
@@ -126,8 +126,8 @@ class RoomMemberStore(SQLBaseStore):
         )
 
     def _get_members_by_dict(self, where_dict):
-        clause = " AND ".join("%s = ?" % k for k in where.keys())
-        vals = where.values()
+        clause = " AND ".join("%s = ?" % k for k in where_dict.keys())
+        vals = where_dict.values()
         return self._get_members_query(clause, vals)
 
     @defer.inlineCallbacks
@@ -136,11 +136,11 @@ class RoomMemberStore(SQLBaseStore):
             "SELECT e.* FROM events as e "
             "INNER JOIN room_memberships as m "
             "ON e.event_id = m.event_id "
-            "INNER JOIN current_state as c "
+            "INNER JOIN current_state_events as c "
             "ON m.event_id = c.event_id "
             "WHERE %s "
         ) % (where_clause,)
 
-        rows = yield self._execute_and_decode(sql, where_values)
+        rows = yield self._execute_and_decode(sql, *where_values)
         results = [self._parse_event_from_row(r) for r in rows]
         defer.returnValue(results)
