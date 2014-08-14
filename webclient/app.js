@@ -23,8 +23,8 @@ var matrixWebClient = angular.module('matrixWebClient', [
     'matrixService'
 ]);
 
-matrixWebClient.config(['$routeProvider',
-    function($routeProvider) {
+matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
+    function($routeProvider, $provide, $httpProvider) {
         $routeProvider.
             when('/login', {
                 templateUrl: 'login/login.html',
@@ -41,6 +41,22 @@ matrixWebClient.config(['$routeProvider',
             otherwise({
                 redirectTo: '/rooms'
             });
+            
+        $provide.factory('AccessTokenInterceptor', function ($q) {
+            return {
+                responseError: function(rejection) {
+                    console.log("Rejection: " + JSON.stringify(rejection));
+                    if (rejection.status === 403 && "data" in rejection && 
+                            "errcode" in rejection.data && 
+                            rejection.data.errcode === "M_UNKNOWN_TOKEN") {
+                        console.log("TODO: Got a 403 with an unknown token. Logging out.")
+                        // TODO logout
+                    }
+                    return $q.reject(rejection);
+                }
+            };
+        });
+        $httpProvider.interceptors.push('AccessTokenInterceptor');
     }]);
 
 matrixWebClient.run(['$location', 'matrixService' , function($location, matrixService) {
