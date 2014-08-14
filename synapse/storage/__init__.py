@@ -81,11 +81,11 @@ class DataStore(RoomDataStore, RoomMemberStore, MessageStore, RoomStore,
             "event_type", event.type,
             "sender": event.user_id,
             "room_id": event.room_id,
-            "content": event.content,
+            "content": json.dumps(event.content),
         }
 
         unrec = {k: v for k, v in event.get_full_dict() if k not in vals.keys()}
-        val["unrecognized_keys"] = unrec
+        val["unrecognized_keys"] = json.dumps(unrec)
 
         yield self._simple_insert("events", vals)
 

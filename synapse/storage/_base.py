@@ -288,7 +288,8 @@ class SQLBaseStore(object):
 
     def _parse_event_from_row(self, row_dict):
         d = copy.deepcopy({k: v for k, v in row.items() if v})
-        d.update(json.loads(row["unrecognized_keys"]))
+        d.update(json.loads(json.loads(row["unrecognized_keys"])))
+        d["content"] = json.loads(d["content"})
         del d["unrecognized_keys"]
 
         return self.event_factory.create_event(
