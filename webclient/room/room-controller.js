@@ -25,7 +25,8 @@ angular.module('RoomController', [])
         user_id: matrixService.config().user_id,
         events_from: "END", // when to start the event stream from.
         earliest_token: "END", // stores how far back we've paginated.
-        can_paginate: true
+        can_paginate: true, // this is toggled off when we run out of items
+        stream_failure: undefined // the response when the stream fails
     };
     $scope.messages = [];
     $scope.members = {};
@@ -76,7 +77,7 @@ angular.module('RoomController', [])
                 }
             },
             function(error) {
-                console.log("paginateBackMessages Ruh roh: " + JSON.stringify(error));
+                console.log("Failed to paginateBackMessages: " + JSON.stringify(error));
             }
         )
     };
@@ -89,6 +90,7 @@ angular.module('RoomController', [])
                 "timeout": 5000
             }})
             .then(function(response) {
+                $scope.state.stream_failure = undefined;
                 console.log("Got response from "+$scope.state.events_from+" to "+response.data.end);
                 $scope.state.events_from = response.data.end;
                 $scope.feedback = "";
@@ -102,7 +104,7 @@ angular.module('RoomController', [])
                     $timeout(shortPoll, 0);
                 }
             }, function(response) {
-                $scope.feedback = "Can't stream: " + response.data;
+                $scope.state.stream_failure = response;
 
                 if (response.status == 403) {
                     $scope.stopPoll = true;
@@ -215,7 +217,7 @@ angular.module('RoomController', [])
         // Join the room
         matrixService.join($scope.room_id).then(
             function() {
-                console.log("Joined room");
+                console.log("Joined room "+$scope.room_id);
                 // Now start reading from the stream
                 $timeout(shortPoll, 0);
 
