@@ -17,3 +17,4 @@
 
 CLIENT_PREFIX = "/matrix/client/api/v1"
 FEDERATION_PREFIX = "/matrix/federation/v1"
+WEB_CLIENT_PREFIX = "/matrix/client"

@@ -26,7 +26,7 @@ from twisted.web.static import File
 from twisted.web.server import Site
 from synapse.http.server import JsonResource, RootRedirect
 from synapse.http.client import TwistedHttpClient
-from synapse.api.urls import CLIENT_PREFIX, FEDERATION_PREFIX
+from synapse.api.urls import CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX
 
 from daemonize import Daemonize
 
@@ -104,11 +104,11 @@ class SynapseHomeServer(HomeServer):
         ]
         if web_client:
             logger.info("Adding the web client.")
-            desired_tree.append(("/matrix/client",  # TODO constant please
+            desired_tree.append((WEB_CLIENT_PREFIX,
                                 self.get_resource_for_web_client()))
 
         if web_client and redirect_root_to_web_client:
-            self.root_resource = RootRedirect("/matrix/client")
+            self.root_resource = RootRedirect(WEB_CLIENT_PREFIX)
         else:
             self.root_resource = Resource()
 
