@@ -68,7 +68,7 @@ angular.module('LoginController', ['matrixService'])
         // try to login
         matrixService.login($scope.account.user_id, $scope.account.password).then(
             function(response) {
-                if ("access_token" in response) {
+                if ("access_token" in response.data) {
                     $scope.feedback = "Login successful.";
                     matrixService.setConfig({
                         homeserver: $scope.account.homeserver,
@@ -79,7 +79,7 @@ angular.module('LoginController', ['matrixService'])
                     $location.path("rooms");
                 }
                 else {
-                    $scope.feedback = "Failed to login: " + JSON.stringify(response);
+                    $scope.feedback = "Failed to login: " + JSON.stringify(response.data);
                 }
             },
             function(error) {
