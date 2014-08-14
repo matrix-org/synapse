@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS events(
     ordering INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id TEXT NOT NULL,
     type TEXT NOT NULL,
---    sender TEXT,
     room_id TEXT,
     content TEXT,
     unrecognized_keys TEXT
@@ -56,4 +55,9 @@ CREATE TABLE IF NOT EXISTS rooms(
     room_id TEXT PRIMARY KEY NOT NULL,
     is_public INTEGER,
     creator TEXT
+);
+
+CREATE TABLE IF NOT EXISTS room_hosts(
+    room_id TEXT NOT NULL,
+    host TEXT NOT NULL
 );

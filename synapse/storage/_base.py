@@ -64,7 +64,11 @@ class SQLBaseStore(object):
 
         def interaction(txn):
             cursor = txn.execute(query, args)
-            return decoder(cursor)
+            if decoder:
+                return decoder(cursor)
+            else:
+                return cursor
+
         return self._db_pool.runInteraction(interaction)
 
     def _execut_query(self, query, *args):
