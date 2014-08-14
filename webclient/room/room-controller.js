@@ -402,6 +402,23 @@ angular.module('RoomController', ['ngSanitize'])
             });
     };
     
+    $scope.imageFileToSend;
+    $scope.$watch("imageFileToSend", function(newValue, oldValue) {
+        if ($scope.imageFileToSend) {
+            // First download the image to the Internet
+            console.log("Uploading image...");
+            mFileUpload.uploadFile($scope.imageFileToSend).then(
+                function(url) {
+                    // Then share the URL
+                    $scope.sendImage(url);
+                },
+                function(error) {
+                    $scope.feedback = "Can't upload image";
+                } 
+            );
+        }
+    });
+    
     $scope.loadMoreHistory = function() {
         paginate(MESSAGES_PER_PAGINATION);
     };

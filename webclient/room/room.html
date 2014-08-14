@@ -75,9 +75,10 @@
                         <input id="mainInput" ng-model="imageURLToSend" ng-enter="sendImage()" placeholder="Image URL"/>
                     </td>
                     <td  width="100px">
-                        <button ng-click="sendImage(imageURLToSend)">Send Image</button>
+                        <button ng-click="sendImage(imageURLToSend)">Send URL</button>
                     </td>
-                    <td>
+                    <td width="100px">
+                        <button m-file-input="imageFileToSend">Send Image</button>
                     </td>
                 </tr>
             </table>
