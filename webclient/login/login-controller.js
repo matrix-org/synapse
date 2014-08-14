@@ -55,8 +55,15 @@ angular.module('LoginController', ['matrixService'])
                  // Go to the user's rooms list page
                 $location.path("rooms");
             },
-            function(reason) {
-                $scope.feedback = "Failure: " + reason;
+            function(error) {
+                if (error.data) {
+                    if (error.data.errcode === "M_USER_IN_USE") {
+                        $scope.feedback = "Username already taken.";
+                    }
+                }
+                else if (error.status === 0) {
+                    $scope.feedback = "Unable to talk to the server.";
+                }
             });
     };
 
@@ -83,8 +90,13 @@ angular.module('LoginController', ['matrixService'])
                 }
             },
             function(error) {
-                if (error.data.errcode === "M_FORBIDDEN") {
-                    $scope.login_error_msg = "Incorrect username or password.";
+                if (error.data) {
+                    if (error.data.errcode === "M_FORBIDDEN") {
+                        $scope.login_error_msg = "Incorrect username or password.";
+                    }
+                }
+                else if (error.status === 0) {
+                    $scope.login_error_msg = "Unable to talk to the server.";
                 }
             }
         );

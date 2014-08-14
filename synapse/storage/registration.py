@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from sqlite3 import IntegrityError
 
-from synapse.api.errors import StoreError
+from synapse.api.errors import StoreError, Codes
 
 from ._base import SQLBaseStore
 
@@ -73,7 +73,7 @@ class RegistrationStore(SQLBaseStore):
                         "VALUES (?,?,?)",
                         [user_id, password_hash, now])
         except IntegrityError:
-            raise StoreError(400, "User ID already taken.")
+            raise StoreError(400, "User ID already taken.", errcode=Codes.USER_IN_USE)
 
         # it's possible for this to get a conflict, but only for a single user
         # since tokens are namespaced based on their user ID
