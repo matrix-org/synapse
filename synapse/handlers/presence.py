@@ -177,7 +177,9 @@ class PresenceHandler(BaseHandler):
             state = self._get_or_offline_usercache(target_user).get_state()
 
         if "mtime" in state:
-            state["mtime_age"] = self.clock.time_msec() - state.pop("mtime")
+            state["mtime_age"] = int(
+                self.clock.time_msec() - state.pop("mtime")
+            )
         defer.returnValue(state)
 
     @defer.inlineCallbacks
@@ -367,7 +369,9 @@ class PresenceHandler(BaseHandler):
             p["observed_user"] = observed_user
             p.update(self._get_or_offline_usercache(observed_user).get_state())
             if "mtime" in p:
-                p["mtime_age"] = self.clock.time_msec() - p.pop("mtime")
+                p["mtime_age"] = int(
+                    self.clock.time_msec() - p.pop("mtime")
+                )
 
         defer.returnValue(presence)
 
@@ -560,7 +564,9 @@ class PresenceHandler(BaseHandler):
 
         if "mtime" in state:
             state = dict(state)
-            state["mtime_age"] = self.clock.time_msec() - state.pop("mtime")
+            state["mtime_age"] = int(
+                self.clock.time_msec() - state.pop("mtime")
+            )
 
         yield self.federation.send_edu(
             destination=destination,
@@ -598,7 +604,9 @@ class PresenceHandler(BaseHandler):
             del state["user_id"]
 
             if "mtime_age" in state:
-                state["mtime"] = self.clock.time_msec() - state.pop("mtime_age")
+                state["mtime"] = int(
+                    self.clock.time_msec() - state.pop("mtime_age")
+                )
 
             statuscache = self._get_or_make_usercache(user)
 
@@ -720,6 +728,8 @@ class UserPresenceCache(object):
         content["user_id"] = user.to_string()
 
         if "mtime" in content:
-            content["mtime_age"] = clock.time_msec() - content.pop("mtime")
+            content["mtime_age"] = int(
+                clock.time_msec() - content.pop("mtime")
+            )
 
         return {"type": "m.presence", "content": content}
