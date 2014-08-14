@@ -121,7 +121,7 @@ class DataStore(RoomDataStore, RoomMemberStore, MessageStore, RoomStore,
 
         results = yield self._execute_and_decode(sql, *args)
 
-        defer.returnValue(
+        defer.returnValue([self._parse_event_from_row(r) for r in results])
 
 
 def schema_path(schema):
