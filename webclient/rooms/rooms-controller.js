@@ -16,7 +16,7 @@ limitations under the License.
 
 'use strict';
 
-angular.module('RoomsController', ['matrixService'])
+angular.module('RoomsController', ['matrixService', 'mFileInput'])
 .controller('RoomsController', ['$scope', '$location', 'matrixService',
                                function($scope, $location, matrixService) {
                                    
@@ -40,7 +40,8 @@ angular.module('RoomsController', ['matrixService'])
 
     $scope.newProfileInfo = {
         name: matrixService.config().displayName,
-        avatar: matrixService.config().avatarUrl
+        avatar: matrixService.config().avatarUrl,
+        avatarFile: undefined
     };
 
     $scope.linkedEmails = {
@@ -162,6 +163,13 @@ angular.module('RoomsController', ['matrixService'])
             }
         );
     };
+
+
+    $scope.$watch("newProfileInfo.avatarFile", function(newValue, oldValue) {
+        if ($scope.newProfileInfo.avatarFile) {
+            //@TODO: Upload this HTML5 image file to somewhere
+        }
+    });
 
     $scope.setAvatar = function(newUrl) {
         console.log("Updating avatar to "+newUrl);
