@@ -56,6 +56,8 @@ class PresenceHandler(BaseHandler):
 
         self.homeserver = hs
 
+        self.clock = hs.get_clock()
+
         distributor = hs.get_distributor()
         distributor.observe("registered_user", self.registered_user)
 
@@ -168,14 +170,15 @@ class PresenceHandler(BaseHandler):
                 state = yield self.store.get_presence_state(
                     target_user.localpart
                 )
-                defer.returnValue(state)
             else:
                 raise SynapseError(404, "Presence information not visible")
         else:
             # TODO(paul): Have remote server send us permissions set
-            defer.returnValue(
-                    self._get_or_offline_usercache(target_user).get_state()
-            )
+            state = self._get_or_offline_usercache(target_user).get_state()
+
+        if "mtime" in state:
+            state["mtime_age"] = self.clock.time_msec() - state.pop("mtime")
+        defer.returnValue(state)
 
     @defer.inlineCallbacks
     def set_state(self, target_user, auth_user, state):
@@ -208,6 +211,8 @@ class PresenceHandler(BaseHandler):
                 "collect_presencelike_data", target_user, state
             ),
         ])
+
+        state["mtime"] = self.clock.time_msec()
 
         now_online = state["state"] != PresenceState.OFFLINE
         was_polling = target_user in self._user_cachemap
@@ -361,6 +366,8 @@ class PresenceHandler(BaseHandler):
             observed_user = self.hs.parse_userid(p.pop("observed_user_id"))
             p["observed_user"] = observed_user
             p.update(self._get_or_offline_usercache(observed_user).get_state())
+            if "mtime" in p:
+                p["mtime_age"] = self.clock.time_msec() - p.pop("mtime")
 
         defer.returnValue(presence)
 
@@ -546,9 +553,14 @@ class PresenceHandler(BaseHandler):
     def _push_presence_remote(self, user, destination, state=None):
         if state is None:
             state = yield self.store.get_presence_state(user.localpart)
+
             yield self.distributor.fire(
                 "collect_presencelike_data", user, state
             )
+
+        if "mtime" in state:
+            state = dict(state)
+            state["mtime_age"] = self.clock.time_msec() - state.pop("mtime")
 
         yield self.federation.send_edu(
             destination=destination,
@@ -584,6 +596,9 @@ class PresenceHandler(BaseHandler):
 
             state = dict(push)
             del state["user_id"]
+
+            if "mtime_age" in state:
+                state["mtime"] = self.clock.time_msec() - state.pop("mtime_age")
 
             statuscache = self._get_or_make_usercache(user)
 
@@ -631,9 +646,14 @@ class PresenceHandler(BaseHandler):
 
     def push_update_to_clients(self, observer_user, observed_user,
                                statuscache):
+        state = statuscache.make_event(user=observed_user, clock=self.clock)
+
         self.notifier.on_new_user_event(
             observer_user.to_string(),
-            event_data=statuscache.make_event(user=observed_user),
+            event_data=statuscache.make_event(
+                user=observed_user,
+                clock=self.clock
+            ),
             stream_type=PresenceStreamData,
             store_id=statuscache.serial
         )
@@ -652,8 +672,10 @@ class PresenceStreamData(StreamData):
                    if from_key < cachemap[k].serial <= to_key]
 
         if updates:
+            clock = self.presence.clock
+
             latest_serial = max([x[1].serial for x in updates])
-            data = [x[1].make_event(user=x[0]) for x in updates]
+            data = [x[1].make_event(user=x[0], clock=clock) for x in updates]
             return ((data, latest_serial))
         else:
             return (([], self.presence._user_cachemap_latest_serial))
@@ -674,6 +696,8 @@ class UserPresenceCache(object):
         self.serial = None
 
     def update(self, state, serial):
+        assert("mtime_age" not in state)
+
         self.state.update(state)
         # Delete keys that are now 'None'
         for k in self.state.keys():
@@ -691,8 +715,11 @@ class UserPresenceCache(object):
         # clone it so caller can't break our cache
         return dict(self.state)
 
-    def make_event(self, user):
+    def make_event(self, user, clock):
         content = self.get_state()
         content["user_id"] = user.to_string()
+
+        if "mtime" in content:
+            content["mtime_age"] = clock.time_msec() - content.pop("mtime")
 
         return {"type": "m.presence", "content": content}

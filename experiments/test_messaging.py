@@ -104,12 +104,12 @@ class InputOutput(object):
                 #self.print_line("OK.")
                 return
 
-            m = re.match("^paginate (\S+)$", line)
+            m = re.match("^backfill (\S+)$", line)
             if m:
-                # we want to paginate a room
+                # we want to backfill a room
                 room_name, = m.groups()
-                self.print_line("paginate %s" % room_name)
-                self.server.paginate(room_name)
+                self.print_line("backfill %s" % room_name)
+                self.server.backfill(room_name)
                 return
 
             self.print_line("Unrecognized command")
@@ -307,7 +307,7 @@ class HomeServer(ReplicationHandler):
         except Exception as e:
             logger.exception(e)
 
-    def paginate(self, room_name, limit=5):
+    def backfill(self, room_name, limit=5):
         room = self.joined_rooms.get(room_name)
 
         if not room:
@@ -315,7 +315,7 @@ class HomeServer(ReplicationHandler):
 
         dest = room.oldest_server
 
-        return self.replication_layer.paginate(dest, room_name, limit)
+        return self.replication_layer.backfill(dest, room_name, limit)
 
     def _get_room_remote_servers(self, room_name):
         return [i for i in self.joined_rooms.setdefault(room_name,).servers]

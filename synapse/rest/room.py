@@ -22,7 +22,6 @@ from synapse.api.events.room import (RoomTopicEvent, MessageEvent,
                                      RoomMemberEvent, FeedbackEvent)
 from synapse.api.constants import Feedback, Membership
 from synapse.api.streams import PaginationConfig
-from synapse.types import RoomAlias
 
 import json
 import logging
@@ -150,10 +149,7 @@ class JoinRoomAliasServlet(RestServlet):
 
         logger.debug("room_alias: %s", room_alias)
 
-        room_alias = RoomAlias.from_string(
-            urllib.unquote(room_alias),
-            self.hs
-        )
+        room_alias = self.hs.parse_roomalias(urllib.unquote(room_alias))
 
         handler = self.handlers.room_member_handler
         ret_dict = yield handler.join_room_alias(user, room_alias)

@@ -24,7 +24,7 @@ Where the bottom (the transport layer) is what talks to the internet via HTTP, a
         * duplicate pdu_id's - i.e., it makes sure we ignore them. 
         * responding to requests for a given pdu_id
         * responding to requests for all metadata for a given context (i.e. room)
-        * handling incoming pagination requests
+        * handling incoming backfill requests
 
     So it has to parse incoming messages to discover which are metadata and which aren't, and has to correctly clobber existing metadata where appropriate.
 

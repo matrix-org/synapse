@@ -10,7 +10,7 @@ VoIP[1].  The basics you need to know to get up and running are:
     
     - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
       you will normally refer to yourself and others using a 3PID: email
-      address, phone number, etc rather than manipulating matrix user IDs)
+      address, phone number, etc rather than manipulating Matrix user IDs)
 
 The overall architecture is::
 
@@ -40,8 +40,8 @@ To get up and running:
 About Matrix
 ============
 
-Matrix specifies a set of pragmatic RESTful HTTP JSON APIs for VoIP and IM as an
-open standard, providing:
+Matrix specifies a set of pragmatic RESTful HTTP JSON APIs as an open standard,
+which handle:
 
     - Creating and managing fully distributed chat rooms with no
       single points of control or failure
@@ -147,7 +147,7 @@ Setting up Federation
 
 In order for other homeservers to send messages to your server, it will need to
 be publicly visible on the internet, and they will need to know its host name.
-You have two choices here, which will influence the form of your matrix user
+You have two choices here, which will influence the form of your Matrix user
 IDs:
 
  1) Use the machine's own hostname as available on public DNS in the form of its
@@ -231,14 +231,15 @@ synapse sandbox running on localhost)
 Logging In To An Existing Account
 ---------------------------------
 
-Just enter the ``@localpart:my.domain.here`` matrix user ID and password into the form and click the Login button.
+Just enter the ``@localpart:my.domain.here`` Matrix user ID and password into
+the form and click the Login button.
 
 
 Identity Servers
 ================
 
 The job of authenticating 3PIDs and tracking which 3PIDs are associated with a
-given matrix user is very security-sensitive, as there is obvious risk of spam
+given Matrix user is very security-sensitive, as there is obvious risk of spam
 if it is too easy to sign up for Matrix accounts or harvest 3PID data. Meanwhile
 the job of publishing the end-to-end encryption public keys for Matrix users is
 also very security-sensitive for similar reasons.

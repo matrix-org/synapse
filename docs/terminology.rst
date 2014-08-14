@@ -11,6 +11,11 @@ medium-term goal we should encourage the unification of this terminology.
 Terms
 =====
 
+Backfilling:
+  The process of synchronising historic state from one home server to another,
+  to backfill the event storage so that scrollback can be presented to the
+  client(s).  (Formerly, and confusingly, called 'pagination')
+
 Context:
   A single human-level entity of interest (currently, a chat room)
 
@@ -27,11 +32,6 @@ Event:
   available.
   [[NOTE(paul): The current server-server implementation calls these simply
   "messages" but the term is too ambiguous here; I've called them Events]]
-
-Pagination:
-  The process of synchronising historic state from one home server to another,
-  to backfill the event storage so that scrollback can be presented to the
-  client(s).
 
 PDU (Persistent Data Unit):
   A message that relates to a single context, irrespective of the server that

@@ -20,6 +20,8 @@ from twisted.internet import defer
 from mock import Mock, call, ANY
 import logging
 
+from ..utils import MockClock
+
 from synapse.server import HomeServer
 from synapse.api.constants import PresenceState
 from synapse.api.errors import SynapseError
@@ -55,6 +57,7 @@ class PresenceStateTestCase(unittest.TestCase):
 
     def setUp(self):
         hs = HomeServer("test",
+                clock=MockClock(),
                 db_pool=None,
                 datastore=Mock(spec=[
                     "get_presence_state",
@@ -154,7 +157,11 @@ class PresenceStateTestCase(unittest.TestCase):
         mocked_set.assert_called_with("apple",
                 {"state": UNAVAILABLE, "status_msg": "Away"})
         self.mock_start.assert_called_with(self.u_apple,
-                state={"state": UNAVAILABLE, "status_msg": "Away"})
+                state={
+                    "state": UNAVAILABLE,
+                    "status_msg": "Away",
+                    "mtime": 1000000, # MockClock
+                })
 
         yield self.handler.set_state(
                 target_user=self.u_apple, auth_user=self.u_apple,
@@ -386,7 +393,10 @@ class PresencePushTestCase(unittest.TestCase):
         self.replication.send_edu = Mock()
         self.replication.send_edu.return_value = defer.succeed((200, "OK"))
 
+        self.clock = MockClock()
+
         hs = HomeServer("test",
+                clock=self.clock,
                 db_pool=None,
                 datastore=Mock(spec=[
                     "set_presence_state",
@@ -519,13 +529,18 @@ class PresencePushTestCase(unittest.TestCase):
         yield self.handler.set_state(self.u_banana, self.u_banana,
                 {"state": ONLINE})
 
+        self.clock.advance_time(2)
+
         presence = yield self.handler.get_presence_list(
                 observer_user=self.u_apple, accepted=True)
 
         self.assertEquals([
-                {"observed_user": self.u_banana, "state": ONLINE},
-                {"observed_user": self.u_clementine, "state": OFFLINE}],
-            presence)
+                {"observed_user": self.u_banana,
+                 "state": ONLINE,
+                 "mtime_age": 2000},
+                {"observed_user": self.u_clementine,
+                 "state": OFFLINE},
+        ], presence)
 
         self.mock_update_client.assert_has_calls([
                 call(observer_user=self.u_banana,
@@ -555,7 +570,8 @@ class PresencePushTestCase(unittest.TestCase):
                     content={
                         "push": [
                             {"user_id": "@apple:test",
-                            "state": "online"},
+                             "state": "online",
+                             "mtime_age": 0},
                         ],
                     }),
                 call(
@@ -564,7 +580,8 @@ class PresencePushTestCase(unittest.TestCase):
                     content={
                         "push": [
                             {"user_id": "@apple:test",
-                             "state": "online"},
+                             "state": "online",
+                             "mtime_age": 0},
                         ],
                     })
         ], any_order=True)
@@ -582,7 +599,8 @@ class PresencePushTestCase(unittest.TestCase):
                 "remote", "m.presence", {
                     "push": [
                         {"user_id": "@potato:remote",
-                         "state": "online"},
+                         "state": "online",
+                         "mtime_age": 1000},
                     ],
                 }
         )
@@ -596,9 +614,11 @@ class PresencePushTestCase(unittest.TestCase):
                     statuscache=ANY),
         ], any_order=True)
 
+        self.clock.advance_time(2)
+
         state = yield self.handler.get_state(self.u_potato, self.u_apple)
 
-        self.assertEquals({"state": ONLINE}, state)
+        self.assertEquals({"state": ONLINE, "mtime_age": 3000}, state)
 
     @defer.inlineCallbacks
     def test_join_room_local(self):

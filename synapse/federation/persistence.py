@@ -114,14 +114,14 @@ class PduActions(object):
 
     @defer.inlineCallbacks
     @log_function
-    def paginate(self, context, pdu_list, limit):
+    def backfill(self, context, pdu_list, limit):
         """ For a given list of PDU id and origins return the proceeding
         `limit` `Pdu`s in the given `context`.
 
         Returns:
             Deferred: Results in a list of `Pdu`s.
         """
-        results = yield self.store.get_pagination(
+        results = yield self.store.get_backfill(
             context, pdu_list, limit
         )
 
@@ -131,7 +131,7 @@ class PduActions(object):
     def is_new(self, pdu):
         """ When we receive a `Pdu` from a remote home server, we want to
         figure out whether it is `new`, i.e. it is not some historic PDU that
-        we haven't seen simply because we haven't paginated back that far.
+        we haven't seen simply because we haven't backfilled back that far.
 
         Returns:
             Deferred: Results in a `bool`

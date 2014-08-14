@@ -42,6 +42,8 @@ angular.module('RoomController', [])
                 console.log("Got response from "+$scope.state.events_from+" to "+response.data.end);
                 $scope.state.events_from = response.data.end;
 
+                $scope.feedback = "";
+
                 for (var i = 0; i < response.data.chunk.length; i++) {
                     var chunk = response.data.chunk[i];
                     if (chunk.room_id == $scope.room_id && chunk.type == "m.room.message") {
@@ -68,12 +70,17 @@ angular.module('RoomController', [])
                     $timeout(shortPoll, 0);
                 }
             }, function(response) {
-                $scope.feedback = "Can't stream: " + JSON.stringify(response);
+                $scope.feedback = "Can't stream: " + response.data;
+
+                if (response.status == 403) {
+                    $scope.stopPoll = true;
+                }
+                
                 if ($scope.stopPoll) {
                     console.log("Stopping polling.");
                 }
                 else {
-                    $timeout(shortPoll, 2000);
+                    $timeout(shortPoll, 5000);
                 }
             });
     };

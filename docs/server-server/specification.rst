@@ -155,9 +155,9 @@ To fetch all the state of a given context:
   PDUs that encode the state.
 
 
-To paginate events on a given context:
+To backfill events on a given context:
 
-  GET .../paginate/:context/
+  GET .../backfill/:context/
     Query args: v, limit
 
     Response: JSON encoding of a single Transaction containing multiple PDUs

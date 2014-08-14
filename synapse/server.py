@@ -28,7 +28,7 @@ from synapse.handlers import Handlers
 from synapse.rest import RestServletFactory
 from synapse.state import StateHandler
 from synapse.storage import DataStore
-from synapse.types import UserID
+from synapse.types import UserID, RoomAlias
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.lockutils import LockManager
@@ -119,6 +119,11 @@ class BaseHomeServer(object):
         """Parse the string given by 's' as a User ID and return a UserID
         object."""
         return UserID.from_string(s, hs=self)
+
+    def parse_roomalias(self, s):
+        """Parse the string given by 's' as a Room Alias and return a RoomAlias
+        object."""
+        return RoomAlias.from_string(s, hs=self)
 
 # Build magic accessors for every dependency
 for depname in BaseHomeServer.DEPENDENCIES:

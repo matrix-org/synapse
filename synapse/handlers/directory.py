@@ -35,9 +35,11 @@ class DirectoryHandler(BaseHandler):
 
     def __init__(self, hs):
         super(DirectoryHandler, self).__init__(hs)
-        self.hs = hs
-        self.http_client = hs.get_http_client()
-        self.clock = hs.get_clock()
+
+        self.federation = hs.get_replication_layer()
+        self.federation.register_query_handler(
+            "directory", self.on_directory_query
+        )
 
     @defer.inlineCallbacks
     def create_association(self, room_alias, room_id, servers):
@@ -58,9 +60,7 @@ class DirectoryHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def get_association(self, room_alias, local_only=False):
-        # TODO(erikj): Do auth
-
+    def get_association(self, room_alias):
         room_id = None
         if room_alias.is_mine:
             result = yield self.store.get_association_from_room_alias(
@@ -70,21 +70,12 @@ class DirectoryHandler(BaseHandler):
             if result:
                 room_id = result.room_id
                 servers = result.servers
-        elif not local_only:
-            path = "%s/ds/room/%s?local_only=1" % (
-                PREFIX,
-                urllib.quote(room_alias.to_string())
+        else:
+            result = yield self.federation.make_query(
+                destination=room_alias.domain,
+                query_type="directory",
+                args={"room_alias": room_alias.to_string()},
             )
-
-            result = None
-            try:
-                result = yield self.http_client.get_json(
-                    destination=room_alias.domain,
-                    path=path,
-                )
-            except:
-                # TODO(erikj): Handle this better?
-                logger.exception("Failed to get remote room alias")
 
             if result and "room_id" in result and "servers" in result:
                 room_id = result["room_id"]
@@ -99,3 +90,20 @@ class DirectoryHandler(BaseHandler):
             "servers": servers,
         })
         return
+
+    @defer.inlineCallbacks
+    def on_directory_query(self, args):
+        room_alias = self.hs.parse_roomalias(args["room_alias"])
+        if not room_alias.is_mine:
+            raise SynapseError(
+                400, "Room Alias is not hosted on this Home Server"
+            )
+
+        result = yield self.store.get_association_from_room_alias(
+            room_alias
+        )
+
+        defer.returnValue({
+            "room_id": result.room_id,
+            "servers": result.servers,
+        })

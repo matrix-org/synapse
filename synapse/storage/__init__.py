@@ -44,7 +44,6 @@ class DataStore(RoomDataStore, RoomMemberStore, MessageStore, RoomStore,
     def __init__(self, hs):
         super(DataStore, self).__init__(hs)
         self.event_factory = hs.get_event_factory()
-        self.hs = hs
 
     @defer.inlineCallbacks
     def persist_event(self, event):

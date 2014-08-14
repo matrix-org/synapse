@@ -32,7 +32,7 @@ import urllib
 
 logger = logging.getLogger(__name__)
 
-
+# FIXME: SURELY these should be killed?!
 _destination_mappings = {
     "red": "localhost:8080",
     "blue": "localhost:8081",
@@ -147,7 +147,7 @@ class TwistedHttpClient(HttpClient):
             destination.encode("ascii"),
             "GET",
             path.encode("ascii"),
-            query_bytes
+            query_bytes=query_bytes
         )
 
         body = yield readBody(response)
