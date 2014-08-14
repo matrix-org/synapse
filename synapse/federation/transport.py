@@ -23,6 +23,7 @@ over a different (albeit still reliable) protocol.
 
 from twisted.internet import defer
 
+from synapse.api.urls import FEDERATION_PREFIX as PREFIX
 from synapse.util.logutils import log_function
 
 import logging
@@ -31,9 +32,6 @@ import re
 
 
 logger = logging.getLogger(__name__)
-
-
-PREFIX = "/matrix/federation/v1"
 
 
 class TransportLayer(object):
