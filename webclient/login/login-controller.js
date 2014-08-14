@@ -68,6 +68,12 @@ angular.module('LoginController', ['matrixService'])
     };
 
     $scope.login = function() {
+        if ($scope.account.user_id.indexOf("@") !== 0) {
+            // technically should be the host of account.homeserver
+            $scope.account.user_id = "@" + $scope.account.user_id + ":" + 
+                                     $location.host()
+        }
+    
         matrixService.setConfig({
             homeserver: $scope.account.homeserver,
             user_id: $scope.account.user_id
