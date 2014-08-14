@@ -39,14 +39,13 @@ angular.module('LoginController', ['matrixService'])
         }
 
         matrixService.register($scope.account.desired_user_name, $scope.account.pwd1).then(
-            function(data) {
+            function(response) {
                 $scope.feedback = "Success";
-
                 // Update the current config 
                 var config = matrixService.config();
                 angular.extend(config, {
-                    access_token: data.access_token,
-                    user_id: data.user_id
+                    access_token: response.data.access_token,
+                    user_id: response.data.user_id
                 });
                 matrixService.setConfig(config);
 
@@ -74,13 +73,18 @@ angular.module('LoginController', ['matrixService'])
                     matrixService.setConfig({
                         homeserver: $scope.account.homeserver,
                         user_id: $scope.account.user_id,
-                        access_token: response.access_token
+                        access_token: response.data.access_token
                     });
                     matrixService.saveConfig();
                     $location.path("rooms");
                 }
                 else {
                     $scope.feedback = "Failed to login: " + JSON.stringify(response);
+                }
+            },
+            function(error) {
+                if (error.data.errcode === "M_FORBIDDEN") {
+                    $scope.login_error_msg = "Incorrect username or password.";
                 }
             }
         );

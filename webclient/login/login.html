@@ -22,6 +22,7 @@
     <h3>Got an account?</h3>
     <form novalidate>
         <!-- Login with an registered user -->
+        <div>{{ login_error_msg }} </div>
         <div>
             <input id="user_id" size="70" type="text" auto-focus ng-model="account.user_id" placeholder="User ID (ex:@bob:localhost)"/>
             <br />

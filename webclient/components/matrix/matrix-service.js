@@ -49,32 +49,13 @@ angular.module('matrixService', [])
         if (path.indexOf(prefixPath) !== 0) {
             path = prefixPath + path;
         }
-        // Do not directly return the $http instance but return a promise
-        // with enriched or cleaned information
-        var deferred = $q.defer();
-        $http({
+        return $http({
             method: method,
             url: baseUrl + path,
             params: params,
             data: data,
             headers: headers
         })
-        .success(function(data, status, headers, config) {
-            deferred.resolve(data, status, headers, config);
-        })
-        .error(function(data, status, headers, config) {
-            // Enrich the error callback with an human readable error reason
-            var reason = data.error;
-            if (!data.error) {
-                reason = JSON.stringify(data);
-            }
-            deferred.reject(reason, data, status, headers, config);
-
-            if (403 === status && "M_UNKNOWN_TOKEN" === data.errcode) {
-                // The access token is no more valid, broadcast the issue
-                $rootScope.$broadcast("M_UNKNOWN_TOKEN");
-            }
-        });
 
         return deferred.promise;
     };
