@@ -21,13 +21,11 @@ from synapse.api.events.room import (
 
 from .directory import DirectoryStore
 from .feedback import FeedbackStore
-from .message import MessageStore
 from .presence import PresenceStore
 from .profile import ProfileStore
 from .registration import RegistrationStore
 from .room import RoomStore
 from .roommember import RoomMemberStore
-from .roomdata import RoomDataStore
 from .stream import StreamStore
 from .pdu import StatePduStore, PduStore
 from .transactions import TransactionStore
@@ -36,7 +34,7 @@ import json
 import os
 
 
-class DataStore(RoomDataStore, RoomMemberStore, MessageStore, RoomStore,
+class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, PduStore, StatePduStore, TransactionStore,
                 DirectoryStore):
@@ -78,7 +76,7 @@ class DataStore(RoomDataStore, RoomMemberStore, MessageStore, RoomStore,
     def _store_event(self, event):
         vals = {
             "event_id": event.event_id,
-            "event_type", event.type,
+            "event_type": event.type,
             "sender": event.user_id,
             "room_id": event.room_id,
             "content": json.dumps(event.content),
@@ -105,7 +103,7 @@ class DataStore(RoomDataStore, RoomMemberStore, MessageStore, RoomStore,
             # TODO (erikj): We also need to update the current state table?
 
     @defer.inlineCallbacks
-    def get_current_state(room_id, event_type=None, state_key="")
+    def get_current_state(room_id, event_type=None, state_key=""):
         sql = (
             "SELECT e.* FROM events as e"
             "INNER JOIN current_state as c ON e.event_id = c.event_id "

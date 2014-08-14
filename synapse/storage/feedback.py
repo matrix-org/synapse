@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from ._base import SQLBaseStore, Table
 from synapse.api.events.room import FeedbackEvent
 
@@ -31,7 +33,7 @@ class FeedbackStore(SQLBaseStore):
             "sender": event.user_id,
         })
 
-    @defer.inlineCallback
+    @defer.inlineCallbacks
     def get_feedback_for_event(self, event_id):
         sql = (
             "SELECT events.* FROM events INNER JOIN feedback "

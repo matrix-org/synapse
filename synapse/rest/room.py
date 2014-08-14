@@ -285,25 +285,28 @@ class FeedbackRestServlet(RestServlet):
                feedback_type):
         user = yield (self.auth.get_user_by_req(request))
 
-        if feedback_type not in Feedback.LIST:
-            raise SynapseError(400, "Bad feedback type.",
-                               errcode=Codes.BAD_JSON)
+        # TODO (erikj): Implement this?
+        raise NotImplementedError("Getting feedback is not supported")
 
-        msg_handler = self.handlers.message_handler
-        feedback = yield msg_handler.get_feedback(
-            room_id=urllib.unquote(room_id),
-            msg_sender_id=msg_sender_id,
-            msg_id=msg_id,
-            user_id=user.to_string(),
-            fb_sender_id=fb_sender_id,
-            fb_type=feedback_type
-        )
-
-        if not feedback:
-            raise SynapseError(404, "Feedback not found.",
-                               errcode=Codes.NOT_FOUND)
-
-        defer.returnValue((200, json.loads(feedback.content)))
+#        if feedback_type not in Feedback.LIST:
+#            raise SynapseError(400, "Bad feedback type.",
+#                               errcode=Codes.BAD_JSON)
+#
+#        msg_handler = self.handlers.message_handler
+#        feedback = yield msg_handler.get_feedback(
+#            room_id=urllib.unquote(room_id),
+#            msg_sender_id=msg_sender_id,
+#            msg_id=msg_id,
+#            user_id=user.to_string(),
+#            fb_sender_id=fb_sender_id,
+#            fb_type=feedback_type
+#        )
+#
+#        if not feedback:
+#            raise SynapseError(404, "Feedback not found.",
+#                               errcode=Codes.NOT_FOUND)
+#
+#        defer.returnValue((200, json.loads(feedback.content)))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, sender_id, msg_id, fb_sender_id,

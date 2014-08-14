@@ -141,12 +141,7 @@ class MessageHandler(BaseHandler):
             yield self.state_handler.handle_new_event(event)
 
             # store in db
-            store_id = yield self.store.store_room_data(
-                room_id=event.room_id,
-                etype=event.type,
-                state_key=event.state_key,
-                content=json.dumps(event.content)
-            )
+            store_id = yield self.store.persist_event(event)
 
             event.destinations = yield self.store.get_joined_hosts_for_room(
                 event.room_id
@@ -201,19 +196,15 @@ class MessageHandler(BaseHandler):
                 raise RoomError(
                     403, "Member does not meet private room rules.")
 
-        data = yield self.store.get_room_data(room_id, event_type, state_key)
+        data = yield self.store.get_current_state(room_id, event_type, state_key)
         defer.returnValue(data)
 
     @defer.inlineCallbacks
-    def get_feedback(self, room_id=None, msg_sender_id=None, msg_id=None,
-                     user_id=None, fb_sender_id=None, fb_type=None):
+    def get_feedback(self, event_id):
         yield self.auth.check_joined_room(room_id, user_id)
 
         # Pull out the feedback from the db
-        fb = yield self.store.get_feedback(
-            room_id=room_id, msg_id=msg_id, msg_sender_id=msg_sender_id,
-            fb_sender_id=fb_sender_id, fb_type=fb_type
-        )
+        fb = yield self.store.get_feedback(event_id)
 
         if fb:
             defer.returnValue(fb)
