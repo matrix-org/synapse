@@ -70,6 +70,9 @@ class BaseHomeServer(object):
         'room_lock_manager',
         'notifier',
         'distributor',
+        'resource_for_client',
+        'resource_for_federation',
+        'resource_for_web_client',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -178,9 +181,6 @@ class HomeServer(BaseHomeServer):
 
     def register_servlets(self):
         """ Register all servlets associated with this HomeServer.
-
-        Args:
-            host_web_client (bool): True to host the web client as well.
         """
         # Simply building the ServletFactory is sufficient to have it register
-        factory = self.get_rest_servlet_factory()
+        self.get_rest_servlet_factory()

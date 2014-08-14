@@ -185,3 +185,8 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False):
     request.write(json_bytes)
     request.finish()
     return NOT_DONE_YET
+
+
+# FIXME: Temp, just so the new name can be used without breaking the world.
+class JsonResource(TwistedHttpServer):
+    pass

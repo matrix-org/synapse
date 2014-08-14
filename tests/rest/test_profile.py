@@ -44,6 +44,7 @@ class ProfileTestCase(unittest.TestCase):
             db_pool=None,
             http_client=None,
             http_server=self.mock_server,
+            resource_for_client=self.mock_server,
             federation=Mock(),
             replication_layer=Mock(),
         )

@@ -32,19 +32,15 @@ class RestServletFactory(object):
     """
 
     def __init__(self, hs):
-        http_server = hs.get_http_server()
+        client_resource = hs.get_resource_for_client()
 
         # TODO(erikj): There *must* be a better way of doing this.
-        room.register_servlets(hs, http_server)
-        events.register_servlets(hs, http_server)
-        register.register_servlets(hs, http_server)
-        login.register_servlets(hs, http_server)
-        profile.register_servlets(hs, http_server)
-        public.register_servlets(hs, http_server)
-        presence.register_servlets(hs, http_server)
-        im.register_servlets(hs, http_server)
-        directory.register_servlets(hs, http_server)
-
-    def register_web_client(self, hs):
-        http_server = hs.get_http_server()
-        webclient.register_servlets(hs, http_server)
+        room.register_servlets(hs, client_resource)
+        events.register_servlets(hs, client_resource)
+        register.register_servlets(hs, client_resource)
+        login.register_servlets(hs, client_resource)
+        profile.register_servlets(hs, client_resource)
+        public.register_servlets(hs, client_resource)
+        presence.register_servlets(hs, client_resource)
+        im.register_servlets(hs, client_resource)
+        directory.register_servlets(hs, client_resource)

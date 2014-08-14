@@ -16,6 +16,8 @@
 """ This module contains base REST classes for constructing REST servlets. """
 import re
 
+CLIENT_PREFIX = "/matrix/client/api/v1"
+
 
 def client_path_pattern(path_regex):
     """Creates a regex compiled client path with the correct client path
@@ -27,7 +29,7 @@ def client_path_pattern(path_regex):
     Returns:
         SRE_Pattern
     """
-    return re.compile("^/matrix/client/api/v1" + path_regex)
+    return re.compile("^" + CLIENT_PREFIX + path_regex)
 
 
 class RestServlet(object):
