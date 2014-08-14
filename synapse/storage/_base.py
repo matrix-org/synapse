@@ -71,7 +71,7 @@ class SQLBaseStore(object):
 
         return self._db_pool.runInteraction(interaction)
 
-    def _execut_query(self, query, *args):
+    def _execute_and_decode(self, query, *args):
         return self._execute(self.cursor_to_dict, *args)
 
     # "Simple" SQL API methods that operate on a single table with no JOINs,

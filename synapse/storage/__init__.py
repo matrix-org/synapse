@@ -119,7 +119,7 @@ class DataStore(RoomDataStore, RoomMemberStore, MessageStore, RoomStore,
         else:
             args = (room_id, )
 
-        results = yield self._execute_query(sql, *args)
+        results = yield self._execute_and_decode(sql, *args)
 
         defer.returnValue(
 

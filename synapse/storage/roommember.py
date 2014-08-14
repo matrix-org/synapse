@@ -141,6 +141,6 @@ class RoomMemberStore(SQLBaseStore):
             "WHERE %s "
         ) % (where_clause,)
 
-        rows = yield self._execute_query(sql, where_values)
+        rows = yield self._execute_and_decode(sql, where_values)
         results = [self._parse_event_from_row(r) for r in rows]
         defer.returnValue(results)
