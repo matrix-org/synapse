@@ -27,6 +27,7 @@ from twisted.web.server import Site
 from synapse.http.server import TwistedHttpServer, JsonResource
 from synapse.http.client import TwistedHttpClient
 from synapse.rest.base import CLIENT_PREFIX
+from synapse.federation.transport import PREFIX
 
 from daemonize import Daemonize
 
@@ -94,7 +95,8 @@ class SynapseHomeServer(HomeServer):
         """
         desired_tree = (  # list of tuples containing (path_str, Resource)
             ("/matrix/client", self.get_resource_for_web_client()),
-            (CLIENT_PREFIX, self.get_resource_for_client())
+            (CLIENT_PREFIX, self.get_resource_for_client()),
+            (PREFIX, self.get_resource_for_federation())
         )
 
         self.root_resource = Resource()

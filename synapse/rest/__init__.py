@@ -15,8 +15,7 @@
 
 
 from . import (
-    room, events, register, login, profile, public, presence, im, directory,
-    webclient
+    room, events, register, login, profile, public, presence, im, directory
 )
 
 
