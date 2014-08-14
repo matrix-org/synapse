@@ -16,9 +16,9 @@ limitations under the License.
 
 'use strict';
 
-angular.module('RoomsController', ['matrixService', 'mFileInput'])
-.controller('RoomsController', ['$scope', '$location', 'matrixService',
-                               function($scope, $location, matrixService) {
+angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload'])
+.controller('RoomsController', ['$scope', '$location', 'matrixService', 'mFileUpload',
+                               function($scope, $location, matrixService, mFileUpload) {
                                    
     $scope.rooms = [];
     $scope.public_rooms = [];
@@ -167,7 +167,16 @@ angular.module('RoomsController', ['matrixService', 'mFileInput'])
 
     $scope.$watch("newProfileInfo.avatarFile", function(newValue, oldValue) {
         if ($scope.newProfileInfo.avatarFile) {
-            //@TODO: Upload this HTML5 image file to somewhere
+            console.log("Uploading new avatar file...");
+            mFileUpload.uploadFile($scope.newProfileInfo.avatarFile).then(
+                function(url) {
+                    $scope.newProfileInfo.avatar = url;
+                    $scope.setAvatar($scope.newProfileInfo.avatar);
+                },
+                function(error) {
+                    $scope.feedback = "Can't upload image";
+                } 
+            );
         }
     });
 
