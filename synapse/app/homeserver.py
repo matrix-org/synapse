@@ -24,7 +24,7 @@ from twisted.python.log import PythonLoggingObserver
 from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
-from synapse.http.server import JsonResource
+from synapse.http.server import JsonResource, RootRedirect
 from synapse.http.client import TwistedHttpClient
 from synapse.rest.base import CLIENT_PREFIX
 from synapse.federation.transport import PREFIX
@@ -85,7 +85,7 @@ class SynapseHomeServer(HomeServer):
 
         return pool
 
-    def create_resource_tree(self, web_client):
+    def create_resource_tree(self, web_client, redirect_root_to_web_client):
         """Create the resource tree for this Home Server.
 
         This in unduly complicated because Twisted does not support putting
@@ -93,6 +93,9 @@ class SynapseHomeServer(HomeServer):
 
         Args:
             web_client (bool): True to enable the web client.
+            redirect_root_to_web_client (bool): True to redirect '/' to the
+            location of the web client. This does nothing if web_client is not
+            True.
         """
         # list containing (path_str, Resource) e.g:
         # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
@@ -105,7 +108,11 @@ class SynapseHomeServer(HomeServer):
             desired_tree.append(("/matrix/client",  # TODO constant please
                                 self.get_resource_for_web_client()))
 
-        self.root_resource = Resource()
+        if web_client and redirect_root_to_web_client:
+            self.root_resource = RootRedirect("/matrix/client")
+        else:
+            self.root_resource = Resource()
+
         # ideally we'd just use getChild and putChild but getChild doesn't work
         # unless you give it a Request object IN ADDITION to the name :/ So
         # instead, we'll store a copy of this mapping so we can actually add
@@ -247,7 +254,9 @@ def setup():
 
     hs.register_servlets()
 
-    hs.create_resource_tree(web_client=args.webclient)
+    hs.create_resource_tree(
+        web_client=args.webclient,
+        redirect_root_to_web_client=True)
     hs.start_listening(args.port)
 
     hs.build_db_pool()
