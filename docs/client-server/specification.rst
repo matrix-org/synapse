@@ -414,6 +414,9 @@ The server checks this, finds it is valid, and returns:
 {
   "access_token": "abcdef0123456789"
 }
+The server may optionally return "user_id" to confirm or change the user's ID.
+This is particularly useful if the home server wishes to support localpart entry
+of usernames (e.g. "bob" rather than "@bob:matrix.org").
 
 OAuth2-based
 ------------

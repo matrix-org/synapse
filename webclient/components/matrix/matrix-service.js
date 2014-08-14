@@ -212,6 +212,17 @@ angular.module('matrixService', [])
             path = path.replace("$room_id", room_id);
             return doRequest("GET", path);
         },
+        
+        paginateBackMessages: function(room_id, from_token, limit) {
+            var path = "/rooms/$room_id/messages/list";
+            path = path.replace("$room_id", room_id);
+            var params = {
+                from: from_token,
+                to: "START",
+                limit: limit
+            };
+            return doRequest("GET", path, params);
+        },
 
         // get a list of public rooms on your home server
         publicRooms: function() {

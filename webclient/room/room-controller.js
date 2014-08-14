@@ -18,11 +18,14 @@ angular.module('RoomController', [])
 .controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService',
                                function($scope, $http, $timeout, $routeParams, $location, matrixService) {
    'use strict';
+    var MESSAGES_PER_PAGINATION = 10;
     $scope.room_id = $routeParams.room_id;
     $scope.room_alias = matrixService.getRoomIdToAliasMapping($scope.room_id);
     $scope.state = {
         user_id: matrixService.config().user_id,
-        events_from: "START"
+        events_from: "END", // when to start the event stream from.
+        earliest_token: "END", // stores how far back we've paginated.
+        can_paginate: true
     };
     $scope.messages = [];
     $scope.members = {};
@@ -30,6 +33,53 @@ angular.module('RoomController', [])
 
     $scope.imageURLToSend = "";
     $scope.userIDToInvite = "";
+    
+    var scrollToBottom = function() {
+        $timeout(function() {
+            var objDiv = document.getElementsByClassName("messageTableWrapper")[0];
+            objDiv.scrollTop = objDiv.scrollHeight;
+        },0);
+    };
+    
+    var parseChunk = function(chunks, appendToStart) {
+        for (var i = 0; i < chunks.length; i++) {
+            var chunk = chunks[i];
+            if (chunk.room_id == $scope.room_id && chunk.type == "m.room.message") {
+                if ("membership_target" in chunk.content) {
+                    chunk.user_id = chunk.content.membership_target;
+                }
+                if (appendToStart) {
+                    $scope.messages.unshift(chunk);
+                }
+                else {
+                    $scope.messages.push(chunk);
+                    scrollToBottom();
+                }
+            }
+            else if (chunk.room_id == $scope.room_id && chunk.type == "m.room.member") {
+                updateMemberList(chunk);
+            }
+            else if (chunk.type === "m.presence") {
+                updatePresence(chunk);
+            }
+        }
+    };
+    
+    var paginate = function(numItems) {
+        matrixService.paginateBackMessages($scope.room_id, $scope.state.earliest_token, numItems).then(
+            function(response) {
+                parseChunk(response.data.chunk, true);
+                $scope.state.earliest_token = response.data.end;
+                if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
+                    // no more messages to paginate :(
+                    $scope.state.can_paginate = false;
+                }
+            },
+            function(error) {
+                console.log("paginateBackMessages Ruh roh: " + JSON.stringify(error));
+            }
+        )
+    };
 
     var shortPoll = function() {
         $http.get(matrixService.config().homeserver + matrixService.prefix + "/events", {
@@ -41,28 +91,10 @@ angular.module('RoomController', [])
             .then(function(response) {
                 console.log("Got response from "+$scope.state.events_from+" to "+response.data.end);
                 $scope.state.events_from = response.data.end;
-
                 $scope.feedback = "";
 
-                for (var i = 0; i < response.data.chunk.length; i++) {
-                    var chunk = response.data.chunk[i];
-                    if (chunk.room_id == $scope.room_id && chunk.type == "m.room.message") {
-                        if ("membership_target" in chunk.content) {
-                            chunk.user_id = chunk.content.membership_target;
-                        }
-                        $scope.messages.push(chunk);
-                        $timeout(function() {
-                            var objDiv = document.getElementsByClassName("messageTableWrapper")[0];
-                            objDiv.scrollTop = objDiv.scrollHeight;
-                        },0);
-                    }
-                    else if (chunk.room_id == $scope.room_id && chunk.type == "m.room.member") {
-                        updateMemberList(chunk);
-                    }
-                    else if (chunk.type === "m.presence") {
-                        updatePresence(chunk);
-                    }
-                }
+                parseChunk(response.data.chunk, false);
+                
                 if ($scope.stopPoll) {
                     console.log("Stopping polling.");
                 }
@@ -199,6 +231,8 @@ angular.module('RoomController', [])
                         $scope.feedback = "Failed get member list: " + error.data.error;
                     }
                 );
+                
+                paginate(MESSAGES_PER_PAGINATION);
             },
             function(reason) {
                 $scope.feedback = "Can't join room: " + reason;
@@ -237,6 +271,10 @@ angular.module('RoomController', [])
             function(error) {
                 $scope.feedback = "Failed to send image: " + error.data.error;
             });
+    };
+    
+    $scope.loadMoreHistory = function() {
+        paginate(MESSAGES_PER_PAGINATION);
     };
 
     $scope.$on('$destroy', function(e) {
