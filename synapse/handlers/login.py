@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from ._base import BaseHandler
-from synapse.api.errors import LoginError
+from synapse.api.errors import LoginError, Codes
 
 import bcrypt
 import logging
@@ -51,7 +51,7 @@ class LoginHandler(BaseHandler):
         user_info = yield self.store.get_user_by_id(user_id=user)
         if not user_info:
             logger.warn("Attempted to login as %s but they do not exist.", user)
-            raise LoginError(403, "")
+            raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
         stored_hash = user_info[0]["password_hash"]
         if bcrypt.checkpw(password, stored_hash):
@@ -62,4 +62,4 @@ class LoginHandler(BaseHandler):
             defer.returnValue(token)
         else:
             logger.warn("Failed password login for user %s", user)
-            raise LoginError(403, "")
+            raise LoginError(403, "", errcode=Codes.FORBIDDEN)
