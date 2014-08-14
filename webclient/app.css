@@ -11,21 +11,33 @@ h1 {
 /*** Overall page layout ***/
 
 .page {
-    max-width: 1280px;
+    position: absolute;
+    top: 80px;
+    bottom: 100px;
+    left: 0px;
+    right: 0px;
+    margin: 20px;
+    margin: 20px;
+}
+
+.wrapper {
     margin: auto;
-    margin-bottom: 80px ! important;
-    padding-left: 20px;
-    padding-right: 20px;
+    max-width: 1280px;
+    height: 100%;
 }
 
 .roomName {
+    max-width: 1280px;
+    width: 100%;
     text-align: right;
+    top: -40px;
+    position: absolute;
     font-size: 16pt;
     margin-bottom: 10px;
 }
 
 .controlPanel {
-    position: fixed;
+    position: absolute;
     bottom: 0px;
     width: 100%;
     background-color: #f8f8f8;
@@ -70,8 +82,9 @@ h1 {
 
 .userAvatar {
     width: 80px;
-    height: 80px;
+    height: 100px;
     position: relative;
+    background-color: #000;
 }
 
 .userAvatar .userAvatarImage {
@@ -81,7 +94,7 @@ h1 {
 
 .userAvatar .userAvatarGradient {
     position: absolute;
-    bottom: 0px;
+    bottom: 20px;
 }
 
 .userAvatar .userName {
@@ -91,7 +104,6 @@ h1 {
     bottom: 0px;
     font-size: 8pt;
     word-wrap: break-word;
-    word-break: break-all;
 }
 
 .userPresence {
@@ -110,27 +122,18 @@ h1 {
     background-color: #FFCC00;
 }
 
-/*** Room page  ***/
-
-/* Limit the height of the page content to 100% of the viewport height minus the
-   height of the header and the footer.
-   The two divs containing the messages list and the users list will then scroll-
-   overflow separetely. 
-  */
-.room .page {
-    height: calc(100vh - 220px); 
-}
-
 /*** Message table ***/
 
 .messageTableWrapper {
-    width: auto;
     height: 100%;
     margin-right: 140px;
     overflow-y: auto;
+    width: auto;
 }
 
 .messageTable {
+    margin: auto;
+    max-width: 1280px;
     width: 100%;
     border-collapse: collapse;
 }
@@ -180,6 +183,8 @@ h1 {
     height: 32px;
     display: inline-table;
     max-width: 90%;
+    word-wrap: break-word;
+    word-break: break-all;
 }
 
 .emote {
@@ -217,12 +222,10 @@ h1 {
 /******************************/
 
 .header {
-    margin-top: 12px ! important;
     padding-left: 20px;
     padding-right: 20px;
     max-width: 1280px;
     margin: auto;
-    height: 60px;
 }
 
 .header-buttons {

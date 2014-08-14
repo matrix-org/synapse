@@ -70,4 +70,9 @@ matrixWebClient
                 $timeout(function() { element[0].focus() }, 0);
             }
         };
+    }])
+    .filter('to_trusted', ['$sce', function($sce){
+        return function(text) {
+            return $sce.trustAsHtml(text);
+        };
     }]);
