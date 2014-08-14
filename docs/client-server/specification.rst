@@ -1,6 +1,6 @@
-=========================
-Synapse Client-Server API
-=========================
+========================
+Matrix Client-Server API
+========================
 
 The following specification outlines how a client can send and receive data from 
 a home server.
