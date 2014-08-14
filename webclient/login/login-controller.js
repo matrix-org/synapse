@@ -79,7 +79,7 @@ angular.module('LoginController', ['matrixService'])
                     $scope.feedback = "Login successful.";
                     matrixService.setConfig({
                         homeserver: $scope.account.homeserver,
-                        user_id: $scope.account.user_id,
+                        user_id: response.data.user_id,
                         access_token: response.data.access_token
                     });
                     matrixService.saveConfig();

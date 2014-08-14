@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.types import UserID
 from base import RestServlet, client_path_pattern
 
 import json
@@ -45,12 +46,17 @@ class LoginRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def do_password_login(self, login_submission):
+        if not login_submission["user"].startswith('@'):
+            login_submission["user"] = UserID.create_local(
+                login_submission["user"], self.hs).to_string()
+
         handler = self.handlers.login_handler
         token = yield handler.login(
             user=login_submission["user"],
             password=login_submission["password"])
 
         result = {
+            "user_id": login_submission["user"],  # may have changed
             "access_token": token,
             "home_server": self.hs.hostname,
         }

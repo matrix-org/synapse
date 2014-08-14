@@ -16,7 +16,6 @@
 from twisted.internet import defer
 
 from ._base import BaseHandler
-from synapse.types import UserID
 from synapse.api.errors import LoginError, Codes
 
 import bcrypt
@@ -36,7 +35,7 @@ class LoginHandler(BaseHandler):
         """Login as the specified user with the specified password.
 
         Args:
-            user (str): The user ID or username.
+            user (str): The user ID.
             password (str): The password.
         Returns:
             The newly allocated access token.
@@ -47,9 +46,6 @@ class LoginHandler(BaseHandler):
         # TODO do this better, it can't go in __init__ else it cyclic loops
         if not hasattr(self, "reg_handler"):
             self.reg_handler = self.hs.get_handlers().registration_handler
-
-        if not user.startswith('@'):
-            user = UserID.create_local(user, self.hs).to_string()
 
         # pull out the hash for this user if they exist
         user_info = yield self.store.get_user_by_id(user_id=user)
