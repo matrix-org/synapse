@@ -189,7 +189,8 @@ Running a Demo Federation of Homeservers
 
 If you want to get up and running quickly with a trio of homeservers in a
 private federation (``localhost:8080``, ``localhost:8081`` and
-``localhost:8082``) which you can then access through the webclient running at http://localhost:8080.  Simply run::
+``localhost:8082``) which you can then access through the webclient running at
+http://localhost:8080. Simply run::
 
     $ demo/start.sh
 
