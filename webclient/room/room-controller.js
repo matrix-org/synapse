@@ -99,8 +99,8 @@ angular.module('RoomController', [])
                     function(response) {
                         var member = $scope.members[chunk.target_user_id];
                         if (member !== undefined) {
-                            console.log("Updated displayname "+chunk.target_user_id+" to " + response.displayname);
-                            member.displayname = response.displayname;
+                            console.log("Updated displayname "+chunk.target_user_id+" to " + response.data.displayname);
+                            member.displayname = response.data.displayname;
                         }
                     }
                 ); 
@@ -108,8 +108,8 @@ angular.module('RoomController', [])
                     function(response) {
                          var member = $scope.members[chunk.target_user_id];
                          if (member !== undefined) {
-                            console.log("Updated image for "+chunk.target_user_id+" to " + response.avatar_url);
-                            member.avatar_url = response.avatar_url;
+                            console.log("Updated image for "+chunk.target_user_id+" to " + response.data.avatar_url);
+                            member.avatar_url = response.data.avatar_url;
                          }
                     }
                 );
@@ -171,8 +171,8 @@ angular.module('RoomController', [])
                 console.log("Sent message");
                 $scope.textInput = "";
             },
-            function(reason) {
-                $scope.feedback = "Failed to send: " + reason;
+            function(error) {
+                $scope.feedback = "Failed to send: " + error.data.error;
             });               
     };
 
@@ -190,13 +190,13 @@ angular.module('RoomController', [])
                 // Get the current member list
                 matrixService.getMemberList($scope.room_id).then(
                     function(response) {
-                        for (var i = 0; i < response.chunk.length; i++) {
-                            var chunk = response.chunk[i];
+                        for (var i = 0; i < response.data.chunk.length; i++) {
+                            var chunk = response.data.chunk[i];
                             updateMemberList(chunk);
                         }
                     },
-                    function(reason) {
-                        $scope.feedback = "Failed get member list: " + reason;
+                    function(error) {
+                        $scope.feedback = "Failed get member list: " + error.data.error;
                     }
                 );
             },
@@ -224,8 +224,8 @@ angular.module('RoomController', [])
                 console.log("Left room ");
                 $location.path("rooms");
             },
-            function(reason) {
-                $scope.feedback = "Failed to leave room: " + reason;
+            function(error) {
+                $scope.feedback = "Failed to leave room: " + error.data.error;
             });
     };
 
@@ -234,8 +234,8 @@ angular.module('RoomController', [])
             function() {
                 console.log("Image sent");
             },
-            function(reason) {
-                $scope.feedback = "Failed to send image: " + reason;
+            function(error) {
+                $scope.feedback = "Failed to send image: " + error.data.error;
             });
     };
 
