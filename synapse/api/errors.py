@@ -27,6 +27,7 @@ class Codes(object):
     BAD_PAGINATION = "M_BAD_PAGINATION"
     UNKNOWN = "M_UNKNOWN"
     NOT_FOUND = "M_NOT_FOUND"
+    UNKNOWN_TOKEN = "M_UNKNOWN_TOKEN"
 
 
 class CodeMessageException(Exception):

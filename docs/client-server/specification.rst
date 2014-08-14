@@ -262,7 +262,10 @@ the error, but the keys 'error' and 'errcode' will always be present.
 Some standard error codes are below:
 
 M_FORBIDDEN:
-Forbidden access, e.g. bad access token, failed login.
+Forbidden access, e.g. joining a room without permission, failed login.
+
+M_UNKNOWN_TOKEN:
+The access token specified was not recognised.
 
 M_BAD_JSON:
 Request contained valid JSON, but it was malformed in some way, e.g. missing
