@@ -30,6 +30,7 @@ import argparse
 import logging
 import logging.config
 import sqlite3
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -131,9 +132,15 @@ def setup():
 
     verbosity = int(args.verbose) if args.verbose else None
 
+    # Because if/when we daemonize we change to root dir.
+    db_name = os.path.abspath(args.db)
+    log_file = args.log_file
+    if log_file:
+        log_file = os.path.abspath(log_file)
+
     setup_logging(
         verbosity=verbosity,
-        filename=args.log_file,
+        filename=log_file,
         config_path=args.log_config,
     )
 
@@ -141,7 +148,7 @@ def setup():
 
     hs = SynapseHomeServer(
         args.host,
-        db_name=args.db
+        db_name=db_name
     )
 
     # This object doesn't need to be saved because it's set as the handler for
