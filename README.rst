@@ -40,8 +40,8 @@ To get up and running:
 About Matrix
 ============
 
-Matrix specifies a set of pragmatic RESTful HTTP JSON APIs for VoIP and IM as an
-open standard, providing:
+Matrix specifies a set of pragmatic RESTful HTTP JSON APIs as an open standard,
+which handle:
 
     - Creating and managing fully distributed chat rooms with no
       single points of control or failure
