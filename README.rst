@@ -120,6 +120,10 @@ may need to also run:
     $ sudo apt-get install python-pip
     $ sudo pip install --upgrade setuptools
     
+If you don't have access to github, then you may need to install ``syutil``
+manually by checking it out and running ``python setup.py develop --user`` on it
+too.
+    
 If you get errors about ``sodium.h`` being missing, you may also need to
 manually install a newer PyNaCl via pip as setuptools installs an old one. Or
 you can check PyNaCl out of git directly (https://github.com/pyca/pynacl) and
