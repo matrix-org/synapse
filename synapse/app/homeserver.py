@@ -85,17 +85,20 @@ class SynapseHomeServer(HomeServer):
 
         return pool
 
-    def create_resource_tree(self):
+    def create_resource_tree(self, web_client):
         """Create the resource tree for this Home Server.
 
         This in unduly complicated because Twisted does not support putting
         child resources more than 1 level deep at a time.
         """
-        desired_tree = (  # list of tuples containing (path_str, Resource)
-            ("/matrix/client", self.get_resource_for_web_client()),
+        desired_tree = [  # list containing (path_str, Resource)
             (CLIENT_PREFIX, self.get_resource_for_client()),
             (PREFIX, self.get_resource_for_federation())
-        )
+        ]
+        if web_client:
+            logger.info("Adding the web client.")
+            desired_tree.append(("/matrix/client",  # TODO constant please
+                                self.get_resource_for_web_client()))
 
         self.root_resource = Resource()
         # ideally we'd just use getChild and putChild but getChild doesn't work
@@ -222,7 +225,7 @@ def setup():
 
     hs.register_servlets()
 
-    hs.create_resource_tree()
+    hs.create_resource_tree(web_client=args.webclient)
     hs.start_listening(args.port)
 
     hs.build_db_pool()
