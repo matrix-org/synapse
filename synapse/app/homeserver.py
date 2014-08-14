@@ -51,7 +51,7 @@ class SynapseHomeServer(HomeServer):
         return JsonResource()
 
     def build_resource_for_web_client(self):
-        return File("webclient")
+        return File("webclient")  # TODO configurable?
 
     def build_db_pool(self):
         """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
@@ -90,8 +90,13 @@ class SynapseHomeServer(HomeServer):
 
         This in unduly complicated because Twisted does not support putting
         child resources more than 1 level deep at a time.
+
+        Args:
+            web_client (bool): True to enable the web client.
         """
-        desired_tree = [  # list containing (path_str, Resource)
+        # list containing (path_str, Resource) e.g:
+        # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
+        desired_tree = [
             (CLIENT_PREFIX, self.get_resource_for_client()),
             (PREFIX, self.get_resource_for_federation())
         ]
@@ -111,19 +116,36 @@ class SynapseHomeServer(HomeServer):
             last_resource = self.root_resource
             for path_seg in full_path.split('/')[1:-1]:
                 if not path_seg in last_resource.listNames():
-                    # resource doesn't exist
+                    # resource doesn't exist, so make a "dummy resource"
                     child_resource = Resource()
                     last_resource.putChild(path_seg, child_resource)
                     res_id = self._resource_id(last_resource, path_seg)
                     resource_mappings[res_id] = child_resource
                     last_resource = child_resource
                 else:
-                    # we have an existing Resource, pull it out.
+                    # we have an existing Resource, use that instead.
                     res_id = self._resource_id(last_resource, path_seg)
                     last_resource = resource_mappings[res_id]
 
-            # now attach the actual resource
+            # ===========================
+            # now attach the actual desired resource
             last_path_seg = full_path.split('/')[-1]
+
+            # if there is already a resource here, thieve its children and
+            # replace it
+            res_id = self._resource_id(last_resource, last_path_seg)
+            if res_id in resource_mappings:
+                # there is a dummy resource at this path already, which needs
+                # to be replaced with the desired resource.
+                existing_dummy_resource = resource_mappings[res_id]
+                for child_name in existing_dummy_resource.listNames():
+                    child_res_id = self._resource_id(existing_dummy_resource,
+                                                     child_name)
+                    child_resource = resource_mappings[child_res_id]
+                    # steal the children
+                    resource.putChild(child_name, child_resource)
+
+            # finally, insert the desired resource in the right place
             last_resource.putChild(last_path_seg, resource)
             res_id = self._resource_id(last_resource, last_path_seg)
             resource_mappings[res_id] = resource
