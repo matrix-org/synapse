@@ -17,7 +17,7 @@ limitations under the License.
 'use strict';
 
 angular.module('matrixService', [])
-.factory('matrixService', ['$http', '$q', function($http, $q) {
+.factory('matrixService', ['$http', '$q', '$rootScope', function($http, $q, $rootScope) {
         
    /* 
     * Permanent storage of user information
@@ -60,7 +60,6 @@ angular.module('matrixService', [])
             headers: headers
         })
         .success(function(data, status, headers, config) {
-            // @TODO: We could detect a bad access token here and make an automatic logout
             deferred.resolve(data, status, headers, config);
         })
         .error(function(data, status, headers, config) {
@@ -70,6 +69,11 @@ angular.module('matrixService', [])
                 reason = JSON.stringify(data);
             }
             deferred.reject(reason, data, status, headers, config);
+
+            if (403 === status && "M_UNKNOWN_TOKEN" === data.errcode) {
+                // The access token is no more valid, broadcast the issue
+                $rootScope.$broadcast("M_UNKNOWN_TOKEN");
+            }
         });
 
         return deferred.promise;
@@ -299,6 +303,12 @@ angular.module('matrixService', [])
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
+        },
+        
+        
+        // 
+        testLogin: function() {
+            
         },
         
         /****** Permanent storage of user information ******/

@@ -55,8 +55,14 @@ angular.module('MatrixWebClientController', ['matrixService'])
         
         // And go to the login page
         $location.path("login");
-    };    
-                          
+    };
+
+    // Listen to the event indicating that the access token is no more valid.
+    // In this case, the user needs to log in again.
+    $scope.$on("M_UNKNOWN_TOKEN", function() {
+        console.log("Invalid access token -> log user out");
+        $scope.logout();
+    });
 }]);
 
    
