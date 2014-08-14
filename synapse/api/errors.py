@@ -74,7 +74,10 @@ class AuthError(SynapseError):
 
 class EventStreamError(SynapseError):
     """An error raised when there a problem with the event stream."""
-    pass
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.BAD_PAGINATION
+        super(EventStreamError, self).__init__(*args, **kwargs)
 
 
 class LoginError(SynapseError):
