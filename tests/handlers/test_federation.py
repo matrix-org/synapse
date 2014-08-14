@@ -42,7 +42,7 @@ class FederationTestCase(unittest.TestCase):
                 "persist_event",
                 "store_room",
             ]),
-            http_server=NonCallableMock(),
+            resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
             notifier=NonCallableMock(spec_set=["on_new_room_event"]),
             handlers=NonCallableMock(spec_set=[

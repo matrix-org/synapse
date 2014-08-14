@@ -21,8 +21,13 @@ from synapse.server import HomeServer
 from twisted.internet import reactor
 from twisted.enterprise import adbapi
 from twisted.python.log import PythonLoggingObserver
-from synapse.http.server import TwistedHttpServer
+from twisted.web.resource import Resource
+from twisted.web.static import File
+from twisted.web.server import Site
+from synapse.http.server import JsonResource
 from synapse.http.client import TwistedHttpClient
+from synapse.rest.base import CLIENT_PREFIX
+from synapse.federation.transport import PREFIX
 
 from daemonize import Daemonize
 
@@ -35,11 +40,18 @@ logger = logging.getLogger(__name__)
 
 
 class SynapseHomeServer(HomeServer):
-    def build_http_server(self):
-        return TwistedHttpServer()
 
     def build_http_client(self):
         return TwistedHttpClient()
+
+    def build_resource_for_client(self):
+        return JsonResource()
+
+    def build_resource_for_federation(self):
+        return JsonResource()
+
+    def build_resource_for_web_client(self):
+        return File("webclient")
 
     def build_db_pool(self):
         """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
@@ -72,6 +84,69 @@ class SynapseHomeServer(HomeServer):
         logging.info("Database prepared in %s.", self.db_name)
 
         return pool
+
+    def create_resource_tree(self, web_client):
+        """Create the resource tree for this Home Server.
+
+        This in unduly complicated because Twisted does not support putting
+        child resources more than 1 level deep at a time.
+        """
+        desired_tree = [  # list containing (path_str, Resource)
+            (CLIENT_PREFIX, self.get_resource_for_client()),
+            (PREFIX, self.get_resource_for_federation())
+        ]
+        if web_client:
+            logger.info("Adding the web client.")
+            desired_tree.append(("/matrix/client",  # TODO constant please
+                                self.get_resource_for_web_client()))
+
+        self.root_resource = Resource()
+        # ideally we'd just use getChild and putChild but getChild doesn't work
+        # unless you give it a Request object IN ADDITION to the name :/ So
+        # instead, we'll store a copy of this mapping so we can actually add
+        # extra resources to existing nodes. See self._resource_id for the key.
+        resource_mappings = {}
+        for (full_path, resource) in desired_tree:
+            logging.info("Attaching %s to path %s", resource, full_path)
+            last_resource = self.root_resource
+            for path_seg in full_path.split('/')[1:-1]:
+                if not path_seg in last_resource.listNames():
+                    # resource doesn't exist
+                    child_resource = Resource()
+                    last_resource.putChild(path_seg, child_resource)
+                    res_id = self._resource_id(last_resource, path_seg)
+                    resource_mappings[res_id] = child_resource
+                    last_resource = child_resource
+                else:
+                    # we have an existing Resource, pull it out.
+                    res_id = self._resource_id(last_resource, path_seg)
+                    last_resource = resource_mappings[res_id]
+
+            # now attach the actual resource
+            last_path_seg = full_path.split('/')[-1]
+            last_resource.putChild(last_path_seg, resource)
+            res_id = self._resource_id(last_resource, last_path_seg)
+            resource_mappings[res_id] = resource
+
+        return self.root_resource
+
+    def _resource_id(self, resource, path_seg):
+        """Construct an arbitrary resource ID so you can retrieve the mapping
+        later.
+
+        If you want to represent resource A putChild resource B with path C,
+        the mapping should looks like _resource_id(A,C) = B.
+
+        Args:
+            resource (Resource): The *parent* Resource
+            path_seg (str): The name of the child Resource to be attached.
+        Returns:
+            str: A unique string which can be a key to the child Resource.
+        """
+        return "%s-%s" % (resource, path_seg)
+
+    def start_listening(self, port):
+        reactor.listenTCP(port, Site(self.root_resource))
 
 
 def setup_logging(verbosity=0, filename=None, config_path=None):
@@ -150,7 +225,8 @@ def setup():
 
     hs.register_servlets()
 
-    hs.get_http_server().start_listening(args.port)
+    hs.create_resource_tree(web_client=args.webclient)
+    hs.start_listening(args.port)
 
     hs.build_db_pool()
 

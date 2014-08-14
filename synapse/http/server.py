@@ -52,10 +52,9 @@ class HttpServer(object):
         pass
 
 
-# The actual HTTP server impl, using twisted http server
-class TwistedHttpServer(HttpServer, resource.Resource):
-    """ This wraps the twisted HTTP server, and triggers the correct callbacks
-    on the transport_layer.
+class JsonResource(HttpServer, resource.Resource):
+    """ This implements the HttpServer interface and provides JSON support for
+    Resources.
 
     Register callbacks via register_path()
     """
