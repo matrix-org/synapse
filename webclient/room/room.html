@@ -33,7 +33,7 @@
                 </td>
                 <td ng-class="!msg.content.membership_target ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : ''">
                     <div class="bubble">
-                        {{ msg.content.msgtype === "m.emote" ? ("* " + (members[msg.user_id].displayname || msg.user_id) + " ") : "" }}
+                        {{ msg.content.msgtype === "m.emote" ? ("* " + (members[msg.user_id].displayname || msg.user_id) + " " + msg.content.body) : "" }}
                         {{ msg.content.msgtype === "m.text" ? msg.content.body : "" }}
                         <img class="image" ng-hide='msg.content.msgtype !== "m.image"' src="{{ msg.content.url }}" alt="{{ msg.content.body }}"/>
                     </div>
