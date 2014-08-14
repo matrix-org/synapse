@@ -94,9 +94,9 @@ class MessageHandler(BaseHandler):
                 event.room_id
             )
 
-            yield self.hs.get_federation().handle_new_event(event)
-
             self.notifier.on_new_room_event(event, store_id)
+
+        yield self.hs.get_federation().handle_new_event(event)
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
