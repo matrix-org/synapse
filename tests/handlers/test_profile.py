@@ -56,7 +56,7 @@ class ProfileTestCase(unittest.TestCase):
                     "set_profile_avatar_url",
                 ]),
                 handlers=None,
-                http_server=Mock(),
+                resource_for_federation=Mock(),
                 replication_layer=self.mock_federation,
             )
         hs.handlers = ProfileHandlers(hs)
@@ -139,7 +139,7 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set = self.datastore.set_profile_avatar_url
         mocked_set.return_value = defer.succeed(())
 
-        yield self.handler.set_avatar_url(self.frank, self.frank, 
+        yield self.handler.set_avatar_url(self.frank, self.frank,
                 "http://my.server/pic.gif")
 
         mocked_set.assert_called_with("1234ABCD", "http://my.server/pic.gif")

@@ -24,7 +24,7 @@ from twisted.python.log import PythonLoggingObserver
 from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
-from synapse.http.server import TwistedHttpServer, JsonResource
+from synapse.http.server import JsonResource
 from synapse.http.client import TwistedHttpClient
 from synapse.rest.base import CLIENT_PREFIX
 from synapse.federation.transport import PREFIX
@@ -40,8 +40,6 @@ logger = logging.getLogger(__name__)
 
 
 class SynapseHomeServer(HomeServer):
-    def build_http_server(self):
-        return TwistedHttpServer()
 
     def build_http_client(self):
         return TwistedHttpClient()

@@ -71,7 +71,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                     "set_profile_displayname",
                 ]),
                 handlers=None,
-                http_server=Mock(),
+                resource_for_federation=Mock(),
                 http_client=None,
                 replication_layer=MockReplication(),
             )

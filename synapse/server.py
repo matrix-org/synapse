@@ -55,7 +55,6 @@ class BaseHomeServer(object):
 
     DEPENDENCIES = [
         'clock',
-        'http_server',
         'http_client',
         'db_pool',
         'persistence_service',
@@ -138,7 +137,9 @@ class HomeServer(BaseHomeServer):
     required.
 
     It still requires the following to be specified by the caller:
-        http_server
+        resource_for_client
+        resource_for_web_client
+        resource_for_federation
         http_client
         db_pool
     """
