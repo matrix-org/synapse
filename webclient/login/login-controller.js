@@ -3,8 +3,16 @@ angular.module('LoginController', ['matrixService'])
                                     function($scope, $location, matrixService) {
     'use strict';
     
+    
+    // Assume that this is hosted on the home server, in which case the URL
+    // contains the home server.
+    var hs_url = $location.protocol() + "://" + $location.host();
+    if ($location.port()) {
+        hs_url += ":" + $location.port();
+    }
+    
     $scope.account = {
-        homeserver: "http://localhost:8080",
+        homeserver: hs_url,
         desired_user_name: "",
         user_id: "",
         password: "",
