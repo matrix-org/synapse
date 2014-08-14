@@ -197,15 +197,9 @@ http://localhost:8080. Simply run::
 Running The Demo Web Client
 ===========================
 
-At the present time, the web client is not directly served by the homeserver's
-HTTP server. To serve this in a form the web browser can reach, arrange for the
-'webclient' sub-directory to be made available by any sort of HTTP server that
-can serve static files. For example, python's SimpleHTTPServer will suffice::
-
-    $ cd webclient
-    $ python -m SimpleHTTPServer
-
-You can now point your browser at  http://localhost:8000/  to find the client.
+You can run the web client when you run the homeserver by adding ``-w`` to the
+command to run ``homeserver.py``. The web client can be accessed via 
+http://localhost/matrix/client
 
 If this is the first time you have used the client from that browser (it uses
 HTML5 local storage to remember its config), you will need to log in to your
