@@ -16,30 +16,30 @@ limitations under the License.
 
 angular.module('RoomController', [])
 // FIXME move directives outta here!
-.directive("keepScroll", function(){
-  return {
-    controller : function($scope){
-      var element = 0;
-      this.setElement = function(el){
-        element = el;
-      }
-      this.addItem = function(item){
-        element.scrollTop = (element.scrollTop+item.clientHeight+1); //1px for margin
-      };
-    },
-    link : function(scope,el,attr, ctrl) {
-     ctrl.setElement(el[0]);
-    }
-  };
+.directive("keepScroll", function() {
+    return {
+        controller : function($scope) {
+            var element = 0;
+            this.setElement = function(el){
+                element = el;
+            }
+            this.addItem = function(item){
+                element.scrollTop = (element.scrollTop + item.clientHeight);
+            };
+        },
+        link : function(scope, el, attr, ctrl) {
+            ctrl.setElement(el[0]);
+        }
+    };
 })
 // FIXME move directives outta here!
 .directive("scrollItem", function(){
-  return{
-    require : "^keepScroll",
-    link : function(scope, el, att, scrCtrl){
-      scrCtrl.addItem(el[0]);
+    return {
+        require : "^keepScroll",
+        link : function(scope, el, att, scrCtrl){
+            scrCtrl.addItem(el[0]);
+        }
     }
-  }
 })
 .controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService',
                                function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService) {
