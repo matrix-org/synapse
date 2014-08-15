@@ -2,8 +2,31 @@ import argparse
 import BaseHTTPServer
 import os
 import SimpleHTTPServer
+import cgi, logging
 
 from daemonize import Daemonize
+
+class SimpleHTTPRequestHandlerWithPOST(SimpleHTTPServer.SimpleHTTPRequestHandler):
+    UPLOAD_PATH = "upload"
+
+    """
+    Accept all post request as file upload
+    """
+    def do_POST(self):
+
+        path = os.path.join(self.UPLOAD_PATH, os.path.basename(self.path))
+        length = self.headers['content-length']
+        data = self.rfile.read(int(length))
+
+        with open(path, 'wb') as fh:
+            fh.write(data)
+
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+
+        # Return the absolute path of the uploaded file
+        self.wfile.write('{"url":"/%s"}' % path)
 
 
 def setup():
@@ -19,7 +42,7 @@ def setup():
 
     httpd = BaseHTTPServer.HTTPServer(
         ('', args.port),
-        SimpleHTTPServer.SimpleHTTPRequestHandler
+        SimpleHTTPRequestHandlerWithPOST
     )
 
     def run():

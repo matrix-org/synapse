@@ -18,7 +18,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
-from synapse.api.errors import AuthError, StoreError
+from synapse.api.errors import AuthError, StoreError, Codes
 from synapse.api.events.room import (RoomTopicEvent, RoomMemberEvent,
                                      MessageEvent, FeedbackEvent)
 
@@ -163,4 +163,5 @@ class Auth(object):
             user_id = yield self.store.get_user_by_token(token=token)
             defer.returnValue(self.hs.parse_userid(user_id))
         except StoreError:
-            raise AuthError(403, "Unrecognised access token.")
+            raise AuthError(403, "Unrecognised access token.",
+                            errcode=Codes.UNKNOWN_TOKEN)

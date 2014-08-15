@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """ This module contains base REST classes for constructing REST servlets. """
+from synapse.api.urls import CLIENT_PREFIX
 import re
 
 
@@ -27,7 +28,7 @@ def client_path_pattern(path_regex):
     Returns:
         SRE_Pattern
     """
-    return re.compile("^/matrix/client/api/v1" + path_regex)
+    return re.compile("^" + CLIENT_PREFIX + path_regex)
 
 
 class RestServlet(object):

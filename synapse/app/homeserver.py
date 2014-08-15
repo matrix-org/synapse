@@ -21,8 +21,12 @@ from synapse.server import HomeServer
 from twisted.internet import reactor
 from twisted.enterprise import adbapi
 from twisted.python.log import PythonLoggingObserver
-from synapse.http.server import TwistedHttpServer
+from twisted.web.resource import Resource
+from twisted.web.static import File
+from twisted.web.server import Site
+from synapse.http.server import JsonResource, RootRedirect
 from synapse.http.client import TwistedHttpClient
+from synapse.api.urls import CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX
 
 from daemonize import Daemonize
 
@@ -36,11 +40,18 @@ logger = logging.getLogger(__name__)
 
 
 class SynapseHomeServer(HomeServer):
-    def build_http_server(self):
-        return TwistedHttpServer()
 
     def build_http_client(self):
         return TwistedHttpClient()
+
+    def build_resource_for_client(self):
+        return JsonResource()
+
+    def build_resource_for_federation(self):
+        return JsonResource()
+
+    def build_resource_for_web_client(self):
+        return File("webclient")  # TODO configurable?
 
     def build_db_pool(self):
         """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
@@ -73,6 +84,98 @@ class SynapseHomeServer(HomeServer):
         logging.info("Database prepared in %s.", self.db_name)
 
         return pool
+
+    def create_resource_tree(self, web_client, redirect_root_to_web_client):
+        """Create the resource tree for this Home Server.
+
+        This in unduly complicated because Twisted does not support putting
+        child resources more than 1 level deep at a time.
+
+        Args:
+            web_client (bool): True to enable the web client.
+            redirect_root_to_web_client (bool): True to redirect '/' to the
+            location of the web client. This does nothing if web_client is not
+            True.
+        """
+        # list containing (path_str, Resource) e.g:
+        # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
+        desired_tree = [
+            (CLIENT_PREFIX, self.get_resource_for_client()),
+            (FEDERATION_PREFIX, self.get_resource_for_federation())
+        ]
+        if web_client:
+            logger.info("Adding the web client.")
+            desired_tree.append((WEB_CLIENT_PREFIX,
+                                self.get_resource_for_web_client()))
+
+        if web_client and redirect_root_to_web_client:
+            self.root_resource = RootRedirect(WEB_CLIENT_PREFIX)
+        else:
+            self.root_resource = Resource()
+
+        # ideally we'd just use getChild and putChild but getChild doesn't work
+        # unless you give it a Request object IN ADDITION to the name :/ So
+        # instead, we'll store a copy of this mapping so we can actually add
+        # extra resources to existing nodes. See self._resource_id for the key.
+        resource_mappings = {}
+        for (full_path, resource) in desired_tree:
+            logging.info("Attaching %s to path %s", resource, full_path)
+            last_resource = self.root_resource
+            for path_seg in full_path.split('/')[1:-1]:
+                if not path_seg in last_resource.listNames():
+                    # resource doesn't exist, so make a "dummy resource"
+                    child_resource = Resource()
+                    last_resource.putChild(path_seg, child_resource)
+                    res_id = self._resource_id(last_resource, path_seg)
+                    resource_mappings[res_id] = child_resource
+                    last_resource = child_resource
+                else:
+                    # we have an existing Resource, use that instead.
+                    res_id = self._resource_id(last_resource, path_seg)
+                    last_resource = resource_mappings[res_id]
+
+            # ===========================
+            # now attach the actual desired resource
+            last_path_seg = full_path.split('/')[-1]
+
+            # if there is already a resource here, thieve its children and
+            # replace it
+            res_id = self._resource_id(last_resource, last_path_seg)
+            if res_id in resource_mappings:
+                # there is a dummy resource at this path already, which needs
+                # to be replaced with the desired resource.
+                existing_dummy_resource = resource_mappings[res_id]
+                for child_name in existing_dummy_resource.listNames():
+                    child_res_id = self._resource_id(existing_dummy_resource,
+                                                     child_name)
+                    child_resource = resource_mappings[child_res_id]
+                    # steal the children
+                    resource.putChild(child_name, child_resource)
+
+            # finally, insert the desired resource in the right place
+            last_resource.putChild(last_path_seg, resource)
+            res_id = self._resource_id(last_resource, last_path_seg)
+            resource_mappings[res_id] = resource
+
+        return self.root_resource
+
+    def _resource_id(self, resource, path_seg):
+        """Construct an arbitrary resource ID so you can retrieve the mapping
+        later.
+
+        If you want to represent resource A putChild resource B with path C,
+        the mapping should looks like _resource_id(A,C) = B.
+
+        Args:
+            resource (Resource): The *parent* Resource
+            path_seg (str): The name of the child Resource to be attached.
+        Returns:
+            str: A unique string which can be a key to the child Resource.
+        """
+        return "%s-%s" % (resource, path_seg)
+
+    def start_listening(self, port):
+        reactor.listenTCP(port, Site(self.root_resource))
 
 
 def setup_logging(verbosity=0, filename=None, config_path=None):
@@ -157,7 +260,10 @@ def setup():
 
     hs.register_servlets()
 
-    hs.get_http_server().start_listening(args.port)
+    hs.create_resource_tree(
+        web_client=args.webclient,
+        redirect_root_to_web_client=True)
+    hs.start_listening(args.port)
 
     hs.build_db_pool()
 

@@ -35,7 +35,7 @@
                     <div class="bubble">
                         {{ msg.content.msgtype === "m.emote" ? ("* " + (members[msg.user_id].displayname || msg.user_id) + " " + msg.content.body) : "" }}
                         {{ msg.content.msgtype === "m.text" ? msg.content.body : "" }}
-                        <img class="image" ng-hide='msg.content.msgtype !== "m.image"' src="{{ msg.content.url }}" alt="{{ msg.content.body }}"/>
+                        <img class="image" ng-hide='msg.content.msgtype !== "m.image"' ng-src="{{ msg.content.url }}" alt="{{ msg.content.body }}"/>
                     </div>
                 </td>
                 <td class="rightBlock">
@@ -86,6 +86,10 @@
                     <button ng-click="inviteUser(userIDToInvite)">Invite</button>
             </span>
             <button ng-click="leaveRoom()">Leave</button>
+            <button ng-click="loadMoreHistory()" ng-disabled="!state.can_paginate">Load more history</button>
+            <div ng-hide="!state.stream_failure">
+                {{ state.stream_failure.data.error || "Connection failure" }}
+            </div>
         </div>
     </div>
 

@@ -51,7 +51,8 @@ class PresenceStateTestCase(unittest.TestCase):
         hs = HomeServer("test",
             db_pool=None,
             http_client=None,
-            http_server=self.mock_server,
+            resource_for_client=self.mock_server,
+            resource_for_federation=self.mock_server,
         )
 
         def _get_user_by_token(token=None):
@@ -108,7 +109,8 @@ class PresenceListTestCase(unittest.TestCase):
         hs = HomeServer("test",
             db_pool=None,
             http_client=None,
-            http_server=self.mock_server,
+            resource_for_client=self.mock_server,
+            resource_for_federation=self.mock_server
         )
 
         def _get_user_by_token(token=None):
@@ -183,7 +185,8 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         hs = HomeServer("test",
             db_pool=None,
             http_client=None,
-            http_server=self.mock_server,
+            resource_for_client=self.mock_server,
+            resource_for_federation=self.mock_server,
             datastore=Mock(spec=[
                 "set_presence_state",
                 "get_presence_list",

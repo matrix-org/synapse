@@ -70,7 +70,7 @@ class FederationTestCase(unittest.TestCase):
         )
         self.clock = MockClock()
         hs = HomeServer("test",
-                http_server=self.mock_http_server,
+                resource_for_federation=self.mock_http_server,
                 http_client=self.mock_http_client,
                 db_pool=None,
                 datastore=self.mock_persistence,

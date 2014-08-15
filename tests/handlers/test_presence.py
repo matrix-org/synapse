@@ -66,7 +66,7 @@ class PresenceStateTestCase(unittest.TestCase):
                     "set_presence_list_accepted",
                 ]),
                 handlers=None,
-                http_server=Mock(),
+                resource_for_federation=Mock(),
                 http_client=None,
             )
         hs.handlers = JustPresenceHandlers(hs)
@@ -188,7 +188,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
                     "del_presence_list",
                 ]),
                 handlers=None,
-                http_server=Mock(),
+                resource_for_client=Mock(),
                 http_client=None,
                 replication_layer=self.replication
             )
@@ -402,7 +402,7 @@ class PresencePushTestCase(unittest.TestCase):
                     "set_presence_state",
                 ]),
                 handlers=None,
-                http_server=Mock(),
+                resource_for_client=Mock(),
                 http_client=None,
                 replication_layer=self.replication,
             )
@@ -727,7 +727,7 @@ class PresencePollingTestCase(unittest.TestCase):
                 db_pool=None,
                 datastore=Mock(spec=[]),
                 handlers=None,
-                http_server=Mock(),
+                resource_for_client=Mock(),
                 http_client=None,
                 replication_layer=self.replication,
             )

@@ -24,9 +24,10 @@ logger = logging.getLogger(__name__)
 
 class Lock(object):
 
-    def __init__(self, deferred):
+    def __init__(self, deferred, key):
         self._deferred = deferred
         self.released = False
+        self.key = key
 
     def release(self):
         self.released = True
@@ -38,9 +39,10 @@ class Lock(object):
             self.release()
 
     def __enter__(self):
-            return self
+        return self
 
     def __exit__(self, type, value, traceback):
+        logger.debug("Releasing lock for key=%r", self.key)
         self.release()
 
 
@@ -63,6 +65,10 @@ class LockManager(object):
         self._lock_deferreds[key] = new_deferred
 
         if old_deferred:
+            logger.debug("Queueing on lock for key=%r", key)
             yield old_deferred
+            logger.debug("Obtained lock for key=%r", key)
+        else:
+            logger.debug("Entering uncontended lock for key=%r", key)
 
-        defer.returnValue(Lock(new_deferred))
+        defer.returnValue(Lock(new_deferred, key))

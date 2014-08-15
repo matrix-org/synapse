@@ -26,8 +26,8 @@ To get up and running:
       with ``python setup.py develop --user`` and then run one with
       ``python synapse/app/homeserver.py``
       
-    - To run your own webclient:
-      ``cd webclient; python -m SimpleHTTPServer`` and hit http://localhost:8000
+    - To run your own webclient, add ``-w``:
+      ``python synapse/app/homeserver.py -w`` and hit http://localhost:8080/matrix/client
       in your web browser (a recent Chrome, Safari or Firefox for now,
       please...)
              
@@ -120,6 +120,10 @@ may need to also run:
     $ sudo apt-get install python-pip
     $ sudo pip install --upgrade setuptools
     
+If you don't have access to github, then you may need to install ``syutil``
+manually by checking it out and running ``python setup.py develop --user`` on it
+too.
+    
 If you get errors about ``sodium.h`` being missing, you may also need to
 manually install a newer PyNaCl via pip as setuptools installs an old one. Or
 you can check PyNaCl out of git directly (https://github.com/pyca/pynacl) and
@@ -189,22 +193,17 @@ Running a Demo Federation of Homeservers
 
 If you want to get up and running quickly with a trio of homeservers in a
 private federation (``localhost:8080``, ``localhost:8081`` and
-``localhost:8082``) which you can then access through the webclient running at http://localhost:8080.  Simply run::
+``localhost:8082``) which you can then access through the webclient running at
+http://localhost:8080. Simply run::
 
     $ demo/start.sh
 
 Running The Demo Web Client
 ===========================
 
-At the present time, the web client is not directly served by the homeserver's
-HTTP server. To serve this in a form the web browser can reach, arrange for the
-'webclient' sub-directory to be made available by any sort of HTTP server that
-can serve static files. For example, python's SimpleHTTPServer will suffice::
-
-    $ cd webclient
-    $ python -m SimpleHTTPServer
-
-You can now point your browser at  http://localhost:8000/  to find the client.
+You can run the web client when you run the homeserver by adding ``-w`` to the
+command to run ``homeserver.py``. The web client can be accessed via 
+http://localhost:8080/matrix/client
 
 If this is the first time you have used the client from that browser (it uses
 HTML5 local storage to remember its config), you will need to log in to your

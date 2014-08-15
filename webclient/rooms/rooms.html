@@ -5,16 +5,33 @@
             
     <div>
         <form>
+            <table>
+                <tr>
+                    <td>
+                        <div class="profile-avatar">
+                            <img  ng-src="{{ newProfileInfo.avatar || 'img/default-profile.jpg' }}" m-file-input="newProfileInfo.avatarFile"/>
+                        </div>
+                    </td>
+                    <td>
+                        <button  m-file-input="newProfileInfo.avatarFile">Upload new Avatar</button> 
+                        or use an existing image URL:
+                        <div>
+                            <input size="40" ng-model="newProfileInfo.avatar" ng-enter="setAvatar(newProfileInfo.avatar)" />
+                            <button ng-disabled="!newProfileInfo.avatar" ng-click="setAvatar(newProfileInfo.avatar)">Update Avatar</button>   
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </form>
+    </div>
+
+    <div>
+        <form>
             <input size="40" ng-model="newProfileInfo.name" ng-enter="setDisplayName(newProfileInfo.name)" />
             <button ng-disabled="!newProfileInfo.name" ng-click="setDisplayName(newProfileInfo.name)">Update Name</button>    
         </form>
     </div>
-    <div>
-        <form>
-            <input size="40" ng-model="newProfileInfo.avatar" ng-enter="setAvatar(newProfileInfo.avatar)" />
-            <button ng-disabled="!newProfileInfo.avatar" ng-click="setAvatar(newProfileInfo.avatar)">Update Avatar</button>    
-        </form>
-    </div>
+
     <br/>
 
     <div>

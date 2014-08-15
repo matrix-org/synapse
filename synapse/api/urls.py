@@ -13,18 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This package includes all the federation specific logic.
-"""
+"""Contains the URL paths to prefix various aspects of the server with. """
 
-from .replication import ReplicationLayer
-from .transport import TransportLayer
-
-
-def initialize_http_replication(homeserver):
-    transport = TransportLayer(
-        homeserver.hostname,
-        server=homeserver.get_resource_for_federation(),
-        client=homeserver.get_http_client()
-    )
-
-    return ReplicationLayer(homeserver, transport)
+CLIENT_PREFIX = "/matrix/client/api/v1"
+FEDERATION_PREFIX = "/matrix/federation/v1"
+WEB_CLIENT_PREFIX = "/matrix/client"

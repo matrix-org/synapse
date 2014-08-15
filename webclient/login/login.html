@@ -15,15 +15,16 @@
         <!-- New user registration -->
         <div>
             <br/>
-            <button ng-click="register()" ng-disabled="!account.desired_user_name || !account.homeserver || !account.identityServer || !account.pwd1 || !account.pwd2">Register</button>
+            <button ng-click="register()" ng-disabled="!account.desired_user_name || !account.homeserver || !account.identityServer || !account.pwd1 || !account.pwd2 || account.pwd1 !== account.pwd2">Register</button>
         </div>
     </form>
 
     <h3>Got an account?</h3>
     <form novalidate>
         <!-- Login with an registered user -->
+        <div>{{ login_error_msg }} </div>
         <div>
-            <input id="user_id" size="70" type="text" auto-focus ng-model="account.user_id" placeholder="User ID (ex:@bob:localhost)"/>
+            <input id="user_id" size="70" type="text" auto-focus ng-model="account.user_id" placeholder="User ID (ex:@bob:localhost or bob)"/>
             <br />
             <input id="password" size="70" type="password" ng-model="account.password" placeholder="Password"/><br />
             <br/>

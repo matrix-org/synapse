@@ -51,7 +51,7 @@ class DirectoryTestCase(unittest.TestCase):
                 "get_association_from_room_alias",
             ]),
             http_client=None,
-            http_server=Mock(),
+            resource_for_federation=Mock(),
             replication_layer=self.mock_federation,
         )
         hs.handlers = DirectoryHandlers(hs)

@@ -16,9 +16,9 @@ limitations under the License.
 
 'use strict';
 
-angular.module('RoomsController', ['matrixService'])
-.controller('RoomsController', ['$scope', '$location', 'matrixService',
-                               function($scope, $location, matrixService) {
+angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload'])
+.controller('RoomsController', ['$scope', '$location', 'matrixService', 'mFileUpload',
+                               function($scope, $location, matrixService, mFileUpload) {
                                    
     $scope.rooms = [];
     $scope.public_rooms = [];
@@ -40,7 +40,8 @@ angular.module('RoomsController', ['matrixService'])
 
     $scope.newProfileInfo = {
         name: matrixService.config().displayName,
-        avatar: matrixService.config().avatarUrl
+        avatar: matrixService.config().avatarUrl,
+        avatarFile: undefined
     };
 
     $scope.linkedEmails = {
@@ -74,18 +75,18 @@ angular.module('RoomsController', ['matrixService'])
         // List all rooms joined or been invited to
         $scope.rooms = matrixService.rooms();
         matrixService.rooms().then(
-            function(data) {
-                data = assignRoomAliases(data);
+            function(response) {
+                var data = assignRoomAliases(response.data);
                 $scope.feedback = "Success";
                 $scope.rooms = data;
             },
-            function(reason) {
-                $scope.feedback = "Failure: " + reason;
+            function(error) {
+                $scope.feedback = "Failure: " + error.data;
             });
         
         matrixService.publicRooms().then(
-            function(data) {
-                $scope.public_rooms = assignRoomAliases(data.chunk);
+            function(response) {
+                $scope.public_rooms = assignRoomAliases(response.data.chunk);
             }
         );
     };
@@ -100,14 +101,14 @@ angular.module('RoomsController', ['matrixService'])
         matrixService.create(room_id, visibility).then(
             function(response) { 
                 // This room has been created. Refresh the rooms list
-                console.log("Created room " + response.room_alias + " with id: "+
-                response.room_id);
+                console.log("Created room " + response.data.room_alias + " with id: "+
+                response.data.room_id);
                 matrixService.createRoomIdToAliasMapping(
-                    response.room_id, response.room_alias);
+                    response.data.room_id, response.data.room_alias);
                 $scope.refresh();
             },
-            function(reason) {
-                $scope.feedback = "Failure: " + reason;
+            function(error) {
+                $scope.feedback = "Failure: " + error.data;
             });
     };
     
@@ -117,17 +118,17 @@ angular.module('RoomsController', ['matrixService'])
         //$location.path("room/" + room_id);
         matrixService.join(room_id).then(
             function(response) {
-                if (response.hasOwnProperty("room_id")) {
-                    if (response.room_id != room_id) {
-                        $location.path("room/" + response.room_id);
+                if (response.data.hasOwnProperty("room_id")) {
+                    if (response.data.room_id != room_id) {
+                        $location.path("room/" + response.data.room_id);
                         return;
                      }
                 }
 
                 $location.path("room/" + room_id);
             },
-            function(reason) {
-                $scope.feedback = "Can't join room: " + reason;
+            function(error) {
+                $scope.feedback = "Can't join room: " + error.data;
             }
         );
     };
@@ -135,15 +136,15 @@ angular.module('RoomsController', ['matrixService'])
     $scope.joinAlias = function(room_alias) {
         matrixService.joinAlias(room_alias).then(
             function(response) {
-                if (response.hasOwnProperty("room_id")) {
-                    $location.path("room/" + response.room_id);
+                if (response.data.hasOwnProperty("room_id")) {
+                    $location.path("room/" + response.data.room_id);
                     return;
                 } else {
                     // TODO (erikj): Do something here?
                 }
             },
-            function(reason) {
-                $scope.feedback = "Can't join room: " + reason;
+            function(error) {
+                $scope.feedback = "Can't join room: " + error.data;
             }
         );
     };
@@ -157,11 +158,27 @@ angular.module('RoomsController', ['matrixService'])
                 matrixService.setConfig(config);
                 matrixService.saveConfig();
             },
-            function(reason) {
-                $scope.feedback = "Can't update display name: " + reason;
+            function(error) {
+                $scope.feedback = "Can't update display name: " + error.data;
             }
         );
     };
+
+
+    $scope.$watch("newProfileInfo.avatarFile", function(newValue, oldValue) {
+        if ($scope.newProfileInfo.avatarFile) {
+            console.log("Uploading new avatar file...");
+            mFileUpload.uploadFile($scope.newProfileInfo.avatarFile).then(
+                function(url) {
+                    $scope.newProfileInfo.avatar = url;
+                    $scope.setAvatar($scope.newProfileInfo.avatar);
+                },
+                function(error) {
+                    $scope.feedback = "Can't upload image";
+                } 
+            );
+        }
+    });
 
     $scope.setAvatar = function(newUrl) {
         console.log("Updating avatar to "+newUrl);
@@ -174,8 +191,8 @@ angular.module('RoomsController', ['matrixService'])
                 matrixService.setConfig(config);
                 matrixService.saveConfig();
             },
-            function(reason) {
-                $scope.feedback = "Can't update avatar: " + reason;
+            function(error) {
+                $scope.feedback = "Can't update avatar: " + error.data;
             }
         );
     };
@@ -183,8 +200,8 @@ angular.module('RoomsController', ['matrixService'])
     $scope.linkEmail = function(email) {
         matrixService.linkEmail(email).then(
             function(response) {
-                if (response.success === true) {
-                    $scope.linkedEmails.authTokenId = response.tokenId;
+                if (response.data.success === true) {
+                    $scope.linkedEmails.authTokenId = response.data.tokenId;
                     $scope.emailFeedback = "You have been sent an email.";
                     $scope.linkedEmails.emailBeingAuthed = email;
                 }
@@ -192,8 +209,8 @@ angular.module('RoomsController', ['matrixService'])
                     $scope.emailFeedback = "Failed to send email.";
                 }
             },
-            function(reason) {
-                $scope.emailFeedback = "Can't send email: " + reason;
+            function(error) {
+                $scope.emailFeedback = "Can't send email: " + error.data;
             }
         );
     };
@@ -206,7 +223,7 @@ angular.module('RoomsController', ['matrixService'])
         }
         matrixService.authEmail(matrixService.config().user_id, tokenId, code).then(
             function(response) {
-                if ("success" in response && response.success === false) {
+                if ("success" in response.data && response.data.success === false) {
                     $scope.emailFeedback = "Failed to authenticate email.";
                     return;
                 }

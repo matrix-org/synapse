@@ -3,8 +3,16 @@ angular.module('LoginController', ['matrixService'])
                                     function($scope, $location, matrixService) {
     'use strict';
     
+    
+    // Assume that this is hosted on the home server, in which case the URL
+    // contains the home server.
+    var hs_url = $location.protocol() + "://" + $location.host();
+    if ($location.port()) {
+        hs_url += ":" + $location.port();
+    }
+    
     $scope.account = {
-        homeserver: "http://localhost:8080",
+        homeserver: hs_url,
         desired_user_name: "",
         user_id: "",
         password: "",
@@ -31,14 +39,13 @@ angular.module('LoginController', ['matrixService'])
         }
 
         matrixService.register($scope.account.desired_user_name, $scope.account.pwd1).then(
-            function(data) {
+            function(response) {
                 $scope.feedback = "Success";
-
                 // Update the current config 
                 var config = matrixService.config();
                 angular.extend(config, {
-                    access_token: data.access_token,
-                    user_id: data.user_id
+                    access_token: response.data.access_token,
+                    user_id: response.data.user_id
                 });
                 matrixService.setConfig(config);
 
@@ -48,8 +55,15 @@ angular.module('LoginController', ['matrixService'])
                  // Go to the user's rooms list page
                 $location.path("rooms");
             },
-            function(reason) {
-                $scope.feedback = "Failure: " + reason;
+            function(error) {
+                if (error.data) {
+                    if (error.data.errcode === "M_USER_IN_USE") {
+                        $scope.feedback = "Username already taken.";
+                    }
+                }
+                else if (error.status === 0) {
+                    $scope.feedback = "Unable to talk to the server.";
+                }
             });
     };
 
@@ -61,18 +75,28 @@ angular.module('LoginController', ['matrixService'])
         // try to login
         matrixService.login($scope.account.user_id, $scope.account.password).then(
             function(response) {
-                if ("access_token" in response) {
+                if ("access_token" in response.data) {
                     $scope.feedback = "Login successful.";
                     matrixService.setConfig({
                         homeserver: $scope.account.homeserver,
-                        user_id: $scope.account.user_id,
-                        access_token: response.access_token
+                        user_id: response.data.user_id,
+                        access_token: response.data.access_token
                     });
                     matrixService.saveConfig();
                     $location.path("rooms");
                 }
                 else {
-                    $scope.feedback = "Failed to login: " + JSON.stringify(response);
+                    $scope.feedback = "Failed to login: " + JSON.stringify(response.data);
+                }
+            },
+            function(error) {
+                if (error.data) {
+                    if (error.data.errcode === "M_FORBIDDEN") {
+                        $scope.login_error_msg = "Incorrect username or password.";
+                    }
+                }
+                else if (error.status === 0) {
+                    $scope.login_error_msg = "Unable to talk to the server.";
                 }
             }
         );

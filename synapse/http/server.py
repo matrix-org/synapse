@@ -22,6 +22,7 @@ from synapse.api.errors import cs_exception, CodeMessageException
 from twisted.internet import defer, reactor
 from twisted.web import server, resource
 from twisted.web.server import NOT_DONE_YET
+from twisted.web.util import redirectTo
 
 import collections
 import logging
@@ -52,10 +53,9 @@ class HttpServer(object):
         pass
 
 
-# The actual HTTP server impl, using twisted http server
-class TwistedHttpServer(HttpServer, resource.Resource):
-    """ This wraps the twisted HTTP server, and triggers the correct callbacks
-    on the transport_layer.
+class JsonResource(HttpServer, resource.Resource):
+    """ This implements the HttpServer interface and provides JSON support for
+    Resources.
 
     Register callbacks via register_path()
     """
@@ -158,6 +158,22 @@ class TwistedHttpServer(HttpServer, resource.Resource):
             if "curl" in user_agent:
                 return True
         return False
+
+
+class RootRedirect(resource.Resource):
+    """Redirects the root '/' path to another path."""
+
+    def __init__(self, path):
+        resource.Resource.__init__(self)
+        self.url = path
+
+    def render_GET(self, request):
+        return redirectTo(self.url, request)
+
+    def getChild(self, name, request):
+        if len(name) == 0:
+            return self  # select ourselves as the child to render
+        return resource.Resource.getChild(self, name, request)
 
 
 def respond_with_json_bytes(request, code, json_bytes, send_cors=False):

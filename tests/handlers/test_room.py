@@ -46,7 +46,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "get_room",
                 "store_room",
             ]),
-            http_server=NonCallableMock(),
+            resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
             notifier=NonCallableMock(spec_set=["on_new_room_event"]),
             handlers=NonCallableMock(spec_set=[
@@ -317,7 +317,6 @@ class RoomCreationTest(unittest.TestCase):
             datastore=NonCallableMock(spec_set=[
                 "store_room",
             ]),
-            http_server=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
             notifier=NonCallableMock(spec_set=["on_new_room_event"]),
             handlers=NonCallableMock(spec_set=[

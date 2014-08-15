@@ -1,6 +1,6 @@
-=========================
-Synapse Client-Server API
-=========================
+========================
+Matrix Client-Server API
+========================
 
 The following specification outlines how a client can send and receive data from 
 a home server.
@@ -262,7 +262,10 @@ the error, but the keys 'error' and 'errcode' will always be present.
 Some standard error codes are below:
 
 M_FORBIDDEN:
-Forbidden access, e.g. bad access token, failed login.
+Forbidden access, e.g. joining a room without permission, failed login.
+
+M_UNKNOWN_TOKEN:
+The access token specified was not recognised.
 
 M_BAD_JSON:
 Request contained valid JSON, but it was malformed in some way, e.g. missing
@@ -411,6 +414,9 @@ The server checks this, finds it is valid, and returns:
 {
   "access_token": "abcdef0123456789"
 }
+The server may optionally return "user_id" to confirm or change the user's ID.
+This is particularly useful if the home server wishes to support localpart entry
+of usernames (e.g. "bob" rather than "@bob:matrix.org").
 
 OAuth2-based
 ------------

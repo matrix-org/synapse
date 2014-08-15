@@ -20,15 +20,9 @@ from ._base import BaseHandler
 from synapse.api.errors import SynapseError
 
 import logging
-import json
-import urllib
 
 
 logger = logging.getLogger(__name__)
-
-
-# TODO(erikj): This needs to be factored out somewere
-PREFIX = "/matrix/client/api/v1"
 
 
 class DirectoryHandler(BaseHandler):
