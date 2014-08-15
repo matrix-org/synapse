@@ -15,6 +15,32 @@ limitations under the License.
 */
 
 angular.module('RoomController', [])
+// FIXME move directives outta here!
+.directive("keepScroll", function(){
+  return {
+    controller : function($scope){
+      var element = 0;
+      this.setElement = function(el){
+        element = el;
+      }
+      this.addItem = function(item){
+        element.scrollTop = (element.scrollTop+item.clientHeight+1); //1px for margin
+      };
+    },
+    link : function(scope,el,attr, ctrl) {
+     ctrl.setElement(el[0]);
+    }
+  };
+})
+// FIXME move directives outta here!
+.directive("scrollItem", function(){
+  return{
+    require : "^keepScroll",
+    link : function(scope, el, att, scrCtrl){
+      scrCtrl.addItem(el[0]);
+    }
+  }
+})
 .controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService',
                                function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService) {
    'use strict';
@@ -54,7 +80,14 @@ angular.module('RoomController', [])
         updatePresence(event);
     });
     
-    var paginate = function(numItems) {
+    $scope.paginateMore = function() {
+        if ($scope.state.can_paginate) {
+            console.log("Paginating more.");
+            paginate(MESSAGES_PER_PAGINATION, false);
+        }
+    };
+    
+    var paginate = function(numItems, toBottom) {
         matrixService.paginateBackMessages($scope.room_id, $scope.state.earliest_token, numItems).then(
             function(response) {
                 eventHandlerService.handleEvents(response.data.chunk, false);
@@ -62,6 +95,11 @@ angular.module('RoomController', [])
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
                     // no more messages to paginate :(
                     $scope.state.can_paginate = false;
+                }
+                
+                if (toBottom) {
+                    console.log("Scrolling to bottom");
+                    scrollToBottom();
                 }
             },
             function(error) {
@@ -73,6 +111,10 @@ angular.module('RoomController', [])
     var updateMemberList = function(chunk) {
         var isNewMember = !(chunk.target_user_id in $scope.members);
         if (isNewMember) {
+            if ("state" in chunk.content) {
+                chunk.presenceState = chunk.content.state;
+            }
+        
             $scope.members[chunk.target_user_id] = chunk;
             // get their display name and profile picture and set it to their
             // member entry in $scope.members. We HAVE to use $timeout with 0 delay 
@@ -181,7 +223,7 @@ angular.module('RoomController', [])
                     }
                 );
                 
-                paginate(MESSAGES_PER_PAGINATION);
+                paginate(MESSAGES_PER_PAGINATION, true);
             },
             function(reason) {
                 $scope.feedback = "Can't join room: " + reason;
@@ -223,6 +265,6 @@ angular.module('RoomController', [])
     };
     
     $scope.loadMoreHistory = function() {
-        paginate(MESSAGES_PER_PAGINATION);
+        paginate(MESSAGES_PER_PAGINATION, false);
     };
 }]);

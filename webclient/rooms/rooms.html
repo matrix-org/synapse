@@ -61,9 +61,9 @@
     
     <h3>My rooms</h3>
     
-    <div class="rooms" ng-repeat="room in rooms">
+    <div class="rooms" ng-repeat="(rm_id, room) in rooms">
         <div>
-            <a href="#/room/{{ room.room_id }}" >{{ room.room_alias }}</a>
+            <a href="#/room/{{ rm_id }}" >{{ room.room_alias }}</a> {{room.membership === 'invite' ? ' (invited)' : ''}}
         </div>
     </div>
     <br/>
@@ -86,7 +86,7 @@
     </div>
     <div>
         <form>
-            <input size="40" ng-model="joinAlias.room_alias" ng-enter="joinAlias(joinAlias.room_alias)" placeholder="(e.g. #foo_channe:example.org)"/>
+            <input size="40" ng-model="joinAlias.room_alias" ng-enter="joinAlias(joinAlias.room_alias)" placeholder="(e.g. #foo_channel:example.org)"/>
             <button ng-disabled="!joinAlias.room_alias" ng-click="joinAlias(joinAlias.room_alias)">Join room</button>    
         </form>
     </div>

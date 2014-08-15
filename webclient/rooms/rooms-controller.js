@@ -16,11 +16,11 @@ limitations under the License.
 
 'use strict';
 
-angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload'])
-.controller('RoomsController', ['$scope', '$location', 'matrixService', 'mFileUpload',
-                               function($scope, $location, matrixService, mFileUpload) {
+angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload', 'eventHandlerService'])
+.controller('RoomsController', ['$scope', '$location', 'matrixService', 'mFileUpload', 'eventHandlerService',
+                               function($scope, $location, matrixService, mFileUpload, eventHandlerService) {
                                    
-    $scope.rooms = [];
+    $scope.rooms = {};
     $scope.public_rooms = [];
     $scope.newRoomId = "";
     $scope.feedback = "";
@@ -52,6 +52,18 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload']
         linkedEmailList: matrixService.config().emailList // linked email list
     };
     
+    $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
+        var config = matrixService.config();
+        if (event.target_user_id === config.user_id && event.content.membership === "invite") {
+            console.log("Invited to room " + event.room_id);
+            // FIXME push membership to top level key to match /im/sync
+            event.membership = event.content.membership;
+            // FIXME bodge a nicer name than the room ID for this invite.
+            event.room_alias = event.user_id + "'s room";
+            $scope.rooms[event.room_id] = event;
+        }
+    });
+    
     var assignRoomAliases = function(data) {
         for (var i=0; i<data.length; i++) {
             var alias = matrixService.getRoomIdToAliasMapping(data[i].room_id);
@@ -73,12 +85,13 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload']
 
     $scope.refresh = function() {
         // List all rooms joined or been invited to
-        $scope.rooms = matrixService.rooms();
         matrixService.rooms().then(
             function(response) {
                 var data = assignRoomAliases(response.data);
                 $scope.feedback = "Success";
-                $scope.rooms = data;
+                for (var i=0; i<data.length; i++) {
+                    $scope.rooms[data[i].room_id] = data[i];
+                }
             },
             function(error) {
                 $scope.feedback = "Failure: " + error.data;

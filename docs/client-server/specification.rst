@@ -694,6 +694,16 @@ Invite/Joining/Leaving a room
   Required keys:
     membership : [join|invite] - The membership state of $user_id in room 
                                  $room_id.
+  Optional keys:
+    displayname,
+    avatar_url : String fields from the member user's profile
+    state,
+    status_msg,
+    mtime_age : Presence information
+
+  These optional keys provide extra information that the client is likely to
+  be interested in so it doesn't have to perform an additional profile or
+  presence information fetch.
 
 Where:
   join - Indicate you ($user_id) are joining the room $room_id.

@@ -33,23 +33,24 @@ angular.module('eventHandlerService', [])
     var PRESENCE_EVENT = "PRESENCE_EVENT";
     
     $rootScope.events = {
-        rooms: {}, // will contain roomId: { messages:[], members:[] }
+        rooms: {}, // will contain roomId: { messages:[], members:{userid1: event} }
     };
     
     var initRoom = function(room_id) {
-        console.log("Creating new handler entry for " + room_id);
-        $rootScope.events.rooms[room_id] = {};
-        $rootScope.events.rooms[room_id].messages = [];
-        $rootScope.events.rooms[room_id].members = [];
+        if (!(room_id in $rootScope.events.rooms)) {
+            console.log("Creating new handler entry for " + room_id);
+            $rootScope.events.rooms[room_id] = {};
+            $rootScope.events.rooms[room_id].messages = [];
+            $rootScope.events.rooms[room_id].members = {};
+        }
     }
     
     var handleMessage = function(event, isLiveEvent) {
         if ("membership_target" in event.content) {
             event.user_id = event.content.membership_target;
         }
-        if (!(event.room_id in $rootScope.events.rooms)) {
-            initRoom(event.room_id);
-        }
+        
+        initRoom(event.room_id);
         
         if (isLiveEvent) {
             $rootScope.events.rooms[event.room_id].messages.push(event);
@@ -67,6 +68,8 @@ angular.module('eventHandlerService', [])
     };
     
     var handleRoomMember = function(event, isLiveEvent) {
+        initRoom(event.room_id);
+        $rootScope.events.rooms[event.room_id].members[event.user_id] = event;
         $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent);
     };
     

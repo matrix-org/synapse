@@ -380,14 +380,23 @@ class PresenceHandler(BaseHandler):
         logger.debug("Start polling for presence from %s", user)
 
         if target_user:
-            target_users = [target_user]
+            target_users = set(target_user)
         else:
             presence = yield self.store.get_presence_list(
                 user.localpart, accepted=True
             )
-            target_users = [
+            target_users = set([
                 self.hs.parse_userid(x["observed_user_id"]) for x in presence
-            ]
+            ])
+
+            # Also include people in all my rooms
+
+            rm_handler = self.homeserver.get_handlers().room_member_handler
+            room_ids = yield rm_handler.get_rooms_for_user(user)
+
+            for room_id in room_ids:
+                for member in (yield rm_handler.get_room_members(room_id)):
+                    target_users.add(member)
 
         if state is None:
             state = yield self.store.get_presence_state(user.localpart)
