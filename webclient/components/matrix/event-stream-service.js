@@ -17,9 +17,10 @@ limitations under the License.
 'use strict';
 
 /*
-This service manages where in the event stream the web client currently is and 
-provides methods to resume/pause/stop the event stream. This service is not
-responsible for parsing event data. For that, see the eventHandlerService.
+This service manages where in the event stream the web client currently is,
+repolling the event stream, and provides methods to resume/pause/stop the event 
+stream. This service is not responsible for parsing event data. For that, see 
+the eventHandlerService.
 */
 angular.module('eventStreamService', [])
 .factory('eventStreamService', ['$q', '$timeout', 'matrixService', 'eventHandlerService', function($q, $timeout, matrixService, eventHandlerService) {
@@ -39,7 +40,7 @@ angular.module('eventStreamService', [])
     // interrupts the stream. Only valid if there is a stream conneciton 
     // open.
     var interrupt = function(shouldPoll) {
-        console.log("p[EventStream] interrupt("+shouldPoll+") "+
+        console.log("[EventStream] interrupt("+shouldPoll+") "+
                     JSON.stringify(settings));
         settings.shouldPoll = shouldPoll;
         settings.isActive = false;

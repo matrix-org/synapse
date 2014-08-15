@@ -29,7 +29,6 @@ angular.module('RoomController', [])
         stream_failure: undefined // the response when the stream fails
     };
     $scope.members = {};
-    $scope.stopPoll = false;
 
     $scope.imageURLToSend = "";
     $scope.userIDToInvite = "";
@@ -69,40 +68,6 @@ angular.module('RoomController', [])
                 console.log("Failed to paginateBackMessages: " + JSON.stringify(error));
             }
         )
-    };
-
-    var shortPoll = function() {
-        eventStreamService.resume().then(
-            function(response) {
-                $scope.state.stream_failure = undefined;
-                console.log("Got response from "+$scope.state.events_from+" to "+response.data.end);
-                $scope.state.events_from = response.data.end;
-                $scope.feedback = "";
-                
-                eventHandlerService.handleEvents(response.data.chunk, true);
-                
-                if ($scope.stopPoll) {
-                    console.log("Stopping polling.");
-                }
-                else {
-                    $timeout(shortPoll, 0);
-                }
-            }, 
-            function(error) {
-                $scope.state.stream_failure = error;
-
-                if (error.status == 403) {
-                    $scope.stopPoll = true;
-                }
-                
-                if ($scope.stopPoll) {
-                    console.log("Stopping polling.");
-                }
-                else {
-                    $timeout(shortPoll, 5000);
-                }
-            }
-        );
     };
 
     var updateMemberList = function(chunk) {
@@ -260,9 +225,4 @@ angular.module('RoomController', [])
     $scope.loadMoreHistory = function() {
         paginate(MESSAGES_PER_PAGINATION);
     };
-
-    $scope.$on('$destroy', function(e) {
-        console.log("onDestroyed: Stopping poll.");
-        $scope.stopPoll = true;
-    });
 }]);

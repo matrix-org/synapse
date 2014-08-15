@@ -46,7 +46,9 @@ angular.module('MatrixWebClientController', ['matrixService'])
         }
     };
 
-    eventStreamService.resume();
+    if (matrixService.config()) {
+        eventStreamService.resume();
+    }
     
     // Logs the user out 
     $scope.logout = function() {
