@@ -37,6 +37,7 @@ class StateTestCase(unittest.TestCase):
             "update_current_state",
             "get_latest_pdus_in_context",
             "get_current_state",
+            "get_pdu",
         ])
         self.replication = Mock(spec=["get_pdu"])
 
@@ -219,6 +220,8 @@ class StateTestCase(unittest.TestCase):
         self.persistence.get_unresolved_state_tree.side_effect = return_tree
 
         self.replication.get_pdu.side_effect = set_return_tree
+
+        self.persistence.get_pdu.return_value = None
 
         is_new = yield self.state.handle_new_state(new_pdu)
 

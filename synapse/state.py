@@ -191,10 +191,18 @@ class StateHandler(object):
                 key=lambda x: x.depth
             )
 
+            pdu_id = missing_prev.prev_state_id
+            origin = missing_prev.prev_state_origin
+
+            is_missing = yield self.store.get_pdu(pdu_id, origin) is None
+
+            if not is_missing:
+                raise Exception("Conflict resolution failed.")
+
             yield self._replication.get_pdu(
                 destination=missing_prev.origin,
-                pdu_origin=missing_prev.prev_state_origin,
-                pdu_id=missing_prev.prev_state_id,
+                pdu_origin=origin,
+                pdu_id=pdu_id,
                 outlier=True
             )
 
