@@ -43,7 +43,7 @@ class StreamStore(SQLBaseStore):
         )
 
         invites_sql = (
-            "SELECT m.event_id FROM room_membershipas as m "
+            "SELECT m.event_id FROM room_memberships as m "
             "INNER JOIN current_state_events as c ON m.event_id = c.event_id "
             "WHERE m.user_id = ? AND m.membership = ?"
         )
@@ -55,8 +55,9 @@ class StreamStore(SQLBaseStore):
 
         sql = (
             "SELECT * FROM events as e WHERE "
-            "(room_id IN (%(current)s)) OR "
-            "(event_id IN (%(invites)s)) "
+            "((room_id IN (%(current)s)) OR "
+            "(event_id IN (%(invites)s))) "
+            " AND e.ordering > ? AND e.ordering < ? "
             "ORDER BY ordering ASC LIMIT %(limit)d"
         ) % {
             "current": current_room_membership_sql,
@@ -66,10 +67,17 @@ class StreamStore(SQLBaseStore):
 
         rows = yield self._execute_and_decode(
             sql,
-            user_id, user_id, Membership.INVITE
+            user_id, user_id, Membership.INVITE, from_key, to_key
         )
 
-        defer.returnValue([self._parse_event_from_row(r) for r in rows])
+        ret = [self._parse_event_from_row(r) for r in rows]
+
+        if ret:
+            max_id = max([r["ordering"] for r in rows])
+        else:
+            max_id = to_key
+
+        defer.returnValue((ret, max_id))
 
     @defer.inlineCallbacks
     def get_recent_events_for_room(self, room_id, limit, with_feedback=False):

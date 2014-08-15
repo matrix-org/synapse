@@ -255,7 +255,10 @@ class MessageHandler(BaseHandler):
         ret = []
 
         for event in room_list:
-            d = event.get_dict()
+            d = {
+                "room_id": event.room_id,
+                "membership": event.membership,
+            }
             ret.append(d)
 
             if event.membership != Membership.JOIN:

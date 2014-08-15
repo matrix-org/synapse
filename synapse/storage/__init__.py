@@ -57,7 +57,8 @@ class DataStore(RoomMemberStore, RoomStore,
         elif event.type == RoomTopicEvent.TYPE:
             yield self._store_room_topic(event)
 
-        yield self._store_event(event)
+        ret = yield self._store_event(event)
+        defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def get_event(self, event_id):
@@ -113,6 +114,9 @@ class DataStore(RoomMemberStore, RoomStore,
                     "state_key": event.state_key,
                 }
             )
+
+        latest = yield self.get_room_events_max_id()
+        defer.returnValue(latest)
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):

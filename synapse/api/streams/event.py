@@ -160,7 +160,7 @@ class EventStream(PaginationStream):
                 self.user_id, from_pkey, to_pkey, limit
             )
 
-            chunk += event_chunk
+            chunk += [e.get_dict() for e in event_chunk]
             next_ver.append(str(max_pkey))
 
         defer.returnValue((chunk, EventStream.SEPARATOR.join(next_ver)))
