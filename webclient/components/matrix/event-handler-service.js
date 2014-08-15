@@ -32,15 +32,37 @@ angular.module('eventHandlerService', [])
     var MEMBER_EVENT = "MEMBER_EVENT";
     var PRESENCE_EVENT = "PRESENCE_EVENT";
     
+    $rootScope.events = {
+        rooms: {}, // will contain roomId: { messages:[], members:[] }
+    };
+    
+    var initRoom = function(room_id) {
+        console.log("Creating new handler entry for " + room_id);
+        $rootScope.events.rooms[room_id] = {};
+        $rootScope.events.rooms[room_id].messages = [];
+        $rootScope.events.rooms[room_id].members = [];
+    }
+    
     var handleMessage = function(event, isLiveEvent) {
         if ("membership_target" in event.content) {
-            // event.user_id = event.content.membership_target;
+            event.user_id = event.content.membership_target;
         }
+        if (!(event.room_id in $rootScope.events.rooms)) {
+            initRoom(event.room_id);
+        }
+        
+        if (isLiveEvent) {
+            $rootScope.events.rooms[event.room_id].messages.push(event);
+        }
+        else {
+            $rootScope.events.rooms[event.room_id].messages.unshift(event);
+        }
+        
+        // TODO send delivery receipt if isLiveEvent
         
         // $broadcast this, as controllers may want to do funky things such as
         // scroll to the bottom, etc which cannot be expressed via simple $scope
         // updates.
-        console.log("Bcast " + JSON.stringify(event));
         $rootScope.$broadcast(MSG_EVENT, event, isLiveEvent);
     };
     

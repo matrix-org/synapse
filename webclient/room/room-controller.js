@@ -28,7 +28,6 @@ angular.module('RoomController', [])
         can_paginate: true, // this is toggled off when we run out of items
         stream_failure: undefined // the response when the stream fails
     };
-    $scope.messages = [];
     $scope.members = {};
     $scope.stopPoll = false;
 
@@ -43,12 +42,8 @@ angular.module('RoomController', [])
     };
     
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
-        if (isLive) {
-            $scope.messages.push(event);
+        if (isLive && event.room_id === $scope.room_id) {
             scrollToBottom();
-        }
-        else {
-            $scope.messages.unshift(event);
         }
     });
     
