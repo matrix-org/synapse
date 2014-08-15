@@ -15,36 +15,11 @@ limitations under the License.
 */
 
 angular.module('RoomController', [])
-// FIXME move directives outta here!
-.directive("keepScroll", function() {
-    return {
-        controller : function($scope) {
-            var element = 0;
-            this.setElement = function(el){
-                element = el;
-            }
-            this.addItem = function(item){
-                element.scrollTop = (element.scrollTop + item.clientHeight);
-            };
-        },
-        link : function(scope, el, attr, ctrl) {
-            ctrl.setElement(el[0]);
-        }
-    };
-})
-// FIXME move directives outta here!
-.directive("scrollItem", function(){
-    return {
-        require : "^keepScroll",
-        link : function(scope, el, att, scrCtrl){
-            scrCtrl.addItem(el[0]);
-        }
-    }
-})
+
 .controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService',
                                function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService) {
    'use strict';
-    var MESSAGES_PER_PAGINATION = 10;
+    var MESSAGES_PER_PAGINATION = 30;
     $scope.room_id = $routeParams.room_id;
     $scope.room_alias = matrixService.getRoomIdToAliasMapping($scope.room_id);
     $scope.state = {
@@ -52,6 +27,7 @@ angular.module('RoomController', [])
         events_from: "END", // when to start the event stream from.
         earliest_token: "END", // stores how far back we've paginated.
         can_paginate: true, // this is toggled off when we run out of items
+        paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
         stream_failure: undefined // the response when the stream fails
     };
     $scope.members = {};
@@ -61,7 +37,7 @@ angular.module('RoomController', [])
     
     var scrollToBottom = function() {
         $timeout(function() {
-            var objDiv = document.getElementsByClassName("messageTableWrapper")[0];
+            var objDiv = document.getElementById("messageTableWrapper");
             objDiv.scrollTop = objDiv.scrollHeight;
         },0);
     };
@@ -82,18 +58,33 @@ angular.module('RoomController', [])
     
     $scope.paginateMore = function() {
         if ($scope.state.can_paginate) {
-            console.log("Paginating more.");
+            // console.log("Paginating more.");
             paginate(MESSAGES_PER_PAGINATION, false);
         }
     };
     
     var paginate = function(numItems, toBottom) {
+        // console.log("paginate " + numItems + ", " + toBottom);
+        if ($scope.state.paginating) {
+            return;
+        }
+        else {
+            $scope.state.paginating = true;
+        }
+        // console.log("paginateBackMessages from " + $scope.state.earliest_token + " for " + numItems);
+        var originalTopRow = $("#messageTable>tbody>tr:first")[0];
         matrixService.paginateBackMessages($scope.room_id, $scope.state.earliest_token, numItems).then(
             function(response) {
+                // hacky bodge to ensure we always scroll to the bottom on the first pagination
+                if (!$scope.events.rooms[$scope.room_id]) {
+                    toBottom = true;
+                }
+                
                 eventHandlerService.handleEvents(response.data.chunk, false);
                 $scope.state.earliest_token = response.data.end;
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
-                    // no more messages to paginate :(
+                    // no more messages to paginate. this currently never gets turned true again, as we never
+                    // expire paginated contents in the current implementation.
                     $scope.state.can_paginate = false;
                 }
                 
@@ -101,9 +92,24 @@ angular.module('RoomController', [])
                     console.log("Scrolling to bottom");
                     scrollToBottom();
                 }
+                else {
+                    $timeout(function() {
+                        // FIXME: this risks a flicker before the scrollTop is actually updated, but we have to
+                        // dispatch it into a function in order to first update the layout.  The right solution
+                        // might be to implement it as a directive, more like
+                        // http://stackoverflow.com/questions/23736647/how-to-retain-scroll-position-of-ng-repeat-in-angularjs
+                        // however, this specific solution breaks because it measures the rows height before
+                        // the contents are interpolated.
+                        var objDiv = document.getElementById("messageTableWrapper");
+                        objDiv.scrollTop = originalTopRow ? (originalTopRow.offsetTop + objDiv.scrollTop) : 0;
+                    }, 0);
+                }
+                
+                $scope.state.paginating = false;
             },
             function(error) {
                 console.log("Failed to paginateBackMessages: " + JSON.stringify(error));
+                $scope.state.paginating = false;
             }
         )
     };
