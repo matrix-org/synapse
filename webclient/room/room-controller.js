@@ -119,7 +119,6 @@ angular.module('RoomController', [])
                     function(response) {
                         var member = $scope.members[chunk.target_user_id];
                         if (member !== undefined) {
-                            console.log("Updated displayname "+chunk.target_user_id+" to " + response.data.displayname);
                             member.displayname = response.data.displayname;
                         }
                     }
@@ -128,7 +127,6 @@ angular.module('RoomController', [])
                     function(response) {
                          var member = $scope.members[chunk.target_user_id];
                          if (member !== undefined) {
-                            console.log("Updated image for "+chunk.target_user_id+" to " + response.data.avatar_url);
                             member.avatar_url = response.data.avatar_url;
                          }
                     }
@@ -204,8 +202,6 @@ angular.module('RoomController', [])
         matrixService.join($scope.room_id).then(
             function() {
                 console.log("Joined room "+$scope.room_id);
-                // Now start reading from the stream
-                $timeout(shortPoll, 0);
 
                 // Get the current member list
                 matrixService.getMemberList($scope.room_id).then(

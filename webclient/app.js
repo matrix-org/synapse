@@ -61,11 +61,15 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
         $httpProvider.interceptors.push('AccessTokenInterceptor');
     }]);
 
-matrixWebClient.run(['$location', 'matrixService' , function($location, matrixService) {
+matrixWebClient.run(['$location', 'matrixService', 'eventStreamService', function($location, matrixService, eventStreamService) {
     // If we have no persistent login information, go to the login page
     var config = matrixService.config();
     if (!config || !config.access_token) {
+        eventStreamService.stop();
         $location.path("login");
+    }
+    else {
+        eventStreamService.resume();
     }
 }]);
 
