@@ -97,30 +97,30 @@ class MessageHandler(BaseHandler):
             self.notifier.on_new_room_event(event, store_id)
 
         yield self.hs.get_federation().handle_new_event(event)
-#
-#    @defer.inlineCallbacks
-#    def get_messages(self, user_id=None, room_id=None, pagin_config=None,
-#                     feedback=False):
-#        """Get messages in a room.
-#
-#        Args:
-#            user_id (str): The user requesting messages.
-#            room_id (str): The room they want messages from.
-#            pagin_config (synapse.api.streams.PaginationConfig): The pagination
-#            config rules to apply, if any.
-#            feedback (bool): True to get compressed feedback with the messages
-#        Returns:
-#            dict: Pagination API results
-#        """
-#        yield self.auth.check_joined_room(room_id, user_id)
-#
-#        data_source = [MessagesStreamData(self.hs, room_id=room_id,
-#                                          feedback=feedback)]
-#        event_stream = EventStream(user_id, data_source)
-#        pagin_config = yield event_stream.fix_tokens(pagin_config)
-#        data_chunk = yield event_stream.get_chunk(config=pagin_config)
-#        defer.returnValue(data_chunk)
-#
+
+    @defer.inlineCallbacks
+    def get_messages(self, user_id=None, room_id=None, pagin_config=None,
+                     feedback=False):
+        """Get messages in a room.
+
+        Args:
+            user_id (str): The user requesting messages.
+            room_id (str): The room they want messages from.
+            pagin_config (synapse.api.streams.PaginationConfig): The pagination
+            config rules to apply, if any.
+            feedback (bool): True to get compressed feedback with the messages
+        Returns:
+            dict: Pagination API results
+        """
+        yield self.auth.check_joined_room(room_id, user_id)
+
+        data_source = [EventsStreamData(self.hs, room_id=room_id,
+                                          feedback=feedback)]
+        event_stream = EventStream(user_id, data_source)
+        pagin_config = yield event_stream.fix_tokens(pagin_config)
+        data_chunk = yield event_stream.get_chunk(config=pagin_config)
+        defer.returnValue(data_chunk)
+
     @defer.inlineCallbacks
     def store_room_data(self, event=None, stamp_event=True):
         """ Stores data for a room.

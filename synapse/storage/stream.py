@@ -53,17 +53,34 @@ class StreamStore(SQLBaseStore):
         else:
             limit = 1000
 
+        # From and to keys should be integers from ordering.
+        from_key = int(from_key)
+        to_key = int(to_key)
+
+        if from_key == to_key:
+            defer.returnValue(([], to_key))
+            return
+
+
         sql = (
             "SELECT * FROM events as e WHERE "
             "((room_id IN (%(current)s)) OR "
             "(event_id IN (%(invites)s))) "
-            " AND e.ordering > ? AND e.ordering < ? "
-            "ORDER BY ordering ASC LIMIT %(limit)d"
         ) % {
             "current": current_room_membership_sql,
             "invites": invites_sql,
-            "limit": limit,
         }
+
+        if from_key < to_key:
+            sql += (
+                "AND e.ordering > ? AND e.ordering < ? "
+                "ORDER BY ordering ASC LIMIT %(limit)d "
+            ) % {"limit": limit}
+        else:
+            sql += (
+                "AND e.ordering < ? AND e.ordering > ? "
+                "ORDER BY ordering DESC LIMIT %(limit)d "
+            ) % {"limit": int(limit)}
 
         rows = yield self._execute_and_decode(
             sql,
@@ -72,12 +89,12 @@ class StreamStore(SQLBaseStore):
 
         ret = [self._parse_event_from_row(r) for r in rows]
 
-        if ret:
-            max_id = max([r["ordering"] for r in rows])
+        if from_key < to_key:
+            key = max([r["ordering"] for r in rows])
         else:
-            max_id = to_key
+            key = min([r["ordering"] for r in rows])
 
-        defer.returnValue((ret, max_id))
+        defer.returnValue((ret, key))
 
     @defer.inlineCallbacks
     def get_recent_events_for_room(self, room_id, limit, with_feedback=False):
