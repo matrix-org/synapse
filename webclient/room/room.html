@@ -20,9 +20,9 @@
         </table>
     </div>
     
-    <div class="messageTableWrapper">
-        <table class="messageTable">
-            <tr ng-repeat="msg in events.rooms[room_id].messages" ng-class="msg.user_id === state.user_id ? 'mine' : ''">
+    <div class="messageTableWrapper" keep-scroll>
+        <table class="messageTable" infinite-scroll="paginateMore()">
+            <tr ng-repeat="msg in events.rooms[room_id].messages" ng-class="msg.user_id === state.user_id ? 'mine' : ''" scroll-item>
                 <td class="leftBlock">
                     <div class="sender" ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id">{{ members[msg.user_id].displayname || msg.user_id }}</div>
                     <div class="timestamp">{{ msg.content.hsob_ts | date:'MMM d HH:mm:ss' }}</div>
