@@ -89,10 +89,14 @@ class StreamStore(SQLBaseStore):
 
         ret = [self._parse_event_from_row(r) for r in rows]
 
-        if from_key < to_key:
-            key = max([r["ordering"] for r in rows])
+
+        if rows:
+            if from_key < to_key:
+                key = max([r["ordering"] for r in rows])
+            else:
+                key = min([r["ordering"] for r in rows])
         else:
-            key = min([r["ordering"] for r in rows])
+            key = to_key
 
         defer.returnValue((ret, key))
 
