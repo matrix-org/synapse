@@ -51,7 +51,7 @@ class StreamStore(SQLBaseStore):
         if limit:
             limit = max(limit, MAX_STREAM_SIZE)
         else:
-            limit = 1000
+            limit = MAX_STREAM_SIZE
 
         # From and to keys should be integers from ordering.
         from_key = int(from_key)
