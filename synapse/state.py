@@ -86,7 +86,7 @@ class StateHandler(object):
         else:
             event.depth = 0
 
-        current_state = yield self.store.get_current_state(
+        current_state = yield self.store.get_current_state_pdu(
             key.context, key.type, key.state_key
         )
 

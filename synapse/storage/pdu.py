@@ -580,7 +580,7 @@ class StatePduStore(SQLBaseStore):
 
         txn.execute(query, query_args)
 
-    def get_current_state(self, context, pdu_type, state_key):
+    def get_current_state_pdu(self, context, pdu_type, state_key):
         """For a given context, pdu_type, state_key 3-tuple, return what is
         currently considered the current state.
 
@@ -595,10 +595,10 @@ class StatePduStore(SQLBaseStore):
         """
 
         return self._db_pool.runInteraction(
-            self._get_current_state, context, pdu_type, state_key
+            self._get_current_state_pdu, context, pdu_type, state_key
         )
 
-    def _get_current_state(self, txn, context, pdu_type, state_key):
+    def _get_current_state_pdu(self, txn, context, pdu_type, state_key):
         return self._get_current_interaction(txn, context, pdu_type, state_key)
 
     def _get_current_interaction(self, txn, context, pdu_type, state_key):
