@@ -16,8 +16,17 @@ limitations under the License.
 
 'use strict';
 
+/*
+This service manages where in the event stream the web client currently is and 
+provides methods to resume/pause/stop the event stream. This service is not
+responsible for parsing event data. For that, see the eventDataHandler.
+*/
 angular.module('eventStreamService', [])
 .factory('eventStreamService', ['matrixService', function(matrixService) {
+    var END = "END";
+    var START = "START";
+    var TIMEOUT_MS = 5000;
+    
     var settings = {
         from: "END",
         to: undefined,
@@ -28,7 +37,7 @@ angular.module('eventStreamService', [])
     // interrupts the stream. Only valid if there is a stream conneciton 
     // open.
     var interrupt = function(shouldPoll) {
-        console.log("[EventStream] interrupt("+shouldPoll+") "+
+        console.log("p[EventStream] interrupt("+shouldPoll+") "+
                     JSON.stringify(settings));
     };
     
@@ -42,7 +51,7 @@ angular.module('eventStreamService', [])
         resume: function() {
             console.log("[EventStream] resume "+JSON.stringify(settings));
             // run the stream from the latest token
-            return matrixService.getEventStream(settings.from, 5000);
+            return matrixService.getEventStream(settings.from, TIMEOUT_MS);
         },
         
         // pause the stream. Resuming it will continue from the current position
@@ -55,13 +64,13 @@ angular.module('eventStreamService', [])
         },
         
         // stop the stream and wipe the position in the stream. Typically used
-        // when logging out.
+        // when logging out / logged out.
         stop: function() {
             console.log("[EventStream] stop "+JSON.stringify(settings));
             // kill any running stream
             interrupt(false);
             // clear the latest token
-            settings.from = "END";
+            settings.from = END;
             saveStreamSettings();
         }
     };

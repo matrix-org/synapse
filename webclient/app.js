@@ -21,7 +21,8 @@ var matrixWebClient = angular.module('matrixWebClient', [
     'RoomController',
     'RoomsController',
     'matrixService',
-    'eventStreamService'
+    'eventStreamService',
+    'eventHandlerService'
 ]);
 
 matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',

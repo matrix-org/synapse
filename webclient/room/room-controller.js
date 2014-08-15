@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', [])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService) {
+.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService',
+                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 10;
     $scope.room_id = $routeParams.room_id;
@@ -42,34 +42,28 @@ angular.module('RoomController', [])
         },0);
     };
     
-    var parseChunk = function(chunks, appendToStart) {
-        for (var i = 0; i < chunks.length; i++) {
-            var chunk = chunks[i];
-            if (chunk.room_id == $scope.room_id && chunk.type == "m.room.message") {
-                if ("membership_target" in chunk.content) {
-                    chunk.user_id = chunk.content.membership_target;
-                }
-                if (appendToStart) {
-                    $scope.messages.unshift(chunk);
-                }
-                else {
-                    $scope.messages.push(chunk);
-                    scrollToBottom();
-                }
-            }
-            else if (chunk.room_id == $scope.room_id && chunk.type == "m.room.member") {
-                updateMemberList(chunk);
-            }
-            else if (chunk.type === "m.presence") {
-                updatePresence(chunk);
-            }
+    $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
+        if (isLive) {
+            $scope.messages.push(event);
+            scrollToBottom();
         }
-    };
+        else {
+            $scope.messages.unshift(event);
+        }
+    });
+    
+    $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
+        updateMemberList(event);
+    });
+    
+    $scope.$on(eventHandlerService.PRESENCE_EVENT, function(ngEvent, event, isLive) {
+        updatePresence(event);
+    });
     
     var paginate = function(numItems) {
         matrixService.paginateBackMessages($scope.room_id, $scope.state.earliest_token, numItems).then(
             function(response) {
-                parseChunk(response.data.chunk, true);
+                eventHandlerService.handleEvents(response.data.chunk, false);
                 $scope.state.earliest_token = response.data.end;
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
                     // no more messages to paginate :(
@@ -89,8 +83,8 @@ angular.module('RoomController', [])
                 console.log("Got response from "+$scope.state.events_from+" to "+response.data.end);
                 $scope.state.events_from = response.data.end;
                 $scope.feedback = "";
-
-                parseChunk(response.data.chunk, false);
+                
+                eventHandlerService.handleEvents(response.data.chunk, true);
                 
                 if ($scope.stopPoll) {
                     console.log("Stopping polling.");
