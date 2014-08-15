@@ -111,9 +111,12 @@ class RoomMemberStore(SQLBaseStore):
         for membership in membership_list:
             args.append(membership)
 
+        # sub-select finds the row ID for the most recent (i.e. current)
+        # state change of this user per room, then the outer select finds those
         query = ("SELECT room_id, membership FROM room_memberships"
-                 + " WHERE user_id=? AND " + where_membership
-                 + " GROUP BY room_id ORDER BY id DESC")
+                 + " WHERE id IN (SELECT MAX(id) FROM room_memberships"
+                 + "   WHERE user_id=? GROUP BY room_id)"
+                 + " AND " + where_membership)
         return self._execute(
             self.cursor_to_dict, query, *args
         )
