@@ -23,7 +23,7 @@ from synapse.api.events.room import (
     RoomTopicEvent, MessageEvent, InviteJoinEvent, RoomMemberEvent,
     RoomConfigEvent
 )
-from synapse.api.streams.event import EventStream, MessagesStreamData
+from synapse.api.streams.event import EventStream, EventsStreamData
 from synapse.util import stringutils
 from ._base import BaseHandler
 
@@ -97,30 +97,30 @@ class MessageHandler(BaseHandler):
             self.notifier.on_new_room_event(event, store_id)
 
         yield self.hs.get_federation().handle_new_event(event)
-
-    @defer.inlineCallbacks
-    def get_messages(self, user_id=None, room_id=None, pagin_config=None,
-                     feedback=False):
-        """Get messages in a room.
-
-        Args:
-            user_id (str): The user requesting messages.
-            room_id (str): The room they want messages from.
-            pagin_config (synapse.api.streams.PaginationConfig): The pagination
-            config rules to apply, if any.
-            feedback (bool): True to get compressed feedback with the messages
-        Returns:
-            dict: Pagination API results
-        """
-        yield self.auth.check_joined_room(room_id, user_id)
-
-        data_source = [MessagesStreamData(self.hs, room_id=room_id,
-                                          feedback=feedback)]
-        event_stream = EventStream(user_id, data_source)
-        pagin_config = yield event_stream.fix_tokens(pagin_config)
-        data_chunk = yield event_stream.get_chunk(config=pagin_config)
-        defer.returnValue(data_chunk)
-
+#
+#    @defer.inlineCallbacks
+#    def get_messages(self, user_id=None, room_id=None, pagin_config=None,
+#                     feedback=False):
+#        """Get messages in a room.
+#
+#        Args:
+#            user_id (str): The user requesting messages.
+#            room_id (str): The room they want messages from.
+#            pagin_config (synapse.api.streams.PaginationConfig): The pagination
+#            config rules to apply, if any.
+#            feedback (bool): True to get compressed feedback with the messages
+#        Returns:
+#            dict: Pagination API results
+#        """
+#        yield self.auth.check_joined_room(room_id, user_id)
+#
+#        data_source = [MessagesStreamData(self.hs, room_id=room_id,
+#                                          feedback=feedback)]
+#        event_stream = EventStream(user_id, data_source)
+#        pagin_config = yield event_stream.fix_tokens(pagin_config)
+#        data_chunk = yield event_stream.get_chunk(config=pagin_config)
+#        defer.returnValue(data_chunk)
+#
     @defer.inlineCallbacks
     def store_room_data(self, event=None, stamp_event=True):
         """ Stores data for a room.
@@ -251,20 +251,27 @@ class MessageHandler(BaseHandler):
             user_id=user_id,
             membership_list=[Membership.INVITE, Membership.JOIN]
         )
-        for room_info in room_list:
-            if room_info["membership"] != Membership.JOIN:
+
+        ret = []
+
+        for event in room_list:
+            d = event.get_dict()
+            ret.append(d)
+
+            if event.membership != Membership.JOIN:
                 continue
             try:
-                event_chunk = yield self.get_messages(
-                    user_id=user_id,
-                    pagin_config=pagin_config,
-                    feedback=feedback,
-                    room_id=room_info["room_id"]
+                messages = yield self.store.get_recent_events_for_room(
+                    event.room_id,
+                    limit=50,
                 )
-                room_info["messages"] = event_chunk
+                d["messages"] = [m.get_dict() for m in messages]
             except:
                 pass
-        defer.returnValue(room_list)
+
+        logger.debug("snapshot_all_rooms returning: %s", ret)
+
+        defer.returnValue(ret)
 
 
 class RoomCreationHandler(BaseHandler):
@@ -442,7 +449,7 @@ class RoomMemberHandler(BaseHandler):
 
         member_list = yield self.store.get_room_members(room_id=room_id)
         event_list = [
-            entry.as_event(self.event_factory).get_dict()
+            entry.get_dict()
             for entry in member_list
         ]
         chunk_data = {
@@ -685,7 +692,7 @@ class RoomMemberHandler(BaseHandler):
             user_id=user.to_string(), membership_list=membership_list
         )
 
-        defer.returnValue([r["room_id"] for r in rooms])
+        defer.returnValue([r.room_id for r in rooms])
 
     @defer.inlineCallbacks
     def _do_local_membership_update(self, event, membership, broadcast_msg):

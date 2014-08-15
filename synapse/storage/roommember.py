@@ -63,6 +63,7 @@ class RoomMemberStore(SQLBaseStore):
             yield self._execute(None, sql, event.room_id, domain)
 
 
+    @defer.inlineCallbacks
     def get_room_member(self, user_id, room_id):
         """Retrieve the current state of a room member.
 
@@ -72,10 +73,12 @@ class RoomMemberStore(SQLBaseStore):
         Returns:
             Deferred: Results in a MembershipEvent or None.
         """
-        return self._get_members_by_dict({
+        rows = yield self._get_members_by_dict({
             "e.room_id": room_id,
             "m.user_id": user_id,
         })
+
+        defer.returnValue(rows[0] if rows else None)
 
     def get_room_members(self, room_id, membership=None):
         """Retrieve the current room member list for a room.
@@ -142,5 +145,8 @@ class RoomMemberStore(SQLBaseStore):
         ) % (where_clause,)
 
         rows = yield self._execute_and_decode(sql, *where_values)
+
+        logger.debug("_get_members_query Got rows %s", rows)
+
         results = [self._parse_event_from_row(r) for r in rows]
         defer.returnValue(results)

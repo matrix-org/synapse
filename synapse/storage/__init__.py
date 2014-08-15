@@ -104,7 +104,15 @@ class DataStore(RoomMemberStore, RoomStore,
 
             yield self._simple_insert("state_events", vals)
 
-            # TODO (erikj): We also need to update the current state table?
+            yield self._simple_insert(
+                "current_state_events",
+                {
+                    "event_id": event.event_id,
+                    "room_id": event.room_id,
+                    "type": event.type,
+                    "state_key": event.state_key,
+                }
+            )
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):

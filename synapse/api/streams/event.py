@@ -28,17 +28,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class MessagesStreamData(StreamData):
-    EVENT_TYPE = MessageEvent.TYPE
+class EventsStreamData(StreamData):
+    EVENT_TYPE = "EventsStream"
 
     def __init__(self, hs, room_id=None, feedback=False):
-        super(MessagesStreamData, self).__init__(hs)
+        super(EventsStreamData, self).__init__(hs)
         self.room_id = room_id
         self.with_feedback = feedback
 
     @defer.inlineCallbacks
     def get_rows(self, user_id, from_key, to_key, limit):
-        (data, latest_ver) = yield self.store.get_message_stream(
+        data, latest_ver = yield self.store.get_room_events_stream(
             user_id=user_id,
             from_key=from_key,
             to_key=to_key,
@@ -50,74 +50,7 @@ class MessagesStreamData(StreamData):
 
     @defer.inlineCallbacks
     def max_token(self):
-        val = yield self.store.get_max_message_id()
-        defer.returnValue(val)
-
-
-class RoomMemberStreamData(StreamData):
-    EVENT_TYPE = RoomMemberEvent.TYPE
-
-    @defer.inlineCallbacks
-    def get_rows(self, user_id, from_key, to_key, limit):
-        (data, latest_ver) = yield self.store.get_room_member_stream(
-            user_id=user_id,
-            from_key=from_key,
-            to_key=to_key
-        )
-
-        defer.returnValue((data, latest_ver))
-
-    @defer.inlineCallbacks
-    def max_token(self):
-        val = yield self.store.get_max_room_member_id()
-        defer.returnValue(val)
-
-
-class FeedbackStreamData(StreamData):
-    EVENT_TYPE = FeedbackEvent.TYPE
-
-    def __init__(self, hs, room_id=None):
-        super(FeedbackStreamData, self).__init__(hs)
-        self.room_id = room_id
-
-    @defer.inlineCallbacks
-    def get_rows(self, user_id, from_key, to_key, limit):
-        (data, latest_ver) = yield self.store.get_feedback_stream(
-            user_id=user_id,
-            from_key=from_key,
-            to_key=to_key,
-            limit=limit,
-            room_id=self.room_id
-        )
-        defer.returnValue((data, latest_ver))
-
-    @defer.inlineCallbacks
-    def max_token(self):
-        val = yield self.store.get_max_feedback_id()
-        defer.returnValue(val)
-
-
-class RoomDataStreamData(StreamData):
-    EVENT_TYPE = RoomTopicEvent.TYPE  # TODO need multiple event types
-
-    def __init__(self, hs, room_id=None):
-        super(RoomDataStreamData, self).__init__(hs)
-        self.room_id = room_id
-
-    @defer.inlineCallbacks
-    def get_rows(self, user_id, from_key, to_key, limit):
-        (data, latest_ver) = yield self.store.get_room_data_stream(
-            user_id=user_id,
-            from_key=from_key,
-            to_key=to_key,
-            limit=limit,
-            room_id=self.room_id
-        )
-        defer.returnValue((data, latest_ver))
-
-    @defer.inlineCallbacks
-    def max_token(self):
-        val = yield self.store.get_max_room_data_id()
+        val = yield self.store.get_room_events_max_id()
         defer.returnValue(val)
 
 

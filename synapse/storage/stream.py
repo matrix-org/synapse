@@ -34,6 +34,7 @@ class StreamStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_room_events_stream(self, user_id, from_key, to_key, room_id,
                                limit=0, with_feedback=False):
+        # TODO (erikj): Handle compressed feedback
 
         current_room_membership_sql = (
             "SELECT m.room_id FROM room_memberships as m "
@@ -69,3 +70,33 @@ class StreamStore(SQLBaseStore):
         )
 
         defer.returnValue([self._parse_event_from_row(r) for r in rows])
+
+    @defer.inlineCallbacks
+    def get_recent_events_for_room(self, room_id, limit, with_feedback=False):
+        # TODO (erikj): Handle compressed feedback
+
+        sql = (
+            "SELECT * FROM events WHERE room_id = ? "
+            "ORDER BY ordering DESC LIMIT ? "
+        )
+
+        rows = yield self._execute_and_decode(
+            sql,
+            room_id, limit
+        )
+
+        rows.reverse()  # As we selected with reverse ordering
+
+        defer.returnValue([self._parse_event_from_row(r) for r in rows])
+
+    @defer.inlineCallbacks
+    def get_room_events_max_id(self):
+        res = yield self._execute_and_decode(
+            "SELECT MAX(ordering) as m FROM events"
+        )
+
+        if not res:
+            defer.returnValue(0)
+            return
+
+        defer.returnValue(res[0]["m"])

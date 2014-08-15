@@ -32,7 +32,10 @@ CREATE TABLE IF NOT EXISTS state_events(
 
 CREATE TABLE IF NOT EXISTS current_state_events(
     event_id TEXT NOT NULL,
-    room_id TEXT NOT NULL
+    room_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    state_key TEXT NOT NULL,
+    CONSTRAINT uniq UNIQUE (room_id, type, state_key) ON CONFLICT REPLACE
 );
 
 CREATE TABLE IF NOT EXISTS room_memberships(
