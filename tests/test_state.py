@@ -36,7 +36,7 @@ class StateTestCase(unittest.TestCase):
             "get_unresolved_state_tree",
             "update_current_state",
             "get_latest_pdus_in_context",
-            "get_current_state",
+            "get_current_state_pdu",
             "get_pdu",
         ])
         self.replication = Mock(spec=["get_pdu"])
@@ -247,7 +247,7 @@ class StateTestCase(unittest.TestCase):
         pdus = [tup]
 
         self.persistence.get_latest_pdus_in_context.return_value = pdus
-        self.persistence.get_current_state.return_value = state_pdu
+        self.persistence.get_current_state_pdu.return_value = state_pdu
 
         yield self.state.handle_new_event(event)
 

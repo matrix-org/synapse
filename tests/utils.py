@@ -221,34 +221,14 @@ class MemoryDataStore(object):
                     content=content)
         self.paths_to_content[path] = data
 
-    def get_message_stream(self, user_id=None, from_key=None, to_key=None,
+    def get_room_events_stream(self, user_id=None, from_key=None, to_key=None,
                             room_id=None, limit=0, with_feedback=False):
-        return ([], from_key)  # TODO
-
-    def get_room_member_stream(self, user_id=None, from_key=None, to_key=None):
-        return ([], from_key)  # TODO
-
-    def get_feedback_stream(self, user_id=None, from_key=None, to_key=None,
-                            room_id=None, limit=0):
-        return ([], from_key)  # TODO
-
-    def get_room_data_stream(self, user_id=None, from_key=None, to_key=None,
-                            room_id=None, limit=0):
         return ([], from_key)  # TODO
 
     def to_events(self, data_store_list):
         return data_store_list  # TODO
 
-    def get_max_message_id(self):
-        return 0  # TODO
-
-    def get_max_feedback_id(self):
-        return 0  # TODO
-
-    def get_max_room_member_id(self):
-        return 0  # TODO
-
-    def get_max_room_data_id(self):
+    def get_room_events_max_id(self):
         return 0  # TODO
 
     def get_joined_hosts_for_room(self, room_id):
