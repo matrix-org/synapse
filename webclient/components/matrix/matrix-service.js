@@ -16,6 +16,12 @@ limitations under the License.
 
 'use strict';
 
+/*
+This service wraps up Matrix API calls. 
+
+This serves to isolate the caller from changes to the underlying url paths, as
+well as attach common params (e.g. access_token) to requests.
+*/
 angular.module('matrixService', [])
 .factory('matrixService', ['$http', '$q', '$rootScope', function($http, $q, $rootScope) {
         
@@ -36,10 +42,16 @@ angular.module('matrixService', [])
     var MAPPING_PREFIX = "alias_for_";
 
     var doRequest = function(method, path, params, data) {
+        if (!config) {
+            console.warn("No config exists. Cannot perform request to "+path);
+            return;
+        }
+    
         // Inject the access token
         if (!params) {
             params = {};
         }
+        
         params.access_token = config.access_token;
         
         return doBaseRequest(config.homeserver, method, path, params, data, undefined);
@@ -297,6 +309,15 @@ angular.module('matrixService', [])
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
         },
         
+        // start listening on /events
+        getEventStream: function(from, timeout) {
+            var path = "/events";
+            var params = {
+                from: from,
+                timeout: timeout
+            };
+            return doRequest("GET", path, params);
+        },
         
         // 
         testLogin: function() {

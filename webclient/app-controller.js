@@ -21,8 +21,8 @@ limitations under the License.
 'use strict';
 
 angular.module('MatrixWebClientController', ['matrixService'])
-.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', 'matrixService',
-                               function($scope, $location, $rootScope, matrixService) {
+.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', 'matrixService', 'eventStreamService',
+                               function($scope, $location, $rootScope, matrixService, eventStreamService) {
          
     // Check current URL to avoid to display the logout button on the login page
     $scope.location = $location.path();
@@ -44,11 +44,17 @@ angular.module('MatrixWebClientController', ['matrixService'])
         else {
             $scope.config = matrixService.config();        
         }
-    };    
-    
+    };
+
+    if (matrixService.config()) {
+        eventStreamService.resume();
+    }
     
     // Logs the user out 
     $scope.logout = function() {
+        // kill the event stream
+        eventStreamService.stop();
+    
         // Clean permanent data
         matrixService.setConfig({});
         matrixService.saveConfig();
@@ -57,7 +63,7 @@ angular.module('MatrixWebClientController', ['matrixService'])
         $location.path("login");
     };
 
-    // Listen to the event indicating that the access token is no more valid.
+    // Listen to the event indicating that the access token is no longer valid.
     // In this case, the user needs to log in again.
     $scope.$on("M_UNKNOWN_TOKEN", function() {
         console.log("Invalid access token -> log user out");

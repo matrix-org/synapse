@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', [])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService) {
+.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService',
+                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 10;
     $scope.room_id = $routeParams.room_id;
@@ -28,9 +28,7 @@ angular.module('RoomController', [])
         can_paginate: true, // this is toggled off when we run out of items
         stream_failure: undefined // the response when the stream fails
     };
-    $scope.messages = [];
     $scope.members = {};
-    $scope.stopPoll = false;
 
     $scope.imageURLToSend = "";
     $scope.userIDToInvite = "";
@@ -42,34 +40,24 @@ angular.module('RoomController', [])
         },0);
     };
     
-    var parseChunk = function(chunks, appendToStart) {
-        for (var i = 0; i < chunks.length; i++) {
-            var chunk = chunks[i];
-            if (chunk.room_id == $scope.room_id && chunk.type == "m.room.message") {
-                if ("membership_target" in chunk.content) {
-                    chunk.user_id = chunk.content.membership_target;
-                }
-                if (appendToStart) {
-                    $scope.messages.unshift(chunk);
-                }
-                else {
-                    $scope.messages.push(chunk);
-                    scrollToBottom();
-                }
-            }
-            else if (chunk.room_id == $scope.room_id && chunk.type == "m.room.member") {
-                updateMemberList(chunk);
-            }
-            else if (chunk.type === "m.presence") {
-                updatePresence(chunk);
-            }
+    $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
+        if (isLive && event.room_id === $scope.room_id) {
+            scrollToBottom();
         }
-    };
+    });
+    
+    $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
+        updateMemberList(event);
+    });
+    
+    $scope.$on(eventHandlerService.PRESENCE_EVENT, function(ngEvent, event, isLive) {
+        updatePresence(event);
+    });
     
     var paginate = function(numItems) {
         matrixService.paginateBackMessages($scope.room_id, $scope.state.earliest_token, numItems).then(
             function(response) {
-                parseChunk(response.data.chunk, true);
+                eventHandlerService.handleEvents(response.data.chunk, false);
                 $scope.state.earliest_token = response.data.end;
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
                     // no more messages to paginate :(
@@ -80,43 +68,6 @@ angular.module('RoomController', [])
                 console.log("Failed to paginateBackMessages: " + JSON.stringify(error));
             }
         )
-    };
-
-    var shortPoll = function() {
-        $http.get(matrixService.config().homeserver + matrixService.prefix + "/events", {
-            "params": {
-                "access_token": matrixService.config().access_token,
-                "from": $scope.state.events_from,
-                "timeout": 5000
-            }})
-            .then(function(response) {
-                $scope.state.stream_failure = undefined;
-                console.log("Got response from "+$scope.state.events_from+" to "+response.data.end);
-                $scope.state.events_from = response.data.end;
-                $scope.feedback = "";
-
-                parseChunk(response.data.chunk, false);
-                
-                if ($scope.stopPoll) {
-                    console.log("Stopping polling.");
-                }
-                else {
-                    $timeout(shortPoll, 0);
-                }
-            }, function(response) {
-                $scope.state.stream_failure = response;
-
-                if (response.status == 403) {
-                    $scope.stopPoll = true;
-                }
-                
-                if ($scope.stopPoll) {
-                    console.log("Stopping polling.");
-                }
-                else {
-                    $timeout(shortPoll, 5000);
-                }
-            });
     };
 
     var updateMemberList = function(chunk) {
@@ -133,7 +84,6 @@ angular.module('RoomController', [])
                     function(response) {
                         var member = $scope.members[chunk.target_user_id];
                         if (member !== undefined) {
-                            console.log("Updated displayname "+chunk.target_user_id+" to " + response.data.displayname);
                             member.displayname = response.data.displayname;
                         }
                     }
@@ -142,7 +92,6 @@ angular.module('RoomController', [])
                     function(response) {
                          var member = $scope.members[chunk.target_user_id];
                          if (member !== undefined) {
-                            console.log("Updated image for "+chunk.target_user_id+" to " + response.data.avatar_url);
                             member.avatar_url = response.data.avatar_url;
                          }
                     }
@@ -218,8 +167,6 @@ angular.module('RoomController', [])
         matrixService.join($scope.room_id).then(
             function() {
                 console.log("Joined room "+$scope.room_id);
-                // Now start reading from the stream
-                $timeout(shortPoll, 0);
 
                 // Get the current member list
                 matrixService.getMemberList($scope.room_id).then(
@@ -278,9 +225,4 @@ angular.module('RoomController', [])
     $scope.loadMoreHistory = function() {
         paginate(MESSAGES_PER_PAGINATION);
     };
-
-    $scope.$on('$destroy', function(e) {
-        console.log("onDestroyed: Stopping poll.");
-        $scope.stopPoll = true;
-    });
 }]);

@@ -1,6 +1,6 @@
 angular.module('LoginController', ['matrixService'])
-.controller('LoginController', ['$scope', '$location', 'matrixService',
-                                    function($scope, $location, matrixService) {
+.controller('LoginController', ['$scope', '$location', 'matrixService', 'eventStreamService',
+                                    function($scope, $location, matrixService, eventStreamService) {
     'use strict';
     
     
@@ -51,7 +51,7 @@ angular.module('LoginController', ['matrixService'])
 
                 // And permanently save it
                 matrixService.saveConfig();
-
+                eventStreamService.resume();
                  // Go to the user's rooms list page
                 $location.path("rooms");
             },
@@ -83,6 +83,7 @@ angular.module('LoginController', ['matrixService'])
                         access_token: response.data.access_token
                     });
                     matrixService.saveConfig();
+                    eventStreamService.resume();
                     $location.path("rooms");
                 }
                 else {
