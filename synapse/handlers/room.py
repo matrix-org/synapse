@@ -603,7 +603,7 @@ class RoomMemberHandler(BaseHandler):
             if prev_state and prev_state.membership == Membership.INVITE:
                 room = yield self.store.get_room(room_id)
                 inviter = UserID.from_string(
-                    prev_state.sender, self.hs
+                    prev_state.user_id, self.hs
                 )
 
                 should_do_dance = not inviter.is_mine and not room
