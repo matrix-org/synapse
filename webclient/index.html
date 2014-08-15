@@ -24,9 +24,9 @@
 
 <body>
 
-    <header class="header">
+    <header id="header">
         <!-- Do not show buttons on the login page -->
-        <div class="header-buttons" ng-hide="'/login' == location ">
+        <div id="header-buttons" ng-hide="'/login' == location ">
             <button ng-click="showConfig()">Config</button>
             <button ng-click="logout()">Log out</button>
         </div>
@@ -34,7 +34,7 @@
         <h1>[matrix]</h1>
     </header>
 
-    <div class="config" ng-hide="!config">
+    <div id="config" ng-hide="!config">
         <div>Home server: {{ config.homeserver }} </div>
         <div>User ID: {{ config.user_id }} </div>
         <div>Access token: {{ config.access_token }} </div>

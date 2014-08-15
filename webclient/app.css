@@ -10,7 +10,7 @@ h1 {
 
 /*** Overall page layout ***/
 
-.page {
+#page {
     position: absolute;
     top: 80px;
     bottom: 100px;
@@ -20,13 +20,13 @@ h1 {
     margin: 20px;
 }
 
-.wrapper {
+#wrapper {
     margin: auto;
     max-width: 1280px;
     height: 100%;
 }
 
-.roomName {
+#roomName {
     max-width: 1280px;
     width: 100%;
     text-align: right;
@@ -36,7 +36,7 @@ h1 {
     margin-bottom: 10px;
 }
 
-.controlPanel {
+#controlPanel {
     position: absolute;
     bottom: 0px;
     width: 100%;
@@ -44,39 +44,39 @@ h1 {
     border-top: #aaa 1px solid;
 }
 
-.controls {
+#controls {
     max-width: 1280px;
     padding: 12px;
     margin: auto;
 }
 
-.inputBarTable {
+#inputBarTable {
     width: 100%;
 }
 
-.inputBarTable tr td {
+#inputBarTable tr td {
     padding: 1px 4px;
 }
 
-.mainInput {
+#mainInput {
     width: 100%;
 }
 
 /*** Participant list ***/
 
-.usersTableWrapper {
+#usersTableWrapper {
     float: right;
     width: 120px;
     height: 100%;
     overflow-y: auto;
 }
 
-.usersTable {
+#usersTable {
     width: 100%;
     border-collapse: collapse;
 }
 
-.usersTable td {
+#usersTable td {
     padding: 0px;
 }
 
@@ -124,21 +124,21 @@ h1 {
 
 /*** Message table ***/
 
-.messageTableWrapper {
+#messageTableWrapper {
     height: 100%;
     margin-right: 140px;
     overflow-y: auto;
     width: auto;
 }
 
-.messageTable {
+#messageTable {
     margin: auto;
     max-width: 1280px;
     width: 100%;
     border-collapse: collapse;
 }
         
-.messageTable td {
+#messageTable td {
     padding: 0px;
 }
 
@@ -235,18 +235,18 @@ h1 {
 
 /******************************/
 
-.header {
+#header {
     padding-left: 20px;
     padding-right: 20px;
     max-width: 1280px;
     margin: auto;
 }
 
-.header-buttons {
+#header-buttons {
     float: right;
 }
 
-.config {
+#config {
     position: absolute;
     z-index: 100;
     top: 100px;
