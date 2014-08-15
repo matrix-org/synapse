@@ -71,6 +71,7 @@ class StreamStore(SQLBaseStore):
             "invites": invites_sql,
         }
 
+        # Constraints and ordering depend on direction.
         if from_key < to_key:
             sql += (
                 "AND e.ordering > ? AND e.ordering < ? "
