@@ -61,7 +61,6 @@ class StreamStore(SQLBaseStore):
             defer.returnValue(([], to_key))
             return
 
-
         sql = (
             "SELECT * FROM events as e WHERE "
             "((room_id IN (%(current)s)) OR "
@@ -89,7 +88,6 @@ class StreamStore(SQLBaseStore):
         )
 
         ret = [self._parse_event_from_row(r) for r in rows]
-
 
         if rows:
             if from_key < to_key:

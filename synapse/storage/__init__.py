@@ -87,7 +87,11 @@ class DataStore(RoomMemberStore, RoomStore,
             "content": json.dumps(event.content),
         }
 
-        unrec = {k: v for k, v in event.get_full_dict().items() if k not in vals.keys()}
+        unrec = {
+            k: v
+            for k, v in event.get_full_dict().items()
+            if k not in vals.keys()
+        }
         vals["unrecognized_keys"] = json.dumps(unrec)
 
         yield self._simple_insert("events", vals)

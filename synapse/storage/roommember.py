@@ -62,7 +62,6 @@ class RoomMemberStore(SQLBaseStore):
 
             yield self._execute(None, sql, event.room_id, domain)
 
-
     @defer.inlineCallbacks
     def get_room_member(self, user_id, room_id):
         """Retrieve the current state of a room member.

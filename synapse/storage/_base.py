@@ -60,7 +60,8 @@ class SQLBaseStore(object):
             The result of decoder(results)
         """
         logger.debug(
-            "[SQL] %s  Args=%s Func=%s", query, args, decoder.__name__ if decoder else None
+            "[SQL] %s  Args=%s Func=%s",
+            query, args, decoder.__name__ if decoder else None
         )
 
         def interaction(txn):

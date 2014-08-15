@@ -114,8 +114,9 @@ class MessageHandler(BaseHandler):
         """
         yield self.auth.check_joined_room(room_id, user_id)
 
-        data_source = [EventsStreamData(self.hs, room_id=room_id,
-                                          feedback=feedback)]
+        data_source = [
+            EventsStreamData(self.hs, room_id=room_id, feedback=feedback)
+        ]
         event_stream = EventStream(user_id, data_source)
         pagin_config = yield event_stream.fix_tokens(pagin_config)
         data_chunk = yield event_stream.get_chunk(config=pagin_config)
@@ -196,7 +197,9 @@ class MessageHandler(BaseHandler):
                 raise RoomError(
                     403, "Member does not meet private room rules.")
 
-        data = yield self.store.get_current_state(room_id, event_type, state_key)
+        data = yield self.store.get_current_state(
+            room_id, event_type, state_key
+        )
         defer.returnValue(data)
 
     @defer.inlineCallbacks
@@ -496,7 +499,7 @@ class RoomMemberHandler(BaseHandler):
             SynapseError if there was a problem changing the membership.
         """
 
-        #broadcast_msg = False
+        # broadcast_msg = False
 
         prev_state = yield self.store.get_room_member(
             event.target_user_id, event.room_id
@@ -570,7 +573,8 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def _do_join(self, event, room_host=None, do_auth=True, broadcast_msg=True):
+    def _do_join(self, event, room_host=None, do_auth=True,
+                 broadcast_msg=True):
         joinee = self.hs.parse_userid(event.target_user_id)
         # room_id = RoomID.from_string(event.room_id, self.hs)
         room_id = event.room_id
@@ -620,7 +624,6 @@ class RoomMemberHandler(BaseHandler):
                 membership=event.content["membership"],
                 broadcast_msg=broadcast_msg,
             )
-
 
         if should_do_dance:
             yield self._do_invite_join_dance(
@@ -755,7 +758,7 @@ class RoomMemberHandler(BaseHandler):
             room_id, "", is_public=False
         )
 
-        #yield self.state_handler.handle_new_event(event)
+        # yield self.state_handler.handle_new_event(event)
         yield federation.handle_new_event(new_event)
         yield federation.get_state_for_room(
             target_host, room_id
