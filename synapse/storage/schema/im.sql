@@ -51,6 +51,18 @@ CREATE TABLE IF NOT EXISTS feedback(
     room_id TEXT
 );
 
+CREATE TABLE IF NOT EXISTS topics(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    topic TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS room_names(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    name TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS rooms(
     room_id TEXT PRIMARY KEY NOT NULL,
     is_public INTEGER,

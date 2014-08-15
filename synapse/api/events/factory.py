@@ -15,7 +15,7 @@
 
 from synapse.api.events.room import (
     RoomTopicEvent, MessageEvent, RoomMemberEvent, FeedbackEvent,
-    InviteJoinEvent, RoomConfigEvent
+    InviteJoinEvent, RoomConfigEvent, RoomNameEvent,
 )
 
 from synapse.util.stringutils import random_string
@@ -25,6 +25,7 @@ class EventFactory(object):
 
     _event_classes = [
         RoomTopicEvent,
+        RoomNameEvent,
         MessageEvent,
         RoomMemberEvent,
         FeedbackEvent,

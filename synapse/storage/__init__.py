@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from synapse.api.events.room import (
     RoomMemberEvent, MessageEvent, RoomTopicEvent, FeedbackEvent,
-    RoomConfigEvent
+    RoomConfigEvent, RoomNameEvent,
 )
 
 from .directory import DirectoryStore
@@ -52,6 +52,10 @@ class DataStore(RoomMemberStore, RoomStore,
             yield self._store_feedback(event)
         elif event.type == RoomConfigEvent.TYPE:
             yield self._store_room_config(event)
+        elif event.type == RoomNameEvent.TYPE:
+            yield self._store_room_name(event)
+        elif event.type == RoomTopicEvent.TYPE:
+            yield self._store_room_topic(event)
 
         yield self._store_event(event)
 

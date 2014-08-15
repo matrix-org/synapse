@@ -76,49 +76,73 @@ class RoomStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_rooms(self, is_public, with_topics):
+    def get_rooms(self, is_public):
         """Retrieve a list of all public rooms.
 
         Args:
             is_public (bool): True if the rooms returned should be public.
-            with_topics (bool): True to include the current topic for the room
-            in the response.
         Returns:
-            A list of room dicts containing at least a "room_id" key, and a
-            "topic" key if one is set and with_topic=True.
+            A list of room dicts containing at least a "room_id" key, a
+            "topic" key if one is set, and a "name" key if one is set
         """
-        room_data_type = RoomTopicEvent.TYPE
-        public = 1 if is_public else 0
 
-        latest_topic = ("SELECT max(room_data.id) FROM room_data WHERE "
-                        + "room_data.type = ? GROUP BY room_id")
-
-        query = ("SELECT rooms.*, room_data.content, room_alias FROM rooms "
-                 + "LEFT JOIN "
-                 + "room_aliases ON room_aliases.room_id = rooms.room_id "
-                 + "LEFT JOIN "
-                 + "room_data ON rooms.room_id = room_data.room_id WHERE "
-                 + "(room_data.id IN (" + latest_topic + ") "
-                 + "OR room_data.id IS NULL) AND rooms.is_public = ?")
-
-        res = yield self._execute(
-            self.cursor_to_dict, query, room_data_type, public
+        topic_subquery = (
+            "SELECT topics.event_id as event_id, topics.room_id as room_id, topic FROM topics "
+            "INNER JOIN current_state_events as c "
+            "ON c.event_id = topics.event_id "
         )
 
-        # return only the keys the specification expects
-        ret_keys = ["room_id", "topic", "room_alias"]
+        name_subquery = (
+            "SELECT room_names.event_id as event_id, room_names.room_id as room_id, name FROM room_names "
+            "INNER JOIN current_state_events as c "
+            "ON c.event_id = room_names.event_id "
+        )
 
-        # extract topic from the json (icky) FIXME
-        for i, room_row in enumerate(res):
-            try:
-                content_json = json.loads(room_row["content"])
-                room_row["topic"] = content_json["topic"]
-            except:
-                pass  # no topic set
-            # filter the dict based on ret_keys
-            res[i] = {k: v for k, v in room_row.iteritems() if k in ret_keys}
+        sql = (
+            "SELECT r.room_id, n.name, t.topic, group_concat(a.room_alias) FROM rooms AS r "
+            "LEFT JOIN (%(topic)s) AS t ON t.room_id = r.room_id "
+            "LEFT JOIN (%(name)s) AS n ON n.room_id = r.room_id "
+            "INNER JOIN room_aliases AS a ON a.room_id = r.room_id "
+            "WHERE r.is_public = ? "
+            "GROUP BY r.room_id "
+        ) % {
+            "topic": topic_subquery,
+            "name": name_subquery,
+        }
 
-        defer.returnValue(res)
+        rows = yield self._execute(None, sql, is_public)
+
+        ret = [
+            {
+                "room_id": r[0],
+                "name": r[1],
+                "topic": r[2],
+                "aliases": r[3].split(","),
+            }
+            for r in rows
+        ]
+
+        defer.returnValue(ret)
+
+    def _store_room_topic(self, event):
+        return self._simple_insert(
+            "topics",
+            {
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "topic": event.topic,
+            }
+        )
+
+    def _store_room_name(self, event):
+        return self._simple_insert(
+            "room_names",
+            {
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "name": event.name,
+            }
+        )
 
 
 class RoomsTable(Table):

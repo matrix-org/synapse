@@ -68,7 +68,7 @@ class SQLBaseStore(object):
             if decoder:
                 return decoder(cursor)
             else:
-                return cursor
+                return cursor.fetchall()
 
         return self._db_pool.runInteraction(interaction)
 
