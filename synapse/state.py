@@ -157,7 +157,10 @@ class StateHandler(object):
             defer.returnValue(True)
             return
 
-        if new_branch[-1] == current_branch[-1]:
+        n = new_branch[-1]
+        c = current_branch[-1]
+
+        if n.pdu_id == c.pdu_id and n.origin == c.origin:
             # We have all the PDUs we need, so we can just do the conflict
             # resolution.
 
