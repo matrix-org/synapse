@@ -15,7 +15,7 @@
 
 from synapse.api.events.room import (
     RoomTopicEvent, MessageEvent, RoomMemberEvent, FeedbackEvent,
-    InviteJoinEvent, RoomConfigEvent, RoomNameEvent,
+    InviteJoinEvent, RoomConfigEvent, RoomNameEvent, GenericEvent,
 )
 
 from synapse.util.stringutils import random_string
@@ -43,10 +43,9 @@ class EventFactory(object):
         if "event_id" not in kwargs:
             kwargs["event_id"] = random_string(10)
 
-        try:
+        if etype in self._event_list:
             handler = self._event_list[etype]
-        except KeyError:  # unknown event type
-            # TODO allow custom event types.
-            raise NotImplementedError("Unknown etype=%s" % etype)
+        else:
+            handler = GenericEvent
 
         return handler(**kwargs)

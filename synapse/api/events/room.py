@@ -16,6 +16,10 @@
 from . import SynapseEvent
 
 
+class GenericEvent(SynapseEvent):
+    def get_content_template(self):
+        return {}
+
 class RoomTopicEvent(SynapseEvent):
     TYPE = "m.room.topic"
 
