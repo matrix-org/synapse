@@ -26,8 +26,8 @@ To get up and running:
       with ``python setup.py develop --user`` and then run one with
       ``python synapse/app/homeserver.py``
       
-    - To run your own webclient:
-      ``cd webclient; python -m SimpleHTTPServer`` and hit http://localhost:8000
+    - To run your own webclient, add ``-w``:
+      ``python synapse/app/homeserver.py -w`` and hit http://localhost:8080/matrix/client
       in your web browser (a recent Chrome, Safari or Firefox for now,
       please...)
              
@@ -203,7 +203,7 @@ Running The Demo Web Client
 
 You can run the web client when you run the homeserver by adding ``-w`` to the
 command to run ``homeserver.py``. The web client can be accessed via 
-http://localhost/matrix/client
+http://localhost:8080/matrix/client
 
 If this is the first time you have used the client from that browser (it uses
 HTML5 local storage to remember its config), you will need to log in to your
