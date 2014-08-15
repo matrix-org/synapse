@@ -50,8 +50,8 @@ class DataStore(RoomMemberStore, RoomStore,
             yield self._store_room_member(event)
         elif event.type == FeedbackEvent.TYPE:
             yield self._store_feedback(event)
-        elif event.type == RoomConfigEvent.TYPE:
-            yield self._store_room_config(event)
+#        elif event.type == RoomConfigEvent.TYPE:
+#            yield self._store_room_config(event)
         elif event.type == RoomNameEvent.TYPE:
             yield self._store_room_name(event)
         elif event.type == RoomTopicEvent.TYPE:
