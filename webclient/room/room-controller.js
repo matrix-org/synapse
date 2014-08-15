@@ -111,6 +111,10 @@ angular.module('RoomController', [])
     var updateMemberList = function(chunk) {
         var isNewMember = !(chunk.target_user_id in $scope.members);
         if (isNewMember) {
+            if ("state" in chunk.content) {
+                chunk.presenceState = chunk.content.state;
+            }
+        
             $scope.members[chunk.target_user_id] = chunk;
             // get their display name and profile picture and set it to their
             // member entry in $scope.members. We HAVE to use $timeout with 0 delay 
