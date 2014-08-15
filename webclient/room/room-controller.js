@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', [])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService) {
+.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService',
+                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 10;
     $scope.room_id = $routeParams.room_id;
@@ -83,13 +83,8 @@ angular.module('RoomController', [])
     };
 
     var shortPoll = function() {
-        $http.get(matrixService.config().homeserver + matrixService.prefix + "/events", {
-            "params": {
-                "access_token": matrixService.config().access_token,
-                "from": $scope.state.events_from,
-                "timeout": 5000
-            }})
-            .then(function(response) {
+        eventStreamService.resume().then(
+            function(response) {
                 $scope.state.stream_failure = undefined;
                 console.log("Got response from "+$scope.state.events_from+" to "+response.data.end);
                 $scope.state.events_from = response.data.end;
@@ -103,10 +98,11 @@ angular.module('RoomController', [])
                 else {
                     $timeout(shortPoll, 0);
                 }
-            }, function(response) {
-                $scope.state.stream_failure = response;
+            }, 
+            function(error) {
+                $scope.state.stream_failure = error;
 
-                if (response.status == 403) {
+                if (error.status == 403) {
                     $scope.stopPoll = true;
                 }
                 
@@ -116,7 +112,8 @@ angular.module('RoomController', [])
                 else {
                     $timeout(shortPoll, 5000);
                 }
-            });
+            }
+        );
     };
 
     var updateMemberList = function(chunk) {

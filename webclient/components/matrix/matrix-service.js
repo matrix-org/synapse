@@ -297,6 +297,15 @@ angular.module('matrixService', [])
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
         },
         
+        // start listening on /events
+        getEventStream: function(from, timeout) {
+            var path = "/events";
+            var params = {
+                from: from,
+                timeout: timeout
+            };
+            return doRequest("GET", path, params);
+        },
         
         // 
         testLogin: function() {
