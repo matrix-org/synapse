@@ -36,10 +36,11 @@ angular.module('RoomController', [])
     $scope.userIDToInvite = "";
     
     var scrollToBottom = function() {
+        console.log("Scrolling to bottom");
         $timeout(function() {
             var objDiv = document.getElementById("messageTableWrapper");
             objDiv.scrollTop = objDiv.scrollHeight;
-        },0);
+        }, 0);
     };
     
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
@@ -59,12 +60,12 @@ angular.module('RoomController', [])
     $scope.paginateMore = function() {
         if ($scope.state.can_paginate) {
             // console.log("Paginating more.");
-            paginate(MESSAGES_PER_PAGINATION, false);
+            paginate(MESSAGES_PER_PAGINATION);
         }
     };
     
-    var paginate = function(numItems, toBottom) {
-        // console.log("paginate " + numItems + ", " + toBottom);
+    var paginate = function(numItems) {
+        // console.log("paginate " + numItems);
         if ($scope.state.paginating) {
             return;
         }
@@ -75,11 +76,7 @@ angular.module('RoomController', [])
         var originalTopRow = $("#messageTable>tbody>tr:first")[0];
         matrixService.paginateBackMessages($scope.room_id, $scope.state.earliest_token, numItems).then(
             function(response) {
-                // hacky bodge to ensure we always scroll to the bottom on the first pagination
-                if (!$scope.events.rooms[$scope.room_id]) {
-                    toBottom = true;
-                }
-                
+                var firstPagination = !$scope.events.rooms[$scope.room_id];
                 eventHandlerService.handleEvents(response.data.chunk, false);
                 $scope.state.earliest_token = response.data.end;
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
@@ -88,11 +85,28 @@ angular.module('RoomController', [])
                     $scope.state.can_paginate = false;
                 }
                 
-                if (toBottom) {
-                    console.log("Scrolling to bottom");
+                $scope.state.paginating = false;
+                
+                var wrapper = $("#messageTableWrapper")[0];
+                var table = $("#messageTable")[0];
+                // console.log("wrapper height=" + wrapper.clientHeight + ", table scrollHeight=" + table.scrollHeight);
+                
+                if ($scope.state.can_paginate) {
+                    // check we don't have to pull in more messages
+                    // n.b. we dispatch through a timeout() to allow the digest to run otherwise the .height methods are stale
+                    $timeout(function() {
+                        if (table.scrollHeight < wrapper.clientHeight) {
+                            paginate(MESSAGES_PER_PAGINATION);
+                            scrollToBottom();                            
+                        }
+                    }, 0);
+                }
+                
+                if (firstPagination) {
                     scrollToBottom();
                 }
                 else {
+                    // lock the scroll position
                     $timeout(function() {
                         // FIXME: this risks a flicker before the scrollTop is actually updated, but we have to
                         // dispatch it into a function in order to first update the layout.  The right solution
@@ -100,12 +114,9 @@ angular.module('RoomController', [])
                         // http://stackoverflow.com/questions/23736647/how-to-retain-scroll-position-of-ng-repeat-in-angularjs
                         // however, this specific solution breaks because it measures the rows height before
                         // the contents are interpolated.
-                        var objDiv = document.getElementById("messageTableWrapper");
-                        objDiv.scrollTop = originalTopRow ? (originalTopRow.offsetTop + objDiv.scrollTop) : 0;
+                        wrapper.scrollTop = originalTopRow ? (originalTopRow.offsetTop + wrapper.scrollTop) : 0;
                     }, 0);
                 }
-                
-                $scope.state.paginating = false;
             },
             function(error) {
                 console.log("Failed to paginateBackMessages: " + JSON.stringify(error));
@@ -242,7 +253,7 @@ angular.module('RoomController', [])
                     }
                 );
                 
-                paginate(MESSAGES_PER_PAGINATION, true);
+                paginate(MESSAGES_PER_PAGINATION);
             },
             function(reason) {
                 $scope.feedback = "Can't join room: " + reason;
@@ -284,6 +295,6 @@ angular.module('RoomController', [])
     };
     
     $scope.loadMoreHistory = function() {
-        paginate(MESSAGES_PER_PAGINATION, false);
+        paginate(MESSAGES_PER_PAGINATION);
     };
 }]);
