@@ -114,7 +114,20 @@ matrixWebClient
             return d + "d " + h + "h";
         }
     })
-    .filter('to_trusted', ['$sce', function($sce){
+    .filter('orderMembersList', function($sce) {
+        return function(members) {
+            var filtered = [];
+            angular.forEach(members, function(value, key) {
+                value["id"] = key;
+                filtered.push( value );
+            });
+            filtered.sort(function (a, b) {
+                return ((a["mtime_age"] || 10e10)> (b["mtime_age"] || 10e10) ? 1 : -1);
+            });
+            return filtered;
+        };
+    })
+    .filter('unsafe', ['$sce', function($sce) {
         return function(text) {
             return $sce.trustAsHtml(text);
         };
