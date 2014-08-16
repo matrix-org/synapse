@@ -117,14 +117,26 @@ angular.module('RoomController', [])
     var updateMemberList = function(chunk) {
         var isNewMember = !(chunk.target_user_id in $scope.members);
         if (isNewMember) {
+            // FIXME: why are we copying these fields around inside chunk?
             if ("state" in chunk.content) {
-                chunk.presenceState = chunk.content.state;
+                chunk.presenceState = chunk.content.state; // why is this renamed?
             }
             if ("mtime_age" in chunk.content) {
                 chunk.mtime_age = chunk.content.mtime_age;
             }
+            if ("displayname" in chunk.content) {
+                chunk.displayname = chunk.content.displayname;
+            }
+            if ("avatar_url" in chunk.content) {
+                chunk.avatar_url = chunk.content.avatar_url;
+            }
         
             $scope.members[chunk.target_user_id] = chunk;
+/*
+            // *SURELY* we don't want to be hammering a new request for
+            // every displayname and profile picture URL.  Hasn't it already
+            // been returned in the chunk?  Hence commenting this out --Matthew
+
             // get their display name and profile picture and set it to their
             // member entry in $scope.members. We HAVE to use $timeout with 0 delay 
             // to make this function run AFTER the current digest cycle, else the 
@@ -148,6 +160,7 @@ angular.module('RoomController', [])
                     }
                 );
             });
+*/            
         }
         else {
             // selectively update membership else it will nuke the picture and displayname too :/
