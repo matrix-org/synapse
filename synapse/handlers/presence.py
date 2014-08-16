@@ -166,7 +166,7 @@ class PresenceHandler(BaseHandler):
                 observed_user=target_user
             )
 
-            if visible or True: # XXX: FIXME: Bodge to unbreak everything
+            if visible or True: # XXX: FIXME: Bodge to unbreak matrix.org. breaks UTs.
                 state = yield self.store.get_presence_state(
                     target_user.localpart
                 )
