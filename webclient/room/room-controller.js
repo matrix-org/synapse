@@ -124,18 +124,18 @@ angular.module('RoomController', [])
             if ("mtime_age" in chunk.content) {
                 chunk.mtime_age = chunk.content.mtime_age;
             }
+/*            
+            // FIXME: once the HS reliably returns the displaynames & avatar_urls for both
+            // local and remote users, we should use this rather than the evalAsync block
+            // below
             if ("displayname" in chunk.content) {
                 chunk.displayname = chunk.content.displayname;
             }
             if ("avatar_url" in chunk.content) {
                 chunk.avatar_url = chunk.content.avatar_url;
             }
-        
+ */      
             $scope.members[chunk.target_user_id] = chunk;
-/*
-            // *SURELY* we don't want to be hammering a new request for
-            // every displayname and profile picture URL.  Hasn't it already
-            // been returned in the chunk?  Hence commenting this out --Matthew
 
             // get their display name and profile picture and set it to their
             // member entry in $scope.members. We HAVE to use $timeout with 0 delay 
@@ -160,7 +160,6 @@ angular.module('RoomController', [])
                     }
                 );
             });
-*/            
         }
         else {
             // selectively update membership else it will nuke the picture and displayname too :/
