@@ -106,12 +106,12 @@ matrixWebClient
                 return s + "s"
             }
             if (t < 60 * 60) {
-                return m + "m " + s + "s";
+                return m + "m "; //  + s + "s";
             }
             if (t < 24 * 60 * 60) {
-                return h + "h " + m + "m";
+                return h + "h "; // + m + "m";
             }
-            return d + "d " + h + "h";
+            return d + "d "; // + h + "h";
         }
     })
     .filter('orderMembersList', function($sce) {
