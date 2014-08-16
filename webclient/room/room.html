@@ -16,7 +16,9 @@
                     <!-- FIXME: does allowing <wbr/> to be unescaped introduce HTML injections from user IDs and display names? -->
                     <div class="userName" ng-bind-html="info.displayname || (name.substr(0, name.indexOf(':')) + '<wbr/>' + name.substr(name.indexOf(':'))) | to_trusted"></div>
                 </td>
-                <td class="userPresence" ng-class="info.presenceState === 'online' ? 'online' : (info.presenceState === 'unavailable' ? 'unavailable' : '')" />
+                <td class="userPresence" ng-class="info.presenceState === 'online' ? 'online' : (info.presenceState === 'unavailable' ? 'unavailable' : '')">
+                    {{ info.mtime_age | duration }} {{ info.mtime_age ? "ago" : "" }}
+                </td>
         </table>
     </div>
     

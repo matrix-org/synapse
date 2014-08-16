@@ -120,6 +120,9 @@ angular.module('RoomController', [])
             if ("state" in chunk.content) {
                 chunk.presenceState = chunk.content.state;
             }
+            if ("mtime_age" in chunk.content) {
+                chunk.mtime_age = chunk.content.mtime_age;
+            }
         
             $scope.members[chunk.target_user_id] = chunk;
             // get their display name and profile picture and set it to their
@@ -160,16 +163,14 @@ angular.module('RoomController', [])
         }
         var member = $scope.members[chunk.content.user_id];
 
+        // XXX: why not just pass the chunk straight through?
         if ("state" in chunk.content) {
-            if (chunk.content.state === "online") {
-                member.presenceState = "online";
-            }
-            else if (chunk.content.state === "offline") {
-                member.presenceState = "offline";
-            }
-            else if (chunk.content.state === "unavailable") {
-                member.presenceState = "unavailable";
-            }
+            member.presenceState = chunk.content.state;
+        }
+
+        if ("mtime_age" in chunk.content) {
+            // FIXME: should probably keep updating mtime_age in realtime like FB does
+            member.mtime_age = chunk.content.mtime_age;
         }
 
         // this may also contain a new display name or avatar url, so check.

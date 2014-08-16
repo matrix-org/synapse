@@ -94,6 +94,26 @@ matrixWebClient
             }
         };
     }])
+    .filter('duration', function() {
+        return function(time) {
+            if (!time) return;
+            var t = parseInt(time / 1000);
+            var s = t % 60;
+            var m = parseInt(t / 60) % 60;
+            var h = parseInt(t / (60 * 60)) % 24;
+            var d = parseInt(t / (60 * 60 * 24));
+            if (t < 60) {
+                return s + "s"
+            }
+            if (t < 60 * 60) {
+                return m + "m " + s + "s";
+            }
+            if (t < 24 * 60 * 60) {
+                return h + "h " + m + "m";
+            }
+            return d + "d " + h + "h";
+        }
+    })
     .filter('to_trusted', ['$sce', function($sce){
         return function(text) {
             return $sce.trustAsHtml(text);
