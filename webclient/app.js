@@ -117,12 +117,34 @@ matrixWebClient
     .filter('orderMembersList', function($sce) {
         return function(members) {
             var filtered = [];
+            
+            var displayNames = {};
             angular.forEach(members, function(value, key) {
                 value["id"] = key;
                 filtered.push( value );
+                if (value["displayname"]) {
+                    if (!displayNames[value["displayname"]]) {
+                        displayNames[value["displayname"]] = [];
+                    }
+                    displayNames[value["displayname"]].push(key);
+                }
             });
+
+            // FIXME: we shouldn't disambiguate displayNames on every orderMembersList
+            // invocation but keep track of duplicates incrementally somewhere            
+            angular.forEach(displayNames, function(value, key) {
+                if (value.length > 1) {
+                    console.log(key + ": " + value);
+                    for (i=0; i < value.length; i++) {
+                        var v = value[i];
+                        members[v].displayname += " (" + v + ")";
+                        console.log(v + " " + members[v]);
+                    };
+                }
+            });
+            
             filtered.sort(function (a, b) {
-                return ((a["mtime_age"] || 10e10)> (b["mtime_age"] || 10e10) ? 1 : -1);
+                return ((a["mtime_age"] || 10e10) > (b["mtime_age"] || 10e10) ? 1 : -1);
             });
             return filtered;
         };
