@@ -137,6 +137,23 @@ angular.module('RoomController', ['ngSanitize'])
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
         if (isLive && event.room_id === $scope.room_id) {
             scrollToBottom();
+            
+            if (window.Notification) {
+                // FIXME: we should also notify based on a timer or other heuristics
+                // rather than the window being minimised
+                if (document.hidden) {
+                    var notification = new window.Notification(
+                        ($scope.members[event.user_id].displayname || event.user_id) +
+                        " (" + $scope.room_alias + ")",
+                    {
+                        "body": event.content.body,
+                        "icon": $scope.members[event.user_id].avatar_url,
+                    });
+                    $timeout(function() {
+                        notification.close();
+                    }, 5 * 1000);
+                }
+            }
         }
     });
     
@@ -154,7 +171,7 @@ angular.module('RoomController', ['ngSanitize'])
             paginate(MESSAGES_PER_PAGINATION);
         }
     };
-    
+        
     var paginate = function(numItems) {
         // console.log("paginate " + numItems);
         if ($scope.state.paginating) {

@@ -45,6 +45,12 @@ angular.module('MatrixWebClientController', ['matrixService'])
             $scope.config = matrixService.config();        
         }
     };
+    
+    $scope.closeConfig = function() {
+        if ($scope.config) {
+            $scope.config = undefined;
+        }
+    };
 
     if (matrixService.config()) {
         eventStreamService.resume();
@@ -69,6 +75,15 @@ angular.module('MatrixWebClientController', ['matrixService'])
         console.log("Invalid access token -> log user out");
         $scope.logout();
     });
+    
+    $scope.requestNotifications = function() {
+        if (window.Notification) {
+            console.log("Notification.permission: " + window.Notification.permission);
+            window.Notification.requestPermission(function(){});
+        }
+    };
+    
+    
 }]);
 
    

@@ -39,6 +39,8 @@
         <div>Home server: {{ config.homeserver }} </div>
         <div>User ID: {{ config.user_id }} </div>
         <div>Access token: {{ config.access_token }} </div>
+        <div><button ng-click="requestNotifications()">Request notifications</button></div>
+        <div><button ng-click="closeConfig()">Close</button></div>
     </div>
 
 
