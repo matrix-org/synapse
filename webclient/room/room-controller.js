@@ -19,10 +19,10 @@ angular.module('RoomController', ['ngSanitize'])
 .directive('ngAutoComplete', ['$timeout', function ($timeout) {
     return function (scope, element, attrs) {
         element.bind("keydown keypress", function (event) {
-            console.log("event: " + event.which);
+            // console.log("event: " + event.which);
             if (event.which === 9) {
                 if (!scope.autoCompleting) { // cache our starting text
-                    console.log("caching " + element[0].value);
+                    // console.log("caching " + element[0].value);
                     scope.autoCompleteOriginal = element[0].value;
                     scope.autoCompleting = true;
                 }
@@ -41,7 +41,7 @@ angular.module('RoomController', ['ngSanitize'])
                 var targetIndex = scope.autoCompleteIndex;
                 var text = scope.autoCompleteOriginal;
                 
-                console.log("targetIndex: " + targetIndex + ", text=" + text);
+                // console.log("targetIndex: " + targetIndex + ", text=" + text);
                                     
                 // FIXME: use the correct regexp to recognise userIDs
                 var search = /@?([a-zA-Z0-9_\-:\.]+)$/.exec(text);
@@ -49,7 +49,7 @@ angular.module('RoomController', ['ngSanitize'])
                     element[0].value = text;
                 }
                 else if (search && search[1]) {
-                    console.log("search found: " + search);
+                    // console.log("search found: " + search);
                     var expansion;
                     
                     // FIXME: could do better than linear search here
@@ -83,7 +83,7 @@ angular.module('RoomController', ['ngSanitize'])
                         element[0].className = "";                        
                     }
                     else {
-                        console.log("wrapped!");
+                        // console.log("wrapped!");
                         element[0].className = "blink"; // XXX: slightly naughty to bypass angular
                         $timeout(function() {
                              element[0].className = "";
