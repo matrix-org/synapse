@@ -62,6 +62,11 @@ h1 {
     width: 100%;
 }
 
+.blink {
+    display: none ! important;
+    background-color: #faa;
+}
+
 /*** Participant list ***/
 
 #usersTableWrapper {
@@ -90,6 +95,7 @@ h1 {
 .userAvatar .userAvatarImage {
     position: absolute;
     top: 0px;
+    object-fit: cover;    
 }
 
 .userAvatar .userAvatarGradient {
@@ -175,6 +181,10 @@ h1 {
     text-align: right;
     vertical-align: top;
     line-height: 0;
+}
+
+.avatarImage {
+    object-fit: cover;
 }
         
 .text {

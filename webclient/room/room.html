@@ -16,7 +16,7 @@
                     <div class="userName">{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}<wbr/>{{ member.displayname ? "" : member.id.substr(member.id.indexOf(':')) }}</div>
                 </td>
                 <td class="userPresence" ng-class="member.presenceState === 'online' ? 'online' : (member.presenceState === 'unavailable' ? 'unavailable' : '')">
-                    {{ member.mtime_age | duration }} {{ member.mtime_age ? "ago" : "" }}
+                    {{ member.mtime_age | duration }}<br/>{{ member.mtime_age ? "ago" : "" }}
                 </td>
         </table>
     </div>
@@ -29,7 +29,7 @@
                     <div class="timestamp">{{ msg.content.hsob_ts | date:'MMM d HH:mm:ss' }}</div>
                 </td>
                 <td class="avatar">
-                    <img ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
+                    <img class="avatarImage" ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
                          ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
                 <td ng-class="!msg.content.membership_target ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : ''">
@@ -40,7 +40,7 @@
                     </div>
                 </td>
                 <td class="rightBlock">
-                    <img ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
+                    <img class="avatarImage" ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
                          ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id || msg.user_id !== state.user_id"/>
                 </td>
             </tr>
@@ -58,7 +58,7 @@
                         {{ state.user_id }} 
                     </td>
                     <td width="*" style="min-width: 100px">
-                        <input id="mainInput" ng-model="textInput" ng-enter="send()" ng-focus="true"/>
+                        <input id="mainInput" ng-model="textInput" ng-enter="send()" ng-focus="true" ng-auto-complete/>
                     </td>
                     <td width="1">
                         <button ng-click="send()">Send</button>

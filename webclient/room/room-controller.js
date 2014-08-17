@@ -16,6 +16,94 @@ limitations under the License.
 
 angular.module('RoomController', ['ngSanitize'])
 
+.directive('ngAutoComplete', ['$timeout', function ($timeout) {
+    return function (scope, element, attrs) {
+        element.bind("keydown keypress", function (event) {
+            console.log("event: " + event.which);
+            if (event.which === 9) {
+                if (!scope.autoCompleting) { // cache our starting text
+                    console.log("caching " + element[0].value);
+                    scope.autoCompleteOriginal = element[0].value;
+                    scope.autoCompleting = true;
+                }
+                
+                if (event.shiftKey) {
+                    scope.autoCompleteIndex--;
+                    if (scope.autoCompleteIndex < 0) {
+                        scope.autoCompleteIndex = 0;
+                    }
+                }
+                else {
+                    scope.autoCompleteIndex++;
+                }
+                
+                var searchIndex = 0;
+                var targetIndex = scope.autoCompleteIndex;
+                var text = scope.autoCompleteOriginal;
+                
+                console.log("targetIndex: " + targetIndex + ", text=" + text);
+                                    
+                // FIXME: use the correct regexp to recognise userIDs
+                var search = /@?([a-zA-Z0-9_\-:\.]+)$/.exec(text);
+                if (targetIndex === 0) {
+                    element[0].value = text;
+                }
+                else if (search && search[1]) {
+                    console.log("search found: " + search);
+                    var expansion;
+                    
+                    // FIXME: could do better than linear search here
+                    angular.forEach(scope.members, function(item, name) {
+                        if (item.displayname && searchIndex < targetIndex) {
+                            if (item.displayname.toLowerCase().indexOf(search[1].toLowerCase()) == 0) {
+                                expansion = item.displayname;
+                                searchIndex++;
+                            }
+                        }
+                    });
+                    if (searchIndex < targetIndex) { // then search raw mxids
+                        angular.forEach(scope.members, function(item, name) {
+                            if (searchIndex < targetIndex) {
+                                if (name.toLowerCase().indexOf(search[1].toLowerCase()) == 1) {
+                                    expansion = name;
+                                    searchIndex++;
+                                }
+                            }
+                        });
+                    }
+                    
+                    if (searchIndex === targetIndex) {
+                        // xchat-style tab complete
+                        if (search[0].length === text.length)
+                            expansion += " : ";
+                        else
+                            expansion += " ";
+                        element[0].value = text.replace(/@?([a-zA-Z0-9_\-:\.]+)$/, expansion);
+                        // cancel blink
+                        element[0].className = "";                        
+                    }
+                    else {
+                        console.log("wrapped!");
+                        element[0].className = "blink"; // XXX: slightly naughty to bypass angular
+                        $timeout(function() {
+                             element[0].className = "";
+                        }, 150);
+                        element[0].value = text;
+                        scope.autoCompleteIndex = 0;
+                    }
+                }
+                else {
+                    scope.autoCompleteIndex = 0;
+                }
+                event.preventDefault();
+            }
+            else if (event.which != 16 && scope.autoCompleting) {
+                scope.autoCompleting = false;
+                scope.autoCompleteIndex = 0;
+            }
+        });
+    };
+}])
 .controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService',
                                function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService) {
    'use strict';
@@ -31,6 +119,9 @@ angular.module('RoomController', ['ngSanitize'])
         stream_failure: undefined // the response when the stream fails
     };
     $scope.members = {};
+    $scope.autoCompleting = false;
+    $scope.autoCompleteIndex = 0;    
+    $scope.autoCompleteOriginal = "";
 
     $scope.imageURLToSend = "";
     $scope.userIDToInvite = "";
