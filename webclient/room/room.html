@@ -13,7 +13,7 @@
                 <td class="userAvatar">
                     <img class="userAvatarImage" ng-src="{{member.avatar_url || 'img/default-profile.jpg'}}" width="80" height="80"/>
                     <img class="userAvatarGradient" src="img/gradient.png" width="80" height="24"/>
-                    <div class="userName">{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}<wbr/>{{ member.displayname ? "" : member.id.substr(member.id.indexOf(':')) }}</div>
+                    <div class="userName">{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}<br/>{{ member.displayname ? "" : member.id.substr(member.id.indexOf(':')) }}</div>
                 </td>
                 <td class="userPresence" ng-class="member.presenceState === 'online' ? 'online' : (member.presenceState === 'unavailable' ? 'unavailable' : '')">
                     {{ member.mtime_age | duration }}<br/>{{ member.mtime_age ? "ago" : "" }}
@@ -23,7 +23,8 @@
     
     <div id="messageTableWrapper" keep-scroll>
         <table id="messageTable" infinite-scroll="paginateMore()">
-            <tr ng-repeat="msg in events.rooms[room_id].messages" ng-class="msg.user_id === state.user_id ? 'mine' : ''" scroll-item>
+            <tr ng-repeat="msg in events.rooms[room_id].messages"
+                ng-class="(events.rooms[room_id].messages[$index - 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
                 <td class="leftBlock">
                     <div class="sender" ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id">{{ members[msg.user_id].displayname || msg.user_id }}</div>
                     <div class="timestamp">{{ msg.content.hsob_ts | date:'MMM d HH:mm:ss' }}</div>
@@ -32,7 +33,7 @@
                     <img class="avatarImage" ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
                          ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
-                <td ng-class="!msg.content.membership_target ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : ''">
+                <td ng-class="!msg.content.membership_target ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble">
                         <span ng-hide='msg.content.msgtype !== "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
                         <span ng-hide='msg.content.msgtype !== "m.text"' ng-bind-html="msg.content.body | linky:'_blank'"/>

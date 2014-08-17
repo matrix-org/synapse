@@ -108,7 +108,7 @@ h1 {
     margin: 2px;
     bottom: 0px;
     font-size: 8pt;
-    word-wrap: break-word;
+    word-break: break-all;
 }
 
 .userPresence {
@@ -148,7 +148,7 @@ h1 {
 }
 
 .leftBlock {
-    width: 1px;
+    width: 10em;
     vertical-align: top;
     background-color: #fff;
     color: #888;
@@ -189,14 +189,20 @@ h1 {
 .text {
     background-color: #eee;
     border: 1px solid #d8d8d8;
-    height: 32px;
+    height: 31px;
     display: inline-table;
     max-width: 90%;
-    word-wrap: break-word;
+    font-size: 16px;
+    /* word-wrap: break-word; */
     word-break: break-all;
 }
 
 .emote {
+    background-color: #fff ! important;
+    border: 0px ! important;
+}
+
+.membership {
     background-color: #fff ! important;
     border: 0px ! important;
 }
@@ -210,22 +216,28 @@ h1 {
 }
 
 .bubble {
-    padding: 6px;
+    padding-top: 7px;
+    padding-bottom: 5px;
     padding-left: 1em;
     padding-right: 1em;
+    vertical-align: middle;
+}
+
+.differentUser td {
+    padding-top: 5px ! important;
+    margin-top: 5px ! important;
 }
 
 .mine {
     text-align: right;
 }
 
-.mine .text .bubble {
-    text-align: left ! important;
-    background-color: #d8d8e8 ! important;
+.mine .text {
+    background-color: #f8f8ff ! important;    
 }
 
-.mine .emote .bubble {
-    background-color: #fff ! important;
+.mine .text .bubble {
+    text-align: left ! important;
 }
 
 /*** Profile ***/
