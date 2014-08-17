@@ -63,7 +63,6 @@ h1 {
 }
 
 .blink {
-    display: none ! important;
     background-color: #faa;
 }
 
