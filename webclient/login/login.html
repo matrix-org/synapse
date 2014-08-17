@@ -15,7 +15,7 @@
         <!-- New user registration -->
         <div>
             <br/>
-            <button ng-click="register()" ng-disabled="!account.desired_user_name || !account.homeserver || !account.identityServer || !account.pwd1 || !account.pwd2 || account.pwd1 !== account.pwd2">Register</button>
+            <button ng-click="register()" ng-disabled="!account.desired_user_name || !account.homeserver || !account.pwd1 || !account.pwd2 || account.pwd1 !== account.pwd2">Register</button>
         </div>
     </form>
 
@@ -28,7 +28,7 @@
             <br />
             <input id="password" size="70" type="password" ng-model="account.password" placeholder="Password"/><br />
             <br/>
-            <button ng-click="login()" ng-disabled="!account.user_id || !account.password || !account.homeserver || !account.identityServer">Login</button>
+            <button ng-click="login()" ng-disabled="!account.user_id || !account.password || !account.homeserver">Login</button>
         </div>
        
     </form>
