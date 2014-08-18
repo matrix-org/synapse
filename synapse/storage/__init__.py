@@ -43,9 +43,10 @@ class DataStore(RoomMemberStore, RoomStore,
     def __init__(self, hs):
         super(DataStore, self).__init__(hs)
         self.event_factory = hs.get_event_factory()
+        self.hs = hs
 
     @defer.inlineCallbacks
-    def persist_event(self, event):
+    def persist_event(self, event, backfilled=False):
         if event.type == RoomMemberEvent.TYPE:
             yield self._store_room_member(event)
         elif event.type == FeedbackEvent.TYPE:
@@ -57,7 +58,7 @@ class DataStore(RoomMemberStore, RoomStore,
         elif event.type == RoomTopicEvent.TYPE:
             yield self._store_room_topic(event)
 
-        ret = yield self._store_event(event)
+        ret = yield self._store_event(event, backfilled)
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
@@ -79,13 +80,22 @@ class DataStore(RoomMemberStore, RoomStore,
         defer.returnValue(event)
 
     @defer.inlineCallbacks
-    def _store_event(self, event):
+    def _store_event(self, event, backfilled):
+        # FIXME (erikj): This should be removed when we start amalgamating
+        # event and pdu storage.
+        yield self.hs.get_federation().fill_out_prev_events(event)
+
         vals = {
+            "topological_ordering": event.depth,
             "event_id": event.event_id,
             "type": event.type,
             "room_id": event.room_id,
             "content": json.dumps(event.content),
+            "processed": True,
         }
+
+        if backfilled:
+            vals["token_ordering"] = "-1"
 
         unrec = {
             k: v
@@ -96,7 +106,7 @@ class DataStore(RoomMemberStore, RoomStore,
 
         yield self._simple_insert("events", vals)
 
-        if hasattr(event, "state_key"):
+        if not backfilled and hasattr(event, "state_key"):
             vals = {
                 "event_id": event.event_id,
                 "room_id": event.room_id,

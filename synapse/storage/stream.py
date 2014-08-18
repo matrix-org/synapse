@@ -73,13 +73,14 @@ class StreamStore(SQLBaseStore):
         # Constraints and ordering depend on direction.
         if from_key < to_key:
             sql += (
-                "AND e.ordering > ? AND e.ordering < ? "
-                "ORDER BY ordering ASC LIMIT %(limit)d "
+                "AND e.token_ordering > ? AND e.token_ordering < ? "
+                "ORDER BY token_ordering, rowid ASC LIMIT %(limit)d "
             ) % {"limit": limit}
         else:
             sql += (
-                "AND e.ordering < ? AND e.ordering > ? "
-                "ORDER BY ordering DESC LIMIT %(limit)d "
+                "AND e.token_ordering < ? "
+                "AND e.token_ordering > ? "
+                "ORDER BY e.token_ordering, rowid DESC LIMIT %(limit)d "
             ) % {"limit": int(limit)}
 
         rows = yield self._execute_and_decode(
@@ -91,9 +92,9 @@ class StreamStore(SQLBaseStore):
 
         if rows:
             if from_key < to_key:
-                key = max([r["ordering"] for r in rows])
+                key = max([r["token_ordering"] for r in rows])
             else:
-                key = min([r["ordering"] for r in rows])
+                key = min([r["token_ordering"] for r in rows])
         else:
             key = to_key
 
@@ -105,7 +106,7 @@ class StreamStore(SQLBaseStore):
 
         sql = (
             "SELECT * FROM events WHERE room_id = ? "
-            "ORDER BY ordering DESC LIMIT ? "
+            "ORDER BY token_ordering, rowid DESC LIMIT ? "
         )
 
         rows = yield self._execute_and_decode(
@@ -120,7 +121,7 @@ class StreamStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_room_events_max_id(self):
         res = yield self._execute_and_decode(
-            "SELECT MAX(ordering) as m FROM events"
+            "SELECT MAX(token_ordering) as m FROM events"
         )
 
         if not res:

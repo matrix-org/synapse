@@ -63,7 +63,7 @@ class FederationEventHandler(object):
             Deferred: Resolved when it has successfully been queued for
             processing.
         """
-        yield self._fill_out_prev_events(event)
+        yield self.fill_out_prev_events(event)
 
         pdu = self.pdu_codec.pdu_from_event(event)
 
@@ -129,7 +129,7 @@ class FederationEventHandler(object):
         yield self.event_handler.on_receive(new_state_event)
 
     @defer.inlineCallbacks
-    def _fill_out_prev_events(self, event):
+    def fill_out_prev_events(self, event):
         if hasattr(event, "prev_events"):
             return
 

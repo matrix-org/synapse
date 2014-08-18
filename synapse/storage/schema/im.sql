@@ -14,12 +14,15 @@
  */
 
 CREATE TABLE IF NOT EXISTS events(
-    ordering INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_ordering INTEGER AUTOINCREMENT,
+    topological_ordering INTEGER NOT NULL,
     event_id TEXT NOT NULL,
     type TEXT NOT NULL,
-    room_id TEXT,
-    content TEXT,
-    unrecognized_keys TEXT
+    room_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    unrecognized_keys TEXT,
+    processed BOOL NOT NULL,
+    CONSTRAINT ev_uniq UNIQUE (event_id)
 );
 
 CREATE TABLE IF NOT EXISTS state_events(
@@ -35,7 +38,7 @@ CREATE TABLE IF NOT EXISTS current_state_events(
     room_id TEXT NOT NULL,
     type TEXT NOT NULL,
     state_key TEXT NOT NULL,
-    CONSTRAINT uniq UNIQUE (room_id, type, state_key) ON CONFLICT REPLACE
+    CONSTRAINT curr_uniq UNIQUE (room_id, type, state_key) ON CONFLICT REPLACE
 );
 
 CREATE TABLE IF NOT EXISTS room_memberships(
