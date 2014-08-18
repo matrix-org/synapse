@@ -113,7 +113,7 @@ def make_graph(pdus, room, filename_prefix):
                 graph.add_edge(state_edge)
 
     graph.write('%s.dot' % filename_prefix, format='raw', prog='dot')
-    graph.write_png("%s.png" % filename_prefix, prog='dot')
+#    graph.write_png("%s.png" % filename_prefix, prog='dot')
     graph.write_svg("%s.svg" % filename_prefix, prog='dot')
 
 
