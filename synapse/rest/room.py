@@ -115,7 +115,7 @@ class RoomTopicRestServlet(RestServlet):
 
         if not data:
             raise SynapseError(404, "Topic not found.", errcode=Codes.NOT_FOUND)
-        defer.returnValue((200, json.loads(data.content)))
+        defer.returnValue((200, data.content))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id):
@@ -175,7 +175,7 @@ class RoomMemberRestServlet(RestServlet):
         if not member:
             raise SynapseError(404, "Member not found.",
                                errcode=Codes.NOT_FOUND)
-        defer.returnValue((200, json.loads(member.content)))
+        defer.returnValue((200, member.content))
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, roomid, target_user_id):
