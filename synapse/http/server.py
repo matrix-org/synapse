@@ -17,16 +17,19 @@
 from syutil.jsonutil import (
     encode_canonical_json, encode_pretty_printed_json
 )
-from synapse.api.errors import cs_exception, CodeMessageException
+from synapse.api.errors import cs_exception, SynapseError, CodeMessageException
+from synapse.util.stringutils import random_string
 
 from twisted.internet import defer, reactor
 from twisted.web import server, resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.util import redirectTo
 
+import base64
 import collections
 import json
 import logging
+import os
 
 
 logger = logging.getLogger(__name__)
@@ -188,14 +191,52 @@ class FileUploadResource(resource.Resource):
             file_map_func = self.map_request_to_name
         self.get_name_for_request = file_map_func
 
+        if not os.path.isdir(self.directory):
+            os.mkdir(self.directory)
+            logger.info("FileUploadResource : Created %s directory.",
+                        self.directory)
+
     @defer.inlineCallbacks
     def map_request_to_name(self, request):
         # auth the user
         auth_user = yield self.auth.get_user_by_req(request)
-        logger.info("User %s is uploading a file.", auth_user)
-        defer.returnValue("boo2.png")
 
-    def render(self, request):
+        # namespace all file uploads on the user
+        prefix = base64.urlsafe_b64encode(
+            auth_user.to_string()
+        ).replace('=', '')
+
+        # use a random string for the main portion
+        main_part = random_string(24)
+
+        # suffix with a file extension if we can make one. This is nice to
+        # provide a hint to clients on the file information.
+        suffix = ""
+        if request.requestHeaders.hasHeader("Content-Type"):
+            content_type = request.requestHeaders.getRawHeaders(
+                "Content-Type")[0]
+            if (content_type.split("/")[0].lower() in
+                    ["image", "video", "audio"]):
+                suffix = "." + content_type.split("/")[-1]
+
+        file_path = os.path.join(self.directory, prefix + main_part + suffix)
+        logger.info("User %s is uploading a file to path %s",
+                    auth_user.to_string(),
+                    file_path)
+
+        # keep trying to make a non-clashing file, with a sensible max attempts
+        attempts = 0
+        while os.path.exists(file_path):
+            main_part = random_string(24)
+            file_path = os.path.join(self.directory,
+                                     prefix + main_part + suffix)
+            attempts += 1
+            if attempts > 25:  # really? Really?
+                raise SynapseError(500, "Unable to create file.")
+
+        defer.returnValue(file_path)
+
+    def render_POST(self, request):
         self._async_render(request)
         return server.NOT_DONE_YET
 
@@ -208,7 +249,7 @@ class FileUploadResource(resource.Resource):
                 f.write(request.content.read())
 
             respond_with_json_bytes(request, 200,
-                                    json.dumps({"url": "not_implemented2"}),
+                                    json.dumps({"path": fname}),
                                     send_cors=True)
 
         except CodeMessageException as e:
