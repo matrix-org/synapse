@@ -74,13 +74,13 @@ class StreamStore(SQLBaseStore):
         if from_key < to_key:
             sql += (
                 "AND e.token_ordering > ? AND e.token_ordering < ? "
-                "ORDER BY token_ordering, rowid ASC LIMIT %(limit)d "
+                "ORDER BY token_ordering ASC LIMIT %(limit)d "
             ) % {"limit": limit}
         else:
             sql += (
                 "AND e.token_ordering < ? "
                 "AND e.token_ordering > ? "
-                "ORDER BY e.token_ordering, rowid DESC LIMIT %(limit)d "
+                "ORDER BY e.token_ordering DESC LIMIT %(limit)d "
             ) % {"limit": int(limit)}
 
         rows = yield self._execute_and_decode(
@@ -107,9 +107,9 @@ class StreamStore(SQLBaseStore):
         end_token = yield self.get_room_events_max_id()
 
         sql = (
-            "SELECT * FROM events WHERE "
+            "SELECT * FROM events "
             "WHERE room_id = ? AND token_ordering <= ? "
-            "ORDER BY topological_ordering, rowid DESC LIMIT ? "
+            "ORDER BY topological_ordering, token_ordering DESC LIMIT ? "
         )
 
         rows = yield self._execute_and_decode(
@@ -121,8 +121,8 @@ class StreamStore(SQLBaseStore):
 
         if rows:
             topo = rows[0]["topological_ordering"]
-            row_id = rows[0]["rowid"]
-            start_token = "p%s-%s" % (topo, row_id)
+            toke = rows[0]["token_ordering"]
+            start_token = "p%s-%s" % (topo, toke)
 
             token = (start_token, end_token)
         else:

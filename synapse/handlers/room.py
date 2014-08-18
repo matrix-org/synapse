@@ -280,7 +280,7 @@ class MessageHandler(BaseHandler):
                     "end": token[1],
                 }
             except:
-                pass
+                logger.exception("Failed to get snapshot")
 
         logger.debug("snapshot_all_rooms returning: %s", ret)
 
