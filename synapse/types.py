@@ -32,6 +32,12 @@ class DomainSpecificString(
             HomeServer as being its own
     """
 
+    # Deny iteration because it will bite you if you try to create a singleton
+    # set by:
+    #    users = set(user)
+    def __iter__(self):
+        raise ValueError("Attempted to iterate a %s" % (type(self).__name__))
+
     @classmethod
     def from_string(cls, s, hs):
         """Parse the string given by 's' into a structure object."""
