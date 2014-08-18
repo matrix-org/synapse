@@ -63,9 +63,8 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
     }]);
 
 matrixWebClient.run(['$location', 'matrixService', 'eventStreamService', function($location, matrixService, eventStreamService) {
-    // If we have no persistent login information, go to the login page
-    var config = matrixService.config();
-    if (!config || !config.access_token) {
+    // If user auth details are not in cache, go to the login page
+    if (!matrixService.isUserLoggedIn()) {
         eventStreamService.stop();
         $location.path("login");
     }

@@ -52,7 +52,7 @@ angular.module('MatrixWebClientController', ['matrixService'])
         }
     };
 
-    if (matrixService.config()) {
+    if (matrixService.isUserLoggedIn()) {
         eventStreamService.resume();
     }
     

@@ -318,12 +318,21 @@ angular.module('matrixService', [])
             };
             return doRequest("GET", path, params);
         },
-        
-        // 
-        testLogin: function() {
-            
+
+        // Indicates if user authentications details are stored in cache
+        isUserLoggedIn: function() {
+            var config = this.config();
+
+            // User is considered logged in if his cache is not empty and contains
+            // an access token
+            if (config && config.access_token) {
+                return true;
+            }
+            else {
+                return false;
+            }
         },
-        
+
         /****** Permanent storage of user information ******/
         
         // Returns the current config
