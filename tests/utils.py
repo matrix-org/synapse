@@ -280,3 +280,44 @@ class MemoryDataStore(object):
 
     def get_presence_list(self, user_localpart, accepted):
         return []
+
+
+def _format_call(args, kwargs):
+    return ", ".join(
+        ["%r" % (a) for a in args] + 
+        ["%s=%r" % (k, v) for k, v in kwargs.items()]
+    )
+
+
+class DeferredMockCallable(object):
+    """A callable instance that stores a set of pending call expectations and
+    return values for them. It allows a unit test to assert that the given set
+    of function calls are eventually made, by awaiting on them to be called.
+    """
+
+    def __init__(self):
+        self.expectations = []
+
+    def __call__(self, *args, **kwargs):
+        if not self.expectations:
+            raise ValueError("%r has no pending calls to handle call(%s)" % (
+                self, _format_call(args, kwargs))
+            )
+
+        for (call, result, d) in self.expectations:
+            if args == call[1] and kwargs == call[2]:
+                d.callback(None)
+                return result
+
+        raise AssertionError("Was not expecting call(%s)" %
+            _format_call(args, kwargs)
+        )
+
+    def expect_call_and_return(self, call, result):
+        self.expectations.append((call, result, defer.Deferred()))
+
+    @defer.inlineCallbacks
+    def await_calls(self):
+        while self.expectations:
+            (_, _, d) = self.expectations.pop(0)
+            yield d
