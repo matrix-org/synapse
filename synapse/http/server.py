@@ -17,10 +17,13 @@
 from syutil.jsonutil import (
     encode_canonical_json, encode_pretty_printed_json
 )
-from synapse.api.errors import cs_exception, SynapseError, CodeMessageException
+from synapse.api.errors import (
+    cs_exception, SynapseError, CodeMessageException, Codes, cs_error
+)
 from synapse.util.stringutils import random_string
 
 from twisted.internet import defer, reactor
+from twisted.protocols.basic import FileSender
 from twisted.web import server, resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.util import redirectTo
@@ -30,7 +33,7 @@ import collections
 import json
 import logging
 import os
-
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -180,16 +183,25 @@ class RootRedirect(resource.Resource):
         return resource.Resource.getChild(self, name, request)
 
 
-class FileUploadResource(resource.Resource):
+class ContentRepoResource(resource.Resource):
+    """Provides file uploading and downloading.
+
+    Uploads are POSTed to wherever this Resource is linked to. This resource
+    returns a "content token" which can be used to GET this content again. The
+    token is typically a path, but it may not be.
+
+    In this case, the token contains 3 sections:
+        - User ID base64d (for namespacing content to each user)
+        - random string
+        - Content type base64d (so we can return it when clients GET it)
+
+    """
     isLeaf = True
 
-    def __init__(self, directory, auth, file_map_func=None):
+    def __init__(self, directory, auth):
         resource.Resource.__init__(self)
         self.directory = directory
         self.auth = auth
-        if not file_map_func:
-            file_map_func = self.map_request_to_name
-        self.get_name_for_request = file_map_func
 
         if not os.path.isdir(self.directory):
             os.mkdir(self.directory)
@@ -210,14 +222,19 @@ class FileUploadResource(resource.Resource):
         main_part = random_string(24)
 
         # suffix with a file extension if we can make one. This is nice to
-        # provide a hint to clients on the file information.
+        # provide a hint to clients on the file information. We will also reuse
+        # this info to spit back the content type to the client.
         suffix = ""
         if request.requestHeaders.hasHeader("Content-Type"):
             content_type = request.requestHeaders.getRawHeaders(
                 "Content-Type")[0]
+            suffix = "." + base64.urlsafe_b64encode(content_type)
             if (content_type.split("/")[0].lower() in
                     ["image", "video", "audio"]):
-                suffix = "." + content_type.split("/")[-1]
+                file_ext = content_type.split("/")[-1]
+                # be a little paranoid and only allow a-z
+                file_ext = re.sub("[^a-z]", "", file_ext)
+                suffix += "." + file_ext
 
         file_path = os.path.join(self.directory, prefix + main_part + suffix)
         logger.info("User %s is uploading a file to path %s",
@@ -236,6 +253,37 @@ class FileUploadResource(resource.Resource):
 
         defer.returnValue(file_path)
 
+    def render_GET(self, request):
+        # no auth here on purpose, to allow anyone to view, even across home
+        # servers.
+
+        # TODO: A little crude here, we could do this better.
+        filename = request.path.split(self.directory + "/")[1]
+        # be paranoid
+        filename = re.sub("[^0-9A-z.-_]", "", filename)
+
+        file_path = self.directory + "/" + filename
+        if os.path.isfile(file_path):
+            # filename has the content type
+            base64_contentype = filename.split(".")[1]
+            content_type = base64.urlsafe_b64decode(base64_contentype)
+            logger.info("Sending file %s", file_path)
+            f = open(file_path, 'rb')
+            request.setHeader('Content-Type', content_type)
+            d = FileSender().beginFileTransfer(f, request)
+            def cbFinished(ignored):
+                f.close()
+                request.finish()
+            d.addCallback(cbFinished)
+        else:
+            respond_with_json_bytes(
+                request,
+                404,
+                json.dumps(cs_error("Not found", code=Codes.NOT_FOUND)),
+                send_cors=True)
+
+        return server.NOT_DONE_YET
+
     def render_POST(self, request):
         self._async_render(request)
         return server.NOT_DONE_YET
@@ -243,13 +291,14 @@ class FileUploadResource(resource.Resource):
     @defer.inlineCallbacks
     def _async_render(self, request):
         try:
-            fname = yield self.get_name_for_request(request)
+            fname = yield self.map_request_to_name(request)
 
+            # TODO I have a suspcious feeling this is just going to block
             with open(fname, "wb") as f:
                 f.write(request.content.read())
 
             respond_with_json_bytes(request, 200,
-                                    json.dumps({"path": fname}),
+                                    json.dumps({"content_token": fname}),
                                     send_cors=True)
 
         except CodeMessageException as e:

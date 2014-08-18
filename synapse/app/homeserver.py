@@ -24,7 +24,7 @@ from twisted.python.log import PythonLoggingObserver
 from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
-from synapse.http.server import JsonResource, RootRedirect, FileUploadResource
+from synapse.http.server import JsonResource, RootRedirect, ContentRepoResource
 from synapse.http.client import TwistedHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX
@@ -56,7 +56,7 @@ class SynapseHomeServer(HomeServer):
         return File("webclient")  # TODO configurable?
 
     def build_resource_for_content_repo(self):
-        return FileUploadResource("uploads", self.auth)
+        return ContentRepoResource("uploads", self.auth)
 
     def build_db_pool(self):
         """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
