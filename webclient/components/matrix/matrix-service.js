@@ -165,6 +165,16 @@ angular.module('matrixService', [])
             return doRequest("DELETE", path, undefined, undefined);
         },
 
+        // Retrieves the room ID corresponding to a room alias
+        resolveRoomAlias:function(room_alias) {
+            var path = "/matrix/client/api/v1/ds/room/$room_alias";
+            room_alias = encodeURIComponent(room_alias);
+
+            path = path.replace("$room_alias", room_alias);
+
+            return doRequest("GET", path, undefined, {});
+        },
+
         sendMessage: function(room_id, msg_id, content) {
             // The REST path spec
             var path = "/rooms/$room_id/messages/$from/$msg_id";

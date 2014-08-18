@@ -37,6 +37,12 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
                 templateUrl: 'room/room.html',
                 controller: 'RoomController'
             }).
+            when('/room/', {    // room URL with room alias in it (ex: http://127.0.0.1:8000/#/room/#public:localhost:8080) will come here.
+                                // The reason is that 2nd hash key breaks routeProvider parameters cutting so that the URL will not match with 
+                                // the previous '/room/:room_id' URL rule
+                templateUrl: 'room/room.html',
+                controller: 'RoomController'
+            }).
             when('/rooms', {
                 templateUrl: 'rooms/rooms.html',
                 controller: 'RoomsController'

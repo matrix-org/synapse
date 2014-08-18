@@ -108,8 +108,11 @@ angular.module('RoomController', ['ngSanitize'])
                                function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
+
+    // Room ids. Checked, computed and resolved in onInit
     $scope.room_id = $routeParams.room_id;
-    $scope.room_alias = matrixService.getRoomIdToAliasMapping($scope.room_id);
+    $scope.room_alias = undefined;
+
     $scope.state = {
         user_id: matrixService.config().user_id,
         events_from: "END", // when to start the event stream from.
@@ -342,7 +345,45 @@ angular.module('RoomController', ['ngSanitize'])
     $scope.onInit = function() {
         // $timeout(function() { document.getElementById('textInput').focus() }, 0);
         console.log("onInit");
+        
+        // Does the room ID provided in the URL?
+        if ($scope.room_id) {
+            // Yes, we can start right now
+            $scope.room_alias = matrixService.getRoomIdToAliasMapping($scope.room_id);
+            onInit2();
+        }
+        else {
+            // No, the URL contains the room alias. Get this alias.
+            // ie: extract #public:localhost:8080 from http://127.0.0.1:8000/#/room/#public:localhost:8080
+            if (3 === location.hash.split("#").length) {
+                $scope.room_alias = "#" + location.hash.split("#")[2];
+            }
+            else {
+                // In case of issue, go to the default page
+                console.log("Error: cannot extract room alias");
+                $location.path("/");
+                return;
+            }
+            
+            console.log("Resolving alias: " + $scope.room_alias);
 
+            // Need a room ID required in Matrix API requests
+            matrixService.resolveRoomAlias($scope.room_alias).then(function(response) {
+                $scope.room_id = response.data.room_id;
+                console.log("   -> Room ID: " + $scope.room_id);
+
+                // Now, we can start
+                onInit2();
+            },
+            function () {
+                // In case of issue, go to the default page
+                console.log("Error: cannot resolve room alias");
+                $location.path("/");
+            });
+        }
+    };
+
+    var onInit2 = function() {
         // Join the room
         matrixService.join($scope.room_id).then(
             function() {
