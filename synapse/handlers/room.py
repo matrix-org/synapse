@@ -59,12 +59,14 @@ class MessageHandler(BaseHandler):
         yield self.auth.check_joined_room(room_id, user_id)
 
         # Pull out the message from the db
-        msg = yield self.store.get_message(room_id=room_id,
-                                           msg_id=msg_id,
-                                           user_id=sender_id)
+#        msg = yield self.store.get_message(
+#            room_id=room_id,
+#            msg_id=msg_id,
+#            user_id=sender_id
+#        )
 
-        if msg:
-            defer.returnValue(msg)
+        # TODO (erikj): Once we work out the correct c-s api we need to think on how to do this.
+
         defer.returnValue(None)
 
     @defer.inlineCallbacks

@@ -104,36 +104,36 @@ class RoomPermissionsTestCase(RestTestCase):
     def tearDown(self):
         pass
 
-    @defer.inlineCallbacks
-    def test_get_message(self):
-        # get message in uncreated room, expect 403
-        (code, response) = yield self.mock_server.trigger_get(
-                           "/rooms/noroom/messages/someid/m1")
-        self.assertEquals(403, code, msg=str(response))
-
-        # get message in created room not joined (no state), expect 403
-        (code, response) = yield self.mock_server.trigger_get(
-                           self.created_rmid_msg_path)
-        self.assertEquals(403, code, msg=str(response))
-
-        # get message in created room and invited, expect 403
-        yield self.invite(room=self.created_rmid, src=self.rmcreator_id,
-                          targ=self.user_id)
-        (code, response) = yield self.mock_server.trigger_get(
-                           self.created_rmid_msg_path)
-        self.assertEquals(403, code, msg=str(response))
-
-        # get message in created room and joined, expect 200
-        yield self.join(room=self.created_rmid, user=self.user_id)
-        (code, response) = yield self.mock_server.trigger_get(
-                           self.created_rmid_msg_path)
-        self.assertEquals(200, code, msg=str(response))
-
-        # get message in created room and left, expect 403
-        yield self.leave(room=self.created_rmid, user=self.user_id)
-        (code, response) = yield self.mock_server.trigger_get(
-                           self.created_rmid_msg_path)
-        self.assertEquals(403, code, msg=str(response))
+#    @defer.inlineCallbacks
+#    def test_get_message(self):
+#        # get message in uncreated room, expect 403
+#        (code, response) = yield self.mock_server.trigger_get(
+#                           "/rooms/noroom/messages/someid/m1")
+#        self.assertEquals(403, code, msg=str(response))
+#
+#        # get message in created room not joined (no state), expect 403
+#        (code, response) = yield self.mock_server.trigger_get(
+#                           self.created_rmid_msg_path)
+#        self.assertEquals(403, code, msg=str(response))
+#
+#        # get message in created room and invited, expect 403
+#        yield self.invite(room=self.created_rmid, src=self.rmcreator_id,
+#                          targ=self.user_id)
+#        (code, response) = yield self.mock_server.trigger_get(
+#                           self.created_rmid_msg_path)
+#        self.assertEquals(403, code, msg=str(response))
+#
+#        # get message in created room and joined, expect 200
+#        yield self.join(room=self.created_rmid, user=self.user_id)
+#        (code, response) = yield self.mock_server.trigger_get(
+#                           self.created_rmid_msg_path)
+#        self.assertEquals(200, code, msg=str(response))
+#
+#        # get message in created room and left, expect 403
+#        yield self.leave(room=self.created_rmid, user=self.user_id)
+#        (code, response) = yield self.mock_server.trigger_get(
+#                           self.created_rmid_msg_path)
+#        self.assertEquals(403, code, msg=str(response))
 
     @defer.inlineCallbacks
     def test_send_message(self):
@@ -913,9 +913,9 @@ class RoomMessagesTestCase(RestTestCase):
         (code, response) = yield self.mock_server.trigger("PUT", path, content)
         self.assertEquals(200, code, msg=str(response))
 
-        (code, response) = yield self.mock_server.trigger("GET", path, None)
-        self.assertEquals(200, code, msg=str(response))
-        self.assert_dict(json.loads(content), response)
+        # (code, response) = yield self.mock_server.trigger("GET", path, None)
+        # self.assertEquals(200, code, msg=str(response))
+        # self.assert_dict(json.loads(content), response)
 
         # m.text message type
         path = "/rooms/%s/messages/%s/mid2" % (
@@ -925,9 +925,9 @@ class RoomMessagesTestCase(RestTestCase):
         (code, response) = yield self.mock_server.trigger("PUT", path, content)
         self.assertEquals(200, code, msg=str(response))
 
-        (code, response) = yield self.mock_server.trigger("GET", path, None)
-        self.assertEquals(200, code, msg=str(response))
-        self.assert_dict(json.loads(content), response)
+        # (code, response) = yield self.mock_server.trigger("GET", path, None)
+        # self.assertEquals(200, code, msg=str(response))
+        # self.assert_dict(json.loads(content), response)
 
         # trying to send message in different user path
         path = "/rooms/%s/messages/%s/mid2" % (
