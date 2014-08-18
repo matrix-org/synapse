@@ -11,8 +11,12 @@
         <table id="usersTable">
             <tr ng-repeat="member in members | orderMembersList">
                 <td class="userAvatar">
-                    <img class="userAvatarImage" ng-src="{{member.avatar_url || 'img/default-profile.jpg'}}" width="80" height="80"/>
-                    <img class="userAvatarGradient" src="img/gradient.png" width="80" height="24"/>
+                    <img class="userAvatarImage" 
+                         ng-src="{{member.avatar_url || 'img/default-profile.jpg'}}" 
+                         alt="{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
+                         title="{{ member.id }}"
+                         width="80" height="80"/>
+                    <img class="userAvatarGradient" src="img/gradient.png" title="{{ member.id }}" width="80" height="24"/>
                     <div class="userName">{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}<br/>{{ member.displayname ? "" : member.id.substr(member.id.indexOf(':')) }}</div>
                 </td>
                 <td class="userPresence" ng-class="member.presenceState === 'online' ? 'online' : (member.presenceState === 'unavailable' ? 'unavailable' : '')">
