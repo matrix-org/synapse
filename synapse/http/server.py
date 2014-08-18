@@ -188,11 +188,13 @@ class ContentRepoResource(resource.Resource):
 
     Uploads are POSTed to wherever this Resource is linked to. This resource
     returns a "content token" which can be used to GET this content again. The
-    token is typically a path, but it may not be.
+    token is typically a path, but it may not be. Tokens can expire, be one-time
+    uses, etc.
 
-    In this case, the token contains 3 sections:
+    In this case, the token is a path to the file and contains 3 interesting
+    sections:
         - User ID base64d (for namespacing content to each user)
-        - random string
+        - random 24 char string
         - Content type base64d (so we can return it when clients GET it)
 
     """
@@ -205,7 +207,7 @@ class ContentRepoResource(resource.Resource):
 
         if not os.path.isdir(self.directory):
             os.mkdir(self.directory)
-            logger.info("FileUploadResource : Created %s directory.",
+            logger.info("ContentRepoResource : Created %s directory.",
                         self.directory)
 
     @defer.inlineCallbacks
@@ -271,6 +273,8 @@ class ContentRepoResource(resource.Resource):
             f = open(file_path, 'rb')
             request.setHeader('Content-Type', content_type)
             d = FileSender().beginFileTransfer(f, request)
+
+            # after the file has been sent, clean up and finish the request
             def cbFinished(ignored):
                 f.close()
                 request.finish()
