@@ -384,6 +384,14 @@ class PresenceInvitesTestCase(unittest.TestCase):
                 self.u_apple, target_user=self.u_banana)
 
     @defer.inlineCallbacks
+    def test_drop_remote(self):
+        yield self.handler.drop(
+                observer_user=self.u_apple, observed_user=self.u_cabbage)
+
+        self.datastore.del_presence_list.assert_called_with(
+                "apple", "@cabbage:elsewhere")
+
+    @defer.inlineCallbacks
     def test_get_presence_list(self):
         self.datastore.get_presence_list.return_value = defer.succeed(
                 [{"observed_user_id": "@banana:test"}]
