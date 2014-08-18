@@ -269,11 +269,16 @@ class MessageHandler(BaseHandler):
             if event.membership != Membership.JOIN:
                 continue
             try:
-                messages = yield self.store.get_recent_events_for_room(
+                messages, token = yield self.store.get_recent_events_for_room(
                     event.room_id,
                     limit=50,
                 )
-                d["messages"] = [m.get_dict() for m in messages]
+
+                d["messages"] = {
+                    "chunk": [m.get_dict() for m in messages],
+                    "start": token[0],
+                    "end": token[1],
+                }
             except:
                 pass
 

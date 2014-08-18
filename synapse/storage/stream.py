@@ -104,19 +104,36 @@ class StreamStore(SQLBaseStore):
     def get_recent_events_for_room(self, room_id, limit, with_feedback=False):
         # TODO (erikj): Handle compressed feedback
 
+        end_token = yield self.get_room_events_max_id()
+
         sql = (
-            "SELECT * FROM events WHERE room_id = ? "
-            "ORDER BY token_ordering, rowid DESC LIMIT ? "
+            "SELECT * FROM events WHERE "
+            "WHERE room_id = ? AND token_ordering <= ? "
+            "ORDER BY topological_ordering, rowid DESC LIMIT ? "
         )
 
         rows = yield self._execute_and_decode(
             sql,
-            room_id, limit
+            room_id, end_token, limit
         )
 
         rows.reverse()  # As we selected with reverse ordering
 
-        defer.returnValue([self._parse_event_from_row(r) for r in rows])
+        if rows:
+            topo = rows[0]["topological_ordering"]
+            row_id = rows[0]["rowid"]
+            start_token = "p%s-%s" % (topo, row_id)
+
+            token = (start_token, end_token)
+        else:
+            token = ("START", end_token)
+
+        defer.returnValue(
+            (
+                [self._parse_event_from_row(r) for r in rows],
+                token
+            )
+        )
 
     @defer.inlineCallbacks
     def get_room_events_max_id(self):
