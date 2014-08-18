@@ -21,7 +21,7 @@ from twisted.internet import defer
 from mock import Mock
 import logging
 
-from ..utils import MockHttpServer
+from ..utils import MockHttpResource
 
 from synapse.api.constants import PresenceState
 from synapse.server import HomeServer
@@ -42,7 +42,7 @@ PATH_PREFIX = "/matrix/client/api/v1"
 class PresenceStateTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.mock_server = MockHttpServer(prefix=PATH_PREFIX)
+        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.mock_handler = Mock(spec=[
             "get_state",
             "set_state",
@@ -51,8 +51,8 @@ class PresenceStateTestCase(unittest.TestCase):
         hs = HomeServer("test",
             db_pool=None,
             http_client=None,
-            resource_for_client=self.mock_server,
-            resource_for_federation=self.mock_server,
+            resource_for_client=self.mock_resource,
+            resource_for_federation=self.mock_resource,
         )
 
         def _get_user_by_token(token=None):
@@ -72,7 +72,7 @@ class PresenceStateTestCase(unittest.TestCase):
         mocked_get.return_value = defer.succeed(
                 {"state": ONLINE, "status_msg": "Available"})
 
-        (code, response) = yield self.mock_server.trigger("GET",
+        (code, response) = yield self.mock_resource.trigger("GET",
                 "/presence/%s/status" % (myid), None)
 
         self.assertEquals(200, code)
@@ -86,7 +86,7 @@ class PresenceStateTestCase(unittest.TestCase):
         mocked_set = self.mock_handler.set_state
         mocked_set.return_value = defer.succeed(())
 
-        (code, response) = yield self.mock_server.trigger("PUT",
+        (code, response) = yield self.mock_resource.trigger("PUT",
                 "/presence/%s/status" % (myid),
                 '{"state": "unavailable", "status_msg": "Away"}')
 
@@ -99,7 +99,7 @@ class PresenceStateTestCase(unittest.TestCase):
 class PresenceListTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.mock_server = MockHttpServer(prefix=PATH_PREFIX)
+        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.mock_handler = Mock(spec=[
             "get_presence_list",
             "send_invite",
@@ -109,8 +109,8 @@ class PresenceListTestCase(unittest.TestCase):
         hs = HomeServer("test",
             db_pool=None,
             http_client=None,
-            resource_for_client=self.mock_server,
-            resource_for_federation=self.mock_server
+            resource_for_client=self.mock_resource,
+            resource_for_federation=self.mock_resource
         )
 
         def _get_user_by_token(token=None):
@@ -131,7 +131,7 @@ class PresenceListTestCase(unittest.TestCase):
                 [{"observed_user": self.u_banana}]
         )
 
-        (code, response) = yield self.mock_server.trigger("GET",
+        (code, response) = yield self.mock_resource.trigger("GET",
                 "/presence_list/%s" % (myid), None)
 
         self.assertEquals(200, code)
@@ -141,7 +141,7 @@ class PresenceListTestCase(unittest.TestCase):
     def test_invite(self):
         self.mock_handler.send_invite.return_value = defer.succeed(())
 
-        (code, response) = yield self.mock_server.trigger("POST",
+        (code, response) = yield self.mock_resource.trigger("POST",
                 "/presence_list/%s" % (myid),
                 """{
                     "invite": ["@banana:test"]
@@ -156,7 +156,7 @@ class PresenceListTestCase(unittest.TestCase):
     def test_drop(self):
         self.mock_handler.drop.return_value = defer.succeed(())
 
-        (code, response) = yield self.mock_server.trigger("POST",
+        (code, response) = yield self.mock_resource.trigger("POST",
                 "/presence_list/%s" % (myid),
                 """{
                     "drop": ["@banana:test"]
@@ -170,7 +170,7 @@ class PresenceListTestCase(unittest.TestCase):
 
 class PresenceEventStreamTestCase(unittest.TestCase):
     def setUp(self):
-        self.mock_server = MockHttpServer(prefix=PATH_PREFIX)
+        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
         # TODO: mocked data store
 
@@ -185,8 +185,8 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         hs = HomeServer("test",
             db_pool=None,
             http_client=None,
-            resource_for_client=self.mock_server,
-            resource_for_federation=self.mock_server,
+            resource_for_client=self.mock_resource,
+            resource_for_federation=self.mock_resource,
             datastore=Mock(spec=[
                 "set_presence_state",
                 "get_presence_list",
@@ -226,7 +226,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         self.mock_datastore.get_presence_list.return_value = defer.succeed(
                 [])
 
-        (code, response) = yield self.mock_server.trigger("GET",
+        (code, response) = yield self.mock_resource.trigger("GET",
                 "/events?timeout=0", None)
 
         self.assertEquals(200, code)
@@ -252,7 +252,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         yield self.presence.set_state(self.u_banana, self.u_banana,
                 state={"state": ONLINE})
 
-        (code, response) = yield self.mock_server.trigger("GET",
+        (code, response) = yield self.mock_resource.trigger("GET",
                 "/events?from=1&timeout=0", None)
 
         self.assertEquals(200, code)

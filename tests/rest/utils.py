@@ -27,12 +27,12 @@ class RestTestCase(unittest.TestCase):
     """Contains extra helper functions to quickly and clearly perform a given
     REST action, which isn't the focus of the test.
 
-    This subclass assumes there are mock_server and auth_user_id attributes.
+    This subclass assumes there are mock_resource and auth_user_id attributes.
     """
 
     def __init__(self, *args, **kwargs):
         super(RestTestCase, self).__init__(*args, **kwargs)
-        self.mock_server = None
+        self.mock_resource = None
         self.auth_user_id = None
 
     def mock_get_user_by_token(self, token=None):
@@ -48,7 +48,7 @@ class RestTestCase(unittest.TestCase):
             content = '{"visibility":"private"}'
         if tok:
             path = path + "?access_token=%s" % tok
-        (code, response) = yield self.mock_server.trigger("PUT", path, content)
+        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
         self.assertEquals(200, code, msg=str(response))
         self.auth_user_id = temp_id
 
@@ -81,11 +81,11 @@ class RestTestCase(unittest.TestCase):
             path = path + "?access_token=%s" % tok
 
         if membership == Membership.LEAVE:
-            (code, response) = yield self.mock_server.trigger("DELETE", path,
+            (code, response) = yield self.mock_resource.trigger("DELETE", path,
                                     None)
             self.assertEquals(expect_code, code, msg=str(response))
         else:
-            (code, response) = yield self.mock_server.trigger("PUT", path,
+            (code, response) = yield self.mock_resource.trigger("PUT", path,
                                     '{"membership":"%s"}' % membership)
             self.assertEquals(expect_code, code, msg=str(response))
 
@@ -93,7 +93,7 @@ class RestTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def register(self, user_id):
-        (code, response) = yield self.mock_server.trigger("POST", "/register",
+        (code, response) = yield self.mock_resource.trigger("POST", "/register",
                                 '{"user_id":"%s"}' % user_id)
         self.assertEquals(200, code)
         defer.returnValue(response)
@@ -111,7 +111,7 @@ class RestTestCase(unittest.TestCase):
         if tok:
             path = path + "?access_token=%s" % tok
 
-        (code, response) = yield self.mock_server.trigger("PUT", path, content)
+        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
         self.assertEquals(expect_code, code, msg=str(response))
 
     def assert_dict(self, required, actual):

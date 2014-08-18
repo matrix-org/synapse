@@ -29,7 +29,8 @@ import json
 import urlparse
 
 
-class MockHttpServer(HttpServer):
+# This is a mock /resource/ not an entire server
+class MockHttpResource(HttpServer):
 
     def __init__(self, prefix=""):
         self.callbacks = []  # 3-tuple of method/pattern/function
