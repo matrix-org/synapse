@@ -24,7 +24,7 @@ from synapse.rest.base import RestServlet, client_path_pattern
 class EventStreamRestServlet(RestServlet):
     PATTERN = client_path_pattern("/events$")
 
-    DEFAULT_LONGPOLL_TIME_MS = 5000
+    DEFAULT_LONGPOLL_TIME_MS = 30000
 
     @defer.inlineCallbacks
     def on_GET(self, request):

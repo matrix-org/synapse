@@ -80,6 +80,14 @@ class PresenceStateTestCase(unittest.TestCase):
             return defer.succeed(allow)
         self.datastore.is_presence_visible = is_presence_visible
 
+        # Mock the RoomMemberHandler
+        room_member_handler = Mock(spec=[
+            "get_rooms_for_user",
+            "get_room_members",
+        ])
+        hs.handlers.room_member_handler = room_member_handler
+        logging.getLogger().debug("Mocking room_member_handler=%r", room_member_handler)
+
         # Some local users to test with
         self.u_apple = hs.parse_userid("@apple:test")
         self.u_banana = hs.parse_userid("@banana:test")
@@ -87,11 +95,21 @@ class PresenceStateTestCase(unittest.TestCase):
 
         self.handler = hs.get_handlers().presence_handler
 
-        hs.handlers.room_member_handler = Mock(spec=[
-            "get_rooms_for_user",
-        ])
-        hs.handlers.room_member_handler.get_rooms_for_user = (
-                lambda u: defer.succeed([]))
+        self.room_members = []
+
+        def get_rooms_for_user(user):
+            if user in self.room_members:
+                return defer.succeed(["a-room"])
+            else:
+                return defer.succeed([])
+        room_member_handler.get_rooms_for_user = get_rooms_for_user
+
+        def get_room_members(room_id):
+            if room_id == "a-room":
+                return defer.succeed(self.room_members)
+            else:
+                return defer.succeed([])
+        room_member_handler.get_room_members = get_room_members
 
         self.mock_start = Mock()
         self.mock_stop = Mock()
@@ -132,11 +150,28 @@ class PresenceStateTestCase(unittest.TestCase):
         mocked_get.assert_called_with("apple")
 
     @defer.inlineCallbacks
+    def test_get_same_room_state(self):
+        mocked_get = self.datastore.get_presence_state
+        mocked_get.return_value = defer.succeed(
+            {"state": ONLINE, "status_msg": "Online"}
+        )
+
+        self.room_members = [self.u_apple, self.u_clementine]
+
+        state = yield self.handler.get_state(
+            target_user=self.u_apple, auth_user=self.u_clementine
+        )
+
+        self.assertEquals({"state": ONLINE, "status_msg": "Online"}, state)
+
+    @defer.inlineCallbacks
     def test_get_disallowed_state(self):
         mocked_get = self.datastore.get_presence_state
         mocked_get.return_value = defer.succeed(
             {"state": ONLINE, "status_msg": "Online"}
         )
+
+        self.room_members = []
 
         yield self.assertFailure(
             self.handler.get_state(
