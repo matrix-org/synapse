@@ -180,28 +180,48 @@ class RootRedirect(resource.Resource):
 class FileUploadResource(resource.Resource):
     isLeaf = True
 
-    def __init__(self, directory):
+    def __init__(self, directory, auth, file_map_func=None):
         resource.Resource.__init__(self)
         self.directory = directory
+        self.auth = auth
+        if not file_map_func:
+            file_map_func = self.map_request_to_name
+        self.get_name_for_request = file_map_func
+
+    @defer.inlineCallbacks
+    def map_request_to_name(self, request):
+        # auth the user
+        auth_user = yield self.auth.get_user_by_req(request)
+        logger.info("User %s is uploading a file.", auth_user)
+        defer.returnValue("boo2.png")
 
     def render(self, request):
         self._async_render(request)
         return server.NOT_DONE_YET
 
-    # @defer.inlineCallbacks
+    @defer.inlineCallbacks
     def _async_render(self, request):
-        request.setResponseCode(200)
-        request.setHeader(b"Content-Type", b"application/json")
+        try:
+            fname = yield self.get_name_for_request(request)
 
-        request.setHeader("Access-Control-Allow-Origin", "*")
-        request.setHeader("Access-Control-Allow-Methods",
-                          "GET, POST, PUT, DELETE, OPTIONS")
-        request.setHeader("Access-Control-Allow-Headers",
-                          "Origin, X-Requested-With, Content-Type, Accept")
+            with open(fname, "wb") as f:
+                f.write(request.content.read())
 
-        request.write(json.dumps({"url": "not_implemented"}))
-        request.finish()
-        defer.succeed("not implemented")
+            respond_with_json_bytes(request, 200,
+                                    json.dumps({"url": "not_implemented2"}),
+                                    send_cors=True)
+
+        except CodeMessageException as e:
+            logger.exception(e)
+            respond_with_json_bytes(request, e.code,
+                                    json.dumps(cs_exception(e)))
+        except Exception as e:
+            logger.error("Failed to store file: %s" % e)
+            respond_with_json_bytes(
+                request,
+                500,
+                json.dumps({"error": "Internal server error"}),
+                send_cors=True)
 
 
 def respond_with_json_bytes(request, code, json_bytes, send_cors=False):

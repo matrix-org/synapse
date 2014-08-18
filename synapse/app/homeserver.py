@@ -56,7 +56,7 @@ class SynapseHomeServer(HomeServer):
         return File("webclient")  # TODO configurable?
 
     def build_resource_for_content_repo(self):
-        return FileUploadResource("uploads")
+        return FileUploadResource("uploads", self.auth)
 
     def build_db_pool(self):
         """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we

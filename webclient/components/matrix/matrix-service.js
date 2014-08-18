@@ -54,13 +54,14 @@ angular.module('matrixService', [])
         
         params.access_token = config.access_token;
         
+        if (path.indexOf(prefixPath) !== 0) {
+            path = prefixPath + path;
+        }
+        
         return doBaseRequest(config.homeserver, method, path, params, data, undefined);
     };
 
     var doBaseRequest = function(baseUrl, method, path, params, data, headers) {
-        if (path.indexOf(prefixPath) !== 0) {
-            path = prefixPath + path;
-        }
         return $http({
             method: method,
             url: baseUrl + path,
@@ -317,6 +318,17 @@ angular.module('matrixService', [])
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
+        },
+        
+        uploadContent: function(file) {
+            var path = "/matrix/content";
+            var headers = {
+                "Content-Type": undefined // undefined means angular will figure it out
+            };
+            var params = {
+                access_token: config.access_token
+            };
+            return doBaseRequest(config.homeserver, "POST", path, params, file, headers);
         },
         
         // start listening on /events
