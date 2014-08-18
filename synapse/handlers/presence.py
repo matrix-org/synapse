@@ -155,7 +155,10 @@ class PresenceHandler(BaseHandler):
         if allowed_by_subscription:
             defer.returnValue(True)
 
-        # TODO(paul): Check same channel
+        rm_handler = self.homeserver.get_handlers().room_member_handler
+        for room_id in (yield rm_handler.get_rooms_for_user(observer_user)):
+            if observed_user in (yield rm_handler.get_room_members(room_id)):
+                defer.returnValue(True)
 
         defer.returnValue(False)
 
@@ -166,16 +169,11 @@ class PresenceHandler(BaseHandler):
                 observed_user=target_user
             )
 
-            if visible or True: # XXX: FIXME: Bodge to unbreak matrix.org. breaks UTs.
+            if visible:
                 state = yield self.store.get_presence_state(
                     target_user.localpart
                 )
             else:
-                # FIXME: *Surely* we shouldn't be 404ing the whole request, whatever
-                # it is, just because presence info isn't visible?!
-                # This causes client/api/v1/rooms/!cURbafjkfsMDVwdRDQ%3Amatrix.org/members/list
-                # to 404 currently
-
                 raise SynapseError(404, "Presence information not visible")
         else:
             # TODO(paul): Have remote server send us permissions set
