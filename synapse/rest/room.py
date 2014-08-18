@@ -350,10 +350,14 @@ class RoomMemberListRestServlet(RestServlet):
 
         for event in members["chunk"]:
             target_user = self.hs.parse_userid(event["target_user_id"])
-            presence_state = yield self.handlers.presence_handler.get_state(
-                target_user=target_user, auth_user=user
-            )
-            event["content"].update(presence_state)
+            # Presence is an optional cache; don't fail if we can't fetch it
+            try:
+                presence_state = yield self.handlers.presence_handler.get_state(
+                    target_user=target_user, auth_user=user
+                )
+                event["content"].update(presence_state)
+            except:
+                pass
 
         defer.returnValue((200, members))
 
