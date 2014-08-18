@@ -10,7 +10,7 @@ h1 {
 
 /*** Overall page layout ***/
 
-.page {
+#page {
     position: absolute;
     top: 80px;
     bottom: 100px;
@@ -20,13 +20,13 @@ h1 {
     margin: 20px;
 }
 
-.wrapper {
+#wrapper {
     margin: auto;
     max-width: 1280px;
     height: 100%;
 }
 
-.roomName {
+#roomName {
     max-width: 1280px;
     width: 100%;
     text-align: right;
@@ -36,7 +36,7 @@ h1 {
     margin-bottom: 10px;
 }
 
-.controlPanel {
+#controlPanel {
     position: absolute;
     bottom: 0px;
     width: 100%;
@@ -44,39 +44,43 @@ h1 {
     border-top: #aaa 1px solid;
 }
 
-.controls {
+#controls {
     max-width: 1280px;
     padding: 12px;
     margin: auto;
 }
 
-.inputBarTable {
+#inputBarTable {
     width: 100%;
 }
 
-.inputBarTable tr td {
+#inputBarTable tr td {
     padding: 1px 4px;
 }
 
-.mainInput {
+#mainInput {
     width: 100%;
+}
+
+.blink {
+    background-color: #faa;
 }
 
 /*** Participant list ***/
 
-.usersTableWrapper {
+#usersTableWrapper {
     float: right;
     width: 120px;
     height: 100%;
     overflow-y: auto;
 }
 
-.usersTable {
+#usersTable {
     width: 100%;
     border-collapse: collapse;
 }
 
-.usersTable td {
+#usersTable td {
     padding: 0px;
 }
 
@@ -90,6 +94,7 @@ h1 {
 .userAvatar .userAvatarImage {
     position: absolute;
     top: 0px;
+    object-fit: cover;    
 }
 
 .userAvatar .userAvatarGradient {
@@ -103,7 +108,7 @@ h1 {
     margin: 2px;
     bottom: 0px;
     font-size: 8pt;
-    word-wrap: break-word;
+    word-break: break-all;
 }
 
 .userPresence {
@@ -124,26 +129,26 @@ h1 {
 
 /*** Message table ***/
 
-.messageTableWrapper {
+#messageTableWrapper {
     height: 100%;
     margin-right: 140px;
     overflow-y: auto;
     width: auto;
 }
 
-.messageTable {
+#messageTable {
     margin: auto;
     max-width: 1280px;
     width: 100%;
     border-collapse: collapse;
 }
         
-.messageTable td {
+#messageTable td {
     padding: 0px;
 }
 
 .leftBlock {
-    width: 1px;
+    width: 10em;
     vertical-align: top;
     background-color: #fff;
     color: #888;
@@ -176,18 +181,28 @@ h1 {
     vertical-align: top;
     line-height: 0;
 }
+
+.avatarImage {
+    object-fit: cover;
+}
         
 .text {
     background-color: #eee;
     border: 1px solid #d8d8d8;
-    height: 32px;
+    height: 31px;
     display: inline-table;
     max-width: 90%;
-    word-wrap: break-word;
+    font-size: 16px;
+    /* word-wrap: break-word; */
     word-break: break-all;
 }
 
 .emote {
+    background-color: #fff ! important;
+    border: 0px ! important;
+}
+
+.membership {
     background-color: #fff ! important;
     border: 0px ! important;
 }
@@ -201,22 +216,32 @@ h1 {
 }
 
 .bubble {
-    padding: 6px;
+    padding-top: 7px;
+    padding-bottom: 5px;
     padding-left: 1em;
     padding-right: 1em;
+    vertical-align: middle;
+}
+
+.differentUser td {
+    padding-top: 5px ! important;
+    margin-top: 5px ! important;
 }
 
 .mine {
     text-align: right;
 }
 
-.mine .text .bubble {
-    text-align: left ! important;
-    background-color: #d8d8e8 ! important;
+.mine .text {
+    background-color: #f8f8ff ! important;    
 }
 
-.mine .emote .bubble {
-    background-color: #fff ! important;
+.mine .emote {
+    background-color: #fff ! important;    
+}
+
+.mine .text .bubble {
+    text-align: left ! important;
 }
 
 /*** Profile ***/
@@ -235,24 +260,24 @@ h1 {
 
 /******************************/
 
-.header {
+#header {
     padding-left: 20px;
     padding-right: 20px;
     max-width: 1280px;
     margin: auto;
 }
 
-.header-buttons {
+#header-buttons {
     float: right;
 }
 
-.config {
+#config {
     position: absolute;
     z-index: 100;
     top: 100px;
     left: 50%;
-    width: 400px;
-    margin-left: -200px;
+    width: 500px;
+    margin-left: -250px;
     text-align: center;
     padding: 20px;
     background-color: #aaa;

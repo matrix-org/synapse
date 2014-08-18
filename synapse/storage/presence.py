@@ -67,6 +67,7 @@ class PresenceStore(SQLBaseStore):
             table="presence_allow_inbound",
             keyvalues={"observed_user_id": observed_localpart,
                        "observer_user_id": observer_userid},
+            retcols=["observed_user_id"],
             allow_none=True,
         )
 

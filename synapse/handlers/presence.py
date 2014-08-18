@@ -166,17 +166,22 @@ class PresenceHandler(BaseHandler):
                 observed_user=target_user
             )
 
-            if visible:
+            if visible or True: # XXX: FIXME: Bodge to unbreak matrix.org. breaks UTs.
                 state = yield self.store.get_presence_state(
                     target_user.localpart
                 )
             else:
+                # FIXME: *Surely* we shouldn't be 404ing the whole request, whatever
+                # it is, just because presence info isn't visible?!
+                # This causes client/api/v1/rooms/!cURbafjkfsMDVwdRDQ%3Amatrix.org/members/list
+                # to 404 currently
+
                 raise SynapseError(404, "Presence information not visible")
         else:
             # TODO(paul): Have remote server send us permissions set
             state = self._get_or_offline_usercache(target_user).get_state()
 
-        if "mtime" in state:
+        if "mtime" in state and (state["mtime"] is not None):
             state["mtime_age"] = int(
                 self.clock.time_msec() - state.pop("mtime")
             )

@@ -1,45 +1,47 @@
 <div ng-controller="RoomController" data-ng-init="onInit()" class="room">
 
-    <div class="page">
-    <div class="wrapper">
+    <div id="page">
+    <div id="wrapper">
 
-    <div class="roomName">
+    <div id="roomName">
         {{ room_alias || room_id }}
     </div>
     
-    <div class="usersTableWrapper">
-        <table class="usersTable">
-            <tr ng-repeat="(name, info) in members">
+    <div id="usersTableWrapper">
+        <table id="usersTable">
+            <tr ng-repeat="member in members | orderMembersList">
                 <td class="userAvatar">
-                    <img class="userAvatarImage" ng-src="{{info.avatar_url || 'img/default-profile.jpg'}}" width="80" height="80"/>
+                    <img class="userAvatarImage" ng-src="{{member.avatar_url || 'img/default-profile.jpg'}}" width="80" height="80"/>
                     <img class="userAvatarGradient" src="img/gradient.png" width="80" height="24"/>
-                    <!-- FIXME: does allowing <wbr/> to be unescaped introduce HTML injections from user IDs and display names? -->
-                    <div class="userName" ng-bind-html="info.displayname || (name.substr(0, name.indexOf(':')) + '<wbr/>' + name.substr(name.indexOf(':'))) | to_trusted"></div>
+                    <div class="userName">{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}<br/>{{ member.displayname ? "" : member.id.substr(member.id.indexOf(':')) }}</div>
                 </td>
-                <td class="userPresence" ng-class="info.presenceState === 'online' ? 'online' : (info.presenceState === 'unavailable' ? 'unavailable' : '')" />
+                <td class="userPresence" ng-class="member.presenceState === 'online' ? 'online' : (member.presenceState === 'unavailable' ? 'unavailable' : '')">
+                    {{ member.mtime_age | duration }}<br/>{{ member.mtime_age ? "ago" : "" }}
+                </td>
         </table>
     </div>
     
-    <div class="messageTableWrapper" keep-scroll>
-        <table class="messageTable" infinite-scroll="paginateMore()">
-            <tr ng-repeat="msg in events.rooms[room_id].messages" ng-class="msg.user_id === state.user_id ? 'mine' : ''" scroll-item>
+    <div id="messageTableWrapper" keep-scroll>
+        <table id="messageTable" infinite-scroll="paginateMore()">
+            <tr ng-repeat="msg in events.rooms[room_id].messages"
+                ng-class="(events.rooms[room_id].messages[$index - 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
                 <td class="leftBlock">
                     <div class="sender" ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id">{{ members[msg.user_id].displayname || msg.user_id }}</div>
                     <div class="timestamp">{{ msg.content.hsob_ts | date:'MMM d HH:mm:ss' }}</div>
                 </td>
                 <td class="avatar">
-                    <img ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
+                    <img class="avatarImage" ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
                          ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
-                <td ng-class="!msg.content.membership_target ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : ''">
+                <td ng-class="!msg.content.membership_target ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble">
-                        {{ msg.content.msgtype === "m.emote" ? ("* " + (members[msg.user_id].displayname || msg.user_id) + " " + msg.content.body) : "" }}
-                        {{ msg.content.msgtype === "m.text" ? msg.content.body : "" }}
+                        <span ng-hide='msg.content.msgtype !== "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
+                        <span ng-hide='msg.content.msgtype !== "m.text"' ng-bind-html="msg.content.body | linky:'_blank'"/>
                         <img class="image" ng-hide='msg.content.msgtype !== "m.image"' ng-src="{{ msg.content.url }}" alt="{{ msg.content.body }}"/>
                     </div>
                 </td>
                 <td class="rightBlock">
-                    <img ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
+                    <img class="avatarImage" ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
                          ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id || msg.user_id !== state.user_id"/>
                 </td>
             </tr>
@@ -49,34 +51,37 @@
     </div>
     </div>
 
-    <div class="controlPanel">
-        <div class="controls">
-            <table class="inputBarTable">
+    <div id="controlPanel">
+        <div id="controls">
+            <table id="inputBarTable">
                 <tr>
                     <td width="1">
                         {{ state.user_id }} 
                     </td>
                     <td width="*" style="min-width: 100px">
-                        <input class="mainInput" ng-model="textInput" ng-enter="send()" ng-focus="true"/>
+                        <input id="mainInput" ng-model="textInput" ng-enter="send()" ng-focus="true" auto-complete/>
                     </td>
                     <td width="1">
                         <button ng-click="send()">Send</button>
                     </td>
                     <td width="1">
-                        {{ feedback }}
+                        
                     </td>
                 </tr>
                 <tr>
                     <td>
                     </td>
                     <td>
-                        <input class="mainInput" ng-model="imageURLToSend" ng-enter="sendImage()" placeholder="Image URL"/>
+                        <input id="mainInput" ng-model="imageURLToSend" ng-enter="sendImage()" placeholder="Image URL"/>
                     </td>
-                    <td  width="100px">
-                        <button ng-click="sendImage(imageURLToSend)">Send Image</button>
+                    <td width="100px">
+                        <button ng-click="sendImage(imageURLToSend)">Send URL</button>
                     </td>
-                    <td>
+                    <!-- TODO: To enable once we have an upload server
+                    <td width="100px">
+                        <button m-file-input="imageFileToSend">Send Image</button>
                     </td>
+                    -->
                 </tr>
             </table>
 
@@ -87,6 +92,7 @@
             </span>
             <button ng-click="leaveRoom()">Leave</button>
             <button ng-click="loadMoreHistory()" ng-disabled="!state.can_paginate">Load more history</button>
+            {{ feedback }}
             <div ng-hide="!state.stream_failure">
                 {{ state.stream_failure.data.error || "Connection failure" }}
             </div>
