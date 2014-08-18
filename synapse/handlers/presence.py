@@ -383,7 +383,7 @@ class PresenceHandler(BaseHandler):
         logger.debug("Start polling for presence from %s", user)
 
         if target_user:
-            target_users = set(target_user)
+            target_users = set([target_user])
         else:
             presence = yield self.store.get_presence_list(
                 user.localpart, accepted=True
