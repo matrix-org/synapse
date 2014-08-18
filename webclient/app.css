@@ -236,6 +236,10 @@ h1 {
     background-color: #f8f8ff ! important;    
 }
 
+.mine .emote {
+    background-color: #fff ! important;    
+}
+
 .mine .text .bubble {
     text-align: left ! important;
 }
