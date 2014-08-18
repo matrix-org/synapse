@@ -25,6 +25,7 @@ from twisted.web.server import NOT_DONE_YET
 from twisted.web.util import redirectTo
 
 import collections
+import json
 import logging
 
 
@@ -174,6 +175,33 @@ class RootRedirect(resource.Resource):
         if len(name) == 0:
             return self  # select ourselves as the child to render
         return resource.Resource.getChild(self, name, request)
+
+
+class FileUploadResource(resource.Resource):
+    isLeaf = True
+
+    def __init__(self, directory):
+        resource.Resource.__init__(self)
+        self.directory = directory
+
+    def render(self, request):
+        self._async_render(request)
+        return server.NOT_DONE_YET
+
+    # @defer.inlineCallbacks
+    def _async_render(self, request):
+        request.setResponseCode(200)
+        request.setHeader(b"Content-Type", b"application/json")
+
+        request.setHeader("Access-Control-Allow-Origin", "*")
+        request.setHeader("Access-Control-Allow-Methods",
+                          "GET, POST, PUT, DELETE, OPTIONS")
+        request.setHeader("Access-Control-Allow-Headers",
+                          "Origin, X-Requested-With, Content-Type, Accept")
+
+        request.write(json.dumps({"url": "not_implemented"}))
+        request.finish()
+        defer.succeed("not implemented")
 
 
 def respond_with_json_bytes(request, code, json_bytes, send_cors=False):

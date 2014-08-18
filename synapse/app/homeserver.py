@@ -24,9 +24,11 @@ from twisted.python.log import PythonLoggingObserver
 from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
-from synapse.http.server import JsonResource, RootRedirect
+from synapse.http.server import JsonResource, RootRedirect, FileUploadResource
 from synapse.http.client import TwistedHttpClient
-from synapse.api.urls import CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX
+from synapse.api.urls import (
+    CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX
+)
 
 from daemonize import Daemonize
 
@@ -52,6 +54,9 @@ class SynapseHomeServer(HomeServer):
 
     def build_resource_for_web_client(self):
         return File("webclient")  # TODO configurable?
+
+    def build_resource_for_content_repo(self):
+        return FileUploadResource("uploads")
 
     def build_db_pool(self):
         """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
@@ -101,7 +106,8 @@ class SynapseHomeServer(HomeServer):
         # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
         desired_tree = [
             (CLIENT_PREFIX, self.get_resource_for_client()),
-            (FEDERATION_PREFIX, self.get_resource_for_federation())
+            (FEDERATION_PREFIX, self.get_resource_for_federation()),
+            (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo())
         ]
         if web_client:
             logger.info("Adding the web client.")

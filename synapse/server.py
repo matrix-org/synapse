@@ -72,6 +72,7 @@ class BaseHomeServer(object):
         'resource_for_client',
         'resource_for_federation',
         'resource_for_web_client',
+        'resource_for_content_repo',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -140,6 +141,7 @@ class HomeServer(BaseHomeServer):
         resource_for_client
         resource_for_web_client
         resource_for_federation
+        resource_for_content_repo
         http_client
         db_pool
     """
