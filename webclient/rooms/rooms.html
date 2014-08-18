@@ -65,7 +65,7 @@
     
     <div class="rooms" ng-repeat="(rm_id, room) in rooms">
         <div>
-            <a href="#/room/{{ rm_id }}" >{{ room.room_alias }}</a> {{room.membership === 'invite' ? ' (invited)' : ''}}
+            <a href="#/room/{{ room.room_alias ? room.room_alias : rm_id }}" >{{ room.room_alias }}</a> {{room.membership === 'invite' ? ' (invited)' : ''}}
         </div>
     </div>
     <br/>
@@ -74,7 +74,7 @@
     
     <div class="public_rooms" ng-repeat="room in public_rooms">
         <div>
-            <a href="#/room/{{ room.room_id }}" >{{ room.room_alias }}</a>
+            <a href="#/room/{{ room.room_alias ? room.room_alias : room.room_id }}" >{{ room.room_alias }}</a>
         </div>
     </div>
     <br/>
