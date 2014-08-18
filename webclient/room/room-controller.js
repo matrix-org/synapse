@@ -16,7 +16,7 @@ limitations under the License.
 
 angular.module('RoomController', ['ngSanitize'])
 
-.directive('ngAutoComplete', ['$timeout', function ($timeout) {
+.directive('autoComplete', ['$timeout', function ($timeout) {
     return function (scope, element, attrs) {
         element.bind("keydown keypress", function (event) {
             // console.log("event: " + event.which);
