@@ -149,12 +149,8 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
     $scope.joinAlias = function(room_alias) {
         matrixService.joinAlias(room_alias).then(
             function(response) {
-                if (response.data.hasOwnProperty("room_id")) {
-                    $location.path("room/" + response.data.room_id);
-                    return;
-                } else {
-                    // TODO (erikj): Do something here?
-                }
+                // Go to this room
+                $location.path("room/" + room_alias);
             },
             function(error) {
                 $scope.feedback = "Can't join room: " + error.data;
