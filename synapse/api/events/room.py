@@ -66,6 +66,8 @@ class RoomMemberEvent(SynapseEvent):
     def __init__(self, **kwargs):
         if "target_user_id" in kwargs:
             kwargs["state_key"] = kwargs["target_user_id"]
+        if "membership" not in kwargs:
+            kwargs["membership"] = kwargs.get("content", {}).get("membership")
         super(RoomMemberEvent, self).__init__(**kwargs)
 
     def get_content_template(self):
