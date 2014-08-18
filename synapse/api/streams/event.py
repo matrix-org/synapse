@@ -18,6 +18,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import EventStreamError
+from synapse.api.events import SynapseEvent
 from synapse.api.events.room import (
     RoomMemberEvent, MessageEvent, FeedbackEvent, RoomTopicEvent
 )
@@ -160,7 +161,10 @@ class EventStream(PaginationStream):
                 self.user_id, from_pkey, to_pkey, limit
             )
 
-            chunk += [e.get_dict() for e in event_chunk]
+            chunk.extend([
+                e.get_dict() if isinstance(e, SynapseEvent) else e
+                for e in event_chunk
+            ])
             next_ver.append(str(max_pkey))
 
         defer.returnValue((chunk, EventStream.SEPARATOR.join(next_ver)))
