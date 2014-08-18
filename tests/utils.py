@@ -111,35 +111,20 @@ class MockClock(object):
 
 class MemoryDataStore(object):
 
-    class RoomMember(namedtuple(
-        "RoomMember",
-        ["room_id", "user_id", "sender", "membership", "content"]
-    )):
-        def as_event(self, event_factory):
-            return event_factory.create_event(
-                etype=RoomMemberEvent.TYPE,
-                room_id=self.room_id,
-                target_user_id=self.user_id,
-                user_id=self.sender,
-                content=json.loads(self.content),
-            )
-
-    PathData = namedtuple("PathData",
-                          ["room_id", "path", "content"])
-
-    Message = namedtuple("Message",
-                         ["room_id", "msg_id", "user_id", "content"])
-
-    Room = namedtuple("Room",
-                      ["room_id", "is_public", "creator"])
+    Room = namedtuple(
+        "Room",
+        ["room_id", "is_public", "creator"]
+    )
 
     def __init__(self):
         self.tokens_to_users = {}
         self.paths_to_content = {}
+
         self.members = {}
-        self.messages = {}
         self.rooms = {}
-        self.room_members = {}
+
+        self.current_state = {}
+        self.events = []
 
     def register(self, user_id, token, password_hash):
         if user_id in self.tokens_to_users.values():
@@ -162,100 +147,66 @@ class MemoryDataStore(object):
         if room_id in self.rooms:
             raise StoreError(409, "Conflicting room!")
 
-        room = MemoryDataStore.Room(room_id=room_id, is_public=is_public,
-                    creator=room_creator_user_id)
+        room = MemoryDataStore.Room(
+            room_id=room_id,
+            is_public=is_public,
+            creator=room_creator_user_id
+        )
         self.rooms[room_id] = room
-        #self.store_room_member(user_id=room_creator_user_id, room_id=room_id,
-                               #membership=Membership.JOIN,
-                               #content={"membership": Membership.JOIN})
 
-    def get_message(self, user_id=None, room_id=None, msg_id=None):
-        try:
-            return self.messages[user_id + room_id + msg_id]
-        except:
-            return None
+    def get_room_member(self, user_id, room_id):
+        return self.members.get(room_id, {}).get(user_id)
 
-    def store_message(self, user_id=None, room_id=None, msg_id=None,
-                      content=None):
-        msg = MemoryDataStore.Message(room_id=room_id, msg_id=msg_id,
-                    user_id=user_id, content=content)
-        self.messages[user_id + room_id + msg_id] = msg
-
-    def get_room_member(self, user_id=None, room_id=None):
-        try:
-            return self.members[user_id + room_id]
-        except:
-            return None
-
-    def get_room_members(self, room_id=None, membership=None):
-        try:
-            return self.room_members[room_id]
-        except:
-            return None
+    def get_room_members(self, room_id, membership=None):
+        if membership:
+            return [
+                v for k, v in self.members.get(room_id, {}).items()
+                if v.membership == membership
+            ]
+        else:
+            return self.members.get(room_id, {}).values()
 
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
-        return [r for r in self.room_members
-                if user_id in self.room_members[r]]
-
-    def store_room_member(self, user_id=None, sender=None, room_id=None,
-                          membership=None, content=None):
-        member = MemoryDataStore.RoomMember(room_id=room_id, user_id=user_id,
-            sender=sender, membership=membership, content=json.dumps(content))
-        self.members[user_id + room_id] = member
-
-        # TODO should be latest state
-        if room_id not in self.room_members:
-            self.room_members[room_id] = []
-        self.room_members[room_id].append(member)
-
-    def get_room_data(self, room_id, etype, state_key=""):
-        path = "%s-%s-%s" % (room_id, etype, state_key)
-        try:
-            return self.paths_to_content[path]
-        except:
-            return None
-
-    def store_room_data(self, room_id, etype, state_key="", content=None):
-        path = "%s-%s-%s" % (room_id, etype, state_key)
-        data = MemoryDataStore.PathData(path=path, room_id=room_id,
-                    content=content)
-        self.paths_to_content[path] = data
+        return [
+            r for r in self.members
+            if self.members[r].get(user_id).membership in membership_list
+        ]
 
     def get_room_events_stream(self, user_id=None, from_key=None, to_key=None,
                             room_id=None, limit=0, with_feedback=False):
         return ([], from_key)  # TODO
 
-    def to_events(self, data_store_list):
-        return data_store_list  # TODO
-
-    def get_room_events_max_id(self):
-        return 0  # TODO
-
     def get_joined_hosts_for_room(self, room_id):
         return defer.succeed([])
 
     def persist_event(self, event):
-        if event.type == MessageEvent.TYPE:
-            return self.store_message(
-                user_id=event.user_id,
-                room_id=event.room_id,
-                msg_id=event.msg_id,
-                content=json.dumps(event.content)
-            )
-        elif event.type == RoomMemberEvent.TYPE:
-            return self.store_room_member(
-                user_id=event.target_user_id,
-                room_id=event.room_id,
-                content=event.content,
-                membership=event.content["membership"]
-            )
+        if event.type == RoomMemberEvent.TYPE:
+            room_id = event.room_id
+            user = event.target_user_id
+            membership = event.membership
+            self.members.setdefault(room_id, {})[user] = event
+
+        if hasattr(event, "state_key"):
+            key = (event.room_id, event.type, event.state_key)
+            self.current_state[key] = event
+
+        self.events.append(event)
+
+    def get_current_state(self, room_id, event_type=None, state_key=""):
+        if event_type:
+            key = (room_id, event_type, state_key)
+            return self.current_state.get(key)
         else:
-            raise NotImplementedError(
-                "Don't know how to persist type=%s" % event.type
-            )
+            return [
+                e for e in self.current_state
+                if e[0] == room_id
+            ]
 
     def set_presence_state(self, user_localpart, state):
         return defer.succeed({"state": 0})
 
     def get_presence_list(self, user_localpart, accepted):
         return []
+
+    def get_room_events_max_id(self):
+        return 0  # TODO (erikj)
