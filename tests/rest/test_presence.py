@@ -51,6 +51,7 @@ class PresenceStateTestCase(unittest.TestCase):
         hs = HomeServer("test",
             db_pool=None,
             http_client=None,
+            datastore=None,
             resource_for_client=self.mock_server,
             resource_for_federation=self.mock_server,
         )
@@ -109,6 +110,7 @@ class PresenceListTestCase(unittest.TestCase):
         hs = HomeServer("test",
             db_pool=None,
             http_client=None,
+            datastore=None,
             resource_for_client=self.mock_server,
             resource_for_federation=self.mock_server
         )

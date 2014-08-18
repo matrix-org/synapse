@@ -14,7 +14,7 @@
  */
 
 CREATE TABLE IF NOT EXISTS events(
-    token_ordering INTEGER AUTOINCREMENT,
+    token_ordering INTEGER PRIMARY KEY AUTOINCREMENT,
     topological_ordering INTEGER NOT NULL,
     event_id TEXT NOT NULL,
     type TEXT NOT NULL,

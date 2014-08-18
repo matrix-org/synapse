@@ -46,6 +46,7 @@ class ProfileTestCase(unittest.TestCase):
             resource_for_client=self.mock_server,
             federation=Mock(),
             replication_layer=Mock(),
+            datastore=None,
         )
 
         def _get_user_by_token(token=None):
