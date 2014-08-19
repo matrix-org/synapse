@@ -57,7 +57,6 @@ class PresenceStateTestCase(unittest.TestCase):
                 "set_presence_state",
             ]),
             http_client=None,
-            datastore=None,
             resource_for_client=self.mock_resource,
             resource_for_federation=self.mock_resource,
         )
@@ -135,7 +134,6 @@ class PresenceListTestCase(unittest.TestCase):
                 "get_presence_list",
             ]),
             http_client=None,
-            datastore=None,
             resource_for_client=self.mock_resource,
             resource_for_federation=self.mock_resource
         )
