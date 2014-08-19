@@ -112,8 +112,11 @@ class StreamStore(SQLBaseStore):
     @log_function
     def get_room_events(self, user_id, from_key, to_key, room_id, limit=0,
                         direction='f', with_feedback=False):
+        # We deal with events request in two different ways depending on if
+        # this looks like an /events request or a pagination request.
         is_events = (
             direction == 'f'
+            and user_id
             and is_stream_token(from_key)
             and to_key and is_stream_token(to_key)
         )
