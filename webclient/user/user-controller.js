@@ -17,9 +17,22 @@ limitations under the License.
 'use strict';
 
 angular.module('UserController', ['matrixService'])
-.controller('UserController', ['$scope', '$routeParams',
-                              function($scope, $routeParams) {                 
+.controller('UserController', ['$scope', '$routeParams', 'matrixService',
+                              function($scope, $routeParams, matrixService) {                 
     $scope.user = {
-        id: $routeParams.user_matrix_id
+        id: $routeParams.user_matrix_id,
+        displayname: "",
+        avatar_url: undefined
     };
+    
+    matrixService.getDisplayName($scope.user.id).then(
+        function(response) {
+            $scope.user.displayname = response.data.displayname;
+        }
+    ); 
+    matrixService.getProfilePictureUrl($scope.user.id).then(
+        function(response) {
+            $scope.user.avatar_url = response.data.avatar_url;
+        }
+    );
 }]);

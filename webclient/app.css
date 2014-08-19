@@ -259,6 +259,14 @@ h1 {
     max-height: 100%;
 }
 
+/*** User profile page ***/
+#user-ids {
+    padding-left: 1em;
+}
+
+#user-displayname {
+    font-size: 16pt;
+}
 /******************************/
 
 #header {

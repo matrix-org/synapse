@@ -3,8 +3,26 @@
     <div id="page">
     <div id="wrapper">
         
-        <div> {{ user.id }}</div>
-    
+        <div>
+            <form>
+                <table>
+                    <tr>
+                        <td>
+                            <div class="profile-avatar">
+                                <img ng-src="{{ user.avatar_url || 'img/default-profile.jpg' }}"/>
+                            </div>
+                        </td>
+                        <td>
+                            <div id="user-ids">
+                                <div id="user-displayname">{{ user.displayname }}</div>
+                                <div>{{ user.id }}</div>                        
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </form>
+        </div>
+
         {{ feedback }}
 
     </div>    
