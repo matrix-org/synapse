@@ -16,11 +16,12 @@
 
 'use strict';
 
+// TODO determine if this is really required as a separate service to matrixService.
 /*
  * Upload an HTML5 file to a server
  */
 angular.module('mFileUpload', [])
-.service('mFileUpload', ['$http', '$q', function ($http, $q) {
+.service('mFileUpload', ['matrixService', '$q', function (matrixService, $q) {
         
     /*
      * Upload an HTML5 file to a server and returned a promise
@@ -28,19 +29,18 @@ angular.module('mFileUpload', [])
      */
     this.uploadFile = function(file) {
         var deferred = $q.defer();
-        
-        // @TODO: This service runs with the do_POST hacky implementation of /synapse/demos/webserver.py.
-        // This is temporary until we have a true file upload service
-        console.log("Uploading " + file.name + "...");
-        $http.post(file.name, file)
-        .success(function(data, status, headers, config) {
-            deferred.resolve(location.origin + data.url);
-            console.log("   -> Successfully uploaded! Available at " + location.origin + data.url);
-        }).
-        error(function(data, status, headers, config) {
-            console.log("   -> Failed to upload"  + file.name);
-            deferred.reject();
-        });
+        console.log("Uploading " + file.name + "... to /matrix/content");
+        matrixService.uploadContent(file).then(
+            function(response) {
+                var content_url = location.origin + "/matrix/content/" + response.data.content_token;
+                console.log("   -> Successfully uploaded! Available at " + content_url);
+                deferred.resolve(content_url);
+            },
+            function(error) {
+                console.log("   -> Failed to upload "  + file.name);
+                deferred.reject(error);
+            }
+        );
         
         return deferred.promise;
     };

@@ -147,7 +147,7 @@ angular.module('RoomController', ['ngSanitize'])
                 if (document.hidden) {
                     var notification = new window.Notification(
                         ($scope.members[event.user_id].displayname || event.user_id) +
-                        " (" + $scope.room_alias + ")",
+                        " (" + ($scope.room_alias || $scope.room_id) + ")", // FIXME: don't leak room_ids here
                     {
                         "body": event.content.body,
                         "icon": $scope.members[event.user_id].avatar_url,
