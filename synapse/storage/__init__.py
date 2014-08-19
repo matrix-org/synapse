@@ -176,7 +176,8 @@ class DataStore(RoomMemberStore, RoomStore,
             "SELECT MIN(stream_ordering) FROM events"
         )
 
-        self.min_token = min(row[0][0], -1) if row and row[0] else -1
+        self.min_token = row[0][0] if row and row[0] and row[0][0] else -1
+        self.min_token = min(self.min_token, -1)
 
         logger.debug("min_token is: %s", self.min_token)
 
