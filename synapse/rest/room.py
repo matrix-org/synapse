@@ -170,8 +170,10 @@ class RoomMemberRestServlet(RestServlet):
         user = yield self.auth.get_user_by_req(request)
 
         handler = self.handlers.room_member_handler
-        member = yield handler.get_room_member(room_id, target_user_id,
-                                               user.to_string())
+        member = yield handler.get_room_member(
+            room_id,
+            urllib.unquote(target_user_id),
+            user.to_string())
         if not member:
             raise SynapseError(404, "Member not found.",
                                errcode=Codes.NOT_FOUND)
@@ -183,7 +185,7 @@ class RoomMemberRestServlet(RestServlet):
 
         event = self.event_factory.create_event(
             etype=self.get_event_type(),
-            target_user_id=target_user_id,
+            target_user_id=urllib.unquote(target_user_id),
             room_id=urllib.unquote(roomid),
             user_id=user.to_string(),
             membership=Membership.LEAVE,
@@ -210,7 +212,7 @@ class RoomMemberRestServlet(RestServlet):
 
         event = self.event_factory.create_event(
             etype=self.get_event_type(),
-            target_user_id=target_user_id,
+            target_user_id=urllib.unquote(target_user_id),
             room_id=urllib.unquote(roomid),
             user_id=user.to_string(),
             membership=content["membership"],
@@ -218,8 +220,8 @@ class RoomMemberRestServlet(RestServlet):
             )
 
         handler = self.handlers.room_member_handler
-        result = yield handler.change_membership(event, broadcast_msg=True)
-        defer.returnValue((200, result))
+        yield handler.change_membership(event, broadcast_msg=True)
+        defer.returnValue((200, ""))
 
 
 class MessageRestServlet(RestServlet):
