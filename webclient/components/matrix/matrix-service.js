@@ -68,9 +68,7 @@ angular.module('matrixService', [])
             params: params,
             data: data,
             headers: headers
-        })
-
-        return deferred.promise;
+        });
     };
 
 
