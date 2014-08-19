@@ -70,9 +70,9 @@ class FederationTestCase(unittest.TestCase):
         store_id = "ASD"
         self.datastore.persist_event.return_value = defer.succeed(store_id)
 
-        yield self.handlers.federation_handler.on_receive(event, False)
+        yield self.handlers.federation_handler.on_receive(event, False, False)
 
-        self.datastore.persist_event.assert_called_once_with(event)
+        self.datastore.persist_event.assert_called_once_with(event, False)
         self.notifier.on_new_room_event.assert_called_once_with(
                 event, store_id)
 
@@ -89,7 +89,7 @@ class FederationTestCase(unittest.TestCase):
             content={},
         )
 
-        yield self.handlers.federation_handler.on_receive(event, False)
+        yield self.handlers.federation_handler.on_receive(event, False, False)
 
         mem_handler = self.handlers.room_member_handler
         self.assertEquals(1, mem_handler.change_membership.call_count)
@@ -115,7 +115,7 @@ class FederationTestCase(unittest.TestCase):
             content={},
         )
 
-        yield self.handlers.federation_handler.on_receive(event, False)
+        yield self.handlers.federation_handler.on_receive(event, False, False)
 
         mem_handler = self.handlers.room_member_handler
         self.assertEquals(0, mem_handler.change_membership.call_count)
