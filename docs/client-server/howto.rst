@@ -1,6 +1,10 @@
 How to use the client-server API
 ================================
 
+TODO(kegan): Tweak joinalias API keys/path? Event stream historical > live needs
+a token (currently doesn't). im/sync responses include outdated event formats
+(room membership change messages).
+
 If you haven't already, get a home server up and running on localhost:8080.
 
 
@@ -237,7 +241,11 @@ listen for incoming events. This can be done like so:
     
 This will block waiting for an incoming event, timing out after several seconds.
 A client should repeatedly make requests with the "from" query parameter with
-the value of "end" (in this case "215").
+the value of "end" (in this case "215"). This value should be stored so when the
+client reopens your app after a period of inactivity, you can resume from where
+you got up to in the event stream. If it has been a long period of inactivity,
+there may be LOTS of events waiting for you. In this case, you may wish to get 
+all state instead and then resume getting live state from a newer end token.
 
 NB: The timeout can be changed by adding a "timeout" query parameter, which is
 in milliseconds. A timeout of 0 will not block.
