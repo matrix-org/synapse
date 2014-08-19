@@ -251,6 +251,7 @@ h1 {
     height: 160px;
     display:table-cell;
     vertical-align: middle;
+    text-align: center;
 }
 
 .profile-avatar img {
