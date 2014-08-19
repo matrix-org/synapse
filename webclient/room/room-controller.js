@@ -435,7 +435,7 @@ angular.module('RoomController', ['ngSanitize'])
 
     // Open the user profile page
     $scope.goToUserPage = function(user_id) {
-        $location.path("user/" + user_id);
+        $location.url("/user/" + user_id);
     };
 
     $scope.leaveRoom = function() {
