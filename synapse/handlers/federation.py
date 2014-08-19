@@ -85,6 +85,6 @@ class FederationHandler(BaseHandler):
             try:
                 yield self.store.persist_event(event, backfilled=True)
             except:
-                logger.debug("Failed to persiste event: %s", event)
+                logger.exception("Failed to persist event: %s", event)
 
         defer.returnValue(events)
