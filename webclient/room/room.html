@@ -10,7 +10,7 @@
     <div id="usersTableWrapper">
         <table id="usersTable">
             <tr ng-repeat="member in members | orderMembersList">
-                <td class="userAvatar">
+                <td class="userAvatar" ng-click="goToUserPage(member.id)">
                     <img class="userAvatarImage" 
                          ng-src="{{member.avatar_url || 'img/default-profile.jpg'}}" 
                          alt="{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
