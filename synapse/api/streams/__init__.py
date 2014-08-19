@@ -29,6 +29,7 @@ class PaginationConfig(object):
     @classmethod
     def from_request(cls, request, raise_invalid_params=True):
         params = {
+            "from_tok": "END",
             "direction": 'f',
         }
 
