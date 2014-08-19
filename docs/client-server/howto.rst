@@ -35,9 +35,9 @@ when accessing other APIs::
         "user_id": "@example:localhost"
     }
 
-NB: If a user ID is not specified, one will be randomly generated for you. If
-you do not specify a password, you will be unable to login to the account if you
-forget the access token.
+NB: If a ``user_id`` is not specified, one will be randomly generated for you. 
+If you do not specify a ``password``, you will be unable to login to the account
+if you forget the ``access_token``.
 
 Implementation note: The matrix specification does not enforce how users 
 register with a server. It just specifies the URL path and absolute minimum 
@@ -46,7 +46,7 @@ but other home servers may use different methods.
 
 Login
 -----
-The aim of login is to get an access token for your existing user ID::
+The aim when logging in is to get an access token for your existing user ID::
 
     curl -XGET "http://localhost:8080/matrix/client/api/v1/login"
 
@@ -103,7 +103,7 @@ You can now send messages to this room::
     curl -XPUT -d '{"msgtype":"m.text", "body":"hello"}' "http://localhost:8080/matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/messages/%40example%3Alocalhost/msgid1?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
     
 NB: There are no limitations to the types of messages which can be exchanged.
-The only requirement is that ``'msgtype'`` is specified.
+The only requirement is that ``"msgtype"`` is specified.
 
 NB: Depending on the room config, users who join the room may be able to see
 message history from before they joined.
@@ -133,7 +133,7 @@ join::
     curl -XPUT -d '{"membership":"join"}' "http://localhost:8080/matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/members/%40myfriend%3Alocalhost/state?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
     
 NB: Only the person invited (``@myfriend:localhost``) can change the membership
-state to ``'join'``.
+state to ``"join"``.
 
 Joining a room via an alias
 ---------------------------
@@ -149,7 +149,7 @@ allows it, you can directly join a room via the alias::
 You will need to use the room ID when sending messages, not the room alias.
 
 NB: If the room is configured to be an invite-only room, you will still require
-the invite in order to join the room even though you know the room alias. As a
+an invite in order to join the room even though you know the room alias. As a
 result, it is more common to see a room alias in relation to a public room, 
 which do not require invitations.
 
@@ -162,7 +162,7 @@ of getting events, depending on what the client already knows.
 Getting all state
 -----------------
 If the client doesn't know any information on the rooms the user is 
-invited/joined on, you can get all your state for all your rooms like so::
+invited/joined on, they can get all the user's state for all rooms::
 
     curl -XGET "http://localhost:8080/matrix/client/api/v1/im/sync?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
     
@@ -222,10 +222,10 @@ invited/joined on, you can get all your state for all your rooms like so::
         }
     ]
     
-This returns all the room IDs of rooms you are invited/joined on, as well as all
-of the messages and feedback for these rooms. This can be a LOT of data. You may
-just want the most recent message for each room. This can be done by applying
-pagination stream parameters to this request::
+This returns all the room IDs of rooms the user is invited/joined on, as well as
+all of the messages and feedback for these rooms. This can be a LOT of data. You
+may just want the most recent message for each room. This can be achieved by 
+applying pagination stream parameters to this request::
 
     curl -XGET "http://localhost:8080/matrix/client/api/v1/im/sync?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK&from=END&to=START&limit=1"
     
@@ -271,13 +271,14 @@ listen for incoming events. This can be done like so::
     }
     
 This will block waiting for an incoming event, timing out after several seconds.
-A client should repeatedly make requests with the ``from`` query parameter with 
-the value of ``end`` (in this case ``215``). This value should be stored so when
-the client reopens your app after a period of inactivity, you can resume from 
-where you got up to in the event stream. If it has been a long period of 
-inactivity, there may be LOTS of events waiting for you. In this case, you may 
-wish to get all state instead and then resume getting live state from a newer 
-end token.
+Even if there are no new events (as in the example above), there will be some
+pagination stream response keys. The client should make subsequent requests 
+using the value of the ``"end"`` key (in this case ``215``) as the ``from`` 
+query parameter. This value should be stored so when the client reopens your app
+after a period of inactivity, you can resume from where you got up to in the 
+event stream. If it has been a long period of inactivity, there may be LOTS of 
+events waiting for the user. In this case, you may wish to get all state instead
+and then resume getting live state from a newer end token.
 
 NB: The timeout can be changed by adding a ``timeout`` query parameter, which is
 in milliseconds. A timeout of 0 will not block.
