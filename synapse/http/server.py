@@ -132,7 +132,11 @@ class JsonResource(HttpServer, resource.Resource):
                 {"error": "Unrecognized request"}
             )
         except CodeMessageException as e:
-            logger.exception(e)
+            if isinstance(e, SynapseError):
+                logger.error("%s SynapseError: %s - %s", request, e.code,
+                             e.msg)
+            else:
+                logger.exception(e)
             self._send_response(
                 request,
                 e.code,
@@ -147,6 +151,14 @@ class JsonResource(HttpServer, resource.Resource):
             )
 
     def _send_response(self, request, code, response_json_object):
+        # could alternatively use request.notifyFinish() and flip a flag when
+        # the Deferred fires, but since the flag is RIGHT THERE it seems like
+        # a waste.
+        if request._disconnected:
+            logger.warn(
+                "Not sending response to request %s, already disconnected.",
+                request)
+            return
 
         if not self._request_user_agent_is_curl(request):
             json_bytes = encode_canonical_json(response_json_object)
