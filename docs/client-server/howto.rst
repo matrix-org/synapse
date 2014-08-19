@@ -1,13 +1,20 @@
-How to use the client-server API
-================================
-
 TODO(kegan): Tweak joinalias API keys/path? Event stream historical > live needs
 a token (currently doesn't). im/sync responses include outdated event formats
 (room membership change messages). Room config (specifically: message history,
-public rooms)
+public rooms). /register seems super simplistic compared to /login, maybe it
+would be better if /register used the same technique as /login?
 
 
-If you haven't already, get a home server up and running on localhost:8080.
+How to use the client-server API
+================================
+
+This guide focuses on how the client-server APIs *provided by the reference 
+home server* can be used. Since this is specific to a home server 
+implementation, there may be variations in relation to registering/logging in
+which are not covered in extensive detail in this guide.
+
+If you haven't already, get a home server up and running on 
+``http://localhost:8080``.
 
 
 Accounts
@@ -32,6 +39,11 @@ NB: If a user ID is not specified, one will be randomly generated for you. If
 you do not specify a password, you will be unable to login to the account if you
 forget the access token.
 
+Implementation note: The matrix specification does not enforce how users 
+register with a server. It just specifies the URL path and absolute minimum 
+keys. The reference home server uses a username/password to authenticate user,
+but other home servers may use different methods.
+
 Login
 -----
 The aim of login is to get an access token for your existing user ID::
@@ -50,11 +62,13 @@ The aim of login is to get an access token for your existing user ID::
         "user_id": "@example:localhost"
     }
     
-NB: Different home servers may implement different methods for logging in to an
-existing account. In order to check that you know how to login to this home 
-server, you must perform a GET first and make sure you recognise the type. If 
-you do not know how to login, you can GET /login/fallback which will return a 
-basic webpage which you can use to login.
+Implementation note: Different home servers may implement different methods for 
+logging in to an existing account. In order to check that you know how to login 
+to this home server, you must perform a ``GET`` first and make sure you 
+recognise the login type. If you do not know how to login, you can 
+``GET /login/fallback`` which will return a basic webpage which you can use to 
+login. The reference home server implementation support username/password login,
+but other home servers may support different login methods (e.g. OAuth2).
 
 
 Communicating
@@ -89,7 +103,7 @@ You can now send messages to this room::
     curl -XPUT -d '{"msgtype":"m.text", "body":"hello"}' "http://localhost:8080/matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/messages/%40example%3Alocalhost/msgid1?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
     
 NB: There are no limitations to the types of messages which can be exchanged.
-The only requirement is that 'msgtype' is specified.
+The only requirement is that ``'msgtype'`` is specified.
 
 NB: Depending on the room config, users who join the room may be able to see
 message history from before they joined.
@@ -108,8 +122,8 @@ You can directly invite a user to a room like so::
 
     curl -XPUT -d '{"membership":"invite"}' "http://localhost:8080/matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/members/%40myfriend%3Alocalhost/state?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
     
-This informs @myfriend:localhost of the room ID !CvcvRuDYDzTOzfKKgh:localhost
-and allows them to join the room.
+This informs ``@myfriend:localhost`` of the room ID 
+``!CvcvRuDYDzTOzfKKgh:localhost`` and allows them to join the room.
 
 Joining a room via an invite
 ----------------------------
@@ -118,8 +132,8 @@ join::
 
     curl -XPUT -d '{"membership":"join"}' "http://localhost:8080/matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/members/%40myfriend%3Alocalhost/state?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
     
-NB: Only the person invited (@myfriend:localhost) can change the membership
-state to 'join'.
+NB: Only the person invited (``@myfriend:localhost``) can change the membership
+state to ``'join'``.
 
 Joining a room via an alias
 ---------------------------
@@ -257,13 +271,14 @@ listen for incoming events. This can be done like so::
     }
     
 This will block waiting for an incoming event, timing out after several seconds.
-A client should repeatedly make requests with the "from" query parameter with
-the value of "end" (in this case "215"). This value should be stored so when the
-client reopens your app after a period of inactivity, you can resume from where
-you got up to in the event stream. If it has been a long period of inactivity,
-there may be LOTS of events waiting for you. In this case, you may wish to get 
-all state instead and then resume getting live state from a newer end token.
+A client should repeatedly make requests with the ``from`` query parameter with 
+the value of ``end`` (in this case ``215``). This value should be stored so when
+the client reopens your app after a period of inactivity, you can resume from 
+where you got up to in the event stream. If it has been a long period of 
+inactivity, there may be LOTS of events waiting for you. In this case, you may 
+wish to get all state instead and then resume getting live state from a newer 
+end token.
 
-NB: The timeout can be changed by adding a "timeout" query parameter, which is
+NB: The timeout can be changed by adding a ``timeout`` query parameter, which is
 in milliseconds. A timeout of 0 will not block.
 
