@@ -89,6 +89,7 @@ h1 {
     height: 100px;
     position: relative;
     background-color: #000;
+    cursor: pointer;
 }
 
 .userAvatar .userAvatarImage {
