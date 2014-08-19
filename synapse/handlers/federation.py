@@ -35,7 +35,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def on_receive(self, event, is_new_state):
+    def on_receive(self, event, is_new_state, backfilled):
         if hasattr(event, "state_key") and not is_new_state:
             logger.debug("Ignoring old state.")
             return
@@ -70,6 +70,21 @@ class FederationHandler(BaseHandler):
 
         else:
             with (yield self.room_lock.lock(event.room_id)):
-                store_id = yield self.store.persist_event(event)
+                store_id = yield self.store.persist_event(event, backfilled)
 
-            yield self.notifier.on_new_room_event(event, store_id)
+            if not backfilled:
+                yield self.notifier.on_new_room_event(event, store_id)
+
+
+    @log_function
+    @defer.inlineCallbacks
+    def backfill(self, dest, room_id, limit):
+        events = yield self.hs.get_federation().backfill(dest, room_id, limit)
+
+        for event in events:
+            try:
+                yield self.store.persist_event(event, backfilled=True)
+            except:
+                logger.debug("Failed to persiste event: %s", event)
+
+        defer.returnValue(events)

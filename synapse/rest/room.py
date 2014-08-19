@@ -383,6 +383,21 @@ class RoomMessageListRestServlet(RestServlet):
         defer.returnValue((200, msgs))
 
 
+class RoomTriggerBackfill(RestServlet):
+    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/backfill$")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id):
+        remote_server = urllib.unquote(request.args["remote"][0])
+        room_id = urllib.unquote(room_id)
+        limit = int(request.args["limit"][0])
+
+        handler = self.handlers.federation_handler
+        events = yield handler.backfill(remote_server, room_id, limit)
+
+        res = [event.get_dict() for event in events]
+        defer.returnValue((200, res))
+
 def _parse_json(request):
     try:
         content = json.loads(request.content.read())
@@ -403,3 +418,4 @@ def register_servlets(hs, http_server):
     RoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
+    RoomTriggerBackfill(hs).register(http_server)

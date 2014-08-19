@@ -20,6 +20,8 @@ from synapse.api.events.room import (
     RoomConfigEvent, RoomNameEvent,
 )
 
+from synapse.util.logutils import log_function
+
 from .directory import DirectoryStore
 from .feedback import FeedbackStore
 from .presence import PresenceStore
@@ -32,7 +34,11 @@ from .pdu import StatePduStore, PduStore
 from .transactions import TransactionStore
 
 import json
+import logging
 import os
+
+
+logger = logging.getLogger(__name__)
 
 
 class DataStore(RoomMemberStore, RoomStore,
@@ -49,6 +55,7 @@ class DataStore(RoomMemberStore, RoomStore,
         self.min_token = None
 
     @defer.inlineCallbacks
+    @log_function
     def persist_event(self, event, backfilled=False):
         if event.type == RoomMemberEvent.TYPE:
             yield self._store_room_member(event)
@@ -83,6 +90,7 @@ class DataStore(RoomMemberStore, RoomStore,
         defer.returnValue(event)
 
     @defer.inlineCallbacks
+    @log_function
     def _store_event(self, event, backfilled):
         # FIXME (erikj): This should be removed when we start amalgamating
         # event and pdu storage
@@ -101,7 +109,7 @@ class DataStore(RoomMemberStore, RoomStore,
             if not self.min_token_deferred.called:
                 yield self.min_token_deferred
             self.min_token -= 1
-            vals["token_ordering"] = self.min_token
+            vals["stream_ordering"] = self.min_token
 
         unrec = {
             k: v
@@ -110,7 +118,11 @@ class DataStore(RoomMemberStore, RoomStore,
         }
         vals["unrecognized_keys"] = json.dumps(unrec)
 
-        yield self._simple_insert("events", vals)
+        try:
+            yield self._simple_insert("events", vals)
+        except:
+            logger.exception("Failed to persist, probably duplicate")
+            return
 
         if not backfilled and hasattr(event, "state_key"):
             vals = {
@@ -161,10 +173,12 @@ class DataStore(RoomMemberStore, RoomStore,
     def _get_min_token(self):
         row = yield self._execute(
             None,
-            "SELECT MIN(token_ordering) FROM events"
+            "SELECT MIN(stream_ordering) FROM events"
         )
 
-        self.min_token = rows[0][0] if rows and rows[0] else 0
+        self.min_token = min(row[0][0], -1) if row and row[0] else -1
+
+        logger.debug("min_token is: %s", self.min_token)
 
         defer.returnValue(self.min_token)
 

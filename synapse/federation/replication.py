@@ -208,7 +208,7 @@ class ReplicationLayer(object):
 
         pdus = [Pdu(outlier=False, **p) for p in transaction.pdus]
         for pdu in pdus:
-            yield self._handle_new_pdu(pdu)
+            yield self._handle_new_pdu(pdu, backfilled=True)
 
         defer.returnValue(pdus)
 
@@ -415,7 +415,7 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def _handle_new_pdu(self, pdu):
+    def _handle_new_pdu(self, pdu, backfilled=False):
         # We reprocess pdus when we have seen them only as outliers
         existing = yield self._get_persisted_pdu(pdu.pdu_id, pdu.origin)
 
@@ -451,7 +451,10 @@ class ReplicationLayer(object):
         # Persist the Pdu, but don't mark it as processed yet.
         yield self.pdu_actions.persist_received(pdu)
 
-        ret = yield self.handler.on_receive_pdu(pdu)
+        if not backfilled:
+            ret = yield self.handler.on_receive_pdu(pdu, backfilled=backfilled)
+        else:
+            ret = None
 
         yield self.pdu_actions.mark_as_processed(pdu)
 
