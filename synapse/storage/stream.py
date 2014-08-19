@@ -265,7 +265,7 @@ class StreamStore(SQLBaseStore):
         if rows:
             topo = rows[0]["topological_ordering"]
             toke = rows[0]["stream_ordering"]
-            start_token = "p%s-%s" % (topo, toke)
+            start_token = "t%s-%s" % (topo, toke)
 
             token = (start_token, end_token)
         else:
