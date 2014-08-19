@@ -104,6 +104,33 @@ angular.module('RoomController', ['ngSanitize'])
         });
     };
 }])
+
+// A directive to anchor the scroller position at the bottom when the browser is resizing.
+// When the screen resizes, the bottom of the element remains the same, not the top.
+.directive('keepScroll', ['$window', function($window) {
+    return {
+        link: function(scope, elem, attrs) {
+
+            scope.windowHeight = $window.innerHeight;
+
+            // Listen to window size change
+            angular.element($window).bind('resize', function() {
+
+                // If the scroller is scrolled to the bottom, there is nothing to do.
+                // The browser will move it as expected
+                if (elem.scrollTop() + elem.height() !== elem[0].scrollHeight) {
+                    // Else, move the scroller position according to the window height change delta
+                    var windowHeightDelta = $window.innerHeight - scope.windowHeight;
+                    elem.scrollTop(elem.scrollTop() - windowHeightDelta);
+                }
+
+                // Store the new window height for the next screen size change
+                scope.windowHeight = $window.innerHeight;
+            });
+        }
+    };
+}])
+
 .controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService',
                                function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService) {
    'use strict';
