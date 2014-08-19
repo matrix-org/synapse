@@ -3,20 +3,22 @@ How to use the client-server API
 
 TODO(kegan): Tweak joinalias API keys/path? Event stream historical > live needs
 a token (currently doesn't). im/sync responses include outdated event formats
-(room membership change messages).
+(room membership change messages). Room config (specifically: message history,
+public rooms)
+
 
 If you haven't already, get a home server up and running on localhost:8080.
 
 
 Accounts
 ========
-Before you can send and receive messages, you must register for an account. If
-you already have an account, you must login into it.
+Before you can send and receive messages, you must **register** for an account. 
+If you already have an account, you must **login** into it.
 
 Registration
 ------------
 The aim of registration is to get a user ID and access token which you will need
-when accessing other APIs.
+when accessing other APIs::
 
     curl -XPOST -d '{"user_id":"example", "password":"wordpass"}' "http://localhost:8080/matrix/client/api/v1/register"
 
@@ -32,7 +34,7 @@ forget the access token.
 
 Login
 -----
-The aim of login is to get an access token for your existing user ID.
+The aim of login is to get an access token for your existing user ID::
 
     curl -XGET "http://localhost:8080/matrix/client/api/v1/login"
 
@@ -55,13 +57,16 @@ you do not know how to login, you can GET /login/fallback which will return a
 basic webpage which you can use to login.
 
 
-Making rooms and sending messages
-=================================
+Communicating
+=============
+
+In order to communicate with another user, you must **create a room** with that 
+user and **send a message** to that room.
 
 Creating a room
 ---------------
 If you want to send a message to someone, you have to be in a room with them. To
-create a room:
+create a room::
 
     curl -XPOST -d '{"room_alias_name":"tutorial"}' "http://localhost:8080/matrix/client/api/v1/rooms?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
 
@@ -79,20 +84,27 @@ TODO(kegan): How to add/remove aliases from an existing room.
 
 Sending messages
 ----------------
-You can now send messages to this room:
+You can now send messages to this room::
 
     curl -XPUT -d '{"msgtype":"m.text", "body":"hello"}' "http://localhost:8080/matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/messages/%40example%3Alocalhost/msgid1?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
     
 NB: There are no limitations to the types of messages which can be exchanged.
 The only requirement is that 'msgtype' is specified.
 
+NB: Depending on the room config, users who join the room may be able to see
+message history from before they joined.
 
-Inviting and joining rooms
-==========================
+Users and rooms
+===============
+
+Each room can be configured to allow or disallow certain rules. In particular,
+these rules may specify if you require an **invitation** from someone already in
+the room in order to **join the room**. In addition, you may also be able to 
+join a room **via a room alias** if one was set up.
 
 Inviting a user to a room
 -------------------------
-You can directly invite a user to a room like so:
+You can directly invite a user to a room like so::
 
     curl -XPUT -d '{"membership":"invite"}' "http://localhost:8080/matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/members/%40myfriend%3Alocalhost/state?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
     
@@ -102,7 +114,7 @@ and allows them to join the room.
 Joining a room via an invite
 ----------------------------
 If you receive an invite, you can join the room by changing the membership to
-join:
+join::
 
     curl -XPUT -d '{"membership":"join"}' "http://localhost:8080/matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/members/%40myfriend%3Alocalhost/state?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
     
@@ -112,7 +124,7 @@ state to 'join'.
 Joining a room via an alias
 ---------------------------
 Alternatively, if you know the room alias for this room and the room config 
-allows it, you can directly join a room via the alias:
+allows it, you can directly join a room via the alias::
 
     curl -XPUT -d '{}' "http://localhost:8080/matrix/client/api/v1/join/%23tutorial%3Alocalhost?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
     
@@ -122,16 +134,21 @@ allows it, you can directly join a room via the alias:
     
 You will need to use the room ID when sending messages, not the room alias.
 
+NB: If the room is configured to be an invite-only room, you will still require
+the invite in order to join the room even though you know the room alias. As a
+result, it is more common to see a room alias in relation to a public room, 
+which do not require invitations.
+
 Getting events
 ==============
 An event is some interesting piece of data that a client may be interested in. 
 It can be a message in a room, a room invite, etc. There are many different ways
-of getting events, depending on what state the client is in.
+of getting events, depending on what the client already knows.
 
 Getting all state
 -----------------
 If the client doesn't know any information on the rooms the user is 
-invited/joined on, you can get all your state for all your rooms like so:
+invited/joined on, you can get all your state for all your rooms like so::
 
     curl -XGET "http://localhost:8080/matrix/client/api/v1/im/sync?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
     
@@ -194,7 +211,7 @@ invited/joined on, you can get all your state for all your rooms like so:
 This returns all the room IDs of rooms you are invited/joined on, as well as all
 of the messages and feedback for these rooms. This can be a LOT of data. You may
 just want the most recent message for each room. This can be done by applying
-pagination stream parameters to this request:
+pagination stream parameters to this request::
 
     curl -XGET "http://localhost:8080/matrix/client/api/v1/im/sync?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK&from=END&to=START&limit=1"
     
@@ -229,7 +246,7 @@ pagination stream parameters to this request:
 Getting live state
 ------------------
 Once you know which rooms the client has previously interacted with, you need to
-listen for incoming events. This can be done like so:
+listen for incoming events. This can be done like so::
 
     curl -XGET "http://localhost:8080/matrix/client/api/v1/events?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK&from=END"
     
