@@ -29,7 +29,7 @@ from synapse.server import HomeServer
 import json
 import logging
 
-from ..utils import MockHttpServer, MemoryDataStore
+from ..utils import MockHttpResource, MemoryDataStore
 from .utils import RestTestCase
 
 from mock import Mock
@@ -116,7 +116,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.mock_server = MockHttpServer(prefix=PATH_PREFIX)
+        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
         state_handler = Mock(spec=["handle_new_event"])
         state_handler.handle_new_event.return_value = True
@@ -142,9 +142,9 @@ class EventStreamPermissionsTestCase(RestTestCase):
         hs.get_clock().time_msec.return_value = 1000000
 
         hs.datastore = MemoryDataStore()
-        synapse.rest.register.register_servlets(hs, self.mock_server)
-        synapse.rest.events.register_servlets(hs, self.mock_server)
-        synapse.rest.room.register_servlets(hs, self.mock_server)
+        synapse.rest.register.register_servlets(hs, self.mock_resource)
+        synapse.rest.events.register_servlets(hs, self.mock_resource)
+        synapse.rest.room.register_servlets(hs, self.mock_resource)
 
         # register an account
         self.user_id = "sid1"
@@ -164,12 +164,12 @@ class EventStreamPermissionsTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_stream_basic_permissions(self):
         # invalid token, expect 403
-        (code, response) = yield self.mock_server.trigger_get(
+        (code, response) = yield self.mock_resource.trigger_get(
                            "/events?access_token=%s" % ("invalid" + self.token))
         self.assertEquals(403, code, msg=str(response))
 
         # valid token, expect content
-        (code, response) = yield self.mock_server.trigger_get(
+        (code, response) = yield self.mock_resource.trigger_get(
                            "/events?access_token=%s&timeout=0" % (self.token))
         self.assertEquals(200, code, msg=str(response))
         self.assertTrue("chunk" in response)
@@ -186,7 +186,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
         # invited to room (expect no content for room)
         yield self.invite(room_id, src=self.other_user, targ=self.user_id,
                           tok=self.other_token)
-        (code, response) = yield self.mock_server.trigger_get(
+        (code, response) = yield self.mock_resource.trigger_get(
                            "/events?access_token=%s&timeout=0" % (self.token))
         self.assertEquals(200, code, msg=str(response))
 

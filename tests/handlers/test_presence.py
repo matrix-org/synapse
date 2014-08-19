@@ -19,8 +19,9 @@ from twisted.internet import defer
 
 from mock import Mock, call, ANY
 import logging
+import json
 
-from ..utils import MockClock
+from ..utils import MockHttpResource, MockClock, DeferredMockCallable
 
 from synapse.server import HomeServer
 from synapse.api.constants import PresenceState
@@ -34,17 +35,27 @@ ONLINE = PresenceState.ONLINE
 
 
 logging.getLogger().addHandler(logging.NullHandler())
+#logging.getLogger().addHandler(logging.StreamHandler())
+#logging.getLogger().setLevel(logging.DEBUG)
 
 
-class MockReplication(object):
-    def __init__(self):
-        self.edu_handlers = {}
+def _expect_edu(destination, edu_type, content, origin="test"):
+    return {
+        "origin": origin,
+        "ts": 1000000,
+        "pdus": [],
+        "edus": [
+            {
+                "origin": origin,
+                "destination": destination,
+                "edu_type": edu_type,
+                "content": content,
+            }
+        ],
+    }
 
-    def register_edu_handler(self, edu_type, handler):
-        self.edu_handlers[edu_type] = handler
-
-    def received_edu(self, origin, edu_type, content):
-        self.edu_handlers[edu_type](origin, content)
+def _make_edu_json(origin, edu_type, content):
+    return json.dumps(_expect_edu("test", edu_type, content, origin=origin))
 
 
 class JustPresenceHandlers(object):
@@ -209,10 +220,13 @@ class PresenceInvitesTestCase(unittest.TestCase):
     """ Tests presence management. """
 
     def setUp(self):
-        self.replication = MockReplication()
-        self.replication.send_edu = Mock()
+        self.mock_http_client = Mock(spec=[])
+        self.mock_http_client.put_json = DeferredMockCallable()
+
+        self.mock_federation_resource = MockHttpResource()
 
         hs = HomeServer("test",
+                clock=MockClock(),
                 db_pool=None,
                 datastore=Mock(spec=[
                     "has_presence_state",
@@ -221,11 +235,17 @@ class PresenceInvitesTestCase(unittest.TestCase):
                     "set_presence_list_accepted",
                     "get_presence_list",
                     "del_presence_list",
+
+                    # Bits that Federation needs
+                    "prep_send_transaction",
+                    "delivered_txn",
+                    "get_received_txn_response",
+                    "set_received_txn_response",
                 ]),
                 handlers=None,
                 resource_for_client=Mock(),
-                http_client=None,
-                replication_layer=self.replication
+                resource_for_federation=self.mock_federation_resource,
+                http_client=self.mock_http_client,
             )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -235,6 +255,10 @@ class PresenceInvitesTestCase(unittest.TestCase):
             return defer.succeed(
                 user_localpart in ("apple", "banana"))
         self.datastore.has_presence_state = has_presence_state
+
+        def get_received_txn_response(*args):
+            return defer.succeed(None)
+        self.datastore.get_received_txn_response = get_received_txn_response
 
         # Some local users to test with
         self.u_apple = hs.parse_userid("@apple:test")
@@ -283,7 +307,19 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_invite_remote(self):
-        self.replication.send_edu.return_value = defer.succeed((200, "OK"))
+        put_json = self.mock_http_client.put_json
+        put_json.expect_call_and_return(
+            call("elsewhere",
+                path="/matrix/federation/v1/send/1000000/",
+                data=_expect_edu("elsewhere", "m.presence_invite",
+                    content={
+                        "observer_user": "@apple:test",
+                        "observed_user": "@cabbage:elsewhere",
+                    }
+                )
+            ),
+            defer.succeed((200, "OK"))
+        )
 
         yield self.handler.send_invite(
                 observer_user=self.u_apple, observed_user=self.u_cabbage)
@@ -291,67 +327,79 @@ class PresenceInvitesTestCase(unittest.TestCase):
         self.datastore.add_presence_list_pending.assert_called_with(
                 "apple", "@cabbage:elsewhere")
 
-        self.replication.send_edu.assert_called_with(
-                destination="elsewhere",
-                edu_type="m.presence_invite",
-                content={
-                    "observer_user": "@apple:test",
-                    "observed_user": "@cabbage:elsewhere",
-                }
-        )
+        yield put_json.await_calls()
 
     @defer.inlineCallbacks
     def test_accept_remote(self):
         # TODO(paul): This test will likely break if/when real auth permissions
         # are added; for now the HS will always accept any invite
-        self.replication.send_edu.return_value = defer.succeed((200, "OK"))
+        put_json = self.mock_http_client.put_json
+        put_json.expect_call_and_return(
+            call("elsewhere",
+                path="/matrix/federation/v1/send/1000000/",
+                data=_expect_edu("elsewhere", "m.presence_accept",
+                    content={
+                        "observer_user": "@cabbage:elsewhere",
+                        "observed_user": "@apple:test",
+                    }
+                )
+            ),
+            defer.succeed((200, "OK"))
+        )
 
-        yield self.replication.received_edu(
-                "elsewhere", "m.presence_invite", {
+        yield self.mock_federation_resource.trigger("PUT",
+            "/matrix/federation/v1/send/1000000/",
+            _make_edu_json("elsewhere", "m.presence_invite",
+                content={
                     "observer_user": "@cabbage:elsewhere",
                     "observed_user": "@apple:test",
                 }
+            )
         )
 
         self.datastore.allow_presence_visible.assert_called_with(
                 "apple", "@cabbage:elsewhere")
 
-        self.replication.send_edu.assert_called_with(
-                destination="elsewhere",
-                edu_type="m.presence_accept",
-                content={
-                    "observer_user": "@cabbage:elsewhere",
-                    "observed_user": "@apple:test",
-                }
-        )
+        yield put_json.await_calls()
 
     @defer.inlineCallbacks
     def test_invited_remote_nonexistant(self):
-        self.replication.send_edu.return_value = defer.succeed((200, "OK"))
-
-        yield self.replication.received_edu(
-                "elsewhere", "m.presence_invite", {
-                    "observer_user": "@cabbage:elsewhere",
-                    "observed_user": "@durian:test",
-                }
+        put_json = self.mock_http_client.put_json
+        put_json.expect_call_and_return(
+            call("elsewhere",
+                path="/matrix/federation/v1/send/1000000/",
+                data=_expect_edu("elsewhere", "m.presence_deny",
+                    content={
+                        "observer_user": "@cabbage:elsewhere",
+                        "observed_user": "@durian:test",
+                    }
+                )
+            ),
+            defer.succeed((200, "OK"))
         )
 
-        self.replication.send_edu.assert_called_with(
-                destination="elsewhere",
-                edu_type="m.presence_deny",
+        yield self.mock_federation_resource.trigger("PUT",
+            "/matrix/federation/v1/send/1000000/",
+            _make_edu_json("elsewhere", "m.presence_invite",
                 content={
                     "observer_user": "@cabbage:elsewhere",
                     "observed_user": "@durian:test",
                 }
+            )
         )
+
+        yield put_json.await_calls()
 
     @defer.inlineCallbacks
     def test_accepted_remote(self):
-        yield self.replication.received_edu(
-                "elsewhere", "m.presence_accept", {
+        yield self.mock_federation_resource.trigger("PUT",
+            "/matrix/federation/v1/send/1000000/",
+            _make_edu_json("elsewhere", "m.presence_accept",
+                content={
                     "observer_user": "@apple:test",
                     "observed_user": "@cabbage:elsewhere",
                 }
+            )
         )
 
         self.datastore.set_presence_list_accepted.assert_called_with(
@@ -362,11 +410,14 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_denied_remote(self):
-        yield self.replication.received_edu(
-                "elsewhere", "m.presence_deny", {
+        yield self.mock_federation_resource.trigger("PUT",
+            "/matrix/federation/v1/send/1000000/",
+            _make_edu_json("elsewhere", "m.presence_deny",
+                content={
                     "observer_user": "@apple:test",
                     "observed_user": "@eggplant:elsewhere",
                 }
+            )
         )
 
         self.datastore.del_presence_list.assert_called_with(
@@ -382,6 +433,14 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
         self.mock_stop.assert_called_with(
                 self.u_apple, target_user=self.u_banana)
+
+    @defer.inlineCallbacks
+    def test_drop_remote(self):
+        yield self.handler.drop(
+                observer_user=self.u_apple, observed_user=self.u_cabbage)
+
+        self.datastore.del_presence_list.assert_called_with(
+                "apple", "@cabbage:elsewhere")
 
     @defer.inlineCallbacks
     def test_get_presence_list(self):
@@ -424,22 +483,29 @@ class PresencePushTestCase(unittest.TestCase):
     BE WARNED...
     """
     def setUp(self):
-        self.replication = MockReplication()
-        self.replication.send_edu = Mock()
-        self.replication.send_edu.return_value = defer.succeed((200, "OK"))
-
         self.clock = MockClock()
+
+        self.mock_http_client = Mock(spec=[])
+        self.mock_http_client.put_json = DeferredMockCallable()
+
+        self.mock_federation_resource = MockHttpResource()
 
         hs = HomeServer("test",
                 clock=self.clock,
                 db_pool=None,
                 datastore=Mock(spec=[
                     "set_presence_state",
+
+                    # Bits that Federation needs
+                    "prep_send_transaction",
+                    "delivered_txn",
+                    "get_received_txn_response",
+                    "set_received_txn_response",
                 ]),
                 handlers=None,
                 resource_for_client=Mock(),
-                http_client=None,
-                replication_layer=self.replication,
+                resource_for_federation=self.mock_federation_resource,
+                http_client=self.mock_http_client,
             )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -447,6 +513,11 @@ class PresencePushTestCase(unittest.TestCase):
         self.mock_update_client.return_value = defer.succeed(None)
 
         self.datastore = hs.get_datastore()
+
+        def get_received_txn_response(*args):
+            return defer.succeed(None)
+        self.datastore.get_received_txn_response = get_received_txn_response
+
         self.handler = hs.get_handlers().presence_handler
         self.handler.push_update_to_clients = self.mock_update_client
 
@@ -585,10 +656,43 @@ class PresencePushTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_push_remote(self):
+        put_json = self.mock_http_client.put_json
+        put_json.expect_call_and_return(
+            call("remote",
+                path=ANY,  # Can't guarantee which txn ID will be which
+                data=_expect_edu("remote", "m.presence",
+                    content={
+                        "push": [
+                            {"user_id": "@apple:test",
+                             "state": "online",
+                             "mtime_age": 0},
+                        ],
+                    }
+                )
+            ),
+            defer.succeed((200, "OK"))
+        )
+        put_json.expect_call_and_return(
+            call("farm",
+                path=ANY,  # Can't guarantee which txn ID will be which
+                data=_expect_edu("farm", "m.presence",
+                    content={
+                        "push": [
+                            {"user_id": "@apple:test",
+                             "state": "online",
+                             "mtime_age": 0},
+                        ],
+                    }
+                )
+            ),
+            defer.succeed((200, "OK"))
+        )
+
         self.room_members = [self.u_apple, self.u_onion]
 
         self.datastore.set_presence_state.return_value = defer.succeed(
-                {"state": ONLINE})
+            {"state": ONLINE}
+        )
 
         # TODO(paul): Gut-wrenching
         self.handler._user_cachemap[self.u_apple] = UserPresenceCache()
@@ -596,30 +700,10 @@ class PresencePushTestCase(unittest.TestCase):
         apple_set.add(self.u_potato.domain)
 
         yield self.handler.set_state(self.u_apple, self.u_apple,
-                {"state": ONLINE})
+            {"state": ONLINE}
+        )
 
-        self.replication.send_edu.assert_has_calls([
-                call(
-                    destination="remote",
-                    edu_type="m.presence",
-                    content={
-                        "push": [
-                            {"user_id": "@apple:test",
-                             "state": "online",
-                             "mtime_age": 0},
-                        ],
-                    }),
-                call(
-                    destination="farm",
-                    edu_type="m.presence",
-                    content={
-                        "push": [
-                            {"user_id": "@apple:test",
-                             "state": "online",
-                             "mtime_age": 0},
-                        ],
-                    })
-        ], any_order=True)
+        yield put_json.await_calls()
 
     @defer.inlineCallbacks
     def test_recv_remote(self):
@@ -630,14 +714,17 @@ class PresencePushTestCase(unittest.TestCase):
 
         self.room_members = [self.u_banana, self.u_potato]
 
-        yield self.replication.received_edu(
-                "remote", "m.presence", {
+        yield self.mock_federation_resource.trigger("PUT",
+            "/matrix/federation/v1/send/1000000/",
+            _make_edu_json("elsewhere", "m.presence",
+                content={
                     "push": [
                         {"user_id": "@potato:remote",
                          "state": "online",
                          "mtime_age": 1000},
                     ],
                 }
+            )
         )
 
         self.mock_update_client.assert_has_calls([
@@ -683,6 +770,35 @@ class PresencePushTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_join_room_remote(self):
         ## Sending local user state to a newly-joined remote user
+        put_json = self.mock_http_client.put_json
+        put_json.expect_call_and_return(
+            call("remote",
+                path=ANY,  # Can't guarantee which txn ID will be which
+                data=_expect_edu("remote", "m.presence",
+                    content={
+                        "push": [
+                            {"user_id": "@apple:test",
+                            "state": "online"},
+                        ],
+                    }
+                ),
+            ),
+            defer.succeed((200, "OK"))
+        )
+        put_json.expect_call_and_return(
+            call("remote",
+                path=ANY,  # Can't guarantee which txn ID will be which
+                data=_expect_edu("remote", "m.presence",
+                    content={
+                        "push": [
+                            {"user_id": "@banana:test",
+                            "state": "offline"},
+                        ],
+                    }
+                ),
+            ),
+            defer.succeed((200, "OK"))
+        )
 
         # TODO(paul): Gut-wrenching
         self.handler._user_cachemap[self.u_apple] = UserPresenceCache()
@@ -694,30 +810,24 @@ class PresencePushTestCase(unittest.TestCase):
             "a-room"
         )
 
-        self.replication.send_edu.assert_has_calls([
-                call(
-                    destination="remote",
-                    edu_type="m.presence",
-                    content={
-                        "push": [
-                            {"user_id": "@apple:test",
-                            "state": "online"},
-                        ],
-                    }),
-                call(
-                    destination="remote",
-                    edu_type="m.presence",
-                    content={
-                        "push": [
-                            {"user_id": "@banana:test",
-                            "state": "offline"},
-                        ],
-                    }),
-        ], any_order=True)
-
-        self.replication.send_edu.reset_mock()
+        yield put_json.await_calls()
 
         ## Sending newly-joined local user state to remote users
+
+        put_json.expect_call_and_return(
+            call("remote",
+                path="/matrix/federation/v1/send/1000002/",
+                data=_expect_edu("remote", "m.presence",
+                    content={
+                        "push": [
+                            {"user_id": "@clementine:test",
+                            "state": "online"},
+                        ],
+                    }
+                ),
+            ),
+            defer.succeed((200, "OK"))
+        )
 
         self.handler._user_cachemap[self.u_clementine] = UserPresenceCache()
         self.handler._user_cachemap[self.u_clementine].update(
@@ -728,17 +838,7 @@ class PresencePushTestCase(unittest.TestCase):
             "a-room"
         )
 
-        self.replication.send_edu.assert_has_calls(
-                call(
-                    destination="remote",
-                    edu_type="m.presence",
-                    content={
-                        "push": [
-                            {"user_id": "@clementine:test",
-                            "state": "online"},
-                        ],
-                    }),
-        )
+        put_json.await_calls()
 
 
 class PresencePollingTestCase(unittest.TestCase):
@@ -755,20 +855,33 @@ class PresencePollingTestCase(unittest.TestCase):
 
 
     def setUp(self):
-        self.replication = MockReplication()
-        self.replication.send_edu = Mock()
+        self.mock_http_client = Mock(spec=[])
+        self.mock_http_client.put_json = DeferredMockCallable()
+
+        self.mock_federation_resource = MockHttpResource()
 
         hs = HomeServer("test",
+                clock=MockClock(),
                 db_pool=None,
-                datastore=Mock(spec=[]),
+                datastore=Mock(spec=[
+                    # Bits that Federation needs
+                    "prep_send_transaction",
+                    "delivered_txn",
+                    "get_received_txn_response",
+                    "set_received_txn_response",
+                ]),
                 handlers=None,
                 resource_for_client=Mock(),
-                http_client=None,
-                replication_layer=self.replication,
+                resource_for_federation=self.mock_federation_resource,
+                http_client=self.mock_http_client,
             )
         hs.handlers = JustPresenceHandlers(hs)
 
         self.datastore = hs.get_datastore()
+
+        def get_received_txn_response(*args):
+            return defer.succeed(None)
+        self.datastore.get_received_txn_response = get_received_txn_response
 
         self.mock_update_client = Mock()
         self.mock_update_client.return_value = defer.succeed(None)
@@ -827,8 +940,9 @@ class PresencePollingTestCase(unittest.TestCase):
     def test_push_local(self):
         # apple goes online
         yield self.handler.set_state(
-                target_user=self.u_apple, auth_user=self.u_apple,
-                state={"state": ONLINE})
+            target_user=self.u_apple, auth_user=self.u_apple,
+            state={"state": ONLINE}
+        )
 
         # apple should see both banana and clementine currently offline
         self.mock_update_client.assert_has_calls([
@@ -885,68 +999,92 @@ class PresencePollingTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_remote_poll_send(self):
+        put_json = self.mock_http_client.put_json
+        put_json.expect_call_and_return(
+            call("remote",
+                path="/matrix/federation/v1/send/1000000/",
+                data=_expect_edu("remote", "m.presence",
+                    content={
+                        "poll": [ "@potato:remote" ],
+                    },
+                ),
+            ),
+            defer.succeed((200, "OK"))
+        )
+
         # clementine goes online
         yield self.handler.set_state(
                 target_user=self.u_clementine, auth_user=self.u_clementine,
                 state={"state": ONLINE})
 
-        self.replication.send_edu.assert_called_with(
-                destination="remote",
-                edu_type="m.presence",
-                content={
-                    "poll": [ "@potato:remote" ],
-                },
-        )
+        yield put_json.await_calls()
 
         # Gut-wrenching tests
         self.assertTrue(self.u_potato in self.handler._remote_recvmap)
         self.assertTrue(self.u_clementine in
                 self.handler._remote_recvmap[self.u_potato])
 
-        self.replication.send_edu.reset_mock()
+        put_json.expect_call_and_return(
+            call("remote",
+                path="/matrix/federation/v1/send/1000001/",
+                data=_expect_edu("remote", "m.presence",
+                    content={
+                        "unpoll": [ "@potato:remote" ],
+                    },
+                ),
+            ),
+            defer.succeed((200, "OK"))
+        )
 
         # clementine goes offline
         yield self.handler.set_state(
                 target_user=self.u_clementine, auth_user=self.u_clementine,
                 state={"state": OFFLINE})
 
-        self.replication.send_edu.assert_called_with(
-                destination="remote",
-                edu_type="m.presence",
-                content={
-                    "unpoll": [ "@potato:remote" ],
-                },
-        )
+        put_json.await_calls()
 
         self.assertFalse(self.u_potato in self.handler._remote_recvmap)
 
     @defer.inlineCallbacks
     def test_remote_poll_receive(self):
-        yield self.replication.received_edu(
-                "remote", "m.presence", {
-                    "poll": [ "@banana:test" ],
-                }
+        put_json = self.mock_http_client.put_json
+        put_json.expect_call_and_return(
+            call("remote",
+                path="/matrix/federation/v1/send/1000000/",
+                data=_expect_edu("remote", "m.presence",
+                    content={
+                        "push": [
+                            {"user_id": "@banana:test",
+                             "state": "offline",
+                             "status_msg": None},
+                        ],
+                    },
+                ),
+            ),
+            defer.succeed((200, "OK"))
         )
+
+        yield self.mock_federation_resource.trigger("PUT",
+            "/matrix/federation/v1/send/1000000/",
+            _make_edu_json("remote", "m.presence",
+                content={
+                    "poll": [ "@banana:test" ],
+                },
+            )
+        )
+
+        yield put_json.await_calls()
 
         # Gut-wrenching tests
         self.assertTrue(self.u_banana in self.handler._remote_sendmap)
 
-        self.replication.send_edu.assert_called_with(
-                destination="remote",
-                edu_type="m.presence",
+        yield self.mock_federation_resource.trigger("PUT",
+            "/matrix/federation/v1/send/1000001/",
+            _make_edu_json("remote", "m.presence",
                 content={
-                    "push": [
-                        {"user_id": "@banana:test",
-                         "state": "offline",
-                         "status_msg": None},
-                    ],
-                },
-        )
-
-        yield self.replication.received_edu(
-                "remote", "m.presence", {
                     "unpoll": [ "@banana:test" ],
                 }
+            )
         )
 
         # Gut-wrenching tests

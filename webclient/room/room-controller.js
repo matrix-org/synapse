@@ -108,8 +108,11 @@ angular.module('RoomController', ['ngSanitize'])
                                function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
-    $scope.room_id = $routeParams.room_id;
-    $scope.room_alias = matrixService.getRoomIdToAliasMapping($scope.room_id);
+
+    // Room ids. Computed and resolved in onInit
+    $scope.room_id = undefined;
+    $scope.room_alias = undefined;
+
     $scope.state = {
         user_id: matrixService.config().user_id,
         events_from: "END", // when to start the event stream from.
@@ -144,7 +147,7 @@ angular.module('RoomController', ['ngSanitize'])
                 if (document.hidden) {
                     var notification = new window.Notification(
                         ($scope.members[event.user_id].displayname || event.user_id) +
-                        " (" + $scope.room_alias + ")",
+                        " (" + ($scope.room_alias || $scope.room_id) + ")", // FIXME: don't leak room_ids here
                     {
                         "body": event.content.body,
                         "icon": $scope.members[event.user_id].avatar_url,
@@ -342,7 +345,57 @@ angular.module('RoomController', ['ngSanitize'])
     $scope.onInit = function() {
         // $timeout(function() { document.getElementById('textInput').focus() }, 0);
         console.log("onInit");
+        
+        // Does the room ID provided in the URL?
+        var room_id_or_alias;
+        if ($routeParams.room_id_or_alias) {
+            room_id_or_alias = decodeURIComponent($routeParams.room_id_or_alias);
+        }
 
+        if (room_id_or_alias && '!' === room_id_or_alias[0]) {
+            // Yes. We can start right now
+            $scope.room_id = room_id_or_alias;
+            $scope.room_alias = matrixService.getRoomIdToAliasMapping($scope.room_id);
+            onInit2();
+        }
+        else {
+            // No. The URL contains the room alias. Get this alias.
+            if (room_id_or_alias) {
+                // The room alias was passed urlencoded, use it as is
+                $scope.room_alias = room_id_or_alias;
+            }
+            else  {
+                // Else get the room alias by hand from the URL
+                // ie: extract #public:localhost:8080 from http://127.0.0.1:8000/#/room/#public:localhost:8080
+                if (3 === location.hash.split("#").length) {
+                    $scope.room_alias = "#" + location.hash.split("#")[2];
+                }
+                else {
+                    // In case of issue, go to the default page
+                    console.log("Error: cannot extract room alias");
+                    $location.path("/");
+                    return;
+                }
+            }
+            
+            // Need a room ID required in Matrix API requests
+            console.log("Resolving alias: " + $scope.room_alias);
+            matrixService.resolveRoomAlias($scope.room_alias).then(function(response) {
+                $scope.room_id = response.data.room_id;
+                console.log("   -> Room ID: " + $scope.room_id);
+
+                // Now, we can start
+                onInit2();
+            },
+            function () {
+                // In case of issue, go to the default page
+                console.log("Error: cannot resolve room alias");
+                $location.path("/");
+            });
+        }
+    };
+
+    var onInit2 = function() {
         // Join the room
         matrixService.join($scope.room_id).then(
             function() {
@@ -378,6 +431,11 @@ angular.module('RoomController', ['ngSanitize'])
             function(reason) {
                 $scope.feedback = "Failure: " + reason;
             });
+    };
+
+    // Open the user profile page
+    $scope.goToUserPage = function(user_id) {
+        $location.url("/user/" + user_id);
     };
 
     $scope.leaveRoom = function() {

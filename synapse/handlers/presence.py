@@ -383,7 +383,7 @@ class PresenceHandler(BaseHandler):
         logger.debug("Start polling for presence from %s", user)
 
         if target_user:
-            target_users = set(target_user)
+            target_users = set([target_user])
         else:
             presence = yield self.store.get_presence_list(
                 user.localpart, accepted=True
@@ -463,9 +463,13 @@ class PresenceHandler(BaseHandler):
         deferreds = []
 
         if target_user:
-            raise NotImplementedError("TODO: remove one user")
+            if target_user not in self._remote_recvmap:
+                return
+            target_users = set([target_user])
+        else:
+            target_users = self._remote_recvmap.keys()
 
-        remoteusers = [u for u in self._remote_recvmap
+        remoteusers = [u for u in target_users
                        if user in self._remote_recvmap[u]]
         remoteusers_by_domain = partition(remoteusers, lambda u: u.domain)
 

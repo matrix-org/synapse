@@ -29,7 +29,7 @@ angular.module('mFileInput', [])
         scope: {
             selectedFile: '=mFileInput'
         },
-        
+
         link: function(scope, element, attrs, ctrl) {
             element.bind("click", function() {
                 element.find("input")[0].click();
@@ -38,6 +38,9 @@ angular.module('mFileInput', [])
                     scope.$apply();
                 });
             });
+
+            // Change the mouse icon on mouseover on this element
+            element.css("cursor", "pointer");
       }
     };
 });

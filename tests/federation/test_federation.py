@@ -20,7 +20,7 @@ from twisted.trial import unittest
 from mock import Mock
 import logging
 
-from ..utils import MockHttpServer, MockClock
+from ..utils import MockHttpResource, MockClock
 
 from synapse.server import HomeServer
 from synapse.federation import initialize_http_replication
@@ -50,7 +50,7 @@ def make_pdu(prev_pdus=[], **kwargs):
 
 class FederationTestCase(unittest.TestCase):
     def setUp(self):
-        self.mock_http_server = MockHttpServer()
+        self.mock_resource = MockHttpResource()
         self.mock_http_client = Mock(spec=[
             "get_json",
             "put_json",
@@ -70,7 +70,7 @@ class FederationTestCase(unittest.TestCase):
         )
         self.clock = MockClock()
         hs = HomeServer("test",
-                resource_for_federation=self.mock_http_server,
+                resource_for_federation=self.mock_resource,
                 http_client=self.mock_http_client,
                 db_pool=None,
                 datastore=self.mock_persistence,
@@ -86,7 +86,7 @@ class FederationTestCase(unittest.TestCase):
         )
 
         # Empty context initially
-        (code, response) = yield self.mock_http_server.trigger("GET",
+        (code, response) = yield self.mock_resource.trigger("GET",
                 "/matrix/federation/v1/state/my-context/", None)
         self.assertEquals(200, code)
         self.assertFalse(response["pdus"])
@@ -111,7 +111,7 @@ class FederationTestCase(unittest.TestCase):
             ])
         )
 
-        (code, response) = yield self.mock_http_server.trigger("GET",
+        (code, response) = yield self.mock_resource.trigger("GET",
                 "/matrix/federation/v1/state/my-context/", None)
         self.assertEquals(200, code)
         self.assertEquals(1, len(response["pdus"]))
@@ -122,7 +122,7 @@ class FederationTestCase(unittest.TestCase):
             defer.succeed(None)
         )
 
-        (code, response) = yield self.mock_http_server.trigger("GET",
+        (code, response) = yield self.mock_resource.trigger("GET",
                 "/matrix/federation/v1/pdu/red/abc123def456/", None)
         self.assertEquals(404, code)
 
@@ -141,7 +141,7 @@ class FederationTestCase(unittest.TestCase):
             )
         )
 
-        (code, response) = yield self.mock_http_server.trigger("GET",
+        (code, response) = yield self.mock_resource.trigger("GET",
                 "/matrix/federation/v1/pdu/red/abc123def456/", None)
         self.assertEquals(200, code)
         self.assertEquals(1, len(response["pdus"]))
@@ -225,7 +225,7 @@ class FederationTestCase(unittest.TestCase):
 
         self.federation.register_edu_handler("m.test", recv_observer)
 
-        yield self.mock_http_server.trigger("PUT",
+        yield self.mock_resource.trigger("PUT",
                 "/matrix/federation/v1/send/1001000/",
                 """{
                     "origin": "remote",
@@ -272,7 +272,7 @@ class FederationTestCase(unittest.TestCase):
 
         self.federation.register_query_handler("a-question", recv_handler)
 
-        code, response = yield self.mock_http_server.trigger("GET",
+        code, response = yield self.mock_resource.trigger("GET",
             "/matrix/federation/v1/query/a-question?three=3&four=4", None)
 
         self.assertEquals(200, code)

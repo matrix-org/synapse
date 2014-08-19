@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 from mock import Mock
 
-from ..utils import MockHttpServer
+from ..utils import MockHttpResource
 
 from synapse.api.errors import SynapseError, AuthError
 from synapse.server import HomeServer
@@ -32,7 +32,7 @@ class ProfileTestCase(unittest.TestCase):
     """ Tests profile management. """
 
     def setUp(self):
-        self.mock_server = MockHttpServer(prefix=PATH_PREFIX)
+        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.mock_handler = Mock(spec=[
             "get_displayname",
             "set_displayname",
@@ -43,7 +43,7 @@ class ProfileTestCase(unittest.TestCase):
         hs = HomeServer("test",
             db_pool=None,
             http_client=None,
-            resource_for_client=self.mock_server,
+            resource_for_client=self.mock_resource,
             federation=Mock(),
             replication_layer=Mock(),
             datastore=None,
@@ -63,7 +63,7 @@ class ProfileTestCase(unittest.TestCase):
         mocked_get = self.mock_handler.get_displayname
         mocked_get.return_value = defer.succeed("Frank")
 
-        (code, response) = yield self.mock_server.trigger("GET",
+        (code, response) = yield self.mock_resource.trigger("GET",
                 "/profile/%s/displayname" % (myid), None)
 
         self.assertEquals(200, code)
@@ -75,7 +75,7 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set = self.mock_handler.set_displayname
         mocked_set.return_value = defer.succeed(())
 
-        (code, response) = yield self.mock_server.trigger("PUT",
+        (code, response) = yield self.mock_resource.trigger("PUT",
                 "/profile/%s/displayname" % (myid),
                 '{"displayname": "Frank Jr."}')
 
@@ -89,7 +89,7 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set = self.mock_handler.set_displayname
         mocked_set.side_effect = AuthError(400, "message")
 
-        (code, response) = yield self.mock_server.trigger("PUT",
+        (code, response) = yield self.mock_resource.trigger("PUT",
                 "/profile/%s/displayname" % ("@4567:test"), '"Frank Jr."')
 
         self.assertTrue(400 <= code < 499,
@@ -100,7 +100,7 @@ class ProfileTestCase(unittest.TestCase):
         mocked_get = self.mock_handler.get_displayname
         mocked_get.return_value = defer.succeed("Bob")
 
-        (code, response) = yield self.mock_server.trigger("GET",
+        (code, response) = yield self.mock_resource.trigger("GET",
                 "/profile/%s/displayname" % ("@opaque:elsewhere"), None)
 
         self.assertEquals(200, code)
@@ -111,7 +111,7 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set = self.mock_handler.set_displayname
         mocked_set.side_effect = SynapseError(400, "message")
 
-        (code, response) = yield self.mock_server.trigger("PUT",
+        (code, response) = yield self.mock_resource.trigger("PUT",
                 "/profile/%s/displayname" % ("@opaque:elsewhere"), None)
 
         self.assertTrue(400 <= code <= 499,
@@ -122,7 +122,7 @@ class ProfileTestCase(unittest.TestCase):
         mocked_get = self.mock_handler.get_avatar_url
         mocked_get.return_value = defer.succeed("http://my.server/me.png")
 
-        (code, response) = yield self.mock_server.trigger("GET",
+        (code, response) = yield self.mock_resource.trigger("GET",
                 "/profile/%s/avatar_url" % (myid), None)
 
         self.assertEquals(200, code)
@@ -134,7 +134,7 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set = self.mock_handler.set_avatar_url
         mocked_set.return_value = defer.succeed(())
 
-        (code, response) = yield self.mock_server.trigger("PUT",
+        (code, response) = yield self.mock_resource.trigger("PUT",
                 "/profile/%s/avatar_url" % (myid),
                 '{"avatar_url": "http://my.server/pic.gif"}')
 

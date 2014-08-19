@@ -89,6 +89,7 @@ h1 {
     height: 100px;
     position: relative;
     background-color: #000;
+    cursor: pointer;
 }
 
 .userAvatar .userAvatarImage {
@@ -251,6 +252,7 @@ h1 {
     height: 160px;
     display:table-cell;
     vertical-align: middle;
+    text-align: center;
 }
 
 .profile-avatar img {
@@ -258,6 +260,14 @@ h1 {
     max-height: 100%;
 }
 
+/*** User profile page ***/
+#user-ids {
+    padding-left: 1em;
+}
+
+#user-displayname {
+    font-size: 16pt;
+}
 /******************************/
 
 #header {
