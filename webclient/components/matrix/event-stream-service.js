@@ -25,7 +25,6 @@ the eventHandlerService.
 angular.module('eventStreamService', [])
 .factory('eventStreamService', ['$q', '$timeout', 'matrixService', 'eventHandlerService', function($q, $timeout, matrixService, eventHandlerService) {
     var END = "END";
-    var START = "START";
     var TIMEOUT_MS = 30000;
     var ERR_TIMEOUT_MS = 5000;
     

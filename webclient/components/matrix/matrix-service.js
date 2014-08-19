@@ -230,8 +230,8 @@ angular.module('matrixService', [])
             path = path.replace("$room_id", room_id);
             var params = {
                 from: from_token,
-                to: "START",
-                limit: limit
+                limit: limit,
+                dir: 'b'
             };
             return doRequest("GET", path, params);
         },

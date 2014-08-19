@@ -466,7 +466,7 @@ class RoomMemberHandler(BaseHandler):
             for entry in member_list
         ]
         chunk_data = {
-            "start": "START",
+            "start": "START",  # FIXME (erikj): START is no longer a valid value
             "end": "END",
             "chunk": event_list
         }
@@ -811,4 +811,5 @@ class RoomListHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_public_room_list(self):
         chunk = yield self.store.get_rooms(is_public=True)
+        # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
