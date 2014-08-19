@@ -13,6 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+""" This module is responsible for getting events from the DB for pagination
+and event streaming.
+
+The order it returns events in depend on whether we are streaming forwards or
+are paginating backwards. We do this because we want to handle out of order
+messages nicely, while still returning them in the correct order when we
+paginate bacwards.
+
+This is implemented by keeping two ordering columns: stream_ordering and
+topological_ordering. Stream ordering is basically insertion/received order
+(except for events from backfill requests). The topolgical_ordering is a
+weak ordering of events based on the pdu graph.
+
+This means that we have to have two different types of tokens, depending on
+what sort order was used:
+    - stream tokens are of the form: "s%d", which maps directly to the column
+    - topological tokems: "t%d-%d", where the integers map to the topological
+      and stream ordering columns respectively.
+"""
+
 from twisted.internet import defer
 
 from ._base import SQLBaseStore
