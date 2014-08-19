@@ -60,7 +60,6 @@ def _parse_stream_token(string):
             raise
         return int(string[1:])
     except:
-        logger.debug("Not stream token: %s", string)
         raise SynapseError(400, "Invalid token")
 
 
@@ -71,7 +70,6 @@ def _parse_topological_token(string):
         parts = string[1:].split('-', 1)
         return (int(parts[0]), int(parts[1]))
     except:
-        logger.debug("Not topological token: %s", string)
         raise SynapseError(400, "Invalid token")
 
 
