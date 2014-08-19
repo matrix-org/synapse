@@ -23,6 +23,8 @@ Accounts
 Before you can send and receive messages, you must **register** for an account. 
 If you already have an account, you must **login** into it.
 
+**Try out the fiddle: http://jsfiddle.net/jrf1h02d/**
+
 Registration
 ------------
 The aim of registration is to get a user ID and access token which you will need
@@ -76,7 +78,9 @@ Communicating
 =============
 
 In order to communicate with another user, you must **create a room** with that 
-user and **send a message** to that room.
+user and **send a message** to that room. 
+
+**Try out the fiddle: http://jsfiddle.net/jnwqcshc/**
 
 Creating a room
 ---------------
