@@ -235,7 +235,7 @@ class MessageRestServlet(RestServlet):
 
         msg_handler = self.handlers.message_handler
         msg = yield msg_handler.get_message(room_id=urllib.unquote(room_id),
-                                            sender_id=sender_id,
+                                            sender_id=urllib.unquote(sender_id),
                                             msg_id=msg_id,
                                             user_id=user.to_string(),
                                             )
@@ -250,7 +250,7 @@ class MessageRestServlet(RestServlet):
     def on_PUT(self, request, room_id, sender_id, msg_id):
         user = yield self.auth.get_user_by_req(request)
 
-        if user.to_string() != sender_id:
+        if user.to_string() != urllib.unquote(sender_id):
             raise SynapseError(403, "Must send messages as yourself.",
                                errcode=Codes.FORBIDDEN)
 
