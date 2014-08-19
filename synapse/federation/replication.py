@@ -158,6 +158,7 @@ class ReplicationLayer(object):
 
         # TODO, add errback, etc.
         self._transaction_queue.enqueue_edu(edu)
+        return defer.succeed(None)
 
     @log_function
     def make_query(self, destination, query_type, args):
