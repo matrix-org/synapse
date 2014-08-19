@@ -2,7 +2,8 @@ TODO(kegan): Tweak joinalias API keys/path? Event stream historical > live needs
 a token (currently doesn't). im/sync responses include outdated event formats
 (room membership change messages). Room config (specifically: message history,
 public rooms). /register seems super simplistic compared to /login, maybe it
-would be better if /register used the same technique as /login?
+would be better if /register used the same technique as /login? /register should
+be "user" not "user_id".
 
 
 How to use the client-server API
