@@ -689,6 +689,9 @@ class PresenceStreamData(StreamData):
         self.presence = hs.get_handlers().presence_handler
 
     def get_rows(self, user_id, from_key, to_key, limit, direction):
+        from_key = int(from_key)
+        to_key = int(to_key)
+
         cachemap = self.presence._user_cachemap
 
         # TODO(paul): limit, and filter by visibility
