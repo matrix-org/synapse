@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-angular.module('RoomController', ['ngSanitize'])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService', 'mFileUpload',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService, mFileUpload) {
+angular.module('RoomController', ['ngSanitize', 'mUtilities'])
+.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService', 'mFileUpload', 'mUtilities',
+                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService, mFileUpload, mUtilities) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
 
@@ -366,10 +366,10 @@ angular.module('RoomController', ['ngSanitize'])
             });
     };
 
-    $scope.sendImage = function(url) {
+    $scope.sendImage = function(url, body) {
         $scope.state.sending = true;
 
-        matrixService.sendImageMessage($scope.room_id, url).then(
+        matrixService.sendImageMessage($scope.room_id, url, body).then(
             function() {
                 console.log("Image sent");
                 $scope.state.sending = false;
@@ -386,17 +386,35 @@ angular.module('RoomController', ['ngSanitize'])
 
             $scope.state.sending = true;
 
-            // First download the image to the Internet
-            console.log("Uploading image...");
-            mFileUpload.uploadFile($scope.imageFileToSend).then(
-                function(url) {
-                    // Then share the URL
-                    $scope.sendImage(url);
+            // First, get the image sise
+            mUtilities.getImageSize($scope.imageFileToSend).then(
+                function(size) {
+
+                    // Upload the image to the Internet
+                    console.log("Uploading image...");
+                    mFileUpload.uploadFile($scope.imageFileToSend).then(
+                        function(url) {
+                            // Build the image info data
+                            var imageInfo = {
+                                size: $scope.imageFileToSend.size,
+                                mimetype: $scope.imageFileToSend.type,
+                                w: size.width,
+                                h: size.height
+                            };
+
+                            // Then share the URL and the metadata
+                            $scope.sendImage(url, imageInfo);
+                        },
+                        function(error) {
+                            $scope.feedback = "Can't upload image";
+                            $scope.state.sending = false;
+                        }
+                    );
                 },
                 function(error) {
-                    $scope.feedback = "Can't upload image";
+                    $scope.feedback = "Can't get selected image size";
                     $scope.state.sending = false;
-                } 
+                }
             );
         }
     });

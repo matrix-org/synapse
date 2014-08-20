@@ -204,11 +204,11 @@ angular.module('matrixService', [])
         },
 
         // Send an image message
-        sendImageMessage: function(room_id, image_url, image_alt, msg_id) {
+        sendImageMessage: function(room_id, image_url, image_body, msg_id) {
             var content = {
                  msgtype: "m.image",
                  url: image_url,
-                 body: image_alt
+                 body: image_body
             };
 
             return this.sendMessage(room_id, msg_id, content);

@@ -27,10 +27,10 @@ angular.module('mFileUpload', [])
      * Upload an HTML5 file to a server and returned a promise
      * that will provide the URL of the uploaded file.
      */
-    this.uploadFile = function(file) {
+    this.uploadFile = function(file, body) {
         var deferred = $q.defer();
         console.log("Uploading " + file.name + "... to /matrix/content");
-        matrixService.uploadContent(file).then(
+        matrixService.uploadContent(file, body).then(
             function(response) {
                 var content_url = location.origin + "/matrix/content/" + response.data.content_token;
                 console.log("   -> Successfully uploaded! Available at " + content_url);
