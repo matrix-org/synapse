@@ -1,0 +1,17 @@
+.loggedin {
+    visibility: hidden;
+}
+
+p {
+    font-family: monospace;
+}
+
+table
+{
+    border-spacing:5px;
+}
+
+th,td
+{
+    padding:5px;
+}
