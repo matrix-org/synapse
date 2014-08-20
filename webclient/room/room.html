@@ -42,7 +42,7 @@
                         <span ng-hide='msg.content.msgtype !== "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
                         <span ng-hide='msg.content.msgtype !== "m.text"' ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
                         <div ng-hide='msg.content.msgtype !== "m.image"'
-                             ng-style="{ 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
+                             ng-style="msg.content.body.h && { 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
                             <img class="image" ng-src="{{ msg.content.url }}"/>
                         </div>
                     </div>
