@@ -54,6 +54,11 @@ SCHEMAS = [
 ]
 
 
+# Remember to update this number every time an incompatible change is made to
+# database schema files, so the users will be informed on server restarts.
+SCHEMA_VERSION = 1
+
+
 class SynapseHomeServer(HomeServer):
 
     def build_http_client(self):
@@ -78,13 +83,30 @@ class SynapseHomeServer(HomeServer):
         logging.info("Preparing database: %s...", self.db_name)
 
         with sqlite3.connect(self.db_name) as db_conn:
-            for sql_loc in SCHEMAS:
-                sql_script = read_schema(sql_loc)
+            c = db_conn.cursor()
+            c.execute("PRAGMA user_version")
+            row = c.fetchone()
 
-                c = db_conn.cursor()
-                c.executescript(sql_script)
-                c.close()
-                db_conn.commit()
+            if row and row[0]:
+                user_version = row[0]
+
+                if user_version < SCHEMA_VERSION:
+                    # TODO(paul): add some kind of intelligent fixup here
+                    raise ValueError("Cannot use this database as the " +
+                        "schema version (%d) does not match (%d)" %
+                        (user_version, SCHEMA_VERSION)
+                    )
+
+            else:
+                for sql_loc in SCHEMAS:
+                    sql_script = read_schema(sql_loc)
+
+                    c.executescript(sql_script)
+                    db_conn.commit()
+
+                c.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
+
+            c.close()
 
         logging.info("Database prepared in %s.", self.db_name)
 
