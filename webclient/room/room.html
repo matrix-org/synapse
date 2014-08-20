@@ -65,27 +65,13 @@
                     <td width="*" style="min-width: 100px">
                         <input id="mainInput" ng-model="textInput" ng-enter="send()" ng-disabled="state.sending" ng-focus="true" auto-complete/>
                     </td>
-                    <td width="1">
+                    <td width="150px">
                         <button ng-click="send()" ng-disabled="state.sending">Send</button>
+                        <button m-file-input="imageFileToSend">Send Image</button>
                     </td>
                     <td width="1">
                         
                     </td>
-                </tr>
-                <tr>
-                    <td>
-                    </td>
-                    <td>
-                        <input id="mainInput" ng-model="imageURLToSend" ng-enter="sendImage(imageURLToSend)" placeholder="Image URL"/>
-                    </td>
-                    <td width="100px">
-                        <button ng-click="sendImage(imageURLToSend)" ng-disabled="state.sending">Send URL</button>
-                    </td>
-                    <!-- TODO: To enable once we have an upload server
-                    <td width="100px">
-                        <button m-file-input="imageFileToSend">Send Image</button>
-                    </td>
-                    -->
                 </tr>
             </table>
 

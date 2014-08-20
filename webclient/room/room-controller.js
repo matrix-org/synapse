@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize'])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService) {
+.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService', 'mFileUpload',
+                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService, mFileUpload) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
 
@@ -372,6 +372,7 @@ angular.module('RoomController', ['ngSanitize'])
         matrixService.sendImageMessage($scope.room_id, url).then(
             function() {
                 console.log("Image sent");
+                $scope.state.sending = false;
             },
             function(error) {
                 $scope.feedback = "Failed to send image: " + error.data.error;
