@@ -121,6 +121,8 @@ these rules may specify if you require an **invitation** from someone already in
 the room in order to **join the room**. In addition, you may also be able to 
 join a room **via a room alias** if one was set up.
 
+**Try out the fiddle: http://jsfiddle.net/og1xokcr/**
+
 Inviting a user to a room
 -------------------------
 You can directly invite a user to a room like so::
@@ -163,6 +165,8 @@ Getting events
 An event is some interesting piece of data that a client may be interested in. 
 It can be a message in a room, a room invite, etc. There are many different ways
 of getting events, depending on what the client already knows.
+
+**Try out the fiddle: http://jsfiddle.net/5uk4dqe2/**
 
 Getting all state
 -----------------
@@ -288,3 +292,12 @@ and then resume getting live state from a newer end token.
 NB: The timeout can be changed by adding a ``timeout`` query parameter, which is
 in milliseconds. A timeout of 0 will not block.
 
+
+Example application
+-------------------
+The following example demonstrates registration and login, live event streaming,
+creating and joining rooms, sending messages, getting member lists and getting 
+historical messages for a room. This covers most functionality of a messaging
+application.
+
+**Try out the fiddle: http://jsfiddle.net/L8r3o1wr/**
