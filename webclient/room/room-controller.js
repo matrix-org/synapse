@@ -89,7 +89,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
         
     var paginate = function(numItems) {
         // console.log("paginate " + numItems);
-        if ($scope.state.paginating) {
+        if ($scope.state.paginating || !$scope.room_id) {
             return;
         }
         else {
@@ -145,7 +145,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
                 console.log("Failed to paginateBackMessages: " + JSON.stringify(error));
                 $scope.state.paginating = false;
             }
-        )
+        );
     };
 
     var updateMemberList = function(chunk) {
