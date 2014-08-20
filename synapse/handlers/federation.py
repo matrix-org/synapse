@@ -72,6 +72,34 @@ class FederationHandler(BaseHandler):
             with (yield self.room_lock.lock(event.room_id)):
                 store_id = yield self.store.persist_event(event, backfilled)
 
+            room = yield self.store.get_room(event.room_id)
+
+            if not room:
+                # Huh, let's try and get the current state
+                try:
+                    federation = self.hs.get_federation()
+                    yield federation.get_state_for_room(
+                        event.origin, event.room_id
+                    )
+
+                    hosts = yield self.store.get_joined_hosts_for_room(
+                        event.room_id
+                    )
+                    if self.hs.hostname in hosts:
+                        try:
+                            yield self.store.store_room(
+                                event.room_id,
+                                "",
+                                is_public=False
+                            )
+                        except:
+                            pass
+                except:
+                    logger.exception(
+                        "Failed to get current state for room %s",
+                        event.room_id
+                    )
+
             if not backfilled:
                 yield self.notifier.on_new_room_event(event, store_id)
 
@@ -88,3 +116,53 @@ class FederationHandler(BaseHandler):
                 logger.exception("Failed to persist event: %s", event)
 
         defer.returnValue(events)
+
+    @log_function
+    @defer.inlineCallbacks
+    def do_invite_join(self, target_host, room_id, joinee, content):
+        federation = self.hs.get_federation()
+
+        hosts = yield self.store.get_joined_hosts_for_room(room_id)
+        if self.hs.hostname in hosts:
+            # We are already in the room.
+            logger.debug("We're already in the room apparently")
+            defer.returnValue(False)
+
+        # First get current state to see if we are already joined.
+        try:
+            yield federation.get_state_for_room(target_host, room_id)
+
+            hosts = yield self.store.get_joined_hosts_for_room(room_id)
+            if self.hs.hostname in hosts:
+                # Oh, we were actually in the room already.
+                logger.debug("We're already in the room apparently")
+                defer.returnValue(False)
+        except Exception:
+            logger.exception("Failed to get current state")
+
+        new_event = self.event_factory.create_event(
+            etype=InviteJoinEvent.TYPE,
+            target_host=target_host,
+            room_id=room_id,
+            user_id=joinee,
+            content=content
+        )
+
+        new_event.destinations = [target_host]
+
+        yield federation.handle_new_event(new_event)
+
+        store_id = yield self.store.persist_event(new_event)
+        self.notifier.on_new_room_event(new_event, store_id)
+
+        try:
+            yield self.store.store_room(
+                event.room_id,
+                "",
+                is_public=False
+            )
+        except:
+            pass
+
+
+        defer.returnValue(True)

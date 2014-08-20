@@ -599,9 +599,9 @@ class RoomMemberHandler(BaseHandler):
         # that we are allowed to join when we decide whether or not we
         # need to do the invite/join dance.
 
-        room = yield self.store.get_room(room_id)
+        hosts = yield self.store.get_joined_hosts_for_room(room_id)
 
-        if room:
+        if self.hs.hostname in hosts:
             should_do_dance = False
         elif room_host:
             should_do_dance = True
@@ -621,8 +621,15 @@ class RoomMemberHandler(BaseHandler):
             else:
                 should_do_dance = False
 
+        have_joined = False
+        if should_do_dance:
+            handler = self.hs.get_handlers().federation_handler
+            have_joined = yield handler.do_invite_join(
+                room_host, room_id, event.user_id, event.content
+            )
+
         # We want to do the _do_update inside the room lock.
-        if not should_do_dance:
+        if not have_joined:
             logger.debug("Doing normal join")
 
             if do_auth:
@@ -633,14 +640,6 @@ class RoomMemberHandler(BaseHandler):
                 event,
                 membership=event.content["membership"],
                 broadcast_msg=broadcast_msg,
-            )
-
-        if should_do_dance:
-            yield self._do_invite_join_dance(
-                room_id=room_id,
-                joinee=event.user_id,
-                target_host=room_host,
-                content=event.content,
             )
 
         user = self.hs.parse_userid(event.user_id)
@@ -747,32 +746,6 @@ class RoomMemberHandler(BaseHandler):
                 room_id=event.room_id,
                 membership=event.content["membership"]
             )
-
-    @defer.inlineCallbacks
-    def _do_invite_join_dance(self, room_id, joinee, target_host, content):
-        logger.debug("Doing remote join dance")
-
-        # do invite join dance
-        federation = self.hs.get_federation()
-        new_event = self.event_factory.create_event(
-            etype=InviteJoinEvent.TYPE,
-            target_host=target_host,
-            room_id=room_id,
-            user_id=joinee,
-            content=content
-        )
-
-        new_event.destinations = [target_host]
-
-        yield self.store.store_room(
-            room_id, "", is_public=False
-        )
-
-        # yield self.state_handler.handle_new_event(event)
-        yield federation.handle_new_event(new_event)
-        yield federation.get_state_for_room(
-            target_host, room_id
-        )
 
     @defer.inlineCallbacks
     def _inject_membership_msg(self, room_id=None, source=None, target=None,
