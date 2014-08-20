@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 matrix.org
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,6 +40,7 @@ class FederationTestCase(unittest.TestCase):
             datastore=NonCallableMock(spec_set=[
                 "persist_event",
                 "store_room",
+                "get_room",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
@@ -69,6 +69,7 @@ class FederationTestCase(unittest.TestCase):
 
         store_id = "ASD"
         self.datastore.persist_event.return_value = defer.succeed(store_id)
+        self.datastore.get_room.return_value = defer.succeed(True)
 
         yield self.handlers.federation_handler.on_receive(event, False, False)
 
