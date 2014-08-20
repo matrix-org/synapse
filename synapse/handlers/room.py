@@ -640,6 +640,8 @@ class RoomMemberHandler(BaseHandler):
     @defer.inlineCallbacks
     def _fill_out_join_content(self, user_id, content):
         # If event doesn't include a display name, add one.
+        # TODO(paul): This really ought to use the distributor's
+        #   collect_presencelike_data signal instead.
         profile_handler = self.hs.get_handlers().profile_handler
         if "displayname" not in content:
             try:
@@ -661,7 +663,7 @@ class RoomMemberHandler(BaseHandler):
                 if avatar_url:
                     content["avatar_url"] = avatar_url
             except:
-                logger.exception("Failed to set display_name")
+                logger.exception("Failed to set avatar_url")
 
     @defer.inlineCallbacks
     def _should_invite_join(self, room_id, prev_state, do_auth):
