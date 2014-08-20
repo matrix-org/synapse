@@ -40,8 +40,8 @@
                 <td ng-class="!msg.content.membership_target ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble">
                         <span ng-hide='msg.content.msgtype !== "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
-                        <span ng-hide='msg.content.msgtype !== "m.text"' ng-bind-html="msg.content.body | linky:'_blank'"/>
-                        <img class="image" ng-hide='msg.content.msgtype !== "m.image"' ng-src="{{ msg.content.url }}" alt="{{ msg.content.body }}"/>
+                        <span ng-hide='msg.content.msgtype !== "m.text"' ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
+                        <img class="image" ng-hide='msg.content.msgtype !== "m.image"' ng-src="{{ msg.content.url }}"/>
                     </div>
                 </td>
                 <td class="rightBlock">
