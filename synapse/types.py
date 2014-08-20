@@ -38,6 +38,14 @@ class DomainSpecificString(
     def __iter__(self):
         raise ValueError("Attempted to iterate a %s" % (type(self).__name__))
 
+    # Because this class is a namedtuple of strings and booleans, it is deeply
+    # immutable.
+    def __copy__(self):
+        return self
+
+    def __deepcopy__(self, memo):
+        return self
+
     @classmethod
     def from_string(cls, s, hs):
         """Parse the string given by 's' into a structure object."""
