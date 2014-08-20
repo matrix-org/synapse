@@ -23,6 +23,7 @@ from .login import LoginHandler
 from .profile import ProfileHandler
 from .presence import PresenceHandler
 from .directory import DirectoryHandler
+from .typing import TypingNotificationHandler
 
 
 class Handlers(object):
@@ -46,3 +47,4 @@ class Handlers(object):
         self.room_list_handler = RoomListHandler(hs)
         self.login_handler = LoginHandler(hs)
         self.directory_handler = DirectoryHandler(hs)
+        self.typing_notification_handler = TypingNotificationHandler(hs)
