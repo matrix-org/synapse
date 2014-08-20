@@ -30,7 +30,8 @@ angular.module('RoomController', ['ngSanitize'])
         earliest_token: "END", // stores how far back we've paginated.
         can_paginate: true, // this is toggled off when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
-        stream_failure: undefined // the response when the stream fails
+        stream_failure: undefined, // the response when the stream fails
+        sending: false // true when a message is being sent. It helps to disable the UI when a process is running
     };
     $scope.members = {};
     $scope.autoCompleting = false;
@@ -232,7 +233,9 @@ angular.module('RoomController', ['ngSanitize'])
         if ($scope.textInput == "") {
             return;
         }
-                    
+
+        $scope.state.sending = true;
+
         // Send the text message
         var promise;
         // FIXME: handle other commands too
@@ -247,10 +250,12 @@ angular.module('RoomController', ['ngSanitize'])
             function() {
                 console.log("Sent message");
                 $scope.textInput = "";
+                $scope.state.sending = false;
             },
             function(error) {
                 $scope.feedback = "Failed to send: " + error.data.error;
-            });               
+                $scope.state.sending = false;
+            });
     };
 
     $scope.onInit = function() {
@@ -362,18 +367,24 @@ angular.module('RoomController', ['ngSanitize'])
     };
 
     $scope.sendImage = function(url) {
+        $scope.state.sending = true;
+
         matrixService.sendImageMessage($scope.room_id, url).then(
             function() {
                 console.log("Image sent");
             },
             function(error) {
                 $scope.feedback = "Failed to send image: " + error.data.error;
+                $scope.state.sending = false;
             });
     };
     
     $scope.imageFileToSend;
     $scope.$watch("imageFileToSend", function(newValue, oldValue) {
         if ($scope.imageFileToSend) {
+
+            $scope.state.sending = true;
+
             // First download the image to the Internet
             console.log("Uploading image...");
             mFileUpload.uploadFile($scope.imageFileToSend).then(
@@ -383,6 +394,7 @@ angular.module('RoomController', ['ngSanitize'])
                 },
                 function(error) {
                     $scope.feedback = "Can't upload image";
+                    $scope.state.sending = false;
                 } 
             );
         }
