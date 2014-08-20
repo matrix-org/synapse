@@ -121,7 +121,10 @@ class DataStore(RoomMemberStore, RoomStore,
         try:
             yield self._simple_insert("events", vals)
         except:
-            logger.exception("Failed to persist, probably duplicate")
+            logger.exception(
+                "Failed to persist, probably duplicate: %s",
+                event_id
+            )
             return
 
         if not backfilled and hasattr(event, "state_key"):
