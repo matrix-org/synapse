@@ -140,9 +140,11 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         joined = ["red", "green"]
 
         self.state_handler.handle_new_event.return_value = defer.succeed(True)
-        self.datastore.get_joined_hosts_for_room.return_value = (
-            defer.succeed(joined)
-        )
+
+        def get_joined(*args):
+            return defer.succeed(joined)
+
+        self.datastore.get_joined_hosts_for_room.side_effect = get_joined
 
         store_id = "store_id_fooo"
         self.datastore.persist_event.return_value = defer.succeed(store_id)
