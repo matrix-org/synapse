@@ -69,6 +69,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.distributor = hs.get_distributor()
         self.hs = hs
 
+        self.distributor.declare("collect_presencelike_data")
+
         self.handlers.room_member_handler = RoomMemberHandler(self.hs)
         self.handlers.profile_handler = ProfileHandler(self.hs)
         self.room_member_handler = self.handlers.room_member_handler

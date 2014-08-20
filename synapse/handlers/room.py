@@ -581,8 +581,8 @@ class RoomMemberHandler(BaseHandler):
         room_id = event.room_id
 
         # If event doesn't include a display name, add one.
-        yield self._fill_out_join_content(
-            joinee, event.content
+        yield self.distributor.fire(
+            "collect_presencelike_data", joinee, event.content
         )
 
         # XXX: We don't do an auth check if we are doing an invite
@@ -636,34 +636,6 @@ class RoomMemberHandler(BaseHandler):
         self.distributor.fire(
             "user_joined_room", user=user, room_id=room_id
         )
-
-    @defer.inlineCallbacks
-    def _fill_out_join_content(self, user_id, content):
-        # If event doesn't include a display name, add one.
-        # TODO(paul): This really ought to use the distributor's
-        #   collect_presencelike_data signal instead.
-        profile_handler = self.hs.get_handlers().profile_handler
-        if "displayname" not in content:
-            try:
-                display_name = yield profile_handler.get_displayname(
-                    user_id
-                )
-
-                if display_name:
-                    content["displayname"] = display_name
-            except:
-                logger.exception("Failed to set display_name")
-
-        if "avatar_url" not in content:
-            try:
-                avatar_url = yield profile_handler.get_avatar_url(
-                    user_id
-                )
-
-                if avatar_url:
-                    content["avatar_url"] = avatar_url
-            except:
-                logger.exception("Failed to set avatar_url")
 
     @defer.inlineCallbacks
     def _should_invite_join(self, room_id, prev_state, do_auth):
