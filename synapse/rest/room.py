@@ -193,7 +193,7 @@ class RoomMemberRestServlet(RestServlet):
             )
 
         handler = self.handlers.room_member_handler
-        yield handler.change_membership(event, broadcast_msg=True)
+        yield handler.change_membership(event)
         defer.returnValue((200, ""))
 
     @defer.inlineCallbacks
@@ -220,7 +220,7 @@ class RoomMemberRestServlet(RestServlet):
             )
 
         handler = self.handlers.room_member_handler
-        yield handler.change_membership(event, broadcast_msg=True)
+        yield handler.change_membership(event)
         defer.returnValue((200, ""))
 
 

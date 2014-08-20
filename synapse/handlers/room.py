@@ -383,7 +383,6 @@ class RoomCreationHandler(BaseHandler):
 
         yield self.hs.get_handlers().room_member_handler.change_membership(
             join_event,
-            broadcast_msg=True,
             do_auth=False
         )
 
@@ -495,18 +494,14 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue(member)
 
     @defer.inlineCallbacks
-    def change_membership(self, event=None, broadcast_msg=False, do_auth=True):
+    def change_membership(self, event=None, do_auth=True):
         """ Change the membership status of a user in a room.
 
         Args:
             event (SynapseEvent): The membership event
-            broadcast_msg (bool): True to inject a membership message into this
-                room on success.
         Raises:
             SynapseError if there was a problem changing the membership.
         """
-
-        broadcast_msg = False
 
         prev_state = yield self.store.get_room_member(
             event.target_user_id, event.room_id
@@ -528,9 +523,7 @@ class RoomMemberHandler(BaseHandler):
         # if this HS is not currently in the room, i.e. we have to do the
         # invite/join dance.
         if event.membership == Membership.JOIN:
-            yield self._do_join(
-                event, do_auth=do_auth, broadcast_msg=broadcast_msg
-            )
+            yield self._do_join(event, do_auth=do_auth)
         else:
             # This is not a JOIN, so we can handle it normally.
             if do_auth:
@@ -548,7 +541,6 @@ class RoomMemberHandler(BaseHandler):
             yield self._do_local_membership_update(
                 event,
                 membership=event.content["membership"],
-                broadcast_msg=broadcast_msg,
             )
 
         defer.returnValue({"room_id": room_id})
@@ -583,8 +575,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def _do_join(self, event, room_host=None, do_auth=True,
-                 broadcast_msg=True):
+    def _do_join(self, event, room_host=None, do_auth=True):
         joinee = self.hs.parse_userid(event.target_user_id)
         # room_id = RoomID.from_string(event.room_id, self.hs)
         room_id = event.room_id
@@ -639,7 +630,6 @@ class RoomMemberHandler(BaseHandler):
             yield self._do_local_membership_update(
                 event,
                 membership=event.content["membership"],
-                broadcast_msg=broadcast_msg,
             )
 
         user = self.hs.parse_userid(event.user_id)
@@ -710,7 +700,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue([r.room_id for r in rooms])
 
     @defer.inlineCallbacks
-    def _do_local_membership_update(self, event, membership, broadcast_msg):
+    def _do_local_membership_update(self, event, membership):
         # store membership
         store_id = yield self.store.persist_event(event)
 
@@ -738,48 +728,6 @@ class RoomMemberHandler(BaseHandler):
 
         yield self.hs.get_federation().handle_new_event(event)
         self.notifier.on_new_room_event(event, store_id)
-
-        if broadcast_msg:
-            yield self._inject_membership_msg(
-                source=event.user_id,
-                target=event.target_user_id,
-                room_id=event.room_id,
-                membership=event.content["membership"]
-            )
-
-    @defer.inlineCallbacks
-    def _inject_membership_msg(self, room_id=None, source=None, target=None,
-                               membership=None):
-        # TODO this should be a different type of message, not m.text
-        if membership == Membership.INVITE:
-            body = "%s invited %s to the room." % (source, target)
-        elif membership == Membership.JOIN:
-            body = "%s joined the room." % (target)
-        elif membership == Membership.LEAVE:
-            body = "%s left the room." % (target)
-        else:
-            raise RoomError(500, "Unknown membership value %s" % membership)
-
-        membership_json = {
-            "msgtype": u"m.text",
-            "body": body,
-            "membership_source": source,
-            "membership_target": target,
-            "membership": membership,
-        }
-
-        msg_id = "m%s" % int(self.clock.time_msec())
-
-        event = self.event_factory.create_event(
-            etype=MessageEvent.TYPE,
-            room_id=room_id,
-            user_id="_homeserver_",
-            msg_id=msg_id,
-            content=membership_json
-        )
-
-        handler = self.hs.get_handlers().message_handler
-        yield handler.send_message(event, suppress_auth=True)
 
 
 class RoomListHandler(BaseHandler):
