@@ -151,10 +151,12 @@ class StreamStore(SQLBaseStore):
             "WHERE m.user_id = ?"
         )
 
-        invites_sql = (
+        # We also want to get any membership events about that user, e.g.
+        # invites or leave notifications.
+        membership_sql = (
             "SELECT m.event_id FROM room_memberships as m "
             "INNER JOIN current_state_events as c ON m.event_id = c.event_id "
-            "WHERE m.user_id = ? AND m.membership = ?"
+            "WHERE m.user_id = ? "
         )
 
         if limit:
@@ -178,13 +180,13 @@ class StreamStore(SQLBaseStore):
             "ORDER BY stream_ordering ASC LIMIT %(limit)d "
         ) % {
             "current": current_room_membership_sql,
-            "invites": invites_sql,
+            "invites": membership_sql,
             "limit": limit
         }
 
         rows = yield self._execute_and_decode(
             sql,
-            user_id, user_id, Membership.INVITE, from_id, to_id
+            user_id, user_id, from_id, to_id
         )
 
         ret = [self._parse_event_from_row(r) for r in rows]
