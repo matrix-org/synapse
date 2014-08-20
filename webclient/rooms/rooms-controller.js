@@ -71,9 +71,10 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
                 // use the existing alias from storage
                 data[i].room_alias = alias;
             }
-            else if (data[i].room_alias) {
+            else if (data[i].aliases && data[i].aliases[0]) {
                 // save the mapping
-                matrixService.createRoomIdToAliasMapping(data[i].room_id, data[i].room_alias);
+                // TODO: select the smarter alias from the array
+                matrixService.createRoomIdToAliasMapping(data[i].room_id, data[i].aliases[0]);
             }
             else {
                 // last resort use the room id
