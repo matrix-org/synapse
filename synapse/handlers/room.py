@@ -506,18 +506,21 @@ class RoomMemberHandler(BaseHandler):
             SynapseError if there was a problem changing the membership.
         """
 
-        # broadcast_msg = False
+        broadcast_msg = False
 
         prev_state = yield self.store.get_room_member(
             event.target_user_id, event.room_id
         )
 
-        if prev_state and prev_state.membership == event.membership:
-            # treat this event as a NOOP.
-            if do_auth:  # This is mainly to fix a unit test.
-                yield self.auth.check(event, raises=True)
-            defer.returnValue({})
-            return
+        if prev_state:
+            event.content["prev"] = prev_state.membership
+
+#        if prev_state and prev_state.membership == event.membership:
+#            # treat this event as a NOOP.
+#            if do_auth:  # This is mainly to fix a unit test.
+#                yield self.auth.check(event, raises=True)
+#            defer.returnValue({})
+#            return
 
         room_id = event.room_id
 

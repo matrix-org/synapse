@@ -794,7 +794,12 @@ class RoomMemberStateTestCase(RestTestCase):
 
         (code, response) = yield self.mock_resource.trigger("GET", path, None)
         self.assertEquals(200, code, msg=str(response))
-        self.assertEquals(json.loads(content), response)
+
+        expected_response = {
+            "membership": Membership.JOIN,
+            "prev": Membership.JOIN,
+        }
+        self.assertEquals(expected_response, response)
 
     @defer.inlineCallbacks
     def test_rooms_members_other(self):
