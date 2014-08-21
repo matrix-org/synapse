@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from synapse.api.errors import SynapseError
+from synapse.types import StreamToken
 
 
 class PaginationConfig(object):
@@ -21,10 +22,10 @@ class PaginationConfig(object):
     """A configuration object which stores pagination parameters."""
 
     def __init__(self, from_tok=None, to_tok=None, direction='f', limit=0):
-        self.from_tok = from_tok
-        self.to_tok = to_tok
-        self.direction = direction
-        self.limit = limit
+        self.from_tok = StreamToken(from_tok) if from_tok else None
+        self.to_tok = StreamToken(to_tok) if to_tok else None
+        self.direction = 'f' if direction == 'f' else 'b'
+        self.limit = int(limit)
 
     @classmethod
     def from_request(cls, request, raise_invalid_params=True):
@@ -47,7 +48,10 @@ class PaginationConfig(object):
                 elif raise_invalid_params:
                     raise SynapseError(400, "%s parameter is invalid." % qp)
 
-        return PaginationConfig(**params)
+        try:
+            return PaginationConfig(**params)
+        except:
+            raise SynapseError(400, "Invalid request.")
 
     def __str__(self):
         return (
