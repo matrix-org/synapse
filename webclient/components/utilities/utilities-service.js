@@ -23,7 +23,7 @@ angular.module('mUtilities', [])
 .service('mUtilities', ['$q', function ($q) {
     /*
      * Get the size of an image
-     * @param {File} imageFile the file containing the image
+     * @param {File|Blob} imageFile the file containing the image
      * @returns {promise} A promise that will be resolved by an object with 2 members:
      *   width & height
      */
