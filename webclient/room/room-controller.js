@@ -160,8 +160,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
             if ("mtime_age" in chunk.content) {
                 chunk.mtime_age = chunk.content.mtime_age;
             }
-/*            
-            // FIXME: once the HS reliably returns the displaynames & avatar_urls for both
+            // Once the HS reliably returns the displaynames & avatar_urls for both
             // local and remote users, we should use this rather than the evalAsync block
             // below
             if ("displayname" in chunk.content) {
@@ -170,9 +169,11 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
             if ("avatar_url" in chunk.content) {
                 chunk.avatar_url = chunk.content.avatar_url;
             }
- */      
             $scope.members[chunk.target_user_id] = chunk;
 
+/*
+            // Stale code for explicitly hammering the homeserver for every displayname & avatar_url
+            
             // get their display name and profile picture and set it to their
             // member entry in $scope.members. We HAVE to use $timeout with 0 delay 
             // to make this function run AFTER the current digest cycle, else the 
@@ -196,6 +197,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
                     }
                 );
             });
+*/            
         }
         else {
             // selectively update membership else it will nuke the picture and displayname too :/
