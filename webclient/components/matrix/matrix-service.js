@@ -61,14 +61,22 @@ angular.module('matrixService', [])
         return doBaseRequest(config.homeserver, method, path, params, data, undefined);
     };
 
-    var doBaseRequest = function(baseUrl, method, path, params, data, headers) {
-        return $http({
+    var doBaseRequest = function(baseUrl, method, path, params, data, headers, $httpParams) {
+
+        var request = {
             method: method,
             url: baseUrl + path,
             params: params,
             data: data,
             headers: headers
-        });
+        };
+
+        // Add additional $http parameters
+        if ($httpParams) {
+            angular.extend(request, $httpParams);
+        }
+
+        return $http(request);
     };
 
 
@@ -326,7 +334,17 @@ angular.module('matrixService', [])
             var params = {
                 access_token: config.access_token
             };
-            return doBaseRequest(config.homeserver, "POST", path, params, file, headers);
+
+            // If the file is actually a Blob object, prevent $http from JSON-stringified it before sending
+            // (Equivalent to jQuery ajax processData = false)
+            var $httpParams;
+            if (file instanceof Blob) {
+                $httpParams = {
+                    transformRequest: angular.identity
+                };
+            }
+
+            return doBaseRequest(config.homeserver, "POST", path, params, file, headers, $httpParams);
         },
         
         // start listening on /events
