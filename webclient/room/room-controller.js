@@ -28,6 +28,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
         user_id: matrixService.config().user_id,
         events_from: "END", // when to start the event stream from.
         earliest_token: "END", // stores how far back we've paginated.
+        first_pagination: true, // this is toggled off when the first pagination is done
         can_paginate: true, // this is toggled off when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
         stream_failure: undefined, // the response when the stream fails
@@ -99,7 +100,6 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
         var originalTopRow = $("#messageTable>tbody>tr:first")[0];
         matrixService.paginateBackMessages($scope.room_id, $scope.state.earliest_token, numItems).then(
             function(response) {
-                var firstPagination = !$scope.events.rooms[$scope.room_id];
                 eventHandlerService.handleEvents(response.data.chunk, false);
                 $scope.state.earliest_token = response.data.end;
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
@@ -125,8 +125,9 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
                     }, 0);
                 }
                 
-                if (firstPagination) {
+                if ($scope.state.first_pagination) {
                     scrollToBottom();
+                    $scope.state.first_pagination = false;
                 }
                 else {
                     // lock the scroll position
