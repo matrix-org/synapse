@@ -328,6 +328,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
                             var chunk = response.data.chunk[i];
                             updateMemberList(chunk);
                         }
+                        eventStreamService.resume();
                     },
                     function(error) {
                         $scope.feedback = "Failed get member list: " + error.data.error;

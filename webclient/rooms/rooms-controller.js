@@ -17,8 +17,8 @@ limitations under the License.
 'use strict';
 
 angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload', 'eventHandlerService'])
-.controller('RoomsController', ['$scope', '$location', 'matrixService', 'mFileUpload', 'eventHandlerService',
-                               function($scope, $location, matrixService, mFileUpload, eventHandlerService) {
+.controller('RoomsController', ['$scope', '$location', 'matrixService', 'mFileUpload', 'eventHandlerService', 'eventStreamService', 
+                               function($scope, $location, matrixService, mFileUpload, eventHandlerService, eventStreamService) {
                                    
     $scope.rooms = {};
     $scope.public_rooms = [];
@@ -113,6 +113,8 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
                 $scope.public_rooms = assignRoomAliases(response.data.chunk);
             }
         );
+
+        eventStreamService.resume();
     };
     
     $scope.createNewRoom = function(room_id, isPrivate) {

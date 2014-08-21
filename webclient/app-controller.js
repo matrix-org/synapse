@@ -53,7 +53,7 @@ angular.module('MatrixWebClientController', ['matrixService'])
     };
 
     if (matrixService.isUserLoggedIn()) {
-        eventStreamService.resume();
+        // eventStreamService.resume();
     }
     
     // Logs the user out 
