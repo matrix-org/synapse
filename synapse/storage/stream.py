@@ -249,10 +249,9 @@ class StreamStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_recent_events_for_room(self, room_id, limit, with_feedback=False):
+    def get_recent_events_for_room(self, room_id, limit, end_token,
+                                   with_feedback=False):
         # TODO (erikj): Handle compressed feedback
-
-        end_token = yield self.get_room_events_max_id()
 
         sql = (
             "SELECT * FROM events "
