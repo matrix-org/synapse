@@ -66,6 +66,10 @@ h1 {
     background-color: #faa;
 }
 
+.mouse-pointer {
+    cursor: pointer;
+}
+
 /*** Participant list ***/
 
 #usersTableWrapper {
@@ -89,7 +93,6 @@ h1 {
     height: 100px;
     position: relative;
     background-color: #000;
-    cursor: pointer;
 }
 
 .userAvatar .userAvatarImage {
@@ -244,6 +247,26 @@ h1 {
 
 .mine .text .bubble {
     text-align: left ! important;
+}
+
+#room-fullscreen-image {
+    position: absolute;
+    top: 0px;
+    height: 0px;
+    width: 100%;
+    height: 100%;
+}
+
+#room-fullscreen-image img {
+    max-width: 100%;
+    max-height: 100%;
+    bottom: 0;
+    left: 0;
+    margin: auto;
+    overflow: auto;
+    position: fixed;
+    right: 0;
+    top: 0;
 }
 
 /*** Profile ***/

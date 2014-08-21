@@ -19,6 +19,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
                                function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService, mFileUpload, mUtilities) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
+    var THUMBNAIL_SIZE = 320;
 
     // Room ids. Computed and resolved in onInit
     $scope.room_id = undefined;
@@ -387,33 +388,22 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
 
             $scope.state.sending = true;
 
-            // First, get the image sise
-            mUtilities.getImageSize($scope.imageFileToSend).then(
-                function(size) {
-
-                    // Upload the image to the Internet
-                    console.log("Uploading image...");
-                    mFileUpload.uploadFile($scope.imageFileToSend).then(
-                        function(url) {
-                            // Build the image info data
-                            var imageInfo = {
-                                size: $scope.imageFileToSend.size,
-                                mimetype: $scope.imageFileToSend.type,
-                                w: size.width,
-                                h: size.height
-                            };
-
-                            // Then share the URL and the metadata
-                            $scope.sendImage(url, imageInfo);
+            // Upload this image with its thumbnail to Internet
+            mFileUpload.uploadImageAndThumbnail($scope.imageFileToSend, THUMBNAIL_SIZE).then(
+                function(imageMessage) {
+                    // imageMessage is complete message structure, send it as is
+                    matrixService.sendMessage($scope.room_id, undefined, imageMessage).then(
+                        function() {
+                            console.log("Image message sent");
+                            $scope.state.sending = false;
                         },
                         function(error) {
-                            $scope.feedback = "Can't upload image";
+                            $scope.feedback = "Failed to send image message: " + error.data.error;
                             $scope.state.sending = false;
-                        }
-                    );
+                        });
                 },
                 function(error) {
-                    $scope.feedback = "Can't get selected image size";
+                    $scope.feedback = "Can't upload image";
                     $scope.state.sending = false;
                 }
             );

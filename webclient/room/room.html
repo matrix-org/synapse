@@ -10,7 +10,7 @@
     <div id="usersTableWrapper">
         <table id="usersTable">
             <tr ng-repeat="member in members | orderMembersList">
-                <td class="userAvatar" ng-click="goToUserPage(member.id)">
+                <td class="userAvatar mouse-pointer" ng-click="goToUserPage(member.id)">
                     <img class="userAvatarImage" 
                          ng-src="{{member.avatar_url || 'img/default-profile.jpg'}}" 
                          alt="{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
@@ -41,9 +41,14 @@
                     <div class="bubble">
                         <span ng-hide='msg.content.msgtype !== "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
                         <span ng-hide='msg.content.msgtype !== "m.text"' ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
-                        <div ng-hide='msg.content.msgtype !== "m.image"'
-                             ng-style="msg.content.body.h && { 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
-                            <img class="image" ng-src="{{ msg.content.url }}"/>
+                        <div ng-show='msg.content.msgtype === "m.image"'>
+                            <div ng-hide='msg.content.thumbnail_url' ng-style="msg.content.body.h && { 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
+                                <img class="image" ng-src="{{ msg.content.url }}"/>
+                            </div>
+                            <div ng-show='msg.content.thumbnail_url' ng-style="{ 'height' : msg.content.thumbnail_info.h }">
+                                <img class="image mouse-pointer" ng-src="{{ msg.content.thumbnail_url }}"
+                                     ng-click="$parent.fullScreenImageURL = msg.content.url"/>
+                            </div>
                         </div>
                     </div>
                 </td>
@@ -90,6 +95,10 @@
                 {{ state.stream_failure.data.error || "Connection failure" }}
             </div>
         </div>
+    </div>
+
+    <div id="room-fullscreen-image" ng-show="fullScreenImageURL" ng-click="fullScreenImageURL = undefined;">
+        <img ng-src="{{ fullScreenImageURL }}"/>
     </div>
 
  </div>
