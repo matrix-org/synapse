@@ -93,10 +93,15 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
         // List all rooms joined or been invited to
         matrixService.rooms().then(
             function(response) {
-                var data = assignRoomAliases(response.data);
+                var data = assignRoomAliases(response.data.rooms);
                 $scope.feedback = "Success";
                 for (var i=0; i<data.length; i++) {
                     $scope.rooms[data[i].room_id] = data[i];
+                }
+
+                var presence = response.data.presence;
+                for (var i = 0; i < presence.length; ++i) {
+                    eventHandlerService.handleEvent(presence[i], false);
                 }
             },
             function(error) {
