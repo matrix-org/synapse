@@ -59,7 +59,7 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
             // FIXME push membership to top level key to match /im/sync
             event.membership = event.content.membership;
             // FIXME bodge a nicer name than the room ID for this invite.
-            event.room_alias = event.user_id + "'s room";
+            event.room_display_name = event.user_id + "'s room";
             $scope.rooms[event.room_id] = event;
         }
     });
@@ -70,15 +70,20 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
             if (alias) {
                 // use the existing alias from storage
                 data[i].room_alias = alias;
+                data[i].room_display_name = alias;
             }
             else if (data[i].aliases && data[i].aliases[0]) {
                 // save the mapping
                 // TODO: select the smarter alias from the array
                 matrixService.createRoomIdToAliasMapping(data[i].room_id, data[i].aliases[0]);
+                data[i].room_display_name = data[i].aliases[0];
+            }
+            else if (data[i].membership == "invite" && "inviter" in data[i]) {
+                data[i].room_display_name = data[i].inviter + "'s room"
             }
             else {
                 // last resort use the room id
-                data[i].room_alias = data[i].room_id;
+                data[i].room_display_name = data[i].room_id;
             }
         }
         return data;
