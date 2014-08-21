@@ -192,6 +192,7 @@ h1 {
     border: 1px solid #d8d8d8;
     height: 31px;
     display: inline-table;
+    margin-top: -1px;
     max-width: 90%;
     font-size: 16px;
     /* word-wrap: break-word; */
