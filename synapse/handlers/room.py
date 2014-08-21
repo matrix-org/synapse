@@ -279,6 +279,9 @@ class MessageHandler(BaseHandler):
                     "start": token[0],
                     "end": token[1],
                 }
+
+                current_state = yield self.store.get_current_state(event.room_id)
+                d["state"] = [c.get_dict() for c in current_state]
             except:
                 logger.exception("Failed to get snapshot")
 
