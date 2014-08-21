@@ -159,7 +159,7 @@ class HomeServer(BaseHomeServer):
         return DataStore(self)
 
     def build_event_factory(self):
-        return EventFactory()
+        return EventFactory(self)
 
     def build_handlers(self):
         return Handlers(self)
