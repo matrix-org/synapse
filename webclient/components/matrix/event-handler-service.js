@@ -69,6 +69,17 @@ angular.module('eventHandlerService', [])
     
     var handleRoomMember = function(event, isLiveEvent) {
         initRoom(event.room_id);
+        
+        // add membership changes as if they were a room message if something interesting changed
+        if (event.content.prev !== event.content.membership) {
+            if (isLiveEvent) {
+                $rootScope.events.rooms[event.room_id].messages.push(event);
+            }
+            else {
+                $rootScope.events.rooms[event.room_id].messages.unshift(event);
+            }
+        }
+        
         $rootScope.events.rooms[event.room_id].members[event.user_id] = event;
         $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent);
     };
