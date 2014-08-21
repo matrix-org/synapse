@@ -10,7 +10,7 @@
     <div id="usersTableWrapper">
         <table id="usersTable">
             <tr ng-repeat="member in members | orderMembersList">
-                <td class="userAvatar" ng-click="goToUserPage(member.id)">
+                <td class="userAvatar mouse-pointer" ng-click="goToUserPage(member.id)">
                     <img class="userAvatarImage" 
                          ng-src="{{member.avatar_url || 'img/default-profile.jpg'}}" 
                          alt="{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
@@ -46,7 +46,8 @@
                                 <img class="image" ng-src="{{ msg.content.url }}"/>
                             </div>
                             <div ng-show='msg.content.thumbnail_url' ng-style="{ 'height' : msg.content.thumbnail_info.h }">
-                                <img class="image" ng-src="{{ msg.content.thumbnail_url }}"/>
+                                <img class="image mouse-pointer" ng-src="{{ msg.content.thumbnail_url }}"
+                                     ng-click="$parent.fullScreenImageURL = msg.content.url"/>
                             </div>
                         </div>
                     </div>
@@ -94,6 +95,10 @@
                 {{ state.stream_failure.data.error || "Connection failure" }}
             </div>
         </div>
+    </div>
+
+    <div id="room-fullscreen-image" ng-show="fullScreenImageURL" ng-click="fullScreenImageURL = undefined;">
+        <img ng-src="{{ fullScreenImageURL }}"/>
     </div>
 
  </div>
