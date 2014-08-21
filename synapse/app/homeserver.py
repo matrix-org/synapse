@@ -235,8 +235,8 @@ def setup():
     parser.add_argument('--pid-file', dest="pid", help="When running as a "
                         "daemon, the file to store the pid in",
                         default="hs.pid")
-    parser.add_argument("-w", "--webclient", dest="webclient",
-                        action="store_true", help="Host the web client.")
+    parser.add_argument("-W", "--webclient", dest="webclient", default=True,
+                        action="store_false", help="Don't host a web client.")
     args = parser.parse_args()
 
     verbosity = int(args.verbose) if args.verbose else None
