@@ -58,7 +58,7 @@ angular.module('matrixWebClient')
         angular.forEach(displayNames, function(value, key) {
             if (value.length > 1) {
                 // console.log(key + ": " + value);
-                for (i=0; i < value.length; i++) {
+                for (var i=0; i < value.length; i++) {
                     var v = value[i];
                     members[v].displayname += " (" + v + ")";
                     // console.log(v + " " + members[v]);
