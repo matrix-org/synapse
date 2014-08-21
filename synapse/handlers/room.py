@@ -264,6 +264,10 @@ class MessageHandler(BaseHandler):
                 "room_id": event.room_id,
                 "membership": event.membership,
             }
+
+            if event.membership == Membership.INVITE:
+                d["inviter"] = event.user_id
+
             ret.append(d)
 
             if event.membership != Membership.JOIN:
