@@ -33,7 +33,7 @@ angular.module('mFileUpload', ['matrixService', 'mUtilities'])
         console.log("Uploading " + file.name + "... to /matrix/content");
         matrixService.uploadContent(file).then(
             function(response) {
-                var content_url = location.origin + "/matrix/content/" + response.data.content_token;
+                var content_url = response.data.content_token;
                 console.log("   -> Successfully uploaded! Available at " + content_url);
                 deferred.resolve(content_url);
             },

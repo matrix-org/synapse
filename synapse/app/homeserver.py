@@ -56,7 +56,7 @@ class SynapseHomeServer(HomeServer):
         return File("webclient")  # TODO configurable?
 
     def build_resource_for_content_repo(self):
-        return ContentRepoResource("uploads", self.auth)
+        return ContentRepoResource(self, self.upload_dir, self.auth)
 
     def build_db_pool(self):
         """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
@@ -257,7 +257,8 @@ def setup():
 
     hs = SynapseHomeServer(
         args.host,
-        db_name=db_name
+        upload_dir=os.path.abspath("uploads"),
+        db_name=db_name,
     )
 
     # This object doesn't need to be saved because it's set as the handler for
