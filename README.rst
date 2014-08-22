@@ -34,12 +34,7 @@ To get up and running:
       machine.my.domain.name``.  Then come join ``#matrix:matrix.org`` and
       say hi! :)
 
-Upgrading an existing homeserver
-================================
-
-Before upgrading an existing homeserver to a new version, please refer to
-UPGRADE.rst for any additional instructions.
-    
+   
 About Matrix
 ============
 
@@ -148,6 +143,13 @@ This should end with a 'PASSED' result::
 
     PASSED (successes=143)
 
+
+Upgrading an existing homeserver
+================================
+
+Before upgrading an existing homeserver to a new version, please refer to
+UPGRADE.rst for any additional instructions.
+ 
 
 Setting up Federation
 =====================
