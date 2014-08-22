@@ -222,6 +222,7 @@ h1 {
     padding-left: 1em;
     padding-right: 1em;
     vertical-align: middle;
+    -webkit-text-size-adjust:100%
 }
 
 .differentUser td {
