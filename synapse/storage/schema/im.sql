@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS events(
     content TEXT NOT NULL,
     unrecognized_keys TEXT,
     processed BOOL NOT NULL,
+    outlier BOOL NOT NULL,
     CONSTRAINT ev_uniq UNIQUE (event_id)
 );
 

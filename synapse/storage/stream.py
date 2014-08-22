@@ -177,6 +177,7 @@ class StreamStore(SQLBaseStore):
             "((room_id IN (%(current)s)) OR "
             "(event_id IN (%(invites)s))) "
             "AND e.stream_ordering > ? AND e.stream_ordering < ? "
+            "AND e.outlier = 0 "
             "ORDER BY stream_ordering ASC LIMIT %(limit)d "
         ) % {
             "current": current_room_membership_sql,
@@ -224,7 +225,7 @@ class StreamStore(SQLBaseStore):
 
         sql = (
             "SELECT * FROM events "
-            "WHERE room_id = ? AND %(bounds)s "
+            "WHERE outlier = 0 AND room_id = ? AND %(bounds)s "
             "ORDER BY topological_ordering %(order)s, stream_ordering %(order)s %(limit)s "
         ) % {"bounds": bounds, "order": order, "limit": limit_str}
 
