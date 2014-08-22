@@ -103,7 +103,9 @@ angular.module('mUtilities', [])
                 var ctx = canvas.getContext("2d");
                 ctx.drawImage(img, 0, 0, width, height);
 
-                var dataUrl = canvas.toDataURL("image/jpeg", 0.7); 
+                // Extract image data in the same format as the original one.
+                // The 0.7 compression value will work with formats that supports it like JPEG.
+                var dataUrl = canvas.toDataURL(imageFile.type, 0.7); 
                 deferred.resolve(self.dataURItoBlob(dataUrl));
             };
             img.onerror = function(e) {
