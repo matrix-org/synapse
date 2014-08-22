@@ -127,6 +127,13 @@ class MemoryDataStore(object):
         self.current_state = {}
         self.events = []
 
+    Snapshot = namedtuple("Snapshot", "room_id user_id membership_state")
+
+    def snapshot_room(self, room_id, user_id, state_type=None, state_key=None):
+        return self.Snapshot(
+            room_id, user_id, self.get_room_member(user_id, room_id)
+        )
+
     def register(self, user_id, token, password_hash):
         if user_id in self.tokens_to_users.values():
             raise StoreError(400, "User in use.")

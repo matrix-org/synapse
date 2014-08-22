@@ -187,6 +187,70 @@ class DataStore(RoomMemberStore, RoomStore,
         defer.returnValue(self.min_token)
 
 
+    def snapshot_room(self, room_id, user_id, state_type=None, state_key=None):
+        """Snapshot the room for an update by a user
+        Args:
+            room_id (synapse.types.RoomId): The room to snapshot.
+            user_id (synapse.types.UserId): The user to snapshot the room for.
+            state_type (str): Optional state type to snapshot.
+            state_key (str): Optional state key to snapshot.
+        Returns:
+            synapse.storage.Snapshot: A snapshot of the state of the room.
+        """
+        def _snapshot(txn):
+            membership_state = self._get_room_member(txn, user_id)
+            prev_pdus = self._get_latest_pdus_in_context(
+                txn, room_id
+            )
+            if state_type is not None and state_key is not None:
+                prev_state_pdu = self._get_current_state_pdu(
+                    txn, room_id, state_type, state_key
+                )
+            else:
+                prev_state_pdu = None
+
+            return Snapshot(
+                store=self,
+                room_id=room_id,
+                user_id=user_id,
+                prev_pdus=prev_pdus,
+                membership_state=membership_state,
+                state_type=state_type,
+                state_key=state_key,
+                prev_state_pdu=prev_state_pdu,
+            )
+
+        return self._db_pool.runInteraction(_snapshot)
+
+
+class Snapshot(object):
+    """Snapshot of the state of a room
+    Args:
+        store (DataStore): The datastore.
+        room_id (RoomId): The room of the snapshot.
+        user_id (UserId): The user this snapshot is for.
+        prev_pdus (list): The list of PDU ids this snapshot is after.
+        membership_state (RoomMemberEvent): The current state of the user in
+            the room.
+        state_type (str, optional): State type captured by the snapshot
+        state_key (str, optional): State key captured by the snapshot
+        prev_state_pdu (PduEntry, optional): pdu id of
+            the previous value of the state type and key in the room.
+    """
+
+    def __init__(self, store, room_id, user_id, prev_pdus,
+                 membership_state, state_type=None, state_key=None,
+                 prev_state_pdu=None):
+        self.store = store
+        self.room_id = room_id
+        self.user_id = user_id
+        self.prev_pdus = prev_pdus
+        self.membership_state
+        self.state_type = state_type
+        self.state_key = state_key
+        self.prev_state_pdu = prev_state_pdu
+
+
 def schema_path(schema):
     """ Get a filesystem path for the named database schema
 

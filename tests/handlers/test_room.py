@@ -45,6 +45,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "get_room_member",
                 "get_room",
                 "store_room",
+                "snapshot_room",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
@@ -75,6 +76,10 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.handlers.profile_handler = ProfileHandler(self.hs)
         self.room_member_handler = self.handlers.room_member_handler
 
+        self.snapshot = Mock()
+        self.datastore.snapshot_room.return_value = self.snapshot
+
+
     @defer.inlineCallbacks
     def test_invite(self):
         room_id = "!foo:red"
@@ -104,8 +109,12 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         # Actual invocation
         yield self.room_member_handler.change_membership(event)
 
-        self.state_handler.handle_new_event.assert_called_once_with(event)
-        self.federation.handle_new_event.assert_called_once_with(event)
+        self.state_handler.handle_new_event.assert_called_once_with(
+            event, self.snapshot,
+        )
+        self.federation.handle_new_event.assert_called_once_with(
+            event, self.snapshot,
+        )
 
         self.assertEquals(
             set(["blue", "red", "green"]),
@@ -116,7 +125,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             event
         )
         self.notifier.on_new_room_event.assert_called_once_with(
-                event, store_id)
+            event, store_id
+        )
 
         self.assertFalse(self.datastore.get_room.called)
         self.assertFalse(self.datastore.store_room.called)
@@ -148,6 +158,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         self.datastore.get_joined_hosts_for_room.side_effect = get_joined
 
+
         store_id = "store_id_fooo"
         self.datastore.persist_event.return_value = defer.succeed(store_id)
         self.datastore.get_room.return_value = defer.succeed(1)  # Not None.
@@ -163,8 +174,12 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         # Actual invocation
         yield self.room_member_handler.change_membership(event)
 
-        self.state_handler.handle_new_event.assert_called_once_with(event)
-        self.federation.handle_new_event.assert_called_once_with(event)
+        self.state_handler.handle_new_event.assert_called_once_with(
+            event, self.snapshot
+        )
+        self.federation.handle_new_event.assert_called_once_with(
+            event, self.snapshot
+        )
 
         self.assertEquals(
             set(["red", "green"]),

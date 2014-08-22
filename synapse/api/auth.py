@@ -34,7 +34,7 @@ class Auth(object):
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def check(self, event, raises=False):
+    def check(self, event, snapshot, raises=False):
         """ Checks if this event is correctly authed.
 
         Returns:
@@ -46,7 +46,11 @@ class Auth(object):
         try:
             if event.type in [RoomTopicEvent.TYPE, MessageEvent.TYPE,
                               FeedbackEvent.TYPE]:
-                yield self.check_joined_room(event.room_id, event.user_id)
+                self._check_joined_room(
+                    member=snapshot.membership_state,
+                    user_id=snapshot.user_id,
+                    room_id=snapshot.room_id,
+                )
                 defer.returnValue(True)
             elif event.type == RoomMemberEvent.TYPE:
                 allowed = yield self.is_membership_change_allowed(event)
@@ -67,13 +71,15 @@ class Auth(object):
                 room_id=room_id,
                 user_id=user_id
             )
-            if not member or member.membership != Membership.JOIN:
-                raise AuthError(403, "User %s not in room %s" %
-                                (user_id, room_id))
+            self._check_joined_room(member, user_id, room_id)
             defer.returnValue(member)
         except AttributeError:
             pass
         defer.returnValue(None)
+
+    def _check_joined_room(self, member, user_id, room_id):
+        if not member or member.membership != Membership.JOIN:
+            raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
 
     @defer.inlineCallbacks
     def is_membership_change_allowed(self, event):

@@ -85,20 +85,21 @@ class MessageHandler(BaseHandler):
         if stamp_event:
             event.content["hsob_ts"] = int(self.clock.time_msec())
 
-        with (yield self.room_lock.lock(event.room_id)):
-            if not suppress_auth:
-                yield self.auth.check(event, raises=True)
+        snapshot = yield self.store.snapshot_room(event.room_id, event.user_id)
 
-            # store message in db
-            store_id = yield self.store.persist_event(event)
+        if not suppress_auth:
+            yield self.auth.check(event, snapshot, raises=True)
 
-            event.destinations = yield self.store.get_joined_hosts_for_room(
-                event.room_id
-            )
+        # store message in db
+        store_id = yield self.store.persist_event(event)
 
-            self.notifier.on_new_room_event(event, store_id)
+        event.destinations = yield self.store.get_joined_hosts_for_room(
+            event.room_id
+        )
 
-        yield self.hs.get_federation().handle_new_event(event)
+        self.notifier.on_new_room_event(event, store_id)
+
+        yield self.hs.get_federation().handle_new_event(event, snapshot)
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
@@ -135,23 +136,24 @@ class MessageHandler(BaseHandler):
             SynapseError if something went wrong.
         """
 
-        with (yield self.room_lock.lock(event.room_id)):
-            yield self.auth.check(event, raises=True)
+        snapshot = yield self.store.snapshot_room(event.room_id, event.user_id)
 
-            if stamp_event:
-                event.content["hsob_ts"] = int(self.clock.time_msec())
+        yield self.auth.check(event, snapshot, raises=True)
 
-            yield self.state_handler.handle_new_event(event)
+        if stamp_event:
+            event.content["hsob_ts"] = int(self.clock.time_msec())
 
-            # store in db
-            store_id = yield self.store.persist_event(event)
+        yield self.state_handler.handle_new_event(event)
 
-            event.destinations = yield self.store.get_joined_hosts_for_room(
-                event.room_id
-            )
-            self.notifier.on_new_room_event(event, store_id)
+        # store in db
+        store_id = yield self.store.persist_event(event)
 
-        yield self.hs.get_federation().handle_new_event(event)
+        event.destinations = yield self.store.get_joined_hosts_for_room(
+            event.room_id
+        )
+        self.notifier.on_new_room_event(event, store_id)
+
+        yield self.hs.get_federation().handle_new_event(event, snapshot)
 
     @defer.inlineCallbacks
     def get_room_data(self, user_id=None, room_id=None,
@@ -220,16 +222,18 @@ class MessageHandler(BaseHandler):
         if stamp_event:
             event.content["hsob_ts"] = int(self.clock.time_msec())
 
-        with (yield self.room_lock.lock(event.room_id)):
-            yield self.auth.check(event, raises=True)
+        snapshot = yield self.store.snapshot_room(event.room_id, user_id)
 
-            # store message in db
-            store_id = yield self.store.persist_event(event)
 
-            event.destinations = yield self.store.get_joined_hosts_for_room(
-                event.room_id
-            )
-        yield self.hs.get_federation().handle_new_event(event)
+        yield self.auth.check(event, snapshot, raises=True)
+
+        # store message in db
+        store_id = yield self.store.persist_event(event)
+
+        event.destinations = yield self.store.get_joined_hosts_for_room(
+            event.room_id
+        )
+        yield self.hs.get_federation().handle_new_event(event, snapshot)
 
         self.notifier.on_new_room_event(event, store_id)
 
@@ -503,6 +507,11 @@ class RoomMemberHandler(BaseHandler):
             SynapseError if there was a problem changing the membership.
         """
 
+        snapshot = yield self.store.snapshot_room(
+            event.room_id, event.user_id,
+            RoomMemberEvent.TYPE, event.target_user_id
+        )
+        ## TODO(markjh): get prev state from snapshot.
         prev_state = yield self.store.get_room_member(
             event.target_user_id, event.room_id
         )
@@ -523,24 +532,22 @@ class RoomMemberHandler(BaseHandler):
         # if this HS is not currently in the room, i.e. we have to do the
         # invite/join dance.
         if event.membership == Membership.JOIN:
-            yield self._do_join(event, do_auth=do_auth)
+            yield self._do_join(event, snapshot, do_auth=do_auth)
         else:
             # This is not a JOIN, so we can handle it normally.
             if do_auth:
-                yield self.auth.check(event, raises=True)
+                yield self.auth.check(event, snapshot, raises=True)
 
-            prev_state = yield self.store.get_room_member(
-                event.target_user_id, event.room_id
-            )
             if prev_state and prev_state.membership == event.membership:
                 # double same action, treat this event as a NOOP.
                 defer.returnValue({})
                 return
 
-            yield self.state_handler.handle_new_event(event)
+            yield self.state_handler.handle_new_event(event, snapshot)
             yield self._do_local_membership_update(
                 event,
                 membership=event.content["membership"],
+                snapshot=snapshot,
             )
 
         defer.returnValue({"room_id": room_id})
@@ -570,12 +577,16 @@ class RoomMemberHandler(BaseHandler):
             content=content,
         )
 
-        yield self._do_join(new_event, room_host=host, do_auth=True)
+        snapshot = yield store.snapshot_room(
+            room_id, joinee, RoomMemberEvent.TYPE, event.target_user_id
+        )
+
+        yield self._do_join(new_event, snapshot, room_host=host, do_auth=True)
 
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def _do_join(self, event, room_host=None, do_auth=True):
+    def _do_join(self, event, snapshot, room_host=None, do_auth=True):
         joinee = self.hs.parse_userid(event.target_user_id)
         # room_id = RoomID.from_string(event.room_id, self.hs)
         room_id = event.room_id
@@ -597,6 +608,7 @@ class RoomMemberHandler(BaseHandler):
         elif room_host:
             should_do_dance = True
         else:
+            # TODO(markjh): get prev_state from snapshot
             prev_state = yield self.store.get_room_member(
                 joinee.to_string(), room_id
             )
@@ -624,12 +636,13 @@ class RoomMemberHandler(BaseHandler):
             logger.debug("Doing normal join")
 
             if do_auth:
-                yield self.auth.check(event, raises=True)
+                yield self.auth.check(event, snapshot, raises=True)
 
-            yield self.state_handler.handle_new_event(event)
+            yield self.state_handler.handle_new_event(event, snapshot)
             yield self._do_local_membership_update(
                 event,
                 membership=event.content["membership"],
+                snapshot=snapshot,
             )
 
         user = self.hs.parse_userid(event.user_id)
@@ -674,7 +687,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue([r.room_id for r in rooms])
 
     @defer.inlineCallbacks
-    def _do_local_membership_update(self, event, membership):
+    def _do_local_membership_update(self, event, membership, snapshot):
         # store membership
         store_id = yield self.store.persist_event(event)
 
@@ -700,7 +713,7 @@ class RoomMemberHandler(BaseHandler):
 
         event.destinations = list(set(destinations))
 
-        yield self.hs.get_federation().handle_new_event(event)
+        yield self.hs.get_federation().handle_new_event(event, snapshot)
         self.notifier.on_new_room_event(event, store_id)
 
 

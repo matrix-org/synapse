@@ -51,19 +51,20 @@ class FederationEventHandler(object):
 
     @log_function
     @defer.inlineCallbacks
-    def handle_new_event(self, event):
+    def handle_new_event(self, event, snapshot):
         """ Takes in an event from the client to server side, that has already
         been authed and handled by the state module, and sends it to any
         remote home servers that may be interested.
 
         Args:
             event
+            snapshot (.storage.Snapshot): THe snapshot the event happened after
 
         Returns:
             Deferred: Resolved when it has successfully been queued for
             processing.
         """
-        yield self.fill_out_prev_events(event)
+        yield self.fill_out_prev_events(event, snapshot)
 
         pdu = self.pdu_codec.pdu_from_event(event)
 
@@ -137,13 +138,11 @@ class FederationEventHandler(object):
         yield self.event_handler.on_receive(new_state_event)
 
     @defer.inlineCallbacks
-    def fill_out_prev_events(self, event):
+    def fill_out_prev_events(self, event, snapshot):
         if hasattr(event, "prev_events"):
             return
 
-        results = yield self.store.get_latest_pdus_in_context(
-            event.room_id
-        )
+        results = snapshot.prev_pdus
 
         es = [
             "%s@%s" % (p_id, origin) for p_id, origin, _ in results
