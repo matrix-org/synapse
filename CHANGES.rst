@@ -1,5 +1,7 @@
 Changes in synapse 0.0.1 (2014-08-22)
 =====================================
+Presence has been disabled in this release due to a bug that caused the
+homeserver to spam other remote homeservers.
 
 Homeserver:
  * Completely change the database schema to support generic event types.
