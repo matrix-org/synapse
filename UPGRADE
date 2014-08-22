@@ -1,5 +1,6 @@
 Upgrading to v0.0.1
-==================
+===================
+
 This release completely changes the database schema and so requires upgrading
 it before starting the new version of the homeserver.
 
