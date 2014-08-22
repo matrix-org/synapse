@@ -33,6 +33,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
         can_paginate: true, // this is toggled off when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
         stream_failure: undefined, // the response when the stream fails
+        // FIXME: sending has been disabled, as surely messages should be sent in the background rather than locking the UI synchronously --Matthew
         sending: false // true when a message is being sent. It helps to disable the UI when a process is running
     };
     $scope.members = {};
@@ -239,7 +240,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
         }
 
         $scope.state.sending = true;
-
+        
         // Send the text message
         var promise;
         // FIXME: handle other commands too
@@ -263,7 +264,6 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
     };
 
     $scope.onInit = function() {
-        // $timeout(function() { document.getElementById('textInput').focus() }, 0);
         console.log("onInit");
         
         // Does the room ID provided in the URL?

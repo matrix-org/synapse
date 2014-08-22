@@ -77,10 +77,10 @@
                         {{ state.user_id }} 
                     </td>
                     <td width="*" style="min-width: 100px">
-                        <input id="mainInput" ng-model="textInput" ng-enter="send()" ng-disabled="state.sending" ng-focus="true" autocomplete="off" tab-complete/>
+                        <input id="mainInput" ng-model="textInput" ng-enter="send()" ng-focus="true" autocomplete="off" tab-complete/>
                     </td>
                     <td width="150px">
-                        <button ng-click="send()" ng-disabled="state.sending">Send</button>
+                        <button ng-click="send()">Send</button>
                         <button m-file-input="imageFileToSend">Send Image</button>
                     </td>
                     <td width="1">
