@@ -307,7 +307,7 @@ class MessageHandler(BaseHandler):
 
         ret = {"rooms": rooms_ret, "presence": presence[0], "end": now_token}
 
-        logger.debug("snapshot_all_rooms returning: %s", ret)
+        # logger.debug("snapshot_all_rooms returning: %s", ret)
 
         defer.returnValue(ret)
 
