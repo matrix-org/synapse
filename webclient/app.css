@@ -145,6 +145,7 @@ h1 {
     max-width: 1280px;
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
         
 #messageTable td {
@@ -190,25 +191,13 @@ h1 {
     object-fit: cover;
 }
         
-.text {
-    background-color: #eee;
-    border: 1px solid #d8d8d8;
-    height: 31px;
-    display: inline-table;
-    margin-top: -1px;
-    max-width: 90%;
-    font-size: 16px;
-    /* word-wrap: break-word; */
-    word-break: break-all;
-}
-
 .emote {
-    background-color: #fff ! important;
+    background-color: transparent ! important;
     border: 0px ! important;
 }
 
 .membership {
-    background-color: #fff ! important;
+    background-color: transparent ! important;
     border: 0px ! important;
 }
 
@@ -221,6 +210,13 @@ h1 {
 }
 
 .bubble {
+    background-color: #eee;
+    border: 1px solid #d8d8d8;
+    display: inline-block;
+    margin-bottom: -1px;
+    max-width: 90%;
+    font-size: 16px;
+    word-wrap: break-word;
     padding-top: 7px;
     padding-bottom: 5px;
     padding-left: 1em;
@@ -229,27 +225,24 @@ h1 {
 }
 
 .differentUser td {
-    padding-top: 5px ! important;
-    margin-top: 5px ! important;
+    padding-bottom: 5px ! important;
 }
 
 .mine {
     text-align: right;
 }
 
-.mine .text {
-    background-color: #f8f8ff ! important;    
-}
-
-.mine .emote {
-    background-color: #fff ! important;    
-}
-
-.mine .membership {
-    background-color: #fff ! important;
+.text.emote .bubble,
+.text.membership .bubble,
+.mine .text.emote .bubble,
+.mine .text.membership .bubble
+  {
+    background-color: transparent ! important;    
+    border: 0px ! important;
 }
 
 .mine .text .bubble {
+    background-color: #f8f8ff ! important;    
     text-align: left ! important;
 }
 

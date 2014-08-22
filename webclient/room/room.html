@@ -29,7 +29,7 @@
         <!-- FIXME: need to have better timestamp semantics than the (msg.content.hsob_ts || msg.ts) hack below -->
         <table id="messageTable" infinite-scroll="paginateMore()">
             <tr ng-repeat="msg in events.rooms[room_id].messages"
-                ng-class="(events.rooms[room_id].messages[$index - 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
+                ng-class="(events.rooms[room_id].messages[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
                 <td class="leftBlock">
                     <div class="sender" ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id">{{ members[msg.user_id].displayname || msg.user_id }}</div>
                     <div class="timestamp">{{ (msg.content.hsob_ts || msg.ts) | date:'MMM d HH:mm:ss' }}</div>
@@ -77,7 +77,7 @@
                         {{ state.user_id }} 
                     </td>
                     <td width="*" style="min-width: 100px">
-                        <input id="mainInput" ng-model="textInput" ng-enter="send()" ng-disabled="state.sending" ng-focus="true" auto-complete/>
+                        <input id="mainInput" ng-model="textInput" ng-enter="send()" ng-disabled="state.sending" ng-focus="true" autocomplete="off" tab-complete/>
                     </td>
                     <td width="150px">
                         <button ng-click="send()" ng-disabled="state.sending">Send</button>
