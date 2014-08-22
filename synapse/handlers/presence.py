@@ -142,6 +142,9 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def is_presence_visible(self, observer_user, observed_user):
+        return defer.succeed(True)
+        # FIXME (erikj): This code path absolutely kills the database.
+
         assert(observed_user.is_mine)
 
         if observer_user == observed_user:
