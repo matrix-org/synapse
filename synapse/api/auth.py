@@ -44,15 +44,15 @@ class Auth(object):
             be raised only if raises=True.
         """
         try:
-            if event.type in [RoomTopicEvent.TYPE, MessageEvent.TYPE,
-                              FeedbackEvent.TYPE]:
-                yield self.check_joined_room(event.room_id, event.user_id)
-                defer.returnValue(True)
-            elif event.type == RoomMemberEvent.TYPE:
-                allowed = yield self.is_membership_change_allowed(event)
-                defer.returnValue(allowed)
+            if hasattr(event, "room_id"):
+                if event.type == RoomMemberEvent.TYPE:
+                    allowed = yield self.is_membership_change_allowed(event)
+                    defer.returnValue(allowed)
+                else:
+                    yield self.check_joined_room(event.room_id, event.user_id)
+                    defer.returnValue(True)
             else:
-                raise AuthError(500, "Unknown event type %s" % event.type)
+                raise AuthError(500, "Unknown event: %s" % event)
         except AuthError as e:
             logger.info("Event auth check failed on event %s with msg: %s",
                         event, e.msg)

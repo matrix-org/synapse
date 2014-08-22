@@ -95,39 +95,62 @@ class RoomCreateRestServlet(RestServlet):
         return (200, {})
 
 
-class RoomTopicRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/topic$")
+class RoomStateEventRestServlet(RestServlet):
+    def register(self, http_server):
+        # /room/$roomid/state/$eventtype
+        no_state_key = "/rooms/(?P<room_id>[^/]*)/state/(?P<event_type>[^/]*)$"
 
-    def get_event_type(self):
-        return RoomTopicEvent.TYPE
+        # /room/$roomid/state/$eventtype/$statekey
+        state_key = ("/rooms/(?P<room_id>[^/]*)/state/" +
+            "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$")
+
+        http_server.register_path("GET",
+                                  client_path_pattern(state_key),
+                                  self.on_GET)
+        http_server.register_path("PUT",
+                                  client_path_pattern(state_key),
+                                  self.on_PUT)
+        http_server.register_path("GET",
+                                  client_path_pattern(no_state_key),
+                                  self.on_GET_no_state_key)
+        http_server.register_path("PUT",
+                                  client_path_pattern(no_state_key),
+                                  self.on_PUT_no_state_key)
+
+    def on_GET_no_state_key(self, request, room_id, event_type):
+        return self.on_GET(request, room_id, event_type, "")
+
+    def on_PUT_no_state_key(self, request, room_id, event_type):
+        return self.on_PUT(request, room_id, event_type, "")
 
     @defer.inlineCallbacks
-    def on_GET(self, request, room_id):
+    def on_GET(self, request, room_id, event_type, state_key):
         user = yield self.auth.get_user_by_req(request)
 
         msg_handler = self.handlers.message_handler
         data = yield msg_handler.get_room_data(
             user_id=user.to_string(),
             room_id=urllib.unquote(room_id),
-            event_type=RoomTopicEvent.TYPE,
-            state_key="",
+            event_type=event_type,
+            state_key=state_key,
         )
 
         if not data:
-            raise SynapseError(404, "Topic not found.", errcode=Codes.NOT_FOUND)
-        defer.returnValue((200, data.content))
+            raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
+        defer.returnValue((200, data[0].get_dict()["content"]))
 
     @defer.inlineCallbacks
-    def on_PUT(self, request, room_id):
+    def on_PUT(self, request, room_id, event_type, state_key):
         user = yield self.auth.get_user_by_req(request)
 
         content = _parse_json(request)
 
         event = self.event_factory.create_event(
-            etype=self.get_event_type(),
+            etype=event_type,
             content=content,
             room_id=urllib.unquote(room_id),
             user_id=user.to_string(),
+            state_key=state_key
             )
 
         msg_handler = self.handlers.message_handler
@@ -412,7 +435,7 @@ def _parse_json(request):
 
 
 def register_servlets(hs, http_server):
-    RoomTopicRestServlet(hs).register(http_server)
+    RoomStateEventRestServlet(hs).register(http_server)
     RoomMemberRestServlet(hs).register(http_server)
     MessageRestServlet(hs).register(http_server)
     FeedbackRestServlet(hs).register(http_server)
