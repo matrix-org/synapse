@@ -17,30 +17,30 @@
 'use strict';
 
 angular.module('RoomController')
-.directive('autoComplete', ['$timeout', function ($timeout) {
+.directive('tabComplete', ['$timeout', function ($timeout) {
     return function (scope, element, attrs) {
         element.bind("keydown keypress", function (event) {
             // console.log("event: " + event.which);
             if (event.which === 9) {
-                if (!scope.autoCompleting) { // cache our starting text
+                if (!scope.tabCompleting) { // cache our starting text
                     // console.log("caching " + element[0].value);
-                    scope.autoCompleteOriginal = element[0].value;
-                    scope.autoCompleting = true;
+                    scope.tabCompleteOriginal = element[0].value;
+                    scope.tabCompleting = true;
                 }
                 
                 if (event.shiftKey) {
-                    scope.autoCompleteIndex--;
-                    if (scope.autoCompleteIndex < 0) {
-                        scope.autoCompleteIndex = 0;
+                    scope.tabCompleteIndex--;
+                    if (scope.tabCompleteIndex < 0) {
+                        scope.tabCompleteIndex = 0;
                     }
                 }
                 else {
-                    scope.autoCompleteIndex++;
+                    scope.tabCompleteIndex++;
                 }
                 
                 var searchIndex = 0;
-                var targetIndex = scope.autoCompleteIndex;
-                var text = scope.autoCompleteOriginal;
+                var targetIndex = scope.tabCompleteIndex;
+                var text = scope.tabCompleteOriginal;
                 
                 // console.log("targetIndex: " + targetIndex + ", text=" + text);
                                     
@@ -90,17 +90,17 @@ angular.module('RoomController')
                              element[0].className = "";
                         }, 150);
                         element[0].value = text;
-                        scope.autoCompleteIndex = 0;
+                        scope.tabCompleteIndex = 0;
                     }
                 }
                 else {
-                    scope.autoCompleteIndex = 0;
+                    scope.tabCompleteIndex = 0;
                 }
                 event.preventDefault();
             }
-            else if (event.which !== 16 && scope.autoCompleting) {
-                scope.autoCompleting = false;
-                scope.autoCompleteIndex = 0;
+            else if (event.which !== 16 && scope.tabCompleting) {
+                scope.tabCompleting = false;
+                scope.tabCompleteIndex = 0;
             }
         });
     };
