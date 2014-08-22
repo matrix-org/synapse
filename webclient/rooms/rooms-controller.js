@@ -19,7 +19,8 @@ limitations under the License.
 angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload', 'eventHandlerService'])
 .controller('RoomsController', ['$scope', '$location', 'matrixService', 'mFileUpload', 'eventHandlerService', 'eventStreamService', 
                                function($scope, $location, matrixService, mFileUpload, eventHandlerService, eventStreamService) {
-                                   
+
+    $scope.config = matrixService.config();
     $scope.rooms = {};
     $scope.public_rooms = [];
     $scope.newRoomId = "";
@@ -36,20 +37,6 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
 
     $scope.joinAlias = {
         room_alias: "",
-    };
-
-    $scope.newProfileInfo = {
-        name: matrixService.config().displayName,
-        avatar: matrixService.config().avatarUrl,
-        avatarFile: undefined
-    };
-
-    $scope.linkedEmails = {
-        linkNewEmail: "", // the email entry box
-        emailBeingAuthed: undefined, // to populate verification text
-        authTokenId: undefined, // the token id from the IS
-        emailCode: "", // the code entry box
-        linkedEmailList: matrixService.config().emailList // linked email list
     };
     
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
@@ -167,107 +154,6 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
             },
             function(error) {
                 $scope.feedback = "Can't join room: " + error.data;
-            }
-        );
-    };
-
-    $scope.setDisplayName = function(newName) {
-        matrixService.setDisplayName(newName).then(
-            function(response) {
-                $scope.feedback = "Updated display name.";
-                var config = matrixService.config();
-                config.displayName = newName;
-                matrixService.setConfig(config);
-                matrixService.saveConfig();
-            },
-            function(error) {
-                $scope.feedback = "Can't update display name: " + error.data;
-            }
-        );
-    };
-
-
-    $scope.$watch("newProfileInfo.avatarFile", function(newValue, oldValue) {
-        if ($scope.newProfileInfo.avatarFile) {
-            console.log("Uploading new avatar file...");
-            mFileUpload.uploadFile($scope.newProfileInfo.avatarFile).then(
-                function(url) {
-                    $scope.newProfileInfo.avatar = url;
-                    $scope.setAvatar($scope.newProfileInfo.avatar);
-                },
-                function(error) {
-                    $scope.feedback = "Can't upload image";
-                } 
-            );
-        }
-    });
-
-    $scope.setAvatar = function(newUrl) {
-        console.log("Updating avatar to "+newUrl);
-        matrixService.setProfilePictureUrl(newUrl).then(
-            function(response) {
-                console.log("Updated avatar");
-                $scope.feedback = "Updated avatar.";
-                var config = matrixService.config();
-                config.avatarUrl = newUrl;
-                matrixService.setConfig(config);
-                matrixService.saveConfig();
-            },
-            function(error) {
-                $scope.feedback = "Can't update avatar: " + error.data;
-            }
-        );
-    };
-
-    $scope.linkEmail = function(email) {
-        matrixService.linkEmail(email).then(
-            function(response) {
-                if (response.data.success === true) {
-                    $scope.linkedEmails.authTokenId = response.data.tokenId;
-                    $scope.emailFeedback = "You have been sent an email.";
-                    $scope.linkedEmails.emailBeingAuthed = email;
-                }
-                else {
-                    $scope.emailFeedback = "Failed to send email.";
-                }
-            },
-            function(error) {
-                $scope.emailFeedback = "Can't send email: " + error.data;
-            }
-        );
-    };
-
-    $scope.submitEmailCode = function(code) {
-        var tokenId = $scope.linkedEmails.authTokenId;
-        if (tokenId === undefined) {
-            $scope.emailFeedback = "You have not requested a code with this email.";
-            return;
-        }
-        matrixService.authEmail(matrixService.config().user_id, tokenId, code).then(
-            function(response) {
-                if ("success" in response.data && response.data.success === false) {
-                    $scope.emailFeedback = "Failed to authenticate email.";
-                    return;
-                }
-                var config = matrixService.config();
-                var emailList = {};
-                if ("emailList" in config) {
-                    emailList = config.emailList;
-                }
-                emailList[response.address] = response;
-                // save the new email list
-                config.emailList = emailList;
-                matrixService.setConfig(config);
-                matrixService.saveConfig();
-                // invalidate the email being authed and update UI.
-                $scope.linkedEmails.emailBeingAuthed = undefined;
-                $scope.emailFeedback = "";
-                $scope.linkedEmails.linkedEmailList = emailList;
-                $scope.linkedEmails.linkNewEmail = "";
-                $scope.linkedEmails.emailCode = "";
-            },
-            function(reason) {
-                $scope.emailFeedback = "Failed to auth email: " + reason;
             }
         );
     };

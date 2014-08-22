@@ -20,6 +20,7 @@ var matrixWebClient = angular.module('matrixWebClient', [
     'LoginController',
     'RoomController',
     'RoomsController',
+    'SettingsController',
     'UserController',
     'matrixService',
     'eventStreamService',
@@ -47,6 +48,10 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
             when('/rooms', {
                 templateUrl: 'rooms/rooms.html',
                 controller: 'RoomsController'
+            }).
+            when('/settings', {
+                templateUrl: 'settings/settings.html',
+                controller: 'SettingsController'
             }).
             when('/user/:user_matrix_id', {
                 templateUrl: 'user/user.html',
