@@ -153,7 +153,8 @@ h1 {
 }
 
 .leftBlock {
-    width: 10em;
+    width: 14em;
+    word-wrap: break-word;
     vertical-align: top;
     background-color: #fff;
     color: #888;
@@ -207,6 +208,10 @@ h1 {
     max-height:320px;
     width: auto;
     height: auto;
+}
+
+.text {
+    vertical-align: top;
 }
 
 .bubble {
