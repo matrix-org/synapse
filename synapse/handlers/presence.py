@@ -187,6 +187,10 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def set_state(self, target_user, auth_user, state):
+        return
+        # TODO (erikj): Turn this back on. Why did we end up sending EDUs
+        # everywhere?
+
         if not target_user.is_mine:
             raise SynapseError(400, "User is not hosted on this Home Server")
 
