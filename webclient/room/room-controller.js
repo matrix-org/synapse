@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'mUtilities'])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService', 'mFileUpload', 'mUtilities',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService, mFileUpload, mUtilities) {
+.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService', 'mFileUpload', 'mUtilities', '$rootScope',
+                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService, mFileUpload, mUtilities, $rootScope) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -199,6 +199,10 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
                 );
             });
 */            
+
+            if (chunk.target_user_id in $rootScope.presence) {
+                updatePresence($rootScope.presence[chunk.target_user_id]);
+            }
         }
         else {
             // selectively update membership else it will nuke the picture and displayname too :/
@@ -265,7 +269,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
 
     $scope.onInit = function() {
         console.log("onInit");
-        
+
         // Does the room ID provided in the URL?
         var room_id_or_alias;
         if ($routeParams.room_id_or_alias) {

@@ -35,6 +35,8 @@ angular.module('eventHandlerService', [])
     $rootScope.events = {
         rooms: {}, // will contain roomId: { messages:[], members:{userid1: event} }
     };
+
+    $rootScope.presence = {};
     
     var initRoom = function(room_id) {
         if (!(room_id in $rootScope.events.rooms)) {
@@ -91,6 +93,7 @@ angular.module('eventHandlerService', [])
     };
     
     var handlePresence = function(event, isLiveEvent) {
+        $rootScope.presence[event.content.user_id] = event;
         $rootScope.$broadcast(PRESENCE_EVENT, event, isLiveEvent);
     };
     
