@@ -70,6 +70,7 @@ angular.module('LoginController', ['matrixService'])
     $scope.login = function() {
         matrixService.setConfig({
             homeserver: $scope.account.homeserver,
+            identityServer: $scope.account.identityServer,
             user_id: $scope.account.user_id
         });
         // try to login
@@ -79,6 +80,7 @@ angular.module('LoginController', ['matrixService'])
                     $scope.feedback = "Login successful.";
                     matrixService.setConfig({
                         homeserver: $scope.account.homeserver,
+                        identityServer: $scope.account.identityServer,
                         user_id: response.data.user_id,
                         access_token: response.data.access_token
                     });
