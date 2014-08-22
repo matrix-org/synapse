@@ -308,18 +308,6 @@ h1 {
     float: right;
 }
 
-#config {
-    position: absolute;
-    z-index: 100;
-    top: 100px;
-    left: 50%;
-    width: 500px;
-    margin-left: -250px;
-    text-align: center;
-    padding: 20px;
-    background-color: #aaa;
-}
-
 .text_entry_section {
     position: fixed;
     bottom: 0;
