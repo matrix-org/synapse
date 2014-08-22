@@ -16,8 +16,8 @@ limitations under the License.
 
 'use strict';
 
-angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload', 'eventHandlerService'])
-.controller('RoomsController', ['$scope', '$location', 'matrixService', 'mFileUpload', 'eventHandlerService', 'eventStreamService', 
+angular.module('HomeController', ['matrixService', 'mFileInput', 'mFileUpload', 'eventHandlerService'])
+.controller('HomeController', ['$scope', '$location', 'matrixService', 'mFileUpload', 'eventHandlerService', 'eventStreamService', 
                                function($scope, $location, matrixService, mFileUpload, eventHandlerService, eventStreamService) {
 
     $scope.config = matrixService.config();

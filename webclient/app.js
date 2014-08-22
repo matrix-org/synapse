@@ -19,7 +19,7 @@ var matrixWebClient = angular.module('matrixWebClient', [
     'MatrixWebClientController',
     'LoginController',
     'RoomController',
-    'RoomsController',
+    'HomeController',
     'SettingsController',
     'UserController',
     'matrixService',
@@ -45,9 +45,9 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
                 templateUrl: 'room/room.html',
                 controller: 'RoomController'
             }).
-            when('/rooms', {
-                templateUrl: 'rooms/rooms.html',
-                controller: 'RoomsController'
+            when('/home', {
+                templateUrl: 'home/home.html',
+                controller: 'HomeController'
             }).
             when('/settings', {
                 templateUrl: 'settings/settings.html',
@@ -58,7 +58,7 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
                 controller: 'UserController'
             }).
             otherwise({
-                redirectTo: '/rooms'
+                redirectTo: '/home'
             });
             
         $provide.factory('AccessTokenInterceptor', ['$q', '$rootScope', 

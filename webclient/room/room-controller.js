@@ -364,7 +364,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
         matrixService.leave($scope.room_id).then(
             function(response) {
                 console.log("Left room ");
-                $location.url("rooms");
+                $location.url("home");
             },
             function(error) {
                 $scope.feedback = "Failed to leave room: " + error.data.error;
