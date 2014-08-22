@@ -316,6 +316,8 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
     };
 
     var onInit2 = function() {
+        eventHandlerService.reInitRoom($scope.room_id); 
+
         // Join the room
         matrixService.join($scope.room_id).then(
             function() {

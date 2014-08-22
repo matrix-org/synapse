@@ -44,6 +44,12 @@ angular.module('eventHandlerService', [])
             $rootScope.events.rooms[room_id].members = {};
         }
     }
+
+    var reInitRoom = function(room_id) {
+        $rootScope.events.rooms[room_id] = {};
+        $rootScope.events.rooms[room_id].messages = [];
+        $rootScope.events.rooms[room_id].members = {};
+    }
     
     var handleMessage = function(event, isLiveEvent) {
         if ("membership_target" in event.content) {
@@ -118,6 +124,10 @@ angular.module('eventHandlerService', [])
             for (var i=0; i<events.length; i++) {
                 this.handleEvent(events[i], isLiveEvents);
             }
-        }
+        },
+
+        reInitRoom: function(room_id) {
+            reInitRoom(room_id);
+        },
     };
 }]);
