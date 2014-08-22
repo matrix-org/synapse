@@ -152,6 +152,8 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
     };
 
     var updateMemberList = function(chunk) {
+        if (chunk.room_id != $scope.room_id) return;
+
         var isNewMember = !(chunk.target_user_id in $scope.members);
         if (isNewMember) {
             // FIXME: why are we copying these fields around inside chunk?
