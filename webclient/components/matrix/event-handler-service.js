@@ -35,6 +35,8 @@ angular.module('eventHandlerService', [])
     $rootScope.events = {
         rooms: {}, // will contain roomId: { messages:[], members:{userid1: event} }
     };
+
+    $rootScope.presence = {};
     
     var initRoom = function(room_id) {
         if (!(room_id in $rootScope.events.rooms)) {
@@ -43,6 +45,12 @@ angular.module('eventHandlerService', [])
             $rootScope.events.rooms[room_id].messages = [];
             $rootScope.events.rooms[room_id].members = {};
         }
+    }
+
+    var reInitRoom = function(room_id) {
+        $rootScope.events.rooms[room_id] = {};
+        $rootScope.events.rooms[room_id].messages = [];
+        $rootScope.events.rooms[room_id].members = {};
     }
     
     var handleMessage = function(event, isLiveEvent) {
@@ -69,11 +77,23 @@ angular.module('eventHandlerService', [])
     
     var handleRoomMember = function(event, isLiveEvent) {
         initRoom(event.room_id);
+        
+        // add membership changes as if they were a room message if something interesting changed
+        if (event.content.prev !== event.content.membership) {
+            if (isLiveEvent) {
+                $rootScope.events.rooms[event.room_id].messages.push(event);
+            }
+            else {
+                $rootScope.events.rooms[event.room_id].messages.unshift(event);
+            }
+        }
+        
         $rootScope.events.rooms[event.room_id].members[event.user_id] = event;
         $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent);
     };
     
     var handlePresence = function(event, isLiveEvent) {
+        $rootScope.presence[event.content.user_id] = event;
         $rootScope.$broadcast(PRESENCE_EVENT, event, isLiveEvent);
     };
     
@@ -107,6 +127,10 @@ angular.module('eventHandlerService', [])
             for (var i=0; i<events.length; i++) {
                 this.handleEvent(events[i], isLiveEvents);
             }
-        }
+        },
+
+        reInitRoom: function(room_id) {
+            reInitRoom(room_id);
+        },
     };
 }]);

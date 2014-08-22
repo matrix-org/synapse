@@ -12,43 +12,71 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+CREATE TABLE IF NOT EXISTS events(
+    stream_ordering INTEGER PRIMARY KEY AUTOINCREMENT,
+    topological_ordering INTEGER NOT NULL,
+    event_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    unrecognized_keys TEXT,
+    processed BOOL NOT NULL,
+    outlier BOOL NOT NULL,
+    CONSTRAINT ev_uniq UNIQUE (event_id)
+);
+
+CREATE TABLE IF NOT EXISTS state_events(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    state_key TEXT NOT NULL,
+    prev_state TEXT
+);
+
+CREATE TABLE IF NOT EXISTS current_state_events(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    state_key TEXT NOT NULL,
+    CONSTRAINT curr_uniq UNIQUE (room_id, type, state_key) ON CONFLICT REPLACE
+);
+
+CREATE TABLE IF NOT EXISTS room_memberships(
+    event_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    sender TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    membership TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS feedback(
+    event_id TEXT NOT NULL,
+    feedback_type TEXT,
+    target_event_id TEXT,
+    sender TEXT,
+    room_id TEXT
+);
+
+CREATE TABLE IF NOT EXISTS topics(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    topic TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS room_names(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    name TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS rooms(
     room_id TEXT PRIMARY KEY NOT NULL,
     is_public INTEGER,
     creator TEXT
 );
 
-CREATE TABLE IF NOT EXISTS room_memberships(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT NOT NULL, -- no foreign key to users table, it could be an id belonging to another home server
-    sender TEXT NOT NULL,
+CREATE TABLE IF NOT EXISTS room_hosts(
     room_id TEXT NOT NULL,
-    membership TEXT NOT NULL,
-    content TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS messages(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT, 
-    room_id TEXT,
-    msg_id TEXT,
-    content TEXT
-);
-
-CREATE TABLE IF NOT EXISTS feedback(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    content TEXT,
-    feedback_type TEXT,
-    fb_sender_id TEXT,
-    msg_id TEXT,
-    room_id TEXT,
-    msg_sender_id TEXT
-);
-
-CREATE TABLE IF NOT EXISTS room_data(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_id TEXT NOT NULL,
-    type TEXT NOT NULL,
-    state_key TEXT NOT NULL,
-    content TEXT
+    host TEXT NOT NULL
 );

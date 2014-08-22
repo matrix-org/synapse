@@ -61,16 +61,23 @@ angular.module('matrixService', [])
         return doBaseRequest(config.homeserver, method, path, params, data, undefined);
     };
 
-    var doBaseRequest = function(baseUrl, method, path, params, data, headers) {
-        return $http({
+    var doBaseRequest = function(baseUrl, method, path, params, data, headers, $httpParams) {
+
+        var request = {
             method: method,
             url: baseUrl + path,
             params: params,
             data: data,
             headers: headers
-        });
-    };
+        };
 
+        // Add additional $http parameters
+        if ($httpParams) {
+            angular.extend(request, $httpParams);
+        }
+
+        return $http(request);
+    };
 
     return {
         /****** Home server API ******/
@@ -204,11 +211,11 @@ angular.module('matrixService', [])
         },
 
         // Send an image message
-        sendImageMessage: function(room_id, image_url, image_alt, msg_id) {
+        sendImageMessage: function(room_id, image_url, image_body, msg_id) {
             var content = {
                  msgtype: "m.image",
                  url: image_url,
-                 body: image_alt
+                 body: image_body
             };
 
             return this.sendMessage(room_id, msg_id, content);
@@ -239,8 +246,8 @@ angular.module('matrixService', [])
             path = path.replace("$room_id", room_id);
             var params = {
                 from: from_token,
-                to: "START",
-                limit: limit
+                limit: limit,
+                dir: 'b'
             };
             return doRequest("GET", path, params);
         },
@@ -302,17 +309,25 @@ angular.module('matrixService', [])
         },
 
         // hit the Identity Server for a 3PID request.
-        linkEmail: function(email) {
+        linkEmail: function(email, clientSecret, sendAttempt) {
             var path = "/matrix/identity/api/v1/validate/email/requestToken"
-            var data = "clientSecret=abc123&email=" + encodeURIComponent(email);
+            var data = "clientSecret="+clientSecret+"&email=" + encodeURIComponent(email)+"&sendAttempt="+sendAttempt;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
         },
 
-        authEmail: function(userId, tokenId, code) {
+        authEmail: function(clientSecret, tokenId, code) {
             var path = "/matrix/identity/api/v1/validate/email/submitToken";
-            var data = "token="+code+"&mxId="+encodeURIComponent(userId)+"&tokenId="+tokenId;
+            var data = "token="+code+"&sid="+tokenId+"&clientSecret="+clientSecret;
+            var headers = {};
+            headers["Content-Type"] = "application/x-www-form-urlencoded";
+            return doBaseRequest(config.identityServer, "POST", path, {}, data, headers);
+        },
+
+        bindEmail: function(userId, tokenId, clientSecret) {
+            var path = "/matrix/identity/api/v1/3pid/bind";
+            var data = "mxid="+encodeURIComponent(userId)+"&sid="+tokenId+"&clientSecret="+clientSecret;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
@@ -326,7 +341,17 @@ angular.module('matrixService', [])
             var params = {
                 access_token: config.access_token
             };
-            return doBaseRequest(config.homeserver, "POST", path, params, file, headers);
+
+            // If the file is actually a Blob object, prevent $http from JSON-stringified it before sending
+            // (Equivalent to jQuery ajax processData = false)
+            var $httpParams;
+            if (file instanceof Blob) {
+                $httpParams = {
+                    transformRequest: angular.identity
+                };
+            }
+
+            return doBaseRequest(config.homeserver, "POST", path, params, file, headers, $httpParams);
         },
         
         // start listening on /events
@@ -375,6 +400,7 @@ angular.module('matrixService', [])
         // Set a new config (Use saveConfig to actually store it permanently)
         setConfig: function(newConfig) {
             config = newConfig;
+            console.log("new IS: "+config.identityServer);
         },
         
         // Commits config into permanent storage

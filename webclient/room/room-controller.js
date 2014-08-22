@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-angular.module('RoomController', ['ngSanitize'])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService) {
+angular.module('RoomController', ['ngSanitize', 'mUtilities'])
+.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService', 'mFileUpload', 'mUtilities', '$rootScope',
+                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService, mFileUpload, mUtilities, $rootScope) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
+    var THUMBNAIL_SIZE = 320;
 
     // Room ids. Computed and resolved in onInit
     $scope.room_id = undefined;
@@ -28,9 +29,12 @@ angular.module('RoomController', ['ngSanitize'])
         user_id: matrixService.config().user_id,
         events_from: "END", // when to start the event stream from.
         earliest_token: "END", // stores how far back we've paginated.
+        first_pagination: true, // this is toggled off when the first pagination is done
         can_paginate: true, // this is toggled off when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
-        stream_failure: undefined // the response when the stream fails
+        stream_failure: undefined, // the response when the stream fails
+        // FIXME: sending has been disabled, as surely messages should be sent in the background rather than locking the UI synchronously --Matthew
+        sending: false // true when a message is being sent. It helps to disable the UI when a process is running
     };
     $scope.members = {};
     $scope.autoCompleting = false;
@@ -88,7 +92,7 @@ angular.module('RoomController', ['ngSanitize'])
         
     var paginate = function(numItems) {
         // console.log("paginate " + numItems);
-        if ($scope.state.paginating) {
+        if ($scope.state.paginating || !$scope.room_id) {
             return;
         }
         else {
@@ -98,7 +102,6 @@ angular.module('RoomController', ['ngSanitize'])
         var originalTopRow = $("#messageTable>tbody>tr:first")[0];
         matrixService.paginateBackMessages($scope.room_id, $scope.state.earliest_token, numItems).then(
             function(response) {
-                var firstPagination = !$scope.events.rooms[$scope.room_id];
                 eventHandlerService.handleEvents(response.data.chunk, false);
                 $scope.state.earliest_token = response.data.end;
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
@@ -124,8 +127,9 @@ angular.module('RoomController', ['ngSanitize'])
                     }, 0);
                 }
                 
-                if (firstPagination) {
+                if ($scope.state.first_pagination) {
                     scrollToBottom();
+                    $scope.state.first_pagination = false;
                 }
                 else {
                     // lock the scroll position
@@ -144,10 +148,12 @@ angular.module('RoomController', ['ngSanitize'])
                 console.log("Failed to paginateBackMessages: " + JSON.stringify(error));
                 $scope.state.paginating = false;
             }
-        )
+        );
     };
 
     var updateMemberList = function(chunk) {
+        if (chunk.room_id != $scope.room_id) return;
+
         var isNewMember = !(chunk.target_user_id in $scope.members);
         if (isNewMember) {
             // FIXME: why are we copying these fields around inside chunk?
@@ -157,8 +163,7 @@ angular.module('RoomController', ['ngSanitize'])
             if ("mtime_age" in chunk.content) {
                 chunk.mtime_age = chunk.content.mtime_age;
             }
-/*            
-            // FIXME: once the HS reliably returns the displaynames & avatar_urls for both
+            // Once the HS reliably returns the displaynames & avatar_urls for both
             // local and remote users, we should use this rather than the evalAsync block
             // below
             if ("displayname" in chunk.content) {
@@ -167,9 +172,11 @@ angular.module('RoomController', ['ngSanitize'])
             if ("avatar_url" in chunk.content) {
                 chunk.avatar_url = chunk.content.avatar_url;
             }
- */      
             $scope.members[chunk.target_user_id] = chunk;
 
+/*
+            // Stale code for explicitly hammering the homeserver for every displayname & avatar_url
+            
             // get their display name and profile picture and set it to their
             // member entry in $scope.members. We HAVE to use $timeout with 0 delay 
             // to make this function run AFTER the current digest cycle, else the 
@@ -193,6 +200,11 @@ angular.module('RoomController', ['ngSanitize'])
                     }
                 );
             });
+*/            
+
+            if (chunk.target_user_id in $rootScope.presence) {
+                updatePresence($rootScope.presence[chunk.target_user_id]);
+            }
         }
         else {
             // selectively update membership else it will nuke the picture and displayname too :/
@@ -232,7 +244,9 @@ angular.module('RoomController', ['ngSanitize'])
         if ($scope.textInput == "") {
             return;
         }
-                    
+
+        $scope.state.sending = true;
+        
         // Send the text message
         var promise;
         // FIXME: handle other commands too
@@ -247,16 +261,17 @@ angular.module('RoomController', ['ngSanitize'])
             function() {
                 console.log("Sent message");
                 $scope.textInput = "";
+                $scope.state.sending = false;
             },
             function(error) {
                 $scope.feedback = "Failed to send: " + error.data.error;
-            });               
+                $scope.state.sending = false;
+            });
     };
 
     $scope.onInit = function() {
-        // $timeout(function() { document.getElementById('textInput').focus() }, 0);
         console.log("onInit");
-        
+
         // Does the room ID provided in the URL?
         var room_id_or_alias;
         if ($routeParams.room_id_or_alias) {
@@ -284,7 +299,7 @@ angular.module('RoomController', ['ngSanitize'])
                 else {
                     // In case of issue, go to the default page
                     console.log("Error: cannot extract room alias");
-                    $location.path("/");
+                    $location.url("/");
                     return;
                 }
             }
@@ -301,12 +316,14 @@ angular.module('RoomController', ['ngSanitize'])
             function () {
                 // In case of issue, go to the default page
                 console.log("Error: cannot resolve room alias");
-                $location.path("/");
+                $location.url("/");
             });
         }
     };
 
     var onInit2 = function() {
+        eventHandlerService.reInitRoom($scope.room_id); 
+
         // Join the room
         matrixService.join($scope.room_id).then(
             function() {
@@ -319,6 +336,7 @@ angular.module('RoomController', ['ngSanitize'])
                             var chunk = response.data.chunk[i];
                             updateMemberList(chunk);
                         }
+                        eventStreamService.resume();
                     },
                     function(error) {
                         $scope.feedback = "Failed get member list: " + error.data.error;
@@ -354,36 +372,51 @@ angular.module('RoomController', ['ngSanitize'])
         matrixService.leave($scope.room_id).then(
             function(response) {
                 console.log("Left room ");
-                $location.path("rooms");
+                $location.url("rooms");
             },
             function(error) {
                 $scope.feedback = "Failed to leave room: " + error.data.error;
             });
     };
 
-    $scope.sendImage = function(url) {
-        matrixService.sendImageMessage($scope.room_id, url).then(
+    $scope.sendImage = function(url, body) {
+        $scope.state.sending = true;
+
+        matrixService.sendImageMessage($scope.room_id, url, body).then(
             function() {
                 console.log("Image sent");
+                $scope.state.sending = false;
             },
             function(error) {
                 $scope.feedback = "Failed to send image: " + error.data.error;
+                $scope.state.sending = false;
             });
     };
     
     $scope.imageFileToSend;
     $scope.$watch("imageFileToSend", function(newValue, oldValue) {
         if ($scope.imageFileToSend) {
-            // First download the image to the Internet
-            console.log("Uploading image...");
-            mFileUpload.uploadFile($scope.imageFileToSend).then(
-                function(url) {
-                    // Then share the URL
-                    $scope.sendImage(url);
+
+            $scope.state.sending = true;
+
+            // Upload this image with its thumbnail to Internet
+            mFileUpload.uploadImageAndThumbnail($scope.imageFileToSend, THUMBNAIL_SIZE).then(
+                function(imageMessage) {
+                    // imageMessage is complete message structure, send it as is
+                    matrixService.sendMessage($scope.room_id, undefined, imageMessage).then(
+                        function() {
+                            console.log("Image message sent");
+                            $scope.state.sending = false;
+                        },
+                        function(error) {
+                            $scope.feedback = "Failed to send image message: " + error.data.error;
+                            $scope.state.sending = false;
+                        });
                 },
                 function(error) {
                     $scope.feedback = "Can't upload image";
-                } 
+                    $scope.state.sending = false;
+                }
             );
         }
     });

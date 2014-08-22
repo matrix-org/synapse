@@ -15,7 +15,7 @@
 
 from synapse.api.events.room import (
     RoomTopicEvent, MessageEvent, RoomMemberEvent, FeedbackEvent,
-    InviteJoinEvent, RoomConfigEvent
+    InviteJoinEvent, RoomConfigEvent, RoomNameEvent, GenericEvent,
 )
 
 from synapse.util.stringutils import random_string
@@ -25,6 +25,7 @@ class EventFactory(object):
 
     _event_classes = [
         RoomTopicEvent,
+        RoomNameEvent,
         MessageEvent,
         RoomMemberEvent,
         FeedbackEvent,
@@ -32,20 +33,24 @@ class EventFactory(object):
         RoomConfigEvent
     ]
 
-    def __init__(self):
+    def __init__(self, hs):
         self._event_list = {}  # dict of TYPE to event class
         for event_class in EventFactory._event_classes:
             self._event_list[event_class.TYPE] = event_class
+
+        self.clock = hs.get_clock()
 
     def create_event(self, etype=None, **kwargs):
         kwargs["type"] = etype
         if "event_id" not in kwargs:
             kwargs["event_id"] = random_string(10)
 
-        try:
+        if "ts" not in kwargs:
+            kwargs["ts"] = int(self.clock.time_msec())
+
+        if etype in self._event_list:
             handler = self._event_list[etype]
-        except KeyError:  # unknown event type
-            # TODO allow custom event types.
-            raise NotImplementedError("Unknown etype=%s" % etype)
+        else:
+            handler = GenericEvent
 
         return handler(**kwargs)

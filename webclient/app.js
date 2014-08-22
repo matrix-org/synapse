@@ -80,6 +80,6 @@ matrixWebClient.run(['$location', 'matrixService', 'eventStreamService', functio
         $location.path("login");
     }
     else {
-        eventStreamService.resume();
+        // eventStreamService.resume();
     }
 }]);

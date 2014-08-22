@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 
 from twisted.internet import defer
@@ -20,6 +19,9 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 
 import collections
+import copy
+import json
+
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,7 @@ class SQLBaseStore(object):
     def __init__(self, hs):
         self.hs = hs
         self._db_pool = hs.get_db_pool()
+        self.event_factory = hs.get_event_factory()
         self._clock = hs.get_clock()
 
     def cursor_to_dict(self, cursor):
@@ -57,13 +60,21 @@ class SQLBaseStore(object):
             The result of decoder(results)
         """
         logger.debug(
-            "[SQL] %s  Args=%s Func=%s", query, args, decoder.__name__
+            "[SQL] %s  Args=%s Func=%s",
+            query, args, decoder.__name__ if decoder else None
         )
 
         def interaction(txn):
             cursor = txn.execute(query, args)
-            return decoder(cursor)
+            if decoder:
+                return decoder(cursor)
+            else:
+                return cursor.fetchall()
+
         return self._db_pool.runInteraction(interaction)
+
+    def _execute_and_decode(self, query, *args):
+        return self._execute(self.cursor_to_dict, query, *args)
 
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
@@ -280,6 +291,22 @@ class SQLBaseStore(object):
             return max_id
 
         return self._db_pool.runInteraction(func)
+
+    def _parse_event_from_row(self, row_dict):
+        d = copy.deepcopy({k: v for k, v in row_dict.items() if v})
+
+        d.pop("stream_ordering", None)
+        d.pop("topological_ordering", None)
+        d.pop("processed", None)
+
+        d.update(json.loads(row_dict["unrecognized_keys"]))
+        d["content"] = json.loads(d["content"])
+        del d["unrecognized_keys"]
+
+        return self.event_factory.create_event(
+            etype=d["type"],
+            **d
+        )
 
 
 class Table(object):

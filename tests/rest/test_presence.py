@@ -287,14 +287,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         # all be ours
 
         # I'll already get my own presence state change
-        self.assertEquals({"start": "0", "end": "1", "chunk": [
-            {"type": "m.presence",
-             "content": {
-                 "user_id": "@apple:test",
-                 "state": ONLINE,
-                 "mtime_age": 0,
-            }},
-        ]}, response)
+        self.assertEquals({"start": "1", "end": "1", "chunk": []}, response)
 
         self.mock_datastore.set_presence_state.return_value = defer.succeed(
                 {"state": ONLINE})

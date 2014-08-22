@@ -40,7 +40,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             self.hostname,
             db_pool=None,
             datastore=NonCallableMock(spec_set=[
-                "store_room_member",
+                "persist_event",
                 "get_joined_hosts_for_room",
                 "get_room_member",
                 "get_room",
@@ -68,6 +68,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.state_handler = hs.get_state_handler()
         self.distributor = hs.get_distributor()
         self.hs = hs
+
+        self.distributor.declare("collect_presencelike_data")
 
         self.handlers.room_member_handler = RoomMemberHandler(self.hs)
         self.handlers.profile_handler = ProfileHandler(self.hs)
@@ -97,7 +99,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         )
 
         store_id = "store_id_fooo"
-        self.datastore.store_room_member.return_value = defer.succeed(store_id)
+        self.datastore.persist_event.return_value = defer.succeed(store_id)
 
         # Actual invocation
         yield self.room_member_handler.change_membership(event)
@@ -110,12 +112,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             set(event.destinations)
         )
 
-        self.datastore.store_room_member.assert_called_once_with(
-            user_id=target_user_id,
-            sender=user_id,
-            room_id=room_id,
-            content=content,
-            membership=Membership.INVITE,
+        self.datastore.persist_event.assert_called_once_with(
+            event
         )
         self.notifier.on_new_room_event.assert_called_once_with(
                 event, store_id)
@@ -144,12 +142,14 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         joined = ["red", "green"]
 
         self.state_handler.handle_new_event.return_value = defer.succeed(True)
-        self.datastore.get_joined_hosts_for_room.return_value = (
-            defer.succeed(joined)
-        )
+
+        def get_joined(*args):
+            return defer.succeed(joined)
+
+        self.datastore.get_joined_hosts_for_room.side_effect = get_joined
 
         store_id = "store_id_fooo"
-        self.datastore.store_room_member.return_value = defer.succeed(store_id)
+        self.datastore.persist_event.return_value = defer.succeed(store_id)
         self.datastore.get_room.return_value = defer.succeed(1)  # Not None.
 
         prev_state = NonCallableMock()
@@ -171,12 +171,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             set(event.destinations)
         )
 
-        self.datastore.store_room_member.assert_called_once_with(
-            user_id=target_user_id,
-            sender=user_id,
-            room_id=room_id,
-            content=content,
-            membership=Membership.JOIN,
+        self.datastore.persist_event.assert_called_once_with(
+            event
         )
         self.notifier.on_new_room_event.assert_called_once_with(
                 event, store_id)

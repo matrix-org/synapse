@@ -66,6 +66,10 @@ h1 {
     background-color: #faa;
 }
 
+.mouse-pointer {
+    cursor: pointer;
+}
+
 /*** Participant list ***/
 
 #usersTableWrapper {
@@ -89,7 +93,6 @@ h1 {
     height: 100px;
     position: relative;
     background-color: #000;
-    cursor: pointer;
 }
 
 .userAvatar .userAvatarImage {
@@ -142,6 +145,7 @@ h1 {
     max-width: 1280px;
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
         
 #messageTable td {
@@ -149,7 +153,8 @@ h1 {
 }
 
 .leftBlock {
-    width: 10em;
+    width: 14em;
+    word-wrap: break-word;
     vertical-align: top;
     background-color: #fff;
     color: #888;
@@ -187,24 +192,13 @@ h1 {
     object-fit: cover;
 }
         
-.text {
-    background-color: #eee;
-    border: 1px solid #d8d8d8;
-    height: 31px;
-    display: inline-table;
-    max-width: 90%;
-    font-size: 16px;
-    /* word-wrap: break-word; */
-    word-break: break-all;
-}
-
 .emote {
-    background-color: #fff ! important;
+    background-color: transparent ! important;
     border: 0px ! important;
 }
 
 .membership {
-    background-color: #fff ! important;
+    background-color: transparent ! important;
     border: 0px ! important;
 }
 
@@ -216,33 +210,66 @@ h1 {
     height: auto;
 }
 
+.text {
+    vertical-align: top;
+}
+
 .bubble {
+    background-color: #eee;
+    border: 1px solid #d8d8d8;
+    display: inline-block;
+    margin-bottom: -1px;
+    max-width: 90%;
+    font-size: 16px;
+    word-wrap: break-word;
     padding-top: 7px;
     padding-bottom: 5px;
     padding-left: 1em;
     padding-right: 1em;
     vertical-align: middle;
+    -webkit-text-size-adjust:100%
 }
 
 .differentUser td {
-    padding-top: 5px ! important;
-    margin-top: 5px ! important;
+    padding-bottom: 5px ! important;
 }
 
 .mine {
     text-align: right;
 }
 
-.mine .text {
-    background-color: #f8f8ff ! important;    
-}
-
-.mine .emote {
-    background-color: #fff ! important;    
+.text.emote .bubble,
+.text.membership .bubble,
+.mine .text.emote .bubble,
+.mine .text.membership .bubble
+  {
+    background-color: transparent ! important;    
+    border: 0px ! important;
 }
 
 .mine .text .bubble {
+    background-color: #f8f8ff ! important;    
     text-align: left ! important;
+}
+
+#room-fullscreen-image {
+    position: absolute;
+    top: 0px;
+    height: 0px;
+    width: 100%;
+    height: 100%;
+}
+
+#room-fullscreen-image img {
+    max-width: 100%;
+    max-height: 100%;
+    bottom: 0;
+    left: 0;
+    margin: auto;
+    overflow: auto;
+    position: fixed;
+    right: 0;
+    top: 0;
 }
 
 /*** Profile ***/

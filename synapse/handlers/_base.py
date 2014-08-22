@@ -24,4 +24,5 @@ class BaseHandler(object):
         self.notifier = hs.get_notifier()
         self.room_lock = hs.get_room_lock_manager()
         self.state_handler = hs.get_state_handler()
+        self.distributor = hs.get_distributor()
         self.hs = hs

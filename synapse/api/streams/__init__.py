@@ -20,23 +20,24 @@ class PaginationConfig(object):
 
     """A configuration object which stores pagination parameters."""
 
-    def __init__(self, from_tok=None, to_tok=None, limit=0):
+    def __init__(self, from_tok=None, to_tok=None, direction='f', limit=0):
         self.from_tok = from_tok
         self.to_tok = to_tok
+        self.direction = direction
         self.limit = limit
 
     @classmethod
     def from_request(cls, request, raise_invalid_params=True):
         params = {
-            "from_tok": PaginationStream.TOK_START,
-            "to_tok": PaginationStream.TOK_END,
-            "limit": 0
+            "from_tok": "END",
+            "direction": 'f',
         }
 
         query_param_mappings = [  # 3-tuple of qp_key, attribute, rules
             ("from", "from_tok", lambda x: type(x) == str),
             ("to", "to_tok", lambda x: type(x) == str),
-            ("limit", "limit", lambda x: x.isdigit())
+            ("limit", "limit", lambda x: x.isdigit()),
+            ("dir", "direction", lambda x: x == 'f' or x == 'b'),
         ]
 
         for qp, attr, is_valid in query_param_mappings:
@@ -48,12 +49,17 @@ class PaginationConfig(object):
 
         return PaginationConfig(**params)
 
+    def __str__(self):
+        return (
+            "<PaginationConfig from_tok=%s, to_tok=%s, "
+            "direction=%s, limit=%s>"
+        ) % (self.from_tok, self.to_tok, self.direction, self.limit)
+
 
 class PaginationStream(object):
 
     """ An interface for streaming data as chunks. """
 
-    TOK_START = "START"
     TOK_END = "END"
 
     def get_chunk(self, config=None):
@@ -76,7 +82,7 @@ class StreamData(object):
         self.hs = hs
         self.store = hs.get_datastore()
 
-    def get_rows(self, user_id, from_pkey, to_pkey, limit):
+    def get_rows(self, user_id, from_pkey, to_pkey, limit, direction):
         """ Get event stream data between the specified pkeys.
 
         Args:

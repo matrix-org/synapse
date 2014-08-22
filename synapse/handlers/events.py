@@ -17,8 +17,7 @@ from twisted.internet import defer
 
 from ._base import BaseHandler
 from synapse.api.streams.event import (
-    EventStream, MessagesStreamData, RoomMemberStreamData, FeedbackStreamData,
-    RoomDataStreamData
+    EventStream, EventsStreamData
 )
 from synapse.handlers.presence import PresenceStreamData
 
@@ -26,10 +25,7 @@ from synapse.handlers.presence import PresenceStreamData
 class EventStreamHandler(BaseHandler):
 
     stream_data_classes = [
-        MessagesStreamData,
-        RoomMemberStreamData,
-        FeedbackStreamData,
-        RoomDataStreamData,
+        EventsStreamData,
         PresenceStreamData,
     ]
 

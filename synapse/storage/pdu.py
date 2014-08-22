@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from ._base import SQLBaseStore, Table, JoinHelper
 
 from synapse.util.logutils import log_function
@@ -319,6 +321,7 @@ class PduStore(SQLBaseStore):
 
         return [(row[0], row[1], row[2]) for row in results]
 
+    @defer.inlineCallbacks
     def get_oldest_pdus_in_context(self, context):
         """Get a list of Pdus that we haven't backfilled beyond yet (and haven't    
         seen). This list is used when we want to backfill backwards and is the 
@@ -331,17 +334,14 @@ class PduStore(SQLBaseStore):
         Returns:
             list: A list of PduIdTuple.
         """
-        return self._db_pool.runInteraction(
-            self._get_oldest_pdus_in_context, context
-        )
-
-    def _get_oldest_pdus_in_context(self, txn, context):
-        txn.execute(
+        results = yield self._execute(
+            None,
             "SELECT pdu_id, origin FROM %(back)s WHERE context = ?"
             % {"back": PduBackwardExtremitiesTable.table_name, },
-            (context,)
+            context
         )
-        return [PduIdTuple(i, o) for i, o in txn.fetchall()]
+
+        defer.returnValue([PduIdTuple(i, o) for i, o in results])
 
     def is_pdu_new(self, pdu_id, origin, context, depth):
         """For a given Pdu, try and figure out if it's 'new', i.e., if it's
@@ -580,7 +580,7 @@ class StatePduStore(SQLBaseStore):
 
         txn.execute(query, query_args)
 
-    def get_current_state(self, context, pdu_type, state_key):
+    def get_current_state_pdu(self, context, pdu_type, state_key):
         """For a given context, pdu_type, state_key 3-tuple, return what is
         currently considered the current state.
 
@@ -595,10 +595,10 @@ class StatePduStore(SQLBaseStore):
         """
 
         return self._db_pool.runInteraction(
-            self._get_current_state, context, pdu_type, state_key
+            self._get_current_state_pdu, context, pdu_type, state_key
         )
 
-    def _get_current_state(self, txn, context, pdu_type, state_key):
+    def _get_current_state_pdu(self, txn, context, pdu_type, state_key):
         return self._get_current_interaction(txn, context, pdu_type, state_key)
 
     def _get_current_interaction(self, txn, context, pdu_type, state_key):

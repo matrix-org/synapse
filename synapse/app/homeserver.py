@@ -56,7 +56,7 @@ class SynapseHomeServer(HomeServer):
         return File("webclient")  # TODO configurable?
 
     def build_resource_for_content_repo(self):
-        return ContentRepoResource("uploads", self.auth)
+        return ContentRepoResource(self, self.upload_dir, self.auth)
 
     def build_db_pool(self):
         """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
@@ -235,8 +235,8 @@ def setup():
     parser.add_argument('--pid-file', dest="pid", help="When running as a "
                         "daemon, the file to store the pid in",
                         default="hs.pid")
-    parser.add_argument("-w", "--webclient", dest="webclient",
-                        action="store_true", help="Host the web client.")
+    parser.add_argument("-W", "--webclient", dest="webclient", default=True,
+                        action="store_false", help="Don't host a web client.")
     args = parser.parse_args()
 
     verbosity = int(args.verbose) if args.verbose else None
@@ -257,7 +257,8 @@ def setup():
 
     hs = SynapseHomeServer(
         args.host,
-        db_name=db_name
+        upload_dir=os.path.abspath("uploads"),
+        db_name=db_name,
     )
 
     # This object doesn't need to be saved because it's set as the handler for

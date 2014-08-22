@@ -15,6 +15,7 @@
 
 from synapse.api.constants import Membership
 from synapse.api.events.room import RoomMemberEvent
+from synapse.api.streams.event import EventsStreamData
 
 from twisted.internet import defer
 from twisted.internet import reactor
@@ -66,7 +67,7 @@ class Notifier(object):
                 self._notify_and_callback(
                     user_id=user_id,
                     event_data=event.get_dict(),
-                    stream_type=event.type,
+                    stream_type=EventsStreamData.EVENT_TYPE,
                     store_id=store_id)
 
     def on_new_user_event(self, user_id, event_data, stream_type, store_id):

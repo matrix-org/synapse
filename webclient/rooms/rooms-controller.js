@@ -17,8 +17,8 @@ limitations under the License.
 'use strict';
 
 angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload', 'eventHandlerService'])
-.controller('RoomsController', ['$scope', '$location', 'matrixService', 'mFileUpload', 'eventHandlerService',
-                               function($scope, $location, matrixService, mFileUpload, eventHandlerService) {
+.controller('RoomsController', ['$scope', '$location', 'matrixService', 'mFileUpload', 'eventHandlerService', 'eventStreamService', 
+                               function($scope, $location, matrixService, mFileUpload, eventHandlerService, eventStreamService) {
                                    
     $scope.rooms = {};
     $scope.public_rooms = [];
@@ -48,6 +48,8 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
         linkNewEmail: "", // the email entry box
         emailBeingAuthed: undefined, // to populate verification text
         authTokenId: undefined, // the token id from the IS
+        clientSecret: undefined, // our client secret
+        sendAttempt: 1,
         emailCode: "", // the code entry box
         linkedEmailList: matrixService.config().emailList // linked email list
     };
@@ -59,7 +61,7 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
             // FIXME push membership to top level key to match /im/sync
             event.membership = event.content.membership;
             // FIXME bodge a nicer name than the room ID for this invite.
-            event.room_alias = event.user_id + "'s room";
+            event.room_display_name = event.user_id + "'s room";
             $scope.rooms[event.room_id] = event;
         }
     });
@@ -70,14 +72,20 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
             if (alias) {
                 // use the existing alias from storage
                 data[i].room_alias = alias;
+                data[i].room_display_name = alias;
             }
-            else if (data[i].room_alias) {
+            else if (data[i].aliases && data[i].aliases[0]) {
                 // save the mapping
-                matrixService.createRoomIdToAliasMapping(data[i].room_id, data[i].room_alias);
+                // TODO: select the smarter alias from the array
+                matrixService.createRoomIdToAliasMapping(data[i].room_id, data[i].aliases[0]);
+                data[i].room_display_name = data[i].aliases[0];
+            }
+            else if (data[i].membership == "invite" && "inviter" in data[i]) {
+                data[i].room_display_name = data[i].inviter + "'s room"
             }
             else {
                 // last resort use the room id
-                data[i].room_alias = data[i].room_id;
+                data[i].room_display_name = data[i].room_id;
             }
         }
         return data;
@@ -87,10 +95,15 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
         // List all rooms joined or been invited to
         matrixService.rooms().then(
             function(response) {
-                var data = assignRoomAliases(response.data);
+                var data = assignRoomAliases(response.data.rooms);
                 $scope.feedback = "Success";
                 for (var i=0; i<data.length; i++) {
                     $scope.rooms[data[i].room_id] = data[i];
+                }
+
+                var presence = response.data.presence;
+                for (var i = 0; i < presence.length; ++i) {
+                    eventHandlerService.handleEvent(presence[i], false);
                 }
             },
             function(error) {
@@ -102,6 +115,8 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
                 $scope.public_rooms = assignRoomAliases(response.data.chunk);
             }
         );
+
+        eventStreamService.resume();
     };
     
     $scope.createNewRoom = function(room_id, isPrivate) {
@@ -128,17 +143,17 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
     // Go to a room
     $scope.goToRoom = function(room_id) {
         // Simply open the room page on this room id
-        //$location.path("room/" + room_id);
+        //$location.url("room/" + room_id);
         matrixService.join(room_id).then(
             function(response) {
                 if (response.data.hasOwnProperty("room_id")) {
                     if (response.data.room_id != room_id) {
-                        $location.path("room/" + response.data.room_id);
+                        $location.url("room/" + response.data.room_id);
                         return;
                      }
                 }
 
-                $location.path("room/" + room_id);
+                $location.url("room/" + room_id);
             },
             function(error) {
                 $scope.feedback = "Can't join room: " + error.data;
@@ -150,7 +165,7 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
         matrixService.joinAlias(room_alias).then(
             function(response) {
                 // Go to this room
-                $location.path("room/" + room_alias);
+                $location.url("room/" + room_alias);
             },
             function(error) {
                 $scope.feedback = "Can't join room: " + error.data;
@@ -206,11 +221,27 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
         );
     };
 
+    var generateClientSecret = function() {
+        var ret = "";
+        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+        for (var i = 0; i < 32; i++) {
+            ret += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        return ret;
+    };
+
+
     $scope.linkEmail = function(email) {
-        matrixService.linkEmail(email).then(
+        if (email != $scope.linkedEmails.emailBeingAuthed) {
+            $scope.linkedEmails.clientSecret = generateClientSecret();
+            $scope.linkedEmails.sendAttempt = 1;
+        }
+        matrixService.linkEmail(email, $scope.linkedEmails.clientSecret, $scope.linkedEmails.sendAttempt).then(
             function(response) {
                 if (response.data.success === true) {
-                    $scope.linkedEmails.authTokenId = response.data.tokenId;
+                    $scope.linkedEmails.authTokenId = response.data.sid;
                     $scope.emailFeedback = "You have been sent an email.";
                     $scope.linkedEmails.emailBeingAuthed = email;
                 }
@@ -230,28 +261,34 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
             $scope.emailFeedback = "You have not requested a code with this email.";
             return;
         }
-        matrixService.authEmail(matrixService.config().user_id, tokenId, code).then(
+        matrixService.authEmail(matrixService.config().user_id, tokenId, code, $scope.linkedEmails.clientSecret).then(
             function(response) {
                 if ("success" in response.data && response.data.success === false) {
                     $scope.emailFeedback = "Failed to authenticate email.";
                     return;
                 }
-                var config = matrixService.config();
-                var emailList = {};
-                if ("emailList" in config) {
-                    emailList = config.emailList;
-                }
-                emailList[response.address] = response;
-                // save the new email list
-                config.emailList = emailList;
-                matrixService.setConfig(config);
-                matrixService.saveConfig();
-                // invalidate the email being authed and update UI.
-                $scope.linkedEmails.emailBeingAuthed = undefined;
-                $scope.emailFeedback = "";
-                $scope.linkedEmails.linkedEmailList = emailList;
-                $scope.linkedEmails.linkNewEmail = "";
-                $scope.linkedEmails.emailCode = "";
+                matrixService.bindEmail(matrixService.config().user_id, tokenId, $scope.linkedEmails.clientSecret).then(
+                    function(response) {
+                         var config = matrixService.config();
+                         var emailList = {};
+                         if ("emailList" in config) {
+                             emailList = config.emailList;
+                         }
+                         emailList[$scope.linkedEmails.emailBeingAuthed] = response;
+                         // save the new email list
+                         config.emailList = emailList;
+                         matrixService.setConfig(config);
+                         matrixService.saveConfig();
+                         // invalidate the email being authed and update UI.
+                         $scope.linkedEmails.emailBeingAuthed = undefined;
+                         $scope.emailFeedback = "";
+                         $scope.linkedEmails.linkedEmailList = emailList;
+                         $scope.linkedEmails.linkNewEmail = "";
+                         $scope.linkedEmails.emailCode = "";
+                    }, function(reason) {
+                        $scope.emailFeedback = "Failed to link email: " + reason;
+                    }
+                );
             },
             function(reason) {
                 $scope.emailFeedback = "Failed to auth email: " + reason;

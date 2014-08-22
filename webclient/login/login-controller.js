@@ -53,7 +53,7 @@ angular.module('LoginController', ['matrixService'])
                 matrixService.saveConfig();
                 eventStreamService.resume();
                  // Go to the user's rooms list page
-                $location.path("rooms");
+                $location.url("rooms");
             },
             function(error) {
                 if (error.data) {
@@ -70,6 +70,7 @@ angular.module('LoginController', ['matrixService'])
     $scope.login = function() {
         matrixService.setConfig({
             homeserver: $scope.account.homeserver,
+            identityServer: $scope.account.identityServer,
             user_id: $scope.account.user_id
         });
         // try to login
@@ -79,12 +80,13 @@ angular.module('LoginController', ['matrixService'])
                     $scope.feedback = "Login successful.";
                     matrixService.setConfig({
                         homeserver: $scope.account.homeserver,
+                        identityServer: $scope.account.identityServer,
                         user_id: response.data.user_id,
                         access_token: response.data.access_token
                     });
                     matrixService.saveConfig();
                     eventStreamService.resume();
-                    $location.path("rooms");
+                    $location.url("rooms");
                 }
                 else {
                     $scope.feedback = "Failed to login: " + JSON.stringify(response.data);

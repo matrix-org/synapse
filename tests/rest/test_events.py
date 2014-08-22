@@ -190,9 +190,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
                            "/events?access_token=%s&timeout=0" % (self.token))
         self.assertEquals(200, code, msg=str(response))
 
-        # First message is a reflection of my own presence status change
-        self.assertEquals(1, len(response["chunk"]))
-        self.assertEquals("m.presence", response["chunk"][0]["type"])
+        self.assertEquals(0, len(response["chunk"]))
 
         # joined room (expect all content for room)
         yield self.join(room=room_id, user=self.user_id, tok=self.token)

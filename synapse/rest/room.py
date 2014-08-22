@@ -115,7 +115,7 @@ class RoomTopicRestServlet(RestServlet):
 
         if not data:
             raise SynapseError(404, "Topic not found.", errcode=Codes.NOT_FOUND)
-        defer.returnValue((200, json.loads(data.content)))
+        defer.returnValue((200, data.content))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id):
@@ -177,7 +177,7 @@ class RoomMemberRestServlet(RestServlet):
         if not member:
             raise SynapseError(404, "Member not found.",
                                errcode=Codes.NOT_FOUND)
-        defer.returnValue((200, json.loads(member.content)))
+        defer.returnValue((200, member.content))
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, roomid, target_user_id):
@@ -193,7 +193,7 @@ class RoomMemberRestServlet(RestServlet):
             )
 
         handler = self.handlers.room_member_handler
-        yield handler.change_membership(event, broadcast_msg=True)
+        yield handler.change_membership(event)
         defer.returnValue((200, ""))
 
     @defer.inlineCallbacks
@@ -220,7 +220,7 @@ class RoomMemberRestServlet(RestServlet):
             )
 
         handler = self.handlers.room_member_handler
-        yield handler.change_membership(event, broadcast_msg=True)
+        yield handler.change_membership(event)
         defer.returnValue((200, ""))
 
 
@@ -287,25 +287,28 @@ class FeedbackRestServlet(RestServlet):
                feedback_type):
         user = yield (self.auth.get_user_by_req(request))
 
-        if feedback_type not in Feedback.LIST:
-            raise SynapseError(400, "Bad feedback type.",
-                               errcode=Codes.BAD_JSON)
+        # TODO (erikj): Implement this?
+        raise NotImplementedError("Getting feedback is not supported")
 
-        msg_handler = self.handlers.message_handler
-        feedback = yield msg_handler.get_feedback(
-            room_id=urllib.unquote(room_id),
-            msg_sender_id=msg_sender_id,
-            msg_id=msg_id,
-            user_id=user.to_string(),
-            fb_sender_id=fb_sender_id,
-            fb_type=feedback_type
-        )
-
-        if not feedback:
-            raise SynapseError(404, "Feedback not found.",
-                               errcode=Codes.NOT_FOUND)
-
-        defer.returnValue((200, json.loads(feedback.content)))
+#        if feedback_type not in Feedback.LIST:
+#            raise SynapseError(400, "Bad feedback type.",
+#                               errcode=Codes.BAD_JSON)
+#
+#        msg_handler = self.handlers.message_handler
+#        feedback = yield msg_handler.get_feedback(
+#            room_id=urllib.unquote(room_id),
+#            msg_sender_id=msg_sender_id,
+#            msg_id=msg_id,
+#            user_id=user.to_string(),
+#            fb_sender_id=fb_sender_id,
+#            fb_type=feedback_type
+#        )
+#
+#        if not feedback:
+#            raise SynapseError(404, "Feedback not found.",
+#                               errcode=Codes.NOT_FOUND)
+#
+#        defer.returnValue((200, json.loads(feedback.content)))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, sender_id, msg_id, fb_sender_id,
@@ -382,6 +385,21 @@ class RoomMessageListRestServlet(RestServlet):
         defer.returnValue((200, msgs))
 
 
+class RoomTriggerBackfill(RestServlet):
+    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/backfill$")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id):
+        remote_server = urllib.unquote(request.args["remote"][0])
+        room_id = urllib.unquote(room_id)
+        limit = int(request.args["limit"][0])
+
+        handler = self.handlers.federation_handler
+        events = yield handler.backfill(remote_server, room_id, limit)
+
+        res = [event.get_dict() for event in events]
+        defer.returnValue((200, res))
+
 def _parse_json(request):
     try:
         content = json.loads(request.content.read())
@@ -402,3 +420,4 @@ def register_servlets(hs, http_server):
     RoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
+    RoomTriggerBackfill(hs).register(http_server)

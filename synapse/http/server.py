@@ -212,8 +212,9 @@ class ContentRepoResource(resource.Resource):
     """
     isLeaf = True
 
-    def __init__(self, directory, auth):
+    def __init__(self, hs, directory, auth):
         resource.Resource.__init__(self)
+        self.hs = hs
         self.directory = directory
         self.auth = auth
 
@@ -250,7 +251,8 @@ class ContentRepoResource(resource.Resource):
                 file_ext = re.sub("[^a-z]", "", file_ext)
                 suffix += "." + file_ext
 
-        file_path = os.path.join(self.directory, prefix + main_part + suffix)
+        file_name = prefix + main_part + suffix
+        file_path = os.path.join(self.directory, file_name)
         logger.info("User %s is uploading a file to path %s",
                     auth_user.to_string(),
                     file_path)
@@ -259,8 +261,8 @@ class ContentRepoResource(resource.Resource):
         attempts = 0
         while os.path.exists(file_path):
             main_part = random_string(24)
-            file_path = os.path.join(self.directory,
-                                     prefix + main_part + suffix)
+            file_name = prefix + main_part + suffix
+            file_path = os.path.join(self.directory, file_name)
             attempts += 1
             if attempts > 25:  # really? Really?
                 raise SynapseError(500, "Unable to create file.")
@@ -272,11 +274,14 @@ class ContentRepoResource(resource.Resource):
         # servers.
 
         # TODO: A little crude here, we could do this better.
-        filename = request.path.split(self.directory + "/")[1]
+        filename = request.path.split('/')[-1]
         # be paranoid
         filename = re.sub("[^0-9A-z.-_]", "", filename)
 
         file_path = self.directory + "/" + filename
+
+        logger.debug("Searching for %s", file_path)
+
         if os.path.isfile(file_path):
             # filename has the content type
             base64_contentype = filename.split(".")[1]
@@ -304,6 +309,10 @@ class ContentRepoResource(resource.Resource):
         self._async_render(request)
         return server.NOT_DONE_YET
 
+    def render_OPTIONS(self, request):
+        respond_with_json_bytes(request, 200, {}, send_cors=True)
+        return server.NOT_DONE_YET
+
     @defer.inlineCallbacks
     def _async_render(self, request):
         try:
@@ -313,8 +322,13 @@ class ContentRepoResource(resource.Resource):
             with open(fname, "wb") as f:
                 f.write(request.content.read())
 
+
+            # FIXME (erikj): These should use constants.
+            file_name = os.path.basename(fname)
+            url = "http://%s/matrix/content/%s" % (self.hs.hostname, file_name)
+
             respond_with_json_bytes(request, 200,
-                                    json.dumps({"content_token": fname}),
+                                    json.dumps({"content_token": url}),
                                     send_cors=True)
 
         except CodeMessageException as e:

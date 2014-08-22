@@ -16,15 +16,43 @@
 from . import SynapseEvent
 
 
+class GenericEvent(SynapseEvent):
+    def get_content_template(self):
+        return {}
+
+
 class RoomTopicEvent(SynapseEvent):
     TYPE = "m.room.topic"
 
+    internal_keys = SynapseEvent.internal_keys + [
+        "topic",
+    ]
+
     def __init__(self, **kwargs):
         kwargs["state_key"] = ""
+        if "topic" in kwargs["content"]:
+            kwargs["topic"] = kwargs["content"]["topic"]
         super(RoomTopicEvent, self).__init__(**kwargs)
 
     def get_content_template(self):
         return {"topic": u"string"}
+
+
+class RoomNameEvent(SynapseEvent):
+    TYPE = "m.room.name"
+
+    internal_keys = SynapseEvent.internal_keys + [
+        "name",
+    ]
+
+    def __init__(self, **kwargs):
+        kwargs["state_key"] = ""
+        if "name" in kwargs["content"]:
+            kwargs["name"] = kwargs["content"]["name"]
+        super(RoomNameEvent, self).__init__(**kwargs)
+
+    def get_content_template(self):
+        return {"name": u"string"}
 
 
 class RoomMemberEvent(SynapseEvent):
@@ -38,6 +66,8 @@ class RoomMemberEvent(SynapseEvent):
     def __init__(self, **kwargs):
         if "target_user_id" in kwargs:
             kwargs["state_key"] = kwargs["target_user_id"]
+        if "membership" not in kwargs:
+            kwargs["membership"] = kwargs.get("content", {}).get("membership")
         super(RoomMemberEvent, self).__init__(**kwargs)
 
     def get_content_template(self):
