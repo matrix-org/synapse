@@ -293,7 +293,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
                 else {
                     // In case of issue, go to the default page
                     console.log("Error: cannot extract room alias");
-                    $location.path("/");
+                    $location.url("/");
                     return;
                 }
             }
@@ -310,7 +310,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
             function () {
                 // In case of issue, go to the default page
                 console.log("Error: cannot resolve room alias");
-                $location.path("/");
+                $location.url("/");
             });
         }
     };
@@ -364,7 +364,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
         matrixService.leave($scope.room_id).then(
             function(response) {
                 console.log("Left room ");
-                $location.path("rooms");
+                $location.url("rooms");
             },
             function(error) {
                 $scope.feedback = "Failed to leave room: " + error.data.error;

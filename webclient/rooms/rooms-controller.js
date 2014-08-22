@@ -141,17 +141,17 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
     // Go to a room
     $scope.goToRoom = function(room_id) {
         // Simply open the room page on this room id
-        //$location.path("room/" + room_id);
+        //$location.url("room/" + room_id);
         matrixService.join(room_id).then(
             function(response) {
                 if (response.data.hasOwnProperty("room_id")) {
                     if (response.data.room_id != room_id) {
-                        $location.path("room/" + response.data.room_id);
+                        $location.url("room/" + response.data.room_id);
                         return;
                      }
                 }
 
-                $location.path("room/" + room_id);
+                $location.url("room/" + room_id);
             },
             function(error) {
                 $scope.feedback = "Can't join room: " + error.data;
@@ -163,7 +163,7 @@ angular.module('RoomsController', ['matrixService', 'mFileInput', 'mFileUpload',
         matrixService.joinAlias(room_alias).then(
             function(response) {
                 // Go to this room
-                $location.path("room/" + room_alias);
+                $location.url("room/" + room_alias);
             },
             function(error) {
                 $scope.feedback = "Can't join room: " + error.data;

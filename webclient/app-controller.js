@@ -66,7 +66,7 @@ angular.module('MatrixWebClientController', ['matrixService'])
         matrixService.saveConfig();
         
         // And go to the login page
-        $location.path("login");
+        $location.url("login");
     };
 
     // Listen to the event indicating that the access token is no longer valid.

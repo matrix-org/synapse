@@ -53,7 +53,7 @@ angular.module('LoginController', ['matrixService'])
                 matrixService.saveConfig();
                 eventStreamService.resume();
                  // Go to the user's rooms list page
-                $location.path("rooms");
+                $location.url("rooms");
             },
             function(error) {
                 if (error.data) {
@@ -84,7 +84,7 @@ angular.module('LoginController', ['matrixService'])
                     });
                     matrixService.saveConfig();
                     eventStreamService.resume();
-                    $location.path("rooms");
+                    $location.url("rooms");
                 }
                 else {
                     $scope.feedback = "Failed to login: " + JSON.stringify(response.data);
