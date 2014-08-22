@@ -33,6 +33,12 @@ To get up and running:
       up port 8080 and run ``python synapse/app/homeserver.py --host 
       machine.my.domain.name``.  Then come join ``#matrix:matrix.org`` and
       say hi! :)
+
+Upgrading an existing homeserver
+================================
+
+Before upgrading an existing homeserver to a new version, please refer to
+UPGRADE.rst for any additional instructions.
     
 About Matrix
 ============
