@@ -1,0 +1,75 @@
+{
+  "apiVersion": "1.0.0", 
+  "apis": [
+    {
+      "operations": [
+        {
+          "method": "POST", 
+          "nickname": "register", 
+          "notes": "Volatile: This API is likely to change.", 
+          "parameters": [
+            {
+              "description": "A registration request", 
+              "name": "body", 
+              "paramType": "body", 
+              "required": true, 
+              "type": "RegistrationRequest"
+            }
+          ], 
+          "responseMessages": [
+            {
+              "code": 400, 
+              "message": "No JSON object."
+            }, 
+            {
+              "code": 400, 
+              "message": "User ID must only contain characters which do not require url encoding."
+            },
+            {
+              "code": 400, 
+              "message": "User ID already taken."
+            }
+          ], 
+          "summary": "Register with the home server.", 
+          "type": "RegistrationResponse"
+        }
+      ], 
+      "path": "/register"
+    }
+  ], 
+  "basePath": "http://localhost:8080/matrix/client/api/v1", 
+  "consumes": [
+    "application/json"
+  ], 
+  "models": {
+    "RegistrationResponse": {
+      "id": "RegistrationResponse", 
+      "properties": {
+        "access_token": {
+          "description": "The access token for this user.", 
+          "type": "string"
+        }, 
+        "user_id": {
+          "description": "The fully-qualified user ID.", 
+          "type": "string"
+        }
+      }
+    }, 
+    "RegistrationRequest": {
+      "id": "RegistrationRequest", 
+      "properties": {
+        "user_id": {
+          "description": "The desired user ID. If not specified, a random user ID will be allocated.", 
+          "type": "string",
+          "required": false
+        }
+      }
+    }
+  }, 
+  "produces": [
+    "application/json"
+  ], 
+  "resourcePath": "/register", 
+  "swaggerVersion": "1.2"
+}
+
