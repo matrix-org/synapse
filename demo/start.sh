@@ -15,8 +15,7 @@ for port in "8080" "8081" "8082"; do
         -f "$DIR/$port.log" \
         -d "$DIR/$port.db" \
         -vv \
-        -D --pid-file "$DIR/$port.pid"\
-        -w
+        -D --pid-file "$DIR/$port.pid"
 done
 
 echo "Starting webclient on port 8000..."
