@@ -4,6 +4,8 @@
 # It will store all the user information, but will *delete* all messages and
 # room data.
 
+set -e
+
 cp "$1" "$1.bak"
 
 DUMP=$(sqlite3 "$1" << 'EOF'
