@@ -82,6 +82,7 @@ angular.module('mFileUpload', ['matrixService', 'mUtilities'])
         // First, get the image size
         mUtilities.getImageSize(imageFile).then(
             function(size) {
+                console.log("image size: " + JSON.stringify(size));
 
                 // The final operation: send imageFile
                 var uploadImage = function() {
