@@ -79,7 +79,6 @@ angular.module('matrixService', [])
         return $http(request);
     };
 
-
     return {
         /****** Home server API ******/
         prefix: prefixPath,
@@ -310,17 +309,25 @@ angular.module('matrixService', [])
         },
 
         // hit the Identity Server for a 3PID request.
-        linkEmail: function(email) {
+        linkEmail: function(email, clientSecret, sendAttempt) {
             var path = "/matrix/identity/api/v1/validate/email/requestToken"
-            var data = "clientSecret=abc123&email=" + encodeURIComponent(email);
+            var data = "clientSecret="+clientSecret+"&email=" + encodeURIComponent(email)+"&sendAttempt="+sendAttempt;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
         },
 
-        authEmail: function(userId, tokenId, code) {
+        authEmail: function(clientSecret, tokenId, code) {
             var path = "/matrix/identity/api/v1/validate/email/submitToken";
-            var data = "token="+code+"&mxId="+encodeURIComponent(userId)+"&tokenId="+tokenId;
+            var data = "token="+code+"&sid="+tokenId+"&clientSecret="+clientSecret;
+            var headers = {};
+            headers["Content-Type"] = "application/x-www-form-urlencoded";
+            return doBaseRequest(config.identityServer, "POST", path, {}, data, headers);
+        },
+
+        bindEmail: function(userId, tokenId, clientSecret) {
+            var path = "/matrix/identity/api/v1/3pid/bind";
+            var data = "mxid="+encodeURIComponent(userId)+"&sid="+tokenId+"&clientSecret="+clientSecret;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
@@ -393,6 +400,7 @@ angular.module('matrixService', [])
         // Set a new config (Use saveConfig to actually store it permanently)
         setConfig: function(newConfig) {
             config = newConfig;
+            console.log("new IS: "+config.identityServer);
         },
         
         // Commits config into permanent storage
