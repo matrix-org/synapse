@@ -39,7 +39,7 @@
     
     .bubble {
         font-size: 12px ! important;
-        height: 20px ! important;
+        min-height: 20px ! important;
     }
     
     #page {
