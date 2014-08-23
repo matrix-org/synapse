@@ -1,3 +1,71 @@
+/*** Mobile voodoo ***/
+@media all and (max-device-width: 640px) {
+            
+    #messageTableWrapper {
+        margin-right: 0px ! important;
+    }
+    
+    .leftBlock {
+        width: 8em ! important;
+    }
+    
+    #header,
+    #messageTable,
+    #wrapper,
+    #roomName,
+    #controls {
+        max-width: 640px ! important;
+    }    
+    
+    #userIdCell,
+    #usersTableWrapper,
+    #extraControls {
+        display: none;
+    }
+    
+    #buttonsCell {
+        width: 60px ! important;
+        padding-left: 20px ! important;
+    }
+    
+    #roomLogo {
+        display: none;
+    }
+    
+    #roomName {
+        text-align: left ! important;
+        top: -35px ! important;
+    }
+    
+    .bubble {
+        font-size: 12px ! important;
+        height: 20px ! important;
+    }
+    
+    #page {
+        top: 35px ! important;
+        bottom: 70px ! important;
+    }
+    
+    #header,
+    #page {
+        margin: 5px ! important;
+    }
+    
+    #header {
+        padding: 5px ! important;
+    }
+        
+    /* stop zoom on select */
+    select:focus,
+    textarea,
+    input
+    {
+        font-size: 16px ! important;
+    }
+    
+}
+
 body {
     font-family: "Myriad Pro", "Myriad", Helvetica, Arial, sans-serif;
     font-size: 12pt;
@@ -17,7 +85,6 @@ h1 {
     left: 0px;
     right: 0px;
     margin: 20px;
-    margin: 20px;
 }
 
 #wrapper {
@@ -32,8 +99,7 @@ h1 {
     text-align: right;
     top: -40px;
     position: absolute;
-    font-size: 16pt;
-    margin-bottom: 10px;
+    font-size: 16px;
 }
 
 #controlPanel {
@@ -48,6 +114,10 @@ h1 {
     max-width: 1280px;
     padding: 12px;
     margin: auto;
+}
+
+#buttonsCell {
+    width: 150px;
 }
 
 #inputBarTable {
@@ -111,13 +181,13 @@ h1 {
     color: #fff;
     margin: 2px;
     bottom: 0px;
-    font-size: 8pt;
+    font-size: 12px;
     word-break: break-all;
 }
 
 .userPresence {
     text-align: center;
-    font-size: 8pt;
+    font-size: 12px;
     color: #fff;
     background-color: #aaa;
     border-bottom: 1px #ddd solid;
@@ -159,7 +229,7 @@ h1 {
     background-color: #fff;
     color: #888;
     font-weight: medium;
-    font-size: 8pt;
+    font-size: 12px;
     text-align: right;
     border-top: 1px #ddd solid;
 }
@@ -277,7 +347,7 @@ h1 {
 .profile-avatar {
     width: 160px;
     height: 160px;
-    display:table-cell;
+    display: table-cell;
     vertical-align: middle;
     text-align: center;
 }
@@ -293,13 +363,19 @@ h1 {
 }
 
 #user-displayname {
-    font-size: 16pt;
+    font-size: 24px;
 }
 /******************************/
 
-#header {
-    padding-left: 20px;
-    padding-right: 20px;
+#header
+{
+    padding: 20px;
+    max-width: 1280px;
+    margin: auto;
+}
+
+#logo,
+#roomLogo {
     max-width: 1280px;
     margin: auto;
 }
