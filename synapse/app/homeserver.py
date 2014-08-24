@@ -37,6 +37,7 @@ import logging
 import logging.config
 import sqlite3
 import os
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -255,8 +256,14 @@ def setup():
 
     logger.info("Server hostname: %s", args.host)
 
+    if re.search(":[0-9]+$", args.host):
+        domain_with_port = args.host
+    else:
+        domain_with_port = "%s:%s" % (args.host, args.port)
+
     hs = SynapseHomeServer(
         args.host,
+        domain_with_port=domain_with_port,
         upload_dir=os.path.abspath("uploads"),
         db_name=db_name,
     )
