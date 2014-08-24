@@ -98,5 +98,6 @@ CREATE TABLE IF NOT EXISTS rooms(
 
 CREATE TABLE IF NOT EXISTS room_hosts(
     room_id TEXT NOT NULL,
-    host TEXT NOT NULL
+    host TEXT NOT NULL,
+    CONSTRAINT room_hosts_uniq UNIQUE (room_id, host) ON CONFLICT IGNORE
 );
