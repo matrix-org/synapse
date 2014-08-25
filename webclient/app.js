@@ -45,7 +45,7 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
                 templateUrl: 'room/room.html',
                 controller: 'RoomController'
             }).
-            when('/home', {
+            when('/', {
                 templateUrl: 'home/home.html',
                 controller: 'HomeController'
             }).
@@ -58,7 +58,7 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
                 controller: 'UserController'
             }).
             otherwise({
-                redirectTo: '/home'
+                redirectTo: '/'
             });
             
         $provide.factory('AccessTokenInterceptor', ['$q', '$rootScope', 
