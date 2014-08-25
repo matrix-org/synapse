@@ -34,6 +34,10 @@ To get up and running:
       machine.my.domain.name``.  Then come join ``#matrix:matrix.org`` and
       say hi! :)
 
+For more detailed setup instructions, please see further down this document.
+
+[1] VoIP currently in development
+
    
 About Matrix
 ============
@@ -84,8 +88,6 @@ with the APIs and the demo clients, and let us know your thoughts at
 https://github.com/matrix-org/synapse/issues or at matrix@matrix.org.
 
 Thanks for trying Matrix!
-
-[1] VoIP currently in development
 
 [2] Cryptographic signing of messages isn't turned on yet
 

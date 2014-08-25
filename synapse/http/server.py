@@ -325,7 +325,9 @@ class ContentRepoResource(resource.Resource):
 
             # FIXME (erikj): These should use constants.
             file_name = os.path.basename(fname)
-            url = "http://%s/matrix/content/%s" % (self.hs.hostname, file_name)
+            url = "http://%s/matrix/content/%s" % (
+                self.hs.domain_with_port, file_name
+            )
 
             respond_with_json_bytes(request, 200,
                                     json.dumps({"content_token": url}),

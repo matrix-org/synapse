@@ -1,5 +1,8 @@
-Changes in synapse 0.0.1
-=======================
+Changes in synapse 0.0.1 (2014-08-22)
+=====================================
+Presence has been disabled in this release due to a bug that caused the
+homeserver to spam other remote homeservers.
+
 Homeserver:
  * Completely change the database schema to support generic event types.
  * Improve presence reliability.
@@ -18,3 +21,8 @@ Webclient:
  * Use the new initial sync API to reduce number of round trips to the homeserver.
  * Change url scheme to use room aliases instead of room ids where known.
  * Increase longpoll timeout.
+
+Changes in synapse 0.0.0 (2014-08-13)
+=====================================
+
+ * Initial alpha release
