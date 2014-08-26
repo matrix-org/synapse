@@ -366,6 +366,21 @@ class RoomTriggerBackfill(RestServlet):
         defer.returnValue((200, res))
 
 
+class RoomMembershipRestServlet(RestServlet):
+
+    def register(self, http_server):
+        # /rooms/$roomid/[invite|join|leave]
+        PATTERN = ("/rooms/(?P<room_id>[^/]*)/" +
+            "(?P<membership_action>join|invite|leave)")
+        register_txn_path(self, PATTERN, http_server)
+
+    def on_POST(self, request, room_id, membership_action):
+        return (200, "Not implemented")
+
+    def on_PUT(self, request, room_id, membership_action, txn_id):
+        return (200, "Not implemented")
+
+
 def _parse_json(request):
     try:
         content = json.loads(request.content.read())
@@ -377,6 +392,30 @@ def _parse_json(request):
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
+def register_txn_path(servlet, regex_string, http_server):
+    """Registers a transaction-based path.
+
+    This registers two paths:
+        PUT regex_string/$txnid
+        POST regex_string
+
+    Args:
+        regex_string (str): The regex string to register. Must NOT have a
+        trailing $ as this string will be appended to.
+        http_server : The http_server to register paths with.
+    """
+    http_server.register_path(
+        "POST",
+        client_path_pattern(regex_string + "$"),
+        servlet.on_POST
+    )
+    http_server.register_path(
+        "PUT",
+        client_path_pattern(regex_string + "/(?P<txn_id>[^/]*)$"),
+        servlet.on_PUT
+    )
+
+
 def register_servlets(hs, http_server):
     RoomStateEventRestServlet(hs).register(http_server)
     MessageRestServlet(hs).register(http_server)
@@ -386,3 +425,4 @@ def register_servlets(hs, http_server):
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     RoomTriggerBackfill(hs).register(http_server)
+    RoomMembershipRestServlet(hs).register(http_server)
