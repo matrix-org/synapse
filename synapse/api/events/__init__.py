@@ -45,7 +45,6 @@ class SynapseEvent(JsonEncodedObject):
 
     internal_keys = [
         "is_state",
-        "state_key",
         "prev_events",
         "prev_state",
         "depth",
