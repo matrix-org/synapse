@@ -91,7 +91,25 @@ class Notifier(object):
                 )
 
     def on_new_user_event(self, *args, **kwargs):
-        pass
+        source = self.event_sources.sources[1]
+
+        listeners = self.signal_keys_to_users.get(
+            (source.SIGNAL_NAME, "moose"),
+            []
+        )
+
+        for listener in listeners:
+            events, end_token = yield source.get_new_events_for_user(
+                listener.user,
+                listener.from_token,
+                listener.limit,
+                key="moose",
+            )
+
+            if events:
+                listener.notify(
+                    self, events, listener.from_token, end_token
+                )
 
     def get_events_for(self, user, pagination_config, timeout):
         deferred = defer.Deferred()

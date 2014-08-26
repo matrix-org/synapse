@@ -15,6 +15,8 @@
 
 from twisted.internet import defer
 
+from synapse.api.events import SynapseEvent
+
 from ._base import BaseHandler
 
 import logging
@@ -50,10 +52,15 @@ class EventStreamHandler(BaseHandler):
 
         events, tokens = yield self.notifier.get_events_for(auth_user, pagin_config, timeout)
 
+        chunks = [
+            e.get_dict() if isinstance(e, SynapseEvent) else e
+            for e in events
+        ]
+
         chunk = {
-            "chunk": [e.get_dict() for e in events],
-            "start_token": tokens[0].to_string(),
-            "end_token": tokens[1].to_string(),
+            "chunk": chunks,
+            "start": tokens[0].to_string(),
+            "end": tokens[1].to_string(),
         }
 
         defer.returnValue(chunk)

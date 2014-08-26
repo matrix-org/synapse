@@ -142,7 +142,7 @@ class PresenceHandler(BaseHandler):
     @defer.inlineCallbacks
     def is_presence_visible(self, observer_user, observed_user):
         defer.returnValue(True)
-        return
+        #return
         # FIXME (erikj): This code path absolutely kills the database.
 
         assert(observed_user.is_mine)
@@ -189,7 +189,7 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def set_state(self, target_user, auth_user, state):
-        return
+        # return
         # TODO (erikj): Turn this back on. Why did we end up sending EDUs
         # everywhere?
 

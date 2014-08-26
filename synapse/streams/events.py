@@ -97,7 +97,7 @@ class PresenceStreamSource(object):
             data = [x[1].make_event(user=x[0], clock=clock) for x in updates]
 
             end_token = from_token.copy_and_replace(
-                "presence_key", latest_serial
+                "presence_key", latest_serial + 1
             )
             return ((data, end_token))
         else:
@@ -107,7 +107,7 @@ class PresenceStreamSource(object):
             return (([], end_token))
 
     def get_keys_for_user(self, user):
-        return defer.succeed([])
+        return defer.succeed(["moose"])
 
     def get_current_token_part(self):
         presence = self.hs.get_handlers().presence_handler

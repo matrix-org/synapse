@@ -126,8 +126,8 @@ class MessageHandler(BaseHandler):
 
         chunk = {
             "chunk": [e.get_dict() for e in events],
-            "start_token": from_token.to_string(),
-            "end_token": next_token.to_string(),
+            "start": from_token.to_string(),
+            "end": next_token.to_string(),
         }
 
         defer.returnValue(chunk)
