@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Feedback, Membership
 from synapse.api.errors import SynapseError
 from . import SynapseEvent
 
@@ -93,17 +93,19 @@ class MessageEvent(SynapseEvent):
 class FeedbackEvent(SynapseEvent):
     TYPE = "m.room.message.feedback"
 
-    valid_keys = SynapseEvent.valid_keys + [
-        "msg_id",  # the message ID being acknowledged
-        "msg_sender_id",  # person who is sending the feedback is 'user_id'
-        "feedback_type",  # the type of feedback (delivery, read, etc)
-    ]
+    valid_keys = SynapseEvent.valid_keys
 
     def __init__(self, **kwargs):
         super(FeedbackEvent, self).__init__(**kwargs)
+        if not kwargs["content"]["type"] in Feedback.LIST:
+            raise SynapseError(400, "Bad feedback value.")
 
     def get_content_template(self):
-        return {}
+        return {
+            "type": u"string",
+            "target_event_id": u"string",
+            "msg_sender_id": u"string"
+        }
 
 
 class InviteJoinEvent(SynapseEvent):
