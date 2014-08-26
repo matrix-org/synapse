@@ -181,7 +181,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
         room_id = "!rid1:test"
         yield self.create_room_as(room_id, self.other_user,
                                   tok=self.other_token)
-        yield self.send(room_id, self.other_user, tok=self.other_token)
+        yield self.send(room_id, tok=self.other_token)
 
         # invited to room (expect no content for room)
         yield self.invite(room_id, src=self.other_user, targ=self.user_id,

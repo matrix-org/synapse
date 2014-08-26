@@ -162,12 +162,12 @@ angular.module('matrixService', [])
             return doRequest("GET", path, undefined, {});
         },
 
-        sendMessage: function(room_id, msg_id, content) {
+        sendMessage: function(room_id, txn_id, content) {
             // The REST path spec
-            var path = "/rooms/$room_id/messages/$from/$msg_id";
+            var path = "/rooms/$room_id/send/m.room.message/$txn_id";
 
-            if (!msg_id) {
-                msg_id = "m" + new Date().getTime();
+            if (!txn_id) {
+                txn_id = "m" + new Date().getTime();
             }
 
             // Like the cmd client, escape room ids
@@ -175,8 +175,7 @@ angular.module('matrixService', [])
 
             // Customize it
             path = path.replace("$room_id", room_id);
-            path = path.replace("$from", config.user_id);
-            path = path.replace("$msg_id", msg_id);
+            path = path.replace("$txn_id", txn_id);
 
             return doRequest("PUT", path, undefined, content);
         },
