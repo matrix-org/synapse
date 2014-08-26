@@ -60,7 +60,9 @@ class DataStore(RoomMemberStore, RoomStore,
     def persist_event(self, event=None, backfilled=False, pdu=None):
         # FIXME (erikj): This should be removed when we start amalgamating
         # event and pdu storage
-        yield self.hs.get_federation().fill_out_prev_events(event)
+        if event is not None:
+            federation_handler = self.hs.get_handlers().federation_handler
+            yield federation_handler.fill_out_prev_events(event)
 
         stream_ordering = None
         if backfilled:

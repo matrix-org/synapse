@@ -368,7 +368,8 @@ class RoomCreationHandler(BaseRoomHandler):
         yield self.state_handler.handle_new_event(config_event)
         # store_id = persist...
 
-        yield self.hs.get_federation().handle_new_event(config_event)
+        federation_handler = self.hs.get_handlers().federation_handler
+        yield federation_handler.handle_new_event(config_event)
         # self.notifier.on_new_room_event(event, store_id)
 
         content = {"membership": Membership.JOIN}

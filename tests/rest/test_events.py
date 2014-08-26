@@ -128,9 +128,9 @@ class EventStreamPermissionsTestCase(RestTestCase):
             "test",
             db_pool=None,
             http_client=None,
-            federation=Mock(),
             replication_layer=Mock(),
             state_handler=state_handler,
+            datastore=MemoryDataStore(),
             persistence_service=persistence_service,
             clock=Mock(spec=[
                 "call_later",
@@ -139,9 +139,10 @@ class EventStreamPermissionsTestCase(RestTestCase):
             ]),
         )
 
+        hs.get_handlers().federation_handler = Mock()
+
         hs.get_clock().time_msec.return_value = 1000000
 
-        hs.datastore = MemoryDataStore()
         synapse.rest.register.register_servlets(hs, self.mock_resource)
         synapse.rest.events.register_servlets(hs, self.mock_resource)
         synapse.rest.room.register_servlets(hs, self.mock_resource)

@@ -20,7 +20,6 @@
 
 # Imports required for the default HomeServer() implementation
 from synapse.federation import initialize_http_replication
-from synapse.federation.handler import FederationEventHandler
 from synapse.api.events.factory import EventFactory
 from synapse.api.notifier import Notifier
 from synapse.api.auth import Auth
@@ -58,7 +57,6 @@ class BaseHomeServer(object):
         'http_client',
         'db_pool',
         'persistence_service',
-        'federation',
         'replication_layer',
         'datastore',
         'event_factory',
@@ -151,9 +149,6 @@ class HomeServer(BaseHomeServer):
 
     def build_replication_layer(self):
         return initialize_http_replication(self)
-
-    def build_federation(self):
-        return FederationEventHandler(self)
 
     def build_datastore(self):
         return DataStore(self)

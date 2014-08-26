@@ -53,22 +53,25 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             handlers=NonCallableMock(spec_set=[
                 "room_member_handler",
                 "profile_handler",
+                "federation_handler",
             ]),
             auth=NonCallableMock(spec_set=["check"]),
-            federation=NonCallableMock(spec_set=[
-                "handle_new_event",
-                "get_state_for_room",
-            ]),
             state_handler=NonCallableMock(spec_set=["handle_new_event"]),
         )
+
+        self.federation = NonCallableMock(spec_set=[
+            "handle_new_event",
+            "get_state_for_room",
+        ])
 
         self.datastore = hs.get_datastore()
         self.handlers = hs.get_handlers()
         self.notifier = hs.get_notifier()
-        self.federation = hs.get_federation()
         self.state_handler = hs.get_state_handler()
         self.distributor = hs.get_distributor()
         self.hs = hs
+
+        self.handlers.federation_handler = self.federation
 
         self.distributor.declare("collect_presencelike_data")
 
@@ -333,20 +336,23 @@ class RoomCreationTest(unittest.TestCase):
             handlers=NonCallableMock(spec_set=[
                 "room_creation_handler",
                 "room_member_handler",
+                "federation_handler",
             ]),
             auth=NonCallableMock(spec_set=["check"]),
-            federation=NonCallableMock(spec_set=[
-                "handle_new_event",
-            ]),
             state_handler=NonCallableMock(spec_set=["handle_new_event"]),
         )
+
+        self.federation = NonCallableMock(spec_set=[
+            "handle_new_event",
+        ])
 
         self.datastore = hs.get_datastore()
         self.handlers = hs.get_handlers()
         self.notifier = hs.get_notifier()
-        self.federation = hs.get_federation()
         self.state_handler = hs.get_state_handler()
         self.hs = hs
+
+        self.handlers.federation_handler = self.federation
 
         self.handlers.room_creation_handler = RoomCreationHandler(self.hs)
         self.room_creation_handler = self.handlers.room_creation_handler

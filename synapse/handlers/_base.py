@@ -43,4 +43,5 @@ class BaseRoomHandler(BaseHandler):
 
         self.notifier.on_new_room_event(event, store_id)
 
-        yield self.hs.get_federation().handle_new_event(event, snapshot)
+        federation_handler = self.hs.get_handlers().federation_handler
+        yield federation_handler.handle_new_event(event, snapshot)

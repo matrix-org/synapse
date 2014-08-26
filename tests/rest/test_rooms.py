@@ -54,12 +54,12 @@ class RoomPermissionsTestCase(RestTestCase):
             "test",
             db_pool=None,
             http_client=None,
-            federation=Mock(),
             datastore=MemoryDataStore(),
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
         )
+        hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
             return hs.parse_userid(self.auth_user_id)
@@ -403,12 +403,12 @@ class RoomsMemberListTestCase(RestTestCase):
             "test",
             db_pool=None,
             http_client=None,
-            federation=Mock(),
             datastore=MemoryDataStore(),
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
         )
+        hs.get_handlers().federation_handler = Mock()
 
         self.auth_user_id = self.user_id
 
@@ -484,12 +484,12 @@ class RoomsCreateTestCase(RestTestCase):
             "test",
             db_pool=None,
             http_client=None,
-            federation=Mock(),
             datastore=MemoryDataStore(),
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
         )
+        hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
             return hs.parse_userid(self.auth_user_id)
@@ -626,12 +626,12 @@ class RoomTopicTestCase(RestTestCase):
             "test",
             db_pool=None,
             http_client=None,
-            federation=Mock(),
             datastore=MemoryDataStore(),
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
         )
+        hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
             return hs.parse_userid(self.auth_user_id)
@@ -729,12 +729,12 @@ class RoomMemberStateTestCase(RestTestCase):
             "test",
             db_pool=None,
             http_client=None,
-            federation=Mock(),
             datastore=MemoryDataStore(),
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
         )
+        hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
             return hs.parse_userid(self.auth_user_id)
@@ -855,12 +855,12 @@ class RoomMessagesTestCase(RestTestCase):
             "test",
             db_pool=None,
             http_client=None,
-            federation=Mock(),
             datastore=MemoryDataStore(),
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
         )
+        hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
             return hs.parse_userid(self.auth_user_id)
