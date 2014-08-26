@@ -426,13 +426,13 @@ class RoomsMemberListTestCase(RestTestCase):
         room_id = "!aa:test"
         yield self.create_room_as(room_id, self.user_id)
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/rooms/%s/members/list" % room_id)
+                           "/rooms/%s/members" % room_id)
         self.assertEquals(200, code, msg=str(response))
 
     @defer.inlineCallbacks
     def test_get_member_list_no_room(self):
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/rooms/roomdoesnotexist/members/list")
+                           "/rooms/roomdoesnotexist/members")
         self.assertEquals(403, code, msg=str(response))
 
     @defer.inlineCallbacks
@@ -440,14 +440,14 @@ class RoomsMemberListTestCase(RestTestCase):
         room_id = "!bb:test"
         yield self.create_room_as(room_id, "@some_other_guy:red")
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/rooms/%s/members/list" % room_id)
+                           "/rooms/%s/members" % room_id)
         self.assertEquals(403, code, msg=str(response))
 
     @defer.inlineCallbacks
     def test_get_member_list_mixed_memberships(self):
         room_id = "!bb:test"
         room_creator = "@some_other_guy:blue"
-        room_path = "/rooms/%s/members/list" % room_id
+        room_path = "/rooms/%s/members" % room_id
         yield self.create_room_as(room_id, room_creator)
         yield self.invite(room=room_id, src=room_creator,
                           targ=self.user_id)
