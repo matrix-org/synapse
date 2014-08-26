@@ -21,6 +21,7 @@ from twisted.trial import unittest
 
 from synapse.api.constants import Membership
 
+import json
 import time
 
 class RestTestCase(unittest.TestCase):
@@ -71,23 +72,22 @@ class RestTestCase(unittest.TestCase):
                                      expect_code=expect_code)
 
     @defer.inlineCallbacks
-    def change_membership(self, room=None, src=None, targ=None,
-                          membership=None, expect_code=200, tok=None):
+    def change_membership(self, room, src, targ, membership, tok=None,
+                          expect_code=200):
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
-        path = "/rooms/%s/members/%s/state" % (room, targ)
+        path = "/rooms/%s/state/m.room.member/%s" % (room, targ)
         if tok:
             path = path + "?access_token=%s" % tok
 
-        if membership == Membership.LEAVE:
-            (code, response) = yield self.mock_resource.trigger("DELETE", path,
-                                    None)
-            self.assertEquals(expect_code, code, msg=str(response))
-        else:
-            (code, response) = yield self.mock_resource.trigger("PUT", path,
-                                    '{"membership":"%s"}' % membership)
-            self.assertEquals(expect_code, code, msg=str(response))
+        data = {
+            "membership": membership
+        }
+
+        (code, response) = yield self.mock_resource.trigger("PUT", path,
+            json.dumps(data))
+        self.assertEquals(expect_code, code, msg=str(response))
 
         self.auth_user_id = temp_id
 

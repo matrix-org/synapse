@@ -99,7 +99,6 @@ class FederationTestCase(unittest.TestCase):
         new_event = mem_handler.change_membership.call_args[0][0]
         self.assertEquals(RoomMemberEvent.TYPE, new_event.type)
         self.assertEquals(room_id, new_event.room_id)
-        self.assertEquals(user_id, new_event.target_user_id)
         self.assertEquals(user_id, new_event.state_key)
         self.assertEquals(Membership.JOIN, new_event.membership)
 
