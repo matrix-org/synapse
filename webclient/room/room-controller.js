@@ -154,7 +154,10 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
     var updateMemberList = function(chunk) {
         if (chunk.room_id != $scope.room_id) return;
 
-        var isNewMember = !(chunk.target_user_id in $scope.members);
+        // set target_user_id to keep things clear
+        var target_user_id = chunk.state_key;
+
+        var isNewMember = !(target_user_id in $scope.members);
         if (isNewMember) {
             // FIXME: why are we copying these fields around inside chunk?
             if ("state" in chunk.content) {
@@ -172,7 +175,7 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
             if ("avatar_url" in chunk.content) {
                 chunk.avatar_url = chunk.content.avatar_url;
             }
-            $scope.members[chunk.target_user_id] = chunk;
+            $scope.members[target_user_id] = chunk;
 
 /*
             // Stale code for explicitly hammering the homeserver for every displayname & avatar_url
@@ -202,13 +205,13 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
             });
 */            
 
-            if (chunk.target_user_id in $rootScope.presence) {
-                updatePresence($rootScope.presence[chunk.target_user_id]);
+            if (target_user_id in $rootScope.presence) {
+                updatePresence($rootScope.presence[target_user_id]);
             }
         }
         else {
             // selectively update membership else it will nuke the picture and displayname too :/
-            var member = $scope.members[chunk.target_user_id];
+            var member = $scope.members[target_user_id];
             member.content.membership = chunk.content.membership;
         }
     }

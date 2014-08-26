@@ -61,7 +61,7 @@ class SynapseCmd(cmd.Cmd):
             "send_delivery_receipts": "on"
         }
         self.path_prefix = "/matrix/client/api/v1"
-        self.event_stream_token = "START"
+        self.event_stream_token = "END"
         self.prompt = ">>> "
 
     def do_EOF(self, line):  # allows CTRL+D quitting
@@ -402,9 +402,7 @@ class SynapseCmd(cmd.Cmd):
         """Leaves a room: "leave <roomid>" """
         try:
             args = self._parse(line, ["roomid"], force_keys=True)
-            path = ("/rooms/%s/members/%s/state" %
-                    (urllib.quote(args["roomid"]), self._usr()))
-            reactor.callFromThread(self._run_and_pprint, "DELETE", path)
+            self._do_membership_change(args["roomid"], "leave", self._usr())
         except Exception as e:
             print e
 
@@ -567,7 +565,7 @@ class SynapseCmd(cmd.Cmd):
                                alt_text="Sent receipt for %s" % event["msg_id"])
 
     def _do_membership_change(self, roomid, membership, userid):
-        path = "/rooms/%s/members/%s/state" % (urllib.quote(roomid), userid)
+        path = "/rooms/%s/state/m.room.member/%s" % (urllib.quote(roomid), urllib.quote(userid))
         data = {
             "membership": membership
         }

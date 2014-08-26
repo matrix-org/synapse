@@ -35,13 +35,14 @@ class RoomMemberStore(SQLBaseStore):
     def _store_room_member(self, event):
         """Store a room member in the database.
         """
-        domain = self.hs.parse_userid(event.target_user_id).domain
+        target_user_id = event.state_key
+        domain = self.hs.parse_userid(target_user_id).domain
 
         yield self._simple_insert(
             "room_memberships",
             {
                 "event_id": event.event_id,
-                "user_id": event.target_user_id,
+                "user_id": target_user_id,
                 "sender": event.user_id,
                 "room_id": event.room_id,
                 "membership": event.membership,

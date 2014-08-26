@@ -41,7 +41,7 @@ angular.module('HomeController', ['matrixService', 'mFileInput', 'mFileUpload', 
     
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
         var config = matrixService.config();
-        if (event.target_user_id === config.user_id && event.content.membership === "invite") {
+        if (event.state_key === config.user_id && event.content.membership === "invite") {
             console.log("Invited to room " + event.room_id);
             // FIXME push membership to top level key to match /im/sync
             event.membership = event.content.membership;

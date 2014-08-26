@@ -54,10 +54,6 @@ angular.module('eventHandlerService', [])
     }
     
     var handleMessage = function(event, isLiveEvent) {
-        if ("membership_target" in event.content) {
-            event.user_id = event.content.membership_target;
-        }
-        
         initRoom(event.room_id);
         
         if (isLiveEvent) {
