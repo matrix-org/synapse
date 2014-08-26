@@ -19,8 +19,8 @@ from synapse.api.streams import PaginationConfig
 from base import RestServlet, client_path_pattern
 
 
-class ImSyncRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/im/sync$")
+class InitialSyncRestServlet(RestServlet):
+    PATTERN = client_path_pattern("/initialSync$")
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -37,4 +37,4 @@ class ImSyncRestServlet(RestServlet):
 
 
 def register_servlets(hs, http_server):
-    ImSyncRestServlet(hs).register(http_server)
+    InitialSyncRestServlet(hs).register(http_server)

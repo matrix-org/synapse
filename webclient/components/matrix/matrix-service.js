@@ -108,7 +108,7 @@ angular.module('matrixService', [])
         // List all rooms joined or been invited to
         rooms: function(from, to, limit) {
             // The REST path spec
-            var path = "/im/sync";
+            var path = "/initialSync";
 
             return doRequest("GET", path);
         },
@@ -217,13 +217,13 @@ angular.module('matrixService', [])
             // Like the cmd client, escape room ids
             room_id = encodeURIComponent(room_id);
 
-            var path = "/rooms/$room_id/members/list";
+            var path = "/rooms/$room_id/members";
             path = path.replace("$room_id", room_id);
             return doRequest("GET", path);
         },
         
         paginateBackMessages: function(room_id, from_token, limit) {
-            var path = "/rooms/$room_id/messages/list";
+            var path = "/rooms/$room_id/messages";
             path = path.replace("$room_id", room_id);
             var params = {
                 from: from_token,

@@ -306,7 +306,7 @@ class FeedbackRestServlet(RestServlet):
 
 
 class RoomMemberListRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/members/list$")
+    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/members$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -333,7 +333,7 @@ class RoomMemberListRestServlet(RestServlet):
 
 
 class RoomMessageListRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/messages/list$")
+    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/messages$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
