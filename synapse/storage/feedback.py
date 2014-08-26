@@ -24,8 +24,8 @@ import json
 
 class FeedbackStore(SQLBaseStore):
 
-    def _store_feedback(self, event):
-        return self._simple_insert("feedback", {
+    def _store_feedback_txn(self, txn, event):
+        self._simple_insert_txn(txn, "feedback", {
             "event_id": event.event_id,
             "feedback_type": event.feedback_type,
             "room_id": event.room_id,

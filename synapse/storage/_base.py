@@ -86,16 +86,18 @@ class SQLBaseStore(object):
             table : string giving the table name
             values : dict of new column names and values for them
         """
+        return self._db_pool.runInteraction(
+            self._simple_insert_txn, table, values,
+        )
+
+    def _simple_insert_txn(self, txn, table, values):
         sql = "INSERT INTO %s (%s) VALUES(%s)" % (
             table,
             ", ".join(k for k in values),
             ", ".join("?" for k in values)
         )
-
-        def func(txn):
-            txn.execute(sql, values.values())
-            return txn.lastrowid
-        return self._db_pool.runInteraction(func)
+        txn.execute(sql, values.values())
+        return txn.lastrowid
 
     def _simple_select_one(self, table, keyvalues, retcols,
                            allow_none=False):

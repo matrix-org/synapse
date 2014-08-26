@@ -31,13 +31,13 @@ logger = logging.getLogger(__name__)
 
 class RoomMemberStore(SQLBaseStore):
 
-    @defer.inlineCallbacks
-    def _store_room_member(self, event):
+    def _store_room_member_txn(self, txn, event):
         """Store a room member in the database.
         """
         domain = self.hs.parse_userid(event.target_user_id).domain
 
-        yield self._simple_insert(
+        self._simple_insert_txn(
+            txn,
             "room_memberships",
             {
                 "event_id": event.event_id,
@@ -54,13 +54,13 @@ class RoomMemberStore(SQLBaseStore):
                 "INSERT OR IGNORE INTO room_hosts (room_id, host) "
                 "VALUES (?, ?)"
             )
-            yield self._execute(None, sql, event.room_id, domain)
+            txn.execute(sql, event.room_id, domain)
         else:
             sql = (
                 "DELETE FROM room_hosts WHERE room_id = ? AND host = ?"
             )
 
-            yield self._execute(None, sql, event.room_id, domain)
+            txn.execute(sql, event.room_id, domain)
 
     @defer.inlineCallbacks
     def get_room_member(self, user_id, room_id):

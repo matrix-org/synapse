@@ -131,8 +131,9 @@ class RoomStore(SQLBaseStore):
 
         defer.returnValue(ret)
 
-    def _store_room_topic(self, event):
-        return self._simple_insert(
+    def _store_room_topic_txn(self, txn, event):
+        self._simple_insert_txn(
+            txn,
             "topics",
             {
                 "event_id": event.event_id,
@@ -141,8 +142,9 @@ class RoomStore(SQLBaseStore):
             }
         )
 
-    def _store_room_name(self, event):
-        return self._simple_insert(
+    def _store_room_name_txn(self, txn, event):
+        self._simple_insert_txn(
+            txn,
             "room_names",
             {
                 "event_id": event.event_id,

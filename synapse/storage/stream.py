@@ -283,17 +283,20 @@ class StreamStore(SQLBaseStore):
             )
         )
 
-    @defer.inlineCallbacks
     def get_room_events_max_id(self):
-        res = yield self._execute_and_decode(
+        return self._db_pool.runInteraction(self._get_room_events_max_id_txn)
+
+    def _get_room_events_max_id_txn(self, txn):
+        txn.execute(
             "SELECT MAX(stream_ordering) as m FROM events"
         )
+
+        res = self.cursor_to_dict(txn)
 
         logger.debug("get_room_events_max_id: %s", res)
 
         if not res or not res[0] or not res[0]["m"]:
-            defer.returnValue("s1")
-            return
+            return "s1"
 
         key = res[0]["m"] + 1
-        defer.returnValue("s%d" % (key,))
+        return "s%d" % (key,)

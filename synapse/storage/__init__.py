@@ -57,19 +57,21 @@ class DataStore(RoomMemberStore, RoomStore,
     @defer.inlineCallbacks
     @log_function
     def persist_event(self, event, backfilled=False):
-        if event.type == RoomMemberEvent.TYPE:
-            yield self._store_room_member(event)
-        elif event.type == FeedbackEvent.TYPE:
-            yield self._store_feedback(event)
-#        elif event.type == RoomConfigEvent.TYPE:
-#            yield self._store_room_config(event)
-        elif event.type == RoomNameEvent.TYPE:
-            yield self._store_room_name(event)
-        elif event.type == RoomTopicEvent.TYPE:
-            yield self._store_room_topic(event)
+        # FIXME (erikj): This should be removed when we start amalgamating
+        # event and pdu storage
+        yield self.hs.get_federation().fill_out_prev_events(event)
 
-        ret = yield self._store_event(event, backfilled)
-        defer.returnValue(ret)
+        stream_ordering = None
+        if backfilled:
+            if not self.min_token_deferred.called:
+                yield self.min_token_deferred
+            self.min_token -= 1
+            stream_ordering = self.min_token
+
+        latest = yield self._db_pool.runInteraction(
+            _persist_event_txn, event, backfilled, stream_ordering
+        )
+        defer.returnValue(latest)
 
     @defer.inlineCallbacks
     def get_event(self, event_id):
@@ -89,12 +91,18 @@ class DataStore(RoomMemberStore, RoomStore,
         event = self._parse_event_from_row(events_dict)
         defer.returnValue(event)
 
-    @defer.inlineCallbacks
     @log_function
-    def _store_event(self, event, backfilled):
-        # FIXME (erikj): This should be removed when we start amalgamating
-        # event and pdu storage
-        yield self.hs.get_federation().fill_out_prev_events(event)
+    def _persist_event_txn(self, txn, event, backfilled, stream_ordering=None):
+        if event.type == RoomMemberEvent.TYPE:
+            self._store_room_member_txn(txn, event)
+        elif event.type == FeedbackEvent.TYPE:
+            self._store_feedback_txn(txn,event)
+#        elif event.type == RoomConfigEvent.TYPE:
+#            self._store_room_config_txn(txn, event)
+        elif event.type == RoomNameEvent.TYPE:
+            self._store_room_name_txn(txn, event)
+        elif event.type == RoomTopicEvent.TYPE:
+            self._store_room_topic_txn(txn, event)
 
         vals = {
             "topological_ordering": event.depth,
@@ -105,11 +113,8 @@ class DataStore(RoomMemberStore, RoomStore,
             "processed": True,
         }
 
-        if backfilled:
-            if not self.min_token_deferred.called:
-                yield self.min_token_deferred
-            self.min_token -= 1
-            vals["stream_ordering"] = self.min_token
+        if stream_ordering is not None:
+            vals["stream_ordering"] = stream_ordering
 
         unrec = {
             k: v
@@ -119,7 +124,7 @@ class DataStore(RoomMemberStore, RoomStore,
         vals["unrecognized_keys"] = json.dumps(unrec)
 
         try:
-            yield self._simple_insert("events", vals)
+            self._simple_insert_txn(txn, "events", vals)
         except:
             logger.exception(
                 "Failed to persist, probably duplicate: %s",
@@ -138,9 +143,10 @@ class DataStore(RoomMemberStore, RoomStore,
             if hasattr(event, "prev_state"):
                 vals["prev_state"] = event.prev_state
 
-            yield self._simple_insert("state_events", vals)
+            self._simple_insert_txn(txn, "state_events", vals)
 
-            yield self._simple_insert(
+            self._simple_insert_txn(
+                txn
                 "current_state_events",
                 {
                     "event_id": event.event_id,
@@ -150,8 +156,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 }
             )
 
-        latest = yield self.get_room_events_max_id()
-        defer.returnValue(latest)
+        return self._get_room_events_max_id_(txn)
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
