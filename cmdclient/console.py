@@ -409,10 +409,9 @@ class SynapseCmd(cmd.Cmd):
     def do_send(self, line):
         """Sends a message. "send <roomid> <body>" """
         args = self._parse(line, ["roomid", "body"])
-        msg_id = "m%s" % int(time.time())
-        path = "/rooms/%s/messages/%s/%s" % (urllib.quote(args["roomid"]),
-                                             self._usr(),
-                                             msg_id)
+        txn_id = "txn%s" % int(time.time())
+        path = "/rooms/%s/send/m.room.message/%s" % (urllib.quote(args["roomid"]),
+                                             txn_id)
         body_json = {
             "msgtype": "m.text",
             "body": args["body"]

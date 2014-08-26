@@ -228,54 +228,6 @@ class JoinRoomAliasServlet(RestServlet):
         defer.returnValue((200, ret_dict))
 
 
-class MessageRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/messages/"
-                                  + "(?P<sender_id>[^/]*)/(?P<msg_id>[^/]*)$")
-
-    def get_event_type(self):
-        return MessageEvent.TYPE
-
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_id, sender_id, msg_id):
-        user = yield self.auth.get_user_by_req(request)
-
-        msg_handler = self.handlers.message_handler
-        msg = yield msg_handler.get_message(room_id=urllib.unquote(room_id),
-                                            sender_id=urllib.unquote(sender_id),
-                                            msg_id=msg_id,
-                                            user_id=user.to_string(),
-                                            )
-
-        if not msg:
-            raise SynapseError(404, "Message not found.",
-                               errcode=Codes.NOT_FOUND)
-
-        defer.returnValue((200, json.loads(msg.content)))
-
-    @defer.inlineCallbacks
-    def on_PUT(self, request, room_id, sender_id, msg_id):
-        user = yield self.auth.get_user_by_req(request)
-
-        if user.to_string() != urllib.unquote(sender_id):
-            raise SynapseError(403, "Must send messages as yourself.",
-                               errcode=Codes.FORBIDDEN)
-
-        content = _parse_json(request)
-
-        event = self.event_factory.create_event(
-            etype=self.get_event_type(),
-            room_id=urllib.unquote(room_id),
-            user_id=user.to_string(),
-            msg_id=msg_id,
-            content=content
-            )
-
-        msg_handler = self.handlers.message_handler
-        yield msg_handler.send_message(event)
-
-        defer.returnValue((200, ""))
-
-
 class FeedbackRestServlet(RestServlet):
     PATTERN = client_path_pattern(
         "/rooms/(?P<room_id>[^/]*)/messages/" +
@@ -495,7 +447,6 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
 
 def register_servlets(hs, http_server):
     RoomStateEventRestServlet(hs).register(http_server)
-    MessageRestServlet(hs).register(http_server)
     FeedbackRestServlet(hs).register(http_server)
     RoomCreateRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
