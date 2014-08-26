@@ -25,14 +25,14 @@ from synapse.api.events.room import (
 from synapse.api.streams.event import EventStream, EventsStreamData
 from synapse.handlers.presence import PresenceStreamData
 from synapse.util import stringutils
-from ._base import BaseHandler
+from ._base import BaseRoomHandler
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class MessageHandler(BaseHandler):
+class MessageHandler(BaseRoomHandler):
 
     def __init__(self, hs):
         super(MessageHandler, self).__init__(hs)
@@ -89,16 +89,7 @@ class MessageHandler(BaseHandler):
         if not suppress_auth:
             yield self.auth.check(event, snapshot, raises=True)
 
-        # store message in db
-        store_id = yield self.store.persist_event(event)
-
-        event.destinations = yield self.store.get_joined_hosts_for_room(
-            event.room_id
-        )
-
-        self.notifier.on_new_room_event(event, store_id)
-
-        yield self.hs.get_federation().handle_new_event(event, snapshot)
+        yield self._on_new_room_event(event, snapshot)
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
@@ -144,15 +135,7 @@ class MessageHandler(BaseHandler):
 
         yield self.state_handler.handle_new_event(event)
 
-        # store in db
-        store_id = yield self.store.persist_event(event)
-
-        event.destinations = yield self.store.get_joined_hosts_for_room(
-            event.room_id
-        )
-        self.notifier.on_new_room_event(event, store_id)
-
-        yield self.hs.get_federation().handle_new_event(event, snapshot)
+        yield self._on_new_room_event(event, snapshot)
 
     @defer.inlineCallbacks
     def get_room_data(self, user_id=None, room_id=None,
@@ -226,14 +209,7 @@ class MessageHandler(BaseHandler):
         yield self.auth.check(event, snapshot, raises=True)
 
         # store message in db
-        store_id = yield self.store.persist_event(event)
-
-        event.destinations = yield self.store.get_joined_hosts_for_room(
-            event.room_id
-        )
-        yield self.hs.get_federation().handle_new_event(event, snapshot)
-
-        self.notifier.on_new_room_event(event, store_id)
+        yield self._on_new_room_event(event, snapshot)
 
     @defer.inlineCallbacks
     def snapshot_all_rooms(self, user_id=None, pagin_config=None,
@@ -311,7 +287,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue(ret)
 
 
-class RoomCreationHandler(BaseHandler):
+class RoomCreationHandler(BaseRoomHandler):
 
     @defer.inlineCallbacks
     def create_room(self, user_id, room_id, config):
@@ -417,7 +393,7 @@ class RoomCreationHandler(BaseHandler):
         defer.returnValue(result)
 
 
-class RoomMemberHandler(BaseHandler):
+class RoomMemberHandler(BaseRoomHandler):
     # TODO(paul): This handler currently contains a messy conflation of
     #   low-level API that works on UserID objects and so on, and REST-level
     #   API that takes ID strings and returns pagination chunks. These concerns
@@ -707,39 +683,26 @@ class RoomMemberHandler(BaseHandler):
 
         defer.returnValue([r.room_id for r in rooms])
 
-    @defer.inlineCallbacks
     def _do_local_membership_update(self, event, membership, snapshot):
-        # store membership
-        store_id = yield self.store.persist_event(event)
-
-        # Send a PDU to all hosts who have joined the room.
-        destinations = yield self.store.get_joined_hosts_for_room(
-            event.room_id
-        )
+        destinations = []
 
         # If we're inviting someone, then we should also send it to that
         # HS.
         target_user_id = event.state_key
         if membership == Membership.INVITE:
-            host = UserID.from_string(
-                target_user_id, self.hs
-            ).domain
+            host = UserID.from_string(target_user_id, self.hs).domain
             destinations.append(host)
 
         # If we are joining a remote HS, include that.
         if membership == Membership.JOIN:
-            host = UserID.from_string(
-                target_user_id, self.hs
-            ).domain
+            host = UserID.from_string(target_user_id, self.hs).domain
             destinations.append(host)
 
-        event.destinations = list(set(destinations))
+        return self._on_new_room_event(
+            event, snapshot, extra_destinations=destinations
+        )
 
-        yield self.hs.get_federation().handle_new_event(event, snapshot)
-        self.notifier.on_new_room_event(event, store_id)
-
-
-class RoomListHandler(BaseHandler):
+class RoomListHandler(BaseRoomHandler):
 
     @defer.inlineCallbacks
     def get_public_room_list(self):

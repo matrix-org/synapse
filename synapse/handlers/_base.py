@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+from twisted.internet import defer
 
 class BaseHandler(object):
 
@@ -26,3 +26,21 @@ class BaseHandler(object):
         self.state_handler = hs.get_state_handler()
         self.distributor = hs.get_distributor()
         self.hs = hs
+
+
+class BaseRoomHandler(BaseHandler):
+
+    @defer.inlineCallbacks
+    def _on_new_room_event(self, event, snapshot, extra_destinations=[]):
+        store_id = yield self.store.persist_event(event)
+
+        destinations = set(extra_destinations)
+        # Send a PDU to all hosts who have joined the room.
+        destinations.update((yield self.store.get_joined_hosts_for_room(
+            event.room_id
+        )))
+        event.destinations = list(destinations)
+
+        self.notifier.on_new_room_event(event, store_id)
+
+        yield self.hs.get_federation().handle_new_event(event, snapshot)
