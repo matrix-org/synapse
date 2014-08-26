@@ -20,9 +20,9 @@ limitations under the License.
 
 'use strict';
 
-angular.module('MatrixWebClientController', ['matrixService'])
-.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', 'matrixService', 'eventStreamService',
-                               function($scope, $location, $rootScope, matrixService, eventStreamService) {
+angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'eventStreamService'])
+.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventStreamService',
+                               function($scope, $location, $rootScope, matrixService, mPresence, eventStreamService) {
          
     // Check current URL to avoid to display the logout button on the login page
     $scope.location = $location.path();
@@ -34,6 +34,7 @@ angular.module('MatrixWebClientController', ['matrixService'])
 
     if (matrixService.isUserLoggedIn()) {
         // eventStreamService.resume();
+        mPresence.start();
     }
     
     $scope.go = function(url) {
@@ -42,9 +43,13 @@ angular.module('MatrixWebClientController', ['matrixService'])
     
     // Logs the user out 
     $scope.logout = function() {
+        
         // kill the event stream
         eventStreamService.stop();
-    
+
+        // Do not update presence anymore
+        mPresence.stop();
+
         // Clean permanent data
         matrixService.setConfig({});
         matrixService.saveConfig();
@@ -66,7 +71,6 @@ angular.module('MatrixWebClientController', ['matrixService'])
             window.Notification.requestPermission(function(){});
         }
     };
-    
     
 }]);
 

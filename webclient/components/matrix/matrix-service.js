@@ -358,6 +358,23 @@ angular.module('matrixService', [])
                 return false;
             }
         },
+        
+        // Enum of presence state
+        presence: {
+            offline: "offline",
+            unavailable: "unavailable",
+            online: "online",
+            free_for_chat: "free_for_chat"
+        },
+        
+        // Set the logged in user presence state
+        setUserPresence: function(presence) {
+            var path = "/presence/$user_id/status";
+            path = path.replace("$user_id", config.user_id);
+            return doRequest("PUT", path, undefined, {
+                state: presence
+            });
+        },
 
         /****** Permanent storage of user information ******/
         
