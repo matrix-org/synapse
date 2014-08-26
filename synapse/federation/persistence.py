@@ -40,25 +40,6 @@ class PduActions(object):
         self.store = datastore
 
     @log_function
-    def persist_received(self, pdu):
-        """ Persists the given `Pdu` that was received from a remote home
-        server.
-
-        Returns:
-            Deferred
-        """
-        return self.store.persist_event(pdu=pdu)
-
-    @log_function
-    def persist_outgoing(self, pdu):
-        """ Persists the given `Pdu` that this home server created.
-
-        Returns:
-            Deferred
-        """
-        return self.store.persist_event(pdu=pdu)
-
-    @log_function
     def mark_as_processed(self, pdu):
         """ Persist the fact that we have fully processed the given `Pdu`
 

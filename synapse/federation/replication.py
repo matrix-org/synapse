@@ -137,7 +137,7 @@ class ReplicationLayer(object):
         #yield self.pdu_actions.populate_previous_pdus(pdu)
 
         # Save *before* trying to send
-        yield self.pdu_actions.persist_outgoing(pdu)
+        yield self.store.persist_event(pdu=pdu)
 
         logger.debug("[%s] Persisted PDU", pdu.pdu_id)
         logger.debug("[%s] transaction_layer.enqueue_pdu... ", pdu.pdu_id)
@@ -450,7 +450,7 @@ class ReplicationLayer(object):
                             logger.exception("Failed to get PDU")
 
         # Persist the Pdu, but don't mark it as processed yet.
-        yield self.pdu_actions.persist_received(pdu)
+        yield self.store.persist_event(pdu=pdu)
 
         if not backfilled:
             ret = yield self.handler.on_receive_pdu(pdu, backfilled=backfilled)
