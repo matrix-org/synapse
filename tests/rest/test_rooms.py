@@ -94,7 +94,7 @@ class RoomPermissionsTestCase(RestTestCase):
         # set topic for public room
         (code, response) = yield self.mock_resource.trigger(
                            "PUT",
-                           "/rooms/%s/topic" % self.created_public_rmid,
+                           "/rooms/%s/state/m.room.topic" % self.created_public_rmid,
                            '{"topic":"Public Room Topic"}')
         self.assertEquals(200, code, msg=str(response))
 
@@ -175,15 +175,15 @@ class RoomPermissionsTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_topic_perms(self):
         topic_content = '{"topic":"My Topic Name"}'
-        topic_path = "/rooms/%s/topic" % self.created_rmid
+        topic_path = "/rooms/%s/state/m.room.topic" % self.created_rmid
 
         # set/get topic in uncreated room, expect 403
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT", "/rooms/%s/topic" % self.uncreated_rmid,
+                           "PUT", "/rooms/%s/state/m.room.topic" % self.uncreated_rmid,
                            topic_content)
         self.assertEquals(403, code, msg=str(response))
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/rooms/%s/topic" % self.uncreated_rmid)
+                           "/rooms/%s/state/m.room.topic" % self.uncreated_rmid)
         self.assertEquals(403, code, msg=str(response))
 
         # set/get topic in created PRIVATE room not joined, expect 403
@@ -223,19 +223,19 @@ class RoomPermissionsTestCase(RestTestCase):
 
         # get topic in PUBLIC room, not joined, expect 200 (or 404)
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/rooms/%s/topic" % self.created_public_rmid)
+                           "/rooms/%s/state/m.room.topic" % self.created_public_rmid)
         self.assertEquals(200, code, msg=str(response))
 
         # set topic in PUBLIC room, not joined, expect 403
         (code, response) = yield self.mock_resource.trigger(
                            "PUT",
-                           "/rooms/%s/topic" % self.created_public_rmid,
+                           "/rooms/%s/state/m.room.topic" % self.created_public_rmid,
                            topic_content)
         self.assertEquals(403, code, msg=str(response))
 
     @defer.inlineCallbacks
     def _test_get_membership(self, room=None, members=[], expect_code=None):
-        path = "/rooms/%s/members/%s/state"
+        path = "/rooms/%s/state/m.room.member/%s"
         for member in members:
             (code, response) = yield self.mock_resource.trigger_get(
                                path %
@@ -291,12 +291,12 @@ class RoomPermissionsTestCase(RestTestCase):
     def test_membership_public_room_perms(self):
         room = self.created_public_rmid
         # get membership of self, get membership of other, public room + invite
-        # expect all 403s
+        # expect all 200s - public rooms, you can see who is in them.
         yield self.invite(room=room, src=self.rmcreator_id,
                           targ=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
-            room=room, expect_code=403)
+            room=room, expect_code=200)
 
         # get membership of self, get membership of other, public room + joined
         # expect all 200s
@@ -306,11 +306,11 @@ class RoomPermissionsTestCase(RestTestCase):
             room=room, expect_code=200)
 
         # get membership of self, get membership of other, public room + left
-        # expect all 403s
+        # expect all 200s - public rooms, you can always see who is in them.
         yield self.leave(room=room, user=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
-            room=room, expect_code=403)
+            room=room, expect_code=200)
 
     @defer.inlineCallbacks
     def test_invited_permissions(self):
@@ -614,7 +614,7 @@ class RoomTopicTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
         self.room_id = "!rid1:test"
-        self.path = "/rooms/%s/topic" % self.room_id
+        self.path = "/rooms/%s/state/m.room.topic" % self.room_id
 
         state_handler = Mock(spec=["handle_new_event"])
         state_handler.handle_new_event.return_value = True
@@ -749,7 +749,7 @@ class RoomMemberStateTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_invalid_puts(self):
-        path = "/rooms/%s/members/%s/state" % (self.room_id, self.user_id)
+        path = "/rooms/%s/state/m.room.member/%s" % (self.room_id, self.user_id)
         # missing keys or invalid json
         (code, response) = yield self.mock_resource.trigger("PUT",
                            path, '{}')
@@ -783,7 +783,7 @@ class RoomMemberStateTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_rooms_members_self(self):
-        path = "/rooms/%s/members/%s/state" % (
+        path = "/rooms/%s/state/m.room.member/%s" % (
             urllib.quote(self.room_id), self.user_id
         )
 
@@ -804,7 +804,7 @@ class RoomMemberStateTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_rooms_members_other(self):
         self.other_id = "@zzsid1:red"
-        path = "/rooms/%s/members/%s/state" % (
+        path = "/rooms/%s/state/m.room.member/%s" % (
             urllib.quote(self.room_id), self.other_id
         )
 
@@ -820,7 +820,7 @@ class RoomMemberStateTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_rooms_members_other_custom_keys(self):
         self.other_id = "@zzsid1:red"
-        path = "/rooms/%s/members/%s/state" % (
+        path = "/rooms/%s/state/m.room.member/%s" % (
             urllib.quote(self.room_id), self.other_id
         )
 
