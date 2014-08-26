@@ -41,6 +41,7 @@ class SynapseEvent(JsonEncodedObject):
         "room_id",
         "user_id",  # sender/initiator
         "content",  # HTTP body, JSON
+        "state_key",
     ]
 
     internal_keys = [
