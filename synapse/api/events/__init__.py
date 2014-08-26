@@ -51,6 +51,7 @@ class SynapseEvent(JsonEncodedObject):
         "depth",
         "destinations",
         "origin",
+        "outlier",
     ]
 
     required_keys = [

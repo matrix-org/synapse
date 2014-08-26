@@ -24,6 +24,7 @@ from synapse.api.events.room import (
     RoomConfigEvent
 )
 from synapse.api.streams.event import EventStream, EventsStreamData
+from synapse.handlers.presence import PresenceStreamData
 from synapse.util import stringutils
 from ._base import BaseHandler
 
@@ -257,21 +258,38 @@ class MessageHandler(BaseHandler):
             membership_list=[Membership.INVITE, Membership.JOIN]
         )
 
-        ret = []
+        rooms_ret = []
+
+        now_rooms_token = yield self.store.get_room_events_max_id()
+
+        # FIXME (erikj): Fix this.
+        presence_stream = PresenceStreamData(self.hs)
+        now_presence_token = yield presence_stream.max_token()
+        presence = yield presence_stream.get_rows(
+            user_id, 0, now_presence_token, None, None
+        )
+
+        # FIXME (erikj): We need to not generate this token,
+        now_token = "%s_%s" % (now_rooms_token, now_presence_token)
 
         for event in room_list:
             d = {
                 "room_id": event.room_id,
                 "membership": event.membership,
             }
-            ret.append(d)
+
+            if event.membership == Membership.INVITE:
+                d["inviter"] = event.user_id
+
+            rooms_ret.append(d)
 
             if event.membership != Membership.JOIN:
                 continue
             try:
                 messages, token = yield self.store.get_recent_events_for_room(
                     event.room_id,
-                    limit=50,
+                    limit=10,
+                    end_token=now_rooms_token,
                 )
 
                 d["messages"] = {
@@ -279,10 +297,17 @@ class MessageHandler(BaseHandler):
                     "start": token[0],
                     "end": token[1],
                 }
+
+                current_state = yield self.store.get_current_state(event.room_id)
+                d["state"] = [c.get_dict() for c in current_state]
             except:
                 logger.exception("Failed to get snapshot")
 
-        logger.debug("snapshot_all_rooms returning: %s", ret)
+        user = self.hs.parse_userid(user_id)
+
+        ret = {"rooms": rooms_ret, "presence": presence[0], "end": now_token}
+
+        # logger.debug("snapshot_all_rooms returning: %s", ret)
 
         defer.returnValue(ret)
 

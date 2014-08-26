@@ -105,6 +105,11 @@ class DataStore(RoomMemberStore, RoomStore,
             "processed": True,
         }
 
+        if hasattr(event, "outlier"):
+            vals["outlier"] = event.outlier
+        else:
+            vals["outlier"] = False
+
         if backfilled:
             if not self.min_token_deferred.called:
                 yield self.min_token_deferred
@@ -123,7 +128,7 @@ class DataStore(RoomMemberStore, RoomStore,
         except:
             logger.exception(
                 "Failed to persist, probably duplicate: %s",
-                event_id
+                event.event_id
             )
             return
 

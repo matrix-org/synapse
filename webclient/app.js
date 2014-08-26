@@ -19,7 +19,8 @@ var matrixWebClient = angular.module('matrixWebClient', [
     'MatrixWebClientController',
     'LoginController',
     'RoomController',
-    'RoomsController',
+    'HomeController',
+    'SettingsController',
     'UserController',
     'matrixService',
     'eventStreamService',
@@ -44,16 +45,20 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
                 templateUrl: 'room/room.html',
                 controller: 'RoomController'
             }).
-            when('/rooms', {
-                templateUrl: 'rooms/rooms.html',
-                controller: 'RoomsController'
+            when('/', {
+                templateUrl: 'home/home.html',
+                controller: 'HomeController'
+            }).
+            when('/settings', {
+                templateUrl: 'settings/settings.html',
+                controller: 'SettingsController'
             }).
             when('/user/:user_matrix_id', {
                 templateUrl: 'user/user.html',
                 controller: 'UserController'
             }).
             otherwise({
-                redirectTo: '/rooms'
+                redirectTo: '/'
             });
             
         $provide.factory('AccessTokenInterceptor', ['$q', '$rootScope', 
@@ -80,6 +85,6 @@ matrixWebClient.run(['$location', 'matrixService', 'eventStreamService', functio
         $location.path("login");
     }
     else {
-        eventStreamService.resume();
+        // eventStreamService.resume();
     }
 }]);

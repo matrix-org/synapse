@@ -22,8 +22,14 @@ CREATE TABLE IF NOT EXISTS events(
     content TEXT NOT NULL,
     unrecognized_keys TEXT,
     processed BOOL NOT NULL,
+    outlier BOOL NOT NULL,
     CONSTRAINT ev_uniq UNIQUE (event_id)
 );
+
+CREATE INDEX IF NOT EXISTS events_event_id ON events (event_id);
+CREATE INDEX IF NOT EXISTS events_stream_ordering ON events (stream_ordering);
+CREATE INDEX IF NOT EXISTS events_topological_ordering ON events (topological_ordering);
+CREATE INDEX IF NOT EXISTS events_room_id ON events (room_id);
 
 CREATE TABLE IF NOT EXISTS state_events(
     event_id TEXT NOT NULL,
@@ -33,6 +39,12 @@ CREATE TABLE IF NOT EXISTS state_events(
     prev_state TEXT
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS state_events_event_id ON state_events (event_id);
+CREATE INDEX IF NOT EXISTS state_events_room_id ON state_events (room_id);
+CREATE INDEX IF NOT EXISTS state_events_type ON state_events (type);
+CREATE INDEX IF NOT EXISTS state_events_state_key ON state_events (state_key);
+
+
 CREATE TABLE IF NOT EXISTS current_state_events(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
@@ -41,6 +53,11 @@ CREATE TABLE IF NOT EXISTS current_state_events(
     CONSTRAINT curr_uniq UNIQUE (room_id, type, state_key) ON CONFLICT REPLACE
 );
 
+CREATE INDEX IF NOT EXISTS curr_events_event_id ON current_state_events (event_id);
+CREATE INDEX IF NOT EXISTS current_state_events_room_id ON current_state_events (room_id);
+CREATE INDEX IF NOT EXISTS current_state_events_type ON current_state_events (type);
+CREATE INDEX IF NOT EXISTS current_state_events_state_key ON current_state_events (state_key);
+
 CREATE TABLE IF NOT EXISTS room_memberships(
     event_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
@@ -48,6 +65,10 @@ CREATE TABLE IF NOT EXISTS room_memberships(
     room_id TEXT NOT NULL,
     membership TEXT NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS room_memberships_event_id ON room_memberships (event_id);
+CREATE INDEX IF NOT EXISTS room_memberships_room_id ON room_memberships (room_id);
+CREATE INDEX IF NOT EXISTS room_memberships_user_id ON room_memberships (user_id);
 
 CREATE TABLE IF NOT EXISTS feedback(
     event_id TEXT NOT NULL,
@@ -77,5 +98,6 @@ CREATE TABLE IF NOT EXISTS rooms(
 
 CREATE TABLE IF NOT EXISTS room_hosts(
     room_id TEXT NOT NULL,
-    host TEXT NOT NULL
+    host TEXT NOT NULL,
+    CONSTRAINT room_hosts_uniq UNIQUE (room_id, host) ON CONFLICT IGNORE
 );

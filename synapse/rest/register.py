@@ -33,10 +33,10 @@ class RegisterRestServlet(RestServlet):
         try:
             register_json = json.loads(request.content.read())
             if "password" in register_json:
-                password = register_json["password"]
+                password = register_json["password"].encode("utf-8")
 
             if type(register_json["user_id"]) == unicode:
-                desired_user_id = register_json["user_id"]
+                desired_user_id = register_json["user_id"].encode("utf-8")
                 if urllib.quote(desired_user_id) != desired_user_id:
                     raise SynapseError(
                         400,

@@ -146,7 +146,7 @@ class RoomMemberStore(SQLBaseStore):
 
         rows = yield self._execute_and_decode(sql, *where_values)
 
-        logger.debug("_get_members_query Got rows %s", rows)
+        # logger.debug("_get_members_query Got rows %s", rows)
 
         results = [self._parse_event_from_row(r) for r in rows]
         defer.returnValue(results)

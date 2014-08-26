@@ -31,30 +31,14 @@ angular.module('MatrixWebClientController', ['matrixService'])
     $rootScope.$on('$routeChangeSuccess', function (event, current, previous) {
         $scope.location = $location.path();
     });
-    
-    
-    // Manage the display of the current config
-    $scope.config;
-    
-    // Toggles the config display
-    $scope.showConfig = function() {
-        if ($scope.config) {
-            $scope.config = undefined;
-        }
-        else {
-            $scope.config = matrixService.config();        
-        }
-    };
-    
-    $scope.closeConfig = function() {
-        if ($scope.config) {
-            $scope.config = undefined;
-        }
-    };
 
     if (matrixService.isUserLoggedIn()) {
-        eventStreamService.resume();
+        // eventStreamService.resume();
     }
+    
+    $scope.go = function(url) {
+        $location.url(url);
+    };
     
     // Logs the user out 
     $scope.logout = function() {
@@ -66,7 +50,7 @@ angular.module('MatrixWebClientController', ['matrixService'])
         matrixService.saveConfig();
         
         // And go to the login page
-        $location.path("login");
+        $location.url("login");
     };
 
     // Listen to the event indicating that the access token is no longer valid.

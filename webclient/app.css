@@ -1,3 +1,71 @@
+/*** Mobile voodoo ***/
+@media all and (max-device-width: 640px) {
+            
+    #messageTableWrapper {
+        margin-right: 0px ! important;
+    }
+    
+    .leftBlock {
+        width: 8em ! important;
+    }
+    
+    #header,
+    #messageTable,
+    #wrapper,
+    #roomName,
+    #controls {
+        max-width: 640px ! important;
+    }    
+    
+    #userIdCell,
+    #usersTableWrapper,
+    #extraControls {
+        display: none;
+    }
+    
+    #buttonsCell {
+        width: 60px ! important;
+        padding-left: 20px ! important;
+    }
+    
+    #roomLogo {
+        display: none;
+    }
+    
+    #roomName {
+        text-align: left ! important;
+        top: -35px ! important;
+    }
+    
+    .bubble {
+        font-size: 12px ! important;
+        min-height: 20px ! important;
+    }
+    
+    #page {
+        top: 35px ! important;
+        bottom: 70px ! important;
+    }
+    
+    #header,
+    #page {
+        margin: 5px ! important;
+    }
+    
+    #header {
+        padding: 5px ! important;
+    }
+        
+    /* stop zoom on select */
+    select:focus,
+    textarea,
+    input
+    {
+        font-size: 16px ! important;
+    }
+    
+}
+
 body {
     font-family: "Myriad Pro", "Myriad", Helvetica, Arial, sans-serif;
     font-size: 12pt;
@@ -17,7 +85,6 @@ h1 {
     left: 0px;
     right: 0px;
     margin: 20px;
-    margin: 20px;
 }
 
 #wrapper {
@@ -32,8 +99,7 @@ h1 {
     text-align: right;
     top: -40px;
     position: absolute;
-    font-size: 16pt;
-    margin-bottom: 10px;
+    font-size: 16px;
 }
 
 #controlPanel {
@@ -48,6 +114,10 @@ h1 {
     max-width: 1280px;
     padding: 12px;
     margin: auto;
+}
+
+#buttonsCell {
+    width: 150px;
 }
 
 #inputBarTable {
@@ -111,13 +181,13 @@ h1 {
     color: #fff;
     margin: 2px;
     bottom: 0px;
-    font-size: 8pt;
+    font-size: 12px;
     word-break: break-all;
 }
 
 .userPresence {
     text-align: center;
-    font-size: 8pt;
+    font-size: 12px;
     color: #fff;
     background-color: #aaa;
     border-bottom: 1px #ddd solid;
@@ -145,6 +215,7 @@ h1 {
     max-width: 1280px;
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
         
 #messageTable td {
@@ -152,12 +223,13 @@ h1 {
 }
 
 .leftBlock {
-    width: 10em;
+    width: 14em;
+    word-wrap: break-word;
     vertical-align: top;
     background-color: #fff;
     color: #888;
     font-weight: medium;
-    font-size: 8pt;
+    font-size: 12px;
     text-align: right;
     border-top: 1px #ddd solid;
 }
@@ -190,24 +262,13 @@ h1 {
     object-fit: cover;
 }
         
-.text {
-    background-color: #eee;
-    border: 1px solid #d8d8d8;
-    height: 31px;
-    display: inline-table;
-    max-width: 90%;
-    font-size: 16px;
-    /* word-wrap: break-word; */
-    word-break: break-all;
-}
-
 .emote {
-    background-color: #fff ! important;
+    background-color: transparent ! important;
     border: 0px ! important;
 }
 
 .membership {
-    background-color: #fff ! important;
+    background-color: transparent ! important;
     border: 0px ! important;
 }
 
@@ -219,32 +280,45 @@ h1 {
     height: auto;
 }
 
+.text {
+    vertical-align: top;
+}
+
 .bubble {
+    background-color: #eee;
+    border: 1px solid #d8d8d8;
+    display: inline-block;
+    margin-bottom: -1px;
+    max-width: 90%;
+    font-size: 16px;
+    word-wrap: break-word;
     padding-top: 7px;
     padding-bottom: 5px;
     padding-left: 1em;
     padding-right: 1em;
     vertical-align: middle;
+    -webkit-text-size-adjust:100%
 }
 
 .differentUser td {
-    padding-top: 5px ! important;
-    margin-top: 5px ! important;
+    padding-bottom: 5px ! important;
 }
 
 .mine {
     text-align: right;
 }
 
-.mine .text {
-    background-color: #f8f8ff ! important;    
-}
-
-.mine .emote {
-    background-color: #fff ! important;    
+.text.emote .bubble,
+.text.membership .bubble,
+.mine .text.emote .bubble,
+.mine .text.membership .bubble
+  {
+    background-color: transparent ! important;    
+    border: 0px ! important;
 }
 
 .mine .text .bubble {
+    background-color: #f8f8ff ! important;    
     text-align: left ! important;
 }
 
@@ -273,7 +347,7 @@ h1 {
 .profile-avatar {
     width: 160px;
     height: 160px;
-    display:table-cell;
+    display: table-cell;
     vertical-align: middle;
     text-align: center;
 }
@@ -289,31 +363,25 @@ h1 {
 }
 
 #user-displayname {
-    font-size: 16pt;
+    font-size: 24px;
 }
 /******************************/
 
-#header {
-    padding-left: 20px;
-    padding-right: 20px;
+#header
+{
+    padding: 20px;
+    max-width: 1280px;
+    margin: auto;
+}
+
+#logo,
+#roomLogo {
     max-width: 1280px;
     margin: auto;
 }
 
 #header-buttons {
     float: right;
-}
-
-#config {
-    position: absolute;
-    z-index: 100;
-    top: 100px;
-    left: 50%;
-    width: 500px;
-    margin-left: -250px;
-    text-align: center;
-    padding: 20px;
-    background-color: #aaa;
 }
 
 .text_entry_section {
