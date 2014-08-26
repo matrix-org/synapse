@@ -257,7 +257,7 @@ class StreamStore(SQLBaseStore):
         sql = (
             "SELECT * FROM events "
             "WHERE room_id = ? AND stream_ordering <= ? "
-            "ORDER BY topological_ordering, stream_ordering DESC LIMIT ? "
+            "ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ? "
         )
 
         rows = yield self._execute_and_decode(
