@@ -20,7 +20,7 @@ from synapse.types import StreamToken
 
 
 class RoomEventSource(object):
-    SIGNAL_NAME = "EventStreamSourceSignal"
+    SIGNAL_NAME = "RoomEventSource"
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -74,6 +74,8 @@ class RoomEventSource(object):
 
 
 class PresenceStreamSource(object):
+    SIGNAL_NAME = "PresenceStreamSource"
+
     def __init__(self, hs):
         self.hs = hs
         self.clock = hs.get_clock()
@@ -105,7 +107,7 @@ class PresenceStreamSource(object):
             return (([], end_token))
 
     def get_keys_for_user(self, user):
-        raise NotImplementedError("get_keys_for_user")
+        return defer.succeed([])
 
     def get_current_token_part(self):
         presence = self.hs.get_handlers().presence_handler
