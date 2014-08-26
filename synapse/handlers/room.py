@@ -20,8 +20,7 @@ from synapse.types import UserID, RoomAlias, RoomID
 from synapse.api.constants import Membership
 from synapse.api.errors import RoomError, StoreError, SynapseError
 from synapse.api.events.room import (
-    RoomTopicEvent, MessageEvent, InviteJoinEvent, RoomMemberEvent,
-    RoomConfigEvent
+    RoomTopicEvent, RoomMemberEvent, RoomConfigEvent
 )
 from synapse.api.streams.event import EventStream, EventsStreamData
 from synapse.handlers.presence import PresenceStreamData
@@ -29,7 +28,6 @@ from synapse.util import stringutils
 from ._base import BaseHandler
 
 import logging
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -302,8 +300,6 @@ class MessageHandler(BaseHandler):
                 d["state"] = [c.get_dict() for c in current_state]
             except:
                 logger.exception("Failed to get snapshot")
-
-        user = self.hs.parse_userid(user_id)
 
         ret = {"rooms": rooms_ret, "presence": presence[0], "end": now_token}
 

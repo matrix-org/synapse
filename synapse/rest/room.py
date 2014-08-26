@@ -249,7 +249,7 @@ class FeedbackRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, msg_sender_id, msg_id, fb_sender_id,
                feedback_type):
-        user = yield (self.auth.get_user_by_req(request))
+        yield (self.auth.get_user_by_req(request))
 
         # TODO (erikj): Implement this?
         raise NotImplementedError("Getting feedback is not supported")

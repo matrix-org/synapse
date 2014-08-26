@@ -18,12 +18,10 @@ from twisted.internet import defer
 from sqlite3 import IntegrityError
 
 from synapse.api.errors import StoreError
-from synapse.api.events.room import RoomTopicEvent
 
 from ._base import SQLBaseStore, Table
 
 import collections
-import json
 import logging
 
 logger = logging.getLogger(__name__)

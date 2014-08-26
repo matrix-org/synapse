@@ -175,7 +175,7 @@ class FederationHandler(BaseHandler):
 
         try:
             yield self.store.store_room(
-                event.room_id,
+                room_id,
                 "",
                 is_public=False
             )
