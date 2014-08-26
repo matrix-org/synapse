@@ -6,7 +6,7 @@ CWD=$(pwd)
 
 cd "$DIR/.."
 
-for port in "8080" "8081" "8082"; do
+for port in 8080 8081 8082; do
     echo "Starting server on port $port... "
 
     python -m synapse.app.homeserver \
@@ -15,7 +15,8 @@ for port in "8080" "8081" "8082"; do
         -f "$DIR/$port.log" \
         -d "$DIR/$port.db" \
         -vv \
-        -D --pid-file "$DIR/$port.pid"
+        -D --pid-file "$DIR/$port.pid" \
+        --manhole $((port + 1000))
 done
 
 echo "Starting webclient on port 8000..."

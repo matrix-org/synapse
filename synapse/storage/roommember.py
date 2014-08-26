@@ -150,3 +150,24 @@ class RoomMemberStore(SQLBaseStore):
 
         results = [self._parse_event_from_row(r) for r in rows]
         defer.returnValue(results)
+
+    @defer.inlineCallbacks
+    def do_users_share_a_room(self, user_list):
+        """ Checks whether a list of users share a room.
+        """
+        user_list_clause = " OR ".join(["m.user_id = ?"] * len(user_list))
+        sql = (
+            "SELECT m.room_id FROM room_memberships as m "
+            "INNER JOIN current_state_events as c "
+            "ON m.event_id = c.event_id "
+            "WHERE m.membership = 'join' "
+            "AND (%(clause)s) "
+            "GROUP BY m.room_id HAVING COUNT(m.room_id) = ?"
+        ) % {"clause": user_list_clause}
+
+        args = user_list
+        args.append(len(user_list))
+
+        rows = yield self._execute(None, sql, *args)
+
+        defer.returnValue(len(rows) > 0)

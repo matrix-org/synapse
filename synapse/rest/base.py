@@ -15,6 +15,7 @@
 
 """ This module contains base REST classes for constructing REST servlets. """
 from synapse.api.urls import CLIENT_PREFIX
+from synapse.rest.transactions import HttpTransactionStore
 import re
 
 
@@ -59,6 +60,7 @@ class RestServlet(object):
         self.handlers = hs.get_handlers()
         self.event_factory = hs.get_event_factory()
         self.auth = hs.get_auth()
+        self.txns = HttpTransactionStore()
 
     def register(self, http_server):
         """ Register this servlet with the given HTTP server. """
