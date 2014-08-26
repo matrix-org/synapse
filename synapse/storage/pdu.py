@@ -114,7 +114,7 @@ class PduStore(SQLBaseStore):
 
         return self._get_pdu_tuples(txn, res)
 
-    def persist_pdu(self, prev_pdus, **cols):
+    def _persist_pdu_txn(self, txn, prev_pdus, cols):
         """Inserts a (non-state) PDU into the database.
 
         Args:
@@ -122,11 +122,6 @@ class PduStore(SQLBaseStore):
             prev_pdus (list)
             **cols: The columns to insert into the PdusTable.
         """
-        return self._db_pool.runInteraction(
-            self._persist_pdu, prev_pdus, cols
-        )
-
-    def _persist_pdu(self, txn, prev_pdus, cols):
         entry = PdusTable.EntryType(
             **{k: cols.get(k, None) for k in PdusTable.fields}
         )
@@ -262,7 +257,7 @@ class PduStore(SQLBaseStore):
 
         return row[0] if row else None
 
-    def update_min_depth_for_context(self, context, depth):
+    def _update_min_depth_for_context_txn(self, txn, context, depth):
         """Update the minimum `depth` of the given context, which is the line
         on which we stop backfilling backwards.
 
@@ -270,11 +265,6 @@ class PduStore(SQLBaseStore):
             context (str)
             depth (int)
         """
-        return self._db_pool.runInteraction(
-            self._update_min_depth_for_context, context, depth
-        )
-
-    def _update_min_depth_for_context(self, txn, context, depth):
         min_depth = self._get_min_depth_interaction(txn, context)
 
         do_insert = depth < min_depth if min_depth else True
@@ -485,7 +475,7 @@ class StatePduStore(SQLBaseStore):
     """A collection of queries for handling state PDUs.
     """
 
-    def persist_state(self, prev_pdus, **cols):
+    def _persist_state_txn(self, txn, prev_pdus, cols):
         """Inserts a state PDU into the database
 
         Args:
@@ -493,12 +483,6 @@ class StatePduStore(SQLBaseStore):
             prev_pdus (list)
             **cols: The columns to insert into the PdusTable and StatePdusTable
         """
-
-        return self._db_pool.runInteraction(
-            self._persist_state, prev_pdus, cols
-        )
-
-    def _persist_state(self, txn, prev_pdus, cols):
         pdu_entry = PdusTable.EntryType(
             **{k: cols.get(k, None) for k in PdusTable.fields}
         )

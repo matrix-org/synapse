@@ -58,7 +58,7 @@ class FederationTestCase(unittest.TestCase):
         self.mock_persistence = Mock(spec=[
             "get_current_state_for_context",
             "get_pdu",
-            "persist_pdu",
+            "persist_event",
             "update_min_depth_for_context",
             "prep_send_transaction",
             "delivered_txn",

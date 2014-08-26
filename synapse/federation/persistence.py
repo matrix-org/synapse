@@ -25,7 +25,6 @@ from .units import Pdu
 
 from synapse.util.logutils import log_function
 
-import copy
 import json
 import logging
 
@@ -48,9 +47,8 @@ class PduActions(object):
         Returns:
             Deferred
         """
-        return self._persist(pdu)
+        return self.store.persist_event(pdu=pdu)
 
-    @defer.inlineCallbacks
     @log_function
     def persist_outgoing(self, pdu):
         """ Persists the given `Pdu` that this home server created.
@@ -58,9 +56,7 @@ class PduActions(object):
         Returns:
             Deferred
         """
-        ret = yield self._persist(pdu)
-
-        defer.returnValue(ret)
+        return self.store.persist_event(pdu=pdu)
 
     @log_function
     def mark_as_processed(self, pdu):
@@ -142,28 +138,6 @@ class PduActions(object):
             context=pdu.context,
             depth=pdu.depth
         )
-
-    @defer.inlineCallbacks
-    @log_function
-    def _persist(self, pdu):
-        kwargs = copy.copy(pdu.__dict__)
-        unrec_keys = copy.copy(pdu.unrecognized_keys)
-        del kwargs["content"]
-        kwargs["content_json"] = json.dumps(pdu.content)
-        kwargs["unrecognized_keys"] = json.dumps(unrec_keys)
-
-        logger.debug("Persisting: %s", repr(kwargs))
-
-        if pdu.is_state:
-            ret = yield self.store.persist_state(**kwargs)
-        else:
-            ret = yield self.store.persist_pdu(**kwargs)
-
-        yield self.store.update_min_depth_for_context(
-            pdu.context, pdu.depth
-        )
-
-        defer.returnValue(ret)
 
 
 class TransactionActions(object):

@@ -57,7 +57,7 @@ class DataStore(RoomMemberStore, RoomStore,
 
     @defer.inlineCallbacks
     @log_function
-    def persist_event(self, event, backfilled=False):
+    def persist_event(self, event=None, backfilled=False, pdu=None):
         # FIXME (erikj): This should be removed when we start amalgamating
         # event and pdu storage
         yield self.hs.get_federation().fill_out_prev_events(event)
@@ -70,7 +70,11 @@ class DataStore(RoomMemberStore, RoomStore,
             stream_ordering = self.min_token
 
         latest = yield self._db_pool.runInteraction(
-            self._persist_event_txn, event, backfilled, stream_ordering
+            self._persist_pdu_event_txn,
+            pdu=pdu,
+            event=event,
+            backfilled=backfilled,
+            stream_ordering=stream_ordering,
         )
         defer.returnValue(latest)
 
@@ -91,6 +95,30 @@ class DataStore(RoomMemberStore, RoomStore,
 
         event = self._parse_event_from_row(events_dict)
         defer.returnValue(event)
+
+    def _persist_pdu_event_txn(self, txn, pdu=None, event=None,
+                               backfilled=False, stream_ordering=None):
+        if pdu is not None:
+            self._persist_pdu_txn(txn, pdu)
+        if event is not None:
+            self._persist_event_txn(txn, event, backfilled, stream_ordering)
+
+    def _persist_pdu_txn(self, txn, pdu):
+        cols = dict(pdu.__dict__)
+        unrec_keys = dict(pdu.unrecognized_keys)
+        del cols["content"]
+        del cols["prev_pdus"]
+        cols["content_json"] = json.dumps(pdu.content)
+        cols["unrecognized_keys"] = json.dumps(unrec_keys)
+
+        logger.debug("Persisting: %s", repr(cols))
+
+        if pdu.is_state:
+            self._persist_state_txn(txn, pdu.prev_pdus, cols)
+        else:
+            self._persist_pdu_txn(txn, pdu.prev_pdus, cols)
+
+        self._update_min_depth_for_context_txn(txn, pdu.context, pdu.depth)
 
     @log_function
     def _persist_event_txn(self, txn, event, backfilled, stream_ordering=None):
