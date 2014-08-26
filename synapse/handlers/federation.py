@@ -32,6 +32,15 @@ logger = logging.getLogger(__name__)
 class FederationHandler(BaseHandler):
 
     """Handles events that originated from federation."""
+    def __init__(self, hs):
+        super(FederationHandler, self).__init__(hs)
+
+        self.distributor.observe(
+            "user_joined_room",
+            self._on_user_joined
+        )
+
+        self.waiting_for_join_list = {}
 
     @log_function
     @defer.inlineCallbacks
@@ -56,7 +65,7 @@ class FederationHandler(BaseHandler):
             content.update({"membership": Membership.JOIN})
             new_event = self.event_factory.create_event(
                 etype=RoomMemberEvent.TYPE,
-                target_user_id=event.user_id,
+                state_key=event.user_id,
                 room_id=event.room_id,
                 user_id=event.user_id,
                 membership=Membership.JOIN,
@@ -102,6 +111,13 @@ class FederationHandler(BaseHandler):
 
             if not backfilled:
                 yield self.notifier.on_new_room_event(event, store_id)
+
+        if event.type == RoomMemberEvent.TYPE:
+            if event.membership == Membership.JOIN:
+                user = self.hs.parse_userid(event.target_user_id)
+                self.distributor.fire(
+                    "user_joined_room", user=user, room_id=event.room_id
+                )
 
 
     @log_function
@@ -152,8 +168,10 @@ class FederationHandler(BaseHandler):
 
         yield federation.handle_new_event(new_event)
 
-        store_id = yield self.store.persist_event(new_event)
-        self.notifier.on_new_room_event(new_event, store_id)
+        # TODO (erikj): Time out here.
+        d = defer.Deferred()
+        self.waiting_for_join_list.setdefault((joinee, room_id), []).append(d)
+        yield d
 
         try:
             yield self.store.store_room(
@@ -166,3 +184,10 @@ class FederationHandler(BaseHandler):
 
 
         defer.returnValue(True)
+
+
+    @log_function
+    def _on_user_joined(self, user, room_id):
+        waiters = self.waiting_for_join_list.get((user.to_string(), room_id), [])
+        while waiters:
+            waiters.pop().callback(None)

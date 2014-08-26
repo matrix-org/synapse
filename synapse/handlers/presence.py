@@ -142,6 +142,10 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def is_presence_visible(self, observer_user, observed_user):
+        defer.returnValue(True)
+        return
+        # FIXME (erikj): This code path absolutely kills the database.
+
         assert(observed_user.is_mine)
 
         if observer_user == observed_user:
@@ -155,12 +159,11 @@ class PresenceHandler(BaseHandler):
         if allowed_by_subscription:
             defer.returnValue(True)
 
-        rm_handler = self.homeserver.get_handlers().room_member_handler
-        for room_id in (yield rm_handler.get_rooms_for_user(observer_user)):
-            if observed_user in (yield rm_handler.get_room_members(room_id)):
-                defer.returnValue(True)
+        share_room = yield self.store.do_users_share_a_room(
+            [observer_user, observed_user]
+        )
 
-        defer.returnValue(False)
+        defer.returnValue(share_room)
 
     @defer.inlineCallbacks
     def get_state(self, target_user, auth_user):
@@ -187,6 +190,10 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def set_state(self, target_user, auth_user, state):
+        return
+        # TODO (erikj): Turn this back on. Why did we end up sending EDUs
+        # everywhere?
+
         if not target_user.is_mine:
             raise SynapseError(400, "User is not hosted on this Home Server")
 

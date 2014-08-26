@@ -2,9 +2,11 @@
 <html xmlns:ng="http://angularjs.org" ng-app="matrixWebClient" ng-controller="MatrixWebClientController">
 <head>
     <title>[matrix]</title>
-    
+        
     <link rel="stylesheet" href="app.css">
     <link rel="icon" href="favicon.ico">
+   
+    <meta name="viewport" content="width=device-width">
    
     <script type='text/javascript' src='js/jquery-1.8.3.min.js'></script> 
     <script src="js/angular.min.js"></script>
@@ -15,10 +17,11 @@
     <script src="app-controller.js"></script>
     <script src="app-directive.js"></script>
     <script src="app-filter.js"></script>
+    <script src="home/home-controller.js"></script>
     <script src="login/login-controller.js"></script>
     <script src="room/room-controller.js"></script>
     <script src="room/room-directive.js"></script>
-    <script src="rooms/rooms-controller.js"></script>
+    <script src="settings/settings-controller.js"></script>
     <script src="user/user-controller.js"></script>
     <script src="components/matrix/matrix-service.js"></script>
     <script src="components/matrix/event-stream-service.js"></script>
@@ -33,21 +36,10 @@
     <header id="header">
         <!-- Do not show buttons on the login page -->
         <div id="header-buttons" ng-hide="'/login' == location ">
-            <button ng-click="showConfig()">Config</button>
+            <button ng-click='go("settings")'>Settings</button>
             <button ng-click="logout()">Log out</button>
         </div>
-
-        <h1>[matrix]</h1>
     </header>
-
-    <div id="config" ng-hide="!config">
-        <div>Home server: {{ config.homeserver }} </div>
-        <div>User ID: {{ config.user_id }} </div>
-        <div>Access token: {{ config.access_token }} </div>
-        <div><button ng-click="requestNotifications()">Request notifications</button></div>
-        <div><button ng-click="closeConfig()">Close</button></div>
-    </div>
-
 
     <div ng-view></div>
 

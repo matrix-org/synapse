@@ -54,12 +54,15 @@ angular.module('matrixWebClient')
         });
 
         // FIXME: we shouldn't disambiguate displayNames on every orderMembersList
-        // invocation but keep track of duplicates incrementally somewhere            
+        // invocation but keep track of duplicates incrementally somewhere
         angular.forEach(displayNames, function(value, key) {
             if (value.length > 1) {
                 // console.log(key + ": " + value);
-                for (i=0; i < value.length; i++) {
+                for (var i=0; i < value.length; i++) {
                     var v = value[i];
+                    // FIXME: this permenantly rewrites the displayname for a given
+                    // room member. which means we can't reset their name if it is
+                    // no longer ambiguous!
                     members[v].displayname += " (" + v + ")";
                     // console.log(v + " " + members[v]);
                 };

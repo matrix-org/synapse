@@ -31,12 +31,14 @@ from synapse.api.urls import (
 )
 
 from daemonize import Daemonize
+import twisted.manhole.telnet
 
 import argparse
 import logging
 import logging.config
 import sqlite3
 import os
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +58,7 @@ class SynapseHomeServer(HomeServer):
         return File("webclient")  # TODO configurable?
 
     def build_resource_for_content_repo(self):
-        return ContentRepoResource("uploads", self.auth)
+        return ContentRepoResource(self, self.upload_dir, self.auth)
 
     def build_db_pool(self):
         """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
@@ -235,8 +237,10 @@ def setup():
     parser.add_argument('--pid-file', dest="pid", help="When running as a "
                         "daemon, the file to store the pid in",
                         default="hs.pid")
-    parser.add_argument("-w", "--webclient", dest="webclient",
-                        action="store_true", help="Host the web client.")
+    parser.add_argument("-W", "--webclient", dest="webclient", default=True,
+                        action="store_false", help="Don't host a web client.")
+    parser.add_argument("--manhole", dest="manhole", type=int, default=None,
+                        help="Turn on the twisted telnet manhole service.")
     args = parser.parse_args()
 
     verbosity = int(args.verbose) if args.verbose else None
@@ -255,9 +259,16 @@ def setup():
 
     logger.info("Server hostname: %s", args.host)
 
+    if re.search(":[0-9]+$", args.host):
+        domain_with_port = args.host
+    else:
+        domain_with_port = "%s:%s" % (args.host, args.port)
+
     hs = SynapseHomeServer(
         args.host,
-        db_name=db_name
+        domain_with_port=domain_with_port,
+        upload_dir=os.path.abspath("uploads"),
+        db_name=db_name,
     )
 
     # This object doesn't need to be saved because it's set as the handler for
@@ -272,6 +283,13 @@ def setup():
     hs.start_listening(args.port)
 
     hs.build_db_pool()
+
+    if args.manhole:
+        f = twisted.manhole.telnet.ShellFactory()
+        f.username = "matrix"
+        f.password = "rabbithole"
+        f.namespace['hs'] = hs
+        reactor.listenTCP(args.manhole, f, interface='127.0.0.1')
 
     if args.daemonize:
         daemon = Daemonize(

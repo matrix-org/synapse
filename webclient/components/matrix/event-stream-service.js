@@ -48,11 +48,12 @@ angular.module('eventStreamService', [])
     var saveStreamSettings = function() {
         localStorage.setItem("streamSettings", JSON.stringify(settings));
     };
-    
-    var startEventStream = function() {
+
+    var doEventStream = function(deferred) {
         settings.shouldPoll = true;
         settings.isActive = true;
-        var deferred = $q.defer();
+        deferred = deferred || $q.defer();
+
         // run the stream from the latest token
         matrixService.getEventStream(settings.from, TIMEOUT_MS).then(
             function(response) {
@@ -63,13 +64,16 @@ angular.module('eventStreamService', [])
                 
                 settings.from = response.data.end;
                 
-                console.log("[EventStream] Got response from "+settings.from+" to "+response.data.end);
+                console.log(
+                    "[EventStream] Got response from "+settings.from+
+                    " to "+response.data.end
+                );
                 eventHandlerService.handleEvents(response.data.chunk, true);
                 
                 deferred.resolve(response);
                 
                 if (settings.shouldPoll) {
-                    $timeout(startEventStream, 0);
+                    $timeout(doEventStream, 0);
                 }
                 else {
                     console.log("[EventStream] Stopping poll.");
@@ -83,13 +87,48 @@ angular.module('eventStreamService', [])
                 deferred.reject(error);
                 
                 if (settings.shouldPoll) {
-                    $timeout(startEventStream, ERR_TIMEOUT_MS);
+                    $timeout(doEventStream, ERR_TIMEOUT_MS);
                 }
                 else {
                     console.log("[EventStream] Stopping polling.");
                 }
             }
         );
+
+        return deferred.promise;
+    }    
+
+    var startEventStream = function() {
+        settings.shouldPoll = true;
+        settings.isActive = true;
+        var deferred = $q.defer();
+
+        // FIXME: We are discarding all the messages.
+        matrixService.rooms().then(
+            function(response) {
+                var rooms = response.data.rooms;
+                for (var i = 0; i < rooms.length; ++i) {
+                    var room = rooms[i];
+                    if ("state" in room) {
+                        for (var j = 0; j < room.state.length; ++j) {
+                            eventHandlerService.handleEvents(room.state[j], false);
+                        }
+                    }
+                }
+
+                var presence = response.data.presence;
+                for (var i = 0; i < presence.length; ++i) {
+                    eventHandlerService.handleEvent(presence[i], false);
+                }
+
+                settings.from = response.data.end
+                doEventStream(deferred);        
+            },
+            function(error) {
+                $scope.feedback = "Failure: " + error.data;
+            }
+        );
+
         return deferred.promise;
     };
     

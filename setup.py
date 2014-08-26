@@ -25,7 +25,7 @@ def read(fname):
 
 setup(
     name="SynapseHomeServer",
-    version="0.1",
+    version="0.0.1",
     packages=find_packages(exclude=["tests"]),
     description="Reference Synapse Home Server",
     install_requires=[

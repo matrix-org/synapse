@@ -15,3 +15,5 @@
 
 """ This is a reference implementation of a synapse home server.
 """
+
+__version__ = "0.0.1"

@@ -61,7 +61,7 @@ class SynapseCmd(cmd.Cmd):
             "send_delivery_receipts": "on"
         }
         self.path_prefix = "/matrix/client/api/v1"
-        self.event_stream_token = "START"
+        self.event_stream_token = "END"
         self.prompt = ">>> "
 
     def do_EOF(self, line):  # allows CTRL+D quitting
@@ -233,51 +233,63 @@ class SynapseCmd(cmd.Cmd):
             defer.returnValue(False)
         defer.returnValue(True)
 
-    def do_3pidrequest(self, line):
+    def do_emailrequest(self, line):
         """Requests the association of a third party identifier
-        <medium> The medium of the identifer (currently only 'email')
-        <address> The address of the identifer (ie. the email address)
+        <address> The email address)
+        <clientSecret> A string of characters generated when requesting an email that you'll supply in subsequent calls to identify yourself
+        <sendAttempt> The number of times the user has requested an email. Leave this the same between requests to retry the request at the transport level. Increment it to request that the email be sent again.
         """
-        args = self._parse(line, ['medium', 'address'])
+        args = self._parse(line, ['address', 'clientSecret', 'sendAttempt'])
 
-        if not args['medium'] == 'email':
-            print "Only email is supported currently"
-            return
+        postArgs = {'email': args['address'], 'clientSecret': args['clientSecret'], 'sendAttempt': args['sendAttempt']}
 
-        postArgs = {'email': args['address'], 'clientSecret': '____'}
-
-        reactor.callFromThread(self._do_3pidrequest, postArgs)
+        reactor.callFromThread(self._do_emailrequest, postArgs)
 
     @defer.inlineCallbacks
-    def _do_3pidrequest(self, args):
+    def _do_emailrequest(self, args):
         url = self._identityServerUrl()+"/matrix/identity/api/v1/validate/email/requestToken"
 
         json_res = yield self.http_client.do_request("POST", url, data=urllib.urlencode(args), jsonreq=False,
                                                      headers={'Content-Type': ['application/x-www-form-urlencoded']})
         print json_res
-        if 'tokenId' in json_res:
-            print "Token ID %s sent" % (json_res['tokenId'])
+        if 'sid' in json_res:
+            print "Token sent. Your session ID is %s" % (json_res['sid'])
 
-    def do_3pidvalidate(self, line):
+    def do_emailvalidate(self, line):
         """Validate and associate a third party ID
-        <medium> The medium of the identifer (currently only 'email')
-        <tokenId> The identifier iof the token given in 3pidrequest
+        <sid> The session ID (sid) given to you in the response to requestToken
         <token> The token sent to your third party identifier address
+        <clientSecret> The same clientSecret you supplied in requestToken
         """
-        args = self._parse(line, ['medium', 'tokenId', 'token'])
+        args = self._parse(line, ['sid', 'token', 'clientSecret'])
 
-        if not args['medium'] == 'email':
-            print "Only email is supported currently"
-            return
+        postArgs = { 'sid' : args['sid'], 'token' : args['token'], 'clientSecret': args['clientSecret'] }
 
-        postArgs = { 'tokenId' : args['tokenId'], 'token' : args['token'] }
-        postArgs['mxId'] = self.config["user"]
-
-        reactor.callFromThread(self._do_3pidvalidate, postArgs)
+        reactor.callFromThread(self._do_emailvalidate, postArgs)
 
     @defer.inlineCallbacks
-    def _do_3pidvalidate(self, args):
+    def _do_emailvalidate(self, args):
         url = self._identityServerUrl()+"/matrix/identity/api/v1/validate/email/submitToken"
+
+        json_res = yield self.http_client.do_request("POST", url, data=urllib.urlencode(args), jsonreq=False,
+                                                     headers={'Content-Type': ['application/x-www-form-urlencoded']})
+        print json_res
+
+    def do_3pidbind(self, line):
+        """Validate and associate a third party ID
+        <sid> The session ID (sid) given to you in the response to requestToken
+        <clientSecret> The same clientSecret you supplied in requestToken
+        """
+        args = self._parse(line, ['sid', 'clientSecret'])
+
+        postArgs = { 'sid' : args['sid'], 'clientSecret': args['clientSecret'] }
+        postArgs['mxid'] = self.config["user"]
+
+        reactor.callFromThread(self._do_3pidbind, postArgs)
+
+    @defer.inlineCallbacks
+    def _do_3pidbind(self, args):
+        url = self._identityServerUrl()+"/matrix/identity/api/v1/3pid/bind"
 
         json_res = yield self.http_client.do_request("POST", url, data=urllib.urlencode(args), jsonreq=False,
                                                      headers={'Content-Type': ['application/x-www-form-urlencoded']})
@@ -390,9 +402,7 @@ class SynapseCmd(cmd.Cmd):
         """Leaves a room: "leave <roomid>" """
         try:
             args = self._parse(line, ["roomid"], force_keys=True)
-            path = ("/rooms/%s/members/%s/state" %
-                    (urllib.quote(args["roomid"]), self._usr()))
-            reactor.callFromThread(self._run_and_pprint, "DELETE", path)
+            self._do_membership_change(args["roomid"], "leave", self._usr())
         except Exception as e:
             print e
 
@@ -555,7 +565,7 @@ class SynapseCmd(cmd.Cmd):
                                alt_text="Sent receipt for %s" % event["msg_id"])
 
     def _do_membership_change(self, roomid, membership, userid):
-        path = "/rooms/%s/members/%s/state" % (urllib.quote(roomid), userid)
+        path = "/rooms/%s/state/m.room.member/%s" % (urllib.quote(roomid), urllib.quote(userid))
         data = {
             "membership": membership
         }

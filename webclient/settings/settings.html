@@ -1,0 +1,73 @@
+<div ng-controller="SettingsController" class="user">
+
+    <div id="page">
+    <div id="wrapper">
+        
+        <h3>Me</h3>
+        <div>
+            <form>
+                <table>
+                    <tr>
+                        <td>
+                            <div class="profile-avatar">
+                                <img ng-src="{{ profile.avatarUrl || 'img/default-profile.jpg' }}" m-file-input="profile.avatarFile"/>
+                            </div>
+                        </td>
+                        <td>
+                            <div id="user-ids">
+                                <input size="40" ng-model="profile.displayName" placeholder="Your name"/>            
+                            </div>
+                        </td>
+                        <td>
+                            <button ng-disabled="(profile.displayName == config.displayName) && (profile.avatarUrl == config.avatarUrl)"
+                                    ng-click="saveProfile()">Save</button>    
+                        </td>
+                    </tr>
+                </table>
+            </form>
+        </div>
+        <br/>
+
+        <h3>Linked emails</h3>
+        <div>
+            <form>
+                <input size="40" ng-model="linkedEmails.linkNewEmail" ng-enter="linkEmail(linkedEmails.linkNewEmail)" />
+                <button ng-disabled="!linkedEmails.linkNewEmail" ng-click="linkEmail(linkedEmails.linkNewEmail)">
+                    Link Email
+                </button>
+                {{ emailFeedback }}    
+            </form>
+            <form ng-hide="!linkedEmails.emailBeingAuthed">
+                Enter validation token for {{ linkedEmails.emailBeingAuthed }}:
+                <br />
+                <input size="20" ng-model="linkedEmails.emailCode" ng-enter="submitEmailCode(linkedEmails.emailCode)" />
+                <button ng-disabled="!linkedEmails.emailCode || !linkedEmails.linkNewEmail" ng-click="submitEmailCode(linkedEmails.emailCode)">
+                    Submit Code
+                </button>   
+            </form>
+            <table>
+                <tr ng-repeat="(address, info) in linkedEmails.linkedEmailList">
+                    <td>{{address}}</td>
+                </tr>
+            </table>
+        </div>
+        <br/>
+
+        <h3>Configuration</h3>
+        <div>
+            <div>Home server: {{ config.homeserver }} </div>
+            <div>User ID: {{ config.user_id }} </div>
+            <div>Access token: {{ config.access_token }} </div>
+        </div>
+        <br/>
+        
+        <div>
+            <div><button ng-click="requestNotifications()">Request notifications</button></div>
+        </div>
+        <br/>
+
+        {{ feedback }}
+
+    </div>    
+    </div>
+</div>
