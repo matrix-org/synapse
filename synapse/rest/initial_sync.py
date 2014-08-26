@@ -19,6 +19,7 @@ from synapse.api.streams import PaginationConfig
 from base import RestServlet, client_path_pattern
 
 
+# TODO: Needs unit testing
 class InitialSyncRestServlet(RestServlet):
     PATTERN = client_path_pattern("/initialSync$")
 

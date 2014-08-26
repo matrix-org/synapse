@@ -96,6 +96,7 @@ class RoomCreateRestServlet(RestServlet):
         return (200, {})
 
 
+# TODO: Needs unit testing for generic events
 class RoomStateEventRestServlet(RestServlet):
     def register(self, http_server):
         # /room/$roomid/state/$eventtype
@@ -168,6 +169,7 @@ class RoomStateEventRestServlet(RestServlet):
             defer.returnValue((200, ""))
 
 
+# TODO: Needs unit testing for generic events + feedback
 class RoomSendEventRestServlet(RestServlet):
 
     def register(self, http_server):
@@ -228,6 +230,7 @@ class JoinRoomAliasServlet(RestServlet):
         defer.returnValue((200, ret_dict))
 
 
+# TODO: Needs unit testing
 class RoomMemberListRestServlet(RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/members$")
 
@@ -255,6 +258,7 @@ class RoomMemberListRestServlet(RestServlet):
         defer.returnValue((200, members))
 
 
+# TODO: Needs unit testing
 class RoomMessageListRestServlet(RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/messages$")
 
@@ -289,6 +293,7 @@ class RoomTriggerBackfill(RestServlet):
         defer.returnValue((200, res))
 
 
+# TODO: Needs unit testing
 class RoomMembershipRestServlet(RestServlet):
 
     def register(self, http_server):
