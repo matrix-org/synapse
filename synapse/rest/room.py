@@ -168,6 +168,46 @@ class RoomStateEventRestServlet(RestServlet):
             defer.returnValue((200, ""))
 
 
+class RoomSendEventRestServlet(RestServlet):
+
+    def register(self, http_server):
+        # /rooms/$roomid/send/$event_type[/$txn_id]
+        PATTERN = ("/rooms/(?P<room_id>[^/]*)/send/(?P<event_type>[^/]*)")
+        register_txn_path(self, PATTERN, http_server, with_get=True)
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, room_id, event_type):
+        user = yield self.auth.get_user_by_req(request)
+        content = _parse_json(request)
+
+        event = self.event_factory.create_event(
+            etype=event_type,
+            room_id=urllib.unquote(room_id),
+            user_id=user.to_string(),
+            content=content
+        )
+
+        msg_handler = self.handlers.message_handler
+        yield msg_handler.send_message(event)
+
+        defer.returnValue((200, {"event_id": event.event_id}))
+
+    def on_GET(self, request, room_id, event_type, txn_id):
+        return (200, "Not implemented")
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_id, event_type, txn_id):
+        try:
+            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+        except KeyError:
+            pass
+
+        response = yield self.on_POST(request, room_id, event_type)
+
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
+
+
 class JoinRoomAliasServlet(RestServlet):
     PATTERN = client_path_pattern("/join/(?P<room_alias>[^/]+)$")
 
@@ -402,7 +442,7 @@ class RoomMembershipRestServlet(RestServlet):
     def on_PUT(self, request, room_id, membership_action, txn_id):
         try:
             defer.returnValue(self.txns.get_client_transaction(request, txn_id))
-        except:
+        except KeyError:
             pass
 
         response = yield self.on_POST(request, room_id, membership_action)
@@ -422,7 +462,7 @@ def _parse_json(request):
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
-def register_txn_path(servlet, regex_string, http_server):
+def register_txn_path(servlet, regex_string, http_server, with_get=False):
     """Registers a transaction-based path.
 
     This registers two paths:
@@ -433,6 +473,7 @@ def register_txn_path(servlet, regex_string, http_server):
         regex_string (str): The regex string to register. Must NOT have a
         trailing $ as this string will be appended to.
         http_server : The http_server to register paths with.
+        with_get: True to also register respective GET paths for the PUTs.
     """
     http_server.register_path(
         "POST",
@@ -443,6 +484,12 @@ def register_txn_path(servlet, regex_string, http_server):
         "PUT",
         client_path_pattern(regex_string + "/(?P<txn_id>[^/]*)$"),
         servlet.on_PUT
+    )
+    if with_get:
+        http_server.register_path(
+        "GET",
+        client_path_pattern(regex_string + "/(?P<txn_id>[^/]*)$"),
+        servlet.on_GET
     )
 
 
@@ -456,3 +503,4 @@ def register_servlets(hs, http_server):
     JoinRoomAliasServlet(hs).register(http_server)
     RoomTriggerBackfill(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
+    RoomSendEventRestServlet(hs).register(http_server)
