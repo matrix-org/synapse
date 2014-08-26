@@ -16,8 +16,9 @@
 from twisted.internet import defer
 
 from synapse.api.events.room import (
-    RoomMemberEvent, MessageEvent, RoomTopicEvent, FeedbackEvent,
-    RoomConfigEvent, RoomNameEvent,
+    RoomMemberEvent, RoomTopicEvent, FeedbackEvent,
+#   RoomConfigEvent,
+    RoomNameEvent,
 )
 
 from synapse.util.logutils import log_function

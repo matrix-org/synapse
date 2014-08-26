@@ -15,15 +15,10 @@
 
 from twisted.internet import defer
 
-from synapse.types import UserID
+from ._base import SQLBaseStore
+
 from synapse.api.constants import Membership
-from synapse.api.events.room import RoomMemberEvent
 
-from ._base import SQLBaseStore, Table
-
-
-import collections
-import json
 import logging
 
 logger = logging.getLogger(__name__)

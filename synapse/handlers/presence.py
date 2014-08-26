@@ -674,7 +674,7 @@ class PresenceHandler(BaseHandler):
 
     def push_update_to_clients(self, observer_user, observed_user,
                                statuscache):
-        state = statuscache.make_event(user=observed_user, clock=self.clock)
+        statuscache.make_event(user=observed_user, clock=self.clock)
 
         self.notifier.on_new_user_event(
             observer_user.to_string(),

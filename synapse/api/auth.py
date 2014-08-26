@@ -19,8 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership
 from synapse.api.errors import AuthError, StoreError, Codes
-from synapse.api.events.room import (RoomTopicEvent, RoomMemberEvent,
-                                     MessageEvent, FeedbackEvent)
+from synapse.api.events.room import RoomMemberEvent
 
 import logging
 
