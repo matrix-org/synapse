@@ -56,7 +56,7 @@ class FederationHandler(BaseHandler):
             content.update({"membership": Membership.JOIN})
             new_event = self.event_factory.create_event(
                 etype=RoomMemberEvent.TYPE,
-                target_user_id=event.user_id,
+                state_key=event.user_id,
                 room_id=event.room_id,
                 user_id=event.user_id,
                 membership=Membership.JOIN,

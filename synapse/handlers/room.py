@@ -374,7 +374,7 @@ class RoomCreationHandler(BaseHandler):
         content = {"membership": Membership.JOIN}
         join_event = self.event_factory.create_event(
             etype=RoomMemberEvent.TYPE,
-            target_user_id=user_id,
+            state_key=user_id,
             room_id=room_id,
             user_id=user_id,
             membership=Membership.JOIN,
@@ -502,9 +502,10 @@ class RoomMemberHandler(BaseHandler):
         Raises:
             SynapseError if there was a problem changing the membership.
         """
+        target_user_id = event.state_key
 
         prev_state = yield self.store.get_room_member(
-            event.target_user_id, event.room_id
+            target_user_id, event.room_id
         )
 
         if prev_state:
@@ -530,7 +531,7 @@ class RoomMemberHandler(BaseHandler):
                 yield self.auth.check(event, raises=True)
 
             prev_state = yield self.store.get_room_member(
-                event.target_user_id, event.room_id
+                target_user_id, event.room_id
             )
             if prev_state and prev_state.membership == event.membership:
                 # double same action, treat this event as a NOOP.
@@ -563,7 +564,7 @@ class RoomMemberHandler(BaseHandler):
         content.update({"membership": Membership.JOIN})
         new_event = self.event_factory.create_event(
             etype=RoomMemberEvent.TYPE,
-            target_user_id=joinee.to_string(),
+            state_key=joinee.to_string(),
             room_id=room_id,
             user_id=joinee.to_string(),
             membership=Membership.JOIN,
@@ -576,7 +577,7 @@ class RoomMemberHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _do_join(self, event, room_host=None, do_auth=True):
-        joinee = self.hs.parse_userid(event.target_user_id)
+        joinee = self.hs.parse_userid(event.state_key)
         # room_id = RoomID.from_string(event.room_id, self.hs)
         room_id = event.room_id
 
@@ -685,16 +686,17 @@ class RoomMemberHandler(BaseHandler):
 
         # If we're inviting someone, then we should also send it to that
         # HS.
+        target_user_id = event.state_key
         if membership == Membership.INVITE:
             host = UserID.from_string(
-                event.target_user_id, self.hs
+                target_user_id, self.hs
             ).domain
             destinations.append(host)
 
         # If we are joining a remote HS, include that.
         if membership == Membership.JOIN:
             host = UserID.from_string(
-                event.target_user_id, self.hs
+                target_user_id, self.hs
             ).domain
             destinations.append(host)
 

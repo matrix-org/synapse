@@ -56,11 +56,11 @@ class Notifier(object):
         # invites MUST prod the person being invited, who won't be in the room.
         if (event.type == RoomMemberEvent.TYPE and
                 event.content["membership"] == Membership.INVITE):
-            member_list.append(event.target_user_id)
+            member_list.append(event.state_key)
         # similarly, LEAVEs must be sent to the person leaving
         if (event.type == RoomMemberEvent.TYPE and
                 event.content["membership"] == Membership.LEAVE):
-            member_list.append(event.target_user_id)
+            member_list.append(event.state_key)
 
         for user_id in member_list:
             if user_id in self.stored_event_listeners:
