@@ -374,17 +374,41 @@ class RoomMembershipRestServlet(RestServlet):
             "(?P<membership_action>join|invite|leave)")
         register_txn_path(self, PATTERN, http_server)
 
+    @defer.inlineCallbacks
     def on_POST(self, request, room_id, membership_action):
-        return (200, "POST Not implemented")
+        user = yield self.auth.get_user_by_req(request)
 
+        content = _parse_json(request)
+
+        # target user is you unless it is an invite
+        state_key = user.to_string()
+        if membership_action == "invite":
+            if "user_id" not in content:
+                raise SynapseError(400, "Missing user_id key.")
+            state_key = content["user_id"]
+
+        event = self.event_factory.create_event(
+            etype=RoomMemberEvent.TYPE,
+            content={"membership": unicode(membership_action)},
+            room_id=urllib.unquote(room_id),
+            user_id=user.to_string(),
+            state_key=state_key
+        )
+        handler = self.handlers.room_member_handler
+        yield handler.change_membership(event)
+        defer.returnValue((200, ""))
+
+    @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):
-        (code, response) = self.txns.get_client_transaction(request, txn_id)
-        if code:
-            return (code, response)
+        try:
+            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+        except:
+            pass
 
-        response = (200, "PUT not implemented txnid %s" % txn_id)
+        response = yield self.on_POST(request, room_id, membership_action)
+
         self.txns.store_client_transaction(request, txn_id, response)
-        return response
+        defer.returnValue(response)
 
 
 def _parse_json(request):

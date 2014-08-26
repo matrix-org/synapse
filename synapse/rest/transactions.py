@@ -41,6 +41,7 @@ class HttpTransactionStore(object):
             logger.debug("get_response Key: %s TxnId: %s", key, txn_id)
             (last_txn_id, response) = self.transactions[key]
             if txn_id == last_txn_id:
+                logger.info("get_response: Returning a response for %s", key)
                 return response
         except KeyError:
             pass
@@ -78,11 +79,13 @@ class HttpTransactionStore(object):
             request must have the transaction ID as the last path segment.
             txn_id (str): The transaction ID for this request.
         Returns:
-            The response tuple or (None, None).
+            The response tuple.
+        Raises:
+            KeyError if the transaction was not found.
         """
         response = self.get_response(self._get_key(request), txn_id)
         if response is None:
-            return (None, None)
+            raise KeyError("Transaction not found.")
         return response
 
     def _get_key(self, request):
