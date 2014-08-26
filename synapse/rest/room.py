@@ -318,7 +318,8 @@ class RoomMemberListRestServlet(RestServlet):
             user_id=user.to_string())
 
         for event in members["chunk"]:
-            target_user = self.hs.parse_userid(event["state_key"])
+            # FIXME: should probably be state_key here, not user_id
+            target_user = self.hs.parse_userid(event["user_id"])
             # Presence is an optional cache; don't fail if we can't fetch it
             try:
                 presence_state = yield self.handlers.presence_handler.get_state(

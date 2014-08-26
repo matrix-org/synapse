@@ -115,19 +115,7 @@ angular.module('matrixService', [])
 
         // Joins a room
         join: function(room_id) {
-            // The REST path spec
-            var path = "/rooms/$room_id/members/$user_id/state";
-
-            // Like the cmd client, escape room ids
-            room_id = encodeURIComponent(room_id);
-
-            // Customize it
-            path = path.replace("$room_id", room_id);
-            path = path.replace("$user_id", config.user_id);
-
-            return doRequest("PUT", path, undefined, {
-                 membership: "join"
-            });
+            return this.membershipChange(room_id, config.user_id, "join");
         },
 
         joinAlias: function(room_alias) {
@@ -141,34 +129,23 @@ angular.module('matrixService', [])
 
         // Invite a user to a room
         invite: function(room_id, user_id) {
-            // The REST path spec
-            var path = "/rooms/$room_id/members/$user_id/state";
-
-            // Like the cmd client, escape room ids
-            room_id = encodeURIComponent(room_id);
-
-            // Customize it
-            path = path.replace("$room_id", room_id);
-            path = path.replace("$user_id", user_id);
-
-            return doRequest("PUT", path, undefined, {
-                 membership: "invite"
-            });
+            return this.membershipChange(room_id, user_id, "invite");
         },
 
         // Leaves a room
         leave: function(room_id) {
+            return this.membershipChange(room_id, config.user_id, "leave");
+        },
+
+        membershipChange: function(room_id, user_id, membershipValue) {
             // The REST path spec
-            var path = "/rooms/$room_id/members/$user_id/state";
+            var path = "/rooms/$room_id/state/m.room.member/$user_id";
+            path = path.replace("$room_id", encodeURIComponent(room_id));
+            path = path.replace("$user_id", encodeURIComponent(user_id));
 
-            // Like the cmd client, escape room ids
-            room_id = encodeURIComponent(room_id);
-
-            // Customize it
-            path = path.replace("$room_id", room_id);
-            path = path.replace("$user_id", config.user_id);
-
-            return doRequest("DELETE", path, undefined, undefined);
+            return doRequest("PUT", path, undefined, {
+                 membership: membershipValue
+            });
         },
 
         // Retrieves the room ID corresponding to a room alias
