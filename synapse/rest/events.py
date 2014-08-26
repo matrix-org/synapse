@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.api.streams import PaginationConfig
+from synapse.streams.config import PaginationConfig
 from synapse.rest.base import RestServlet, client_path_pattern
 
 
@@ -41,10 +41,12 @@ class EventStreamRestServlet(RestServlet):
 
         chunk = yield handler.get_stream(auth_user.to_string(), pagin_config,
                                          timeout=timeout)
+
         defer.returnValue((200, chunk))
 
     def on_OPTIONS(self, request):
         return (200, {})
+
 
 
 def register_servlets(hs, http_server):

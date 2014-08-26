@@ -97,72 +97,32 @@ class RoomID(DomainSpecificString):
 class StreamToken(
     namedtuple(
         "Token",
-        ("events_type", "topological_key", "stream_key", "presence_key")
+        ("events_key", "presence_key")
     )
 ):
     _SEPARATOR = "_"
 
-    _TOPOLOGICAL_PREFIX = "t"
-    _STREAM_PREFIX = "s"
-
-    _TOPOLOGICAL_SEPERATOR = "-"
-
-    TOPOLOGICAL_TYPE = "topo"
-    STREAM_TYPE = "stream"
-
     @classmethod
     def from_string(cls, string):
         try:
-            events_part, presence_part = string.split(cls._SEPARATOR)
-
-            presence_key = int(presence_part)
-
-            topo_length = len(cls._TOPOLOGICAL_PREFIX)
-            stream_length = len(cls._STREAM_PREFIX)
-            if events_part[:topo_length] == cls._TOPOLOGICAL_PREFIX:
-                # topological event token
-                topo_tok = events_part[topo_length:]
-                topo_key, stream_key = topo_tok.split(
-                    cls._TOPOLOGICAL_SEPERATOR, 1
-                )
-
-                topo_key = int(topo_key)
-                stream_key = int(stream_key)
-
-                events_type = cls.TOPOLOGICAL_TYPE
-            elif events_part[:stream_length] == cls._STREAM_PREFIX:
-                topo_key = None
-                stream_key = int(events_part[stream_length:])
-
-                events_type = cls.STREAM_TYPE
-            else:
-                raise
+            events_key, presence_key = string.split(cls._SEPARATOR)
 
             return cls(
-                events_type=events_type,
-                topological_key=topo_key,
-                stream_key=stream_key,
+                events_key=events_key,
                 presence_key=presence_key,
             )
         except:
             raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
-        if self.events_type == self.TOPOLOGICAL_TYPE:
-            return "".join([
-                self._TOPOLOGICAL_PREFIX,
-                str(self.topological_key),
-                self._TOPOLOGICAL_SEPERATOR,
-                str(self.stream_key),
-                self._SEPARATOR,
-                str(self.presence_key),
-            ])
-        elif self.events_type == self.STREAM_TYPE:
-            return "".join([
-                self._STREAM_PREFIX,
-                str(self.stream_key),
-                self._SEPARATOR,
-                str(self.presence_key),
-            ])
+        return "".join([
+            str(self.events_key),
+            self._SEPARATOR,
+            str(self.presence_key),
+        ])
 
-        raise RuntimeError("Unrecognized event type: %s", self.events_type)
+
+    def copy_and_replace(self, key, new_value):
+        d = self._asdict()
+        d[key] = new_value
+        return StreamToken(**d)

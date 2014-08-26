@@ -22,7 +22,7 @@ from synapse.api.events.room import (
     MessageEvent, RoomMemberEvent, FeedbackEvent
 )
 from synapse.api.constants import Feedback
-from synapse.api.streams import PaginationConfig
+from synapse.streams.config import PaginationConfig
 
 import json
 import logging
