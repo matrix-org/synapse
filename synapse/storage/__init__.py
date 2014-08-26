@@ -16,8 +16,9 @@
 from twisted.internet import defer
 
 from synapse.api.events.room import (
-    RoomMemberEvent, MessageEvent, RoomTopicEvent, FeedbackEvent,
-    RoomConfigEvent, RoomNameEvent,
+    RoomMemberEvent, RoomTopicEvent, FeedbackEvent,
+#   RoomConfigEvent,
+    RoomNameEvent,
 )
 
 from synapse.util.logutils import log_function
@@ -115,6 +116,11 @@ class DataStore(RoomMemberStore, RoomStore,
 
         if stream_ordering is not None:
             vals["stream_ordering"] = stream_ordering
+
+        if hasattr(event, "outlier"):
+            vals["outlier"] = event.outlier
+        else:
+            vals["outlier"] = False
 
         unrec = {
             k: v

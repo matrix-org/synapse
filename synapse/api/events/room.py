@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.constants import Membership
+from synapse.api.errors import SynapseError
 from . import SynapseEvent
 
 
@@ -59,15 +61,15 @@ class RoomMemberEvent(SynapseEvent):
     TYPE = "m.room.member"
 
     valid_keys = SynapseEvent.valid_keys + [
-        "target_user_id",  # target
+        # target is the state_key
         "membership",  # action
     ]
 
     def __init__(self, **kwargs):
-        if "target_user_id" in kwargs:
-            kwargs["state_key"] = kwargs["target_user_id"]
         if "membership" not in kwargs:
             kwargs["membership"] = kwargs.get("content", {}).get("membership")
+        if not kwargs["membership"] in Membership.LIST:
+            raise SynapseError(400, "Bad membership value.")
         super(RoomMemberEvent, self).__init__(**kwargs)
 
     def get_content_template(self):
@@ -108,7 +110,7 @@ class InviteJoinEvent(SynapseEvent):
     TYPE = "m.room.invite_join"
 
     valid_keys = SynapseEvent.valid_keys + [
-        "target_user_id",
+        # target_user_id is the state_key
         "target_host",
     ]
 

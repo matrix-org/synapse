@@ -190,6 +190,7 @@ class PresenceStateTestCase(unittest.TestCase):
             ),
             SynapseError
         )
+    test_get_disallowed_state.skip = "Presence polling is disabled"
 
     @defer.inlineCallbacks
     def test_set_my_state(self):
@@ -214,6 +215,7 @@ class PresenceStateTestCase(unittest.TestCase):
                 state={"state": OFFLINE})
 
         self.mock_stop.assert_called_with(self.u_apple)
+    test_set_my_state.skip = "Presence polling is disabled"
 
 
 class PresenceInvitesTestCase(unittest.TestCase):
@@ -653,6 +655,7 @@ class PresencePushTestCase(unittest.TestCase):
                     observed_user=self.u_banana,
                     statuscache=ANY), # self-reflection
         ]) # and no others...
+    test_push_local.skip = "Presence polling is disabled"
 
     @defer.inlineCallbacks
     def test_push_remote(self):
@@ -704,6 +707,7 @@ class PresencePushTestCase(unittest.TestCase):
         )
 
         yield put_json.await_calls()
+    test_push_remote.skip = "Presence polling is disabled"
 
     @defer.inlineCallbacks
     def test_recv_remote(self):
@@ -996,6 +1000,8 @@ class PresencePollingTestCase(unittest.TestCase):
 
         self.assertFalse("banana" in self.handler._local_pushmap)
         self.assertFalse("clementine" in self.handler._local_pushmap)
+    test_push_local.skip = "Presence polling is disabled"
+
 
     @defer.inlineCallbacks
     def test_remote_poll_send(self):
@@ -1044,6 +1050,7 @@ class PresencePollingTestCase(unittest.TestCase):
         put_json.await_calls()
 
         self.assertFalse(self.u_potato in self.handler._remote_recvmap)
+    test_remote_poll_send.skip = "Presence polling is disabled"
 
     @defer.inlineCallbacks
     def test_remote_poll_receive(self):

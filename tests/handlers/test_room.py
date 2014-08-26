@@ -90,7 +90,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         event = self.hs.get_event_factory().create_event(
             etype=RoomMemberEvent.TYPE,
             user_id=user_id,
-            target_user_id=target_user_id,
+            state_key=target_user_id,
             room_id=room_id,
             membership=Membership.INVITE,
             content=content,
@@ -143,7 +143,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         event = self.hs.get_event_factory().create_event(
             etype=RoomMemberEvent.TYPE,
             user_id=user_id,
-            target_user_id=target_user_id,
+            state_key=target_user_id,
             room_id=room_id,
             membership=Membership.JOIN,
             content=content,
@@ -374,7 +374,7 @@ class RoomCreationTest(unittest.TestCase):
         self.assertEquals(RoomMemberEvent.TYPE, join_event.type)
         self.assertEquals(room_id, join_event.room_id)
         self.assertEquals(user_id, join_event.user_id)
-        self.assertEquals(user_id, join_event.target_user_id)
+        self.assertEquals(user_id, join_event.state_key)
 
         self.assertTrue(self.state_handler.handle_new_event.called)
 

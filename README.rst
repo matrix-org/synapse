@@ -24,11 +24,8 @@ To get up and running:
     
     - To run your own **private** homeserver on localhost:8080, install synapse 
       with ``python setup.py develop --user`` and then run one with
-      ``python synapse/app/homeserver.py``
-      
-    - To run your own webclient, add ``-w``:
-      ``python synapse/app/homeserver.py -w`` and hit http://localhost:8080/matrix/client
-      in your web browser (a recent Chrome, Safari or Firefox for now,
+      ``python synapse/app/homeserver.py`` - you will find a webclient running
+      at http://localhost:8080 (use a recent Chrome, Safari or Firefox for now,
       please...)
              
     - To make the homeserver **public** and let it exchange messages with 
@@ -36,7 +33,12 @@ To get up and running:
       up port 8080 and run ``python synapse/app/homeserver.py --host 
       machine.my.domain.name``.  Then come join ``#matrix:matrix.org`` and
       say hi! :)
-    
+
+For more detailed setup instructions, please see further down this document.
+
+[1] VoIP currently in development
+
+   
 About Matrix
 ============
 
@@ -86,8 +88,6 @@ with the APIs and the demo clients, and let us know your thoughts at
 https://github.com/matrix-org/synapse/issues or at matrix@matrix.org.
 
 Thanks for trying Matrix!
-
-[1] VoIP currently in development
 
 [2] Cryptographic signing of messages isn't turned on yet
 
@@ -146,6 +146,13 @@ This should end with a 'PASSED' result::
     PASSED (successes=143)
 
 
+Upgrading an existing homeserver
+================================
+
+Before upgrading an existing homeserver to a new version, please refer to
+UPGRADE.rst for any additional instructions.
+ 
+
 Setting up Federation
 =====================
 
@@ -201,9 +208,7 @@ http://localhost:8080. Simply run::
 Running The Demo Web Client
 ===========================
 
-You can run the web client when you run the homeserver by adding ``-w`` to the
-command to run ``homeserver.py``. The web client can be accessed via 
-http://localhost:8080/matrix/client
+The homeserver runs a web client by default at http://localhost:8080.
 
 If this is the first time you have used the client from that browser (it uses
 HTML5 local storage to remember its config), you will need to log in to your

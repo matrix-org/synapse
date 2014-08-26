@@ -19,9 +19,6 @@ from twisted.internet import defer
 
 from synapse.api.errors import EventStreamError
 from synapse.api.events import SynapseEvent
-from synapse.api.events.room import (
-    RoomMemberEvent, MessageEvent, FeedbackEvent, RoomTopicEvent
-)
 from synapse.api.streams import PaginationStream, StreamData
 
 import logging

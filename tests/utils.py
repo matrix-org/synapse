@@ -190,7 +190,7 @@ class MemoryDataStore(object):
     def persist_event(self, event):
         if event.type == RoomMemberEvent.TYPE:
             room_id = event.room_id
-            user = event.target_user_id
+            user = event.state_key
             membership = event.membership
             self.members.setdefault(room_id, {})[user] = event
 
@@ -203,7 +203,9 @@ class MemoryDataStore(object):
     def get_current_state(self, room_id, event_type=None, state_key=""):
         if event_type:
             key = (room_id, event_type, state_key)
-            return self.current_state.get(key)
+            if self.current_state.get(key):
+                return [self.current_state.get(key)]
+            return None
         else:
             return [
                 e for e in self.current_state
@@ -221,7 +223,7 @@ class MemoryDataStore(object):
 
 def _format_call(args, kwargs):
     return ", ".join(
-        ["%r" % (a) for a in args] + 
+        ["%r" % (a) for a in args] +
         ["%s=%r" % (k, v) for k, v in kwargs.items()]
     )
 

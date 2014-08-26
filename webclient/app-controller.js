@@ -20,9 +20,9 @@ limitations under the License.
 
 'use strict';
 
-angular.module('MatrixWebClientController', ['matrixService'])
-.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', 'matrixService', 'eventStreamService',
-                               function($scope, $location, $rootScope, matrixService, eventStreamService) {
+angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'eventStreamService'])
+.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventStreamService',
+                               function($scope, $location, $rootScope, matrixService, mPresence, eventStreamService) {
          
     // Check current URL to avoid to display the logout button on the login page
     $scope.location = $location.path();
@@ -31,42 +31,31 @@ angular.module('MatrixWebClientController', ['matrixService'])
     $rootScope.$on('$routeChangeSuccess', function (event, current, previous) {
         $scope.location = $location.path();
     });
-    
-    
-    // Manage the display of the current config
-    $scope.config;
-    
-    // Toggles the config display
-    $scope.showConfig = function() {
-        if ($scope.config) {
-            $scope.config = undefined;
-        }
-        else {
-            $scope.config = matrixService.config();        
-        }
-    };
-    
-    $scope.closeConfig = function() {
-        if ($scope.config) {
-            $scope.config = undefined;
-        }
-    };
 
     if (matrixService.isUserLoggedIn()) {
-        eventStreamService.resume();
+        // eventStreamService.resume();
+        mPresence.start();
     }
+    
+    $scope.go = function(url) {
+        $location.url(url);
+    };
     
     // Logs the user out 
     $scope.logout = function() {
+        
         // kill the event stream
         eventStreamService.stop();
-    
+
+        // Do not update presence anymore
+        mPresence.stop();
+
         // Clean permanent data
         matrixService.setConfig({});
         matrixService.saveConfig();
         
         // And go to the login page
-        $location.path("login");
+        $location.url("login");
     };
 
     // Listen to the event indicating that the access token is no longer valid.
@@ -82,7 +71,6 @@ angular.module('MatrixWebClientController', ['matrixService'])
             window.Notification.requestPermission(function(){});
         }
     };
-    
     
 }]);
 

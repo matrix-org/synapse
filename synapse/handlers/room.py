@@ -20,15 +20,14 @@ from synapse.types import UserID, RoomAlias, RoomID
 from synapse.api.constants import Membership
 from synapse.api.errors import RoomError, StoreError, SynapseError
 from synapse.api.events.room import (
-    RoomTopicEvent, MessageEvent, InviteJoinEvent, RoomMemberEvent,
-    RoomConfigEvent
+    RoomTopicEvent, RoomMemberEvent, RoomConfigEvent
 )
 from synapse.api.streams.event import EventStream, EventsStreamData
+from synapse.handlers.presence import PresenceStreamData
 from synapse.util import stringutils
 from ._base import BaseHandler
 
 import logging
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -260,21 +259,38 @@ class MessageHandler(BaseHandler):
             membership_list=[Membership.INVITE, Membership.JOIN]
         )
 
-        ret = []
+        rooms_ret = []
+
+        now_rooms_token = yield self.store.get_room_events_max_id()
+
+        # FIXME (erikj): Fix this.
+        presence_stream = PresenceStreamData(self.hs)
+        now_presence_token = yield presence_stream.max_token()
+        presence = yield presence_stream.get_rows(
+            user_id, 0, now_presence_token, None, None
+        )
+
+        # FIXME (erikj): We need to not generate this token,
+        now_token = "%s_%s" % (now_rooms_token, now_presence_token)
 
         for event in room_list:
             d = {
                 "room_id": event.room_id,
                 "membership": event.membership,
             }
-            ret.append(d)
+
+            if event.membership == Membership.INVITE:
+                d["inviter"] = event.user_id
+
+            rooms_ret.append(d)
 
             if event.membership != Membership.JOIN:
                 continue
             try:
                 messages, token = yield self.store.get_recent_events_for_room(
                     event.room_id,
-                    limit=50,
+                    limit=10,
+                    end_token=now_rooms_token,
                 )
 
                 d["messages"] = {
@@ -282,10 +298,15 @@ class MessageHandler(BaseHandler):
                     "start": token[0],
                     "end": token[1],
                 }
+
+                current_state = yield self.store.get_current_state(event.room_id)
+                d["state"] = [c.get_dict() for c in current_state]
             except:
                 logger.exception("Failed to get snapshot")
 
-        logger.debug("snapshot_all_rooms returning: %s", ret)
+        ret = {"rooms": rooms_ret, "presence": presence[0], "end": now_token}
+
+        # logger.debug("snapshot_all_rooms returning: %s", ret)
 
         defer.returnValue(ret)
 
@@ -377,7 +398,7 @@ class RoomCreationHandler(BaseHandler):
         content = {"membership": Membership.JOIN}
         join_event = self.event_factory.create_event(
             etype=RoomMemberEvent.TYPE,
-            target_user_id=user_id,
+            state_key=user_id,
             room_id=room_id,
             user_id=user_id,
             membership=Membership.JOIN,
@@ -505,6 +526,7 @@ class RoomMemberHandler(BaseHandler):
         Raises:
             SynapseError if there was a problem changing the membership.
         """
+        target_user_id = event.state_key
 
         snapshot = yield self.store.snapshot_room(
             event.room_id, event.user_id,
@@ -512,7 +534,7 @@ class RoomMemberHandler(BaseHandler):
         )
         ## TODO(markjh): get prev state from snapshot.
         prev_state = yield self.store.get_room_member(
-            event.target_user_id, event.room_id
+            target_user_id, event.room_id
         )
 
         if prev_state:
@@ -569,7 +591,7 @@ class RoomMemberHandler(BaseHandler):
         content.update({"membership": Membership.JOIN})
         new_event = self.event_factory.create_event(
             etype=RoomMemberEvent.TYPE,
-            target_user_id=joinee.to_string(),
+            state_key=joinee.to_string(),
             room_id=room_id,
             user_id=joinee.to_string(),
             membership=Membership.JOIN,
@@ -586,7 +608,7 @@ class RoomMemberHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _do_join(self, event, snapshot, room_host=None, do_auth=True):
-        joinee = self.hs.parse_userid(event.target_user_id)
+        joinee = self.hs.parse_userid(event.state_key)
         # room_id = RoomID.from_string(event.room_id, self.hs)
         room_id = event.room_id
 
@@ -697,16 +719,17 @@ class RoomMemberHandler(BaseHandler):
 
         # If we're inviting someone, then we should also send it to that
         # HS.
+        target_user_id = event.state_key
         if membership == Membership.INVITE:
             host = UserID.from_string(
-                event.target_user_id, self.hs
+                target_user_id, self.hs
             ).domain
             destinations.append(host)
 
         # If we are joining a remote HS, include that.
         if membership == Membership.JOIN:
             host = UserID.from_string(
-                event.target_user_id, self.hs
+                target_user_id, self.hs
             ).domain
             destinations.append(host)
 

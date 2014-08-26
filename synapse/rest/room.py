@@ -18,9 +18,10 @@ from twisted.internet import defer
 
 from base import RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
-from synapse.api.events.room import (RoomTopicEvent, MessageEvent,
-                                     RoomMemberEvent, FeedbackEvent)
-from synapse.api.constants import Feedback, Membership
+from synapse.api.events.room import (
+    MessageEvent, RoomMemberEvent, FeedbackEvent
+)
+from synapse.api.constants import Feedback
 from synapse.api.streams import PaginationConfig
 
 import json
@@ -95,46 +96,76 @@ class RoomCreateRestServlet(RestServlet):
         return (200, {})
 
 
-class RoomTopicRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/topic$")
+class RoomStateEventRestServlet(RestServlet):
+    def register(self, http_server):
+        # /room/$roomid/state/$eventtype
+        no_state_key = "/rooms/(?P<room_id>[^/]*)/state/(?P<event_type>[^/]*)$"
 
-    def get_event_type(self):
-        return RoomTopicEvent.TYPE
+        # /room/$roomid/state/$eventtype/$statekey
+        state_key = ("/rooms/(?P<room_id>[^/]*)/state/" +
+            "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$")
+
+        http_server.register_path("GET",
+                                  client_path_pattern(state_key),
+                                  self.on_GET)
+        http_server.register_path("PUT",
+                                  client_path_pattern(state_key),
+                                  self.on_PUT)
+        http_server.register_path("GET",
+                                  client_path_pattern(no_state_key),
+                                  self.on_GET_no_state_key)
+        http_server.register_path("PUT",
+                                  client_path_pattern(no_state_key),
+                                  self.on_PUT_no_state_key)
+
+    def on_GET_no_state_key(self, request, room_id, event_type):
+        return self.on_GET(request, room_id, event_type, "")
+
+    def on_PUT_no_state_key(self, request, room_id, event_type):
+        return self.on_PUT(request, room_id, event_type, "")
 
     @defer.inlineCallbacks
-    def on_GET(self, request, room_id):
+    def on_GET(self, request, room_id, event_type, state_key):
         user = yield self.auth.get_user_by_req(request)
 
         msg_handler = self.handlers.message_handler
         data = yield msg_handler.get_room_data(
             user_id=user.to_string(),
             room_id=urllib.unquote(room_id),
-            event_type=RoomTopicEvent.TYPE,
-            state_key="",
+            event_type=urllib.unquote(event_type),
+            state_key=urllib.unquote(state_key),
         )
 
         if not data:
-            raise SynapseError(404, "Topic not found.", errcode=Codes.NOT_FOUND)
-        defer.returnValue((200, data.content))
+            raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
+        defer.returnValue((200, data[0].get_dict()["content"]))
 
     @defer.inlineCallbacks
-    def on_PUT(self, request, room_id):
+    def on_PUT(self, request, room_id, event_type, state_key):
         user = yield self.auth.get_user_by_req(request)
+        event_type = urllib.unquote(event_type)
 
         content = _parse_json(request)
 
         event = self.event_factory.create_event(
-            etype=self.get_event_type(),
+            etype=event_type,
             content=content,
             room_id=urllib.unquote(room_id),
             user_id=user.to_string(),
+            state_key=urllib.unquote(state_key)
             )
-
-        msg_handler = self.handlers.message_handler
-        yield msg_handler.store_room_data(
-            event=event
-        )
-        defer.returnValue((200, ""))
+        if event_type == RoomMemberEvent.TYPE:
+            # membership events are special
+            handler = self.handlers.room_member_handler
+            yield handler.change_membership(event)
+            defer.returnValue((200, ""))
+        else:
+            # store random bits of state
+            msg_handler = self.handlers.message_handler
+            yield msg_handler.store_room_data(
+                event=event
+            )
+            defer.returnValue((200, ""))
 
 
 class JoinRoomAliasServlet(RestServlet):
@@ -155,73 +186,6 @@ class JoinRoomAliasServlet(RestServlet):
         ret_dict = yield handler.join_room_alias(user, room_alias)
 
         defer.returnValue((200, ret_dict))
-
-
-class RoomMemberRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/members/"
-                                  + "(?P<target_user_id>[^/]*)/state$")
-
-    def get_event_type(self):
-        return RoomMemberEvent.TYPE
-
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_id, target_user_id):
-        room_id = urllib.unquote(room_id)
-        user = yield self.auth.get_user_by_req(request)
-
-        handler = self.handlers.room_member_handler
-        member = yield handler.get_room_member(
-            room_id,
-            urllib.unquote(target_user_id),
-            user.to_string())
-        if not member:
-            raise SynapseError(404, "Member not found.",
-                               errcode=Codes.NOT_FOUND)
-        defer.returnValue((200, member.content))
-
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, roomid, target_user_id):
-        user = yield self.auth.get_user_by_req(request)
-
-        event = self.event_factory.create_event(
-            etype=self.get_event_type(),
-            target_user_id=urllib.unquote(target_user_id),
-            room_id=urllib.unquote(roomid),
-            user_id=user.to_string(),
-            membership=Membership.LEAVE,
-            content={"membership": Membership.LEAVE}
-            )
-
-        handler = self.handlers.room_member_handler
-        yield handler.change_membership(event)
-        defer.returnValue((200, ""))
-
-    @defer.inlineCallbacks
-    def on_PUT(self, request, roomid, target_user_id):
-        user = yield self.auth.get_user_by_req(request)
-
-        content = _parse_json(request)
-        if "membership" not in content:
-            raise SynapseError(400, "No membership key.",
-                               errcode=Codes.BAD_JSON)
-
-        valid_membership_values = [Membership.JOIN, Membership.INVITE]
-        if (content["membership"] not in valid_membership_values):
-            raise SynapseError(400, "Membership value must be %s." % (
-                    valid_membership_values,), errcode=Codes.BAD_JSON)
-
-        event = self.event_factory.create_event(
-            etype=self.get_event_type(),
-            target_user_id=urllib.unquote(target_user_id),
-            room_id=urllib.unquote(roomid),
-            user_id=user.to_string(),
-            membership=content["membership"],
-            content=content
-            )
-
-        handler = self.handlers.room_member_handler
-        yield handler.change_membership(event)
-        defer.returnValue((200, ""))
 
 
 class MessageRestServlet(RestServlet):
@@ -285,7 +249,7 @@ class FeedbackRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, msg_sender_id, msg_id, fb_sender_id,
                feedback_type):
-        user = yield (self.auth.get_user_by_req(request))
+        yield (self.auth.get_user_by_req(request))
 
         # TODO (erikj): Implement this?
         raise NotImplementedError("Getting feedback is not supported")
@@ -354,7 +318,8 @@ class RoomMemberListRestServlet(RestServlet):
             user_id=user.to_string())
 
         for event in members["chunk"]:
-            target_user = self.hs.parse_userid(event["target_user_id"])
+            # FIXME: should probably be state_key here, not user_id
+            target_user = self.hs.parse_userid(event["user_id"])
             # Presence is an optional cache; don't fail if we can't fetch it
             try:
                 presence_state = yield self.handlers.presence_handler.get_state(
@@ -400,6 +365,52 @@ class RoomTriggerBackfill(RestServlet):
         res = [event.get_dict() for event in events]
         defer.returnValue((200, res))
 
+
+class RoomMembershipRestServlet(RestServlet):
+
+    def register(self, http_server):
+        # /rooms/$roomid/[invite|join|leave]
+        PATTERN = ("/rooms/(?P<room_id>[^/]*)/" +
+            "(?P<membership_action>join|invite|leave)")
+        register_txn_path(self, PATTERN, http_server)
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, room_id, membership_action):
+        user = yield self.auth.get_user_by_req(request)
+
+        content = _parse_json(request)
+
+        # target user is you unless it is an invite
+        state_key = user.to_string()
+        if membership_action == "invite":
+            if "user_id" not in content:
+                raise SynapseError(400, "Missing user_id key.")
+            state_key = content["user_id"]
+
+        event = self.event_factory.create_event(
+            etype=RoomMemberEvent.TYPE,
+            content={"membership": unicode(membership_action)},
+            room_id=urllib.unquote(room_id),
+            user_id=user.to_string(),
+            state_key=state_key
+        )
+        handler = self.handlers.room_member_handler
+        yield handler.change_membership(event)
+        defer.returnValue((200, ""))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_id, membership_action, txn_id):
+        try:
+            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+        except:
+            pass
+
+        response = yield self.on_POST(request, room_id, membership_action)
+
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
+
+
 def _parse_json(request):
     try:
         content = json.loads(request.content.read())
@@ -411,9 +422,32 @@ def _parse_json(request):
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
+def register_txn_path(servlet, regex_string, http_server):
+    """Registers a transaction-based path.
+
+    This registers two paths:
+        PUT regex_string/$txnid
+        POST regex_string
+
+    Args:
+        regex_string (str): The regex string to register. Must NOT have a
+        trailing $ as this string will be appended to.
+        http_server : The http_server to register paths with.
+    """
+    http_server.register_path(
+        "POST",
+        client_path_pattern(regex_string + "$"),
+        servlet.on_POST
+    )
+    http_server.register_path(
+        "PUT",
+        client_path_pattern(regex_string + "/(?P<txn_id>[^/]*)$"),
+        servlet.on_PUT
+    )
+
+
 def register_servlets(hs, http_server):
-    RoomTopicRestServlet(hs).register(http_server)
-    RoomMemberRestServlet(hs).register(http_server)
+    RoomStateEventRestServlet(hs).register(http_server)
     MessageRestServlet(hs).register(http_server)
     FeedbackRestServlet(hs).register(http_server)
     RoomCreateRestServlet(hs).register(http_server)
@@ -421,3 +455,4 @@ def register_servlets(hs, http_server):
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     RoomTriggerBackfill(hs).register(http_server)
+    RoomMembershipRestServlet(hs).register(http_server)

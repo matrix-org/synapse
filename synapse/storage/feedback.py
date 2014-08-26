@@ -15,11 +15,7 @@
 
 from twisted.internet import defer
 
-from ._base import SQLBaseStore, Table
-from synapse.api.events.room import FeedbackEvent
-
-import collections
-import json
+from ._base import SQLBaseStore
 
 
 class FeedbackStore(SQLBaseStore):

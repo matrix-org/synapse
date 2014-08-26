@@ -19,8 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership
 from synapse.api.errors import AuthError, StoreError, Codes
-from synapse.api.events.room import (RoomTopicEvent, RoomMemberEvent,
-                                     MessageEvent, FeedbackEvent)
+from synapse.api.events.room import RoomMemberEvent
 
 import logging
 
@@ -44,19 +43,19 @@ class Auth(object):
             be raised only if raises=True.
         """
         try:
-            if event.type in [RoomTopicEvent.TYPE, MessageEvent.TYPE,
-                              FeedbackEvent.TYPE]:
-                self._check_joined_room(
-                    member=snapshot.membership_state,
-                    user_id=snapshot.user_id,
-                    room_id=snapshot.room_id,
-                )
-                defer.returnValue(True)
-            elif event.type == RoomMemberEvent.TYPE:
-                allowed = yield self.is_membership_change_allowed(event)
-                defer.returnValue(allowed)
+            if hasattr(event, "room_id"):
+                if event.type == RoomMemberEvent.TYPE:
+                    allowed = yield self.is_membership_change_allowed(event)
+                    defer.returnValue(allowed)
+                else:
+                    self._check_joined_room(
+                        member=snapshot.membership_state,
+                        user_id=snapshot.user_id,
+                        room_id=snapshot.room_id,
+                    )
+                    defer.returnValue(True)
             else:
-                raise AuthError(500, "Unknown event type %s" % event.type)
+                raise AuthError(500, "Unknown event: %s" % event)
         except AuthError as e:
             logger.info("Event auth check failed on event %s with msg: %s",
                         event, e.msg)
@@ -83,6 +82,8 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def is_membership_change_allowed(self, event):
+        target_user_id = event.state_key
+
         # does this room even exist
         room = yield self.store.get_room(event.room_id)
         if not room:
@@ -100,7 +101,7 @@ class Auth(object):
         # get info about the target
         try:
             target = yield self.store.get_room_member(
-                user_id=event.target_user_id,
+                user_id=target_user_id,
                 room_id=event.room_id)
         except:
             target = None
@@ -114,12 +115,12 @@ class Auth(object):
                 raise AuthError(403, "You are not in room %s." % event.room_id)
             elif target_in_room:  # the target is already in the room.
                 raise AuthError(403, "%s is already in the room." %
-                                     event.target_user_id)
+                                     target_user_id)
         elif Membership.JOIN == membership:
             # Joins are valid iff caller == target and they were:
             # invited: They are accepting the invitation
             # joined: It's a NOOP
-            if event.user_id != event.target_user_id:
+            if event.user_id != target_user_id:
                 raise AuthError(403, "Cannot force another user to join.")
             elif room.is_public:
                 pass  # anyone can join public rooms.
@@ -129,10 +130,10 @@ class Auth(object):
         elif Membership.LEAVE == membership:
             if not caller_in_room:  # trying to leave a room you aren't joined
                 raise AuthError(403, "You are not in room %s." % event.room_id)
-            elif event.target_user_id != event.user_id:
+            elif target_user_id != event.user_id:
                 # trying to force another user to leave
                 raise AuthError(403, "Cannot force %s to leave." %
-                                event.target_user_id)
+                                target_user_id)
         else:
             raise AuthError(500, "Unknown membership %s" % membership)
 

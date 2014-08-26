@@ -61,16 +61,23 @@ angular.module('matrixService', [])
         return doBaseRequest(config.homeserver, method, path, params, data, undefined);
     };
 
-    var doBaseRequest = function(baseUrl, method, path, params, data, headers) {
-        return $http({
+    var doBaseRequest = function(baseUrl, method, path, params, data, headers, $httpParams) {
+
+        var request = {
             method: method,
             url: baseUrl + path,
             params: params,
             data: data,
             headers: headers
-        });
-    };
+        };
 
+        // Add additional $http parameters
+        if ($httpParams) {
+            angular.extend(request, $httpParams);
+        }
+
+        return $http(request);
+    };
 
     return {
         /****** Home server API ******/
@@ -108,19 +115,7 @@ angular.module('matrixService', [])
 
         // Joins a room
         join: function(room_id) {
-            // The REST path spec
-            var path = "/rooms/$room_id/members/$user_id/state";
-
-            // Like the cmd client, escape room ids
-            room_id = encodeURIComponent(room_id);
-
-            // Customize it
-            path = path.replace("$room_id", room_id);
-            path = path.replace("$user_id", config.user_id);
-
-            return doRequest("PUT", path, undefined, {
-                 membership: "join"
-            });
+            return this.membershipChange(room_id, undefined, "join");
         },
 
         joinAlias: function(room_alias) {
@@ -134,34 +129,27 @@ angular.module('matrixService', [])
 
         // Invite a user to a room
         invite: function(room_id, user_id) {
-            // The REST path spec
-            var path = "/rooms/$room_id/members/$user_id/state";
-
-            // Like the cmd client, escape room ids
-            room_id = encodeURIComponent(room_id);
-
-            // Customize it
-            path = path.replace("$room_id", room_id);
-            path = path.replace("$user_id", user_id);
-
-            return doRequest("PUT", path, undefined, {
-                 membership: "invite"
-            });
+            return this.membershipChange(room_id, user_id, "invite");
         },
 
         // Leaves a room
         leave: function(room_id) {
+            return this.membershipChange(room_id, undefined, "leave");
+        },
+
+        membershipChange: function(room_id, user_id, membershipValue) {
             // The REST path spec
-            var path = "/rooms/$room_id/members/$user_id/state";
+            var path = "/rooms/$room_id/$membership";
+            path = path.replace("$room_id", encodeURIComponent(room_id));
+            path = path.replace("$membership", encodeURIComponent(membershipValue));
 
-            // Like the cmd client, escape room ids
-            room_id = encodeURIComponent(room_id);
+            var data = {};
+            if (user_id !== undefined) {
+                data = { user_id: user_id };
+            }
 
-            // Customize it
-            path = path.replace("$room_id", room_id);
-            path = path.replace("$user_id", config.user_id);
-
-            return doRequest("DELETE", path, undefined, undefined);
+            // TODO: Use PUT with transaction IDs
+            return doRequest("POST", path, undefined, data);
         },
 
         // Retrieves the room ID corresponding to a room alias
@@ -302,17 +290,25 @@ angular.module('matrixService', [])
         },
 
         // hit the Identity Server for a 3PID request.
-        linkEmail: function(email) {
+        linkEmail: function(email, clientSecret, sendAttempt) {
             var path = "/matrix/identity/api/v1/validate/email/requestToken"
-            var data = "clientSecret=abc123&email=" + encodeURIComponent(email);
+            var data = "clientSecret="+clientSecret+"&email=" + encodeURIComponent(email)+"&sendAttempt="+sendAttempt;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
         },
 
-        authEmail: function(userId, tokenId, code) {
+        authEmail: function(clientSecret, tokenId, code) {
             var path = "/matrix/identity/api/v1/validate/email/submitToken";
-            var data = "token="+code+"&mxId="+encodeURIComponent(userId)+"&tokenId="+tokenId;
+            var data = "token="+code+"&sid="+tokenId+"&clientSecret="+clientSecret;
+            var headers = {};
+            headers["Content-Type"] = "application/x-www-form-urlencoded";
+            return doBaseRequest(config.identityServer, "POST", path, {}, data, headers);
+        },
+
+        bindEmail: function(userId, tokenId, clientSecret) {
+            var path = "/matrix/identity/api/v1/3pid/bind";
+            var data = "mxid="+encodeURIComponent(userId)+"&sid="+tokenId+"&clientSecret="+clientSecret;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
@@ -326,7 +322,17 @@ angular.module('matrixService', [])
             var params = {
                 access_token: config.access_token
             };
-            return doBaseRequest(config.homeserver, "POST", path, params, file, headers);
+
+            // If the file is actually a Blob object, prevent $http from JSON-stringified it before sending
+            // (Equivalent to jQuery ajax processData = false)
+            var $httpParams;
+            if (file instanceof Blob) {
+                $httpParams = {
+                    transformRequest: angular.identity
+                };
+            }
+
+            return doBaseRequest(config.homeserver, "POST", path, params, file, headers, $httpParams);
         },
         
         // start listening on /events
@@ -352,6 +358,23 @@ angular.module('matrixService', [])
                 return false;
             }
         },
+        
+        // Enum of presence state
+        presence: {
+            offline: "offline",
+            unavailable: "unavailable",
+            online: "online",
+            free_for_chat: "free_for_chat"
+        },
+        
+        // Set the logged in user presence state
+        setUserPresence: function(presence) {
+            var path = "/presence/$user_id/status";
+            path = path.replace("$user_id", config.user_id);
+            return doRequest("PUT", path, undefined, {
+                state: presence
+            });
+        },
 
         /****** Permanent storage of user information ******/
         
@@ -375,6 +398,7 @@ angular.module('matrixService', [])
         // Set a new config (Use saveConfig to actually store it permanently)
         setConfig: function(newConfig) {
             config = newConfig;
+            console.log("new IS: "+config.identityServer);
         },
         
         // Commits config into permanent storage

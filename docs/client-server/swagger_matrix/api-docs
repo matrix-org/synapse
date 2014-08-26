@@ -1,0 +1,38 @@
+{
+  "apiVersion": "1.0.0",
+  "swaggerVersion": "1.2",
+  "apis": [
+    {
+      "path": "/login",
+      "description": "Login operations"
+    },
+    {
+      "path": "/registration",
+      "description": "Registration operations"
+    },
+    {
+      "path": "/rooms",
+      "description": "Room operations"
+    },
+    {
+      "path": "/profile",
+      "description": "Profile operations"
+    },
+    {
+      "path": "/presence",
+      "description": "Presence operations"
+    }
+  ],
+  "authorizations": {
+    "token": {
+      "scopes": []
+    }
+  },
+  "info": {
+    "title": "Matrix Client-Server API Reference",
+    "description": "This contains the client-server API for the reference implementation of the home server",
+    "termsOfServiceUrl": "http://matrix.org",
+    "license": "Apache 2.0",
+    "licenseUrl": "http://www.apache.org/licenses/LICENSE-2.0.html"
+  }
+}

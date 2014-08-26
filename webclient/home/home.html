@@ -1,0 +1,63 @@
+<div ng-controller="HomeController" data-ng-init="onInit()">
+
+    <div id="page">
+    <div id="wrapper">
+        
+    <div>
+        <form>
+            <table>
+                <tr>
+                    <td>
+                        <div class="profile-avatar">
+                            <img ng-src="{{ config.avatarUrl || 'img/default-profile.jpg' }}"/>
+                        </div>
+                    </td>
+                    <td>
+                        <div id="user-ids">
+                            <div id="user-displayname">{{ config.displayName }}</div>
+                            <div>{{ config.user_id }}</div>                        
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </form>
+    </div>
+    
+    <h3>My rooms</h3>
+    
+    <div class="rooms" ng-repeat="(rm_id, room) in rooms">
+        <div>
+            <a href="#/room/{{ room.room_alias ? room.room_alias : rm_id }}" >{{ room.room_display_name }}</a> {{room.membership === 'invite' ? ' (invited)' : ''}}
+        </div>
+    </div>
+    <br/>
+
+    <h3>Public rooms</h3>
+    
+    <div class="public_rooms" ng-repeat="room in public_rooms">
+        <div>
+            <a href="#/room/{{ room.room_alias ? room.room_alias : room.room_id }}" >{{ room.room_alias }}</a>
+        </div>
+    </div>
+    <br/>
+    
+    <div>
+        <form>
+            <input size="40" ng-model="newRoom.room_id" ng-enter="createNewRoom(newRoom.room_id, newRoom.private)" placeholder="(e.g. foo_channel)"/>
+            <input type="checkbox" ng-model="newRoom.private">private
+            <button ng-disabled="!newRoom.room_id" ng-click="createNewRoom(newRoom.room_id, newRoom.private)">Create room</button>    
+        </form>
+    </div>
+    <div>
+        <form>
+            <input size="40" ng-model="joinAlias.room_alias" ng-enter="joinAlias(joinAlias.room_alias)" placeholder="(e.g. #foo_channel:example.org)"/>
+            <button ng-disabled="!joinAlias.room_alias" ng-click="joinAlias(joinAlias.room_alias)">Join room</button>    
+        </form>
+    </div>
+    <br/>
+    
+    {{ feedback }}
+
+    </div>    
+    </div>
+</div>

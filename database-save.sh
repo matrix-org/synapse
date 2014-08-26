@@ -8,7 +8,7 @@
 #
 #   $ sqlite3 homeserver.db < table-save.sql
 
-sqlite3 homeserver.db <<'EOF' >table-save.sql
+sqlite3 "$1" <<'EOF' >table-save.sql
 .dump users
 .dump access_tokens
 .dump presence

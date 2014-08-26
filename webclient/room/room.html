@@ -1,4 +1,5 @@
 <div ng-controller="RoomController" data-ng-init="onInit()" class="room">
+    <h1 id="roomLogo">[matrix]</h1>
 
     <div id="page">
     <div id="wrapper">
@@ -10,7 +11,7 @@
     <div id="usersTableWrapper">
         <table id="usersTable">
             <tr ng-repeat="member in members | orderMembersList">
-                <td class="userAvatar" ng-click="goToUserPage(member.id)">
+                <td class="userAvatar mouse-pointer" ng-click="goToUserPage(member.id)">
                     <img class="userAvatarImage" 
                          ng-src="{{member.avatar_url || 'img/default-profile.jpg'}}" 
                          alt="{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
@@ -26,24 +27,35 @@
     </div>
     
     <div id="messageTableWrapper" keep-scroll>
+        <!-- FIXME: need to have better timestamp semantics than the (msg.content.hsob_ts || msg.ts) hack below -->
         <table id="messageTable" infinite-scroll="paginateMore()">
             <tr ng-repeat="msg in events.rooms[room_id].messages"
-                ng-class="(events.rooms[room_id].messages[$index - 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
+                ng-class="(events.rooms[room_id].messages[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
                 <td class="leftBlock">
                     <div class="sender" ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id">{{ members[msg.user_id].displayname || msg.user_id }}</div>
-                    <div class="timestamp">{{ msg.content.hsob_ts | date:'MMM d HH:mm:ss' }}</div>
+                    <div class="timestamp">{{ (msg.content.hsob_ts || msg.ts) | date:'MMM d HH:mm' }}</div>
                 </td>
                 <td class="avatar">
                     <img class="avatarImage" ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.jpg' }}" width="32" height="32"
                          ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
-                <td ng-class="!msg.content.membership_target ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
+                <td ng-class="!msg.content.membership ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble">
+                        <span ng-hide='msg.type !== "m.room.member"'>
+                            {{ members[msg.user_id].displayname || msg.user_id }}
+                            {{ {"join": "joined", "leave": "left", "invite": "invited"}[msg.content.membership] }}
+                            {{ msg.content.membership === "invite" ? (msg.state_key || '') : '' }}
+                        </span>
                         <span ng-hide='msg.content.msgtype !== "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
                         <span ng-hide='msg.content.msgtype !== "m.text"' ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
-                        <div ng-hide='msg.content.msgtype !== "m.image"'
-                             ng-style="msg.content.body.h && { 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
-                            <img class="image" ng-src="{{ msg.content.url }}"/>
+                        <div ng-show='msg.content.msgtype === "m.image"'>
+                            <div ng-hide='msg.content.thumbnail_url' ng-style="msg.content.body.h && { 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
+                                <img class="image" ng-src="{{ msg.content.url }}"/>
+                            </div>
+                            <div ng-show='msg.content.thumbnail_url' ng-style="{ 'height' : msg.content.thumbnail_info.h }">
+                                <img class="image mouse-pointer" ng-src="{{ msg.content.thumbnail_url }}"
+                                     ng-click="$parent.fullScreenImageURL = msg.content.url"/>
+                            </div>
                         </div>
                     </div>
                 </td>
@@ -62,34 +74,37 @@
         <div id="controls">
             <table id="inputBarTable">
                 <tr>
-                    <td width="1">
+                    <td id="userIdCell" width="1px">
                         {{ state.user_id }} 
                     </td>
-                    <td width="*" style="min-width: 100px">
-                        <input id="mainInput" ng-model="textInput" ng-enter="send()" ng-disabled="state.sending" ng-focus="true" auto-complete/>
+                    <td width="*">
+                        <input id="mainInput" ng-model="textInput" ng-enter="send()" ng-focus="true" autocomplete="off" tab-complete/>
                     </td>
-                    <td width="150px">
-                        <button ng-click="send()" ng-disabled="state.sending">Send</button>
-                        <button m-file-input="imageFileToSend">Send Image</button>
-                    </td>
-                    <td width="1">
-                        
+                    <td id="buttonsCell">
+                        <button ng-click="send()">Send</button>
+                        <button m-file-input="imageFileToSend">Image</button>
                     </td>
                 </tr>
             </table>
 
-            <span>
-               Invite a user: 
-                    <input ng-model="userIDToInvite" size="32" type="text" placeholder="User ID (ex:@user:homeserver)"/>     
-                    <button ng-click="inviteUser(userIDToInvite)">Invite</button>
-            </span>
-            <button ng-click="leaveRoom()">Leave</button>
-            <button ng-click="loadMoreHistory()" ng-disabled="!state.can_paginate">Load more history</button>
+            <div id="extraControls">
+                <span>
+                   Invite a user: 
+                        <input ng-model="userIDToInvite" size="32" type="text" placeholder="User ID (ex:@user:homeserver)"/>     
+                        <button ng-click="inviteUser(userIDToInvite)">Invite</button>
+                </span>
+                <button ng-click="leaveRoom()">Leave</button>
+            </div>
+        
             {{ feedback }}
             <div ng-hide="!state.stream_failure">
                 {{ state.stream_failure.data.error || "Connection failure" }}
             </div>
         </div>
+    </div>
+
+    <div id="room-fullscreen-image" ng-show="fullScreenImageURL" ng-click="fullScreenImageURL = undefined;">
+        <img ng-src="{{ fullScreenImageURL }}"/>
     </div>
 
  </div>

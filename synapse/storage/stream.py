@@ -37,10 +37,8 @@ from twisted.internet import defer
 
 from ._base import SQLBaseStore
 from synapse.api.errors import SynapseError
-from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
 
-import json
 import logging
 
 
@@ -177,6 +175,7 @@ class StreamStore(SQLBaseStore):
             "((room_id IN (%(current)s)) OR "
             "(event_id IN (%(invites)s))) "
             "AND e.stream_ordering > ? AND e.stream_ordering < ? "
+            "AND e.outlier = 0 "
             "ORDER BY stream_ordering ASC LIMIT %(limit)d "
         ) % {
             "current": current_room_membership_sql,
@@ -224,7 +223,7 @@ class StreamStore(SQLBaseStore):
 
         sql = (
             "SELECT * FROM events "
-            "WHERE room_id = ? AND %(bounds)s "
+            "WHERE outlier = 0 AND room_id = ? AND %(bounds)s "
             "ORDER BY topological_ordering %(order)s, stream_ordering %(order)s %(limit)s "
         ) % {"bounds": bounds, "order": order, "limit": limit_str}
 
@@ -249,15 +248,14 @@ class StreamStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_recent_events_for_room(self, room_id, limit, with_feedback=False):
+    def get_recent_events_for_room(self, room_id, limit, end_token,
+                                   with_feedback=False):
         # TODO (erikj): Handle compressed feedback
-
-        end_token = yield self.get_room_events_max_id()
 
         sql = (
             "SELECT * FROM events "
             "WHERE room_id = ? AND stream_ordering <= ? "
-            "ORDER BY topological_ordering, stream_ordering DESC LIMIT ? "
+            "ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ? "
         )
 
         rows = yield self._execute_and_decode(
