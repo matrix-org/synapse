@@ -115,7 +115,7 @@ angular.module('matrixService', [])
 
         // Joins a room
         join: function(room_id) {
-            return this.membershipChange(room_id, config.user_id, "join");
+            return this.membershipChange(room_id, undefined, "join");
         },
 
         joinAlias: function(room_alias) {
@@ -134,18 +134,22 @@ angular.module('matrixService', [])
 
         // Leaves a room
         leave: function(room_id) {
-            return this.membershipChange(room_id, config.user_id, "leave");
+            return this.membershipChange(room_id, undefined, "leave");
         },
 
         membershipChange: function(room_id, user_id, membershipValue) {
             // The REST path spec
-            var path = "/rooms/$room_id/state/m.room.member/$user_id";
+            var path = "/rooms/$room_id/$membership";
             path = path.replace("$room_id", encodeURIComponent(room_id));
-            path = path.replace("$user_id", encodeURIComponent(user_id));
+            path = path.replace("$membership", encodeURIComponent(membershipValue));
 
-            return doRequest("PUT", path, undefined, {
-                 membership: membershipValue
-            });
+            var data = {};
+            if (user_id !== undefined) {
+                data = { user_id: user_id };
+            }
+
+            // TODO: Use PUT with transaction IDs
+            return doRequest("POST", path, undefined, data);
         },
 
         // Retrieves the room ID corresponding to a room alias
@@ -353,6 +357,23 @@ angular.module('matrixService', [])
             else {
                 return false;
             }
+        },
+        
+        // Enum of presence state
+        presence: {
+            offline: "offline",
+            unavailable: "unavailable",
+            online: "online",
+            free_for_chat: "free_for_chat"
+        },
+        
+        // Set the logged in user presence state
+        setUserPresence: function(presence) {
+            var path = "/presence/$user_id/status";
+            path = path.replace("$user_id", config.user_id);
+            return doRequest("PUT", path, undefined, {
+                state: presence
+            });
         },
 
         /****** Permanent storage of user information ******/

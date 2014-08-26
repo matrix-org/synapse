@@ -366,6 +366,51 @@ class RoomTriggerBackfill(RestServlet):
         defer.returnValue((200, res))
 
 
+class RoomMembershipRestServlet(RestServlet):
+
+    def register(self, http_server):
+        # /rooms/$roomid/[invite|join|leave]
+        PATTERN = ("/rooms/(?P<room_id>[^/]*)/" +
+            "(?P<membership_action>join|invite|leave)")
+        register_txn_path(self, PATTERN, http_server)
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, room_id, membership_action):
+        user = yield self.auth.get_user_by_req(request)
+
+        content = _parse_json(request)
+
+        # target user is you unless it is an invite
+        state_key = user.to_string()
+        if membership_action == "invite":
+            if "user_id" not in content:
+                raise SynapseError(400, "Missing user_id key.")
+            state_key = content["user_id"]
+
+        event = self.event_factory.create_event(
+            etype=RoomMemberEvent.TYPE,
+            content={"membership": unicode(membership_action)},
+            room_id=urllib.unquote(room_id),
+            user_id=user.to_string(),
+            state_key=state_key
+        )
+        handler = self.handlers.room_member_handler
+        yield handler.change_membership(event)
+        defer.returnValue((200, ""))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_id, membership_action, txn_id):
+        try:
+            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+        except:
+            pass
+
+        response = yield self.on_POST(request, room_id, membership_action)
+
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
+
+
 def _parse_json(request):
     try:
         content = json.loads(request.content.read())
@@ -377,6 +422,30 @@ def _parse_json(request):
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
+def register_txn_path(servlet, regex_string, http_server):
+    """Registers a transaction-based path.
+
+    This registers two paths:
+        PUT regex_string/$txnid
+        POST regex_string
+
+    Args:
+        regex_string (str): The regex string to register. Must NOT have a
+        trailing $ as this string will be appended to.
+        http_server : The http_server to register paths with.
+    """
+    http_server.register_path(
+        "POST",
+        client_path_pattern(regex_string + "$"),
+        servlet.on_POST
+    )
+    http_server.register_path(
+        "PUT",
+        client_path_pattern(regex_string + "/(?P<txn_id>[^/]*)$"),
+        servlet.on_PUT
+    )
+
+
 def register_servlets(hs, http_server):
     RoomStateEventRestServlet(hs).register(http_server)
     MessageRestServlet(hs).register(http_server)
@@ -386,3 +455,4 @@ def register_servlets(hs, http_server):
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     RoomTriggerBackfill(hs).register(http_server)
+    RoomMembershipRestServlet(hs).register(http_server)
