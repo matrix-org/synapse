@@ -99,14 +99,14 @@ class RestTestCase(unittest.TestCase):
         defer.returnValue(response)
 
     @defer.inlineCallbacks
-    def send(self, room_id, sender_id, body=None, msg_id=None, tok=None,
+    def send(self, room_id, body=None, txn_id=None, tok=None,
              expect_code=200):
-        if msg_id is None:
-            msg_id = "m%s" % (str(time.time()))
+        if txn_id is None:
+            txn_id = "m%s" % (str(time.time()))
         if body is None:
             body = "body_text_here"
 
-        path = "/rooms/%s/messages/%s/%s" % (room_id, sender_id, msg_id)
+        path = "/rooms/%s/send/m.room.message/%s" % (room_id, txn_id)
         content = '{"msgtype":"m.text","body":"%s"}' % body
         if tok:
             path = path + "?access_token=%s" % tok
