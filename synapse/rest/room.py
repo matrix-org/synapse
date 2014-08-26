@@ -375,10 +375,16 @@ class RoomMembershipRestServlet(RestServlet):
         register_txn_path(self, PATTERN, http_server)
 
     def on_POST(self, request, room_id, membership_action):
-        return (200, "Not implemented")
+        return (200, "POST Not implemented")
 
     def on_PUT(self, request, room_id, membership_action, txn_id):
-        return (200, "Not implemented")
+        (code, response) = self.txns.get_client_transaction(request, txn_id)
+        if code:
+            return (code, response)
+
+        response = (200, "PUT not implemented txnid %s" % txn_id)
+        self.txns.store_client_transaction(request, txn_id, response)
+        return response
 
 
 def _parse_json(request):
