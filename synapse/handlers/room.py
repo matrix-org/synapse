@@ -222,8 +222,7 @@ class MessageHandler(BaseHandler):
         if stamp_event:
             event.content["hsob_ts"] = int(self.clock.time_msec())
 
-        snapshot = yield self.store.snapshot_room(event.room_id, user_id)
-
+        snapshot = yield self.store.snapshot_room(event.room_id, event.user_id)
 
         yield self.auth.check(event, snapshot, raises=True)
 
@@ -577,8 +576,8 @@ class RoomMemberHandler(BaseHandler):
             content=content,
         )
 
-        snapshot = yield store.snapshot_room(
-            room_id, joinee, RoomMemberEvent.TYPE, event.target_user_id
+        snapshot = yield self.store.snapshot_room(
+            room_id, joinee, RoomMemberEvent.TYPE, joinee
         )
 
         yield self._do_join(new_event, snapshot, room_host=host, do_auth=True)

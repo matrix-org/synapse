@@ -69,7 +69,7 @@ class DataStore(RoomMemberStore, RoomStore,
             stream_ordering = self.min_token
 
         latest = yield self._db_pool.runInteraction(
-            _persist_event_txn, event, backfilled, stream_ordering
+            self._persist_event_txn, event, backfilled, stream_ordering
         )
         defer.returnValue(latest)
 
@@ -128,7 +128,7 @@ class DataStore(RoomMemberStore, RoomStore,
         except:
             logger.exception(
                 "Failed to persist, probably duplicate: %s",
-                event_id
+                event.event_id
             )
             return
 
@@ -146,7 +146,7 @@ class DataStore(RoomMemberStore, RoomStore,
             self._simple_insert_txn(txn, "state_events", vals)
 
             self._simple_insert_txn(
-                txn
+                txn,
                 "current_state_events",
                 {
                     "event_id": event.event_id,
