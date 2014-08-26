@@ -31,6 +31,7 @@ from synapse.api.urls import (
 )
 
 from daemonize import Daemonize
+import twisted.manhole.telnet
 
 import argparse
 import logging
@@ -238,6 +239,8 @@ def setup():
                         default="hs.pid")
     parser.add_argument("-W", "--webclient", dest="webclient", default=True,
                         action="store_false", help="Don't host a web client.")
+    parser.add_argument("--manhole", dest="manhole", type=int, default=None,
+                        help="Turn on the twisted telnet manhole service.")
     args = parser.parse_args()
 
     verbosity = int(args.verbose) if args.verbose else None
@@ -280,6 +283,13 @@ def setup():
     hs.start_listening(args.port)
 
     hs.build_db_pool()
+
+    if args.manhole:
+        f = twisted.manhole.telnet.ShellFactory()
+        f.username = "matrix"
+        f.password = "rabbithole"
+        f.namespace['hs'] = hs
+        reactor.listenTCP(args.manhole, f, interface='127.0.0.1')
 
     if args.daemonize:
         daemon = Daemonize(
