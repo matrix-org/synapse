@@ -76,9 +76,9 @@ angular.module('HomeController', ['matrixService', 'mFileInput', 'mFileUpload', 
         return data;
     };
 
-    $scope.refresh = function() {
+    var refresh = function() {
         // List all rooms joined or been invited to
-        matrixService.rooms().then(
+        matrixService.rooms(1,true).then(
             function(response) {
                 var data = assignRoomAliases(response.data.rooms);
                 $scope.feedback = "Success";
@@ -118,7 +118,7 @@ angular.module('HomeController', ['matrixService', 'mFileInput', 'mFileUpload', 
                 response.data.room_id);
                 matrixService.createRoomIdToAliasMapping(
                     response.data.room_id, response.data.room_alias);
-                $scope.refresh();
+                refresh();
             },
             function(error) {
                 $scope.feedback = "Failure: " + error.data;
@@ -158,5 +158,7 @@ angular.module('HomeController', ['matrixService', 'mFileInput', 'mFileUpload', 
         );
     };
  
-    $scope.refresh();
+    $scope.onInit = function() {
+        refresh();
+    };
 }]);
