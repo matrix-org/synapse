@@ -228,75 +228,6 @@ class JoinRoomAliasServlet(RestServlet):
         defer.returnValue((200, ret_dict))
 
 
-class FeedbackRestServlet(RestServlet):
-    PATTERN = client_path_pattern(
-        "/rooms/(?P<room_id>[^/]*)/messages/" +
-        "(?P<msg_sender_id>[^/]*)/(?P<msg_id>[^/]*)/feedback/" +
-        "(?P<sender_id>[^/]*)/(?P<feedback_type>[^/]*)$"
-    )
-
-    def get_event_type(self):
-        return FeedbackEvent.TYPE
-
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_id, msg_sender_id, msg_id, fb_sender_id,
-               feedback_type):
-        yield (self.auth.get_user_by_req(request))
-
-        # TODO (erikj): Implement this?
-        raise NotImplementedError("Getting feedback is not supported")
-
-#        if feedback_type not in Feedback.LIST:
-#            raise SynapseError(400, "Bad feedback type.",
-#                               errcode=Codes.BAD_JSON)
-#
-#        msg_handler = self.handlers.message_handler
-#        feedback = yield msg_handler.get_feedback(
-#            room_id=urllib.unquote(room_id),
-#            msg_sender_id=msg_sender_id,
-#            msg_id=msg_id,
-#            user_id=user.to_string(),
-#            fb_sender_id=fb_sender_id,
-#            fb_type=feedback_type
-#        )
-#
-#        if not feedback:
-#            raise SynapseError(404, "Feedback not found.",
-#                               errcode=Codes.NOT_FOUND)
-#
-#        defer.returnValue((200, json.loads(feedback.content)))
-
-    @defer.inlineCallbacks
-    def on_PUT(self, request, room_id, sender_id, msg_id, fb_sender_id,
-               feedback_type):
-        user = yield (self.auth.get_user_by_req(request))
-
-        if user.to_string() != fb_sender_id:
-            raise SynapseError(403, "Must send feedback as yourself.",
-                               errcode=Codes.FORBIDDEN)
-
-        if feedback_type not in Feedback.LIST:
-            raise SynapseError(400, "Bad feedback type.",
-                               errcode=Codes.BAD_JSON)
-
-        content = _parse_json(request)
-
-        event = self.event_factory.create_event(
-            etype=self.get_event_type(),
-            room_id=urllib.unquote(room_id),
-            msg_sender_id=sender_id,
-            msg_id=msg_id,
-            user_id=user.to_string(),  # user sending the feedback
-            feedback_type=feedback_type,
-            content=content
-            )
-
-        msg_handler = self.handlers.message_handler
-        yield msg_handler.send_feedback(event)
-
-        defer.returnValue((200, ""))
-
-
 class RoomMemberListRestServlet(RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/members$")
 
@@ -447,7 +378,6 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
 
 def register_servlets(hs, http_server):
     RoomStateEventRestServlet(hs).register(http_server)
-    FeedbackRestServlet(hs).register(http_server)
     RoomCreateRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)

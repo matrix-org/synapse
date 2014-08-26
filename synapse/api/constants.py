@@ -31,8 +31,8 @@ class Feedback(object):
     """Represents the types of feedback a user can send in response to a
     message."""
 
-    DELIVERED = u"d"
-    READ = u"r"
+    DELIVERED = u"delivered"
+    READ = u"read"
     LIST = (DELIVERED, READ)
 
 
