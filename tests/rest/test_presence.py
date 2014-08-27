@@ -171,7 +171,7 @@ class PresenceListTestCase(unittest.TestCase):
         )
 
         (code, response) = yield self.mock_resource.trigger("GET",
-                "/presence_list/%s" % (myid), None)
+                "/presence/list/%s" % (myid), None)
 
         self.assertEquals(200, code)
         self.assertEquals(
@@ -192,7 +192,7 @@ class PresenceListTestCase(unittest.TestCase):
         )
 
         (code, response) = yield self.mock_resource.trigger("POST",
-            "/presence_list/%s" % (myid),
+            "/presence/list/%s" % (myid),
             """{"invite": ["@banana:test"]}"""
         )
 
@@ -212,7 +212,7 @@ class PresenceListTestCase(unittest.TestCase):
         )
 
         (code, response) = yield self.mock_resource.trigger("POST",
-            "/presence_list/%s" % (myid),
+            "/presence/list/%s" % (myid),
             """{"drop": ["@banana:test"]}"""
         )
 

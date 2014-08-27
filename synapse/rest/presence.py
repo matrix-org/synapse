@@ -68,7 +68,7 @@ class PresenceStatusRestServlet(RestServlet):
 
 
 class PresenceListRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/presence_list/(?P<user_id>[^/]*)")
+    PATTERN = client_path_pattern("/presence/list/(?P<user_id>[^/]*)")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
