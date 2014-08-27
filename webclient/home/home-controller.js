@@ -86,7 +86,9 @@ angular.module('HomeController', ['matrixService', 'mFileInput', 'mFileUpload', 
                     $scope.rooms[data[i].room_id] = data[i];
 
                     // Create a shortcut for the last message of this room
-                    $scope.rooms[data[i].room_id].lastMsg = data[i].messages.chunk[0];
+                    if (data[i].messages && data[i].messages.chunk && data[i].messages.chunk[0]) {
+                        $scope.rooms[data[i].room_id].lastMsg = data[i].messages.chunk[0];
+                    }
                 }
 
                 var presence = response.data.presence;

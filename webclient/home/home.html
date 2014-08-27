@@ -23,13 +23,60 @@
         </form>
     </div>
     
-    <h3>My rooms</h3>
-    
-    <div class="rooms" ng-repeat="(rm_id, room) in rooms">
-        <div>
-            <a href="#/room/{{ room.room_alias ? room.room_alias : rm_id }}" >{{ room.room_display_name }}</a> {{room.membership === 'invite' ? ' (invited)' : ''}}
-        </div>
-    </div>
+    <h3>Recents</h3>
+
+    <div class="recentsTableWrapper">
+    <table class="recentsTable">
+        <tbody ng-repeat="(rm_id, room) in rooms" ng-click="goToPage('room/' + (room.room_alias ? room.room_alias : rm_id) )" class ="recentsRoom" >
+            <tr>
+                <td class="recentsRoomName">
+                    {{ room.room_display_name }}
+                </td>
+                <td class="recentsRoomSummaryTS">
+                    {{ (room.lastMsg.ts) | date:'MMM d HH:mm' }}
+                </td>
+            </tr>
+
+            <tr>
+                <td colspan="2" class="recentsRoomSummary">
+
+                    <div ng-show="room.membership === 'invite'" >
+                        {{ room.inviter }} invited you
+                    </div>
+
+                    <div ng-hide="room.membership === 'invite'" ng-switch="room.lastMsg.type" >
+                         <div ng-switch-when="m.room.member">
+                            {{ room.lastMsg.user_id }}
+                            {{ {"join": "joined", "leave": "left", "invite": "invited"}[room.lastMsg.content.membership] }}
+                            {{ room.lastMsg.content.membership === "invite" ? (room.lastMsg.state_key || '') : '' }}
+                        </div>
+
+                        <div ng-switch-when="m.room.message">
+                            <div ng-switch="room.lastMsg.content.msgtype">
+                                <div ng-switch-when="m.text">
+                                    {{ room.lastMsg.user_id }} :
+                                    <span ng-bind-html="(room.lastMsg.content.body) | linky:'_blank'">
+                                    </span>
+                                </div>
+
+                                <div ng-switch-when="m.image">
+                                    {{ room.lastMsg.user_id }} sent an image
+                                </div>
+
+                                <div ng-switch-default>
+                                    {{ room.lastMsg.content }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div ng-switch-default>
+                            {{ room.lastMsg }}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
     <br/>
 
     <h3>Public rooms</h3>
