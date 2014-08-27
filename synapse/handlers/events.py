@@ -144,3 +144,29 @@ class EventStreamHandler(BaseHandler):
                 self._stop_timer_per_user[auth_user] = (
                     self.clock.call_later(5, _later)
                 )
+
+
+class EventHandler(BaseHandler):
+
+    @defer.inlineCallbacks
+    def get_event(self, user, event_id):
+        """Retrieve a single specified event.
+
+        Args:
+            user (synapse.types.UserID): The user requesting the event
+            event_id (str): The event ID to obtain.
+        Returns:
+            dict: An event, or None if there is no event matching this ID.
+        Raises:
+            SynapseError if there was a problem retrieving this event, or
+            AuthError if the user does not have the rights to inspect this
+            event.
+        """
+        event = yield self.store.get_event(event_id)
+
+        if not event:
+            defer.returnValue(None)
+            return
+
+        yield self.auth.check(event, raises=True)
+        defer.returnValue(event)

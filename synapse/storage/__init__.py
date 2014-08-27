@@ -80,7 +80,6 @@ class DataStore(RoomMemberStore, RoomStore,
             [
                 "event_id",
                 "type",
-                "sender",
                 "room_id",
                 "content",
                 "unrecognized_keys"
