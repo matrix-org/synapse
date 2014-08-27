@@ -178,8 +178,12 @@ class Notifier(object):
         if timeout:
             reactor.callLater(timeout/1000, self._timeout_listener, listener)
 
-        self._register_with_keys(listener)
+            self._register_with_keys(listener)
+
         yield self._check_for_updates(listener)
+
+        if not timeout:
+            self._timeout_listener(listener)
 
         return
 
