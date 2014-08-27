@@ -96,7 +96,9 @@ class DataStore(RoomMemberStore, RoomStore,
         if pdu is not None:
             self._persist_event_pdu_txn(txn, pdu)
         if event is not None:
-            self._persist_event_txn(txn, event, backfilled, stream_ordering)
+            return self._persist_event_txn(
+                txn, event, backfilled, stream_ordering
+            )
 
     def _persist_event_pdu_txn(self, txn, pdu):
         cols = dict(pdu.__dict__)
