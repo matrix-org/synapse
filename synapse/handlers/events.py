@@ -50,7 +50,12 @@ class EventStreamHandler(BaseHandler):
         if pagin_config.from_token is None:
             pagin_config.from_token = None
 
-        events, tokens = yield self.notifier.get_events_for(auth_user, pagin_config, timeout)
+        rm_handler = self.hs.get_handlers().room_member_handler
+        room_ids = yield rm_handler.get_rooms_for_user(auth_user)
+
+        events, tokens = yield self.notifier.get_events_for(
+            auth_user, room_ids, pagin_config, timeout
+        )
 
         chunks = [
             e.get_dict() if isinstance(e, SynapseEvent) else e

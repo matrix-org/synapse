@@ -120,8 +120,11 @@ class MessageHandler(BaseHandler):
         else:
             from_token = yield self.hs.get_event_sources().get_current_token()
 
+        user = self.hs.parse_userid(user_id)
+
         events, next_token = yield data_source.get_pagination_rows(
-            from_token, pagin_config.to_token, pagin_config.limit, room_id
+            user, from_token, pagin_config.to_token, pagin_config.limit,
+            room_id
         )
 
         chunk = {
@@ -265,6 +268,8 @@ class MessageHandler(BaseHandler):
             membership_list=[Membership.INVITE, Membership.JOIN]
         )
 
+        user = self.hs.parse_userid(user_id)
+
         rooms_ret = []
 
         # FIXME (erikj): We need to not generate this token,
@@ -272,8 +277,8 @@ class MessageHandler(BaseHandler):
 
         # FIXME (erikj): Fix this.
         presence_stream = self.hs.get_event_sources().sources[1]
-        presence = yield presence_stream.get_new_events_for_user(
-            user_id, now_token, None, None
+        presence, _ = yield presence_stream.get_pagination_rows(
+            user, now_token, None, None, None
         )
 
         limit = pagin_config.limit
@@ -297,7 +302,7 @@ class MessageHandler(BaseHandler):
                 messages, token = yield self.store.get_recent_events_for_room(
                     event.room_id,
                     limit=limit,
-                    end_token=now_token.events_key.to_string(),
+                    end_token=now_token.events_key,
                 )
 
                 d["messages"] = {
@@ -311,7 +316,7 @@ class MessageHandler(BaseHandler):
             except:
                 logger.exception("Failed to get snapshot")
 
-        ret = {"rooms": rooms_ret, "presence": presence[0], "end": now_token.to_string()}
+        ret = {"rooms": rooms_ret, "presence": presence, "end": now_token.to_string()}
 
         defer.returnValue(ret)
 

@@ -676,12 +676,7 @@ class PresenceHandler(BaseHandler):
         statuscache.make_event(user=observed_user, clock=self.clock)
 
         self.notifier.on_new_user_event(
-            observer_user.to_string(),
-            event_data=statuscache.make_event(
-                user=observed_user,
-                clock=self.clock
-            ),
-            store_id=statuscache.serial
+            [observer_user],
         )
 
 
