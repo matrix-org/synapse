@@ -25,6 +25,10 @@
     {
       "path": "/events",
       "description": "Event operations"
+    },
+    {
+      "path": "/directory",
+      "description": "Directory operations"
     }
   ],
   "authorizations": {
