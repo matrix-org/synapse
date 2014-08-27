@@ -387,6 +387,15 @@ h1 {
     padding-bottom: 5px;
 }
 
+/*** Recents in the room page ***/
+#roomRecentsTableWrapper {
+    float: left;
+    max-width: 320px;
+    margin-right: 20px;
+    height: 100%;
+    overflow-y: auto;
+}
+
 /*** Profile ***/
 
 .profile-avatar {
