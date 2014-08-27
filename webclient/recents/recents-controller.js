@@ -20,7 +20,11 @@ angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
 .controller('RecentsController', ['$scope', 'matrixService', 'eventHandlerService', 'eventStreamService', 
                                function($scope,  matrixService, eventHandlerService, eventStreamService) {
     $scope.rooms = {};
-    
+
+    // $scope of the parent where the recents component is included can override this value
+    // in order to highlight a specific room in the list
+    $scope.recentsSelectedRoomID;
+
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
         var config = matrixService.config();
         if (event.state_key === config.user_id && event.content.membership === "invite") {

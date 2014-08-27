@@ -327,6 +327,9 @@ angular.module('RoomController', ['ngSanitize', 'mUtilities'])
     var onInit2 = function() {
         eventHandlerService.reInitRoom($scope.room_id); 
 
+        // Make recents highlight the current room
+        $scope.recentsSelectedRoomID = $scope.room_id;
+
         // Join the room
         matrixService.join($scope.room_id).then(
             function() {

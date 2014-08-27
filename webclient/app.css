@@ -368,6 +368,10 @@ h1 {
     background-color: #f8f8ff;
 }
 
+.recentsRoomSelected {
+    background-color: #eee;
+}
+
 .recentsRoomName {
     font-size: 16px;
     padding-top: 7px;
