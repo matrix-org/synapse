@@ -15,8 +15,9 @@
 
 from .register import RegistrationHandler
 from .room import (
-    MessageHandler, RoomCreationHandler, RoomMemberHandler, RoomListHandler
+    RoomCreationHandler, RoomMemberHandler, RoomListHandler
 )
+from .message import MessageHandler
 from .events import EventStreamHandler, EventHandler
 from .federation import FederationHandler
 from .login import LoginHandler
