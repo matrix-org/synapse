@@ -50,25 +50,6 @@ class PduActions(object):
 
     @defer.inlineCallbacks
     @log_function
-    def populate_previous_pdus(self, pdu):
-        """ Given an outgoing `Pdu` fill out its `prev_ids` key with the `Pdu`s
-        that we have received.
-
-        Returns:
-            Deferred
-        """
-        results = yield self.store.get_latest_pdus_in_context(pdu.context)
-
-        pdu.prev_pdus = [(p_id, origin) for p_id, origin, _ in results]
-
-        vs = [int(v) for _, _, v in results]
-        if vs:
-            pdu.depth = max(vs) + 1
-        else:
-            pdu.depth = 0
-
-    @defer.inlineCallbacks
-    @log_function
     def after_transaction(self, transaction_id, destination, origin):
         """ Returns all `Pdu`s that we sent to the given remote home server
         after a given transaction id.

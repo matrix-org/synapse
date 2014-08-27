@@ -276,7 +276,7 @@ class PduStore(SQLBaseStore):
                 (context, depth)
             )
 
-    def get_latest_pdus_in_context(self, context):
+    def _get_latest_pdus_in_context(self, txn, context):
         """Get's a list of the most current pdus for a given context. This is
         used when we are sending a Pdu and need to fill out the `prev_pdus`
         key
@@ -285,11 +285,6 @@ class PduStore(SQLBaseStore):
             txn
             context
         """
-        return self._db_pool.runInteraction(
-            self._get_latest_pdus_in_context, context
-        )
-
-    def _get_latest_pdus_in_context(self, txn, context):
         query = (
             "SELECT p.pdu_id, p.origin, p.depth FROM %(pdus)s as p "
             "INNER JOIN %(forward)s as f ON p.pdu_id = f.pdu_id "

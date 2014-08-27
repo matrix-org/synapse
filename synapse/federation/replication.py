@@ -134,8 +134,6 @@ class ReplicationLayer(object):
 
         logger.debug("[%s] Persisting PDU", pdu.pdu_id)
 
-        #yield self.pdu_actions.populate_previous_pdus(pdu)
-
         # Save *before* trying to send
         yield self.store.persist_event(pdu=pdu)
 
