@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService', 'mFileUpload', 'mUtilities', '$rootScope',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService, mFileUpload, mUtilities, $rootScope) {
+.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService', 'matrixPhoneService', 'mFileUpload', 'MatrixCall', 'mUtilities', '$rootScope',
+                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService, matrixPhoneService, mFileUpload, MatrixCall, mUtilities, $rootScope) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -81,6 +81,10 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
     
     $scope.$on(eventHandlerService.PRESENCE_EVENT, function(ngEvent, event, isLive) {
         updatePresence(event);
+    });
+
+    $rootScope.$on(matrixPhoneService.CALL_EVENT, function(ngEvent, call) {
+        console.trace("incoming call");
     });
     
     $scope.paginateMore = function() {
@@ -430,4 +434,14 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
     $scope.loadMoreHistory = function() {
         paginate(MESSAGES_PER_PAGINATION);
     };
+
+    $scope.startVoiceCall = function() {
+        var call = new MatrixCall($scope.room_id);
+        call.onError = $scope.onCallError;
+        call.placeCall();
+    }
+
+    $scope.onCallError = function(errStr) {
+        $scope.feedback = errStr;
+    }
 }]);
