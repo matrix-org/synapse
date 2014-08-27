@@ -7,6 +7,16 @@
     
     .leftBlock {
         width: 8em ! important;
+        font-size: 8px ! important;
+    }
+    
+    .rightBlock {
+        width: 0px ! important;
+        display: none ! important;
+    }
+    
+    .avatar {
+        width: 36px ! important;
     }
     
     #header,
