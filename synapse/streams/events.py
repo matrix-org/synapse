@@ -47,14 +47,19 @@ class RoomEventSource(object):
         return self.store.get_room_events_max_id()
 
     @defer.inlineCallbacks
-    def get_pagination_rows(self, user, from_token, to_token, limit, key):
+    def get_pagination_rows(self, user, pagination_config, key):
+        from_token = pagination_config.from_token
+        to_token = pagination_config.to_token
+        limit = pagination_config.limit
+        direction = pagination_config.direction
+
         to_key = to_token.events_key if to_token else None
 
         events, next_key = yield self.store.paginate_room_events(
             room_id=key,
             from_key=from_token.events_key,
             to_key=to_key,
-            direction='b',
+            direction=direction,
             limit=limit,
             with_feedback=True
         )
@@ -101,7 +106,12 @@ class PresenceSource(object):
         presence = self.hs.get_handlers().presence_handler
         return presence._user_cachemap_latest_serial
 
-    def get_pagination_rows(self, user, from_token, to_token, limit, key):
+    def get_pagination_rows(self, user, pagination_config, key):
+        # TODO (erikj): Does this make sense? Ordering?
+
+        from_token = pagination_config.from_token
+        to_token = pagination_config.to_token
+
         from_key = int(from_token.presence_key)
 
         if to_token:
@@ -167,7 +177,5 @@ class StreamSource(object):
     def get_current_token_part(self):
         raise NotImplementedError("get_current_token_part")
 
-
-class PaginationSource(object):
-    def get_pagination_rows(self, user, from_token, to_token, limit, key):
+    def get_pagination_rows(self, user, pagination_config, key):
         raise NotImplementedError("get_rows")

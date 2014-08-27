@@ -22,6 +22,7 @@ from synapse.api.errors import RoomError, StoreError, SynapseError
 from synapse.api.events.room import (
     RoomTopicEvent, RoomMemberEvent, RoomConfigEvent
 )
+from synapse.streams.config import PaginationConfig
 from synapse.util import stringutils
 from ._base import BaseHandler
 
@@ -115,21 +116,18 @@ class MessageHandler(BaseHandler):
 
         data_source = self.hs.get_event_sources().sources[0]
 
-        if pagin_config.from_token:
-            from_token = pagin_config.from_token
-        else:
-            from_token = yield self.hs.get_event_sources().get_current_token()
+        if not pagin_config.from_token:
+            pagin_config.from_token = yield self.hs.get_event_sources().get_current_token()
 
         user = self.hs.parse_userid(user_id)
 
         events, next_token = yield data_source.get_pagination_rows(
-            user, from_token, pagin_config.to_token, pagin_config.limit,
-            room_id
+            user, pagin_config, room_id
         )
 
         chunk = {
             "chunk": [e.get_dict() for e in events],
-            "start": from_token.to_string(),
+            "start": pagin_config.from_token.to_string(),
             "end": next_token.to_string(),
         }
 
@@ -277,8 +275,9 @@ class MessageHandler(BaseHandler):
 
         # FIXME (erikj): Fix this.
         presence_stream = self.hs.get_event_sources().sources[1]
+        pagination_config = PaginationConfig(from_token=now_token)
         presence, _ = yield presence_stream.get_pagination_rows(
-            user, now_token, None, None, None
+            user, pagination_config, None
         )
 
         limit = pagin_config.limit

@@ -26,40 +26,53 @@ class PaginationConfig(object):
 
     """A configuration object which stores pagination parameters."""
 
-    def __init__(self, from_tok=None, to_tok=None, direction='f', limit=0):
-        self.from_token = (
-            StreamToken.from_string(from_tok) if from_tok else None
-        )
-        self.to_token = StreamToken.from_string(to_tok) if to_tok else None
+    def __init__(self, from_token=None, to_token=None, direction='f',
+                 limit=0):
+        self.from_token = from_token
+        self.to_token = to_token
         self.direction = 'f' if direction == 'f' else 'b'
         self.limit = int(limit)
 
     @classmethod
     def from_request(cls, request, raise_invalid_params=True):
-        params = {
-            "direction": 'f',
-        }
+        def get_param(name, default=None):
+            lst = request.args.get(name, [])
+            if len(lst) > 1:
+                raise SynapseError(
+                    400, "%s must be specified only once" % (name,)
+                )
+            elif len(lst) == 1:
+                return lst[0]
+            else:
+                return default
 
-        query_param_mappings = [  # 3-tuple of qp_key, attribute, rules
-            ("from", "from_tok", lambda x: type(x) == str),
-            ("to", "to_tok", lambda x: type(x) == str),
-            ("limit", "limit", lambda x: x.isdigit()),
-            ("dir", "direction", lambda x: x == 'f' or x == 'b'),
-        ]
+        direction = get_param("dir", 'f')
+        if direction not in ['f', 'b']:
+            raise SynapseError(400, "'dir' parameter is invalid.")
 
-        for qp, attr, is_valid in query_param_mappings:
-            if qp in request.args:
-                if is_valid(request.args[qp][0]):
-                    params[attr] = request.args[qp][0]
-                elif raise_invalid_params:
-                    raise SynapseError(400, "%s parameter is invalid." % qp)
-
-        if "from_tok" in params and params["from_tok"] == "END":
-            # TODO (erikj): This is for compatibility only.
-            del params["from_tok"]
+        from_tok = get_param("from")
+        to_tok = get_param("to")
 
         try:
-            return PaginationConfig(**params)
+            if from_tok == "END":
+                from_tok = None  # For backwards compat.
+            elif from_tok:
+                from_tok = StreamToken.from_string(from_tok)
+        except:
+            raise SynapseError(400, "'from' paramater is invalid")
+
+        try:
+            if to_tok:
+                to_tok = StreamToken.from_string(to_tok)
+        except:
+            raise SynapseError(400, "'to' paramater is invalid")
+
+        limit = get_param("limit", "0")
+        if not limit.isdigit():
+            raise SynapseError(400, "'limit' parameter must be an integer.")
+
+        try:
+            return PaginationConfig(from_tok, to_tok, direction, limit)
         except:
             logger.exception("Failed to create pagination config")
             raise SynapseError(400, "Invalid request.")
