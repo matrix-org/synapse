@@ -133,7 +133,7 @@ class MessageHandler(BaseRoomHandler):
         if stamp_event:
             event.content["hsob_ts"] = int(self.clock.time_msec())
 
-        yield self.state_handler.handle_new_event(event)
+        yield self.state_handler.handle_new_event(event, snapshot)
 
         yield self._on_new_room_event(event, snapshot)
 
@@ -362,6 +362,13 @@ class RoomCreationHandler(BaseRoomHandler):
             content=config,
         )
 
+        snapshot = yield self.store.snapshot_room(
+            room_id=room_id,
+            user_id=user_id,
+            state_type=RoomConfigEvent.TYPE,
+            state_key="",
+        )
+
         if room_alias:
             yield self.store.create_room_alias_association(
                 room_id=room_id,
@@ -369,11 +376,11 @@ class RoomCreationHandler(BaseRoomHandler):
                 servers=[self.hs.hostname],
             )
 
-        yield self.state_handler.handle_new_event(config_event)
+        yield self.state_handler.handle_new_event(config_event, snapshot)
         # store_id = persist...
 
         federation_handler = self.hs.get_handlers().federation_handler
-        yield federation_handler.handle_new_event(config_event)
+        yield federation_handler.handle_new_event(config_event, snapshot)
         # self.notifier.on_new_room_event(event, store_id)
 
         content = {"membership": Membership.JOIN}

@@ -243,21 +243,24 @@ class StateTestCase(unittest.TestCase):
 
         state_pdu = new_fake_pdu_entry("C", "test", "mem", "x", "A", 20)
 
-        tup = ("pdu_id", "origin.com", 5)
-        pdus = [tup]
+        snapshot = Mock()
+        snapshot.prev_state_pdu = state_pdu
+        event_id = "pdu_id@origin.com"
 
-        self.persistence.get_latest_pdus_in_context.return_value = pdus
-        self.persistence.get_current_state_pdu.return_value = state_pdu
+        def fill_out_prev_events(event):
+            event.prev_events = [event_id]
+            event.depth = 6
+        snapshot.fill_out_prev_events = fill_out_prev_events
 
-        yield self.state.handle_new_event(event)
+        yield self.state.handle_new_event(event, snapshot)
 
-        self.assertLess(tup[2], event.depth)
+        self.assertLess(5, event.depth)
 
         self.assertEquals(1, len(event.prev_events))
 
         prev_id = event.prev_events[0]
 
-        self.assertEqual(encode_event_id(tup[0], tup[1]), prev_id)
+        self.assertEqual(event_id, prev_id)
 
         self.assertEqual(
             encode_event_id(state_pdu.pdu_id, state_pdu.origin),

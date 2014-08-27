@@ -330,6 +330,7 @@ class RoomCreationTest(unittest.TestCase):
             db_pool=None,
             datastore=NonCallableMock(spec_set=[
                 "store_room",
+                "snapshot_room",
             ]),
             http_client=NonCallableMock(spec_set=[]),
             notifier=NonCallableMock(spec_set=["on_new_room_event"]),

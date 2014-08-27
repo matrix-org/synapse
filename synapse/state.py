@@ -45,7 +45,7 @@ class StateHandler(object):
 
     @defer.inlineCallbacks
     @log_function
-    def handle_new_event(self, event):
+    def handle_new_event(self, event, snapshot):
         """ Given an event this works out if a) we have sufficient power level
         to update the state and b) works out what the prev_state should be.
 
@@ -70,25 +70,13 @@ class StateHandler(object):
         # Now I need to fill out the prev state and work out if it has auth
         # (w.r.t. to power levels)
 
-        results = yield self.store.get_latest_pdus_in_context(
-            event.room_id
-        )
+        snapshot.fill_out_prev_events(event)
 
-        event.prev_events = [
-            encode_event_id(p_id, origin) for p_id, origin, _ in results
-        ]
         event.prev_events = [
             e for e in event.prev_events if e != event.event_id
         ]
 
-        if results:
-            event.depth = max([int(v) for _, _, v in results]) + 1
-        else:
-            event.depth = 0
-
-        current_state = yield self.store.get_current_state_pdu(
-            key.context, key.type, key.state_key
-        )
+        current_state = snapshot.prev_state_pdu
 
         if current_state:
             event.prev_state = encode_event_id(
