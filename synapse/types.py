@@ -92,3 +92,36 @@ class RoomAlias(DomainSpecificString):
 class RoomID(DomainSpecificString):
     """Structure representing a room id. """
     SIGIL = "!"
+
+
+class StreamToken(
+    namedtuple(
+        "Token",
+        ("events_key", "presence_key")
+    )
+):
+    _SEPARATOR = "_"
+
+    @classmethod
+    def from_string(cls, string):
+        try:
+            events_key, presence_key = string.split(cls._SEPARATOR)
+
+            return cls(
+                events_key=events_key,
+                presence_key=presence_key,
+            )
+        except:
+            raise SynapseError(400, "Invalid Token")
+
+    def to_string(self):
+        return "".join([
+            str(self.events_key),
+            self._SEPARATOR,
+            str(self.presence_key),
+        ])
+
+    def copy_and_replace(self, key, new_value):
+        d = self._asdict()
+        d[key] = new_value
+        return StreamToken(**d)

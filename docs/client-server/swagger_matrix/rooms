@@ -578,6 +578,51 @@
           ]
         }
       ]
+    },
+    {
+      "path": "/rooms/{roomId}/state",
+      "operations": [
+        {
+          "method": "GET",
+          "summary": "Get a list of all the current state events for this room.",
+          "notes": "Get a list of all the current state events for this room.",
+          "type": "array",
+          "items": {
+            "$ref": "Event"
+          },
+          "nickname": "get_state_events",
+          "parameters": [
+            {
+              "name": "roomId",
+              "description": "The room to get a list of current state events from.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/rooms/{roomId}/initialSync",
+      "operations": [
+        {
+          "method": "GET",
+          "summary": "Get all the current information for this room, including messages and state events.",
+          "notes": "Get all the current information for this room, including messages and state events.",
+          "type": "InitialSyncRoomData",
+          "nickname": "get_room_sync_data",
+          "parameters": [
+            {
+              "name": "roomId",
+              "description": "The room to get information for.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
+        }
+      ]
     }
   ],
   "models": {
@@ -783,6 +828,34 @@
         "user_id": {
           "type": "string",
           "description": "The fully-qualified user ID."
+        }
+      }
+    },
+    "InitialSyncRoomData": {
+      "id": "InitialSyncRoomData",
+      "properties": {
+        "membership": {
+          "type": "string",
+          "description": "This user's membership state in this room.",
+          "required": true
+        },
+        "room_id": {
+          "type": "string",
+          "description": "The ID of this room.",
+          "required": true
+        },
+        "messages": {
+          "type": "MessagePaginationChunk",
+          "description": "The most recent messages for this room, governed by the limit parameter.",
+          "required": false
+        },
+        "state": {
+          "type": "array",
+          "description": "A list of state events representing the current state of the room.",
+          "required": false,
+          "items": {
+            "$ref": "Event"
+          }
         }
       }
     }

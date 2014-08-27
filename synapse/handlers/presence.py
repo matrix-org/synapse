@@ -17,7 +17,6 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, AuthError
 from synapse.api.constants import PresenceState
-from synapse.api.streams import StreamData
 
 from ._base import BaseHandler
 
@@ -677,44 +676,8 @@ class PresenceHandler(BaseHandler):
         statuscache.make_event(user=observed_user, clock=self.clock)
 
         self.notifier.on_new_user_event(
-            observer_user.to_string(),
-            event_data=statuscache.make_event(
-                user=observed_user,
-                clock=self.clock
-            ),
-            stream_type=PresenceStreamData,
-            store_id=statuscache.serial
+            [observer_user],
         )
-
-
-class PresenceStreamData(StreamData):
-    def __init__(self, hs):
-        super(PresenceStreamData, self).__init__(hs)
-        self.presence = hs.get_handlers().presence_handler
-
-    def get_rows(self, user_id, from_key, to_key, limit, direction):
-        from_key = int(from_key)
-        to_key = int(to_key)
-
-        cachemap = self.presence._user_cachemap
-
-        # TODO(paul): limit, and filter by visibility
-        updates = [(k, cachemap[k]) for k in cachemap
-                   if from_key < cachemap[k].serial <= to_key]
-
-        if updates:
-            clock = self.presence.clock
-
-            latest_serial = max([x[1].serial for x in updates])
-            data = [x[1].make_event(user=x[0], clock=clock) for x in updates]
-            return ((data, latest_serial))
-        else:
-            return (([], self.presence._user_cachemap_latest_serial))
-
-    def max_token(self):
-        return self.presence._user_cachemap_latest_serial
-
-PresenceStreamData.EVENT_TYPE = PresenceStreamData
 
 
 class UserPresenceCache(object):

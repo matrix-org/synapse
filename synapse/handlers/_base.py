@@ -31,7 +31,8 @@ class BaseHandler(object):
 class BaseRoomHandler(BaseHandler):
 
     @defer.inlineCallbacks
-    def _on_new_room_event(self, event, snapshot, extra_destinations=[]):
+    def _on_new_room_event(self, event, snapshot, extra_destinations=[],
+                           extra_users=[]):
         snapshot.fill_out_prev_events(event)
 
         store_id = yield self.store.persist_event(event)
@@ -43,7 +44,7 @@ class BaseRoomHandler(BaseHandler):
         )))
         event.destinations = list(destinations)
 
-        self.notifier.on_new_room_event(event, store_id)
+        self.notifier.on_new_room_event(event, extra_users=[])
 
         federation_handler = self.hs.get_handlers().federation_handler
         yield federation_handler.handle_new_event(event, snapshot)

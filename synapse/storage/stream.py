@@ -174,7 +174,7 @@ class StreamStore(SQLBaseStore):
             "SELECT * FROM events as e WHERE "
             "((room_id IN (%(current)s)) OR "
             "(event_id IN (%(invites)s))) "
-            "AND e.stream_ordering > ? AND e.stream_ordering < ? "
+            "AND e.stream_ordering > ? AND e.stream_ordering <= ? "
             "AND e.outlier = 0 "
             "ORDER BY stream_ordering ASC LIMIT %(limit)d "
         ) % {
@@ -296,5 +296,5 @@ class StreamStore(SQLBaseStore):
         if not res or not res[0] or not res[0]["m"]:
             return "s1"
 
-        key = res[0]["m"] + 1
+        key = res[0]["m"]
         return "s%d" % (key,)

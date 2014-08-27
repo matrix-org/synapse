@@ -176,7 +176,7 @@ class FederationHandler(BaseHandler):
                     )
 
             if not backfilled:
-                yield self.notifier.on_new_room_event(event, store_id)
+                yield self.notifier.on_new_room_event(event)
 
         if event.type == RoomMemberEvent.TYPE:
             if event.membership == Membership.JOIN:
