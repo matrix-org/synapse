@@ -102,6 +102,10 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
             ])
         self.datastore.get_presence_list = get_presence_list
 
+        def do_users_share_a_room(userlist):
+            return defer.succeed(False)
+        self.datastore.do_users_share_a_room = do_users_share_a_room
+
         self.handlers = hs.get_handlers()
 
         self.mock_update_client = Mock()

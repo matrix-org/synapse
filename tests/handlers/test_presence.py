@@ -92,10 +92,7 @@ class PresenceStateTestCase(unittest.TestCase):
         self.datastore.is_presence_visible = is_presence_visible
 
         # Mock the RoomMemberHandler
-        room_member_handler = Mock(spec=[
-            "get_rooms_for_user",
-            "get_room_members",
-        ])
+        room_member_handler = Mock(spec=[])
         hs.handlers.room_member_handler = room_member_handler
         logging.getLogger().debug("Mocking room_member_handler=%r", room_member_handler)
 
@@ -121,6 +118,11 @@ class PresenceStateTestCase(unittest.TestCase):
             else:
                 return defer.succeed([])
         room_member_handler.get_room_members = get_room_members
+
+        def do_users_share_a_room(userlist):
+            shared = all(map(lambda u: u in self.room_members, userlist))
+            return defer.succeed(shared)
+        self.datastore.do_users_share_a_room = do_users_share_a_room
 
         self.mock_start = Mock()
         self.mock_stop = Mock()

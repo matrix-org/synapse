@@ -229,11 +229,19 @@ class PresenceEventStreamTestCase(unittest.TestCase):
 
         # HIDEOUS HACKERY
         # TODO(paul): This should be injected in via the HomeServer DI system
-        from synapse.handlers.events import EventStreamHandler
-        from synapse.handlers.presence import PresenceStreamData
-        EventStreamHandler.stream_data_classes = [
-            PresenceStreamData
-        ]
+        from synapse.streams.events import (
+            PresenceSource, NullSource, EventSources
+        )
+
+        old_SOURCE_TYPES = EventSources.SOURCE_TYPES
+        def tearDown():
+            EventSources.SOURCE_TYPES = old_SOURCE_TYPES
+        self.tearDown = tearDown
+
+        EventSources.SOURCE_TYPES = {
+            k: NullSource for k in old_SOURCE_TYPES.keys()
+        }
+        EventSources.SOURCE_TYPES["presence"] = PresenceSource
 
         hs = HomeServer("test",
             db_pool=None,
@@ -288,7 +296,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         # all be ours
 
         # I'll already get my own presence state change
-        self.assertEquals({"start": "1", "end": "1", "chunk": []}, response)
+        self.assertEquals({"start": "0_1", "end": "0_1", "chunk": []}, response)
 
         self.mock_datastore.set_presence_state.return_value = defer.succeed(
                 {"state": ONLINE})
@@ -299,10 +307,10 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 state={"state": ONLINE})
 
         (code, response) = yield self.mock_resource.trigger("GET",
-                "/events?from=1&timeout=0", None)
+                "/events?from=0_1&timeout=0", None)
 
         self.assertEquals(200, code)
-        self.assertEquals({"start": "1", "end": "2", "chunk": [
+        self.assertEquals({"start": "0_1", "end": "0_2", "chunk": [
             {"type": "m.presence",
              "content": {
                  "user_id": "@banana:test",
