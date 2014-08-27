@@ -162,6 +162,8 @@ class Auth(object):
         """
         try:
             user_id = yield self.store.get_user_by_token(token=token)
+            if not user_id:
+                raise StoreError()
             defer.returnValue(self.hs.parse_userid(user_id))
         except StoreError:
             raise AuthError(403, "Unrecognised access token.",

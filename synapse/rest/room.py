@@ -18,11 +18,9 @@ from twisted.internet import defer
 
 from base import RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
-from synapse.api.events.room import (
-    MessageEvent, RoomMemberEvent, FeedbackEvent
-)
-from synapse.api.constants import Feedback
 from synapse.streams.config import PaginationConfig
+from synapse.api.events.room import RoomMemberEvent
+from synapse.api.constants import Membership
 
 import json
 import logging
@@ -36,31 +34,28 @@ class RoomCreateRestServlet(RestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def register(self, http_server):
-        # /rooms OR /rooms/<roomid>
-        http_server.register_path("POST",
-                                  client_path_pattern("/rooms$"),
-                                  self.on_POST)
-        http_server.register_path("PUT",
-                                  client_path_pattern(
-                                      "/rooms/(?P<room_id>[^/]*)$"),
-                                  self.on_PUT)
+        PATTERN = "/createRoom"
+        register_txn_path(self, PATTERN, http_server)
         # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
         http_server.register_path("OPTIONS",
                                   client_path_pattern("/rooms(?:/.*)?$"),
                                   self.on_OPTIONS)
+        # define CORS for /createRoom[/txnid]
+        http_server.register_path("OPTIONS",
+                                  client_path_pattern("/createRoom(?:/.*)?$"),
+                                  self.on_OPTIONS)
 
     @defer.inlineCallbacks
-    def on_PUT(self, request, room_id):
-        room_id = urllib.unquote(room_id)
-        auth_user = yield self.auth.get_user_by_req(request)
+    def on_PUT(self, request, txn_id):
+        try:
+            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+        except KeyError:
+            pass
 
-        if not room_id:
-            raise SynapseError(400, "PUT must specify a room ID")
+        response = yield self.on_POST(request)
 
-        room_config = self.get_room_config(request)
-        info = yield self.make_room(room_config, auth_user, room_id)
-        room_config.update(info)
-        defer.returnValue((200, info))
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -210,24 +205,63 @@ class RoomSendEventRestServlet(RestServlet):
         defer.returnValue(response)
 
 
+# TODO: Needs unit testing for room ID + alias joins
 class JoinRoomAliasServlet(RestServlet):
-    PATTERN = client_path_pattern("/join/(?P<room_alias>[^/]+)$")
+
+    def register(self, http_server):
+        # /join/$room_identifier[/$txn_id]
+        PATTERN = ("/join/(?P<room_identifier>[^/]*)")
+        register_txn_path(self, PATTERN, http_server)
 
     @defer.inlineCallbacks
-    def on_PUT(self, request, room_alias):
+    def on_POST(self, request, room_identifier):
         user = yield self.auth.get_user_by_req(request)
 
-        if not user:
-            defer.returnValue((403, "Unrecognized user"))
+        # the identifier could be a room alias or a room id. Try one then the
+        # other if it fails to parse, without swallowing other valid
+        # SynapseErrors.
 
-        logger.debug("room_alias: %s", room_alias)
+        identifier = None
+        is_room_alias = False
+        try:
+            identifier = self.hs.parse_roomalias(
+                urllib.unquote(room_identifier)
+            )
+            is_room_alias = True
+        except SynapseError:
+            identifier = self.hs.parse_roomid(
+                urllib.unquote(room_identifier)
+            )
 
-        room_alias = self.hs.parse_roomalias(urllib.unquote(room_alias))
+        # TODO: Support for specifying the home server to join with?
 
-        handler = self.handlers.room_member_handler
-        ret_dict = yield handler.join_room_alias(user, room_alias)
+        if is_room_alias:
+            handler = self.handlers.room_member_handler
+            ret_dict = yield handler.join_room_alias(user, identifier)
+            defer.returnValue((200, ret_dict))
+        else:  # room id
+            event = self.event_factory.create_event(
+                etype=RoomMemberEvent.TYPE,
+                content={"membership": Membership.JOIN},
+                room_id=urllib.unquote(identifier.to_string()),
+                user_id=user.to_string(),
+                state_key=user.to_string()
+            )
+            handler = self.handlers.room_member_handler
+            yield handler.change_membership(event)
+            defer.returnValue((200, ""))
 
-        defer.returnValue((200, ret_dict))
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_identifier, txn_id):
+        try:
+            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+        except KeyError:
+            pass
+
+        response = yield self.on_POST(request, room_identifier)
+
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
 
 
 # TODO: Needs unit testing

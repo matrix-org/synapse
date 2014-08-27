@@ -10,7 +10,7 @@ docs/build/
 *.egg-info
 
 cmdclient_config.json
-homeserver.db
+homeserver*.db
 
 .coverage
 htmlcov

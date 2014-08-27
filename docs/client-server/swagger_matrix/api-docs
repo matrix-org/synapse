@@ -21,6 +21,10 @@
     {
       "path": "/presence",
       "description": "Presence operations"
+    },
+    {
+      "path": "/events",
+      "description": "Event operations"
     }
   ],
   "authorizations": {
