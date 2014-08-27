@@ -19,6 +19,22 @@ from synapse.api.constants import Membership
 from synapse.types import StreamToken
 
 
+class NullSource(object):
+    """This event source never yields any events and its token remains at
+    zero. It may be useful for unit-testing."""
+    def __init__(self, hs):
+        pass
+
+    def get_new_events_for_user(self, user, from_token, limit):
+        return defer.succeed(([], from_token))
+
+    def get_current_token_part(self):
+        return defer.succeed(0)
+
+    def get_pagination_rows(self, user, pagination_config, key):
+        return defer.succeed(([], from_token))
+
+
 class RoomEventSource(object):
     def __init__(self, hs):
         self.store = hs.get_datastore()
