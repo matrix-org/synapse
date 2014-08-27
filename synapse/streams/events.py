@@ -171,4 +171,3 @@ class StreamSource(object):
 class PaginationSource(object):
     def get_pagination_rows(self, user, from_token, to_token, limit, key):
         raise NotImplementedError("get_rows")
-

@@ -59,7 +59,6 @@ class EventStreamHandler(BaseHandler):
                     )
             self._streams_per_user[auth_user] += 1
 
-
             if pagin_config.from_token is None:
                 pagin_config.from_token = None
 

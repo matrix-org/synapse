@@ -311,12 +311,18 @@ class MessageHandler(BaseHandler):
                     "end": token[1],
                 }
 
-                current_state = yield self.store.get_current_state(event.room_id)
+                current_state = yield self.store.get_current_state(
+                    event.room_id
+                )
                 d["state"] = [c.get_dict() for c in current_state]
             except:
                 logger.exception("Failed to get snapshot")
 
-        ret = {"rooms": rooms_ret, "presence": presence, "end": now_token.to_string()}
+        ret = {
+            "rooms": rooms_ret,
+            "presence": presence,
+            "end": now_token.to_string()
+        }
 
         defer.returnValue(ret)
 
@@ -499,7 +505,7 @@ class RoomMemberHandler(BaseHandler):
             for entry in member_list
         ]
         chunk_data = {
-            "start": "START",  # FIXME (erikj): START is no longer a valid value
+            "start": "START",  # FIXME (erikj): START is no longer valid
             "end": "END",
             "chunk": event_list
         }

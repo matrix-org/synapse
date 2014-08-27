@@ -121,7 +121,6 @@ class StreamToken(
             str(self.presence_key),
         ])
 
-
     def copy_and_replace(self, key, new_value):
         d = self._asdict()
         d[key] = new_value

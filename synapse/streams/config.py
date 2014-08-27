@@ -27,7 +27,9 @@ class PaginationConfig(object):
     """A configuration object which stores pagination parameters."""
 
     def __init__(self, from_tok=None, to_tok=None, direction='f', limit=0):
-        self.from_token = StreamToken.from_string(from_tok) if from_tok else None
+        self.from_token = (
+            StreamToken.from_string(from_tok) if from_tok else None
+        )
         self.to_token = StreamToken.from_string(to_tok) if to_tok else None
         self.direction = 'f' if direction == 'f' else 'b'
         self.limit = int(limit)
@@ -67,6 +69,3 @@ class PaginationConfig(object):
             "<PaginationConfig from_tok=%s, to_tok=%s, "
             "direction=%s, limit=%s>"
         ) % (self.from_tok, self.to_tok, self.direction, self.limit)
-
-
-
