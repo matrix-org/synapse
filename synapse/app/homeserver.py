@@ -208,6 +208,7 @@ class SynapseHomeServer(HomeServer):
 
     def start_listening(self, port):
         reactor.listenTCP(port, Site(self.root_resource))
+        logger.info("Synapse now listening on port %d", port)
 
 
 def setup_logging(verbosity=0, filename=None, config_path=None):
