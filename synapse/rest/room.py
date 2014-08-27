@@ -322,6 +322,21 @@ class RoomMessageListRestServlet(RestServlet):
         defer.returnValue((200, msgs))
 
 
+# TODO: Needs unit testing
+class RoomStateRestServlet(RestServlet):
+    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/state$")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id):
+        user = yield self.auth.get_user_by_req(request)
+        # TODO: Get all the current state for this room and return in the same
+        # format as initial sync, that is:
+        # [
+        #   { state event }, { state event }
+        # ]
+        defer.returnValue((200, []))
+
+
 class RoomTriggerBackfill(RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/backfill$")
 
@@ -436,3 +451,4 @@ def register_servlets(hs, http_server):
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)
+    RoomStateRestServlet(hs).register(http_server)
