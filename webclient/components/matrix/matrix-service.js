@@ -415,6 +415,40 @@ angular.module('matrixService', [])
             config.version = configVersion;
             localStorage.setItem("config", JSON.stringify(config));
         },
+
+
+        /****** Room aliases management ******/
+
+        /**
+         * Enhance data returned by rooms() and publicRooms() by adding room_alias
+         *  & room_display_name which are computed from data already retrieved from the server.
+         * @param {Array} data the response of rooms() and publicRooms()
+         * @returns {Array} the same array with enriched objects
+         */
+        assignRoomAliases: function(data) {
+            for (var i=0; i<data.length; i++) {
+                var alias = this.getRoomIdToAliasMapping(data[i].room_id);
+                if (alias) {
+                    // use the existing alias from storage
+                    data[i].room_alias = alias;
+                    data[i].room_display_name = alias;
+                }
+                else if (data[i].aliases && data[i].aliases[0]) {
+                    // save the mapping
+                    // TODO: select the smarter alias from the array
+                    this.createRoomIdToAliasMapping(data[i].room_id, data[i].aliases[0]);
+                    data[i].room_display_name = data[i].aliases[0];
+                }
+                else if (data[i].membership == "invite" && "inviter" in data[i]) {
+                    data[i].room_display_name = data[i].inviter + "'s room"
+                }
+                else {
+                    // last resort use the room id
+                    data[i].room_display_name = data[i].room_id;
+                }
+            }
+            return data;
+        },
         
         createRoomIdToAliasMapping: function(roomId, alias) {
             localStorage.setItem(MAPPING_PREFIX+roomId, alias);
