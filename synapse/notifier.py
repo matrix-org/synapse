@@ -69,7 +69,7 @@ class Notifier(object):
     def on_new_room_event(self, event, extra_users=[]):
         room_id = event.room_id
 
-        source = self.event_sources.sources[0]
+        source = self.event_sources.sources["room"]
 
         listeners = self.rooms_to_listeners.get(room_id, set()).copy()
 
@@ -94,7 +94,7 @@ class Notifier(object):
 
     @defer.inlineCallbacks
     def on_new_user_event(self, users=[], rooms=[]):
-        source = self.event_sources.sources[1]
+        source = self.event_sources.sources["presence"]
 
         listeners = set()
 
@@ -176,7 +176,7 @@ class Notifier(object):
         limit = listener.limit
 
         # TODO (erikj): DeferredList?
-        for source in self.event_sources.sources:
+        for source in self.event_sources.sources.values():
             stuff, new_token = yield source.get_new_events_for_user(
                 listener.user,
                 from_token,

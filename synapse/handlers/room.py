@@ -114,7 +114,7 @@ class MessageHandler(BaseHandler):
         """
         yield self.auth.check_joined_room(room_id, user_id)
 
-        data_source = self.hs.get_event_sources().sources[0]
+        data_source = self.hs.get_event_sources().sources["room"]
 
         if not pagin_config.from_token:
             pagin_config.from_token = yield self.hs.get_event_sources().get_current_token()
@@ -274,7 +274,7 @@ class MessageHandler(BaseHandler):
         now_token = yield self.hs.get_event_sources().get_current_token()
 
         # FIXME (erikj): Fix this.
-        presence_stream = self.hs.get_event_sources().sources[1]
+        presence_stream = self.hs.get_event_sources().sources["presence"]
         pagination_config = PaginationConfig(from_token=now_token)
         presence, _ = yield presence_stream.get_pagination_rows(
             user, pagination_config, None
