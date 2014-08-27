@@ -24,6 +24,15 @@ logger = logging.getLogger(__name__)
 
 
 class _NotificationListener(object):
+    """ This represents a single client connection to the events stream.
+
+    The events stream handler will have yielded to the deferred, so to
+    notify the handler it is sufficient to resolve the deferred.
+
+    This listener will also keep track of which rooms it is listening in
+    so that it can remove itself from the indexes in the Notifier class.
+    """
+
     def __init__(self, user, rooms, from_token, limit, timeout, deferred):
         self.user = user
         self.from_token = from_token
@@ -36,6 +45,11 @@ class _NotificationListener(object):
         self.pending_notifications = []
 
     def notify(self, notifier, events, start_token, end_token):
+        """ Inform whoever is listening about the new events. This will
+        also remove this listener from all the indexes in the Notifier
+        it knows about.
+        """
+
         result = (events, (start_token, end_token))
 
         try:
@@ -51,6 +65,11 @@ class _NotificationListener(object):
 
 
 class Notifier(object):
+    """ This class is responsible for notifying any listeners when there are
+    new events available for it.
+
+    Primarily used from the /events stream.
+    """
 
     def __init__(self, hs):
         self.hs = hs
@@ -67,6 +86,13 @@ class Notifier(object):
     @log_function
     @defer.inlineCallbacks
     def on_new_room_event(self, event, extra_users=[]):
+        """ Used by handlers to inform the notifier something has happened
+        in the room, room event wise.
+
+        This triggers the notifier to wake up any listeners that are
+        listening to the room, and any listeners for the users in the
+        `extra_users` param.
+        """
         room_id = event.room_id
 
         source = self.event_sources.sources["room"]
@@ -94,6 +120,11 @@ class Notifier(object):
 
     @defer.inlineCallbacks
     def on_new_user_event(self, users=[], rooms=[]):
+        """ Used to inform listeners that something has happend
+        presence/user event wise.
+
+        Will wake up all listeners for the given users and rooms.
+        """
         source = self.event_sources.sources["presence"]
 
         listeners = set()
@@ -117,6 +148,10 @@ class Notifier(object):
                 )
 
     def get_events_for(self, user, rooms, pagination_config, timeout):
+        """ For the given user and rooms, return any new events for them. If
+        there are no new events wait for up to `timeout` milliseconds for any
+        new events to happen before returning.
+        """
         deferred = defer.Deferred()
 
         self._get_events(
