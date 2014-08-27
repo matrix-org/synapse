@@ -1,6 +1,9 @@
 <div ng-controller="RecentsController" data-ng-init="onInit()">
     <table class="recentsTable">
-        <tbody ng-repeat="(rm_id, room) in rooms | orderRecents" ng-click="goToPage('room/' + (room.room_alias ? room.room_alias : room.room_id) )" class ="recentsRoom" >
+        <tbody ng-repeat="(rm_id, room) in rooms | orderRecents" 
+               ng-click="goToPage('room/' + (room.room_alias ? room.room_alias : room.room_id) )" 
+               class ="recentsRoom" 
+               ng-class="{'recentsRoomSelected': (room.room_id === recentsSelectedRoomID)}">
             <tr>
                 <td class="recentsRoomName">
                     {{ room.room_display_name }}

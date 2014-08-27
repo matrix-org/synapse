@@ -16,7 +16,7 @@ limitations under the License.
 
 'use strict';
 
-angular.module('SettingsController', ['matrixService', 'mFileUpload'])
+angular.module('SettingsController', ['matrixService', 'mFileUpload', 'mFileInput'])
 .controller('SettingsController', ['$scope', 'matrixService', 'mFileUpload',
                               function($scope, matrixService, mFileUpload) {                 
     $scope.config = matrixService.config();

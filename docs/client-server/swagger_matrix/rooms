@@ -14,13 +14,103 @@
   },
   "apis": [
     {
+      "path": "/rooms/{roomId}/send/{eventType}/{txnId}",
+      "operations": [
+        {
+          "method": "PUT",
+          "summary": "Send a generic non-state event to this room.",
+          "notes": "This operation can also be done as a POST to /rooms/{roomId}/send/{eventType}",
+          "type": "EventId",
+          "nickname": "send_non_state_event",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "body",
+              "description": "The event contents",
+              "required": true,
+              "type": "EventContent",
+              "paramType": "body"
+            },
+            {
+              "name": "roomId",
+              "description": "The room to send the message in.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "eventType",
+              "description": "The type of event to send.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "txnId",
+              "description": "A client transaction ID to ensure idempotency. This can only be omitted if the HTTP method becomes a POST.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/rooms/{roomId}/state/{eventType}/{stateKey}",
+      "operations": [
+        {
+          "method": "PUT",
+          "summary": "Send a generic state event to this room.",
+          "notes": "The state key can be omitted, such that you can PUT to /rooms/{roomId}/state/{eventType}. The state key defaults to a 0 length string in this case.",
+          "type": "void",
+          "nickname": "send_state_event",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "body",
+              "description": "The event contents",
+              "required": true,
+              "type": "EventContent",
+              "paramType": "body"
+            },
+            {
+              "name": "roomId",
+              "description": "The room to send the message in.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "eventType",
+              "description": "The type of event to send.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "stateKey",
+              "description": "An identifier used to specify clobbering semantics. State events with the same (roomId, eventType, stateKey) will be replaced.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "path": "/rooms/{roomId}/send/m.room.message/{txnId}",
       "operations": [
         {
           "method": "PUT",
           "summary": "Send a message in this room.",
-          "notes": "Send a message in this room.",
-          "type": "void",
+          "notes": "This operation can also be done as a POST to /rooms/{roomId}/send/m.room.message",
+          "type": "EventId",
           "nickname": "send_message",
           "consumes": [
             "application/json"
@@ -42,7 +132,7 @@
             },
             {
               "name": "txnId",
-              "description": "A client transaction ID to ensure idempotency.",
+              "description": "A client transaction ID to ensure idempotency. This can only be omitted if the HTTP method becomes a POST.",
               "required": true,
               "type": "string",
               "paramType": "path"
@@ -110,8 +200,8 @@
         {
           "method": "PUT",
           "summary": "Send feedback to a message.",
-          "notes": "Send feedback to a message.",
-          "type": "void",
+          "notes": "This operation can also be done as a POST to /rooms/{roomId}/send/m.room.message.feedback",
+          "type": "EventId",
           "nickname": "send_feedback",
           "consumes": [
             "application/json"
@@ -133,7 +223,7 @@
             },
             {
               "name": "txnId",
-              "description": "A client transaction ID to ensure idempotency.",
+              "description": "A client transaction ID to ensure idempotency. This can only be omitted if the HTTP method becomes a POST.",
               "required": true,
               "type": "string",
               "paramType": "path"
@@ -488,6 +578,51 @@
           ]
         }
       ]
+    },
+    {
+      "path": "/rooms/{roomId}/state",
+      "operations": [
+        {
+          "method": "GET",
+          "summary": "Get a list of all the current state events for this room.",
+          "notes": "Get a list of all the current state events for this room.",
+          "type": "array",
+          "items": {
+            "$ref": "Event"
+          },
+          "nickname": "get_state_events",
+          "parameters": [
+            {
+              "name": "roomId",
+              "description": "The room to get a list of current state events from.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/rooms/{roomId}/initialSync",
+      "operations": [
+        {
+          "method": "GET",
+          "summary": "Get all the current information for this room, including messages and state events.",
+          "notes": "Get all the current information for this room, including messages and state events.",
+          "type": "InitialSyncRoomData",
+          "nickname": "get_room_sync_data",
+          "parameters": [
+            {
+              "name": "roomId",
+              "description": "The room to get information for.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
+        }
+      ]
     }
   ],
   "models": {
@@ -633,18 +768,43 @@
       "properties": {
         "event_id": {
           "type": "string",
-          "description": "An ID which uniquely identifies this event.",
+          "description": "An ID which uniquely identifies this event. This is automatically set by the server.",
           "required": true
         },
         "room_id": {
           "type": "string",
-          "description": "The room in which this event occurred.",
+          "description": "The room in which this event occurred. This is automatically set by the server.",
+          "required": true
+        },
+        "type": {
+          "type": "string",
+          "description": "The event type.",
           "required": true
         }
       },
       "subTypes": [
         "MessageEvent"
       ]
+    },
+    "EventId": {
+      "id": "EventId",
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "description": "The allocated event ID for this event.",
+          "required": true
+        }
+      }
+    },
+    "EventContent": {
+      "id": "EventContent",
+      "properties": {
+        "__event_content_keys__": {
+          "type": "string",
+          "description": "Event-specific content keys and values.",
+          "required": false
+        }
+      }
     },
     "MessageEvent": {
       "id": "MessageEvent",
@@ -668,6 +828,34 @@
         "user_id": {
           "type": "string",
           "description": "The fully-qualified user ID."
+        }
+      }
+    },
+    "InitialSyncRoomData": {
+      "id": "InitialSyncRoomData",
+      "properties": {
+        "membership": {
+          "type": "string",
+          "description": "This user's membership state in this room.",
+          "required": true
+        },
+        "room_id": {
+          "type": "string",
+          "description": "The ID of this room.",
+          "required": true
+        },
+        "messages": {
+          "type": "MessagePaginationChunk",
+          "description": "The most recent messages for this room, governed by the limit parameter.",
+          "required": false
+        },
+        "state": {
+          "type": "array",
+          "description": "A list of state events representing the current state of the room.",
+          "required": false,
+          "items": {
+            "$ref": "Event"
+          }
         }
       }
     }

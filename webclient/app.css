@@ -7,6 +7,16 @@
     
     .leftBlock {
         width: 8em ! important;
+        font-size: 8px ! important;
+    }
+    
+    .rightBlock {
+        width: 0px ! important;
+        display: none ! important;
+    }
+    
+    .avatar {
+        width: 36px ! important;
     }
     
     #header,
@@ -368,6 +378,10 @@ h1 {
     background-color: #f8f8ff;
 }
 
+.recentsRoomSelected {
+    background-color: #eee;
+}
+
 .recentsRoomName {
     font-size: 16px;
     padding-top: 7px;
@@ -385,6 +399,15 @@ h1 {
     color: #888;
     font-size: 12px;
     padding-bottom: 5px;
+}
+
+/*** Recents in the room page ***/
+#roomRecentsTableWrapper {
+    float: left;
+    max-width: 320px;
+    margin-right: 20px;
+    height: 100%;
+    overflow-y: auto;
 }
 
 /*** Profile ***/
