@@ -44,7 +44,7 @@ class BaseRoomHandler(BaseHandler):
         )))
         event.destinations = list(destinations)
 
-        self.notifier.on_new_room_event(event, extra_users=[])
+        self.notifier.on_new_room_event(event, extra_users=extra_users)
 
         federation_handler = self.hs.get_handlers().federation_handler
         yield federation_handler.handle_new_event(event, snapshot)

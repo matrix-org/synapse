@@ -128,9 +128,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             event
         )
         self.notifier.on_new_room_event.assert_called_once_with(
-            event, store_id
+            event, extra_users=[self.hs.parse_userid(target_user_id)]
         )
-
         self.assertFalse(self.datastore.get_room.called)
         self.assertFalse(self.datastore.store_room.called)
         self.assertFalse(self.federation.get_state_for_room.called)
@@ -193,7 +192,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             event
         )
         self.notifier.on_new_room_event.assert_called_once_with(
-                event, store_id)
+                event, extra_users=[user])
 
         join_signal_observer.assert_called_with(
                 user=user, room_id=room_id)
