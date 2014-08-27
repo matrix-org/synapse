@@ -78,12 +78,15 @@ angular.module('HomeController', ['matrixService', 'mFileInput', 'mFileUpload', 
 
     var refresh = function() {
         // List all rooms joined or been invited to
-        matrixService.rooms(1,true).then(
+        matrixService.rooms(1, false).then(
             function(response) {
                 var data = assignRoomAliases(response.data.rooms);
                 $scope.feedback = "Success";
                 for (var i=0; i<data.length; i++) {
                     $scope.rooms[data[i].room_id] = data[i];
+
+                    // Create a shortcut for the last message of this room
+                    $scope.rooms[data[i].room_id].lastMsg = data[i].messages.chunk[0];
                 }
 
                 var presence = response.data.presence;

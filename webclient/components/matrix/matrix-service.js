@@ -106,11 +106,20 @@ angular.module('matrixService', [])
         },
 
         // List all rooms joined or been invited to
-        rooms: function(from, to, limit) {
+        rooms: function(limit, feedback) {
             // The REST path spec
+
             var path = "/initialSync";
 
-            return doRequest("GET", path);
+            var params = {};
+            if (limit) {
+                params.limit = limit;
+            }
+            if (feedback) {
+                params.feedback = feedback;
+            }
+
+            return doRequest("GET", path, params);
         },
 
         // Joins a room
