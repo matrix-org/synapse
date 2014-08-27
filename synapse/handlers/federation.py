@@ -214,7 +214,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def do_invite_join(self, target_host, room_id, joinee, content):
+    def do_invite_join(self, target_host, room_id, joinee, content, snapshot):
 
         hosts = yield self.store.get_joined_hosts_for_room(room_id)
         if self.hs.hostname in hosts:
@@ -244,7 +244,8 @@ class FederationHandler(BaseHandler):
 
         new_event.destinations = [target_host]
 
-        yield self.handle_new_event(new_event)
+        snapshot.fill_out_prev_events(new_event)
+        yield self.handle_new_event(new_event, snapshot)
 
         # TODO (erikj): Time out here.
         d = defer.Deferred()

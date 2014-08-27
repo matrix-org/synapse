@@ -637,7 +637,7 @@ class RoomMemberHandler(BaseRoomHandler):
         if should_do_dance:
             handler = self.hs.get_handlers().federation_handler
             have_joined = yield handler.do_invite_join(
-                room_host, room_id, event.user_id, event.content
+                room_host, room_id, event.user_id, event.content, snapshot
             )
 
         # We want to do the _do_update inside the room lock.

@@ -78,7 +78,9 @@ class Auth(object):
 
     def _check_joined_room(self, member, user_id, room_id):
         if not member or member.membership != Membership.JOIN:
-            raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+            raise AuthError(403, "User %s not in room %s (%s)" % (
+                user_id, room_id, repr(member)
+            ))
 
     @defer.inlineCallbacks
     def is_membership_change_allowed(self, event):

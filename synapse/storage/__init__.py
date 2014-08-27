@@ -94,11 +94,11 @@ class DataStore(RoomMemberStore, RoomStore,
     def _persist_pdu_event_txn(self, txn, pdu=None, event=None,
                                backfilled=False, stream_ordering=None):
         if pdu is not None:
-            self._persist_pdu_txn(txn, pdu)
+            self._persist_event_pdu_txn(txn, pdu)
         if event is not None:
             self._persist_event_txn(txn, event, backfilled, stream_ordering)
 
-    def _persist_pdu_txn(self, txn, pdu):
+    def _persist_event_pdu_txn(self, txn, pdu):
         cols = dict(pdu.__dict__)
         unrec_keys = dict(pdu.unrecognized_keys)
         del cols["content"]
@@ -185,7 +185,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 }
             )
 
-        return self._get_room_events_max_id_(txn)
+        return self._get_room_events_max_id_txn(txn)
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
@@ -232,7 +232,7 @@ class DataStore(RoomMemberStore, RoomStore,
             synapse.storage.Snapshot: A snapshot of the state of the room.
         """
         def _snapshot(txn):
-            membership_state = self._get_room_member(txn, user_id)
+            membership_state = self._get_room_member(txn, user_id, room_id)
             prev_pdus = self._get_latest_pdus_in_context(
                 txn, room_id
             )
@@ -279,7 +279,7 @@ class Snapshot(object):
         self.room_id = room_id
         self.user_id = user_id
         self.prev_pdus = prev_pdus
-        self.membership_state
+        self.membership_state = membership_state
         self.state_type = state_type
         self.state_key = state_key
         self.prev_state_pdu = prev_state_pdu
@@ -295,7 +295,7 @@ class Snapshot(object):
         event.prev_events = [e for e in es if e != event.event_id]
 
         if self.prev_pdus:
-            event.depth = max([int(v) for _, _, v in results]) + 1
+            event.depth = max([int(v) for _, _, v in self.prev_pdus]) + 1
         else:
             event.depth = 0
 

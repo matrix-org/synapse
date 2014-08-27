@@ -50,13 +50,13 @@ class RoomMemberStore(SQLBaseStore):
                 "INSERT OR IGNORE INTO room_hosts (room_id, host) "
                 "VALUES (?, ?)"
             )
-            txn.execute(sql, event.room_id, domain)
+            txn.execute(sql, (event.room_id, domain))
         else:
             sql = (
                 "DELETE FROM room_hosts WHERE room_id = ? AND host = ?"
             )
 
-            txn.execute(sql, event.room_id, domain)
+            txn.execute(sql, (event.room_id, domain))
 
     @defer.inlineCallbacks
     def get_room_member(self, user_id, room_id):
@@ -74,6 +74,24 @@ class RoomMemberStore(SQLBaseStore):
         })
 
         defer.returnValue(rows[0] if rows else None)
+
+    def _get_room_member(self, txn, user_id, room_id):
+        sql = (
+            "SELECT e.* FROM events as e"
+            " INNER JOIN room_memberships as m"
+            " ON e.event_id = m.event_id"
+            " INNER JOIN current_state_events as c"
+            " ON m.event_id = c.event_id"
+            " WHERE m.user_id = ? and e.room_id = ?"
+            " LIMIT 1"
+        )
+        txn.execute(sql, (user_id, room_id))
+        rows = self.cursor_to_dict(txn)
+        if rows:
+            return self._parse_event_from_row(rows[0])
+        else:
+            return None
+
 
     def get_room_members(self, room_id, membership=None):
         """Retrieve the current room member list for a room.
