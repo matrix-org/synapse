@@ -471,7 +471,7 @@ class SynapseCmd(cmd.Cmd):
             room_name = args["vis"]
             body["room_alias_name"] = room_name
 
-        reactor.callFromThread(self._run_and_pprint, "POST", "/rooms", body)
+        reactor.callFromThread(self._run_and_pprint, "POST", "/createRoom", body)
 
     def do_raw(self, line):
         """Directly send a JSON object: "raw <method> <path> <data> <notoken>"
