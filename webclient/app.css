@@ -342,6 +342,51 @@ h1 {
     top: 0;
 }
 
+/*** Recents ***/
+.recentsTable {
+    max-width: 480px;
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.recentsTable tr {
+    width: 100%;
+}
+.recentsTable td {
+    vertical-align: text-top;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.recentsRoom {
+    cursor: pointer;
+}
+
+.recentsRoom:hover {
+    background-color: #f8f8ff;
+}
+
+.recentsRoomName {
+    font-size: 16px;
+    padding-top: 7px;
+    width: auto;
+}
+
+.recentsRoomSummaryTS {
+    color: #888;
+    font-size: 12px;
+    width: 7em;
+    text-align: right;
+}
+
+.recentsRoomSummary {
+    color: #888;
+    font-size: 12px;
+    padding-bottom: 5px;
+}
+
 /*** Profile ***/
 
 .profile-avatar {

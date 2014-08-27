@@ -23,13 +23,8 @@
         </form>
     </div>
     
-    <h3>My rooms</h3>
-    
-    <div class="rooms" ng-repeat="(rm_id, room) in rooms">
-        <div>
-            <a href="#/room/{{ room.room_alias ? room.room_alias : rm_id }}" >{{ room.room_display_name }}</a> {{room.membership === 'invite' ? ' (invited)' : ''}}
-        </div>
-    </div>
+    <h3>Recents</h3>
+        <div ng-include="'recents/recents.html'"></div>
     <br/>
 
     <h3>Public rooms</h3>

@@ -20,6 +20,7 @@ var matrixWebClient = angular.module('matrixWebClient', [
     'LoginController',
     'RoomController',
     'HomeController',
+    'RecentsController',
     'SettingsController',
     'UserController',
     'matrixService',

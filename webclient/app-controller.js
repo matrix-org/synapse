@@ -37,7 +37,11 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         mPresence.start();
     }
     
-    $scope.go = function(url) {
+    /**
+     * Open a given page.
+     * @param {String} url url of the page
+     */
+    $scope.goToPage = function(url) {
         $location.url(url);
     };
     
