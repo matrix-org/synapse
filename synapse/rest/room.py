@@ -34,31 +34,28 @@ class RoomCreateRestServlet(RestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def register(self, http_server):
-        # /rooms OR /rooms/<roomid>
-        http_server.register_path("POST",
-                                  client_path_pattern("/rooms$"),
-                                  self.on_POST)
-        http_server.register_path("PUT",
-                                  client_path_pattern(
-                                      "/rooms/(?P<room_id>[^/]*)$"),
-                                  self.on_PUT)
+        PATTERN = "/createRoom"
+        register_txn_path(self, PATTERN, http_server)
         # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
         http_server.register_path("OPTIONS",
                                   client_path_pattern("/rooms(?:/.*)?$"),
                                   self.on_OPTIONS)
+        # define CORS for /createRoom[/txnid]
+        http_server.register_path("OPTIONS",
+                                  client_path_pattern("/createRoom(?:/.*)?$"),
+                                  self.on_OPTIONS)
 
     @defer.inlineCallbacks
-    def on_PUT(self, request, room_id):
-        room_id = urllib.unquote(room_id)
-        auth_user = yield self.auth.get_user_by_req(request)
+    def on_PUT(self, request, txn_id):
+        try:
+            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+        except KeyError:
+            pass
 
-        if not room_id:
-            raise SynapseError(400, "PUT must specify a room ID")
+        response = yield self.on_POST(request)
 
-        room_config = self.get_room_config(request)
-        info = yield self.make_room(room_config, auth_user, room_id)
-        room_config.update(info)
-        defer.returnValue((200, info))
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
 
     @defer.inlineCallbacks
     def on_POST(self, request):

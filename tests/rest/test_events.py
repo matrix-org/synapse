@@ -178,9 +178,8 @@ class EventStreamPermissionsTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_stream_room_permissions(self):
-        room_id = "!rid1:test"
-        yield self.create_room_as(room_id, self.other_user,
-                                  tok=self.other_token)
+        room_id = yield self.create_room_as(self.other_user,
+                                            tok=self.other_token)
         yield self.send(room_id, tok=self.other_token)
 
         # invited to room (expect no content for room)

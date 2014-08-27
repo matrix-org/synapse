@@ -97,7 +97,7 @@ angular.module('matrixService', [])
         // Create a room
         create: function(room_id, visibility) {
             // The REST path spec
-            var path = "/rooms";
+            var path = "/createRoom";
 
             return doRequest("POST", path, undefined, {
                 visibility: visibility,
