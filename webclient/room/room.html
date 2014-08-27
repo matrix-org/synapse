@@ -7,7 +7,11 @@
     <div id="roomName">
         {{ room_alias || room_id }}
     </div>
-    
+
+    <div id="roomRecentsTableWrapper">
+        <div ng-include="'recents/recents.html'"></div>
+    </div>
+
     <div id="usersTableWrapper">
         <table id="usersTable">
             <tr ng-repeat="member in members | orderMembersList">

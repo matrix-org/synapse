@@ -97,7 +97,7 @@ angular.module('matrixService', [])
         // Create a room
         create: function(room_id, visibility) {
             // The REST path spec
-            var path = "/rooms";
+            var path = "/createRoom";
 
             return doRequest("POST", path, undefined, {
                 visibility: visibility,
@@ -106,11 +106,20 @@ angular.module('matrixService', [])
         },
 
         // List all rooms joined or been invited to
-        rooms: function(from, to, limit) {
+        rooms: function(limit, feedback) {
             // The REST path spec
+
             var path = "/initialSync";
 
-            return doRequest("GET", path);
+            var params = {};
+            if (limit) {
+                params.limit = limit;
+            }
+            if (feedback) {
+                params.feedback = feedback;
+            }
+
+            return doRequest("GET", path, params);
         },
 
         // Joins a room
@@ -124,7 +133,8 @@ angular.module('matrixService', [])
 
             path = path.replace("$room_alias", room_alias);
 
-            return doRequest("PUT", path, undefined, {});
+            // TODO: PUT with txn ID
+            return doRequest("POST", path, undefined, {});
         },
 
         // Invite a user to a room
@@ -154,7 +164,7 @@ angular.module('matrixService', [])
 
         // Retrieves the room ID corresponding to a room alias
         resolveRoomAlias:function(room_alias) {
-            var path = "/matrix/client/api/v1/ds/room/$room_alias";
+            var path = "/matrix/client/api/v1/directory/room/$room_alias";
             room_alias = encodeURIComponent(room_alias);
 
             path = path.replace("$room_alias", room_alias);
@@ -234,7 +244,7 @@ angular.module('matrixService', [])
 
         // get a list of public rooms on your home server
         publicRooms: function() {
-            var path = "/public/rooms"
+            var path = "/publicRooms"
             return doRequest("GET", path);
         },
         
@@ -404,6 +414,40 @@ angular.module('matrixService', [])
         saveConfig: function() {
             config.version = configVersion;
             localStorage.setItem("config", JSON.stringify(config));
+        },
+
+
+        /****** Room aliases management ******/
+
+        /**
+         * Enhance data returned by rooms() and publicRooms() by adding room_alias
+         *  & room_display_name which are computed from data already retrieved from the server.
+         * @param {Array} data the response of rooms() and publicRooms()
+         * @returns {Array} the same array with enriched objects
+         */
+        assignRoomAliases: function(data) {
+            for (var i=0; i<data.length; i++) {
+                var alias = this.getRoomIdToAliasMapping(data[i].room_id);
+                if (alias) {
+                    // use the existing alias from storage
+                    data[i].room_alias = alias;
+                    data[i].room_display_name = alias;
+                }
+                else if (data[i].aliases && data[i].aliases[0]) {
+                    // save the mapping
+                    // TODO: select the smarter alias from the array
+                    this.createRoomIdToAliasMapping(data[i].room_id, data[i].aliases[0]);
+                    data[i].room_display_name = data[i].aliases[0];
+                }
+                else if (data[i].membership == "invite" && "inviter" in data[i]) {
+                    data[i].room_display_name = data[i].inviter + "'s room"
+                }
+                else {
+                    // last resort use the room id
+                    data[i].room_display_name = data[i].room_id;
+                }
+            }
+            return data;
         },
         
         createRoomIdToAliasMapping: function(roomId, alias) {

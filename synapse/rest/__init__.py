@@ -15,8 +15,7 @@
 
 
 from . import (
-    room, events, register, login, profile, public, presence, initial_sync,
-    directory
+    room, events, register, login, profile, presence, initial_sync, directory
 )
 
 
@@ -40,7 +39,6 @@ class RestServletFactory(object):
         register.register_servlets(hs, client_resource)
         login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
-        public.register_servlets(hs, client_resource)
         presence.register_servlets(hs, client_resource)
         initial_sync.register_servlets(hs, client_resource)
         directory.register_servlets(hs, client_resource)

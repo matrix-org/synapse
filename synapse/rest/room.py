@@ -34,31 +34,28 @@ class RoomCreateRestServlet(RestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def register(self, http_server):
-        # /rooms OR /rooms/<roomid>
-        http_server.register_path("POST",
-                                  client_path_pattern("/rooms$"),
-                                  self.on_POST)
-        http_server.register_path("PUT",
-                                  client_path_pattern(
-                                      "/rooms/(?P<room_id>[^/]*)$"),
-                                  self.on_PUT)
+        PATTERN = "/createRoom"
+        register_txn_path(self, PATTERN, http_server)
         # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
         http_server.register_path("OPTIONS",
                                   client_path_pattern("/rooms(?:/.*)?$"),
                                   self.on_OPTIONS)
+        # define CORS for /createRoom[/txnid]
+        http_server.register_path("OPTIONS",
+                                  client_path_pattern("/createRoom(?:/.*)?$"),
+                                  self.on_OPTIONS)
 
     @defer.inlineCallbacks
-    def on_PUT(self, request, room_id):
-        room_id = urllib.unquote(room_id)
-        auth_user = yield self.auth.get_user_by_req(request)
+    def on_PUT(self, request, txn_id):
+        try:
+            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+        except KeyError:
+            pass
 
-        if not room_id:
-            raise SynapseError(400, "PUT must specify a room ID")
+        response = yield self.on_POST(request)
 
-        room_config = self.get_room_config(request)
-        info = yield self.make_room(room_config, auth_user, room_id)
-        room_config.update(info)
-        defer.returnValue((200, info))
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -268,6 +265,17 @@ class JoinRoomAliasServlet(RestServlet):
 
 
 # TODO: Needs unit testing
+class PublicRoomListRestServlet(RestServlet):
+    PATTERN = client_path_pattern("/publicRooms$")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        handler = self.handlers.room_list_handler
+        data = yield handler.get_public_room_list()
+        defer.returnValue((200, data))
+
+
+# TODO: Needs unit testing
 class RoomMemberListRestServlet(RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/members$")
 
@@ -312,6 +320,50 @@ class RoomMessageListRestServlet(RestServlet):
             feedback=with_feedback)
 
         defer.returnValue((200, msgs))
+
+
+# TODO: Needs unit testing
+class RoomStateRestServlet(RestServlet):
+    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/state$")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id):
+        user = yield self.auth.get_user_by_req(request)
+        # TODO: Get all the current state for this room and return in the same
+        # format as initial sync, that is:
+        # [
+        #   { state event }, { state event }
+        # ]
+        defer.returnValue((200, []))
+
+
+# TODO: Needs unit testing
+class RoomInitialSyncRestServlet(RestServlet):
+    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/initialSync$")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id):
+        user = yield self.auth.get_user_by_req(request)
+        # TODO: Get all the initial sync data for this room and return in the
+        # same format as initial sync, that is:
+        # {
+        #   membership: join,
+        #   messages: [
+        #       chunk: [ msg events ],
+        #       start: s_tok,
+        #       end: e_tok
+        #   ],
+        #   room_id: foo,
+        #   state: [
+        #       { state event } , { state event }
+        #   ]
+        # }
+        # Probably worth keeping the keys room_id and membership for parity with
+        # /initialSync even though they must be joined to sync this and know the
+        # room ID, so clients can reuse the same code (room_id and membership
+        # are MANDATORY for /initialSync, so the code will expect it to be
+        # there)
+        defer.returnValue((200, {}))
 
 
 class RoomTriggerBackfill(RestServlet):
@@ -427,3 +479,6 @@ def register_servlets(hs, http_server):
     RoomTriggerBackfill(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
+    PublicRoomListRestServlet(hs).register(http_server)
+    RoomStateRestServlet(hs).register(http_server)
+    RoomInitialSyncRestServlet(hs).register(http_server)

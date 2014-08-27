@@ -124,6 +124,11 @@ class BaseHomeServer(object):
         object."""
         return UserID.from_string(s, hs=self)
 
+    def parse_roomid(self, s):
+        """Parse the string given by 's' as a Room ID and return a RoomID
+        object."""
+        return RoomID.from_string(s, hs=self)
+
     def parse_roomalias(self, s):
         """Parse the string given by 's' as a Room Alias and return a RoomAlias
         object."""

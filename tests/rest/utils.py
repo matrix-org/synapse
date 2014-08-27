@@ -24,6 +24,7 @@ from synapse.api.constants import Membership
 import json
 import time
 
+
 class RestTestCase(unittest.TestCase):
     """Contains extra helper functions to quickly and clearly perform a given
     REST action, which isn't the focus of the test.
@@ -40,18 +41,19 @@ class RestTestCase(unittest.TestCase):
         return self.auth_user_id
 
     @defer.inlineCallbacks
-    def create_room_as(self, room_id, room_creator, is_public=True, tok=None):
+    def create_room_as(self, room_creator, is_public=True, tok=None):
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
-        path = "/rooms/%s" % room_id
+        path = "/createRoom"
         content = "{}"
         if not is_public:
             content = '{"visibility":"private"}'
         if tok:
             path = path + "?access_token=%s" % tok
-        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
+        (code, response) = yield self.mock_resource.trigger("POST", path, content)
         self.assertEquals(200, code, msg=str(response))
         self.auth_user_id = temp_id
+        defer.returnValue(response["room_id"])
 
     @defer.inlineCallbacks
     def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):

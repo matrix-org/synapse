@@ -14,13 +14,103 @@
   },
   "apis": [
     {
-      "path": "/rooms/{roomId}/messages/{userId}/{messageId}",
+      "path": "/rooms/{roomId}/send/{eventType}/{txnId}",
+      "operations": [
+        {
+          "method": "PUT",
+          "summary": "Send a generic non-state event to this room.",
+          "notes": "This operation can also be done as a POST to /rooms/{roomId}/send/{eventType}",
+          "type": "EventId",
+          "nickname": "send_non_state_event",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "body",
+              "description": "The event contents",
+              "required": true,
+              "type": "EventContent",
+              "paramType": "body"
+            },
+            {
+              "name": "roomId",
+              "description": "The room to send the message in.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "eventType",
+              "description": "The type of event to send.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "txnId",
+              "description": "A client transaction ID to ensure idempotency. This can only be omitted if the HTTP method becomes a POST.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/rooms/{roomId}/state/{eventType}/{stateKey}",
+      "operations": [
+        {
+          "method": "PUT",
+          "summary": "Send a generic state event to this room.",
+          "notes": "The state key can be omitted, such that you can PUT to /rooms/{roomId}/state/{eventType}. The state key defaults to a 0 length string in this case.",
+          "type": "void",
+          "nickname": "send_state_event",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "body",
+              "description": "The event contents",
+              "required": true,
+              "type": "EventContent",
+              "paramType": "body"
+            },
+            {
+              "name": "roomId",
+              "description": "The room to send the message in.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "eventType",
+              "description": "The type of event to send.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "stateKey",
+              "description": "An identifier used to specify clobbering semantics. State events with the same (roomId, eventType, stateKey) will be replaced.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/rooms/{roomId}/send/m.room.message/{txnId}",
       "operations": [
         {
           "method": "PUT",
           "summary": "Send a message in this room.",
-          "notes": "Send a message in this room.",
-          "type": "void",
+          "notes": "This operation can also be done as a POST to /rooms/{roomId}/send/m.room.message",
+          "type": "EventId",
           "nickname": "send_message",
           "consumes": [
             "application/json"
@@ -41,67 +131,18 @@
               "paramType": "path"
             },
             {
-              "name": "userId",
-              "description": "The fully qualified message sender's user ID.",
+              "name": "txnId",
+              "description": "A client transaction ID to ensure idempotency. This can only be omitted if the HTTP method becomes a POST.",
               "required": true,
               "type": "string",
               "paramType": "path"
-            },
-            {
-              "name": "messageId",
-              "description": "A message ID which is unique for each room and user.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            }
-          ],
-          "responseMessages": [
-            {
-              "code": 403,
-              "message": "Must send messages as yourself."
-            }
-          ]
-        },
-        {
-          "method": "GET",
-          "summary": "Get a message from this room.",
-          "notes": "Get a message from this room.",
-          "type": "Message",
-          "nickname": "get_message",
-          "parameters": [
-            {
-              "name": "roomId",
-              "description": "The room to send the message in.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "userId",
-              "description": "The fully qualified message sender's user ID.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "messageId",
-              "description": "A message ID which is unique for each room and user.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            }
-          ],
-          "responseMessages": [
-            {
-              "code": 404,
-              "message": "Message not found."
             }
           ]
         }
       ]
     },
     {
-      "path": "/rooms/{roomId}/topic",
+      "path": "/rooms/{roomId}/state/m.room.topic",
       "operations": [
         {
           "method": "PUT",
@@ -126,12 +167,6 @@
               "required": true,
               "type": "string",
               "paramType": "path"
-            }
-          ],
-          "responseMessages": [
-            {
-              "code": 403,
-              "message": "Must send messages as yourself."
             }
           ]
         },
@@ -160,13 +195,13 @@
       ]
     },
     {
-      "path": "/rooms/{roomId}/messages/{msgSenderId}/{messageId}/feedback/{senderId}/{feedbackType}",
+      "path": "/rooms/{roomId}/send/m.room.message.feedback/{txnId}",
       "operations": [
         {
           "method": "PUT",
           "summary": "Send feedback to a message.",
-          "notes": "Send feedback to a message.",
-          "type": "void",
+          "notes": "This operation can also be done as a POST to /rooms/{roomId}/send/m.room.message.feedback",
+          "type": "EventId",
           "nickname": "send_feedback",
           "consumes": [
             "application/json"
@@ -187,107 +222,124 @@
               "paramType": "path"
             },
             {
-              "name": "msgSenderId",
-              "description": "The fully qualified message sender's user ID.",
+              "name": "txnId",
+              "description": "A client transaction ID to ensure idempotency. This can only be omitted if the HTTP method becomes a POST.",
               "required": true,
               "type": "string",
               "paramType": "path"
-            },
-            {
-              "name": "messageId",
-              "description": "A message ID which is unique for each room and user.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "senderId",
-              "description": "The fully qualified feedback sender's user ID.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "feedbackType",
-              "description": "The type of feedback being sent.",
-              "required": true,
-              "type": "string",
-              "paramType": "path",
-              "enum": [
-                "d",
-                "r"
-              ]
             }
           ],
           "responseMessages": [
-            {
-              "code": 403,
-              "message": "Must send feedback as yourself."
-            },
             {
               "code": 400,
               "message": "Bad feedback type."
-            }
-          ]
-        },
-        {
-          "method": "GET",
-          "summary": "Get feedback for a message.",
-          "notes": "Get feedback for a message.",
-          "type": "Feedback",
-          "nickname": "get_feedback",
-          "parameters": [
-            {
-              "name": "roomId",
-              "description": "The room to send the message in.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "msgSenderId",
-              "description": "The fully qualified message sender's user ID.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "messageId",
-              "description": "A message ID which is unique for each room and user.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "senderId",
-              "description": "The fully qualified feedback sender's user ID.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "feedbackType",
-              "description": "Enum: The type of feedback being sent.",
-              "required": true,
-              "type": "string",
-              "paramType": "path",
-              "enum": [
-                "d",
-                "r"
-              ]
-            }
-          ],
-          "responseMessages": [
-            {
-              "code": 404,
-              "message": "Feedback not found."
             }
           ]
         }
       ]
     },
     {
-      "path": "/rooms/{roomId}/members/{userId}/state",
+      "path": "/rooms/{roomId}/invite/{txnId}",
+      "operations": [
+        {
+          "method": "PUT",
+          "summary": "Invite a user to this room.",
+          "notes": "This operation can also be done as a POST to /rooms/{roomId}/invite",
+          "type": "void",
+          "nickname": "invite",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "roomId",
+              "description": "The room which has this user.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "txnId",
+              "description": "A client transaction ID for this PUT to ensure idempotency. This can only be omitted if the HTTP method becomes a POST. ",
+              "required": false,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "body",
+              "description": "The user to invite.",
+              "required": true,
+              "type": "InviteRequest",
+              "paramType": "body"
+            }
+          ]
+        }  
+      ]
+    },
+    {
+      "path": "/rooms/{roomId}/join/{txnId}",
+      "operations": [
+        {
+          "method": "PUT",
+          "summary": "Join this room.",
+          "notes": "This operation can also be done as a POST to /rooms/{roomId}/join",
+          "type": "void",
+          "nickname": "join_room",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "roomId",
+              "description": "The room to join.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "txnId",
+              "description": "A client transaction ID for this PUT to ensure idempotency. This can only be omitted if the HTTP method becomes a POST. ",
+              "required": false,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
+        }  
+      ]
+    },
+    {
+      "path": "/rooms/{roomId}/leave/{txnId}",
+      "operations": [
+        {
+          "method": "PUT",
+          "summary": "Leave this room.",
+          "notes": "This operation can also be done as a POST to /rooms/{roomId}/leave",
+          "type": "void",
+          "nickname": "leave",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "roomId",
+              "description": "The room to leave.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "txnId",
+              "description": "A client transaction ID for this PUT to ensure idempotency. This can only be omitted if the HTTP method becomes a POST. ",
+              "required": false,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
+        }  
+      ]
+    },
+    {
+      "path": "/rooms/{roomId}/state/m.room.member/{userId}",
       "operations": [
         {
           "method": "PUT",
@@ -376,58 +428,25 @@
               "message": "Member not found."
             }
           ]
-        },
-        {
-          "method": "DELETE",
-          "summary": "Leave a room.",
-          "notes": "Leave a room.",
-          "type": "void",
-          "nickname": "remove_membership",
-          "parameters": [
-            {
-              "name": "userId",
-              "description": "The user who is leaving.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "roomId",
-              "description": "The room which has this user.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            }
-          ],
-          "responseMessages": [
-            {
-              "code": 403,
-              "message": "You are not in the room."
-            },
-            {
-              "code": 403,
-              "message": "Cannot force another user to leave."
-            }
-          ]
         }
       ]
     },
     {
-      "path": "/join/{roomAlias}",
+      "path": "/join/{roomAliasOrId}",
       "operations": [
         {
           "method": "PUT",
-          "summary": "Join a room via a room alias.",
-          "notes": "Join a room via a room alias.",
+          "summary": "Join a room via a room alias or room ID.",
+          "notes": "Join a room via a room alias or room ID.",
           "type": "RoomInfo",
-          "nickname": "join_room_via_alias",
+          "nickname": "join",
           "consumes": [
             "application/json"
           ],
           "parameters": [
             {
-              "name": "roomAlias",
-              "description": "The room alias to join.",
+              "name": "roomAliasOrId",
+              "description": "The room alias or room ID to join.",
               "required": true,
               "type": "string",
               "paramType": "path"
@@ -443,7 +462,7 @@
       ]
     },
     {
-      "path": "/rooms",
+      "path": "/createRoom",
       "operations": [
         {
           "method": "POST",
@@ -477,7 +496,7 @@
       ]
     },
     {
-      "path": "/rooms/{roomId}/messages/list",
+      "path": "/rooms/{roomId}/messages",
       "operations": [
         {
           "method": "GET",
@@ -519,7 +538,7 @@
       ]
     },
     {
-      "path": "/rooms/{roomId}/members/list",
+      "path": "/rooms/{roomId}/members",
       "operations": [
         {
           "method": "GET",
@@ -704,18 +723,43 @@
       "properties": {
         "event_id": {
           "type": "string",
-          "description": "An ID which uniquely identifies this event.",
+          "description": "An ID which uniquely identifies this event. This is automatically set by the server.",
           "required": true
         },
         "room_id": {
           "type": "string",
-          "description": "The room in which this event occurred.",
+          "description": "The room in which this event occurred. This is automatically set by the server.",
+          "required": true
+        },
+        "type": {
+          "type": "string",
+          "description": "The event type.",
           "required": true
         }
       },
       "subTypes": [
         "MessageEvent"
       ]
+    },
+    "EventId": {
+      "id": "EventId",
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "description": "The allocated event ID for this event.",
+          "required": true
+        }
+      }
+    },
+    "EventContent": {
+      "id": "EventContent",
+      "properties": {
+        "__event_content_keys__": {
+          "type": "string",
+          "description": "Event-specific content keys and values.",
+          "required": false
+        }
+      }
     },
     "MessageEvent": {
       "id": "MessageEvent",
@@ -733,73 +777,12 @@
         }
       }
     },
-    "Tag": {
-      "id": "Tag",
+    "InviteRequest": {
+      "id": "InviteRequest",
       "properties": {
-        "id": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "name": {
-          "type": "string"
-        }
-      }
-    },
-    "Pet": {
-      "id": "Pet",
-      "required": [
-        "id",
-        "name"
-      ],
-      "properties": {
-        "id": {
-          "type": "integer",
-          "format": "int64",
-          "description": "unique identifier for the pet",
-          "minimum": "0.0",
-          "maximum": "100.0"
-        },
-        "category": {
-          "$ref": "Category"
-        },
-        "name": {
-          "type": "string"
-        },
-        "photoUrls": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "tags": {
-          "type": "array",
-          "items": {
-            "$ref": "Tag"
-          }
-        },
-        "status": {
+        "user_id": {
           "type": "string",
-          "description": "pet status in the store",
-          "enum": [
-            "available",
-            "pending",
-            "sold"
-          ]
-        }
-      }
-    },
-    "Category": {
-      "id": "Category",
-      "properties": {
-        "id": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "name": {
-          "type": "string"
-        },
-        "pet": {
-          "$ref": "Pet"
+          "description": "The fully-qualified user ID."
         }
       }
     }

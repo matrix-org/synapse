@@ -74,13 +74,11 @@ class RoomPermissionsTestCase(RestTestCase):
         # create some rooms under the name rmcreator_id
         self.uncreated_rmid = "!aa:test"
 
-        self.created_rmid = "!abc:test"
-        yield self.create_room_as(self.created_rmid, self.rmcreator_id,
-                                  is_public=False)
+        self.created_rmid = yield self.create_room_as(self.rmcreator_id,
+                                                      is_public=False)
 
-        self.created_public_rmid = "!def1234ghi:test"
-        yield self.create_room_as(self.created_public_rmid, self.rmcreator_id,
-                                  is_public=True)
+        self.created_public_rmid = yield self.create_room_as(self.rmcreator_id,
+                                                             is_public=True)
 
         # send a message in one of the rooms
         self.created_rmid_msg_path = ("/rooms/%s/send/m.room.message/a1" %
@@ -423,8 +421,7 @@ class RoomsMemberListTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_get_member_list(self):
-        room_id = "!aa:test"
-        yield self.create_room_as(room_id, self.user_id)
+        room_id = yield self.create_room_as(self.user_id)
         (code, response) = yield self.mock_resource.trigger_get(
                            "/rooms/%s/members" % room_id)
         self.assertEquals(200, code, msg=str(response))
@@ -437,18 +434,16 @@ class RoomsMemberListTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_get_member_list_no_permission(self):
-        room_id = "!bb:test"
-        yield self.create_room_as(room_id, "@some_other_guy:red")
+        room_id = yield self.create_room_as("@some_other_guy:red")
         (code, response) = yield self.mock_resource.trigger_get(
                            "/rooms/%s/members" % room_id)
         self.assertEquals(403, code, msg=str(response))
 
     @defer.inlineCallbacks
     def test_get_member_list_mixed_memberships(self):
-        room_id = "!bb:test"
         room_creator = "@some_other_guy:blue"
+        room_id = yield self.create_room_as(room_creator)
         room_path = "/rooms/%s/members" % room_id
-        yield self.create_room_as(room_id, room_creator)
         yield self.invite(room=room_id, src=room_creator,
                           targ=self.user_id)
         # can't see list if you're just invited.
@@ -503,106 +498,56 @@ class RoomsCreateTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_post_room_no_keys(self):
         # POST with no config keys, expect new room id
-        (code, response) = yield self.mock_resource.trigger("POST", "/rooms",
-                                                          "{}")
+        (code, response) = yield self.mock_resource.trigger("POST",
+                                                            "/createRoom",
+                                                            "{}")
         self.assertEquals(200, code, response)
         self.assertTrue("room_id" in response)
 
     @defer.inlineCallbacks
     def test_post_room_visibility_key(self):
         # POST with visibility config key, expect new room id
-        (code, response) = yield self.mock_resource.trigger("POST", "/rooms",
-                                                '{"visibility":"private"}')
+        (code, response) = yield self.mock_resource.trigger(
+            "POST",
+            "/createRoom",
+            '{"visibility":"private"}')
         self.assertEquals(200, code)
         self.assertTrue("room_id" in response)
 
     @defer.inlineCallbacks
     def test_post_room_custom_key(self):
         # POST with custom config keys, expect new room id
-        (code, response) = yield self.mock_resource.trigger("POST", "/rooms",
-                                                '{"custom":"stuff"}')
+        (code, response) = yield self.mock_resource.trigger(
+            "POST",
+            "/createRoom",
+            '{"custom":"stuff"}')
         self.assertEquals(200, code)
         self.assertTrue("room_id" in response)
 
     @defer.inlineCallbacks
     def test_post_room_known_and_unknown_keys(self):
         # POST with custom + known config keys, expect new room id
-        (code, response) = yield self.mock_resource.trigger("POST", "/rooms",
-                                 '{"visibility":"private","custom":"things"}')
+        (code, response) = yield self.mock_resource.trigger(
+            "POST",
+            "/createRoom",
+            '{"visibility":"private","custom":"things"}')
         self.assertEquals(200, code)
         self.assertTrue("room_id" in response)
 
     @defer.inlineCallbacks
     def test_post_room_invalid_content(self):
         # POST with invalid content / paths, expect 400
-        (code, response) = yield self.mock_resource.trigger("POST", "/rooms",
-                                                          '{"visibili')
-        self.assertEquals(400, code)
-
-        (code, response) = yield self.mock_resource.trigger("POST", "/rooms",
-                                                          '["hello"]')
-        self.assertEquals(400, code)
-
-    @defer.inlineCallbacks
-    def test_put_room_no_keys(self):
-        # PUT with no config keys, expect new room id
         (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%21aa%3Atest", "{}"
-        )
-        self.assertEquals(200, code)
-        self.assertTrue("room_id" in response)
-
-    @defer.inlineCallbacks
-    def test_put_room_visibility_key(self):
-        # PUT with known config keys, expect new room id
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%21bb%3Atest", '{"visibility":"private"}'
-        )
-        self.assertEquals(200, code)
-        self.assertTrue("room_id" in response)
-
-    @defer.inlineCallbacks
-    def test_put_room_custom_key(self):
-        # PUT with custom config keys, expect new room id
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%21cc%3Atest", '{"custom":"stuff"}'
-        )
-        self.assertEquals(200, code)
-        self.assertTrue("room_id" in response)
-
-    @defer.inlineCallbacks
-    def test_put_room_known_and_unknown_keys(self):
-        # PUT with custom + known config keys, expect new room id
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%21dd%3Atest",
-            '{"visibility":"private","custom":"things"}'
-        )
-        self.assertEquals(200, code)
-        self.assertTrue("room_id" in response)
-
-    @defer.inlineCallbacks
-    def test_put_room_invalid_content(self):
-        # PUT with invalid content / room names, expect 400
-
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/ee", '{"sdf"'
-        )
+            "POST",
+            "/createRoom",
+            '{"visibili')
         self.assertEquals(400, code)
 
         (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/ee", '["hello"]'
-        )
+            "POST",
+            "/createRoom",
+            '["hello"]')
         self.assertEquals(400, code)
-
-    @defer.inlineCallbacks
-    def test_put_room_conflict(self):
-        yield self.create_room_as("!aa:test", self.user_id)
-
-        # PUT with conflicting room ID, expect 409
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%21aa%3Atest", "{}"
-        )
-        self.assertEquals(409, code)
 
 
 class RoomTopicTestCase(RestTestCase):
@@ -613,8 +558,6 @@ class RoomTopicTestCase(RestTestCase):
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
-        self.room_id = "!rid1:test"
-        self.path = "/rooms/%s/state/m.room.topic" % self.room_id
 
         state_handler = Mock(spec=["handle_new_event"])
         state_handler.handle_new_event.return_value = True
@@ -640,7 +583,8 @@ class RoomTopicTestCase(RestTestCase):
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 
         # create the room
-        yield self.create_room_as(self.room_id, self.user_id)
+        self.room_id = yield self.create_room_as(self.user_id)
+        self.path = "/rooms/%s/state/m.room.topic" % self.room_id
 
     def tearDown(self):
         pass
@@ -717,7 +661,6 @@ class RoomMemberStateTestCase(RestTestCase):
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
-        self.room_id = "!rid1:test"
 
         state_handler = Mock(spec=["handle_new_event"])
         state_handler.handle_new_event.return_value = True
@@ -742,7 +685,7 @@ class RoomMemberStateTestCase(RestTestCase):
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 
-        yield self.create_room_as(self.room_id, self.user_id)
+        self.room_id = yield self.create_room_as(self.user_id)
 
     def tearDown(self):
         pass
@@ -843,7 +786,6 @@ class RoomMessagesTestCase(RestTestCase):
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
-        self.room_id = "!rid1:test"
 
         state_handler = Mock(spec=["handle_new_event"])
         state_handler.handle_new_event.return_value = True
@@ -868,7 +810,7 @@ class RoomMessagesTestCase(RestTestCase):
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 
-        yield self.create_room_as(self.room_id, self.user_id)
+        self.room_id = yield self.create_room_as(self.user_id)
 
     def tearDown(self):
         pass
