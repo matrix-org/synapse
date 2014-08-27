@@ -271,10 +271,6 @@ def setup():
         db_name=db_name,
     )
 
-    # This object doesn't need to be saved because it's set as the handler for
-    # the replication layer
-    hs.get_federation()
-
     hs.register_servlets()
 
     hs.create_resource_tree(
