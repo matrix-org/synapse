@@ -32,6 +32,8 @@ class BaseRoomHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _on_new_room_event(self, event, snapshot, extra_destinations=[]):
+        snapshot.fill_out_prev_events(event)
+
         store_id = yield self.store.persist_event(event)
 
         destinations = set(extra_destinations)

@@ -22,8 +22,9 @@ from synapse.api.events.room import (
 from synapse.api.constants import Membership
 from synapse.handlers.federation import FederationHandler
 from synapse.server import HomeServer
+from synapse.federation.units import Pdu
 
-from mock import NonCallableMock
+from mock import NonCallableMock, ANY
 
 import logging
 
@@ -60,37 +61,42 @@ class FederationTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_msg(self):
-        event = self.hs.get_event_factory().create_event(
-            etype=MessageEvent.TYPE,
-            msg_id="bob",
-            room_id="foo",
+        pdu = Pdu(
+            pdu_type=MessageEvent.TYPE,
+            context="foo",
             content={"msgtype": u"fooo"},
+            ts=0,
+            pdu_id="a",
+            origin="b",
         )
 
         store_id = "ASD"
         self.datastore.persist_event.return_value = defer.succeed(store_id)
         self.datastore.get_room.return_value = defer.succeed(True)
 
-        yield self.handlers.federation_handler.on_receive(event, False, False)
+        yield self.handlers.federation_handler.on_receive_pdu(pdu, False)
 
-        self.datastore.persist_event.assert_called_once_with(event, False)
+        self.datastore.persist_event.assert_called_once_with(ANY, False)
         self.notifier.on_new_room_event.assert_called_once_with(
-                event, store_id)
+                ANY, store_id)
 
     @defer.inlineCallbacks
     def test_invite_join_target_this(self):
         room_id = "foo"
         user_id = "@bob:red"
 
-        event = self.hs.get_event_factory().create_event(
-            etype=InviteJoinEvent.TYPE,
+        pdu = Pdu(
+            pdu_type=InviteJoinEvent.TYPE,
             user_id=user_id,
             target_host=self.hostname,
-            room_id=room_id,
+            context=room_id,
             content={},
+            ts=0,
+            pdu_id="a",
+            origin="b",
         )
 
-        yield self.handlers.federation_handler.on_receive(event, False, False)
+        yield self.handlers.federation_handler.on_receive_pdu(pdu, False)
 
         mem_handler = self.handlers.room_member_handler
         self.assertEquals(1, mem_handler.change_membership.call_count)
@@ -107,15 +113,18 @@ class FederationTestCase(unittest.TestCase):
         room_id = "foo"
         user_id = "@bob:red"
 
-        event = self.hs.get_event_factory().create_event(
-            etype=InviteJoinEvent.TYPE,
+        pdu = Pdu(
+            pdu_type=InviteJoinEvent.TYPE,
             user_id=user_id,
-            target_user_id="@red:not%s" % self.hostname,
-            room_id=room_id,
+            state_key="@red:not%s" % self.hostname,
+            context=room_id,
             content={},
+            ts=0,
+            pdu_id="a",
+            origin="b",
         )
 
-        yield self.handlers.federation_handler.on_receive(event, False, False)
+        yield self.handlers.federation_handler.on_receive_pdu(pdu, False)
 
         mem_handler = self.handlers.room_member_handler
         self.assertEquals(0, mem_handler.change_membership.call_count)

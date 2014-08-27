@@ -78,7 +78,6 @@ class FederationHandler(BaseHandler):
             Deferred: Resolved when it has successfully been queued for
             processing.
         """
-        yield self.fill_out_prev_events(event, snapshot)
 
         pdu = self.pdu_codec.pdu_from_event(event)
 
@@ -86,7 +85,6 @@ class FederationHandler(BaseHandler):
             pdu.destinations = []
 
         yield self.replication_layer.send_pdu(pdu)
-
 
     @log_function
     def get_state_for_room(self, destination, room_id):
@@ -102,64 +100,18 @@ class FederationHandler(BaseHandler):
         """
         event = self.pdu_codec.event_from_pdu(pdu)
 
-        try:
-            with (yield self.lock_manager.lock(pdu.context)):
-                if event.is_state and not backfilled:
-                    is_new_state = yield self.state_handler.handle_new_state(
-                        pdu
-                    )
-                    if not is_new_state:
-                        return
-                else:
-                    is_new_state = False
+        with (yield self.lock_manager.lock(pdu.context)):
+            if event.is_state and not backfilled:
+                is_new_state = yield self.state_handler.handle_new_state(
+                    pdu
+                )
+                if not is_new_state:
+                    return
+            else:
+                is_new_state = False
+        # TODO: Implement something in federation that allows us to
+        # respond to PDU.
 
-            yield self.on_receive(event, is_new_state, backfilled)
-
-        except AuthError:
-            # TODO: Implement something in federation that allows us to
-            # respond to PDU.
-            raise
-
-        return
-
-    @defer.inlineCallbacks
-    def _on_new_state(self, pdu, new_state_event):
-        # TODO: Do any store stuff here. Notifiy C2S about this new
-        # state.
-
-        yield self.store.update_current_state(
-            pdu_id=pdu.pdu_id,
-            origin=pdu.origin,
-            context=pdu.context,
-            pdu_type=pdu.pdu_type,
-            state_key=pdu.state_key
-        )
-
-        yield self.on_receive(new_state_event)
-
-    @defer.inlineCallbacks
-    def fill_out_prev_events(self, event, snapshot):
-        if hasattr(event, "prev_events"):
-            return
-
-        results = snapshot.prev_pdus
-
-        es = [
-            "%s@%s" % (p_id, origin) for p_id, origin, _ in results
-        ]
-
-        event.prev_events = [e for e in es if e != event.event_id]
-
-        if results:
-            event.depth = max([int(v) for _, _, v in results]) + 1
-        else:
-            event.depth = 0
-
-
-
-    @log_function
-    @defer.inlineCallbacks
-    def on_receive(self, event, is_new_state, backfilled):
         if hasattr(event, "state_key") and not is_new_state:
             logger.debug("Ignoring old state.")
             return

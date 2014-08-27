@@ -58,12 +58,6 @@ class DataStore(RoomMemberStore, RoomStore,
     @defer.inlineCallbacks
     @log_function
     def persist_event(self, event=None, backfilled=False, pdu=None):
-        # FIXME (erikj): This should be removed when we start amalgamating
-        # event and pdu storage
-        if event is not None:
-            federation_handler = self.hs.get_handlers().federation_handler
-            yield federation_handler.fill_out_prev_events(event)
-
         stream_ordering = None
         if backfilled:
             if not self.min_token_deferred.called:
@@ -289,6 +283,21 @@ class Snapshot(object):
         self.state_type = state_type
         self.state_key = state_key
         self.prev_state_pdu = prev_state_pdu
+
+    def fill_out_prev_events(self, event):
+        if hasattr(event, "prev_events"):
+            return
+
+        es = [
+            "%s@%s" % (p_id, origin) for p_id, origin, _ in self.prev_pdus
+        ]
+
+        event.prev_events = [e for e in es if e != event.event_id]
+
+        if self.prev_pdus:
+            event.depth = max([int(v) for _, _, v in results]) + 1
+        else:
+            event.depth = 0
 
 
 def schema_path(schema):

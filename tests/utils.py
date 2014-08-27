@@ -127,7 +127,9 @@ class MemoryDataStore(object):
         self.current_state = {}
         self.events = []
 
-    Snapshot = namedtuple("Snapshot", "room_id user_id membership_state")
+    class Snapshot(namedtuple("Snapshot", "room_id user_id membership_state")):
+        def fill_out_prev_events(self, event):
+            pass
 
     def snapshot_room(self, room_id, user_id, state_type=None, state_key=None):
         return self.Snapshot(
