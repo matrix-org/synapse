@@ -28,7 +28,7 @@ from synapse.handlers import Handlers
 from synapse.rest import RestServletFactory
 from synapse.state import StateHandler
 from synapse.storage import DataStore
-from synapse.types import UserID, RoomAlias
+from synapse.types import UserID, RoomAlias, RoomID
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.lockutils import LockManager
@@ -117,6 +117,9 @@ class BaseHomeServer(object):
 
         setattr(BaseHomeServer, "get_%s" % (depname), _get)
 
+    # TODO: Why are these parse_ methods so high up along with other globals?
+    # Surely these should be in a util package or in the api package?
+
     # Other utility methods
     def parse_userid(self, s):
         """Parse the string given by 's' as a User ID and return a UserID
@@ -127,6 +130,11 @@ class BaseHomeServer(object):
         """Parse the string given by 's' as a Room Alias and return a RoomAlias
         object."""
         return RoomAlias.from_string(s, hs=self)
+
+    def parse_roomid(self, s):
+        """Parse the string given by 's' as a Room ID and return a RoomID
+        object."""
+        return RoomID.from_string(s, hs=self)
 
 # Build magic accessors for every dependency
 for depname in BaseHomeServer.DEPENDENCIES:
