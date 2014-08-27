@@ -265,6 +265,17 @@ class JoinRoomAliasServlet(RestServlet):
 
 
 # TODO: Needs unit testing
+class PublicRoomListRestServlet(RestServlet):
+    PATTERN = client_path_pattern("/publicRooms$")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        handler = self.handlers.room_list_handler
+        data = yield handler.get_public_room_list()
+        defer.returnValue((200, data))
+
+
+# TODO: Needs unit testing
 class RoomMemberListRestServlet(RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/members$")
 
@@ -424,3 +435,4 @@ def register_servlets(hs, http_server):
     RoomTriggerBackfill(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
+    PublicRoomListRestServlet(hs).register(http_server)

@@ -235,7 +235,7 @@ angular.module('matrixService', [])
 
         // get a list of public rooms on your home server
         publicRooms: function() {
-            var path = "/public/rooms"
+            var path = "/publicRooms"
             return doRequest("GET", path);
         },
         
