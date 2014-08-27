@@ -16,12 +16,11 @@ limitations under the License.
 
 'use strict';
 
-angular.module('HomeController', ['matrixService', 'eventHandlerService'])
+angular.module('HomeController', ['matrixService', 'eventHandlerService', 'RecentsController'])
 .controller('HomeController', ['$scope', '$location', 'matrixService', 'eventHandlerService', 'eventStreamService', 
                                function($scope, $location, matrixService, eventHandlerService, eventStreamService) {
 
     $scope.config = matrixService.config();
-    $scope.rooms = {};
     $scope.public_rooms = [];
     $scope.newRoomId = "";
     $scope.feedback = "";
@@ -32,77 +31,18 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService'])
     };
     
     $scope.goToRoom = {
-        room_id: "",
+        room_id: ""
     };
 
     $scope.joinAlias = {
-        room_alias: "",
-    };
-    
-    $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
-        var config = matrixService.config();
-        if (event.state_key === config.user_id && event.content.membership === "invite") {
-            console.log("Invited to room " + event.room_id);
-            // FIXME push membership to top level key to match /im/sync
-            event.membership = event.content.membership;
-            // FIXME bodge a nicer name than the room ID for this invite.
-            event.room_display_name = event.user_id + "'s room";
-            $scope.rooms[event.room_id] = event;
-        }
-    });
-    
-    var assignRoomAliases = function(data) {
-        for (var i=0; i<data.length; i++) {
-            var alias = matrixService.getRoomIdToAliasMapping(data[i].room_id);
-            if (alias) {
-                // use the existing alias from storage
-                data[i].room_alias = alias;
-                data[i].room_display_name = alias;
-            }
-            else if (data[i].aliases && data[i].aliases[0]) {
-                // save the mapping
-                // TODO: select the smarter alias from the array
-                matrixService.createRoomIdToAliasMapping(data[i].room_id, data[i].aliases[0]);
-                data[i].room_display_name = data[i].aliases[0];
-            }
-            else if (data[i].membership == "invite" && "inviter" in data[i]) {
-                data[i].room_display_name = data[i].inviter + "'s room"
-            }
-            else {
-                // last resort use the room id
-                data[i].room_display_name = data[i].room_id;
-            }
-        }
-        return data;
+        room_alias: ""
     };
 
     var refresh = function() {
-        // List all rooms joined or been invited to
-        matrixService.rooms(1, false).then(
-            function(response) {
-                var data = assignRoomAliases(response.data.rooms);
-                $scope.feedback = "Success";
-                for (var i=0; i<data.length; i++) {
-                    $scope.rooms[data[i].room_id] = data[i];
-
-                    // Create a shortcut for the last message of this room
-                    if (data[i].messages && data[i].messages.chunk && data[i].messages.chunk[0]) {
-                        $scope.rooms[data[i].room_id].lastMsg = data[i].messages.chunk[0];
-                    }
-                }
-
-                var presence = response.data.presence;
-                for (var i = 0; i < presence.length; ++i) {
-                    eventHandlerService.handleEvent(presence[i], false);
-                }
-            },
-            function(error) {
-                $scope.feedback = "Failure: " + error.data;
-            });
         
         matrixService.publicRooms().then(
             function(response) {
-                $scope.public_rooms = assignRoomAliases(response.data.chunk);
+                $scope.public_rooms = matrixService.assignRoomAliases(response.data.chunk);
             }
         );
 
