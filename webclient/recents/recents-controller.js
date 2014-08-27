@@ -25,22 +25,23 @@ angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
     // in order to highlight a specific room in the list
     $scope.recentsSelectedRoomID;
 
+    // Refresh the list on matrix invitation and message event
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
-        var config = matrixService.config();
-        if (event.state_key === config.user_id && event.content.membership === "invite") {
-            console.log("Invited to room " + event.room_id);
-            // FIXME push membership to top level key to match /im/sync
-            event.membership = event.content.membership;
-            // FIXME bodge a nicer name than the room ID for this invite.
-            event.room_display_name = event.user_id + "'s room";
-            $scope.rooms[event.room_id] = event;
-        }
+        refresh();
+    });
+    $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
+        refresh();
     });
     
     var refresh = function() {
         // List all rooms joined or been invited to
+        // TODO: This is a pity that event-stream-service.js makes the same call
+        // We should be able to reuse event-stream-service.js fetched data
         matrixService.rooms(1, false).then(
             function(response) {
+                // Reset data
+                $scope.rooms = {};
+
                 var data = matrixService.assignRoomAliases(response.data.rooms);
                 for (var i=0; i<data.length; i++) {
                     $scope.rooms[data[i].room_id] = data[i];
