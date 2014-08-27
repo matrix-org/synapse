@@ -22,7 +22,7 @@
 from synapse.federation import initialize_http_replication
 from synapse.federation.handler import FederationEventHandler
 from synapse.api.events.factory import EventFactory
-from synapse.api.notifier import Notifier
+from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
 from synapse.rest import RestServletFactory
@@ -32,6 +32,7 @@ from synapse.types import UserID, RoomAlias, RoomID
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.lockutils import LockManager
+from synapse.streams.events import EventSources
 
 
 class BaseHomeServer(object):
@@ -73,6 +74,7 @@ class BaseHomeServer(object):
         'resource_for_federation',
         'resource_for_web_client',
         'resource_for_content_repo',
+        'event_sources',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -194,6 +196,9 @@ class HomeServer(BaseHomeServer):
 
     def build_distributor(self):
         return Distributor()
+
+    def build_event_sources(self):
+        return EventSources(self)
 
     def register_servlets(self):
         """ Register all servlets associated with this HomeServer.

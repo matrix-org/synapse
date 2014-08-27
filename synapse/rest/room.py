@@ -18,9 +18,9 @@ from twisted.internet import defer
 
 from base import RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
+from synapse.streams.config import PaginationConfig
 from synapse.api.events.room import RoomMemberEvent
 from synapse.api.constants import Membership
-from synapse.api.streams import PaginationConfig
 
 import json
 import logging

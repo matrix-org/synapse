@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.streams import PaginationConfig
+from synapse.streams.config import PaginationConfig
 from base import RestServlet, client_path_pattern
 
 

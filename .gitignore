@@ -17,3 +17,10 @@ htmlcov
 
 demo/*.db
 demo/*.log
+demo/*.pid
+
+graph/*.svg
+graph/*.png
+graph/*.dot
+
+uploads
