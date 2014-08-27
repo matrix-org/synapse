@@ -83,8 +83,8 @@ class RoomPermissionsTestCase(RestTestCase):
                                   is_public=True)
 
         # send a message in one of the rooms
-        self.created_rmid_msg_path = ("/rooms/%s/messages/%s/midaaa1" %
-                                (self.created_rmid, self.rmcreator_id))
+        self.created_rmid_msg_path = ("/rooms/%s/send/m.room.message/a1" %
+                                (self.created_rmid))
         (code, response) = yield self.mock_resource.trigger(
                            "PUT",
                            self.created_rmid_msg_path,
@@ -138,14 +138,14 @@ class RoomPermissionsTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_send_message(self):
         msg_content = '{"msgtype":"m.text","body":"hello"}'
-        send_msg_path = ("/rooms/%s/messages/%s/mid1" %
-                        (self.created_rmid, self.user_id))
+        send_msg_path = ("/rooms/%s/send/m.room.message/mid1" %
+                        (self.created_rmid))
 
         # send message in uncreated room, expect 403
         (code, response) = yield self.mock_resource.trigger(
                            "PUT",
-                           "/rooms/%s/messages/%s/mid1" %
-                           (self.uncreated_rmid, self.user_id), msg_content)
+                           "/rooms/%s/send/m.room.message/mid2" %
+                           (self.uncreated_rmid), msg_content)
         self.assertEquals(403, code, msg=str(response))
 
         # send message in created room not joined (no state), expect 403
@@ -875,9 +875,8 @@ class RoomMessagesTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_invalid_puts(self):
-        path = "/rooms/%s/messages/%s/mid1" % (
-            urllib.quote(self.room_id), self.user_id
-        )
+        path = "/rooms/%s/send/m.room.message/mid1" % (
+            urllib.quote(self.room_id))
         # missing keys or invalid json
         (code, response) = yield self.mock_resource.trigger("PUT",
                            path, '{}')
@@ -905,9 +904,8 @@ class RoomMessagesTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_rooms_messages_sent(self):
-        path = "/rooms/%s/messages/%s/mid1" % (
-            urllib.quote(self.room_id), self.user_id
-        )
+        path = "/rooms/%s/send/m.room.message/mid1" % (
+            urllib.quote(self.room_id))
 
         content = '{"body":"test","msgtype":{"type":"a"}}'
         (code, response) = yield self.mock_resource.trigger("PUT", path, content)
@@ -923,9 +921,8 @@ class RoomMessagesTestCase(RestTestCase):
 #        self.assert_dict(json.loads(content), response)
 
         # m.text message type
-        path = "/rooms/%s/messages/%s/mid2" % (
-            urllib.quote(self.room_id), self.user_id
-        )
+        path = "/rooms/%s/send/m.room.message/mid2" % (
+            urllib.quote(self.room_id))
         content = '{"body":"test2","msgtype":"m.text"}'
         (code, response) = yield self.mock_resource.trigger("PUT", path, content)
         self.assertEquals(200, code, msg=str(response))
@@ -933,11 +930,3 @@ class RoomMessagesTestCase(RestTestCase):
 #        (code, response) = yield self.mock_resource.trigger("GET", path, None)
 #        self.assertEquals(200, code, msg=str(response))
 #        self.assert_dict(json.loads(content), response)
-
-        # trying to send message in different user path
-        path = "/rooms/%s/messages/%s/mid2" % (
-            urllib.quote(self.room_id), "invalid" + self.user_id
-        )
-        content = '{"body":"test2","msgtype":"m.text"}'
-        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
-        self.assertEquals(403, code, msg=str(response))

@@ -249,6 +249,10 @@ class MessageHandler(BaseRoomHandler):
         # FIXME (erikj): We need to not generate this token,
         now_token = "%s_%s" % (now_rooms_token, now_presence_token)
 
+        limit = pagin_config.limit
+        if not limit:
+            limit = 10
+
         for event in room_list:
             d = {
                 "room_id": event.room_id,
@@ -265,7 +269,7 @@ class MessageHandler(BaseRoomHandler):
             try:
                 messages, token = yield self.store.get_recent_events_for_room(
                     event.room_id,
-                    limit=10,
+                    limit=limit,
                     end_token=now_rooms_token,
                 )
 

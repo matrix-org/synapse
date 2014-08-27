@@ -18,10 +18,8 @@ from twisted.internet import defer
 
 from base import RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
-from synapse.api.events.room import (
-    MessageEvent, RoomMemberEvent, FeedbackEvent
-)
-from synapse.api.constants import Feedback
+from synapse.api.events.room import RoomMemberEvent
+from synapse.api.constants import Membership
 from synapse.api.streams import PaginationConfig
 
 import json
@@ -96,6 +94,7 @@ class RoomCreateRestServlet(RestServlet):
         return (200, {})
 
 
+# TODO: Needs unit testing for generic events
 class RoomStateEventRestServlet(RestServlet):
     def register(self, http_server):
         # /room/$roomid/state/$eventtype
@@ -168,143 +167,107 @@ class RoomStateEventRestServlet(RestServlet):
             defer.returnValue((200, ""))
 
 
-class JoinRoomAliasServlet(RestServlet):
-    PATTERN = client_path_pattern("/join/(?P<room_alias>[^/]+)$")
+# TODO: Needs unit testing for generic events + feedback
+class RoomSendEventRestServlet(RestServlet):
+
+    def register(self, http_server):
+        # /rooms/$roomid/send/$event_type[/$txn_id]
+        PATTERN = ("/rooms/(?P<room_id>[^/]*)/send/(?P<event_type>[^/]*)")
+        register_txn_path(self, PATTERN, http_server, with_get=True)
 
     @defer.inlineCallbacks
-    def on_PUT(self, request, room_alias):
+    def on_POST(self, request, room_id, event_type):
         user = yield self.auth.get_user_by_req(request)
-
-        if not user:
-            defer.returnValue((403, "Unrecognized user"))
-
-        logger.debug("room_alias: %s", room_alias)
-
-        room_alias = self.hs.parse_roomalias(urllib.unquote(room_alias))
-
-        handler = self.handlers.room_member_handler
-        ret_dict = yield handler.join_room_alias(user, room_alias)
-
-        defer.returnValue((200, ret_dict))
-
-
-class MessageRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/messages/"
-                                  + "(?P<sender_id>[^/]*)/(?P<msg_id>[^/]*)$")
-
-    def get_event_type(self):
-        return MessageEvent.TYPE
-
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_id, sender_id, msg_id):
-        user = yield self.auth.get_user_by_req(request)
-
-        msg_handler = self.handlers.message_handler
-        msg = yield msg_handler.get_message(room_id=urllib.unquote(room_id),
-                                            sender_id=urllib.unquote(sender_id),
-                                            msg_id=msg_id,
-                                            user_id=user.to_string(),
-                                            )
-
-        if not msg:
-            raise SynapseError(404, "Message not found.",
-                               errcode=Codes.NOT_FOUND)
-
-        defer.returnValue((200, json.loads(msg.content)))
-
-    @defer.inlineCallbacks
-    def on_PUT(self, request, room_id, sender_id, msg_id):
-        user = yield self.auth.get_user_by_req(request)
-
-        if user.to_string() != urllib.unquote(sender_id):
-            raise SynapseError(403, "Must send messages as yourself.",
-                               errcode=Codes.FORBIDDEN)
-
         content = _parse_json(request)
 
         event = self.event_factory.create_event(
-            etype=self.get_event_type(),
+            etype=event_type,
             room_id=urllib.unquote(room_id),
             user_id=user.to_string(),
-            msg_id=msg_id,
             content=content
-            )
+        )
 
         msg_handler = self.handlers.message_handler
         yield msg_handler.send_message(event)
 
-        defer.returnValue((200, ""))
+        defer.returnValue((200, {"event_id": event.event_id}))
 
-
-class FeedbackRestServlet(RestServlet):
-    PATTERN = client_path_pattern(
-        "/rooms/(?P<room_id>[^/]*)/messages/" +
-        "(?P<msg_sender_id>[^/]*)/(?P<msg_id>[^/]*)/feedback/" +
-        "(?P<sender_id>[^/]*)/(?P<feedback_type>[^/]*)$"
-    )
-
-    def get_event_type(self):
-        return FeedbackEvent.TYPE
+    def on_GET(self, request, room_id, event_type, txn_id):
+        return (200, "Not implemented")
 
     @defer.inlineCallbacks
-    def on_GET(self, request, room_id, msg_sender_id, msg_id, fb_sender_id,
-               feedback_type):
-        yield (self.auth.get_user_by_req(request))
+    def on_PUT(self, request, room_id, event_type, txn_id):
+        try:
+            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+        except KeyError:
+            pass
 
-        # TODO (erikj): Implement this?
-        raise NotImplementedError("Getting feedback is not supported")
+        response = yield self.on_POST(request, room_id, event_type)
 
-#        if feedback_type not in Feedback.LIST:
-#            raise SynapseError(400, "Bad feedback type.",
-#                               errcode=Codes.BAD_JSON)
-#
-#        msg_handler = self.handlers.message_handler
-#        feedback = yield msg_handler.get_feedback(
-#            room_id=urllib.unquote(room_id),
-#            msg_sender_id=msg_sender_id,
-#            msg_id=msg_id,
-#            user_id=user.to_string(),
-#            fb_sender_id=fb_sender_id,
-#            fb_type=feedback_type
-#        )
-#
-#        if not feedback:
-#            raise SynapseError(404, "Feedback not found.",
-#                               errcode=Codes.NOT_FOUND)
-#
-#        defer.returnValue((200, json.loads(feedback.content)))
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
+
+
+# TODO: Needs unit testing for room ID + alias joins
+class JoinRoomAliasServlet(RestServlet):
+
+    def register(self, http_server):
+        # /join/$room_identifier[/$txn_id]
+        PATTERN = ("/join/(?P<room_identifier>[^/]*)")
+        register_txn_path(self, PATTERN, http_server)
 
     @defer.inlineCallbacks
-    def on_PUT(self, request, room_id, sender_id, msg_id, fb_sender_id,
-               feedback_type):
-        user = yield (self.auth.get_user_by_req(request))
+    def on_POST(self, request, room_identifier):
+        user = yield self.auth.get_user_by_req(request)
 
-        if user.to_string() != fb_sender_id:
-            raise SynapseError(403, "Must send feedback as yourself.",
-                               errcode=Codes.FORBIDDEN)
+        # the identifier could be a room alias or a room id. Try one then the
+        # other if it fails to parse, without swallowing other valid
+        # SynapseErrors.
 
-        if feedback_type not in Feedback.LIST:
-            raise SynapseError(400, "Bad feedback type.",
-                               errcode=Codes.BAD_JSON)
-
-        content = _parse_json(request)
-
-        event = self.event_factory.create_event(
-            etype=self.get_event_type(),
-            room_id=urllib.unquote(room_id),
-            msg_sender_id=sender_id,
-            msg_id=msg_id,
-            user_id=user.to_string(),  # user sending the feedback
-            feedback_type=feedback_type,
-            content=content
+        identifier = None
+        is_room_alias = False
+        try:
+            identifier = self.hs.parse_roomalias(
+                urllib.unquote(room_identifier)
+            )
+            is_room_alias = True
+        except SynapseError:
+            identifier = self.hs.parse_roomid(
+                urllib.unquote(room_identifier)
             )
 
-        msg_handler = self.handlers.message_handler
-        yield msg_handler.send_feedback(event)
+        # TODO: Support for specifying the home server to join with?
 
-        defer.returnValue((200, ""))
+        if is_room_alias:
+            handler = self.handlers.room_member_handler
+            ret_dict = yield handler.join_room_alias(user, identifier)
+            defer.returnValue((200, ret_dict))
+        else:  # room id
+            event = self.event_factory.create_event(
+                etype=RoomMemberEvent.TYPE,
+                content={"membership": Membership.JOIN},
+                room_id=urllib.unquote(identifier.to_string()),
+                user_id=user.to_string(),
+                state_key=user.to_string()
+            )
+            handler = self.handlers.room_member_handler
+            yield handler.change_membership(event)
+            defer.returnValue((200, ""))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_identifier, txn_id):
+        try:
+            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+        except KeyError:
+            pass
+
+        response = yield self.on_POST(request, room_identifier)
+
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
 
 
+# TODO: Needs unit testing
 class RoomMemberListRestServlet(RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/members$")
 
@@ -332,6 +295,7 @@ class RoomMemberListRestServlet(RestServlet):
         defer.returnValue((200, members))
 
 
+# TODO: Needs unit testing
 class RoomMessageListRestServlet(RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/messages$")
 
@@ -366,6 +330,7 @@ class RoomTriggerBackfill(RestServlet):
         defer.returnValue((200, res))
 
 
+# TODO: Needs unit testing
 class RoomMembershipRestServlet(RestServlet):
 
     def register(self, http_server):
@@ -402,7 +367,7 @@ class RoomMembershipRestServlet(RestServlet):
     def on_PUT(self, request, room_id, membership_action, txn_id):
         try:
             defer.returnValue(self.txns.get_client_transaction(request, txn_id))
-        except:
+        except KeyError:
             pass
 
         response = yield self.on_POST(request, room_id, membership_action)
@@ -422,7 +387,7 @@ def _parse_json(request):
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
-def register_txn_path(servlet, regex_string, http_server):
+def register_txn_path(servlet, regex_string, http_server, with_get=False):
     """Registers a transaction-based path.
 
     This registers two paths:
@@ -433,6 +398,7 @@ def register_txn_path(servlet, regex_string, http_server):
         regex_string (str): The regex string to register. Must NOT have a
         trailing $ as this string will be appended to.
         http_server : The http_server to register paths with.
+        with_get: True to also register respective GET paths for the PUTs.
     """
     http_server.register_path(
         "POST",
@@ -444,15 +410,20 @@ def register_txn_path(servlet, regex_string, http_server):
         client_path_pattern(regex_string + "/(?P<txn_id>[^/]*)$"),
         servlet.on_PUT
     )
+    if with_get:
+        http_server.register_path(
+        "GET",
+        client_path_pattern(regex_string + "/(?P<txn_id>[^/]*)$"),
+        servlet.on_GET
+    )
 
 
 def register_servlets(hs, http_server):
     RoomStateEventRestServlet(hs).register(http_server)
-    MessageRestServlet(hs).register(http_server)
-    FeedbackRestServlet(hs).register(http_server)
     RoomCreateRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     RoomTriggerBackfill(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
+    RoomSendEventRestServlet(hs).register(http_server)

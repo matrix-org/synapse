@@ -47,5 +47,22 @@ class EventStreamRestServlet(RestServlet):
         return (200, {})
 
 
+# TODO: Unit test gets, with and without auth, with different kinds of events.
+class EventRestServlet(RestServlet):
+    PATTERN = client_path_pattern("/events/(?P<event_id>[^/]*)$")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, event_id):
+        auth_user = yield self.auth.get_user_by_req(request)
+        handler = self.handlers.event_handler
+        event = yield handler.get_event(auth_user, event_id)
+
+        if event:
+            defer.returnValue((200, event.get_dict()))
+        else:
+            defer.returnValue((404, "Event not found."))
+
+
 def register_servlets(hs, http_server):
     EventStreamRestServlet(hs).register(http_server)
+    EventRestServlet(hs).register(http_server)

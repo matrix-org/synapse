@@ -23,9 +23,9 @@ class FeedbackStore(SQLBaseStore):
     def _store_feedback_txn(self, txn, event):
         self._simple_insert_txn(txn, "feedback", {
             "event_id": event.event_id,
-            "feedback_type": event.feedback_type,
+            "feedback_type": event.content["type"],
             "room_id": event.room_id,
-            "target_event_id": event.target_event,
+            "target_event_id": event.content["target_event_id"],
             "sender": event.user_id,
         })
 
