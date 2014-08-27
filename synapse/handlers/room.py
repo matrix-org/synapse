@@ -270,10 +270,8 @@ class MessageHandler(BaseHandler):
 
         rooms_ret = []
 
-        # FIXME (erikj): We need to not generate this token,
         now_token = yield self.hs.get_event_sources().get_current_token()
 
-        # FIXME (erikj): Fix this.
         presence_stream = self.hs.get_event_sources().sources["presence"]
         pagination_config = PaginationConfig(from_token=now_token)
         presence, _ = yield presence_stream.get_pagination_rows(
