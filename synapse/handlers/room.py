@@ -94,7 +94,7 @@ class MessageHandler(BaseHandler):
                 event.room_id
             )
 
-            self.notifier.on_new_room_event(event, store_id)
+            self.notifier.on_new_room_event(event)
 
         yield self.hs.get_federation().handle_new_event(event)
 
@@ -158,7 +158,7 @@ class MessageHandler(BaseHandler):
             event.destinations = yield self.store.get_joined_hosts_for_room(
                 event.room_id
             )
-            self.notifier.on_new_room_event(event, store_id)
+            self.notifier.on_new_room_event(event)
 
         yield self.hs.get_federation().handle_new_event(event)
 
@@ -240,7 +240,7 @@ class MessageHandler(BaseHandler):
             )
         yield self.hs.get_federation().handle_new_event(event)
 
-        self.notifier.on_new_room_event(event, store_id)
+        self.notifier.on_new_room_event(event)
 
     @defer.inlineCallbacks
     def snapshot_all_rooms(self, user_id=None, pagin_config=None,
@@ -405,10 +405,8 @@ class RoomCreationHandler(BaseHandler):
             )
 
         yield self.state_handler.handle_new_event(config_event)
-        # store_id = persist...
 
         yield self.hs.get_federation().handle_new_event(config_event)
-        # self.notifier.on_new_room_event(event, store_id)
 
         content = {"membership": Membership.JOIN}
         join_event = self.event_factory.create_event(
@@ -726,23 +724,20 @@ class RoomMemberHandler(BaseHandler):
         # If we're inviting someone, then we should also send it to that
         # HS.
         target_user_id = event.state_key
+        target_user = self.hs.parse_userid(target_user_id)
         if membership == Membership.INVITE:
-            host = UserID.from_string(
-                target_user_id, self.hs
-            ).domain
+            host = target_user.domain
             destinations.append(host)
 
         # If we are joining a remote HS, include that.
         if membership == Membership.JOIN:
-            host = UserID.from_string(
-                target_user_id, self.hs
-            ).domain
+            host = target_user.domain
             destinations.append(host)
 
         event.destinations = list(set(destinations))
 
         yield self.hs.get_federation().handle_new_event(event)
-        self.notifier.on_new_room_event(event, store_id)
+        self.notifier.on_new_room_event(event, extra_users=[target_user])
 
 
 class RoomListHandler(BaseHandler):
