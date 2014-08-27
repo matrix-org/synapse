@@ -155,7 +155,7 @@ angular.module('matrixService', [])
 
         // Retrieves the room ID corresponding to a room alias
         resolveRoomAlias:function(room_alias) {
-            var path = "/matrix/client/api/v1/ds/room/$room_alias";
+            var path = "/matrix/client/api/v1/directory/room/$room_alias";
             room_alias = encodeURIComponent(room_alias);
 
             path = path.replace("$room_alias", room_alias);
