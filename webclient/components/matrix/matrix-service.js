@@ -124,7 +124,8 @@ angular.module('matrixService', [])
 
             path = path.replace("$room_alias", room_alias);
 
-            return doRequest("PUT", path, undefined, {});
+            // TODO: PUT with txn ID
+            return doRequest("POST", path, undefined, {});
         },
 
         // Invite a user to a room
