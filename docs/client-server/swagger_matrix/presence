@@ -55,7 +55,7 @@
       ]
     },
     {
-      "path": "/presence_list/{userId}",
+      "path": "/presence/list/{userId}",
       "operations": [
         {
           "method": "GET",
