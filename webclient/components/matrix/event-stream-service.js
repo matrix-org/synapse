@@ -117,6 +117,9 @@ angular.module('eventStreamService', [])
                 var presence = response.data.presence;
                 eventHandlerService.handleEvents(presence, false);
 
+                // Initial sync is done
+                eventHandlerService.handleInitialSyncDone();
+
                 settings.from = response.data.end;
                 doEventStream(deferred);        
             },
