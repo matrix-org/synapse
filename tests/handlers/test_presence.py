@@ -15,7 +15,7 @@
 
 
 from twisted.trial import unittest
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from mock import Mock, call, ANY
 import logging
@@ -192,7 +192,6 @@ class PresenceStateTestCase(unittest.TestCase):
             ),
             SynapseError
         )
-    test_get_disallowed_state.skip = "Presence polling is disabled"
 
     @defer.inlineCallbacks
     def test_set_my_state(self):
@@ -217,7 +216,6 @@ class PresenceStateTestCase(unittest.TestCase):
                 state={"state": OFFLINE})
 
         self.mock_stop.assert_called_with(self.u_apple)
-    test_set_my_state.skip = "Presence polling is disabled"
 
 
 class PresenceInvitesTestCase(unittest.TestCase):
@@ -657,7 +655,6 @@ class PresencePushTestCase(unittest.TestCase):
                     observed_user=self.u_banana,
                     statuscache=ANY), # self-reflection
         ]) # and no others...
-    test_push_local.skip = "Presence polling is disabled"
 
     @defer.inlineCallbacks
     def test_push_remote(self):
@@ -709,7 +706,6 @@ class PresencePushTestCase(unittest.TestCase):
         )
 
         yield put_json.await_calls()
-    test_push_remote.skip = "Presence polling is disabled"
 
     @defer.inlineCallbacks
     def test_recv_remote(self):
@@ -857,6 +853,7 @@ class PresencePollingTestCase(unittest.TestCase):
             'apple': [ "@banana:test", "@clementine:test" ],
             'banana': [ "@apple:test" ],
             'clementine': [ "@apple:test", "@potato:remote" ],
+            'fig': [ "@potato:remote" ],
     }
 
 
@@ -906,9 +903,10 @@ class PresencePollingTestCase(unittest.TestCase):
         # Mocked database state
         # Local users always start offline
         self.current_user_state = {
-                "apple": OFFLINE,
-                "banana": OFFLINE,
-                "clementine": OFFLINE,
+            "apple": OFFLINE,
+            "banana": OFFLINE,
+            "clementine": OFFLINE,
+            "fig": OFFLINE,
         }
 
         def get_presence_state(user_localpart):
@@ -938,6 +936,7 @@ class PresencePollingTestCase(unittest.TestCase):
         self.u_apple = hs.parse_userid("@apple:test")
         self.u_banana = hs.parse_userid("@banana:test")
         self.u_clementine = hs.parse_userid("@clementine:test")
+        self.u_fig = hs.parse_userid("@fig:test")
 
         # Remote users
         self.u_potato = hs.parse_userid("@potato:remote")
@@ -1002,7 +1001,6 @@ class PresencePollingTestCase(unittest.TestCase):
 
         self.assertFalse("banana" in self.handler._local_pushmap)
         self.assertFalse("clementine" in self.handler._local_pushmap)
-    test_push_local.skip = "Presence polling is disabled"
 
 
     @defer.inlineCallbacks
@@ -1028,9 +1026,31 @@ class PresencePollingTestCase(unittest.TestCase):
         yield put_json.await_calls()
 
         # Gut-wrenching tests
-        self.assertTrue(self.u_potato in self.handler._remote_recvmap)
+        self.assertTrue(self.u_potato in self.handler._remote_recvmap,
+            msg="expected potato to be in _remote_recvmap"
+        )
         self.assertTrue(self.u_clementine in
                 self.handler._remote_recvmap[self.u_potato])
+
+        # fig goes online; shouldn't send a second poll
+        yield self.handler.set_state(
+            target_user=self.u_fig, auth_user=self.u_fig,
+            state={"state": ONLINE}
+        )
+
+        reactor.iterate(delay=0)
+
+        put_json.assert_had_no_calls()
+
+        # fig goes offline
+        yield self.handler.set_state(
+            target_user=self.u_fig, auth_user=self.u_fig,
+            state={"state": OFFLINE}
+        )
+
+        reactor.iterate(delay=0)
+
+        put_json.assert_had_no_calls()
 
         put_json.expect_call_and_return(
             call("remote",
@@ -1051,8 +1071,9 @@ class PresencePollingTestCase(unittest.TestCase):
 
         put_json.await_calls()
 
-        self.assertFalse(self.u_potato in self.handler._remote_recvmap)
-    test_remote_poll_send.skip = "Presence polling is disabled"
+        self.assertFalse(self.u_potato in self.handler._remote_recvmap,
+            msg="expected potato not to be in _remote_recvmap"
+        )
 
     @defer.inlineCallbacks
     def test_remote_poll_receive(self):

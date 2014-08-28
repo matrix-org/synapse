@@ -225,8 +225,13 @@ class SynapseCmd(cmd.Cmd):
         json_res = yield self.http_client.do_request("GET", url)
         print json_res
 
-        if ("type" not in json_res or "m.login.password" != json_res["type"] or
-                "stages" in json_res):
+        if "flows" not in json_res:
+            print "Failed to find any login flows."
+            defer.returnValue(False)
+
+        flow = json_res["flows"][0] # assume first is the one we want.
+        if ("type" not in flow or "m.login.password" != flow["type"] or
+                "stages" in flow):
             fallback_url = self._url() + "/login/fallback"
             print ("Unable to login via the command line client. Please visit "
                 "%s to login." % fallback_url)

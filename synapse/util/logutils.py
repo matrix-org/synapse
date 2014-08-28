@@ -15,6 +15,7 @@
 
 
 from inspect import getcallargs
+from functools import wraps
 
 import logging
 import inspect
@@ -28,6 +29,7 @@ def log_function(f):
     lineno = f.func_code.co_firstlineno
     pathname = f.func_code.co_filename
 
+    @wraps(f)
     def wrapped(*args, **kwargs):
         name = f.__module__
         logger = logging.getLogger(name)

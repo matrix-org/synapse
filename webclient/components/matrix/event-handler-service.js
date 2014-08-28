@@ -27,13 +27,15 @@ Typically, this service will store events or broadcast them to any listeners
 if typically all the $on method would do is update its own $scope.
 */
 angular.module('eventHandlerService', [])
-.factory('eventHandlerService', ['matrixService', '$rootScope', function(matrixService, $rootScope) {
+.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', function(matrixService, $rootScope, $q) {
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
     var PRESENCE_EVENT = "PRESENCE_EVENT";
+
+    var InitialSyncDeferred = $q.defer();
     
     $rootScope.events = {
-        rooms: {}, // will contain roomId: { messages:[], members:{userid1: event} }
+        rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
     };
 
     $rootScope.presence = {};
@@ -47,11 +49,11 @@ angular.module('eventHandlerService', [])
         }
     }
 
-    var reInitRoom = function(room_id) {
-        $rootScope.events.rooms[room_id] = {};
-        $rootScope.events.rooms[room_id].messages = [];
-        $rootScope.events.rooms[room_id].members = {};
-    }
+    var resetRoomMessages = function(room_id) {
+        if ($rootScope.events.rooms[room_id]) {
+            $rootScope.events.rooms[room_id].messages = [];
+        }
+    };
     
     var handleMessage = function(event, isLiveEvent) {
         initRoom(event.room_id);
@@ -125,8 +127,18 @@ angular.module('eventHandlerService', [])
             }
         },
 
-        reInitRoom: function(room_id) {
-            reInitRoom(room_id);
+        handleInitialSyncDone: function() {
+            console.log("# handleInitialSyncDone");
+            InitialSyncDeferred.resolve($rootScope.events, $rootScope.presence);
         },
+
+        // Returns a promise that resolves when the initialSync request has been processed
+        waitForInitialSyncCompletion: function() {
+            return InitialSyncDeferred.promise;
+        },
+
+        resetRoomMessages: function(room_id) {
+            resetRoomMessages(room_id);
+        }
     };
 }]);

@@ -17,21 +17,32 @@
 'use strict';
 
 angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
-.controller('RecentsController', ['$scope', 'matrixService', 'eventHandlerService', 'eventStreamService', 
-                               function($scope,  matrixService, eventHandlerService, eventStreamService) {
+.controller('RecentsController', ['$scope', 'matrixService', 'eventHandlerService', 
+                               function($scope,  matrixService, eventHandlerService) {
     $scope.rooms = {};
 
     // $scope of the parent where the recents component is included can override this value
     // in order to highlight a specific room in the list
     $scope.recentsSelectedRoomID;
 
-    // Refresh the list on matrix invitation and message event
-    $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
-        refresh();
-    });
-    $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
-        refresh();
-    });
+    var listenToEventStream = function() {
+        // Refresh the list on matrix invitation and message event
+        $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
+            var config = matrixService.config();
+            if (event.state_key === config.user_id && event.content.membership === "invite") {
+                console.log("Invited to room " + event.room_id);
+                // FIXME push membership to top level key to match /im/sync
+                event.membership = event.content.membership;
+                // FIXME bodge a nicer name than the room ID for this invite.
+                event.room_display_name = event.user_id + "'s room";
+                $scope.rooms[event.room_id] = event;
+            }
+        });
+        $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
+            $scope.rooms[event.room_id].lastMsg = event;
+        });
+    };
+
     
     var refresh = function() {
         // List all rooms joined or been invited to
@@ -56,6 +67,9 @@ angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
                 for (var i = 0; i < presence.length; ++i) {
                     eventHandlerService.handleEvent(presence[i], false);
                 }
+
+                // From now, update recents from the stream
+                listenToEventStream();
             },
             function(error) {
                 $scope.feedback = "Failure: " + error.data;

@@ -96,7 +96,7 @@ angular.module('eventStreamService', [])
         );
 
         return deferred.promise;
-    }    
+    }; 
 
     var startEventStream = function() {
         settings.shouldPoll = true;
@@ -110,18 +110,17 @@ angular.module('eventStreamService', [])
                 for (var i = 0; i < rooms.length; ++i) {
                     var room = rooms[i];
                     if ("state" in room) {
-                        for (var j = 0; j < room.state.length; ++j) {
-                            eventHandlerService.handleEvents(room.state[j], false);
-                        }
+                        eventHandlerService.handleEvents(room.state, false);
                     }
                 }
 
                 var presence = response.data.presence;
-                for (var i = 0; i < presence.length; ++i) {
-                    eventHandlerService.handleEvent(presence[i], false);
-                }
+                eventHandlerService.handleEvents(presence, false);
 
-                settings.from = response.data.end
+                // Initial sync is done
+                eventHandlerService.handleInitialSyncDone();
+
+                settings.from = response.data.end;
                 doEventStream(deferred);        
             },
             function(error) {

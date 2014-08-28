@@ -28,6 +28,16 @@ from mock import patch, Mock
 import json
 import urlparse
 
+from inspect import getcallargs
+
+
+def get_mock_call_args(pattern_func, mock_func):
+    """ Return the arguments the mock function was called with interpreted
+    by the pattern functions argument list.
+    """
+    invoked_args, invoked_kargs = mock_func.call_args
+    return getcallargs(pattern_func, *invoked_args, **invoked_kargs)
+
 
 # This is a mock /resource/ not an entire server
 class MockHttpResource(HttpServer):
@@ -238,8 +248,11 @@ class DeferredMockCallable(object):
 
     def __init__(self):
         self.expectations = []
+        self.calls = []
 
     def __call__(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+
         if not self.expectations:
             raise ValueError("%r has no pending calls to handle call(%s)" % (
                 self, _format_call(args, kwargs))
@@ -262,3 +275,15 @@ class DeferredMockCallable(object):
         while self.expectations:
             (_, _, d) = self.expectations.pop(0)
             yield d
+        self.calls = []
+
+    def assert_had_no_calls(self):
+        if self.calls:
+            calls = self.calls
+            self.calls = []
+
+            raise AssertionError("Expected not to received any calls, got:\n" +
+                "\n".join([
+                    "call(%s)" % _format_call(c[0], c[1]) for c in calls
+                ])
+            )

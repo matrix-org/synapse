@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService', 'mFileUpload', 'mUtilities', '$rootScope',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService, mFileUpload, mUtilities, $rootScope) {
+.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mUtilities', '$rootScope',
+                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventHandlerService, mFileUpload, mUtilities, $rootScope) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -282,7 +282,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
         }
 
         if (room_id_or_alias && '!' === room_id_or_alias[0]) {
-            // Yes. We can start right now
+            // Yes. We can go on right now
             $scope.room_id = room_id_or_alias;
             $scope.room_alias = matrixService.getRoomIdToAliasMapping($scope.room_id);
             onInit2();
@@ -313,7 +313,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
                 $scope.room_id = response.data.room_id;
                 console.log("   -> Room ID: " + $scope.room_id);
 
-                // Now, we can start
+                // Now, we can go on
                 onInit2();
             },
             function () {
@@ -323,36 +323,61 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
             });
         }
     };
-
+    
     var onInit2 = function() {
-        eventHandlerService.reInitRoom($scope.room_id); 
+        console.log("onInit2");
+        
+        // Make sure the initialSync has been before going further
+        eventHandlerService.waitForInitialSyncCompletion().then(
+            function() {
+                var needsToJoin = true;
+                
+                // The room members is available in the data fetched by initialSync
+                if ($rootScope.events.rooms[$scope.room_id]) {
+                    var members = $rootScope.events.rooms[$scope.room_id].members;
+
+                    // Update the member list
+                    for (var i in members) {
+                        var member = members[i];
+                        updateMemberList(member);
+                    }
+
+                    // Check if the user has already join the room
+                    if ($scope.state.user_id in members) {
+                        if ("join" === members[$scope.state.user_id].membership) {
+                            needsToJoin = false;
+                        }
+                    }
+                }
+                
+                // Do we to join the room before starting?
+                if (needsToJoin) {
+                    matrixService.join($scope.room_id).then(
+                        function() {
+                            console.log("Joined room "+$scope.room_id);
+                            onInit3();
+                        },
+                        function(reason) {
+                            $scope.feedback = "Can't join room: " + reason;
+                        });
+                }
+                else {
+                    onInit3();
+                }
+            }
+        );
+    };
+
+    var onInit3 = function() {
+        console.log("onInit3");
+        
+        // TODO: We should be able to keep them
+        eventHandlerService.resetRoomMessages($scope.room_id); 
 
         // Make recents highlight the current room
         $scope.recentsSelectedRoomID = $scope.room_id;
-
-        // Join the room
-        matrixService.join($scope.room_id).then(
-            function() {
-                console.log("Joined room "+$scope.room_id);
-
-                // Get the current member list
-                matrixService.getMemberList($scope.room_id).then(
-                    function(response) {
-                        for (var i = 0; i < response.data.chunk.length; i++) {
-                            var chunk = response.data.chunk[i];
-                            updateMemberList(chunk);
-                        }
-                    },
-                    function(error) {
-                        $scope.feedback = "Failed get member list: " + error.data.error;
-                    }
-                );
-                
-                paginate(MESSAGES_PER_PAGINATION);
-            },
-            function(reason) {
-                $scope.feedback = "Can't join room: " + reason;
-            });
+        
+        paginate(MESSAGES_PER_PAGINATION);
     }; 
     
     $scope.inviteUser = function(user_id) {

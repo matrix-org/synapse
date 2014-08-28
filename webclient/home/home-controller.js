@@ -17,8 +17,8 @@ limitations under the License.
 'use strict';
 
 angular.module('HomeController', ['matrixService', 'eventHandlerService', 'RecentsController'])
-.controller('HomeController', ['$scope', '$location', 'matrixService', 'eventHandlerService', 'eventStreamService', 
-                               function($scope, $location, matrixService, eventHandlerService, eventStreamService) {
+.controller('HomeController', ['$scope', '$location', 'matrixService', 
+                               function($scope, $location, matrixService) {
 
     $scope.config = matrixService.config();
     $scope.public_rooms = [];
