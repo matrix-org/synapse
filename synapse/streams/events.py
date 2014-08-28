@@ -15,7 +15,6 @@
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership
 from synapse.types import StreamToken
 
 
@@ -32,7 +31,7 @@ class NullSource(object):
         return defer.succeed(0)
 
     def get_pagination_rows(self, user, pagination_config, key):
-        return defer.succeed(([], from_token))
+        return defer.succeed(([], pagination_config.from_token))
 
 
 class RoomEventSource(object):
