@@ -146,7 +146,7 @@ class FederationHandler(BaseHandler):
                 # Huh, let's try and get the current state
                 try:
                     yield self.replication_layer.get_state_for_context(
-                        origin, event.room_id
+                        event.origin, event.room_id
                     )
 
                     hosts = yield self.store.get_joined_hosts_for_room(
