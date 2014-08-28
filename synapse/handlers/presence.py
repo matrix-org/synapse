@@ -517,6 +517,7 @@ class PresenceHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
+    @trace_function
     def push_presence(self, user, statuscache):
         assert(user.is_mine)
 
@@ -559,6 +560,7 @@ class PresenceHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
+    @trace_function
     def _send_presence_to_distribution(self, srcuser, localusers=set(),
             remotedomains=set(), statuscache=None):
 
