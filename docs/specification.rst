@@ -68,15 +68,108 @@ Non-state messages
 
 What are they, when are they used, what do they contain, how should they be used
 
-m.room.message types
---------------------
-- m.text
-- m.emote
-- m.audio
-- m.image
-- m.video
-- m.location
+m.room.message msgtypes
+-----------------------
+Each ``m.room.message`` MUST have a ``msgtype`` key which identifies the type of
+message being sent. Each type has their own required and optional keys, as outlined
+below:
 
+``m.text``
+  Required keys:
+    - ``body`` : "string" - The body of the message.
+  Optional keys:
+    None.
+  Example:
+    ``{ "msgtype": "m.text", "body": "I am a fish" }``
+
+``m.emote``
+  Required keys:
+    - ``body`` : "string" - The emote action to perform.
+  Optional keys:
+    None.
+  Example:
+    ``{ "msgtype": "m.emote", "body": "tries to come up with a witty explanation" }``
+
+``m.image``
+  Required keys:
+    - ``url`` : "string" - The URL to the image.
+  Optional keys:
+    - ``info`` : "string" - info : JSON object (ImageInfo) - The image info for image 
+      referred to in ``url``.
+    - ``thumbnail_url`` : "string" - The URL to the thumbnail.
+    - ``thumbnail_info`` : JSON object (ImageInfo) - The image info for the image 
+      referred to in ``thumbnail_url``.
+    - ``body`` : "string" - The alt text of the image, or some kind of content 
+      description for accessibility e.g. "image attachment".
+
+ImageInfo: 
+  Information about an image::
+    
+    { 
+      "size" : integer (size of image in bytes),
+      "w" : integer (width of image in pixels),
+      "h" : integer (height of image in pixels),
+      "mimetype" : "string (e.g. image/jpeg)",
+    }
+
+``m.audio``
+  Required keys:
+    - ``url`` : "string" - The URL to the audio.
+  Optional keys:
+    - ``info`` : JSON object (AudioInfo) - The audio info for the audio referred to in 
+      ``url``.
+    - ``body`` : "string" - A description of the audio e.g. "Bee Gees - 
+      Stayin' Alive", or some kind of content description for accessibility e.g. 
+      "audio attachment".
+
+AudioInfo: 
+  Information about a piece of audio::
+
+    {
+      "mimetype" : "string (e.g. audio/aac)",
+      "size" : integer (size of audio in bytes),
+      "duration" : integer (duration of audio in milliseconds),
+    }
+
+``m.video``
+  Required keys:
+    - ``url`` : "string" - The URL to the video.
+  Optional keys:
+    - ``info`` : JSON object (VideoInfo) - The video info for the video referred to in 
+      ``url``.
+    - ``body`` : "string" - A description of the video e.g. "Gangnam style", 
+      or some kind of content description for accessibility e.g. "video attachment".
+
+VideoInfo: 
+  Information about a video::
+
+    {
+      "mimetype" : "string (e.g. video/mp4)",
+      "size" : integer (size of video in bytes),
+      "duration" : integer (duration of video in milliseconds),
+      "w" : integer (width of video in pixels),
+      "h" : integer (height of video in pixels),
+      "thumbnail_url" : "string (URL to image)",
+      "thumbanil_info" : JSON object (ImageInfo)
+    }
+
+``m.location``
+  Required keys:
+    - ``geo_uri`` : "string" - The geo URI representing the location.
+  Optional keys:
+    - ``thumbnail_url`` : "string" - The URL to a thumnail of the location being 
+      represented.
+    - ``thumbnail_info`` : JSON object (ImageInfo) - The image info for the image 
+      referred to in ``thumbnail_url``.
+    - ``body`` : "string" - A description of the location e.g. "Big Ben, 
+      London, UK", or some kind of content description for accessibility e.g. 
+      "location attachment".
+
+The following keys can be attached to any ``m.room.message``:
+
+  Optional keys:
+    - ``sender_ts`` : integer - A timestamp (ms resolution) representing the 
+      wall-clock time when the message was sent from the client.
 
 Presence
 ========
@@ -203,7 +296,6 @@ requests to that home server as a query parameter 'access_token'.
 
 - TODO Kegan : Make registration like login (just omit the "user" key on the 
   initial request?)
-- TODO Kegan : Allow alternative forms of login (>1 route)
 
 If the client has already registered, they need to be able to login to their
 account. The home server may provide many different ways of logging in, such
