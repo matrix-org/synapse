@@ -263,26 +263,17 @@ class PresenceHandler(BaseHandler):
         statuscache = self._get_or_make_usercache(user)
 
         if user.is_mine:
-            remote_domains = set(
-                (yield self.store.get_joined_hosts_for_room(room_id))
+            self.push_update_to_local_and_remote(
+                observed_user=user,
+                room_ids=[room_id],
+                statuscache=self._get_or_offline_usercache(user),
             )
-
-            if not remote_domains:
-                defer.returnValue(None)
-
-            deferreds = []
-            for domain in remote_domains:
-                logger.debug(" | push to remote domain %s", domain)
-                deferreds.append(self._push_presence_remote(user, domain,
-                    state=statuscache.get_state())
-                )
-
-
-        self.push_update_to_clients_2(
-            observed_user=user,
-            room_ids=[room_id],
-            statuscache=self._get_or_offline_usercache(user),
-        )
+        else:
+            self.push_update_to_clients_2(
+                observed_user=user,
+                room_ids=[room_id],
+                statuscache=self._get_or_offline_usercache(user),
+            )
 
     @defer.inlineCallbacks
     def send_invite(self, observer_user, observed_user):
@@ -398,6 +389,7 @@ class PresenceHandler(BaseHandler):
 
         if target_user:
             target_users = set([target_user])
+            room_ids = []
         else:
             presence = yield self.store.get_presence_list(
                 user.localpart, accepted=True
@@ -411,23 +403,24 @@ class PresenceHandler(BaseHandler):
             rm_handler = self.homeserver.get_handlers().room_member_handler
             room_ids = yield rm_handler.get_rooms_for_user(user)
 
-            for room_id in room_ids:
-                for member in (yield rm_handler.get_room_members(room_id)):
-                    target_users.add(member)
-
         if state is None:
             state = yield self.store.get_presence_state(user.localpart)
 
-        localusers, remoteusers = partitionbool(
-            target_users,
-            lambda u: u.is_mine
+        _, remote_domains = yield self.push_update_to_local_and_remote(
+            observed_user=user,
+            users_to_push=target_users,
+            room_ids=room_ids,
+            statuscache=self._get_or_make_usercache(user),
         )
 
-        for target_user in localusers:
-            self._start_polling_local(user, target_user)
+        for target_user in target_users:
+            if target_user.is_mine:
+                self._start_polling_local(user, target_user)
 
         deferreds = []
-        remoteusers_by_domain = partition(remoteusers, lambda u: u.domain)
+        remote_users = [u for u in target_users if not u.is_mine]
+        remoteusers_by_domain = partition(remote_users, lambda u: u.domain)
+        # Only poll for people in our get_presence_list
         for domain in remoteusers_by_domain:
             remoteusers = remoteusers_by_domain[domain]
 
@@ -448,12 +441,6 @@ class PresenceHandler(BaseHandler):
             self._local_pushmap[target_localpart] = set()
 
         self._local_pushmap[target_localpart].add(user)
-
-        self.push_update_to_clients(
-            observer_user=user,
-            observed_user=target_user,
-            statuscache=self._get_or_offline_usercache(target_user),
-        )
 
     def _start_polling_remote(self, user, domain, remoteusers):
         to_poll = set()
@@ -551,21 +538,15 @@ class PresenceHandler(BaseHandler):
         rm_handler = self.homeserver.get_handlers().room_member_handler
         room_ids = yield rm_handler.get_rooms_for_user(user)
 
-        remote_domains = set()
-        for room_id in room_ids:
-            remote_domains.update(
-                (yield self.store.get_joined_hosts_for_room(room_id))
-            )
-
-        if not localusers and not remotedomains:
+        if not localusers and not room_ids:
             defer.returnValue(None)
 
-        deferreds = []
-        for domain in remotedomains:
-            logger.debug(" | push to remote domain %s", domain)
-            deferreds.append(self._push_presence_remote(user, domain,
-                state=statuscache.get_state())
-            )
+        yield self.push_update_to_local_and_remote(
+            observed_user=user,
+            users_to_push=localusers,
+            room_ids=room_ids,
+            statuscache=statuscache,
+        )
 
         self.push_update_to_clients_2(
             observed_user=user,
@@ -668,13 +649,45 @@ class PresenceHandler(BaseHandler):
 
         yield defer.DeferredList(deferreds)
 
-    def push_update_to_clients(self, observer_user, observed_user,
-                               statuscache):
-        statuscache.make_event(user=observed_user, clock=self.clock)
+    @defer.inlineCallbacks
+    def push_update_to_local_and_remote(self, observed_user,
+                                        users_to_push=[], room_ids=[],
+                                        statuscache=None):
 
-        self.notifier.on_new_user_event(
-            [observer_user],
+        localusers, remoteusers = partitionbool(
+            users_to_push,
+            lambda u: u.is_mine
         )
+
+        localusers = set(localusers)
+
+        self.push_update_to_clients_2(
+            observed_user,
+            users_to_push=localusers,
+            room_ids=room_ids,
+            statuscache=statuscache,
+        )
+
+        remote_domains = set([r.domain for r in remoteusers])
+        for room_id in room_ids:
+            remote_domains.update(
+                (yield self.store.get_joined_hosts_for_room(room_id))
+            )
+
+        remote_domains.discard(self.hs.hostname)
+
+        deferreds = []
+        for domain in remote_domains:
+            logger.debug(" | push to remote domain %s", domain)
+            deferreds.append(
+                self._push_presence_remote(
+                    observed_user, domain, state=statuscache.get_state()
+                )
+            )
+
+        yield defer.DeferredList(deferreds)
+
+        defer.returnValue((localusers, remote_domains))
 
     def push_update_to_clients_2(self, observed_user, users_to_push=[],
                                  room_ids=[], statuscache=None):
