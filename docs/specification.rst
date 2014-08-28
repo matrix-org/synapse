@@ -230,19 +230,21 @@ with all the valid login flows when requested::
   The client can login via 3 paths: 1a and 1b, 2a and 2b, or 3. The client should
   select one of these paths.
   
-  [
-    {
-      "type": "<login type1a>",
-      "stages": [ "<login type 1a>", "<login type 1b>" ]
-    },
-    {
-      "type": "<login type2a>",
-      "stages": [ "<login type 2a>", "<login type 2b>" ]
-    },
-    {
-      "type": "<login type3>"
-    }
-  ]
+  {
+    "flows": [
+      {
+        "type": "<login type1a>",
+        "stages": [ "<login type 1a>", "<login type 1b>" ]
+      },
+      {
+        "type": "<login type2a>",
+        "stages": [ "<login type 2a>", "<login type 2b>" ]
+      },
+      {
+        "type": "<login type3>"
+      }
+    ]
+  }
 
 After the login is completed, the client's fully-qualified user ID and a new access 
 token MUST be returned::
