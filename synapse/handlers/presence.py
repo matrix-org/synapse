@@ -18,6 +18,8 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError, AuthError
 from synapse.api.constants import PresenceState
 
+from synapse.util.logutils import trace_function, log_function
+
 from ._base import BaseHandler
 
 import logging
@@ -142,7 +144,7 @@ class PresenceHandler(BaseHandler):
     @defer.inlineCallbacks
     def is_presence_visible(self, observer_user, observed_user):
         defer.returnValue(True)
-        return
+        # return
         # FIXME (erikj): This code path absolutely kills the database.
 
         assert(observed_user.is_mine)
@@ -188,8 +190,9 @@ class PresenceHandler(BaseHandler):
         defer.returnValue(state)
 
     @defer.inlineCallbacks
+    @trace_function
     def set_state(self, target_user, auth_user, state):
-        return
+        # return
         # TODO (erikj): Turn this back on. Why did we end up sending EDUs
         # everywhere?
 
@@ -245,10 +248,12 @@ class PresenceHandler(BaseHandler):
 
         self.push_presence(user, statuscache=statuscache)
 
+    @trace_function
     def started_user_eventstream(self, user):
         # TODO(paul): Use "last online" state
         self.set_state(user, user, {"state": PresenceState.ONLINE})
 
+    @trace_function
     def stopped_user_eventstream(self, user):
         # TODO(paul): Save current state as "last online" state
         self.set_state(user, user, {"state": PresenceState.OFFLINE})
@@ -382,6 +387,7 @@ class PresenceHandler(BaseHandler):
         defer.returnValue(presence)
 
     @defer.inlineCallbacks
+    @trace_function
     def start_polling_presence(self, user, target_user=None, state=None):
         logger.debug("Start polling for presence from %s", user)
 
@@ -457,6 +463,7 @@ class PresenceHandler(BaseHandler):
             content={"poll": [u.to_string() for u in remoteusers]}
         )
 
+    @trace_function
     def stop_polling_presence(self, user, target_user=None):
         logger.debug("Stop polling for presence from %s", user)
 
