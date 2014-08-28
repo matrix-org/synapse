@@ -152,3 +152,10 @@ class SynapseEvent(JsonEncodedObject):
                         msg = self._check_json(entry, template[key][0])
                         if msg:
                             return msg
+
+
+class SynapseStateEvent(SynapseEvent):
+     def __init__(self, **kwargs):
+        if "state_key" not in kwargs:
+            kwargs["state_key"] = ""
+        super(SynapseStateEvent, self).__init__(**kwargs)

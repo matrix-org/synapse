@@ -17,10 +17,11 @@
 from twisted.internet import defer
 
 from synapse.types import UserID, RoomAlias, RoomID
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import StoreError, SynapseError
 from synapse.api.events.room import (
-    RoomMemberEvent, RoomConfigEvent
+    RoomMemberEvent, RoomCreateEvent, RoomPowerLevelsEvent,
+    RoomJoinRulesEvent, RoomDefaultLevelEvent,
 )
 from synapse.util import stringutils
 from ._base import BaseRoomHandler
@@ -62,6 +63,8 @@ class RoomCreationHandler(BaseRoomHandler):
         else:
             room_alias = None
 
+        is_public = config.get("visibility", None) == "public"
+
         if room_id:
             # Ensure room_id is the correct type
             room_id_obj = RoomID.from_string(room_id, self.hs)
@@ -71,7 +74,7 @@ class RoomCreationHandler(BaseRoomHandler):
             yield self.store.store_room(
                 room_id=room_id,
                 room_creator_user_id=user_id,
-                is_public=config["visibility"] == "public"
+                is_public=is_public
             )
         else:
             # autogen room IDs and try to create it. We may clash, so just
@@ -85,7 +88,7 @@ class RoomCreationHandler(BaseRoomHandler):
                     yield self.store.store_room(
                         room_id=gen_room_id.to_string(),
                         room_creator_user_id=user_id,
-                        is_public=config["visibility"] == "public"
+                        is_public=is_public
                     )
                     room_id = gen_room_id.to_string()
                     break
@@ -94,18 +97,10 @@ class RoomCreationHandler(BaseRoomHandler):
             if not room_id:
                 raise StoreError(500, "Couldn't generate a room ID.")
 
-        config_event = self.event_factory.create_event(
-            etype=RoomConfigEvent.TYPE,
-            room_id=room_id,
-            user_id=user_id,
-            content=config,
-        )
 
-        snapshot = yield self.store.snapshot_room(
-            room_id=room_id,
-            user_id=user_id,
-            state_type=RoomConfigEvent.TYPE,
-            state_key="",
+        user = self.hs.parse_userid(user_id)
+        creation_events = self._create_events_for_new_room(
+            user, room_id, is_public=is_public
         )
 
         if room_alias:
@@ -115,11 +110,18 @@ class RoomCreationHandler(BaseRoomHandler):
                 servers=[self.hs.hostname],
             )
 
-        yield self.state_handler.handle_new_event(config_event, snapshot)
-        # store_id = persist...
-
         federation_handler = self.hs.get_handlers().federation_handler
-        yield federation_handler.handle_new_event(config_event, snapshot)
+
+        for event in creation_events:
+            snapshot = yield self.store.snapshot_room(
+                room_id=room_id,
+                user_id=user_id,
+            )
+
+            logger.debug("Event: %s", event)
+
+            yield self.state_handler.handle_new_event(event, snapshot)
+            yield self._on_new_room_event(event, snapshot, extra_users=[user])
 
         content = {"membership": Membership.JOIN}
         join_event = self.event_factory.create_event(
@@ -141,6 +143,39 @@ class RoomCreationHandler(BaseRoomHandler):
             result["room_alias"] = room_alias.to_string()
 
         defer.returnValue(result)
+
+    def _create_events_for_new_room(self, creator, room_id, is_public=False):
+        event_keys = {
+            "room_id": room_id,
+            "user_id": creator.to_string(),
+        }
+
+        creation_event = self.event_factory.create_event(
+            etype=RoomCreateEvent.TYPE,
+            content={"creator": creator.to_string()},
+            **event_keys
+        )
+
+        power_levels_event = self.event_factory.create_event(
+            etype=RoomPowerLevelsEvent.TYPE,
+            content={creator.to_string(): 10},
+            **event_keys
+        )
+
+        default_level_event = self.event_factory.create_event(
+            etype=RoomDefaultLevelEvent.TYPE,
+            content={"default_level": 0},
+            **event_keys
+        )
+
+        join_rule = JoinRules.PUBLIC if is_public else JoinRules.INVITE
+        join_rules_event = self.event_factory.create_event(
+            etype=RoomJoinRulesEvent.TYPE,
+            content={"join_rule": join_rule},
+            **event_keys
+        )
+
+        return [creation_event, power_levels_event, default_level_event, join_rules_event]
 
 
 class RoomMemberHandler(BaseRoomHandler):
