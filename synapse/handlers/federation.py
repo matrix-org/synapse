@@ -188,27 +188,14 @@ class FederationHandler(BaseHandler):
     @log_function
     @defer.inlineCallbacks
     def backfill(self, dest, room_id, limit):
-        events = yield self._backfill(dest, room_id, limit)
-
-        for event in events:
-            try:
-                yield self.store.persist_event(event, backfilled=True)
-            except:
-                logger.exception("Failed to persist event: %s", event)
-
-        defer.returnValue(events)
-
-    @defer.inlineCallbacks
-    def _backfill(self, dest, room_id, limit):
         pdus = yield self.replication_layer.backfill(dest, room_id, limit)
 
-        if not pdus:
-            defer.returnValue([])
+        events = []
 
-        events = [
-            self.pdu_codec.event_from_pdu(pdu)
-            for pdu in pdus
-        ]
+        for pdu in pdus:
+            event = self.pdu_codec.event_from_pdu(pdu)
+            events.append(event)
+            yield self.store.persist_event(event, backfilled=True)
 
         defer.returnValue(events)
 
