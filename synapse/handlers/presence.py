@@ -437,16 +437,22 @@ class PresenceHandler(BaseHandler):
         )
 
     def _start_polling_remote(self, user, domain, remoteusers):
+        to_poll = set()
+
         for u in remoteusers:
             if u not in self._remote_recvmap:
                 self._remote_recvmap[u] = set()
+                to_poll.add(u)
 
             self._remote_recvmap[u].add(user)
+
+        if not to_poll:
+            return defer.succeed(None)
 
         return self.federation.send_edu(
             destination=domain,
             edu_type="m.presence",
-            content={"poll": [u.to_string() for u in remoteusers]}
+            content={"poll": [u.to_string() for u in to_poll]}
         )
 
     def stop_polling_presence(self, user, target_user=None):
@@ -489,16 +495,22 @@ class PresenceHandler(BaseHandler):
                 del self._local_pushmap[localpart]
 
     def _stop_polling_remote(self, user, domain, remoteusers):
+        to_unpoll = set()
+
         for u in remoteusers:
             self._remote_recvmap[u].remove(user)
 
             if not self._remote_recvmap[u]:
                 del self._remote_recvmap[u]
+                to_unpoll.add(u)
+
+        if not to_unpoll:
+            return defer.succeed(None)
 
         return self.federation.send_edu(
             destination=domain,
             edu_type="m.presence",
-            content={"unpoll": [u.to_string() for u in remoteusers]}
+            content={"unpoll": [u.to_string() for u in to_unpoll]}
         )
 
     @defer.inlineCallbacks

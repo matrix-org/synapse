@@ -15,7 +15,7 @@
 
 
 from twisted.trial import unittest
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from mock import Mock, call, ANY
 import logging
@@ -853,6 +853,7 @@ class PresencePollingTestCase(unittest.TestCase):
             'apple': [ "@banana:test", "@clementine:test" ],
             'banana': [ "@apple:test" ],
             'clementine': [ "@apple:test", "@potato:remote" ],
+            'fig': [ "@potato:remote" ],
     }
 
 
@@ -902,9 +903,10 @@ class PresencePollingTestCase(unittest.TestCase):
         # Mocked database state
         # Local users always start offline
         self.current_user_state = {
-                "apple": OFFLINE,
-                "banana": OFFLINE,
-                "clementine": OFFLINE,
+            "apple": OFFLINE,
+            "banana": OFFLINE,
+            "clementine": OFFLINE,
+            "fig": OFFLINE,
         }
 
         def get_presence_state(user_localpart):
@@ -934,6 +936,7 @@ class PresencePollingTestCase(unittest.TestCase):
         self.u_apple = hs.parse_userid("@apple:test")
         self.u_banana = hs.parse_userid("@banana:test")
         self.u_clementine = hs.parse_userid("@clementine:test")
+        self.u_fig = hs.parse_userid("@fig:test")
 
         # Remote users
         self.u_potato = hs.parse_userid("@potato:remote")
@@ -1023,9 +1026,31 @@ class PresencePollingTestCase(unittest.TestCase):
         yield put_json.await_calls()
 
         # Gut-wrenching tests
-        self.assertTrue(self.u_potato in self.handler._remote_recvmap)
+        self.assertTrue(self.u_potato in self.handler._remote_recvmap,
+            msg="expected potato to be in _remote_recvmap"
+        )
         self.assertTrue(self.u_clementine in
                 self.handler._remote_recvmap[self.u_potato])
+
+        # fig goes online; shouldn't send a second poll
+        yield self.handler.set_state(
+            target_user=self.u_fig, auth_user=self.u_fig,
+            state={"state": ONLINE}
+        )
+
+        reactor.iterate(delay=0)
+
+        put_json.assert_had_no_calls()
+
+        # fig goes offline
+        yield self.handler.set_state(
+            target_user=self.u_fig, auth_user=self.u_fig,
+            state={"state": OFFLINE}
+        )
+
+        reactor.iterate(delay=0)
+
+        put_json.assert_had_no_calls()
 
         put_json.expect_call_and_return(
             call("remote",
@@ -1046,7 +1071,9 @@ class PresencePollingTestCase(unittest.TestCase):
 
         put_json.await_calls()
 
-        self.assertFalse(self.u_potato in self.handler._remote_recvmap)
+        self.assertFalse(self.u_potato in self.handler._remote_recvmap,
+            msg="expected potato not to be in _remote_recvmap"
+        )
 
     @defer.inlineCallbacks
     def test_remote_poll_receive(self):
