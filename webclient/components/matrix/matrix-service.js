@@ -420,34 +420,38 @@ angular.module('matrixService', [])
         /****** Room aliases management ******/
 
         /**
-         * Enhance data returned by rooms() and publicRooms() by adding room_alias
-         *  & room_display_name which are computed from data already retrieved from the server.
-         * @param {Array} data the response of rooms() and publicRooms()
-         * @returns {Array} the same array with enriched objects
+         * Get the room_alias & room_display_name which are computed from data 
+         * already retrieved from the server.
+         * @param {Room object} room one element of the array returned by the response
+         *  of rooms() and publicRooms()
+         * @returns {Object} {room_alias: "...", room_display_name: "..."}
          */
-        assignRoomAliases: function(data) {
-            for (var i=0; i<data.length; i++) {
-                var alias = this.getRoomIdToAliasMapping(data[i].room_id);
-                if (alias) {
-                    // use the existing alias from storage
-                    data[i].room_alias = alias;
-                    data[i].room_display_name = alias;
-                }
-                else if (data[i].aliases && data[i].aliases[0]) {
-                    // save the mapping
-                    // TODO: select the smarter alias from the array
-                    this.createRoomIdToAliasMapping(data[i].room_id, data[i].aliases[0]);
-                    data[i].room_display_name = data[i].aliases[0];
-                }
-                else if (data[i].membership == "invite" && "inviter" in data[i]) {
-                    data[i].room_display_name = data[i].inviter + "'s room"
-                }
-                else {
-                    // last resort use the room id
-                    data[i].room_display_name = data[i].room_id;
-                }
+        getRoomAliasAndDisplayName: function(room) {
+            var result = {
+                room_alias: undefined,
+                room_display_name: undefined
+            };
+            
+            var alias = this.getRoomIdToAliasMapping(room.room_id);
+            if (alias) {
+                // use the existing alias from storage
+                result.room_alias = alias;
+                result.room_display_name = alias;
             }
-            return data;
+            else if (room.aliases && room.aliases[0]) {
+                // save the mapping
+                // TODO: select the smarter alias from the array
+                this.createRoomIdToAliasMapping(room.room_id, room.aliases[0]);
+                result.room_display_name = room.aliases[0];
+            }
+            else if (room.membership === "invite" && "inviter" in room) {
+                result.room_display_name = room.inviter + "'s room";
+            }
+            else {
+                // last resort use the room id
+                result.room_display_name = room.room_id;
+            }
+            return result;
         },
         
         createRoomIdToAliasMapping: function(roomId, alias) {

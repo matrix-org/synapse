@@ -53,13 +53,16 @@ angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
                 // Reset data
                 $scope.rooms = {};
 
-                var data = matrixService.assignRoomAliases(response.data.rooms);
-                for (var i=0; i<data.length; i++) {
-                    $scope.rooms[data[i].room_id] = data[i];
+                var rooms = response.data.rooms;
+                for (var i=0; i<rooms.length; i++) {
+                    var room = rooms[i];
+                    
+                    // Add room_alias & room_display_name members
+                    $scope.rooms[room.room_id] = angular.extend(room, matrixService.getRoomAliasAndDisplayName(room));
 
                     // Create a shortcut for the last message of this room
-                    if (data[i].messages && data[i].messages.chunk && data[i].messages.chunk[0]) {
-                        $scope.rooms[data[i].room_id].lastMsg = data[i].messages.chunk[0];
+                    if (room.messages && room.messages.chunk && room.messages.chunk[0]) {
+                        $scope.rooms[room.room_id].lastMsg = room.messages.chunk[0];
                     }
                 }
 
