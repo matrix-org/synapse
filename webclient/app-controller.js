@@ -33,7 +33,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
     });
 
     if (matrixService.isUserLoggedIn()) {
-        // eventStreamService.resume();
+        eventStreamService.resume();
         mPresence.start();
     }
     

@@ -45,8 +45,6 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
                 $scope.public_rooms = matrixService.assignRoomAliases(response.data.chunk);
             }
         );
-
-        eventStreamService.resume();
     };
     
     $scope.createNewRoom = function(room_id, isPrivate) {

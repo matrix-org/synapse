@@ -79,13 +79,11 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
         $httpProvider.interceptors.push('AccessTokenInterceptor');
     }]);
 
-matrixWebClient.run(['$location', 'matrixService', 'eventStreamService', function($location, matrixService, eventStreamService) {
+matrixWebClient.run(['$location', 'matrixService', function($location, matrixService) {
+
     // If user auth details are not in cache, go to the login page
     if (!matrixService.isUserLoggedIn()) {
-        eventStreamService.stop();
         $location.path("login");
     }
-    else {
-        // eventStreamService.resume();
-    }
+
 }]);
