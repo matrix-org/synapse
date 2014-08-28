@@ -35,7 +35,7 @@ class BaseRoomHandler(BaseHandler):
                            extra_users=[]):
         snapshot.fill_out_prev_events(event)
 
-        store_id = yield self.store.persist_event(event)
+        yield self.store.persist_event(event)
 
         destinations = set(extra_destinations)
         # Send a PDU to all hosts who have joined the room.

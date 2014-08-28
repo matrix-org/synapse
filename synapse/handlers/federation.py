@@ -22,8 +22,6 @@ from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
 from synapse.federation.pdu_codec import PduCodec
 
-from synapse.api.errors import AuthError
-
 from twisted.internet import defer
 
 import logging
@@ -146,7 +144,7 @@ class FederationHandler(BaseHandler):
 
         else:
             with (yield self.room_lock.lock(event.room_id)):
-                store_id = yield self.store.persist_event(event, backfilled)
+                yield self.store.persist_event(event, backfilled)
 
             room = yield self.store.get_room(event.room_id)
 
