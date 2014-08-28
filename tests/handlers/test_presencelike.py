@@ -139,7 +139,6 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         mocked_set.assert_called_with("apple",
                 {"state": UNAVAILABLE, "status_msg": "Away"})
-    test_set_my_state.skip = "Presence polling is disabled"
 
     @defer.inlineCallbacks
     def test_push_local(self):
@@ -214,7 +213,6 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
             "displayname": "I am an Apple",
             "avatar_url": "http://foo",
         }, statuscache.state)
-    test_push_local.skip = "Presence polling is disabled"
 
 
     @defer.inlineCallbacks
@@ -246,7 +244,6 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                     ],
                 },
         )
-    test_push_remote.skip = "Presence polling is disabled"
 
     @defer.inlineCallbacks
     def test_recv_remote(self):
