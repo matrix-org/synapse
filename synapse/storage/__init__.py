@@ -33,6 +33,7 @@ from .roommember import RoomMemberStore
 from .stream import StreamStore
 from .pdu import StatePduStore, PduStore
 from .transactions import TransactionStore
+from .keys import KeyStore
 
 import json
 import logging
@@ -45,7 +46,7 @@ logger = logging.getLogger(__name__)
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, PduStore, StatePduStore, TransactionStore,
-                DirectoryStore):
+                DirectoryStore, KeyStore):
 
     def __init__(self, hs):
         super(DataStore, self).__init__(hs)
