@@ -100,7 +100,7 @@ class EventStreamHandler(BaseHandler):
 
                 logger.debug("Scheduling _later: for %s", auth_user)
                 self._stop_timer_per_user[auth_user] = (
-                    self.clock.call_later(600, _later)
+                    self.clock.call_later(30, _later)
                 )
 
 
