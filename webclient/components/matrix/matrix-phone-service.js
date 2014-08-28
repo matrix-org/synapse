@@ -17,19 +17,14 @@ limitations under the License.
 'use strict';
 
 angular.module('matrixPhoneService', [])
-.factory('matrixPhoneService', ['$rootScope', 'matrixService', 'MatrixCall', 'eventHandlerService', function MatrixCallFactory($rootScope, matrixService, MatrixCall, eventHandlerService) {
+.factory('matrixPhoneService', ['$rootScope', '$injector', 'matrixService', 'eventHandlerService', function MatrixPhoneService($rootScope, $injector, matrixService, eventHandlerService) {
     var matrixPhoneService = function() {
-    }
+    };
 
     matrixPhoneService.CALL_EVENT = "CALL_EVENT";
     matrixPhoneService.allCalls = {};
 
-    MatrixCall.prototype.placeCall = function() {
-        self = this;
-        navigator.getUserMedia({audio: true, video: false}, function(s) { self.gotUserMedia(s); }, function(e) { self.getUserMediaFailed(e); });
-    };
-    
-    matrixPhoneService.prototype.callPlaced = function(call) {
+    matrixPhoneService.callPlaced = function(call) {
         matrixPhoneService.allCalls[call.call_id] = call;
     };
 
@@ -38,17 +33,34 @@ angular.module('matrixPhoneService', [])
         if (event.user_id == matrixService.config().user_id) return;
         var msg = event.content;
         if (msg.msgtype == 'm.call.invite') {
+            var MatrixCall = $injector.get('MatrixCall');
             var call = new MatrixCall(event.room_id);
             call.call_id = msg.call_id;
-            $rootScope.$broadcast(matrixPhoneService.CALL_EVENT, call);
+            call.initWithInvite(msg);
             matrixPhoneService.allCalls[call.call_id] = call;
+            $rootScope.$broadcast(matrixPhoneService.CALL_EVENT, call);
+        } else if (msg.msgtype == 'm.call.answer') {
+            var call = matrixPhoneService.allCalls[msg.call_id];
+            if (!call) {
+                console.trace("Got answer for unknown call ID "+msg.call_id);
+                return;
+            }
+            call.receivedAnswer(msg);
         } else if (msg.msgtype == 'm.call.candidate') {
-            call = matrixPhoneService.allCalls[msg.call_id];
+            var call = matrixPhoneService.allCalls[msg.call_id];
             if (!call) {
                 console.trace("Got candidate for unknown call ID "+msg.call_id);
                 return;
             }
             call.gotRemoteIceCandidate(msg.candidate);
+        } else if (msg.msgtype == 'm.call.hangup') {
+            var call = matrixPhoneService.allCalls[msg.call_id];
+            if (!call) {
+                console.trace("Got hangup for unknown call ID "+msg.call_id);
+                return;
+            }
+            call.onHangup();
+            matrixPhoneService.allCalls[msg.call_id] = undefined;
         }
     });
     

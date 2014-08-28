@@ -85,6 +85,9 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
 
     $rootScope.$on(matrixPhoneService.CALL_EVENT, function(ngEvent, call) {
         console.trace("incoming call");
+        call.onError = $scope.onCallError;
+        call.onHangup = $scope.onCallHangup;
+        $scope.currentCall = call;
     });
     
     $scope.paginateMore = function() {
@@ -92,6 +95,15 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
             // console.log("Paginating more.");
             paginate(MESSAGES_PER_PAGINATION);
         }
+    };
+
+    $scope.answerCall = function() {
+        $scope.currentCall.answer();
+    };
+
+    $scope.hangupCall = function() {
+        $scope.currentCall.hangup();
+        $scope.currentCall = undefined;
     };
         
     var paginate = function(numItems) {
@@ -438,10 +450,17 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
     $scope.startVoiceCall = function() {
         var call = new MatrixCall($scope.room_id);
         call.onError = $scope.onCallError;
+        call.onHangup = $scope.onCallHangup;
         call.placeCall();
+        $scope.currentCall = call;
     }
 
     $scope.onCallError = function(errStr) {
         $scope.feedback = errStr;
+    }
+
+    $scope.onCallHangup = function() {
+        $scope.feedback = "Call ended";
+        $scope.currentCall = undefined;
     }
 }]);
