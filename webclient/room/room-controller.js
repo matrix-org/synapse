@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventStreamService', 'eventHandlerService', 'mFileUpload', 'mUtilities', '$rootScope',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventStreamService, eventHandlerService, mFileUpload, mUtilities, $rootScope) {
+.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mUtilities', '$rootScope',
+                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventHandlerService, mFileUpload, mUtilities, $rootScope) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;

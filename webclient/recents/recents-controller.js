@@ -17,8 +17,8 @@
 'use strict';
 
 angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
-.controller('RecentsController', ['$scope', 'matrixService', 'eventHandlerService', 'eventStreamService', 
-                               function($scope,  matrixService, eventHandlerService, eventStreamService) {
+.controller('RecentsController', ['$scope', 'matrixService', 'eventHandlerService', 
+                               function($scope,  matrixService, eventHandlerService) {
     $scope.rooms = {};
 
     // $scope of the parent where the recents component is included can override this value
