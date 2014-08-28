@@ -18,7 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError, AuthError
 from synapse.api.constants import PresenceState
 
-from synapse.util.logutils import trace_function, log_function
+from synapse.util.logutils import log_function
 
 from ._base import BaseHandler
 
@@ -190,7 +190,7 @@ class PresenceHandler(BaseHandler):
         defer.returnValue(state)
 
     @defer.inlineCallbacks
-    @trace_function
+    @log_function
     def set_state(self, target_user, auth_user, state):
         # return
         # TODO (erikj): Turn this back on. Why did we end up sending EDUs
@@ -248,12 +248,12 @@ class PresenceHandler(BaseHandler):
 
         self.push_presence(user, statuscache=statuscache)
 
-    @trace_function
+    @log_function
     def started_user_eventstream(self, user):
         # TODO(paul): Use "last online" state
         self.set_state(user, user, {"state": PresenceState.ONLINE})
 
-    @trace_function
+    @log_function
     def stopped_user_eventstream(self, user):
         # TODO(paul): Save current state as "last online" state
         self.set_state(user, user, {"state": PresenceState.OFFLINE})
@@ -383,7 +383,7 @@ class PresenceHandler(BaseHandler):
         defer.returnValue(presence)
 
     @defer.inlineCallbacks
-    @trace_function
+    @log_function
     def start_polling_presence(self, user, target_user=None, state=None):
         logger.debug("Start polling for presence from %s", user)
 
@@ -461,7 +461,7 @@ class PresenceHandler(BaseHandler):
             content={"poll": [u.to_string() for u in to_poll]}
         )
 
-    @trace_function
+    @log_function
     def stop_polling_presence(self, user, target_user=None):
         logger.debug("Stop polling for presence from %s", user)
 
@@ -501,7 +501,7 @@ class PresenceHandler(BaseHandler):
             if not self._local_pushmap[localpart]:
                 del self._local_pushmap[localpart]
 
-    @trace_function
+    @log_function
     def _stop_polling_remote(self, user, domain, remoteusers):
         to_unpoll = set()
 
@@ -522,7 +522,7 @@ class PresenceHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    @trace_function
+    @log_function
     def push_presence(self, user, statuscache):
         assert(user.is_mine)
 

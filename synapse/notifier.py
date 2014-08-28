@@ -15,7 +15,7 @@
 
 from twisted.internet import defer, reactor
 
-from synapse.util.logutils import log_function, trace_function
+from synapse.util.logutils import log_function
 
 import logging
 
@@ -119,7 +119,7 @@ class Notifier(object):
                 )
 
     @defer.inlineCallbacks
-    @trace_function
+    @log_function
     def on_new_user_event(self, users=[], rooms=[]):
         """ Used to inform listeners that something has happend
         presence/user event wise.
