@@ -28,6 +28,16 @@ from mock import patch, Mock
 import json
 import urlparse
 
+from inspect import getcallargs
+
+
+def get_mock_call_args(pattern_func, mock_func):
+    """ Return the arguments the mock function was called with interpreted
+    by the pattern functions argument list.
+    """
+    invoked_args, invoked_kargs = mock_func.call_args
+    return getcallargs(pattern_func, *invoked_args, **invoked_kargs)
+
 
 # This is a mock /resource/ not an entire server
 class MockHttpResource(HttpServer):

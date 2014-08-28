@@ -85,12 +85,6 @@ class FederationHandler(BaseHandler):
         yield self.replication_layer.send_pdu(pdu)
 
     @log_function
-    def get_state_for_room(self, destination, room_id):
-        return self.replication_layer.get_state_for_context(
-            destination, room_id
-        )
-
-    @log_function
     @defer.inlineCallbacks
     def on_receive_pdu(self, pdu, backfilled):
         """ Called by the ReplicationLayer when we have a new pdu. We need to
@@ -139,7 +133,7 @@ class FederationHandler(BaseHandler):
 
             yield self.hs.get_handlers().room_member_handler.change_membership(
                 new_event,
-                True
+                do_auth=True
             )
 
         else:
@@ -151,8 +145,8 @@ class FederationHandler(BaseHandler):
             if not room:
                 # Huh, let's try and get the current state
                 try:
-                    yield self.get_state_for_room(
-                        event.origin, event.room_id
+                    yield self.replication_layer.get_state_for_context(
+                        origin, event.room_id
                     )
 
                     hosts = yield self.store.get_joined_hosts_for_room(
@@ -161,9 +155,9 @@ class FederationHandler(BaseHandler):
                     if self.hs.hostname in hosts:
                         try:
                             yield self.store.store_room(
-                                event.room_id,
-                                "",
-                                is_public=False
+                                room_id=event.room_id,
+                                room_creator_user_id="",
+                                is_public=False,
                             )
                         except:
                             pass
@@ -209,7 +203,9 @@ class FederationHandler(BaseHandler):
 
         # First get current state to see if we are already joined.
         try:
-            yield self.get_state_for_room(target_host, room_id)
+            yield self.replication_layer.get_state_for_context(
+                target_host, room_id
+            )
 
             hosts = yield self.store.get_joined_hosts_for_room(room_id)
             if self.hs.hostname in hosts:
@@ -239,8 +235,8 @@ class FederationHandler(BaseHandler):
 
         try:
             yield self.store.store_room(
-                room_id,
-                "",
+                room_id=room_id,
+                room_creator_user_id="",
                 is_public=False
             )
         except:
