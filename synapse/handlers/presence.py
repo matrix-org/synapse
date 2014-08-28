@@ -503,6 +503,7 @@ class PresenceHandler(BaseHandler):
             if not self._local_pushmap[localpart]:
                 del self._local_pushmap[localpart]
 
+    @trace_function
     def _stop_polling_remote(self, user, domain, remoteusers):
         for u in remoteusers:
             self._remote_recvmap[u].remove(user)
