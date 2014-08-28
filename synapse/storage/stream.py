@@ -294,7 +294,7 @@ class StreamStore(SQLBaseStore):
         logger.debug("get_room_events_max_id: %s", res)
 
         if not res or not res[0] or not res[0]["m"]:
-            return "s1"
+            return "s0"
 
         key = res[0]["m"]
         return "s%d" % (key,)
