@@ -23,9 +23,9 @@
 angular.module('mPresence', [])
 .service('mPresence', ['$timeout', 'matrixService', function ($timeout, matrixService) {
 
-    // Time in ms after that a user is considered as offline/away
-    var OFFLINE_TIME = 5 * 60000; // 5 mins
-    
+    // Time in ms after that a user is considered as unavailable/away
+    var UNAVAILABLE_TIME = 5 * 60000; // 5 mins
+   
     // The current presence state
     var state = undefined;
 
@@ -88,11 +88,11 @@ angular.module('mPresence', [])
     };
     
     /**
-     * Callback called when the user made no action on the page for OFFLINE_TIME ms.
+     * Callback called when the user made no action on the page for UNAVAILABLE_TIME ms.
      * @private
      */
-    function onOfflineTimerFire() {
-        self.setState(matrixService.presence.offline);
+    function onUnvailableTimerFire() {
+        self.setState(matrixService.presence.unavailable);
     }
 
     /**
@@ -105,7 +105,7 @@ angular.module('mPresence', [])
         
         // Re-arm the timer
         $timeout.cancel(timer);
-        timer = $timeout(onOfflineTimerFire, OFFLINE_TIME);
+        timer = $timeout(onUnvailableTimerFire, UNAVAILABLE_TIME);
     }    
 
 }]);
