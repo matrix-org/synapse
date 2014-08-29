@@ -41,7 +41,7 @@ angular.module('matrixService', [])
     var prefixPath = "/matrix/client/api/v1";
     var MAPPING_PREFIX = "alias_for_";
 
-    var doRequest = function(method, path, params, data) {
+    var doRequest = function(method, path, params, data, $httpParams) {
         if (!config) {
             console.warn("No config exists. Cannot perform request to "+path);
             return;
@@ -58,7 +58,7 @@ angular.module('matrixService', [])
             path = prefixPath + path;
         }
         
-        return doBaseRequest(config.homeserver, method, path, params, data, undefined);
+        return doBaseRequest(config.homeserver, method, path, params, data, undefined, $httpParams);
     };
 
     var doBaseRequest = function(baseUrl, method, path, params, data, headers, $httpParams) {
@@ -343,15 +343,31 @@ angular.module('matrixService', [])
 
             return doBaseRequest(config.homeserver, "POST", path, params, file, headers, $httpParams);
         },
-        
-        // start listening on /events
-        getEventStream: function(from, timeout) {
+
+        /**
+         * Start listening on /events
+         * @param {String} from the token from which to listen events to
+         * @param {Integer} serverTimeout the time in ms the server will hold open the connection
+         * @param {Integer} clientTimeout the timeout in ms used at the client HTTP request level
+         * @returns a promise
+         */
+        getEventStream: function(from, serverTimeout, clientTimeout) {
             var path = "/events";
             var params = {
                 from: from,
-                timeout: timeout
+                timeout: serverTimeout
             };
-            return doRequest("GET", path, params);
+
+            var $httpParams;
+            if (clientTimeout) {
+                // If the Internet connection is lost, this timeout is used to be able to
+                // cancel the current request and notify the client so that it can retry with a new request.
+                $httpParams = {
+                    timeout: clientTimeout
+                };
+            }
+
+            return doRequest("GET", path, params, undefined, $httpParams);
         },
 
         // Indicates if user authentications details are stored in cache
