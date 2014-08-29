@@ -22,10 +22,40 @@ angular.module('SettingsController', ['matrixService', 'mFileUpload', 'mFileInpu
     $scope.config = matrixService.config();
 
     $scope.profile = {
-        displayName: $scope.config.displayName,
-        avatarUrl: $scope.config.avatarUrl
+        displayName: "",
+        avatarUrl: ""
     };
-    
+
+    // The profile as stored on the server
+    $scope.profileOnServer = {
+        displayName: "",
+        avatarUrl: ""
+    };
+
+    $scope.onInit = function() {
+        // Load profile data
+        // Display name
+        matrixService.getDisplayName($scope.config.user_id).then(
+            function(response) {
+                $scope.profile.displayName = response.data.displayname;
+                $scope.profileOnServer.displayName = response.data.displayname;
+            },
+            function(error) {
+                $scope.feedback = "Can't load display name";
+            } 
+        );
+        // Avatar
+        matrixService.getProfilePictureUrl($scope.config.user_id).then(
+            function(response) {
+                $scope.profile.avatarUrl = response.data.avatar_url;
+                $scope.profileOnServer.avatarUrl = response.data.avatar_url;
+            },
+            function(error) {
+                $scope.feedback = "Can't load avatar URL";
+            } 
+        );
+    };
+
     $scope.$watch("profile.avatarFile", function(newValue, oldValue) {
         if ($scope.profile.avatarFile) {
             console.log("Uploading new avatar file...");
@@ -41,10 +71,10 @@ angular.module('SettingsController', ['matrixService', 'mFileUpload', 'mFileInpu
     });
     
     $scope.saveProfile = function() {
-        if ($scope.profile.displayName !== $scope.config.displayName) {
+        if ($scope.profile.displayName !== $scope.profileOnServer.displayName) {
             setDisplayName($scope.profile.displayName);
         }
-        if ($scope.profile.avatarUrl !== $scope.config.avatarUrl) {
+        if ($scope.profile.avatarUrl !== $scope.profileOnServer.avatarUrl) {
             setAvatar($scope.profile.avatarUrl);
         }
     };
@@ -53,11 +83,6 @@ angular.module('SettingsController', ['matrixService', 'mFileUpload', 'mFileInpu
         matrixService.setDisplayName(displayName).then(
             function(response) {
                 $scope.feedback = "Updated display name.";
-                
-                var config = matrixService.config();
-                config.displayName = displayName;
-                matrixService.setConfig(config);
-                matrixService.saveConfig();
             },
             function(error) {
                 $scope.feedback = "Can't update display name: " + error.data;
@@ -71,11 +96,6 @@ angular.module('SettingsController', ['matrixService', 'mFileUpload', 'mFileInpu
             function(response) {
                 console.log("Updated avatar");
                 $scope.feedback = "Updated avatar.";
-                
-                var config = matrixService.config();
-                config.avatarUrl = avatarURL;
-                matrixService.setConfig(config);
-                matrixService.saveConfig();
             },
             function(error) {
                 $scope.feedback = "Can't update avatar: " + error.data;

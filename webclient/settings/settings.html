@@ -1,4 +1,4 @@
-<div ng-controller="SettingsController" class="user">
+<div ng-controller="SettingsController" class="user" data-ng-init="onInit()">
 
     <div id="page">
     <div id="wrapper">
@@ -10,7 +10,7 @@
                     <tr>
                         <td>
                             <div class="profile-avatar">
-                                <img ng-src="{{ profile.avatarUrl || 'img/default-profile.jpg' }}" m-file-input="profile.avatarFile"/>
+                                <img ng-src="{{ (null !== profile.avatarUrl) ? profile.avatarUrl : 'img/default-profile.jpg' }}" m-file-input="profile.avatarFile"/>
                             </div>
                         </td>
                         <td>
@@ -19,7 +19,7 @@
                             </div>
                         </td>
                         <td>
-                            <button ng-disabled="(profile.displayName == config.displayName) && (profile.avatarUrl == config.avatarUrl)"
+                            <button ng-disabled="(profile.displayName == profileOnServer.displayName) && (profile.avatarUrl == profileOnServer.avatarUrl)"
                                     ng-click="saveProfile()">Save</button>    
                         </td>
                     </tr>

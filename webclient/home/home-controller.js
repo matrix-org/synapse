@@ -37,6 +37,11 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
     $scope.joinAlias = {
         room_alias: ""
     };
+    
+    $scope.profile = {
+        displayName: "",
+        avatarUrl: ""
+    };
 
     var refresh = function() {
         
@@ -108,6 +113,28 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
     };
  
     $scope.onInit = function() {
+        // Load profile data
+        // Display name
+        matrixService.getDisplayName($scope.config.user_id).then(
+            function(response) {
+                $scope.profile.displayName = response.data.displayname;
+                $scope.profileOnServer.displayName = response.data.displayname;
+            },
+            function(error) {
+                $scope.feedback = "Can't load display name";
+            } 
+        );
+        // Avatar
+        matrixService.getProfilePictureUrl($scope.config.user_id).then(
+            function(response) {
+                $scope.profile.avatarUrl = response.data.avatar_url;
+                $scope.profileOnServer.avatarUrl = response.data.avatar_url;
+            },
+            function(error) {
+                $scope.feedback = "Can't load avatar URL";
+            } 
+        );
+
         refresh();
     };
 }]);

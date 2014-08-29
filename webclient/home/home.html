@@ -9,13 +9,13 @@
                 <tr>
                     <td>
                         <div class="profile-avatar">
-                            <img ng-src="{{ config.avatarUrl || 'img/default-profile.jpg' }}"/>
+                            <img ng-src="{{ (null !== profile.avatarUrl) ? profile.avatarUrl : 'img/default-profile.jpg' }}"/>
                         </div>
                     </td>
                     <td>
                         <div id="user-ids">
-                            <div id="user-displayname">{{ config.displayName }}</div>
-                            <div>{{ config.user_id }}</div>                        
+                            <div id="user-displayname">{{ profile.displayName }}</div>
+                            <div>{{ config.user_id }}</div>
                         </div>
                     </td>
                 </tr>
