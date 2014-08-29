@@ -105,6 +105,10 @@
                 <button ng-click="hangupCall()">Reject</button>
                 </div>
                 <button ng-click="hangupCall()" ng-show="currentCall && currentCall.state != 'ringing'">Hang up</button>
+                <span ng-show="currentCall.state == 'invite_sent'">Calling...</span>
+                <span ng-show="currentCall.state == 'connecting'">Call Connecting...</span>
+                <span ng-show="currentCall.state == 'connected'">Call Connected</span>
+                <span ng-show="currentCall.state == 'ended'">Call Ended</span>
                 <span style="display: none; ">{{ currentCall.state }}</span>
             </div>
         

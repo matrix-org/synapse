@@ -36,7 +36,7 @@ var forAllTracksOnStream = function(s, f) {
 }
 
 angular.module('MatrixCall', [])
-.factory('MatrixCall', ['matrixService', 'matrixPhoneService', function MatrixCallFactory(matrixService, matrixPhoneService) {
+.factory('MatrixCall', ['matrixService', 'matrixPhoneService', '$rootScope', function MatrixCallFactory(matrixService, matrixPhoneService, $rootScope) {
     var MatrixCall = function(room_id) {
         this.room_id = room_id;
         this.call_id = "c" + new Date().getTime();
@@ -204,6 +204,7 @@ angular.module('MatrixCall', [])
         // ideally we'd consider the call to be connected when we get media but chrome doesn't implement nay of the 'onstarted' events yet
         if (this.peerConn.iceConnectionState == 'completed' || this.peerConn.iceConnectionState == 'connected') {
             this.state = 'connected';
+            $rootScope.$apply();
         }
     };
 
