@@ -301,7 +301,7 @@ h1 {
     display: inline-block;
     margin-bottom: -1px;
     max-width: 90%;
-    font-size: 16px;
+    font-size: 14px;
     word-wrap: break-word;
     padding-top: 7px;
     padding-bottom: 5px;
@@ -309,6 +309,11 @@ h1 {
     padding-right: 1em;
     vertical-align: middle;
     -webkit-text-size-adjust:100%
+}
+
+.bubble img {
+    max-width: 100%;
+    max-height: auto;
 }
 
 .differentUser td {
