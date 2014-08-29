@@ -1,3 +1,10 @@
+Changes in synapse 0.1.1 (2014-08-29)
+=====================================
+
+Homeserver:
+    * Fix bug that caused the event stream to not notify some clients about
+      changes.
+
 Changes in synapse 0.1.0 (2014-08-29)
 =====================================
 Presence has been reenabled in this release.
