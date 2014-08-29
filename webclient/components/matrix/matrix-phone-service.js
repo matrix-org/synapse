@@ -59,7 +59,7 @@ angular.module('matrixPhoneService', [])
                 console.trace("Got hangup for unknown call ID "+msg.call_id);
                 return;
             }
-            call.onHangup();
+            call.onHangupReceived();
             matrixPhoneService.allCalls[msg.call_id] = undefined;
         }
     });

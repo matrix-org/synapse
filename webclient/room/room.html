@@ -104,6 +104,7 @@
                 <button ng-click="answerCall()">Answer</button>
                 <button ng-click="hangupCall()">Reject</button>
                 </div>
+                <button ng-click="hangupCall()" ng-show="currentCall && currentCall.state != 'ringing'">Hang up</button>
                 {{ currentCall.state }}
             </div>
         
@@ -111,7 +112,6 @@
             <div ng-hide="!state.stream_failure">
                 {{ state.stream_failure.data.error || "Connection failure" }}
             </div>
-           <audio id="remoteAudio" autoplay="autoplay"></audio>
         </div>
     </div>
 

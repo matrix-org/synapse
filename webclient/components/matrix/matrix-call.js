@@ -16,6 +16,25 @@ limitations under the License.
 
 'use strict';
 
+var forAllVideoTracksOnStream = function(s, f) {
+    var tracks = s.getVideoTracks();
+    for (var i = 0; i < tracks.length; i++) {
+        f(tracks[i]);
+    }
+}
+
+var forAllAudioTracksOnStream = function(s, f) {
+    var tracks = s.getAudioTracks();
+    for (var i = 0; i < tracks.length; i++) {
+        f(tracks[i]);
+    }
+}
+
+var forAllTracksOnStream = function(s, f) {
+    forAllVideoTracksOnStream(s, f);
+    forAllAudioTracksOnStream(s, f);
+}
+
 angular.module('MatrixCall', [])
 .factory('MatrixCall', ['matrixService', 'matrixPhoneService', function MatrixCallFactory(matrixService, matrixPhoneService) {
     var MatrixCall = function(room_id) {
@@ -55,7 +74,15 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.hangup = function() {
-        console.trace("Rejecting call "+this.call_id);
+        console.trace("Ending call "+this.call_id);
+
+        forAllTracksOnStream(this.localAVStream, function(t) {
+            t.stop();
+        });
+        forAllTracksOnStream(this.remoteAVStream, function(t) {
+            t.stop();
+        });
+
         var content = {
             msgtype: "m.call.hangup",
             version: 0,
@@ -66,6 +93,7 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.gotUserMediaForInvite = function(stream) {
+        this.localAVStream = stream;
         var audioTracks = stream.getAudioTracks();
         for (var i = 0; i < audioTracks.length; i++) {
             audioTracks[i].enabled = true;
@@ -86,6 +114,7 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.gotUserMediaForAnswer = function(stream) {
+        this.localAVStream = stream;
         var audioTracks = stream.getAudioTracks();
         for (var i = 0; i < audioTracks.length; i++) {
             audioTracks[i].enabled = true;
@@ -172,7 +201,8 @@ angular.module('MatrixCall', [])
 
     MatrixCall.prototype.onIceConnectionStateChanged = function() {
         console.trace("Ice connection state changed to: "+this.peerConn.iceConnectionState);
-        if (this.peerConn.iceConnectionState == 'completed') {
+        // ideally we'd consider the call to be connected when we get media but chrome doesn't implement nay of the 'onstarted' events yet
+        if (this.peerConn.iceConnectionState == 'completed' || this.peerConn.iceConnectionState == 'connected') {
             this.state = 'connected';
         }
     };
@@ -191,9 +221,43 @@ angular.module('MatrixCall', [])
 
     MatrixCall.prototype.onAddStream = function(event) {
         console.trace("Stream added"+event);
+
+        var s = event.stream;
+
+        this.remoteAVStream = s;
+
+        var self = this;
+        forAllTracksOnStream(s, function(t) {
+            // not currently implemented in chrome
+            t.onstarted = self.onRemoteStreamTrackStarted;
+        });
+
+        // not currently implemented in chrome
+        event.stream.onstarted = this.onRemoteStreamStarted;
         var player = new Audio();
-        player.src = URL.createObjectURL(event.stream);
+        player.src = URL.createObjectURL(s);
         player.play();
+    };
+
+    MatrixCall.prototype.onRemoteStreamStarted = function(event) {
+        this.state = 'connected';
+    };
+
+    MatrixCall.prototype.onRemoteStreamTrackStarted = function(event) {
+        this.state = 'connected';
+    };
+
+    MatrixCall.prototype.onHangupReceived = function() {
+        this.state = 'ended';
+
+        forAllTracksOnStream(this.localAVStream, function(t) {
+            t.stop();
+        });
+        forAllTracksOnStream(this.remoteAVStream, function(t) {
+            t.stop();
+        });
+
+        this.onHangup();
     };
 
     return MatrixCall;
