@@ -216,22 +216,101 @@ In contrast, these are invalid requests::
 
 Receiving live updates on a client
 ----------------------------------
-- C-S longpoll event stream
-- Concept of start/end tokens.
-- Mention /initialSync to get token.
+Clients can receive new events by long-polling the home server. This will hold open the
+HTTP connection for a short period of time waiting for new events, returning early if an
+event occurs. This is called the "Event Stream". All events which the client is authorised 
+to view will appear in the event stream. When the stream is closed, an ``end`` token is 
+returned. This token can be used in the next request to continue where the client left off.
 
+When the client first logs in, they will need to initially synchronise with their home
+server. This is achieved via the ``/initialSync`` API. This API also returns an ``end``
+token which can be used with the event stream.
 
 Rooms
 =====
-- How are they created? PDU anchor point: "root of the tree".
+
+Creation
+--------
+To create a room, a client has to use the ``/createRoom`` API. There are various options
+which can be set when creating a room:
+
+``visibility``
+  Type: 
+    String
+  Optional: 
+    Yes
+  Value:
+    Either ``public`` or ``private``.
+  Description:
+    A ``public`` visibility indicates that the room will be shown in the public room list. A
+    ``private`` visibility will hide the room from the public room list. Rooms default to
+    ``public`` visibility if this key is not included.
+
+``room_alias_name``
+  Type: 
+    String
+  Optional: 
+    Yes
+  Value:
+    The room alias localpart.
+  Description:
+    If this is included, a room alias will be created and mapped to the newly created room.
+    The alias will belong on the same home server which created the room, e.g.
+    ``!qadnasoi:domain.com >>> #room_alias_name:domain.com``
+
+Example::
+
+  {
+    "visibility": "public", 
+    "room_alias_name": "the pub"
+  }
+
+- TODO: This creates a room creation event which serves as the root of the PDU graph for this room.
+
+Modifying aliases
+-----------------
 - Adding / removing aliases.
-- Invite/join dance
-- State and non-state data (+extensibility)
 
-TODO : Room permissions / config / power levels.
+Permissions
+-----------
+- TODO : Room permissions / config / power levels. What they are. How do they work. Examples.
 
-Messages
-========
+Inviting users
+--------------
+- API to hit (``$roomid/invite``) with ``user_id`` key. Needs FQ user ID, explain why.
+- Outline invite join dance
+
+Joining rooms
+-------------
+- API to hit (``/join/$alias or id``). Explain how alias joining works (auto-resolving). 
+- Outline invite join dance
+
+Leaving rooms
+-------------
+- API to hit (``$roomid/leave``).
+- Is there a dance?
+
+Room events
+-----------
+- Split into state and non-state data
+- Explain what they are, semantics, give examples of clobbering / not, use cases (msgs vs room names).
+  Not too much detail on the actual event contents.
+- API to hit.
+- Extensibility provided by the API for custom events. Examples.
+- How this hooks into ``initialSync``.
+- See the "Room Events" section for actual spec on each type.
+
+Syncing a room
+--------------
+- Single room initial sync. API to hit. Why it might be used (lazy loading)
+
+Getting grouped state events
+----------------------------
+- ``/members`` and ``/messages`` and the events they return.
+- ``/state`` and it returns ALL THE THINGS.
+
+Room Events
+===========
 
 This specification outlines several standard event types, all of which are
 prefixed with ``m.``
