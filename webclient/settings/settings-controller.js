@@ -25,7 +25,7 @@ angular.module('SettingsController', ['matrixService', 'mFileUpload', 'mFileInpu
         displayName: $scope.config.displayName,
         avatarUrl: $scope.config.avatarUrl
     };
-
+    
     $scope.$watch("profile.avatarFile", function(newValue, oldValue) {
         if ($scope.profile.avatarFile) {
             console.log("Uploading new avatar file...");
@@ -142,5 +142,24 @@ angular.module('SettingsController', ['matrixService', 'mFileUpload', 'mFileInpu
                 $scope.emailFeedback = "Failed to auth email: " + reason;
             }
         );
+    };
+    
+    
+    /*** Desktop notifications section ***/
+    $scope.settings = {
+        notifications: undefined
+    };
+
+    // If the browser supports it, check the desktop notification state
+    if ("Notification" in window) {
+        $scope.settings.notifications = window.Notification.permission;
+    }
+
+    $scope.requestNotifications = function() {
+        console.log("requestNotifications");
+        window.Notification.requestPermission(function (permission) {
+            console.log("   -> User decision: " + permission);
+            $scope.settings.notifications = permission;
+        });
     };
 }]);

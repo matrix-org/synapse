@@ -69,13 +69,6 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         $scope.logout();
     });
     
-    $scope.requestNotifications = function() {
-        if (window.Notification) {
-            console.log("Notification.permission: " + window.Notification.permission);
-            window.Notification.requestPermission(function(){});
-        }
-    };
-    
 }]);
 
    

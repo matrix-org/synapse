@@ -52,17 +52,30 @@
             </table>
         </div>
         <br/>
-
+        
+        <h3>Desktop notifications</h3>
+        <div ng-switch="settings.notifications">
+            <div ng-switch-when="granted">
+                Notifications are enabled.
+            </div>
+            <div ng-switch-when="denied">
+                You have denied permission for notifications.<br/>
+                To enable it, reset the notification setting for this web site into your browser settings.
+            </div>
+            <div ng-switch-when="default">
+                <button ng-click="requestNotifications()">Click here to enable them</button>
+            </div>
+            <div ng-switch-default="">
+                Sorry, your browser does not support notifications.
+            </div>
+        </div>
+        <br/>
+        
         <h3>Configuration</h3>
         <div>
             <div>Home server: {{ config.homeserver }} </div>
             <div>User ID: {{ config.user_id }} </div>
             <div>Access token: {{ config.access_token }} </div>
-        </div>
-        <br/>
-        
-        <div>
-            <div><button ng-click="requestNotifications()">Request notifications</button></div>
         </div>
         <br/>
 
