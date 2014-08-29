@@ -132,10 +132,87 @@ Identity
 
 API Standards
 -------------
-- All HTTP[S]
-- Uses JSON as HTTP bodies
-- Standard error response format { errcode: M_WHATEVER, error: "some message" }
-- C-S API provides POST for operations, or PUT with txn IDs. Explain txn IDs.
+All communication in Matrix is performed over HTTP[S] using a Content-Type of ``application/json``.
+Any errors which occur on the Matrix API level MUST return a "standard error response". This is a
+JSON object which looks like::
+
+  {
+    "errcode": "<error code>",
+    "error": "<error message>"
+  }
+
+The ``error`` string will be a human-readable error message, usually a sentence
+explaining what went wrong. The ``errcode`` string will be a unique string which can be 
+used to handle an error message e.g. ``M_FORBIDDEN``. These error codes should have their 
+namespace first in ALL CAPS, followed by a single _. For example, if there was a custom
+namespace ``com.mydomain.here``, and a ``FORBIDDEN`` code, the error code should look
+like ``COM.MYDOMAIN.HERE_FORBIDDEN``. There may be additional keys depending on 
+the error, but the keys ``error`` and ``errcode`` MUST always be present. 
+
+Some standard error codes are below:
+
+:``M_FORBIDDEN``:
+  Forbidden access, e.g. joining a room without permission, failed login.
+
+:``M_UNKNOWN_TOKEN``:
+  The access token specified was not recognised.
+
+:``M_BAD_JSON``:
+  Request contained valid JSON, but it was malformed in some way, e.g. missing
+  required keys, invalid values for keys.
+
+:``M_NOT_JSON``:
+  Request did not contain valid JSON.
+
+:``M_NOT_FOUND``:
+  No resource was found for this request.
+
+Some requests have unique error codes:
+
+:``M_USER_IN_USE``:
+  Encountered when trying to register a user ID which has been taken.
+
+:``M_ROOM_IN_USE``:
+  Encountered when trying to create a room which has been taken.
+
+:``M_BAD_PAGINATION``:
+  Encountered when specifying bad pagination query parameters.
+
+:``M_LOGIN_EMAIL_URL_NOT_YET``:
+  Encountered when polling for an email link which has not been clicked yet.
+
+The C-S API typically uses ``HTTP POST`` to submit requests. This means these requests
+are not idempotent. The C-S API also allows ``HTTP PUT`` to make requests idempotent.
+In order to use a ``PUT``, paths should be suffixed with ``/{txnId}``. ``{txnId}`` is a
+client-generated transaction ID which identifies the request. Crucially, it **only** 
+serves to identify new requests from retransmits. After the request has finished, the
+``{txnId}`` value should be changed (how is not specified, it could be a monotonically
+increasing integer, etc). It is preferable to use ``HTTP PUT`` to make sure requests to 
+send messages do not get sent more than once should clients need to retransmit requests.
+
+Valid requests look like::
+
+    POST /some/path/here
+    {
+      "key": "This is a post."
+    }
+
+    PUT /some/path/here/11
+    {
+      "key": "This is a put with a txnId of 11."
+    }
+
+In contrast, these are invalid requests::
+
+    POST /some/path/here/11
+    {
+      "key": "This is a post, but it has a txnId."
+    }
+
+    PUT /some/path/here
+    {
+      "key": "This is a put but it is missing a txnId."
+    }
 
 Receiving live updates on a client
 ----------------------------------
