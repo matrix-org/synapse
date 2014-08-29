@@ -41,6 +41,7 @@
     <header id="header">
         <!-- Do not show buttons on the login page -->
         <div id="header-buttons" ng-hide="'/login' == location ">
+            <button ng-click='goToPage("/")'>Home</button>
             <button ng-click='goToPage("settings")'>Settings</button>
             <button ng-click="logout()">Log out</button>
         </div>
