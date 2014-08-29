@@ -260,19 +260,18 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def user_joined_room(self, user, room_id):
-
         if user.is_mine:
+            statuscache = self._get_or_make_usercache(user)
+
+            # No actual update but we need to bump the serial anyway for the
+            # event source
+            self._user_cachemap_latest_serial += 1
+            statuscache.update({}, serial=self._user_cachemap_latest_serial)
+
             self.push_update_to_local_and_remote(
                 observed_user=user,
                 room_ids=[room_id],
-                statuscache=self._get_or_offline_usercache(user),
-            )
-
-        else:
-            self.push_update_to_clients(
-                observed_user=user,
-                room_ids=[room_id],
-                statuscache=self._get_or_offline_usercache(user),
+                statuscache=statuscache,
             )
 
         # We also want to tell them about current presence of people.
