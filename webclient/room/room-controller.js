@@ -83,7 +83,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         updatePresence(event);
     });
 
-    $rootScope.$on(matrixPhoneService.CALL_EVENT, function(ngEvent, call) {
+    $rootScope.$on(matrixPhoneService.INCOMING_CALL_EVENT, function(ngEvent, call) {
         console.trace("incoming call");
         call.onError = $scope.onCallError;
         call.onHangup = $scope.onCallHangup;

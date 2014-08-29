@@ -172,9 +172,9 @@ angular.module('matrixService', [])
             return doRequest("GET", path, undefined, {});
         },
 
-        sendMessage: function(room_id, txn_id, content) {
+        sendEvent: function(room_id, eventType, txn_id, content) {
             // The REST path spec
-            var path = "/rooms/$room_id/send/m.room.message/$txn_id";
+            var path = "/rooms/$room_id/send/"+eventType+"/$txn_id";
 
             if (!txn_id) {
                 txn_id = "m" + new Date().getTime();
@@ -188,6 +188,10 @@ angular.module('matrixService', [])
             path = path.replace("$txn_id", txn_id);
 
             return doRequest("PUT", path, undefined, content);
+        },
+
+        sendMessage: function(room_id, txn_id, content) {
+            return self.sendObject(room_id, 'm.room.message', txn_id, content);
         },
 
         // Send a text message

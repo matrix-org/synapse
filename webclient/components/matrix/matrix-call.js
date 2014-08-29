@@ -84,11 +84,10 @@ angular.module('MatrixCall', [])
         });
 
         var content = {
-            msgtype: "m.call.hangup",
             version: 0,
             call_id: this.call_id,
         };
-        matrixService.sendMessage(this.room_id, undefined, content).then(this.messageSent, this.messageSendFailed);
+        matrixService.sendEvent(this.room_id, 'm.call.hangup', undefined, content).then(this.messageSent, this.messageSendFailed);
         this.state = 'ended';
     };
 
@@ -135,12 +134,11 @@ angular.module('MatrixCall', [])
         console.trace(event);
         if (event.candidate) {
             var content = {
-                msgtype: "m.call.candidate",
                 version: 0,
                 call_id: this.call_id,
                 candidate: event.candidate
             };
-            matrixService.sendMessage(this.room_id, undefined, content).then(this.messageSent, this.messageSendFailed);
+            matrixService.sendEvent(this.room_id, 'm.call.candidate', undefined, content).then(this.messageSent, this.messageSendFailed);
         }
     }
 
@@ -163,12 +161,11 @@ angular.module('MatrixCall', [])
         this.peerConn.setLocalDescription(description);
 
         var content = {
-            msgtype: "m.call.invite",
             version: 0,
             call_id: this.call_id,
             offer: description
         };
-        matrixService.sendMessage(this.room_id, undefined, content).then(this.messageSent, this.messageSendFailed);
+        matrixService.sendEvent(this.room_id, 'm.call.invite', undefined, content).then(this.messageSent, this.messageSendFailed);
         this.state = 'invite_sent';
     };
 
@@ -176,12 +173,11 @@ angular.module('MatrixCall', [])
         console.trace("Created answer: "+description);
         this.peerConn.setLocalDescription(description);
         var content = {
-            msgtype: "m.call.answer",
             version: 0,
             call_id: this.call_id,
             answer: description
         };
-        matrixService.sendMessage(this.room_id, undefined, content).then(this.messageSent, this.messageSendFailed);
+        matrixService.sendEvent(this.room_id, 'm.call.answer', undefined, content).then(this.messageSent, this.messageSendFailed);
         this.state = 'connecting';
     };
 
