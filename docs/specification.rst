@@ -28,6 +28,9 @@ Architecture
 
 - Client is an end-user (web app, mobile app) which uses C-S APIs to talk to the home server.
   A given client is typically responsible for a single user.
+- A single user is represented by a User ID, scoped to the home server which allocated the account.
+  User IDs MUST have @ prefix; looks like @foo:domain - domain indicates the user's home
+  server. 
 - Home server provides C-S APIs and has the ability to federate with other HSes.
   Typically responsible for N clients.
 - Federation's purpose is to share content between interested HSes; no SPOF. 
@@ -46,10 +49,16 @@ participants in that room will receive the message. Rooms are uniquely
 identified via a room ID. There is exactly one room ID for each room. Each
 room can also have an alias. Each room can have many aliases.
 
-::
+- Room IDs MUST have ! prefix; looks like !foo:domain - domain is simply for namespacing,
+  the room does NOT reside on any one domain. NOT human readable.
 
-                            How events flow in rooms
-                            ========================
+- Room Aliases MUST have # prefix; looks like #foo:domain - domain indicates where this
+  alias can be mapped to a room ID. Key point: human readable / friendly.
+
+- Aliases can be queried on the domain they specify, which will return a room ID if a
+  mapping exists. These mappings can change.
+
+::
 
        { @alice:matrix.org }                             { @bob:domain.com }
                |                                                 ^
@@ -59,25 +68,24 @@ room can also have an alias. Each room can have many aliases.
       Content: { JSON object }                     Content: { JSON object }
                |                                                 |
                V                                                 |
-       +------------------+                            +------------------+
-       |   Home Server    |                            |   Home Server    |
-       |   matrix.org     |<-------Federation--------->|   domain.com     |
-       +------------------+                            +------------------+
-      Room ID: !qporfwt:matrix.org                    Room ID: !qporfwt:matrix.org
-      Servers: matrix.org, domain.com                 Servers: matrix.org, domain.com
-      Members:                                        Members:
-        - @alice:matrix.org                             - @alice:matrix.org
-        - @bob:domain.com                               - @bob:domain.com
-                  
+       +------------------+                          +------------------+
+       |   Home Server    |                          |   Home Server    |
+       |   matrix.org     |<-------Federation------->|   domain.com     |
+       +------------------+                          +------------------+
+                |       .................................        |
+                |______|         Shared State            |_______|
+                       |  Room ID: !qporfwt:matrix.org   |
+                       | Servers: matrix.org, domain.com |
+                       | Members:                        |
+                       |  - @alice:matrix.org            |
+                       |  - @bob:domain.com              |
+                       |.................................|
 
-- Room IDs MUST have ! prefix; looks like !foo:domain - domain is simply for namespacing,
-  the room does NOT reside on domain. NOT human readable.
-- Room Aliases MUST have # prefix; looks like #foo:domain - domain indicates where this
-  alias can be mapped to a room ID. Key point: human readable / friendly.
-- User IDs MUST have @ prefix; looks like @foo:domain - domain indicates the user's home
-  server. 
-- Aliases can be queried on the domain they specify, which will return a room ID if a
-  mapping exists. These mappings can change.
+- Federation's goal is to maintain the shared state. Don't need FULL state in order
+  to be a part of a room.
+- Introduce the DAG.
+- Events are wrapped in PDUs.
+
        
 Identity
 --------
@@ -103,7 +111,7 @@ Receiving live updates on a client
 
 Rooms
 =====
-- How are they created?
+- How are they created? PDU anchor point: "root of the tree".
 - Adding / removing aliases.
 - Invite/join dance
 - State and non-state data (+extensibility)
@@ -167,15 +175,15 @@ below:
     - ``body`` : "string" - The alt text of the image, or some kind of content 
       description for accessibility e.g. "image attachment".
 
-ImageInfo: 
-  Information about an image::
+  ImageInfo: 
+    Information about an image::
     
-    { 
-      "size" : integer (size of image in bytes),
-      "w" : integer (width of image in pixels),
-      "h" : integer (height of image in pixels),
-      "mimetype" : "string (e.g. image/jpeg)",
-    }
+      { 
+        "size" : integer (size of image in bytes),
+        "w" : integer (width of image in pixels),
+        "h" : integer (height of image in pixels),
+        "mimetype" : "string (e.g. image/jpeg)",
+      }
 
 ``m.audio``
   Required keys:
@@ -186,15 +194,14 @@ ImageInfo:
     - ``body`` : "string" - A description of the audio e.g. "Bee Gees - 
       Stayin' Alive", or some kind of content description for accessibility e.g. 
       "audio attachment".
+  AudioInfo: 
+    Information about a piece of audio::
 
-AudioInfo: 
-  Information about a piece of audio::
-
-    {
-      "mimetype" : "string (e.g. audio/aac)",
-      "size" : integer (size of audio in bytes),
-      "duration" : integer (duration of audio in milliseconds),
-    }
+      {
+        "mimetype" : "string (e.g. audio/aac)",
+        "size" : integer (size of audio in bytes),
+        "duration" : integer (duration of audio in milliseconds),
+      }
 
 ``m.video``
   Required keys:
@@ -205,18 +212,18 @@ AudioInfo:
     - ``body`` : "string" - A description of the video e.g. "Gangnam style", 
       or some kind of content description for accessibility e.g. "video attachment".
 
-VideoInfo: 
-  Information about a video::
+  VideoInfo: 
+    Information about a video::
 
-    {
-      "mimetype" : "string (e.g. video/mp4)",
-      "size" : integer (size of video in bytes),
-      "duration" : integer (duration of video in milliseconds),
-      "w" : integer (width of video in pixels),
-      "h" : integer (height of video in pixels),
-      "thumbnail_url" : "string (URL to image)",
-      "thumbanil_info" : JSON object (ImageInfo)
-    }
+      {
+        "mimetype" : "string (e.g. video/mp4)",
+        "size" : integer (size of video in bytes),
+        "duration" : integer (duration of video in milliseconds),
+        "w" : integer (width of video in pixels),
+        "h" : integer (height of video in pixels),
+        "thumbnail_url" : "string (URL to image)",
+        "thumbanil_info" : JSON object (ImageInfo)
+      }
 
 ``m.location``
   Required keys:
@@ -624,61 +631,62 @@ can also be performed.
 
 There are three main kinds of communication that occur between home servers:
 
- - Queries
+:Queries:
    These are single request/response interactions between a given pair of
-   servers, initiated by one side sending an HTTP request to obtain some
+   servers, initiated by one side sending an HTTP GET request to obtain some
    information, and responded by the other. They are not persisted and contain
    no long-term significant history. They simply request a snapshot state at the
    instant the query is made.
 
- - EDUs - Ephemeral Data Units
+:Ephemeral Data Units (EDUs):
    These are notifications of events that are pushed from one home server to
    another. They are not persisted and contain no long-term significant history,
    nor does the receiving home server have to reply to them.
 
- - PDUs - Persisted Data Units
+:Persisted Data Units (PDUs):
    These are notifications of events that are broadcast from one home server to
    any others that are interested in the same "context" (namely, a Room ID).
    They are persisted to long-term storage and form the record of history for
    that context.
 
-Where Queries are presented directly across the HTTP connection as GET requests
-to specific URLs, EDUs and PDUs are further wrapped in an envelope called a
-Transaction, which is transferred from the origin to the destination home server
-using a PUT request.
+EDUs and PDUs are further wrapped in an envelope called a Transaction, which is 
+transferred from the origin to the destination home server using an HTTP PUT request.
 
 
-Transactions and EDUs/PDUs
---------------------------
+Transactions
+------------
 The transfer of EDUs and PDUs between home servers is performed by an exchange
-of Transaction messages, which are encoded as JSON objects with a dict as the
-top-level element, passed over an HTTP PUT request. A Transaction is meaningful
-only to the pair of home servers that exchanged it; they are not globally-
-meaningful.
+of Transaction messages, which are encoded as JSON objects, passed over an 
+HTTP PUT request. A Transaction is meaningful only to the pair of home servers that 
+exchanged it; they are not globally-meaningful.
 
-Each transaction has an opaque ID and timestamp (UNIX epoch time in
-milliseconds) generated by its origin server, an origin and destination server
-name, a list of "previous IDs", and a list of PDUs - the actual message payload
-that the Transaction carries.
+Each transaction has:
+ - An opaque transaction ID.
+ - A timestamp (UNIX epoch time in milliseconds) generated by its origin server.
+ - An origin and destination server name.
+ - A list of "previous IDs".
+ - A list of PDUs and EDUs - the actual message payload that the Transaction carries.
 
 ::
 
- {"transaction_id":"916d630ea616342b42e98a3be0b74113",
+ {
+  "transaction_id":"916d630ea616342b42e98a3be0b74113",
   "ts":1404835423000,
   "origin":"red",
   "destination":"blue",
   "prev_ids":["e1da392e61898be4d2009b9fecce5325"],
   "pdus":[...],
-  "edus":[...]}
+  "edus":[...]
+ }
 
-The "previous IDs" field will contain a list of previous transaction IDs that
-the origin server has sent to this destination. Its purpose is to act as a
+The ``prev_ids`` field contains a list of previous transaction IDs that
+the ``origin`` server has sent to this ``destination``. Its purpose is to act as a
 sequence checking mechanism - the destination server can check whether it has
 successfully received that Transaction, or ask for a retransmission if not.
 
-The "pdus" field of a transaction is a list, containing zero or more PDUs.[*]
-Each PDU is itself a dict containing a number of keys, the exact details of
-which will vary depending on the type of PDU. Similarly, the "edus" field is
+The ``pdus`` field of a transaction is a list, containing zero or more PDUs.[*]
+Each PDU is itself a JSON object containing a number of keys, the exact details of
+which will vary depending on the type of PDU. Similarly, the ``edus`` field is
 another list containing the EDUs. This key may be entirely absent if there are
 no EDUs to transfer.
 
@@ -687,27 +695,35 @@ receiving an "empty" transaction, as this is useful for informing peers of other
 transaction IDs they should be aware of. This effectively acts as a push
 mechanism to encourage peers to continue to replicate content.)
 
-All PDUs have an ID, a context, a declaration of their type, a list of other PDU
-IDs that have been seen recently on that context (regardless of which origin
-sent them), and a nested content field containing the actual event content.
+PDUs and EDUs
+-------------
+
+All PDUs have:
+ - An ID
+ - A context
+ - A declaration of their type
+ - A list of other PDU IDs that have been seen recently on that context (regardless of which origin
+   sent them)
 
 [[TODO(paul): Update this structure so that 'pdu_id' is a two-element
 [origin,ref] pair like the prev_pdus are]]
 
 ::
 
- {"pdu_id":"a4ecee13e2accdadf56c1025af232176",
+ {
+  "pdu_id":"a4ecee13e2accdadf56c1025af232176",
   "context":"#example.green",
   "origin":"green",
   "ts":1404838188000,
   "pdu_type":"m.text",
   "prev_pdus":[["blue","99d16afbc857975916f1d73e49e52b65"]],
   "content":...
-  "is_state":false}
+  "is_state":false
+ }
 
-In contrast to the transaction layer, it is important to note that the prev_pdus
+In contrast to Transactions, it is important to note that the ``prev_pdus``
 field of a PDU refers to PDUs that any origin server has sent, rather than
-previous IDs that this origin has sent. This list may refer to other PDUs sent
+previous IDs that this ``origin`` has sent. This list may refer to other PDUs sent
 by the same origin as the current one, or other origins.
 
 Because of the distributed nature of participants in a Matrix conversation, it
