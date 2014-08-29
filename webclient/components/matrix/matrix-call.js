@@ -73,9 +73,7 @@ angular.module('MatrixCall', [])
         this.state = 'wait_local_media';
     };
 
-    MatrixCall.prototype.hangup = function() {
-        console.trace("Ending call "+this.call_id);
-
+    MatrixCall.prototype.stopAllMedia = function() {
         if (this.localAVStream) {
             forAllTracksOnStream(this.localAVStream, function(t) {
                 t.stop();
@@ -86,6 +84,12 @@ angular.module('MatrixCall', [])
                 t.stop();
             });
         }
+    };
+
+    MatrixCall.prototype.hangup = function() {
+        console.trace("Ending call "+this.call_id);
+
+        this.stopAllMedia();
 
         var content = {
             version: 0,
@@ -232,8 +236,9 @@ angular.module('MatrixCall', [])
             t.onstarted = self.onRemoteStreamTrackStarted;
         });
 
+        event.stream.onended = function(e) { self.onRemoteStreamEnded(e); }; 
         // not currently implemented in chrome
-        event.stream.onstarted = this.onRemoteStreamStarted;
+        event.stream.onstarted = function(e) { self.onRemoteStreamStarted(e); };
         var player = new Audio();
         player.src = URL.createObjectURL(s);
         player.play();
@@ -243,24 +248,19 @@ angular.module('MatrixCall', [])
         this.state = 'connected';
     };
 
+    MatrixCall.prototype.onRemoteStreamEnded = function(event) {
+        this.state = 'ended';
+        this.stopAllMedia();
+        this.onHangup();
+    };
+
     MatrixCall.prototype.onRemoteStreamTrackStarted = function(event) {
         this.state = 'connected';
     };
 
     MatrixCall.prototype.onHangupReceived = function() {
         this.state = 'ended';
-
-        if (this.localAVStream) {
-            forAllTracksOnStream(this.localAVStream, function(t) {
-                t.stop();
-            });
-        }
-        if (this.remoteAVStream) {
-            forAllTracksOnStream(this.remoteAVStream, function(t) {
-                t.stop();
-            });
-        }
-
+        this.stopAllMedia();
         this.onHangup();
     };
 
