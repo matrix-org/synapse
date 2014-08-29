@@ -28,6 +28,7 @@
     }    
     
     #userIdCell,
+    #roomRecentsTableWrapper,
     #usersTableWrapper,
     #extraControls {
         display: none;
@@ -353,6 +354,7 @@ h1 {
 }
 
 /*** Recents ***/
+
 .recentsTable {
     max-width: 480px;
     width: 100%;
