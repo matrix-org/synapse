@@ -76,12 +76,16 @@ angular.module('MatrixCall', [])
     MatrixCall.prototype.hangup = function() {
         console.trace("Ending call "+this.call_id);
 
-        forAllTracksOnStream(this.localAVStream, function(t) {
-            t.stop();
-        });
-        forAllTracksOnStream(this.remoteAVStream, function(t) {
-            t.stop();
-        });
+        if (this.localAVStream) {
+            forAllTracksOnStream(this.localAVStream, function(t) {
+                t.stop();
+            });
+        }
+        if (this.remoteAVStream) {
+            forAllTracksOnStream(this.remoteAVStream, function(t) {
+                t.stop();
+            });
+        }
 
         var content = {
             version: 0,
@@ -246,12 +250,16 @@ angular.module('MatrixCall', [])
     MatrixCall.prototype.onHangupReceived = function() {
         this.state = 'ended';
 
-        forAllTracksOnStream(this.localAVStream, function(t) {
-            t.stop();
-        });
-        forAllTracksOnStream(this.remoteAVStream, function(t) {
-            t.stop();
-        });
+        if (this.localAVStream) {
+            forAllTracksOnStream(this.localAVStream, function(t) {
+                t.stop();
+            });
+        }
+        if (this.remoteAVStream) {
+            forAllTracksOnStream(this.remoteAVStream, function(t) {
+                t.stop();
+            });
+        }
 
         this.onHangup();
     };
