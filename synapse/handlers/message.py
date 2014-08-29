@@ -277,10 +277,13 @@ class MessageHandler(BaseRoomHandler):
                     end_token=now_token.events_key,
                 )
 
+                start_token = now_token.copy_and_replace("events_key", token[0])
+                end_token = now_token.copy_and_replace("events_key", token[1])
+
                 d["messages"] = {
                     "chunk": [m.get_dict() for m in messages],
-                    "start": token[0],
-                    "end": token[1],
+                    "start": start_token.to_string(),
+                    "end": end_token.to_string(),
                 }
 
                 current_state = yield self.store.get_current_state(

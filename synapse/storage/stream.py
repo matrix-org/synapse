@@ -205,8 +205,11 @@ class StreamStore(SQLBaseStore):
                              with_feedback=False):
         # TODO (erikj): Handle compressed feedback
 
-        from_comp = '<' if direction =='b' else '>'
-        to_comp = '>' if direction =='b' else '<'
+        # Tokens really represent positions between elements, but we use
+        # the convention of pointing to the event before the gap. Hence
+        # we have a bit of asymmetry when it comes to equalities.
+        from_comp = '<=' if direction =='b' else '>'
+        to_comp = '>' if direction =='b' else '<='
         order = "DESC" if direction == 'b' else "ASC"
 
         args = [room_id]
