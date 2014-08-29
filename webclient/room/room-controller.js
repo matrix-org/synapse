@@ -253,6 +253,10 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         if ($scope.textInput.indexOf("/me") === 0) {
             promise = matrixService.sendEmoteMessage($scope.room_id, $scope.textInput.substr(4));
         }
+        else if ($scope.textInput.indexOf("/nick ") === 0) {
+            // Change user display name
+            promise = matrixService.setDisplayName($scope.textInput.substr(6));
+        }
         else {
             promise = matrixService.sendTextMessage($scope.room_id, $scope.textInput);
         }
