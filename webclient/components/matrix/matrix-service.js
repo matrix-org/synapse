@@ -191,7 +191,7 @@ angular.module('matrixService', [])
         },
 
         sendMessage: function(room_id, txn_id, content) {
-            return self.sendObject(room_id, 'm.room.message', txn_id, content);
+            return this.sendEvent(room_id, 'm.room.message', txn_id, content);
         },
 
         // Send a text message
