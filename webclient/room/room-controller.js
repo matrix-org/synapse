@@ -209,7 +209,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     
     var updateMemberListPresenceAge = function() {
         $scope.now = new Date().getTime();
-        //console.log("updateMemberListPresenceAge() - now = " + $scope.now);
+        // TODO: don't bother polling every 5s if we know none of our counters are younger than 1 minute
         $timeout(updateMemberListPresenceAge, 5 * 1000);
     };
 
