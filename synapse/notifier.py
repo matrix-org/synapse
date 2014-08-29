@@ -119,6 +119,7 @@ class Notifier(object):
                 )
 
     @defer.inlineCallbacks
+    @log_function
     def on_new_user_event(self, users=[], rooms=[]):
         """ Used to inform listeners that something has happend
         presence/user event wise.
