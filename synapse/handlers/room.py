@@ -472,7 +472,7 @@ class RoomEventSource(object):
     def get_new_events_for_user(self, user, from_key, limit):
         # We just ignore the key for now.
 
-        to_key = yield self.get_current_token_part()
+        to_key = yield self.get_current_key()
 
         events, end_key = yield self.store.get_room_events_stream(
             user_id=user.to_string(),
@@ -484,7 +484,7 @@ class RoomEventSource(object):
 
         defer.returnValue((events, end_key))
 
-    def get_current_token_part(self):
+    def get_current_key(self):
         return self.store.get_room_events_max_id()
 
     @defer.inlineCallbacks

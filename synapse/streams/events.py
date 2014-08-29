@@ -31,7 +31,7 @@ class NullSource(object):
     def get_new_events_for_user(self, user, from_key, limit):
         return defer.succeed(([], from_key))
 
-    def get_current_token_part(self):
+    def get_current_key(self):
         return defer.succeed(0)
 
     def get_pagination_rows(self, user, pagination_config, key):
@@ -55,13 +55,13 @@ class EventSources(object):
     def get_current_token(self):
         token = StreamToken(
             room_key=(
-                yield self.sources["room"].get_current_token_part()
+                yield self.sources["room"].get_current_key()
             ),
             presence_key=(
-                yield self.sources["presence"].get_current_token_part()
+                yield self.sources["presence"].get_current_key()
             ),
             typing_key=(
-                yield self.sources["typing"].get_current_token_part()
+                yield self.sources["typing"].get_current_key()
             )
         )
         defer.returnValue(token)
@@ -72,8 +72,8 @@ class StreamSource(object):
         """from_key is the key within this event source."""
         raise NotImplementedError("get_new_events_for_user")
 
-    def get_current_token_part(self):
-        raise NotImplementedError("get_current_token_part")
+    def get_current_key(self):
+        raise NotImplementedError("get_current_key")
 
     def get_pagination_rows(self, user, pagination_config, key):
         raise NotImplementedError("get_rows")

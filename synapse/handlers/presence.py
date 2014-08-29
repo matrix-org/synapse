@@ -747,7 +747,7 @@ class PresenceEventSource(object):
         else:
             return (([], presence._user_cachemap_latest_serial))
 
-    def get_current_token_part(self):
+    def get_current_key(self):
         presence = self.hs.get_handlers().presence_handler
         return presence._user_cachemap_latest_serial
 
