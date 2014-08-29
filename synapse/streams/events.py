@@ -19,6 +19,7 @@ from synapse.types import StreamToken
 
 from synapse.handlers.presence import PresenceEventSource
 from synapse.handlers.room import RoomEventSource
+from synapse.handlers.typing import TypingNotificationEventSource
 
 
 class NullSource(object):
@@ -41,6 +42,7 @@ class EventSources(object):
     SOURCE_TYPES = {
         "room": RoomEventSource,
         "presence": PresenceEventSource,
+        "typing": TypingNotificationEventSource,
     }
 
     def __init__(self, hs):
@@ -49,15 +51,19 @@ class EventSources(object):
             for name, cls in EventSources.SOURCE_TYPES.items()
         }
 
-    @staticmethod
-    def create_token(events_key, presence_key):
-        return StreamToken(events_key=events_key, presence_key=presence_key)
-
     @defer.inlineCallbacks
     def get_current_token(self):
-        events_key = yield self.sources["room"].get_current_token_part()
-        presence_key = yield self.sources["presence"].get_current_token_part()
-        token = EventSources.create_token(events_key, presence_key)
+        token = StreamToken(
+            events_key=(
+                yield self.sources["room"].get_current_token_part()
+            ),
+            presence_key=(
+                yield self.sources["presence"].get_current_token_part()
+            ),
+            typing_key=(
+                yield self.sources["typing"].get_current_token_part()
+            )
+        )
         defer.returnValue(token)
 
 

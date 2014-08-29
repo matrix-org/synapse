@@ -295,7 +295,9 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         # all be ours
 
         # I'll already get my own presence state change
-        self.assertEquals({"start": "0_1", "end": "0_1", "chunk": []}, response)
+        self.assertEquals({"start": "0_1_0", "end": "0_1_0", "chunk": []},
+            response
+        )
 
         self.mock_datastore.set_presence_state.return_value = defer.succeed(
                 {"state": ONLINE})
@@ -306,10 +308,10 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 state={"state": ONLINE})
 
         (code, response) = yield self.mock_resource.trigger("GET",
-                "/events?from=0_1&timeout=0", None)
+                "/events?from=0_1_0&timeout=0", None)
 
         self.assertEquals(200, code)
-        self.assertEquals({"start": "0_1", "end": "0_2", "chunk": [
+        self.assertEquals({"start": "0_1_0", "end": "0_2_0", "chunk": [
             {"type": "m.presence",
              "content": {
                  "user_id": "@banana:test",
