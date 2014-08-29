@@ -106,7 +106,9 @@ class Notifier(object):
 
         # TODO (erikj): Can we make this more efficient by hitting the
         # db once?
-        for listener in listeners:
+
+        @defer.inlineCallbacks
+        def notify(listener):
             events, end_token = yield source.get_new_events_for_user(
                 listener.user,
                 listener.from_token,
@@ -117,6 +119,13 @@ class Notifier(object):
                 listener.notify(
                     self, events, listener.from_token, end_token
                 )
+
+        def eb(failure):
+            logger.exception("Failed to notify listener", failure)
+
+        yield defer.DeferredList(
+            [notify(l).addErrback(eb) for l in listeners]
+        )
 
     @defer.inlineCallbacks
     @log_function
@@ -136,7 +145,8 @@ class Notifier(object):
         for room in rooms:
             listeners |= self.rooms_to_listeners.get(room, set()).copy()
 
-        for listener in listeners:
+        @defer.inlineCallbacks
+        def notify(listener):
             events, end_token = yield source.get_new_events_for_user(
                 listener.user,
                 listener.from_token,
@@ -147,6 +157,13 @@ class Notifier(object):
                 listener.notify(
                     self, events, listener.from_token, end_token
                 )
+
+        def eb(failure):
+            logger.exception("Failed to notify listener", failure)
+
+        yield defer.DeferredList(
+            [notify(l).addErrback(eb) for l in listeners]
+        )
 
     def get_events_for(self, user, rooms, pagination_config, timeout):
         """ For the given user and rooms, return any new events for them. If
