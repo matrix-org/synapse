@@ -95,7 +95,6 @@ angular.module('eventHandlerService', [])
         $rootScope.$broadcast(PRESENCE_EVENT, event, isLiveEvent);
     };
     
-    
     return {
         MSG_EVENT: MSG_EVENT,
         MEMBER_EVENT: MEMBER_EVENT,

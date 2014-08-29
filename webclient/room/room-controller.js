@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'mFileInput'])
-.controller('RoomController', ['$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload',
-                               function($scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload) {
+.controller('RoomController', ['$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall',
+                               function($scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -82,12 +82,28 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     $scope.$on(eventHandlerService.PRESENCE_EVENT, function(ngEvent, event, isLive) {
         updatePresence(event);
     });
+
+    $rootScope.$on(matrixPhoneService.CALL_EVENT, function(ngEvent, call) {
+        console.trace("incoming call");
+        call.onError = $scope.onCallError;
+        call.onHangup = $scope.onCallHangup;
+        $scope.currentCall = call;
+    });
     
     $scope.paginateMore = function() {
         if ($scope.state.can_paginate) {
             // console.log("Paginating more.");
             paginate(MESSAGES_PER_PAGINATION);
         }
+    };
+
+    $scope.answerCall = function() {
+        $scope.currentCall.answer();
+    };
+
+    $scope.hangupCall = function() {
+        $scope.currentCall.hangup();
+        $scope.currentCall = undefined;
     };
         
     var paginate = function(numItems) {
@@ -454,4 +470,21 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     $scope.loadMoreHistory = function() {
         paginate(MESSAGES_PER_PAGINATION);
     };
+
+    $scope.startVoiceCall = function() {
+        var call = new MatrixCall($scope.room_id);
+        call.onError = $scope.onCallError;
+        call.onHangup = $scope.onCallHangup;
+        call.placeCall();
+        $scope.currentCall = call;
+    }
+
+    $scope.onCallError = function(errStr) {
+        $scope.feedback = errStr;
+    }
+
+    $scope.onCallHangup = function() {
+        $scope.feedback = "Call ended";
+        $scope.currentCall = undefined;
+    }
 }]);

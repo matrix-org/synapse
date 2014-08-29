@@ -98,6 +98,14 @@
                         <button ng-click="inviteUser(userIDToInvite)">Invite</button>
                 </span>
                 <button ng-click="leaveRoom()">Leave</button>
+                <button ng-click="startVoiceCall()" ng-show="currentCall == undefined">Voice Call</button>
+                <div ng-show="currentCall.state == 'ringing'">
+                Incoming call from {{ currentCall.user_id }}
+                <button ng-click="answerCall()">Answer</button>
+                <button ng-click="hangupCall()">Reject</button>
+                </div>
+                <button ng-click="hangupCall()" ng-show="currentCall && currentCall.state != 'ringing'">Hang up</button>
+                {{ currentCall.state }}
             </div>
         
             {{ feedback }}
