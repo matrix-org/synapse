@@ -4,32 +4,22 @@
     <div id="wrapper">
         
         <h3>Me</h3>
-        <div>
+        <div class="section">
             <form>
-                <table>
-                    <tr>
-                        <td>
-                            <div class="profile-avatar">
-                                <img ng-src="{{ (null !== profile.avatarUrl) ? profile.avatarUrl : 'img/default-profile.jpg' }}" m-file-input="profile.avatarFile"/>
-                            </div>
-                        </td>
-                        <td>
-                            <div id="user-ids">
-                                <input size="40" ng-model="profile.displayName" placeholder="Your name"/>            
-                            </div>
-                        </td>
-                        <td>
-                            <button ng-disabled="(profile.displayName == profileOnServer.displayName) && (profile.avatarUrl == profileOnServer.avatarUrl)"
-                                    ng-click="saveProfile()">Save</button>    
-                        </td>
-                    </tr>
-                </table>
+                <div class="profile-avatar">
+                    <img ng-src="{{ (null !== profile.avatarUrl) ? profile.avatarUrl : 'img/default-profile.jpg' }}" m-file-input="profile.avatarFile"/>
+                </div>
+                <div id="user-ids">
+                    <input size="40" ng-model="profile.displayName" placeholder="Your name"/>            
+                    <button ng-disabled="(profile.displayName == profileOnServer.displayName) && (profile.avatarUrl == profileOnServer.avatarUrl)"
+                            ng-click="saveProfile()">Save</button>    
+                </div>
             </form>
         </div>
         <br/>
 
         <h3>Linked emails</h3>
-        <div>
+        <div class="section">
             <form>
                 <input size="40" ng-model="linkedEmails.linkNewEmail" ng-enter="linkEmail(linkedEmails.linkNewEmail)" />
                 <button ng-disabled="!linkedEmails.linkNewEmail" ng-click="linkEmail(linkedEmails.linkNewEmail)">
@@ -54,7 +44,7 @@
         <br/>
         
         <h3>Desktop notifications</h3>
-        <div ng-switch="settings.notifications">
+        <div class="section" ng-switch="settings.notifications">
             <div ng-switch-when="granted">
                 Notifications are enabled.
             </div>
@@ -72,8 +62,9 @@
         <br/>
         
         <h3>Configuration</h3>
-        <div>
+        <div class="section">
             <div>Home server: {{ config.homeserver }} </div>
+            <div>Identity server: {{ config.identityServer }} </div>
             <div>User ID: {{ config.user_id }} </div>
             <div>Access token: {{ config.access_token }} </div>
         </div>
