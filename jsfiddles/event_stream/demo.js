@@ -65,14 +65,15 @@ $('.login').live('click', function() {
 
 var getCurrentRoomList = function() {
     $("#roomId").val("");
-    var url = "http://localhost:8080/matrix/client/api/v1/im/sync?access_token=" + accountInfo.access_token + "&from=END&to=START&limit=1";
+    var url = "http://localhost:8080/matrix/client/api/v1/initialSync?access_token=" + accountInfo.access_token + "&limit=1";
     $.getJSON(url, function(data) {
-        for (var i=0; i<data.length; ++i) {
-            if ("messages" in data[i]) {
-                data[i].latest_message = data[i].messages.chunk[0].content.body;   
+        var rooms = data.rooms;
+        for (var i=0; i<rooms.length; ++i) {
+            if ("messages" in rooms[i]) {
+                rooms[i].latest_message = rooms[i].messages.chunk[0].content.body;   
             }
         }
-        roomInfo = data;
+        roomInfo = rooms;
         setRooms(roomInfo);  
     }).fail(function(err) {
         alert(JSON.stringify($.parseJSON(err.responseText)));
@@ -92,17 +93,14 @@ $('.sendMessage').live('click', function() {
 
 var sendMessage = function(roomId) {
     var body = "jsfiddle message @" + $.now();
-    var msgId = $.now();
     
     if (roomId.length === 0) {
         return;
     }
     
-    var url = "http://localhost:8080/matrix/client/api/v1/rooms/$roomid/messages/$user/$msgid?access_token=$token";
+    var url = "http://localhost:8080/matrix/client/api/v1/rooms/$roomid/send/m.room.message?access_token=$token";
     url = url.replace("$token", accountInfo.access_token);
     url = url.replace("$roomid", encodeURIComponent(roomId));
-    url = url.replace("$user", encodeURIComponent(accountInfo.user_id));
-    url = url.replace("$msgid", msgId);
     
     var data = {
         msgtype: "m.text",
@@ -111,7 +109,7 @@ var sendMessage = function(roomId) {
     
     $.ajax({
         url: url,
-        type: "PUT",
+        type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify(data),
         dataType: "json",

@@ -38,8 +38,9 @@ var longpollEventStream = function() {
             else if (data.chunk[i].type === "m.room.member") {
                 if (viewingRoomId === data.chunk[i].room_id) {
                     console.log("Got new member: " + JSON.stringify(data.chunk[i]));
+                    addMessage(data.chunk[i]);
                     for (j=0; j<memberInfo.length; ++j) {
-                        if (memberInfo[j].target_user_id === data.chunk[i].target_user_id) {
+                        if (memberInfo[j].state_key === data.chunk[i].state_key) {
                             memberInfo[j] = data.chunk[i];
                             updatedMemberList = true;
                             break;
@@ -50,7 +51,7 @@ var longpollEventStream = function() {
                         updatedMemberList = true;
                     }
                 }
-                if (data.chunk[i].target_user_id === accountInfo.user_id) {
+                if (data.chunk[i].state_key === accountInfo.user_id) {
                     getCurrentRoomList(); // update our join/invite list
                 }
             }
@@ -133,7 +134,7 @@ $('.createRoom').live('click', function() {
         data.room_alias_name = roomAlias;   
     }
     $.ajax({
-        url: "http://localhost:8080/matrix/client/api/v1/rooms?access_token="+accountInfo.access_token,
+        url: "http://localhost:8080/matrix/client/api/v1/createRoom?access_token="+accountInfo.access_token,
         type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify(data),
@@ -154,14 +155,15 @@ $('.createRoom').live('click', function() {
 
 // ************** Getting current state **************
 var getCurrentRoomList = function() {
-    var url = "http://localhost:8080/matrix/client/api/v1/im/sync?access_token=" + accountInfo.access_token + "&from=END&to=START&limit=1";
+    var url = "http://localhost:8080/matrix/client/api/v1/initialSync?access_token=" + accountInfo.access_token + "&limit=1";
     $.getJSON(url, function(data) {
-        for (var i=0; i<data.length; ++i) {
-            if ("messages" in data[i]) {
-                data[i].latest_message = data[i].messages.chunk[0].content.body;   
+        var rooms = data.rooms;
+        for (var i=0; i<rooms.length; ++i) {
+            if ("messages" in rooms[i]) {
+                rooms[i].latest_message = rooms[i].messages.chunk[0].content.body;   
             }
         }
-        roomInfo = data;
+        roomInfo = rooms;
         setRooms(roomInfo);  
     }).fail(function(err) {
         alert(JSON.stringify($.parseJSON(err.responseText)));
@@ -179,7 +181,8 @@ var loadRoomContent = function(roomId) {
 
 var getMessages = function(roomId) {
     $("#messages").empty();
-    var url = "http://localhost:8080/matrix/client/api/v1/rooms/" + roomId + "/messages/list?access_token=" + accountInfo.access_token + "&from=END&to=START&limit=10";
+    var url = "http://localhost:8080/matrix/client/api/v1/rooms/" + 
+              encodeURIComponent(roomId) + "/messages?access_token=" + accountInfo.access_token + "&from=END&dir=b&limit=10";
     $.getJSON(url, function(data) {
         for (var i=data.chunk.length-1; i>=0; --i) {
             addMessage(data.chunk[i]);   
@@ -190,7 +193,8 @@ var getMessages = function(roomId) {
 var getMemberList = function(roomId) {
     $("#members").empty();
     memberInfo = [];
-    var url = "http://localhost:8080/matrix/client/api/v1/rooms/" + roomId + "/members/list?access_token=" + accountInfo.access_token;
+    var url = "http://localhost:8080/matrix/client/api/v1/rooms/" + 
+              encodeURIComponent(roomId) + "/members?access_token=" + accountInfo.access_token;
     $.getJSON(url, function(data) {
         for (var i=0; i<data.chunk.length; ++i) {
             memberInfo.push(data.chunk[i]);
@@ -212,11 +216,9 @@ $('.sendMessage').live('click', function() {
 var sendMessage = function(roomId, body) {
     var msgId = $.now();
     
-    var url = "http://localhost:8080/matrix/client/api/v1/rooms/$roomid/messages/$user/$msgid?access_token=$token";
+    var url = "http://localhost:8080/matrix/client/api/v1/rooms/$roomid/send/m.room.message?access_token=$token";
     url = url.replace("$token", accountInfo.access_token);
     url = url.replace("$roomid", encodeURIComponent(roomId));
-    url = url.replace("$user", encodeURIComponent(accountInfo.user_id));
-    url = url.replace("$msgid", msgId);
     
     var data = {
         msgtype: "m.text",
@@ -225,7 +227,7 @@ var sendMessage = function(roomId, body) {
     
     $.ajax({
         url: url,
-        type: "PUT",
+        type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify(data),
         dataType: "json",
@@ -260,13 +262,12 @@ var setRooms = function(roomList) {
         var membership = $(this).find('td:eq(1)').text();
         if (membership !== "join") {
             console.log("Joining room " + roomId); 
-            var url = "http://localhost:8080/matrix/client/api/v1/rooms/$roomid/members/$user/state?access_token=$token";
+            var url = "http://localhost:8080/matrix/client/api/v1/rooms/$roomid/join?access_token=$token";
             url = url.replace("$token", accountInfo.access_token);
             url = url.replace("$roomid", encodeURIComponent(roomId));
-            url = url.replace("$user", encodeURIComponent(accountInfo.user_id));
             $.ajax({
                 url: url,
-                type: "PUT",
+                type: "POST",
                 contentType: "application/json; charset=utf-8",
                 data: JSON.stringify({membership: "join"}),
                 dataType: "json",
@@ -286,16 +287,33 @@ var setRooms = function(roomList) {
 };
 
 var addMessage = function(data) {
+
+    var msg = data.content.body;
+    if (data.type === "m.room.member") {
+        if (data.content.membership === "invite") {
+            msg = "<em>invited " + data.state_key + " to the room</em>";
+        }
+        else if (data.content.membership === "join") {
+            msg = "<em>joined the room</em>";
+        }
+        else if (data.content.membership === "leave") {
+            msg = "<em>left the room</em>";
+        }
+        else {
+            msg = "<em>" + data.content.membership + "</em>";
+        }
+    }
+
     var row = "<tr>" +
               "<td>"+data.user_id+"</td>" +
-              "<td>"+data.content.body+"</td>" +
+              "<td>"+msg+"</td>" +
               "</tr>"; 
     $("#messages").append(row);
 };
 
 var addMember = function(data) {
     var row = "<tr>" +
-              "<td>"+data.target_user_id+"</td>" +
+              "<td>"+data.state_key+"</td>" +
               "<td>"+data.content.membership+"</td>" +
               "</tr>"; 
     $("#members").append(row);
