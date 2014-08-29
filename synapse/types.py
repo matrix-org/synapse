@@ -105,20 +105,14 @@ class StreamToken(
     @classmethod
     def from_string(cls, string):
         try:
-            events_key, presence_key = string.split(cls._SEPARATOR)
+            keys = string.split(cls._SEPARATOR)
 
-            return cls(
-                events_key=events_key,
-                presence_key=presence_key,
-            )
+            return cls(*keys)
         except:
             raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
-        return self._SEPARATOR.join([
-            str(self.events_key),
-            str(self.presence_key),
-        ])
+        return self._SEPARATOR.join([str(k) for k in self])
 
     def copy_and_replace(self, key, new_value):
         d = self._asdict()
