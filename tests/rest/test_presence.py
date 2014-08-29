@@ -229,7 +229,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         # HIDEOUS HACKERY
         # TODO(paul): This should be injected in via the HomeServer DI system
         from synapse.streams.events import (
-            PresenceSource, NullSource, EventSources
+            PresenceEventSource, NullSource, EventSources
         )
 
         old_SOURCE_TYPES = EventSources.SOURCE_TYPES
@@ -240,7 +240,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         EventSources.SOURCE_TYPES = {
             k: NullSource for k in old_SOURCE_TYPES.keys()
         }
-        EventSources.SOURCE_TYPES["presence"] = PresenceSource
+        EventSources.SOURCE_TYPES["presence"] = PresenceEventSource
 
         hs = HomeServer("test",
             db_pool=None,

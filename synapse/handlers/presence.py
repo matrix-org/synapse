@@ -722,6 +722,84 @@ class PresenceHandler(BaseHandler):
         )
 
 
+class PresenceEventSource(object):
+    def __init__(self, hs):
+        self.hs = hs
+        self.clock = hs.get_clock()
+
+    def get_new_events_for_user(self, user, from_token, limit):
+        from_key = int(from_token.presence_key)
+
+        presence = self.hs.get_handlers().presence_handler
+        cachemap = presence._user_cachemap
+
+        # TODO(paul): limit, and filter by visibility
+        updates = [(k, cachemap[k]) for k in cachemap
+                   if from_key < cachemap[k].serial]
+
+        if updates:
+            clock = self.clock
+
+            latest_serial = max([x[1].serial for x in updates])
+            data = [x[1].make_event(user=x[0], clock=clock) for x in updates]
+
+            end_token = from_token.copy_and_replace(
+                "presence_key", latest_serial
+            )
+            return ((data, end_token))
+        else:
+            end_token = from_token.copy_and_replace(
+                "presence_key", presence._user_cachemap_latest_serial
+            )
+            return (([], end_token))
+
+    def get_current_token_part(self):
+        presence = self.hs.get_handlers().presence_handler
+        return presence._user_cachemap_latest_serial
+
+    def get_pagination_rows(self, user, pagination_config, key):
+        # TODO (erikj): Does this make sense? Ordering?
+
+        from_token = pagination_config.from_token
+        to_token = pagination_config.to_token
+
+        from_key = int(from_token.presence_key)
+
+        if to_token:
+            to_key = int(to_token.presence_key)
+        else:
+            to_key = -1
+
+        presence = self.hs.get_handlers().presence_handler
+        cachemap = presence._user_cachemap
+
+        # TODO(paul): limit, and filter by visibility
+        updates = [(k, cachemap[k]) for k in cachemap
+                   if to_key < cachemap[k].serial < from_key]
+
+        if updates:
+            clock = self.clock
+
+            earliest_serial = max([x[1].serial for x in updates])
+            data = [x[1].make_event(user=x[0], clock=clock) for x in updates]
+
+            if to_token:
+                next_token = to_token
+            else:
+                next_token = from_token
+
+            next_token = next_token.copy_and_replace(
+                "presence_key", earliest_serial
+            )
+            return ((data, next_token))
+        else:
+            if not to_token:
+                to_token = from_token.copy_and_replace(
+                    "presence_key", 0
+                )
+            return (([], to_token))
+
+
 class UserPresenceCache(object):
     """Store an observed user's state and status message.
 
