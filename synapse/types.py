@@ -115,9 +115,8 @@ class StreamToken(
             raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
-        return "".join([
+        return self._SEPARATOR.join([
             str(self.events_key),
-            self._SEPARATOR,
             str(self.presence_key),
         ])
 
