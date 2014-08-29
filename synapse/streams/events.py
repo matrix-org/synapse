@@ -54,7 +54,7 @@ class EventSources(object):
     @defer.inlineCallbacks
     def get_current_token(self):
         token = StreamToken(
-            events_key=(
+            room_key=(
                 yield self.sources["room"].get_current_token_part()
             ),
             presence_key=(

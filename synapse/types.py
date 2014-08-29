@@ -97,7 +97,7 @@ class RoomID(DomainSpecificString):
 class StreamToken(
     namedtuple(
         "Token",
-        ("events_key", "presence_key", "typing_key")
+        ("room_key", "presence_key", "typing_key")
     )
 ):
     _SEPARATOR = "_"

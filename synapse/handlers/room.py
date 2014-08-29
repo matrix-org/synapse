@@ -476,13 +476,13 @@ class RoomEventSource(object):
 
         events, end_key = yield self.store.get_room_events_stream(
             user_id=user.to_string(),
-            from_key=from_token.events_key,
+            from_key=from_token.room_key,
             to_key=to_key,
             room_id=None,
             limit=limit,
         )
 
-        end_token = from_token.copy_and_replace("events_key", end_key)
+        end_token = from_token.copy_and_replace("room_key", end_key)
 
         defer.returnValue((events, end_token))
 
@@ -496,17 +496,17 @@ class RoomEventSource(object):
         limit = pagination_config.limit
         direction = pagination_config.direction
 
-        to_key = to_token.events_key if to_token else None
+        to_key = to_token.room_key if to_token else None
 
         events, next_key = yield self.store.paginate_room_events(
             room_id=key,
-            from_key=from_token.events_key,
+            from_key=from_token.room_key,
             to_key=to_key,
             direction=direction,
             limit=limit,
             with_feedback=True
         )
 
-        next_token = from_token.copy_and_replace("events_key", next_key)
+        next_token = from_token.copy_and_replace("room_key", next_key)
 
         defer.returnValue((events, next_token))
