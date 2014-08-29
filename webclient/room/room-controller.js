@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mUtilities', '$rootScope',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventHandlerService, mFileUpload, mUtilities, $rootScope) {
+angular.module('RoomController', ['ngSanitize', 'mFileInput'])
+.controller('RoomController', ['$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload',
+                               function($scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
