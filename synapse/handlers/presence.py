@@ -260,7 +260,6 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def user_joined_room(self, user, room_id):
-        statuscache = self._get_or_make_usercache(user)
 
         if user.is_mine:
             self.push_update_to_local_and_remote(
@@ -268,11 +267,23 @@ class PresenceHandler(BaseHandler):
                 room_ids=[room_id],
                 statuscache=self._get_or_offline_usercache(user),
             )
+
         else:
-            self.push_update_to_clients_2(
+            self.push_update_to_clients(
                 observed_user=user,
                 room_ids=[room_id],
                 statuscache=self._get_or_offline_usercache(user),
+            )
+
+        # We also want to tell them about current presence of people.
+        rm_handler = self.homeserver.get_handlers().room_member_handler
+        curr_users = yield rm_handler.get_room_members(room_id)
+
+        for local_user in [c for c in curr_users if c.is_mine]:
+            self.push_update_to_local_and_remote(
+                observed_user=local_user,
+                users_to_push=[user],
+                statuscache=self._get_or_offline_usercache(local_user),
             )
 
     @defer.inlineCallbacks
@@ -405,8 +416,13 @@ class PresenceHandler(BaseHandler):
 
         if state is None:
             state = yield self.store.get_presence_state(user.localpart)
+        else:
+#            statuscache = self._get_or_make_usercache(user)
+#            self._user_cachemap_latest_serial += 1
+#            statuscache.update(state, self._user_cachemap_latest_serial)
+            pass
 
-        _, remote_domains = yield self.push_update_to_local_and_remote(
+        yield self.push_update_to_local_and_remote(
             observed_user=user,
             users_to_push=target_users,
             room_ids=room_ids,
@@ -416,6 +432,14 @@ class PresenceHandler(BaseHandler):
         for target_user in target_users:
             if target_user.is_mine:
                 self._start_polling_local(user, target_user)
+
+                # We want to tell the person that just came online
+                # presence state of people they are interested in?
+                self.push_update_to_clients(
+                    observed_user=target_user,
+                    users_to_push=[user],
+                    statuscache=self._get_or_offline_usercache(target_user),
+                )
 
         deferreds = []
         remote_users = [u for u in target_users if not u.is_mine]
@@ -544,13 +568,7 @@ class PresenceHandler(BaseHandler):
         yield self.push_update_to_local_and_remote(
             observed_user=user,
             users_to_push=localusers,
-            room_ids=room_ids,
-            statuscache=statuscache,
-        )
-
-        self.push_update_to_clients_2(
-            observed_user=user,
-            users_to_push=localusers,
+            remote_domains=remotedomains,
             room_ids=room_ids,
             statuscache=statuscache,
         )
@@ -570,12 +588,17 @@ class PresenceHandler(BaseHandler):
                 self.clock.time_msec() - state.pop("mtime")
             )
 
+        user_state = {
+            "user_id": user.to_string(),
+        }
+        user_state.update(**state)
+
         yield self.federation.send_edu(
             destination=destination,
             edu_type="m.presence",
             content={
                 "push": [
-                    dict(user_id=user.to_string(), **state),
+                    user_state,
                 ],
             }
         )
@@ -610,7 +633,7 @@ class PresenceHandler(BaseHandler):
             self._user_cachemap_latest_serial += 1
             statuscache.update(state, serial=self._user_cachemap_latest_serial)
 
-            self.push_update_to_clients_2(
+            self.push_update_to_clients(
                 observed_user=user,
                 users_to_push=observers,
                 room_ids=room_ids,
@@ -652,6 +675,7 @@ class PresenceHandler(BaseHandler):
     @defer.inlineCallbacks
     def push_update_to_local_and_remote(self, observed_user,
                                         users_to_push=[], room_ids=[],
+                                        remote_domains=[],
                                         statuscache=None):
 
         localusers, remoteusers = partitionbool(
@@ -661,14 +685,15 @@ class PresenceHandler(BaseHandler):
 
         localusers = set(localusers)
 
-        self.push_update_to_clients_2(
-            observed_user,
+        self.push_update_to_clients(
+            observed_user=observed_user,
             users_to_push=localusers,
             room_ids=room_ids,
             statuscache=statuscache,
         )
 
-        remote_domains = set([r.domain for r in remoteusers])
+        remote_domains = set(remote_domains)
+        remote_domains |= set([r.domain for r in remoteusers])
         for room_id in room_ids:
             remote_domains.update(
                 (yield self.store.get_joined_hosts_for_room(room_id))
@@ -689,10 +714,8 @@ class PresenceHandler(BaseHandler):
 
         defer.returnValue((localusers, remote_domains))
 
-    def push_update_to_clients_2(self, observed_user, users_to_push=[],
+    def push_update_to_clients(self, observed_user, users_to_push=[],
                                  room_ids=[], statuscache=None):
-        statuscache.make_event(user=observed_user, clock=self.clock)
-
         self.notifier.on_new_user_event(
             users_to_push,
             room_ids,
