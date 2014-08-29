@@ -96,8 +96,40 @@ CREATE TABLE IF NOT EXISTS rooms(
     creator TEXT
 );
 
+CREATE TABLE IF NOT EXISTS room_join_rules(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    join_rule TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS room_join_rules_event_id ON room_join_rules(event_id);
+CREATE INDEX IF NOT EXISTS room_join_rules_room_id ON room_join_rules(room_id);
+
+
+CREATE TABLE IF NOT EXISTS room_power_levels(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    level INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS room_power_levels_event_id ON room_power_levels(event_id);
+CREATE INDEX IF NOT EXISTS room_power_levels_room_id ON room_power_levels(room_id);
+CREATE INDEX IF NOT EXISTS room_power_levels_room_user ON room_power_levels(room_id, user_id);
+
+
+CREATE TABLE IF NOT EXISTS room_default_levels(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    level INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS room_default_levels_event_id ON room_default_levels(event_id);
+CREATE INDEX IF NOT EXISTS room_default_levels_room_id ON room_default_levels(room_id);
+
+
 CREATE TABLE IF NOT EXISTS room_hosts(
     room_id TEXT NOT NULL,
     host TEXT NOT NULL,
     CONSTRAINT room_hosts_uniq UNIQUE (room_id, host) ON CONFLICT IGNORE
 );
+
+CREATE INDEX IF NOT EXISTS room_hosts_room_id ON room_hosts (room_id);

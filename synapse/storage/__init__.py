@@ -19,6 +19,9 @@ from synapse.api.events.room import (
     RoomMemberEvent, RoomTopicEvent, FeedbackEvent,
 #   RoomConfigEvent,
     RoomNameEvent,
+    RoomJoinRulesEvent,
+    RoomPowerLevelsEvent,
+    RoomDefaultLevelEvent,
 )
 
 from synapse.util.logutils import log_function
@@ -129,6 +132,12 @@ class DataStore(RoomMemberStore, RoomStore,
             self._store_room_name_txn(txn, event)
         elif event.type == RoomTopicEvent.TYPE:
             self._store_room_topic_txn(txn, event)
+        elif event.type == RoomJoinRulesEvent.TYPE:
+            self._store_join_rule(txn, event)
+        elif event.type == RoomPowerLevelsEvent.TYPE:
+            self._store_power_levels(txn, event)
+        elif event.type == RoomDefaultLevelEvent.TYPE:
+            self._store_default_level(txn, event)
 
         vals = {
             "topological_ordering": event.depth,
