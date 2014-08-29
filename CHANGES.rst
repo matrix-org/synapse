@@ -1,3 +1,25 @@
+Changes in synapse 0.1.0 (2014-08-29)
+=====================================
+Presence has been reenabled in this release.
+
+Homeserver:
+ * Update client to server API, including:
+    - Use a more consistent url scheme.
+    - Provide more useful information in the initial sync api.
+ * Change the presence handling to be much more efficient.
+ * Change the presence server to server API to not require explicit polling of
+   all users who share a room with a user.
+ * Fix races in the event streaming logic.
+
+Webclient:
+ * Update to use new client to server API.
+ * Add basic VOIP support.
+ * Add idle timers that change your status to away.
+ * Add recent rooms column when viewing a room.
+ * Various network efficiency improvements.
+ * Add basic mobile browser support.
+ * Add a settings page.
+
 Changes in synapse 0.0.1 (2014-08-22)
 =====================================
 Presence has been disabled in this release due to a bug that caused the
