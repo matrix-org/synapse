@@ -51,7 +51,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             objDiv.scrollTop = objDiv.scrollHeight;
         }, 0);
     };
-    
+
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
         if (isLive && event.room_id === $scope.room_id) {
             scrollToBottom();
@@ -88,6 +88,10 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         call.onHangup = $scope.onCallHangup;
         $scope.currentCall = call;
     });
+
+    $scope.memberCount = function() {
+        return Object.keys($scope.members).length;
+    };
     
     $scope.paginateMore = function() {
         if ($scope.state.can_paginate) {
