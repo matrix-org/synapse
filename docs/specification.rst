@@ -35,8 +35,8 @@ namespaced to the home server which allocated the account and looks like::
 
   @localpart:domain
 
-The ``localpart`` of a user ID may be a user name, or an opaque ID identifying this user.
-
+The ``localpart`` of a user ID may be a user name, or an opaque ID identifying this user. They are
+case-insensitive.
 
 A "Home Server" is a server which provides C-S APIs and has the ability to federate with other HSes.
 It is typically responsible for multiple clients. "Federation" is the term used to describe the
@@ -60,7 +60,8 @@ identified via a "Room ID", which look like::
 
 There is exactly one room ID for each room. Whilst the room ID does contain a
 domain, it is simply for namespacing room IDs. The room does NOT reside on the
-domain specified. Room IDs are not meant to be human readable.
+domain specified. Room IDs are not meant to be human readable. They ARE
+case-sensitive.
 
 The following diagram shows an ``m.room.message`` event being sent in the room 
 ``!qporfwt:matrix.org``::
@@ -102,10 +103,10 @@ Each room can also have multiple "Room Aliases", which looks like::
 
 A room alias "points" to a room ID. The room ID the alias is pointing to can be obtained
 by visiting the domain specified. Room aliases are designed to be human readable strings
-which can be used to publicise rooms. Note that the mapping from a room alias to a 
-room ID is not fixed, and may change over time to point to a different room ID. For this
-reason, Clients SHOULD resolve the room alias to a room ID once and then use that ID on
-subsequent requests.
+which can be used to publicise rooms. They are case-insensitive. Note that the mapping 
+from a room alias to a room ID is not fixed, and may change over time to point to a 
+different room ID. For this reason, Clients SHOULD resolve the room alias to a room ID 
+once and then use that ID on subsequent requests.
 
 ::
 
@@ -214,6 +215,12 @@ In contrast, these are invalid requests::
       "key": "This is a put but it is missing a txnId."
     }
 
+
+
+- TODO: All strings everywhere are UTF-8
+
+
+
 Receiving live updates on a client
 ----------------------------------
 Clients can receive new events by long-polling the home server. This will hold open the
@@ -288,6 +295,7 @@ Joining rooms
 Leaving rooms
 -------------
 - API to hit (``$roomid/leave``).
+- If no more HSes in room, can delete room?
 - Is there a dance?
 
 Room events
