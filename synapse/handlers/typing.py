@@ -152,10 +152,10 @@ class TypingNotificationEventSource(object):
         self.hs = hs
 
     def get_new_events_for_user(self, user, from_token, limit):
-        return ([], 0)
+        return ([], from_token)
 
     def get_current_token_part(self):
         return 0
 
     def get_pagination_rows(self, user, pagination_config, key):
-        return ([], 0)
+        return ([], pagination_config.from_token)
