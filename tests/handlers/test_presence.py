@@ -193,6 +193,8 @@ class PresenceStateTestCase(unittest.TestCase):
             SynapseError
         )
 
+    test_get_disallowed_state.skip = "Presence permissions are disabled"
+
     @defer.inlineCallbacks
     def test_set_my_state(self):
         mocked_set = self.datastore.set_presence_state
@@ -497,6 +499,7 @@ class PresencePushTestCase(unittest.TestCase):
                 db_pool=None,
                 datastore=Mock(spec=[
                     "set_presence_state",
+                    "get_joined_hosts_for_room",
 
                     # Bits that Federation needs
                     "prep_send_transaction",
@@ -511,8 +514,12 @@ class PresencePushTestCase(unittest.TestCase):
             )
         hs.handlers = JustPresenceHandlers(hs)
 
+        def update(*args,**kwargs):
+            # print "mock_update_client: Args=%s, kwargs=%s" %(args, kwargs,)
+            return defer.succeed(None)
+
         self.mock_update_client = Mock()
-        self.mock_update_client.return_value = defer.succeed(None)
+        self.mock_update_client.side_effect = update
 
         self.datastore = hs.get_datastore()
 
@@ -545,6 +552,14 @@ class PresencePushTestCase(unittest.TestCase):
             else:
                 return defer.succeed([])
         self.room_member_handler.get_room_members = get_room_members
+
+        def get_room_hosts(room_id):
+            if room_id == "a-room":
+                hosts = set([u.domain for u in self.room_members])
+                return defer.succeed(hosts)
+            else:
+                return defer.succeed([])
+        self.datastore.get_joined_hosts_for_room = get_room_hosts
 
         @defer.inlineCallbacks
         def fetch_room_distributions_into(room_id, localusers=None,
@@ -611,18 +626,10 @@ class PresencePushTestCase(unittest.TestCase):
                 {"state": ONLINE})
 
         self.mock_update_client.assert_has_calls([
-                call(observer_user=self.u_apple,
+                call(users_to_push=set([self.u_apple, self.u_banana, self.u_clementine]),
+                    room_ids=["a-room"],
                     observed_user=self.u_apple,
                     statuscache=ANY), # self-reflection
-                call(observer_user=self.u_banana,
-                    observed_user=self.u_apple,
-                    statuscache=ANY),
-                call(observer_user=self.u_clementine,
-                    observed_user=self.u_apple,
-                    statuscache=ANY),
-                call(observer_user=self.u_elderberry,
-                    observed_user=self.u_apple,
-                    statuscache=ANY),
         ], any_order=True)
         self.mock_update_client.reset_mock()
 
@@ -651,7 +658,8 @@ class PresencePushTestCase(unittest.TestCase):
         ], presence)
 
         self.mock_update_client.assert_has_calls([
-                call(observer_user=self.u_banana,
+                call(users_to_push=set([self.u_banana]),
+                    room_ids=[],
                     observed_user=self.u_banana,
                     statuscache=ANY), # self-reflection
         ]) # and no others...
@@ -659,21 +667,21 @@ class PresencePushTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_push_remote(self):
         put_json = self.mock_http_client.put_json
-        put_json.expect_call_and_return(
-            call("remote",
-                path=ANY,  # Can't guarantee which txn ID will be which
-                data=_expect_edu("remote", "m.presence",
-                    content={
-                        "push": [
-                            {"user_id": "@apple:test",
-                             "state": "online",
-                             "mtime_age": 0},
-                        ],
-                    }
-                )
-            ),
-            defer.succeed((200, "OK"))
-        )
+#        put_json.expect_call_and_return(
+#            call("remote",
+#                path=ANY,  # Can't guarantee which txn ID will be which
+#                data=_expect_edu("remote", "m.presence",
+#                    content={
+#                        "push": [
+#                            {"user_id": "@apple:test",
+#                             "state": "online",
+#                             "mtime_age": 0},
+#                        ],
+#                    }
+#                )
+#            ),
+#            defer.succeed((200, "OK"))
+#        )
         put_json.expect_call_and_return(
             call("farm",
                 path=ANY,  # Can't guarantee which txn ID will be which
@@ -681,7 +689,7 @@ class PresencePushTestCase(unittest.TestCase):
                     content={
                         "push": [
                             {"user_id": "@apple:test",
-                             "state": "online",
+                             "state": u"online",
                              "mtime_age": 0},
                         ],
                     }
@@ -730,10 +738,8 @@ class PresencePushTestCase(unittest.TestCase):
         )
 
         self.mock_update_client.assert_has_calls([
-                call(observer_user=self.u_apple,
-                    observed_user=self.u_potato,
-                    statuscache=ANY),
-                call(observer_user=self.u_banana,
+                call(users_to_push=set([self.u_apple]),
+                    room_ids=["a-room"],
                     observed_user=self.u_potato,
                     statuscache=ANY),
         ], any_order=True)
@@ -753,19 +759,17 @@ class PresencePushTestCase(unittest.TestCase):
         )
 
         self.mock_update_client.assert_has_calls([
-            # Apple and Elderberry see each other
-            call(observer_user=self.u_apple,
+            call(room_ids=["a-room"],
                 observed_user=self.u_elderberry,
+                users_to_push=set(),
                 statuscache=ANY),
-            call(observer_user=self.u_elderberry,
+            call(users_to_push=set([self.u_elderberry]),
                 observed_user=self.u_apple,
+                room_ids=[],
                 statuscache=ANY),
-            # Banana and Elderberry see each other
-            call(observer_user=self.u_banana,
-                observed_user=self.u_elderberry,
-                statuscache=ANY),
-            call(observer_user=self.u_elderberry,
+            call(users_to_push=set([self.u_elderberry]),
                 observed_user=self.u_banana,
+                room_ids=[],
                 statuscache=ANY),
         ], any_order=True)
 
@@ -887,7 +891,12 @@ class PresencePollingTestCase(unittest.TestCase):
         self.datastore.get_received_txn_response = get_received_txn_response
 
         self.mock_update_client = Mock()
-        self.mock_update_client.return_value = defer.succeed(None)
+
+        def update(*args,**kwargs):
+            # print "mock_update_client: Args=%s, kwargs=%s" %(args, kwargs,)
+            return defer.succeed(None)
+
+        self.mock_update_client.side_effect = update
 
         self.handler = hs.get_handlers().presence_handler
         self.handler.push_update_to_clients = self.mock_update_client
@@ -951,10 +960,10 @@ class PresencePollingTestCase(unittest.TestCase):
 
         # apple should see both banana and clementine currently offline
         self.mock_update_client.assert_has_calls([
-                call(observer_user=self.u_apple,
+                call(users_to_push=[self.u_apple],
                     observed_user=self.u_banana,
                     statuscache=ANY),
-                call(observer_user=self.u_apple,
+                call(users_to_push=[self.u_apple],
                     observed_user=self.u_clementine,
                     statuscache=ANY),
         ], any_order=True)
@@ -974,10 +983,11 @@ class PresencePollingTestCase(unittest.TestCase):
 
         # apple and banana should now both see each other online
         self.mock_update_client.assert_has_calls([
-                call(observer_user=self.u_apple,
+                call(users_to_push=set([self.u_apple]),
                     observed_user=self.u_banana,
+                    room_ids=[],
                     statuscache=ANY),
-                call(observer_user=self.u_banana,
+                call(users_to_push=[self.u_banana],
                     observed_user=self.u_apple,
                     statuscache=ANY),
         ], any_order=True)
@@ -994,8 +1004,9 @@ class PresencePollingTestCase(unittest.TestCase):
 
         # banana should now be told apple is offline
         self.mock_update_client.assert_has_calls([
-                call(observer_user=self.u_banana,
+                call(users_to_push=set([self.u_banana, self.u_apple]),
                     observed_user=self.u_apple,
+                    room_ids=[],
                     statuscache=ANY),
         ], any_order=True)
 
@@ -1008,10 +1019,22 @@ class PresencePollingTestCase(unittest.TestCase):
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("remote",
-                path="/matrix/federation/v1/send/1000000/",
+                path=ANY,
                 data=_expect_edu("remote", "m.presence",
                     content={
                         "poll": [ "@potato:remote" ],
+                    },
+                ),
+            ),
+            defer.succeed((200, "OK"))
+        )
+
+        put_json.expect_call_and_return(
+            call("remote",
+                path=ANY,
+                data=_expect_edu("remote", "m.presence",
+                    content={
+                        "push": [ {"user_id": "@clementine:test" }],
                     },
                 ),
             ),
@@ -1032,15 +1055,28 @@ class PresencePollingTestCase(unittest.TestCase):
         self.assertTrue(self.u_clementine in
                 self.handler._remote_recvmap[self.u_potato])
 
+
+        put_json.expect_call_and_return(
+            call("remote",
+                path=ANY,
+                data=_expect_edu("remote", "m.presence",
+                    content={
+                        "push": [ {"user_id": "@fig:test" }],
+                    },
+                ),
+            ),
+            defer.succeed((200, "OK"))
+        )
+
         # fig goes online; shouldn't send a second poll
         yield self.handler.set_state(
             target_user=self.u_fig, auth_user=self.u_fig,
             state={"state": ONLINE}
         )
 
-        reactor.iterate(delay=0)
+        # reactor.iterate(delay=0)
 
-        put_json.assert_had_no_calls()
+        yield put_json.await_calls()
 
         # fig goes offline
         yield self.handler.set_state(
@@ -1054,7 +1090,7 @@ class PresencePollingTestCase(unittest.TestCase):
 
         put_json.expect_call_and_return(
             call("remote",
-                path="/matrix/federation/v1/send/1000001/",
+                path=ANY,
                 data=_expect_edu("remote", "m.presence",
                     content={
                         "unpoll": [ "@potato:remote" ],
@@ -1069,7 +1105,7 @@ class PresencePollingTestCase(unittest.TestCase):
                 target_user=self.u_clementine, auth_user=self.u_clementine,
                 state={"state": OFFLINE})
 
-        put_json.await_calls()
+        yield put_json.await_calls()
 
         self.assertFalse(self.u_potato in self.handler._remote_recvmap,
             msg="expected potato not to be in _remote_recvmap"

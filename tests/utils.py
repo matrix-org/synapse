@@ -21,7 +21,7 @@ from synapse.api.events.room import (
     RoomMemberEvent, MessageEvent
 )
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from collections import namedtuple
 from mock import patch, Mock
@@ -263,18 +263,43 @@ class DeferredMockCallable(object):
                 d.callback(None)
                 return result
 
-        raise AssertionError("Was not expecting call(%s)" %
+        failure = AssertionError("Was not expecting call(%s)" %
             _format_call(args, kwargs)
         )
+
+        for _, _, d in self.expectations:
+            try:
+                d.errback(failure)
+            except:
+                pass
+
+        raise failure
 
     def expect_call_and_return(self, call, result):
         self.expectations.append((call, result, defer.Deferred()))
 
     @defer.inlineCallbacks
-    def await_calls(self):
-        while self.expectations:
-            (_, _, d) = self.expectations.pop(0)
-            yield d
+    def await_calls(self, timeout=1000):
+        deferred = defer.DeferredList(
+            [d for _, _, d in self.expectations],
+            fireOnOneErrback=True
+        )
+
+        timer = reactor.callLater(
+            timeout/1000,
+            deferred.errback,
+            AssertionError(
+                "%d pending calls left: %s"% (
+                    len([e for e in self.expectations if not e[2].called]),
+                    [e for e in self.expectations if not e[2].called]
+                )
+            )
+        )
+
+        yield deferred
+
+        timer.cancel()
+
         self.calls = []
 
     def assert_had_no_calls(self):

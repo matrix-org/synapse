@@ -9,7 +9,9 @@ TODO(Introduction) : Matthew
 
 Architecture
 ============
-- Sending a message from A to B
+
+Clients transmit data to other clients through home servers (HSes). Clients do not communicate with each
+other directly.
 
 ::
 
@@ -26,39 +28,42 @@ Architecture
        |                  |<--------( HTTP )-----------|                  |
        +------------------+        Federation          +------------------+
 
-- Client is an end-user (web app, mobile app) which uses C-S APIs to talk to the home server.
-  A given client is typically responsible for a single user.
-- A single user is represented by a User ID, scoped to the home server which allocated the account.
-  User IDs MUST have @ prefix; looks like @foo:domain - domain indicates the user's home
-  server. 
-- Home server provides C-S APIs and has the ability to federate with other HSes.
-  Typically responsible for N clients.
-- Federation's purpose is to share content between interested HSes; no SPOF. 
-- Events are actions within the system. Typically each action (e.g. sending a message)
-  correlates with exactly one event. Each event has a ``type`` string. 
-- ``type`` values SHOULD be namespaced according to standard Java package naming conventions, 
-  with a ``.`` delimiter e.g. ``com.example.myapp.event``
-- Events are typically send in the context of a room.
+A "Client" is an end-user, typically a human using a web application or mobile app. Clients use the
+"Client-to-Server" (C-S) API to communicate with their home server. A single Client is usually
+responsible for a single user account. A user account is represented by their "User ID". This ID is
+namespaced to the home server which allocated the account and looks like::
+
+  @localpart:domain
+
+The ``localpart`` of a user ID may be a user name, or an opaque ID identifying this user.
+
+
+A "Home Server" is a server which provides C-S APIs and has the ability to federate with other HSes.
+It is typically responsible for multiple clients. "Federation" is the term used to describe the
+sharing of data between two or more home servers.
+
+Data in Matrix is encapsulated in an "Event". An event is an action within the system. Typically each
+action (e.g. sending a message) correlates with exactly one event. Each event has a ``type`` which is
+used to differentiate different kinds of data. ``type`` values SHOULD be namespaced according to standard
+Java package naming conventions, e.g. ``com.example.myapp.event``. Events are usually sent in the context
+of a "Room".
 
 Room structure
 --------------
 
-A room is a conceptual place where users can send and receive messages. Rooms 
-can be created, joined and left. Messages are sent to a room, and all 
-participants in that room will receive the message. Rooms are uniquely 
-identified via a room ID. There is exactly one room ID for each room. Each
-room can also have an alias. Each room can have many aliases.
+A room is a conceptual place where users can send and receive events. Rooms 
+can be created, joined and left. Events are sent to a room, and all 
+participants in that room will receive the event. Rooms are uniquely 
+identified via a "Room ID", which look like::
 
-- Room IDs MUST have ! prefix; looks like !foo:domain - domain is simply for namespacing,
-  the room does NOT reside on any one domain. NOT human readable.
+  !opaque_id:domain
 
-- Room Aliases MUST have # prefix; looks like #foo:domain - domain indicates where this
-  alias can be mapped to a room ID. Key point: human readable / friendly.
+There is exactly one room ID for each room. Whilst the room ID does contain a
+domain, it is simply for namespacing room IDs. The room does NOT reside on the
+domain specified. Room IDs are not meant to be human readable.
 
-- Aliases can be queried on the domain they specify, which will return a room ID if a
-  mapping exists. These mappings can change.
-
-::
+The following diagram shows an ``m.room.message`` event being sent in the room 
+``!qporfwt:matrix.org``::
 
        { @alice:matrix.org }                             { @bob:domain.com }
                |                                                 ^
@@ -73,18 +78,48 @@ room can also have an alias. Each room can have many aliases.
        |   matrix.org     |<-------Federation------->|   domain.com     |
        +------------------+                          +------------------+
                 |       .................................        |
-                |______|         Shared State            |_______|
-                       |  Room ID: !qporfwt:matrix.org   |
+                |______|     Partially Shared State      |_______|
+                       | Room ID: !qporfwt:matrix.org    |
                        | Servers: matrix.org, domain.com |
                        | Members:                        |
                        |  - @alice:matrix.org            |
                        |  - @bob:domain.com              |
                        |.................................|
 
-- Federation's goal is to maintain the shared state. Don't need FULL state in order
-  to be a part of a room.
-- Introduce the DAG.
-- Events are wrapped in PDUs.
+Federation maintains shared state between multiple home servers, such that when an event is
+sent to a room, the home server knows where to forward the event on to, and how to process
+the event. Home servers do not need to have completely shared state in order to participate 
+in a room. State is scoped to a single room, and federation ensures that all home servers 
+have the information they need, even if that means the home server has to request more 
+information from another home server before processing the event.
+
+Room Aliases
+------------
+
+Each room can also have multiple "Room Aliases", which looks like::
+
+  #room_alias:domain
+
+A room alias "points" to a room ID. The room ID the alias is pointing to can be obtained
+by visiting the domain specified. Room aliases are designed to be human readable strings
+which can be used to publicise rooms. Note that the mapping from a room alias to a 
+room ID is not fixed, and may change over time to point to a different room ID. For this
+reason, Clients SHOULD resolve the room alias to a room ID once and then use that ID on
+subsequent requests.
+
+::
+
+          GET    
+   #matrix:domain.com      !aaabaa:matrix.org
+           |                    ^
+           |                    |
+    _______V____________________|____
+   |          domain.com            |
+   | Mappings:                      |
+   | #matrix >> !aaabaa:matrix.org  |
+   | #golf >> !wfeiofh:sport.com    |
+   | #bike >> !4rguxf:matrix.org    |
+   |________________________________|
 
        
 Identity
