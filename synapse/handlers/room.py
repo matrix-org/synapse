@@ -469,22 +469,20 @@ class RoomEventSource(object):
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def get_new_events_for_user(self, user, from_token, limit):
+    def get_new_events_for_user(self, user, from_key, limit):
         # We just ignore the key for now.
 
         to_key = yield self.get_current_token_part()
 
         events, end_key = yield self.store.get_room_events_stream(
             user_id=user.to_string(),
-            from_key=from_token.room_key,
+            from_key=from_key,
             to_key=to_key,
             room_id=None,
             limit=limit,
         )
 
-        end_token = from_token.copy_and_replace("room_key", end_key)
-
-        defer.returnValue((events, end_token))
+        defer.returnValue((events, end_key))
 
     def get_current_token_part(self):
         return self.store.get_room_events_max_id()

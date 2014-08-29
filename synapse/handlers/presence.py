@@ -727,8 +727,8 @@ class PresenceEventSource(object):
         self.hs = hs
         self.clock = hs.get_clock()
 
-    def get_new_events_for_user(self, user, from_token, limit):
-        from_key = int(from_token.presence_key)
+    def get_new_events_for_user(self, user, from_key, limit):
+        from_key = int(from_key)
 
         presence = self.hs.get_handlers().presence_handler
         cachemap = presence._user_cachemap
@@ -743,15 +743,9 @@ class PresenceEventSource(object):
             latest_serial = max([x[1].serial for x in updates])
             data = [x[1].make_event(user=x[0], clock=clock) for x in updates]
 
-            end_token = from_token.copy_and_replace(
-                "presence_key", latest_serial
-            )
-            return ((data, end_token))
+            return ((data, latest_serial))
         else:
-            end_token = from_token.copy_and_replace(
-                "presence_key", presence._user_cachemap_latest_serial
-            )
-            return (([], end_token))
+            return (([], presence._user_cachemap_latest_serial))
 
     def get_current_token_part(self):
         presence = self.hs.get_handlers().presence_handler

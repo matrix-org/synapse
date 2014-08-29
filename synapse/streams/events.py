@@ -28,8 +28,8 @@ class NullSource(object):
     def __init__(self, hs):
         pass
 
-    def get_new_events_for_user(self, user, from_token, limit):
-        return defer.succeed(([], from_token))
+    def get_new_events_for_user(self, user, from_key, limit):
+        return defer.succeed(([], from_key))
 
     def get_current_token_part(self):
         return defer.succeed(0)
@@ -68,7 +68,8 @@ class EventSources(object):
 
 
 class StreamSource(object):
-    def get_new_events_for_user(self, user, from_token, limit):
+    def get_new_events_for_user(self, user, from_key, limit):
+        """from_key is the key within this event source."""
         raise NotImplementedError("get_new_events_for_user")
 
     def get_current_token_part(self):

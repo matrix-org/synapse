@@ -151,8 +151,8 @@ class TypingNotificationEventSource(object):
     def __init__(self, hs):
         self.hs = hs
 
-    def get_new_events_for_user(self, user, from_token, limit):
-        return ([], from_token)
+    def get_new_events_for_user(self, user, from_key, limit):
+        return ([], from_key)
 
     def get_current_token_part(self):
         return 0
