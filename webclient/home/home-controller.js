@@ -118,7 +118,6 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
         matrixService.getDisplayName($scope.config.user_id).then(
             function(response) {
                 $scope.profile.displayName = response.data.displayname;
-                $scope.profileOnServer.displayName = response.data.displayname;
             },
             function(error) {
                 $scope.feedback = "Can't load display name";
@@ -128,7 +127,6 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
         matrixService.getProfilePictureUrl($scope.config.user_id).then(
             function(response) {
                 $scope.profile.avatarUrl = response.data.avatar_url;
-                $scope.profileOnServer.avatarUrl = response.data.avatar_url;
             },
             function(error) {
                 $scope.feedback = "Can't load avatar URL";
