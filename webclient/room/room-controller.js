@@ -471,7 +471,5 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     }
 
     $scope.onCallHangup = function() {
-        $scope.feedback = "Call ended";
-        $scope.currentCall = undefined;
     }
 }]);
