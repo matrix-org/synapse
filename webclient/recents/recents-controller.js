@@ -17,21 +17,34 @@
 'use strict';
 
 angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
-.controller('RecentsController', ['$scope', 'matrixService', 'eventHandlerService', 'eventStreamService', 
-                               function($scope,  matrixService, eventHandlerService, eventStreamService) {
+.controller('RecentsController', ['$scope', 'matrixService', 'eventHandlerService', 
+                               function($scope,  matrixService, eventHandlerService) {
     $scope.rooms = {};
 
     // $scope of the parent where the recents component is included can override this value
     // in order to highlight a specific room in the list
     $scope.recentsSelectedRoomID;
 
-    // Refresh the list on matrix invitation and message event
-    $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
-        refresh();
-    });
-    $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
-        refresh();
-    });
+    var listenToEventStream = function() {
+        // Refresh the list on matrix invitation and message event
+        $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
+            var config = matrixService.config();
+            if (isLive && event.state_key === config.user_id && event.content.membership === "invite") {
+                console.log("Invited to room " + event.room_id);
+                // FIXME push membership to top level key to match /im/sync
+                event.membership = event.content.membership;
+                // FIXME bodge a nicer name than the room ID for this invite.
+                event.room_display_name = event.user_id + "'s room";
+                $scope.rooms[event.room_id] = event;
+            }
+        });
+        $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
+            if (isLive) {
+                $scope.rooms[event.room_id].lastMsg = event;              
+            }
+        });
+    };
+
     
     var refresh = function() {
         // List all rooms joined or been invited to
@@ -42,13 +55,16 @@ angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
                 // Reset data
                 $scope.rooms = {};
 
-                var data = matrixService.assignRoomAliases(response.data.rooms);
-                for (var i=0; i<data.length; i++) {
-                    $scope.rooms[data[i].room_id] = data[i];
+                var rooms = response.data.rooms;
+                for (var i=0; i<rooms.length; i++) {
+                    var room = rooms[i];
+                    
+                    // Add room_alias & room_display_name members
+                    $scope.rooms[room.room_id] = angular.extend(room, matrixService.getRoomAliasAndDisplayName(room));
 
                     // Create a shortcut for the last message of this room
-                    if (data[i].messages && data[i].messages.chunk && data[i].messages.chunk[0]) {
-                        $scope.rooms[data[i].room_id].lastMsg = data[i].messages.chunk[0];
+                    if (room.messages && room.messages.chunk && room.messages.chunk[0]) {
+                        $scope.rooms[room.room_id].lastMsg = room.messages.chunk[0];
                     }
                 }
 
@@ -56,6 +72,9 @@ angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
                 for (var i = 0; i < presence.length; ++i) {
                     eventHandlerService.handleEvent(presence[i], false);
                 }
+
+                // From now, update recents from the stream
+                listenToEventStream();
             },
             function(error) {
                 $scope.feedback = "Failure: " + error.data;

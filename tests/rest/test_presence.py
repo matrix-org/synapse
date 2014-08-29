@@ -114,7 +114,6 @@ class PresenceStateTestCase(unittest.TestCase):
         self.assertEquals(200, code)
         mocked_set.assert_called_with("apple",
                 {"state": UNAVAILABLE, "status_msg": "Away"})
-    test_set_my_status.skip = "Presence polling is disabled"
 
 
 class PresenceListTestCase(unittest.TestCase):
@@ -318,4 +317,3 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                  "mtime_age": 0,
             }},
         ]}, response)
-    test_shortpoll.skip = "Presence polling is disabled"

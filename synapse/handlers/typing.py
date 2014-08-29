@@ -17,10 +17,11 @@ from twisted.internet import defer
 
 from ._base import BaseHandler
 
+from synapse.api.errors import SynapseError, AuthError
+
 import logging
 
 from collections import namedtuple
-
 
 logger = logging.getLogger(__name__)
 

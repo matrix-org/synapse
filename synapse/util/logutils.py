@@ -15,8 +15,11 @@
 
 
 from inspect import getcallargs
+from functools import wraps
 
 import logging
+import inspect
+import traceback
 
 
 def log_function(f):
@@ -26,6 +29,7 @@ def log_function(f):
     lineno = f.func_code.co_firstlineno
     pathname = f.func_code.co_filename
 
+    @wraps(f)
     def wrapped(*args, **kwargs):
         name = f.__module__
         logger = logging.getLogger(name)
@@ -63,4 +67,55 @@ def log_function(f):
 
         return f(*args, **kwargs)
 
+    wrapped.__name__ = func_name
+    return wrapped
+
+
+def trace_function(f):
+    func_name = f.__name__
+    linenum = f.func_code.co_firstlineno
+    pathname = f.func_code.co_filename
+
+    def wrapped(*args, **kwargs):
+        name = f.__module__
+        logger = logging.getLogger(name)
+        level = logging.DEBUG
+
+        s = inspect.currentframe().f_back
+
+        to_print = [
+            "\t%s:%s %s. Args: args=%s, kwargs=%s" % (
+                pathname, linenum, func_name, args, kwargs
+            )
+        ]
+        while s:
+            if True or s.f_globals["__name__"].startswith("synapse"):
+                filename, lineno, function, _, _ = inspect.getframeinfo(s)
+                args_string = inspect.formatargvalues(*inspect.getargvalues(s))
+
+                to_print.append(
+                    "\t%s:%d %s. Args: %s" % (
+                        filename, lineno, function, args_string
+                    )
+                )
+
+            s = s.f_back
+
+        msg = "\nTraceback for %s:\n" % (func_name,) + "\n".join(to_print)
+
+        record = logging.LogRecord(
+            name=name,
+            level=level,
+            pathname=pathname,
+            lineno=lineno,
+            msg=msg,
+            args=None,
+            exc_info=None
+        )
+
+        logger.handle(record)
+
+        return f(*args, **kwargs)
+
+    wrapped.__name__ = func_name
     return wrapped

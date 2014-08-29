@@ -25,7 +25,8 @@ the eventHandlerService.
 angular.module('eventStreamService', [])
 .factory('eventStreamService', ['$q', '$timeout', 'matrixService', 'eventHandlerService', function($q, $timeout, matrixService, eventHandlerService) {
     var END = "END";
-    var TIMEOUT_MS = 30000;
+    var SERVER_TIMEOUT_MS = 30000;
+    var CLIENT_TIMEOUT_MS = 40000;
     var ERR_TIMEOUT_MS = 5000;
     
     var settings = {
@@ -55,7 +56,7 @@ angular.module('eventStreamService', [])
         deferred = deferred || $q.defer();
 
         // run the stream from the latest token
-        matrixService.getEventStream(settings.from, TIMEOUT_MS).then(
+        matrixService.getEventStream(settings.from, SERVER_TIMEOUT_MS, CLIENT_TIMEOUT_MS).then(
             function(response) {
                 if (!settings.isActive) {
                     console.log("[EventStream] Got response but now inactive. Dropping data.");
@@ -80,7 +81,7 @@ angular.module('eventStreamService', [])
                 }
             },
             function(error) {
-                if (error.status == 403) {
+                if (error.status === 403) {
                     settings.shouldPoll = false;
                 }
                 
@@ -96,7 +97,7 @@ angular.module('eventStreamService', [])
         );
 
         return deferred.promise;
-    }    
+    }; 
 
     var startEventStream = function() {
         settings.shouldPoll = true;
@@ -110,18 +111,17 @@ angular.module('eventStreamService', [])
                 for (var i = 0; i < rooms.length; ++i) {
                     var room = rooms[i];
                     if ("state" in room) {
-                        for (var j = 0; j < room.state.length; ++j) {
-                            eventHandlerService.handleEvents(room.state[j], false);
-                        }
+                        eventHandlerService.handleEvents(room.state, false);
                     }
                 }
 
                 var presence = response.data.presence;
-                for (var i = 0; i < presence.length; ++i) {
-                    eventHandlerService.handleEvent(presence[i], false);
-                }
+                eventHandlerService.handleEvents(presence, false);
 
-                settings.from = response.data.end
+                // Initial sync is done
+                eventHandlerService.handleInitialSyncDone();
+
+                settings.from = response.data.end;
                 doEventStream(deferred);        
             },
             function(error) {

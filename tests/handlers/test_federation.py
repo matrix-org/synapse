@@ -28,6 +28,8 @@ from mock import NonCallableMock, ANY
 
 import logging
 
+from ..utils import get_mock_call_args
+
 logging.getLogger().addHandler(logging.NullHandler())
 
 
@@ -99,9 +101,13 @@ class FederationTestCase(unittest.TestCase):
 
         mem_handler = self.handlers.room_member_handler
         self.assertEquals(1, mem_handler.change_membership.call_count)
-        self.assertEquals(True, mem_handler.change_membership.call_args[0][1])
+        call_args = get_mock_call_args(
+            lambda event, do_auth: None,
+            mem_handler.change_membership
+        )
+        self.assertEquals(True, call_args["do_auth"])
 
-        new_event = mem_handler.change_membership.call_args[0][0]
+        new_event = call_args["event"]
         self.assertEquals(RoomMemberEvent.TYPE, new_event.type)
         self.assertEquals(room_id, new_event.room_id)
         self.assertEquals(user_id, new_event.state_key)

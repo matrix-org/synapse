@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.events import SynapseEvent
+from synapse.util.logutils import log_function
 
 from ._base import BaseHandler
 
@@ -44,6 +45,7 @@ class EventStreamHandler(BaseHandler):
         self.notifier = hs.get_notifier()
 
     @defer.inlineCallbacks
+    @log_function
     def get_stream(self, auth_user_id, pagin_config, timeout=0):
         auth_user = self.hs.parse_userid(auth_user_id)
 
@@ -90,13 +92,15 @@ class EventStreamHandler(BaseHandler):
                 # 10 seconds of grace to allow the client to reconnect again
                 #   before we think they're gone
                 def _later():
+                    logger.debug("_later stopped_user_eventstream %s", auth_user)
                     self.distributor.fire(
                         "stopped_user_eventstream", auth_user
                     )
                     del self._stop_timer_per_user[auth_user]
 
+                logger.debug("Scheduling _later: for %s", auth_user)
                 self._stop_timer_per_user[auth_user] = (
-                    self.clock.call_later(5, _later)
+                    self.clock.call_later(30, _later)
                 )
 
 

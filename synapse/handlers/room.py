@@ -360,7 +360,8 @@ class RoomMemberHandler(BaseRoomHandler):
         )
 
         snapshot = yield self.store.snapshot_room(
-            room_id, joinee, RoomMemberEvent.TYPE, joinee
+            room_id, joinee.to_string(), RoomMemberEvent.TYPE,
+            joinee.to_string()
         )
 
         yield self._do_join(new_event, snapshot, room_host=host, do_auth=True)

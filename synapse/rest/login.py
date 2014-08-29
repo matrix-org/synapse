@@ -27,7 +27,7 @@ class LoginRestServlet(RestServlet):
     PASS_TYPE = "m.login.password"
 
     def on_GET(self, request):
-        return (200, {"type": LoginRestServlet.PASS_TYPE})
+        return (200, {"flows": [{"type": LoginRestServlet.PASS_TYPE}]})
 
     def on_OPTIONS(self, request):
         return (200, {})

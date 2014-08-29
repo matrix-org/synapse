@@ -1,0 +1,916 @@
+Matrix Specification
+====================
+
+TODO(Introduction) : Matthew
+ - Similar to intro paragraph from README.
+ - Explaining the overall mission, what this spec describes...
+ - "What is Matrix?"
+ - Draw parallels with email?
+
+Architecture
+============
+
+Clients transmit data to other clients through home servers (HSes). Clients do not communicate with each
+other directly.
+
+::
+
+                         How data flows between clients
+                         ==============================
+
+       { Matrix client A }                             { Matrix client B }
+           ^          |                                    ^          |
+           |  events  |                                    |  events  |
+           |          V                                    |          V
+       +------------------+                            +------------------+
+       |                  |---------( HTTP )---------->|                  |
+       |   Home Server    |                            |   Home Server    |
+       |                  |<--------( HTTP )-----------|                  |
+       +------------------+        Federation          +------------------+
+
+A "Client" is an end-user, typically a human using a web application or mobile app. Clients use the
+"Client-to-Server" (C-S) API to communicate with their home server. A single Client is usually
+responsible for a single user account. A user account is represented by their "User ID". This ID is
+namespaced to the home server which allocated the account and looks like::
+
+  @localpart:domain
+
+The ``localpart`` of a user ID may be a user name, or an opaque ID identifying this user.
+
+
+A "Home Server" is a server which provides C-S APIs and has the ability to federate with other HSes.
+It is typically responsible for multiple clients. "Federation" is the term used to describe the
+sharing of data between two or more home servers.
+
+Data in Matrix is encapsulated in an "Event". An event is an action within the system. Typically each
+action (e.g. sending a message) correlates with exactly one event. Each event has a ``type`` which is
+used to differentiate different kinds of data. ``type`` values SHOULD be namespaced according to standard
+Java package naming conventions, e.g. ``com.example.myapp.event``. Events are usually sent in the context
+of a "Room".
+
+Room structure
+--------------
+
+A room is a conceptual place where users can send and receive events. Rooms 
+can be created, joined and left. Events are sent to a room, and all 
+participants in that room will receive the event. Rooms are uniquely 
+identified via a "Room ID", which look like::
+
+  !opaque_id:domain
+
+There is exactly one room ID for each room. Whilst the room ID does contain a
+domain, it is simply for namespacing room IDs. The room does NOT reside on the
+domain specified. Room IDs are not meant to be human readable.
+
+The following diagram shows an ``m.room.message`` event being sent in the room 
+``!qporfwt:matrix.org``::
+
+       { @alice:matrix.org }                             { @bob:domain.com }
+               |                                                 ^
+               |                                                 |
+      Room ID: !qporfwt:matrix.org                 Room ID: !qporfwt:matrix.org
+      Event type: m.room.message                   Event type: m.room.message
+      Content: { JSON object }                     Content: { JSON object }
+               |                                                 |
+               V                                                 |
+       +------------------+                          +------------------+
+       |   Home Server    |                          |   Home Server    |
+       |   matrix.org     |<-------Federation------->|   domain.com     |
+       +------------------+                          +------------------+
+                |       .................................        |
+                |______|     Partially Shared State      |_______|
+                       | Room ID: !qporfwt:matrix.org    |
+                       | Servers: matrix.org, domain.com |
+                       | Members:                        |
+                       |  - @alice:matrix.org            |
+                       |  - @bob:domain.com              |
+                       |.................................|
+
+Federation maintains shared state between multiple home servers, such that when an event is
+sent to a room, the home server knows where to forward the event on to, and how to process
+the event. Home servers do not need to have completely shared state in order to participate 
+in a room. State is scoped to a single room, and federation ensures that all home servers 
+have the information they need, even if that means the home server has to request more 
+information from another home server before processing the event.
+
+Room Aliases
+------------
+
+Each room can also have multiple "Room Aliases", which looks like::
+
+  #room_alias:domain
+
+A room alias "points" to a room ID. The room ID the alias is pointing to can be obtained
+by visiting the domain specified. Room aliases are designed to be human readable strings
+which can be used to publicise rooms. Note that the mapping from a room alias to a 
+room ID is not fixed, and may change over time to point to a different room ID. For this
+reason, Clients SHOULD resolve the room alias to a room ID once and then use that ID on
+subsequent requests.
+
+::
+
+          GET    
+   #matrix:domain.com      !aaabaa:matrix.org
+           |                    ^
+           |                    |
+    _______V____________________|____
+   |          domain.com            |
+   | Mappings:                      |
+   | #matrix >> !aaabaa:matrix.org  |
+   | #golf >> !wfeiofh:sport.com    |
+   | #bike >> !4rguxf:matrix.org    |
+   |________________________________|
+
+       
+Identity
+--------
+- Identity in relation to 3PIDs. Discovery of users based on 3PIDs.
+- Identity servers; trusted clique of servers which replicate content.
+- They govern the mapping of 3PIDs to user IDs and the creation of said mappings.
+- Not strictly required in order to communicate.
+
+
+API Standards
+-------------
+All communication in Matrix is performed over HTTP[S] using a Content-Type of ``application/json``.
+Any errors which occur on the Matrix API level MUST return a "standard error response". This is a
+JSON object which looks like::
+
+  {
+    "errcode": "<error code>",
+    "error": "<error message>"
+  }
+
+The ``error`` string will be a human-readable error message, usually a sentence
+explaining what went wrong. The ``errcode`` string will be a unique string which can be 
+used to handle an error message e.g. ``M_FORBIDDEN``. These error codes should have their 
+namespace first in ALL CAPS, followed by a single _. For example, if there was a custom
+namespace ``com.mydomain.here``, and a ``FORBIDDEN`` code, the error code should look
+like ``COM.MYDOMAIN.HERE_FORBIDDEN``. There may be additional keys depending on 
+the error, but the keys ``error`` and ``errcode`` MUST always be present. 
+
+Some standard error codes are below:
+
+:``M_FORBIDDEN``:
+  Forbidden access, e.g. joining a room without permission, failed login.
+
+:``M_UNKNOWN_TOKEN``:
+  The access token specified was not recognised.
+
+:``M_BAD_JSON``:
+  Request contained valid JSON, but it was malformed in some way, e.g. missing
+  required keys, invalid values for keys.
+
+:``M_NOT_JSON``:
+  Request did not contain valid JSON.
+
+:``M_NOT_FOUND``:
+  No resource was found for this request.
+
+Some requests have unique error codes:
+
+:``M_USER_IN_USE``:
+  Encountered when trying to register a user ID which has been taken.
+
+:``M_ROOM_IN_USE``:
+  Encountered when trying to create a room which has been taken.
+
+:``M_BAD_PAGINATION``:
+  Encountered when specifying bad pagination query parameters.
+
+:``M_LOGIN_EMAIL_URL_NOT_YET``:
+  Encountered when polling for an email link which has not been clicked yet.
+
+The C-S API typically uses ``HTTP POST`` to submit requests. This means these requests
+are not idempotent. The C-S API also allows ``HTTP PUT`` to make requests idempotent.
+In order to use a ``PUT``, paths should be suffixed with ``/{txnId}``. ``{txnId}`` is a
+client-generated transaction ID which identifies the request. Crucially, it **only** 
+serves to identify new requests from retransmits. After the request has finished, the
+``{txnId}`` value should be changed (how is not specified, it could be a monotonically
+increasing integer, etc). It is preferable to use ``HTTP PUT`` to make sure requests to 
+send messages do not get sent more than once should clients need to retransmit requests.
+
+Valid requests look like::
+
+    POST /some/path/here
+    {
+      "key": "This is a post."
+    }
+
+    PUT /some/path/here/11
+    {
+      "key": "This is a put with a txnId of 11."
+    }
+
+In contrast, these are invalid requests::
+
+    POST /some/path/here/11
+    {
+      "key": "This is a post, but it has a txnId."
+    }
+
+    PUT /some/path/here
+    {
+      "key": "This is a put but it is missing a txnId."
+    }
+
+Receiving live updates on a client
+----------------------------------
+- C-S longpoll event stream
+- Concept of start/end tokens.
+- Mention /initialSync to get token.
+
+
+Rooms
+=====
+- How are they created? PDU anchor point: "root of the tree".
+- Adding / removing aliases.
+- Invite/join dance
+- State and non-state data (+extensibility)
+
+TODO : Room permissions / config / power levels.
+
+Messages
+========
+
+This specification outlines several standard event types, all of which are
+prefixed with ``m.``
+
+State messages
+--------------
+- m.room.name
+- m.room.topic
+- m.room.member
+- m.room.config
+- m.room.invite_join
+
+What are they, when are they used, what do they contain, how should they be used
+
+Non-state messages
+------------------
+- m.room.message
+- m.room.message.feedback (and compressed format)
+
+What are they, when are they used, what do they contain, how should they be used
+
+m.room.message msgtypes
+-----------------------
+Each ``m.room.message`` MUST have a ``msgtype`` key which identifies the type of
+message being sent. Each type has their own required and optional keys, as outlined
+below:
+
+``m.text``
+  Required keys:
+    - ``body`` : "string" - The body of the message.
+  Optional keys:
+    None.
+  Example:
+    ``{ "msgtype": "m.text", "body": "I am a fish" }``
+
+``m.emote``
+  Required keys:
+    - ``body`` : "string" - The emote action to perform.
+  Optional keys:
+    None.
+  Example:
+    ``{ "msgtype": "m.emote", "body": "tries to come up with a witty explanation" }``
+
+``m.image``
+  Required keys:
+    - ``url`` : "string" - The URL to the image.
+  Optional keys:
+    - ``info`` : "string" - info : JSON object (ImageInfo) - The image info for image 
+      referred to in ``url``.
+    - ``thumbnail_url`` : "string" - The URL to the thumbnail.
+    - ``thumbnail_info`` : JSON object (ImageInfo) - The image info for the image 
+      referred to in ``thumbnail_url``.
+    - ``body`` : "string" - The alt text of the image, or some kind of content 
+      description for accessibility e.g. "image attachment".
+
+  ImageInfo: 
+    Information about an image::
+    
+      { 
+        "size" : integer (size of image in bytes),
+        "w" : integer (width of image in pixels),
+        "h" : integer (height of image in pixels),
+        "mimetype" : "string (e.g. image/jpeg)",
+      }
+
+``m.audio``
+  Required keys:
+    - ``url`` : "string" - The URL to the audio.
+  Optional keys:
+    - ``info`` : JSON object (AudioInfo) - The audio info for the audio referred to in 
+      ``url``.
+    - ``body`` : "string" - A description of the audio e.g. "Bee Gees - 
+      Stayin' Alive", or some kind of content description for accessibility e.g. 
+      "audio attachment".
+  AudioInfo: 
+    Information about a piece of audio::
+
+      {
+        "mimetype" : "string (e.g. audio/aac)",
+        "size" : integer (size of audio in bytes),
+        "duration" : integer (duration of audio in milliseconds),
+      }
+
+``m.video``
+  Required keys:
+    - ``url`` : "string" - The URL to the video.
+  Optional keys:
+    - ``info`` : JSON object (VideoInfo) - The video info for the video referred to in 
+      ``url``.
+    - ``body`` : "string" - A description of the video e.g. "Gangnam style", 
+      or some kind of content description for accessibility e.g. "video attachment".
+
+  VideoInfo: 
+    Information about a video::
+
+      {
+        "mimetype" : "string (e.g. video/mp4)",
+        "size" : integer (size of video in bytes),
+        "duration" : integer (duration of video in milliseconds),
+        "w" : integer (width of video in pixels),
+        "h" : integer (height of video in pixels),
+        "thumbnail_url" : "string (URL to image)",
+        "thumbanil_info" : JSON object (ImageInfo)
+      }
+
+``m.location``
+  Required keys:
+    - ``geo_uri`` : "string" - The geo URI representing the location.
+  Optional keys:
+    - ``thumbnail_url`` : "string" - The URL to a thumnail of the location being 
+      represented.
+    - ``thumbnail_info`` : JSON object (ImageInfo) - The image info for the image 
+      referred to in ``thumbnail_url``.
+    - ``body`` : "string" - A description of the location e.g. "Big Ben, 
+      London, UK", or some kind of content description for accessibility e.g. 
+      "location attachment".
+
+The following keys can be attached to any ``m.room.message``:
+
+  Optional keys:
+    - ``sender_ts`` : integer - A timestamp (ms resolution) representing the 
+      wall-clock time when the message was sent from the client.
+
+Presence
+========
+
+Each user has the concept of presence information. This encodes the
+"availability" of that user, suitable for display on other user's clients. This
+is transmitted as an ``m.presence`` event and is one of the few events which
+are sent *outside the context of a room*. The basic piece of presence information 
+is represented by the ``state`` key, which is an enum of one of the following:
+
+  - ``online`` : The default state when the user is connected to an event stream.
+  - ``unavailable`` : The user is not reachable at this time.
+  - ``offline`` : The user is not connected to an event stream.
+  - ``free_for_chat`` : The user is generally willing to receive messages 
+    moreso than default.
+  - ``hidden`` : TODO. Behaves as offline, but allows the user to see the client 
+    state anyway and generally interact with client features.
+
+This basic ``state`` field applies to the user as a whole, regardless of how many
+client devices they have connected. The home server should synchronise this
+status choice among multiple devices to ensure the user gets a consistent
+experience.
+
+Idle Time
+---------
+As well as the basic ``state`` field, the presence information can also show a sense
+of an "idle timer". This should be maintained individually by the user's
+clients, and the home server can take the highest reported time as that to
+report. When a user is offline, the home server can still report when the user was last
+seen online.
+
+Transmission
+------------
+- Transmitted as an EDU.
+- Presence lists determine who to send to.
+
+Presence List
+-------------
+Each user's home server stores a "presence list" for that user. This stores a
+list of other user IDs the user has chosen to add to it. To be added to this 
+list, the user being added must receive permission from the list owner. Once
+granted, both user's HS(es) store this information. Since such subscriptions
+are likely to be bidirectional, HSes may wish to automatically accept requests
+when a reverse subscription already exists.
+
+Presence and Permissions
+------------------------
+For a viewing user to be allowed to see the presence information of a target
+user, either:
+
+ - The target user has allowed the viewing user to add them to their presence
+   list, or
+ - The two users share at least one room in common
+
+In the latter case, this allows for clients to display some minimal sense of
+presence information in a user list for a room.
+
+Typing notifications
+====================
+
+TODO : Leo
+
+Voice over IP
+=============
+
+TODO : Dave
+
+Profiles
+========
+
+Internally within Matrix users are referred to by their user ID, which is not a
+human-friendly string. Profiles grant users the ability to see human-readable 
+names for other users that are in some way meaningful to them. Additionally, 
+profiles can publish additional information, such as the user's age or location.
+
+A Profile consists of a display name, an avatar picture, and a set of other 
+metadata fields that the user may wish to publish (email address, phone
+numbers, website URLs, etc...). This specification puts no requirements on the 
+display name other than it being a valid unicode string.
+
+- Metadata extensibility
+- Bundled with which events? e.g. m.room.member
+- Generate own events? What type?
+
+Registration and login
+======================
+
+Clients must register with a home server in order to use Matrix. After 
+registering, the client will be given an access token which must be used in ALL
+requests to that home server as a query parameter 'access_token'.
+
+- TODO Kegan : Make registration like login (just omit the "user" key on the 
+  initial request?)
+
+If the client has already registered, they need to be able to login to their
+account. The home server may provide many different ways of logging in, such
+as user/password auth, login via a social network (OAuth2), login by confirming 
+a token sent to their email address, etc. This specification does not define how
+home servers should authorise their users who want to login to their existing 
+accounts, but instead defines the standard interface which implementations 
+should follow so that ANY client can login to ANY home server.
+
+The login process breaks down into the following:
+  1. Determine the requirements for logging in.
+  2. Submit the login stage credentials.
+  3. Get credentials or be told the next stage in the login process and repeat 
+     step 2.
+     
+As each home server may have different ways of logging in, the client needs to know how
+they should login. All distinct login stages MUST have a corresponding ``type``.
+A ``type`` is a namespaced string which details the mechanism for logging in.
+
+A client may be able to login via multiple valid login flows, and should choose a single
+flow when logging in. A flow is a series of login stages. The home server MUST respond 
+with all the valid login flows when requested::
+
+  The client can login via 3 paths: 1a and 1b, 2a and 2b, or 3. The client should
+  select one of these paths.
+  
+  {
+    "flows": [
+      {
+        "type": "<login type1a>",
+        "stages": [ "<login type 1a>", "<login type 1b>" ]
+      },
+      {
+        "type": "<login type2a>",
+        "stages": [ "<login type 2a>", "<login type 2b>" ]
+      },
+      {
+        "type": "<login type3>"
+      }
+    ]
+  }
+
+After the login is completed, the client's fully-qualified user ID and a new access 
+token MUST be returned::
+
+  {
+    "user_id": "@user:matrix.org",
+    "access_token": "abcdef0123456789"
+  }
+
+The ``user_id`` key is particularly useful if the home server wishes to support 
+localpart entry of usernames (e.g. "user" rather than "@user:matrix.org"), as the
+client may not be able to determine its ``user_id`` in this case.
+
+If a login has multiple requests, the home server may wish to create a session. If
+a home server responds with a 'session' key to a request, clients MUST submit it in 
+subsequent requests until the login is completed::
+
+  {
+    "session": "<session id>"
+  }
+
+This specification defines the following login types:
+ - ``m.login.password``
+ - ``m.login.oauth2``
+ - ``m.login.email.code``
+ - ``m.login.email.url``
+
+
+Password-based
+--------------
+:Type: 
+  m.login.password
+:Description: 
+  Login is supported via a username and password.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.password",
+    "user": "<user_id or user localpart>",
+    "password": "<password>"
+  }
+
+The home server MUST respond with either new credentials, the next stage of the login
+process, or a standard error response.
+
+OAuth2-based
+------------
+:Type: 
+  m.login.oauth2
+:Description:
+  Login is supported via OAuth2 URLs. This login consists of multiple requests.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.oauth2",
+    "user": "<user_id or user localpart>"
+  }
+
+The server MUST respond with::
+
+  {
+    "uri": <Authorization Request URI OR service selection URI>
+  }
+
+The home server acts as a 'confidential' client for the purposes of OAuth2.
+If the uri is a ``sevice selection URI``, it MUST point to a webpage which prompts the 
+user to choose which service to authorize with. On selection of a service, this
+MUST link through to an ``Authorization Request URI``. If there is only 1 service which the
+home server accepts when logging in, this indirection can be skipped and the
+"uri" key can be the ``Authorization Request URI``. 
+
+The client then visits the ``Authorization Request URI``, which then shows the OAuth2 
+Allow/Deny prompt. Hitting 'Allow' returns the ``redirect URI`` with the auth code. 
+Home servers can choose any path for the ``redirect URI``. The client should visit 
+the ``redirect URI``, which will then finish the OAuth2 login process, granting the 
+home server an access token for the chosen service. When the home server gets 
+this access token, it verifies that the cilent has authorised with the 3rd party, and 
+can now complete the login. The OAuth2 ``redirect URI`` (with auth code) MUST respond 
+with either new credentials, the next stage of the login process, or a standard error 
+response.
+    
+For example, if a home server accepts OAuth2 from Google, it would return the 
+Authorization Request URI for Google::
+
+  {
+    "uri": "https://accounts.google.com/o/oauth2/auth?response_type=code&
+    client_id=CLIENT_ID&redirect_uri=REDIRECT_URI&scope=photos"
+  }
+
+The client then visits this URI and authorizes the home server. The client then
+visits the REDIRECT_URI with the auth code= query parameter which returns::
+
+  {
+    "user_id": "@user:matrix.org",
+    "access_token": "0123456789abcdef"
+  }
+
+Email-based (code)
+------------------
+:Type: 
+  m.login.email.code
+:Description:
+  Login is supported by typing in a code which is sent in an email. This login 
+  consists of multiple requests.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.email.code",
+    "user": "<user_id or user localpart>",
+    "email": "<email address>"
+  }
+
+After validating the email address, the home server MUST send an email containing
+an authentication code and return::
+
+  {
+    "type": "m.login.email.code",
+    "session": "<session id>"
+  }
+
+The second request in this login stage involves sending this authentication code::
+
+  {
+    "type": "m.login.email.code",
+    "session": "<session id>",
+    "code": "<code in email sent>"
+  }
+
+The home server MUST respond to this with either new credentials, the next stage of 
+the login process, or a standard error response.
+
+Email-based (url)
+-----------------
+:Type: 
+  m.login.email.url
+:Description:
+  Login is supported by clicking on a URL in an email. This login consists of 
+  multiple requests.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.email.url",
+    "user": "<user_id or user localpart>",
+    "email": "<email address>"
+  }
+
+After validating the email address, the home server MUST send an email containing
+an authentication URL and return::
+
+  {
+    "type": "m.login.email.url",
+    "session": "<session id>"
+  }
+
+The email contains a URL which must be clicked. After it has been clicked, the
+client should perform another request::
+
+  {
+    "type": "m.login.email.url",
+    "session": "<session id>"
+  }
+
+The home server MUST respond to this with either new credentials, the next stage of 
+the login process, or a standard error response. 
+
+A common client implementation will be to periodically poll until the link is clicked.
+If the link has not been visited yet, a standard error response with an errcode of 
+``M_LOGIN_EMAIL_URL_NOT_YET`` should be returned.
+
+
+N-Factor Authentication
+-----------------------
+Multiple login stages can be combined to create N-factor authentication during login.
+
+This can be achieved by responding with the ``next`` login type on completion of a 
+previous login stage::
+
+  {
+    "next": "<next login type>"
+  }
+
+If a home server implements N-factor authentication, it MUST respond with all 
+``stages`` when initially queried for their login requirements::
+
+  {
+    "type": "<1st login type>",
+    "stages": [ <1st login type>, <2nd login type>, ... , <Nth login type> ]
+  }
+
+This can be represented conceptually as::
+
+   _______________________
+  |    Login Stage 1      |
+  | type: "<login type1>" |
+  |  ___________________  |
+  | |_Request_1_________| | <-- Returns "session" key which is used throughout.
+  |  ___________________  |     
+  | |_Request_2_________| | <-- Returns a "next" value of "login type2"
+  |_______________________|
+            |
+            |
+   _________V_____________
+  |    Login Stage 2      |
+  | type: "<login type2>" |
+  |  ___________________  |
+  | |_Request_1_________| |
+  |  ___________________  |
+  | |_Request_2_________| |
+  |  ___________________  |
+  | |_Request_3_________| | <-- Returns a "next" value of "login type3"
+  |_______________________|
+            |
+            |
+   _________V_____________
+  |    Login Stage 3      |
+  | type: "<login type3>" |
+  |  ___________________  |
+  | |_Request_1_________| | <-- Returns user credentials
+  |_______________________|
+
+Fallback
+--------
+Clients cannot be expected to be able to know how to process every single
+login type. If a client determines it does not know how to handle a given
+login type, it should request a login fallback page::
+
+  GET matrix/client/api/v1/login/fallback
+
+This MUST return an HTML page which can perform the entire login process.
+
+Identity
+========
+
+TODO : Dave
+- 3PIDs and identity server, functions
+
+Federation
+==========
+
+Federation is the term used to describe how to communicate between Matrix home 
+servers. Federation is a mechanism by which two home servers can exchange
+Matrix event messages, both as a real-time push of current events, and as a
+historic fetching mechanism to synchronise past history for clients to view. It
+uses HTTP connections between each pair of servers involved as the underlying
+transport. Messages are exchanged between servers in real-time by active pushing
+from each server's HTTP client into the server of the other. Queries to fetch
+historic data for the purpose of back-filling scrollback buffers and the like
+can also be performed.
+
+There are three main kinds of communication that occur between home servers:
+
+:Queries:
+   These are single request/response interactions between a given pair of
+   servers, initiated by one side sending an HTTP GET request to obtain some
+   information, and responded by the other. They are not persisted and contain
+   no long-term significant history. They simply request a snapshot state at the
+   instant the query is made.
+
+:Ephemeral Data Units (EDUs):
+   These are notifications of events that are pushed from one home server to
+   another. They are not persisted and contain no long-term significant history,
+   nor does the receiving home server have to reply to them.
+
+:Persisted Data Units (PDUs):
+   These are notifications of events that are broadcast from one home server to
+   any others that are interested in the same "context" (namely, a Room ID).
+   They are persisted to long-term storage and form the record of history for
+   that context.
+
+EDUs and PDUs are further wrapped in an envelope called a Transaction, which is 
+transferred from the origin to the destination home server using an HTTP PUT request.
+
+
+Transactions
+------------
+The transfer of EDUs and PDUs between home servers is performed by an exchange
+of Transaction messages, which are encoded as JSON objects, passed over an 
+HTTP PUT request. A Transaction is meaningful only to the pair of home servers that 
+exchanged it; they are not globally-meaningful.
+
+Each transaction has:
+ - An opaque transaction ID.
+ - A timestamp (UNIX epoch time in milliseconds) generated by its origin server.
+ - An origin and destination server name.
+ - A list of "previous IDs".
+ - A list of PDUs and EDUs - the actual message payload that the Transaction carries.
+
+::
+
+ {
+  "transaction_id":"916d630ea616342b42e98a3be0b74113",
+  "ts":1404835423000,
+  "origin":"red",
+  "destination":"blue",
+  "prev_ids":["e1da392e61898be4d2009b9fecce5325"],
+  "pdus":[...],
+  "edus":[...]
+ }
+
+The ``prev_ids`` field contains a list of previous transaction IDs that
+the ``origin`` server has sent to this ``destination``. Its purpose is to act as a
+sequence checking mechanism - the destination server can check whether it has
+successfully received that Transaction, or ask for a retransmission if not.
+
+The ``pdus`` field of a transaction is a list, containing zero or more PDUs.[*]
+Each PDU is itself a JSON object containing a number of keys, the exact details of
+which will vary depending on the type of PDU. Similarly, the ``edus`` field is
+another list containing the EDUs. This key may be entirely absent if there are
+no EDUs to transfer.
+
+(* Normally the PDU list will be non-empty, but the server should cope with
+receiving an "empty" transaction, as this is useful for informing peers of other
+transaction IDs they should be aware of. This effectively acts as a push
+mechanism to encourage peers to continue to replicate content.)
+
+PDUs and EDUs
+-------------
+
+All PDUs have:
+ - An ID
+ - A context
+ - A declaration of their type
+ - A list of other PDU IDs that have been seen recently on that context (regardless of which origin
+   sent them)
+
+[[TODO(paul): Update this structure so that 'pdu_id' is a two-element
+[origin,ref] pair like the prev_pdus are]]
+
+::
+
+ {
+  "pdu_id":"a4ecee13e2accdadf56c1025af232176",
+  "context":"#example.green",
+  "origin":"green",
+  "ts":1404838188000,
+  "pdu_type":"m.text",
+  "prev_pdus":[["blue","99d16afbc857975916f1d73e49e52b65"]],
+  "content":...
+  "is_state":false
+ }
+
+In contrast to Transactions, it is important to note that the ``prev_pdus``
+field of a PDU refers to PDUs that any origin server has sent, rather than
+previous IDs that this ``origin`` has sent. This list may refer to other PDUs sent
+by the same origin as the current one, or other origins.
+
+Because of the distributed nature of participants in a Matrix conversation, it
+is impossible to establish a globally-consistent total ordering on the events.
+However, by annotating each outbound PDU at its origin with IDs of other PDUs it
+has received, a partial ordering can be constructed allowing causallity
+relationships to be preserved. A client can then display these messages to the
+end-user in some order consistent with their content and ensure that no message
+that is semantically in reply of an earlier one is ever displayed before it.
+
+PDUs fall into two main categories: those that deliver Events, and those that
+synchronise State. For PDUs that relate to State synchronisation, additional
+keys exist to support this:
+
+::
+
+ {...,
+  "is_state":true,
+  "state_key":TODO
+  "power_level":TODO
+  "prev_state_id":TODO
+  "prev_state_origin":TODO}
+
+[[TODO(paul): At this point we should probably have a long description of how
+State management works, with descriptions of clobbering rules, power levels, etc
+etc... But some of that detail is rather up-in-the-air, on the whiteboard, and
+so on. This part needs refining. And writing in its own document as the details
+relate to the server/system as a whole, not specifically to server-server
+federation.]]
+
+EDUs, by comparison to PDUs, do not have an ID, a context, or a list of
+"previous" IDs. The only mandatory fields for these are the type, origin and
+destination home server names, and the actual nested content.
+
+::
+
+ {"edu_type":"m.presence",
+  "origin":"blue",
+  "destination":"orange",
+  "content":...}
+
+Backfilling
+-----------
+- What it is, when is it used, how is it done
+
+SRV Records
+-----------
+- Why it is needed
+
+Security
+========
+- rate limiting
+- crypto (s-s auth)
+- E2E
+- Lawful intercept + Key Escrow
+
+TODO Mark
+
+Policy Servers
+==============
+TODO
+
+Content repository
+==================
+- thumbnail paths
+
+Address book repository
+=======================
+- format
+
+
+Glossary
+========
+- domain specific words/acronyms with definitions
+
+User ID:
+  An opaque ID which identifies an end-user, which consists of some opaque 
+  localpart combined with the domain name of their home server. 

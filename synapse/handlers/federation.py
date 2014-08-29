@@ -22,8 +22,6 @@ from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
 from synapse.federation.pdu_codec import PduCodec
 
-from synapse.api.errors import AuthError
-
 from twisted.internet import defer
 
 import logging
@@ -87,12 +85,6 @@ class FederationHandler(BaseHandler):
         yield self.replication_layer.send_pdu(pdu)
 
     @log_function
-    def get_state_for_room(self, destination, room_id):
-        return self.replication_layer.get_state_for_context(
-            destination, room_id
-        )
-
-    @log_function
     @defer.inlineCallbacks
     def on_receive_pdu(self, pdu, backfilled):
         """ Called by the ReplicationLayer when we have a new pdu. We need to
@@ -141,19 +133,19 @@ class FederationHandler(BaseHandler):
 
             yield self.hs.get_handlers().room_member_handler.change_membership(
                 new_event,
-                True
+                do_auth=True
             )
 
         else:
             with (yield self.room_lock.lock(event.room_id)):
-                store_id = yield self.store.persist_event(event, backfilled)
+                yield self.store.persist_event(event, backfilled)
 
             room = yield self.store.get_room(event.room_id)
 
             if not room:
                 # Huh, let's try and get the current state
                 try:
-                    yield self.get_state_for_room(
+                    yield self.replication_layer.get_state_for_context(
                         event.origin, event.room_id
                     )
 
@@ -163,9 +155,9 @@ class FederationHandler(BaseHandler):
                     if self.hs.hostname in hosts:
                         try:
                             yield self.store.store_room(
-                                event.room_id,
-                                "",
-                                is_public=False
+                                room_id=event.room_id,
+                                room_creator_user_id="",
+                                is_public=False,
                             )
                         except:
                             pass
@@ -188,27 +180,14 @@ class FederationHandler(BaseHandler):
     @log_function
     @defer.inlineCallbacks
     def backfill(self, dest, room_id, limit):
-        events = yield self._backfill(dest, room_id, limit)
-
-        for event in events:
-            try:
-                yield self.store.persist_event(event, backfilled=True)
-            except:
-                logger.exception("Failed to persist event: %s", event)
-
-        defer.returnValue(events)
-
-    @defer.inlineCallbacks
-    def _backfill(self, dest, room_id, limit):
         pdus = yield self.replication_layer.backfill(dest, room_id, limit)
 
-        if not pdus:
-            defer.returnValue([])
+        events = []
 
-        events = [
-            self.pdu_codec.event_from_pdu(pdu)
-            for pdu in pdus
-        ]
+        for pdu in pdus:
+            event = self.pdu_codec.event_from_pdu(pdu)
+            events.append(event)
+            yield self.store.persist_event(event, backfilled=True)
 
         defer.returnValue(events)
 
@@ -224,7 +203,9 @@ class FederationHandler(BaseHandler):
 
         # First get current state to see if we are already joined.
         try:
-            yield self.get_state_for_room(target_host, room_id)
+            yield self.replication_layer.get_state_for_context(
+                target_host, room_id
+            )
 
             hosts = yield self.store.get_joined_hosts_for_room(room_id)
             if self.hs.hostname in hosts:
@@ -254,8 +235,8 @@ class FederationHandler(BaseHandler):
 
         try:
             yield self.store.store_room(
-                room_id,
-                "",
+                room_id=room_id,
+                room_creator_user_id="",
                 is_public=False
             )
         except:
