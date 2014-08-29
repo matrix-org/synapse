@@ -274,6 +274,15 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 lambda u: defer.succeed([]))
 
         self.mock_datastore = hs.get_datastore()
+
+        def get_profile_displayname(user_id):
+            return defer.succeed("Frank")
+        self.mock_datastore.get_profile_displayname = get_profile_displayname
+
+        def get_profile_avatar_url(user_id):
+            return defer.succeed(None)
+        self.mock_datastore.get_profile_avatar_url = get_profile_avatar_url
+
         self.presence = hs.get_handlers().presence_handler
 
         self.u_apple = hs.parse_userid("@apple:test")
@@ -316,6 +325,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
              "content": {
                  "user_id": "@banana:test",
                  "state": ONLINE,
+                 "displayname": "Frank",
                  "mtime_age": 0,
             }},
         ]}, response)
