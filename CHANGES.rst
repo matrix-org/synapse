@@ -1,3 +1,9 @@
+Changes in synapse 0.1.2 (2014-08-29)
+=====================================
+
+Webclient:
+ * Add basic call state UI for VoIP calls.
+
 Changes in synapse 0.1.1 (2014-08-29)
 =====================================
 
