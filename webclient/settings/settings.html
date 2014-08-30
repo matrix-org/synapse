@@ -1,16 +1,20 @@
 <div ng-controller="SettingsController" class="user" data-ng-init="onInit()">
 
-    <div id="page">
     <div id="wrapper">
-        
-        <h3>Me</h3>
+
+        <div id="genericHeading">
+            <img src="img/logo-small.png" width="100" height="43" alt="[matrix]"/>
+        </div>
+
+        <h1>Settings</h1>
         <div class="section">
             <form>
                 <div class="profile-avatar">
-                    <img ng-src="{{ (null !== profile.avatarUrl) ? profile.avatarUrl : 'img/default-profile.jpg' }}" m-file-input="profile.avatarFile"/>
+                    <img ng-src="{{ (null !== profile.avatarUrl) ? profile.avatarUrl : 'img/default-profile.png' }}" m-file-input="profile.avatarFile"/>
                 </div>
                 <div id="user-ids">
-                    <input size="40" ng-model="profile.displayName" placeholder="Your name"/>            
+                    <input size="40" ng-model="profile.displayName" placeholder="Your display name"/>
+                    <br/>
                     <button ng-disabled="(profile.displayName == profileOnServer.displayName) && (profile.avatarUrl == profileOnServer.avatarUrl)"
                             ng-click="saveProfile()">Save</button>    
                 </div>
@@ -53,7 +57,7 @@
                 To enable it, reset the notification setting for this web site into your browser settings.
             </div>
             <div ng-switch-when="default">
-                <button ng-click="requestNotifications()">Click here to enable them</button>
+                <button ng-click="requestNotifications()" style="font-size: 14pt">Enable desktop notifications</button>
             </div>
             <div ng-switch-default="">
                 Sorry, your browser does not support notifications.
@@ -73,5 +77,4 @@
         {{ feedback }}
 
     </div>    
-    </div>
 </div>

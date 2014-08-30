@@ -95,14 +95,18 @@ angular.module('matrixService', [])
         },
 
         // Create a room
-        create: function(room_id, visibility) {
+        create: function(room_alias, visibility) {
             // The REST path spec
             var path = "/createRoom";
 
-            return doRequest("POST", path, undefined, {
-                visibility: visibility,
-                room_alias_name: room_id
-            });
+            var req = {
+                "visibility": visibility
+            };
+            if (room_alias) {
+                req.room_alias_name = room_alias;
+            }
+            
+            return doRequest("POST", path, undefined, req);
         },
 
         // List all rooms joined or been invited to

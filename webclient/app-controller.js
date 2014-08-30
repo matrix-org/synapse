@@ -37,12 +37,24 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         mPresence.start();
     }
     
+    $scope.user_id = matrixService.config().user_id;
+    
     /**
      * Open a given page.
      * @param {String} url url of the page
      */
     $scope.goToPage = function(url) {
         $location.url(url);
+    };
+    
+    // Open the given user profile page
+    $scope.goToUserPage = function(user_id) {
+        if (user_id === $scope.user_id) {
+            $location.url("/settings");
+        }
+        else {
+            $location.url("/user/" + user_id);
+        }
     };
     
     // Logs the user out 

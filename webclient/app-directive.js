@@ -32,7 +32,12 @@ angular.module('matrixWebClient')
 .directive('ngFocus', ['$timeout', function($timeout) {
     return {
         link: function(scope, element, attr) {
-            $timeout(function() { element[0].focus(); }, 0);
+            // XXX: slightly evil hack to disable autofocus on iOS, as in general
+            // it causes more problems than it fixes, by bouncing the page
+            // around
+            if (!/(iPad|iPhone|iPod)/g.test(navigator.userAgent)) {
+                $timeout(function() { element[0].focus(); }, 0);
+            }            
         }
     };
 }]);

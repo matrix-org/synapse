@@ -58,14 +58,14 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
         );
     };
     
-    $scope.createNewRoom = function(room_id, isPrivate) {
+    $scope.createNewRoom = function(room_alias, isPrivate) {
         
         var visibility = "public";
         if (isPrivate) {
             visibility = "private";
         }
         
-        matrixService.create(room_id, visibility).then(
+        matrixService.create(room_alias, visibility).then(
             function(response) { 
                 // This room has been created. Refresh the rooms list
                 console.log("Created room " + response.data.room_alias + " with id: "+

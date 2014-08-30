@@ -1,55 +1,49 @@
 <div ng-controller="LoginController" class="login">    
-    <h1 id="logo">[matrix]</h1>
-
-    <div id="page">
-    <div id="wrapper">
-
-    {{ feedback }}
+    <div id="wrapper" class="loginWrapper">
         
-    <h3>Register for an account:</h3>
-    <form novalidate>
-        <input id="desired_user_name" size="70" type="text" auto-focus ng-model="account.desired_user_name" placeholder="User name (ex:bob)"/>
-        <br/>
-        <input id="pwd1" size="70" type="password" auto-focus ng-model="account.pwd1" placeholder="Type a password"/>
-        <br/>
-        <input id="pwd2" size="70" type="password" auto-focus ng-model="account.pwd2" placeholder="Re-type your password"/>
-        <br/>
-        <!-- New user registration -->
-        <div>
-            <br/>
-            <button ng-click="register()" ng-disabled="!account.desired_user_name || !account.homeserver || !account.pwd1 || !account.pwd2 || account.pwd1 !== account.pwd2">Register</button>
-        </div>
-    </form>
-
-    <h3>Got an account?</h3>
-    <form novalidate>
-        <!-- Login with an registered user -->
-        <div>{{ login_error_msg }} </div>
-        <div>
-            <input id="user_id" size="70" type="text" auto-focus ng-model="account.user_id" placeholder="User ID (ex:@bob:localhost or bob)"/>
-            <br />
-            <input id="password" size="70" type="password" ng-model="account.password" placeholder="Password"/><br />
-            <br/>
-            <button ng-click="login()" ng-disabled="!account.user_id || !account.password || !account.homeserver">Login</button>
-        </div>
-       
-    </form>
-
-    <h3>Servers</h3>
-    <form novalidate>
-        <div>
-        Home Server: 
-        <input id="homeserver" size="57" type="text" ng-model="account.homeserver" placeholder="Home server URL (ex: http://localhost:8080)"/>
-        </div>
-        <br />
-        <div>
-        Identity Server: 
-        <input id="identityServer" size="56" type="text" ng-model="account.identityServer" placeholder="Identity server URL (ex: http://localhost:8090)"/>
-        </div>
-        <br />
-    </form>
-    <br/>
+        <a href ng-click="goToPage('/login')">
+        <img src="img/logo.png" width="240" height="102" alt="[matrix]" style="padding: 50px"/>
+        </a>
     
+        <br/>
+
+        <form id="loginForm" novalidate>
+            <!-- Login with an registered user -->
+            <div>
+                Log in using:<br/>
+                
+                <div ng-repeat="type in login_types">
+                <input type="radio" ng-model="$parent.login_type" value="{{ type }}" id="radio_{{ type }}"/>
+                <label for="radio_{{ type }}">{{ login_type_label[type] }}</label>
+                </div>
+                    
+                <div style="text-align: center">
+                    <br/>
+                    <input id="user_id" size="32" type="text" ng-focus="true" ng-model="account.user_id" placeholder="{{ login_type_label[login_type] }}"/>
+                    <br/>
+                    <input id="password" size="32" type="password" ng-model="account.password" placeholder="Password"/>
+                    <br/><br/>
+                    <button ng-click="login()" ng-disabled="!account.user_id || !account.password || !account.homeserver">Login</button>
+                    <br/><br/>
+                </div>
+
+                <div class="feedback">{{ feedback }} {{ login_error_msg }}</div>
+                
+                <div id="serverConfig">
+                    <label for="homeserver">Home Server:</label> 
+                    <input id="homeserver" size="32" type="text" ng-model="account.homeserver" placeholder="URL (e.g. http://matrix.org:8080)"/>
+                    <div class="smallPrint">Your home server stores all your conversation and account data.</div>
+                    <label for="identityServer">Identity Server:</label>
+                    <input id="identityServer" size="32" type="text" ng-model="account.identityServer" placeholder="URL (e.g. http://matrix.org:8090)"/>
+                    <div class="smallPrint">Matrix provides identity servers to track which emails etc. belong to which Matrix IDs.<br/>
+                        Only http://matrix.org:8090 currently exists.</div>
+                    <br/>
+                    <br/>
+                    <a href="#/register" style="padding-right: 3em">Create account</a>
+                    <a href="#/reset_password">Forgotten password?</a>
+                </div>
+            </div>
+        </form>
 
     </div>
     </div>

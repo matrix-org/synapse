@@ -10,63 +10,26 @@ angular.module('LoginController', ['matrixService'])
     if ($location.port()) {
         hs_url += ":" + $location.port();
     }
+    var example_domain = $location.host();
     
     $scope.account = {
         homeserver: hs_url,
+        example_domain: example_domain,
         desired_user_name: "",
         user_id: "",
         password: "",
-        identityServer: "",
+        identityServer: "http://matrix.org:8090",
         pwd1: "",
-        pwd2: ""
+        pwd2: "",
     };
-
-    $scope.register = function() {
-
-        // Set the urls
-        matrixService.setConfig({
-            homeserver: $scope.account.homeserver,
-            identityServer: $scope.account.identityServer
-        });
-        
-        if ($scope.account.pwd1 !== $scope.account.pwd2) {
-            $scope.feedback = "Passwords don't match.";
-            return;
-        }
-        else if ($scope.account.pwd1.length < 6) {
-            $scope.feedback = "Password must be at least 6 characters.";
-            return;
-        }
-
-        matrixService.register($scope.account.desired_user_name, $scope.account.pwd1).then(
-            function(response) {
-                $scope.feedback = "Success";
-                // Update the current config 
-                var config = matrixService.config();
-                angular.extend(config, {
-                    access_token: response.data.access_token,
-                    user_id: response.data.user_id
-                });
-                matrixService.setConfig(config);
-
-                // And permanently save it
-                matrixService.saveConfig();
-                eventStreamService.resume();
-                 // Go to the user's rooms list page
-                $location.url("home");
-            },
-            function(error) {
-                if (error.data) {
-                    if (error.data.errcode === "M_USER_IN_USE") {
-                        $scope.feedback = "Username already taken.";
-                    }
-                }
-                else if (error.status === 0) {
-                    $scope.feedback = "Unable to talk to the server.";
-                }
-            });
+    
+    $scope.login_types = [ "email", "mxid" ];
+    $scope.login_type_label = {
+        "email": "Email address",
+        "mxid": "Matrix ID (e.g. @bob:matrix.org or bob)",
     };
-
+    $scope.login_type = 'mxid'; // TODO: remember the user's preferred login_type
+    
     $scope.login = function() {
         matrixService.setConfig({
             homeserver: $scope.account.homeserver,

@@ -388,16 +388,11 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         matrixService.invite($scope.room_id, user_id).then(
             function() {
                 console.log("Invited.");
-                $scope.feedback = "Request for invitation succeeds";
+                $scope.feedback = "Invite sent successfully";
             },
             function(reason) {
                 $scope.feedback = "Failure: " + reason;
             });
-    };
-
-    // Open the user profile page
-    $scope.goToUserPage = function(user_id) {
-        $location.url("/user/" + user_id);
     };
 
     $scope.leaveRoom = function() {

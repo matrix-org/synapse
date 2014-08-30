@@ -4,6 +4,8 @@
     <title>[matrix]</title>
         
     <link rel="stylesheet" href="app.css">
+    <link rel="stylesheet" href="mobile.css">
+    
     <link rel="icon" href="favicon.ico">
    
     <meta name="viewport" content="width=device-width">
@@ -19,6 +21,7 @@
     <script src="app-filter.js"></script>
     <script src="home/home-controller.js"></script>
     <script src="login/login-controller.js"></script>
+    <script src="login/register-controller.js"></script>
     <script src="recents/recents-controller.js"></script>
     <script src="recents/recents-filter.js"></script>
     <script src="room/room-controller.js"></script>
@@ -38,16 +41,23 @@
 
 <body>
 
-    <header id="header">
+    <div id="header">
         <!-- Do not show buttons on the login page -->
-        <div id="header-buttons" ng-hide="'/login' == location ">
+        <div id="headerContent" ng-hide="'/login' == location || '/register' == location">
+            <a href id="headerUserId" ng-click='goToUserPage(user_id)'>{{ user_id }}</a>
+            &nbsp;
             <button ng-click='goToPage("/")'>Home</button>
             <button ng-click='goToPage("settings")'>Settings</button>
             <button ng-click="logout()">Log out</button>
         </div>
-    </header>
+    </div>
 
-    <div ng-view></div>
+    <div id="page" ng-view></div>
 
+    <div id="footer" ng-hide="location.indexOf('/room') == 0">
+        <div id="footerContent">
+            &copy 2014 Matrix.org
+        </div>
+    </div>
 </body>
 </html>
