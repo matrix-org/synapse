@@ -7,7 +7,10 @@ angular.module('LoginController', ['matrixService'])
     // Assume that this is hosted on the home server, in which case the URL
     // contains the home server.
     var hs_url = $location.protocol() + "://" + $location.host();
-    if ($location.port()) {
+    if ($location.port() &&
+        !($location.protocol() === "http" && $location.port() === 80) &&
+        !($location.protocol() === "https" && $location.port() === 443))
+    {
         hs_url += ":" + $location.port();
     }
     var example_domain = $location.host();
