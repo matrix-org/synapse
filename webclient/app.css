@@ -416,8 +416,8 @@ a:active  { color: #000; }
 }
 
 #room-fullscreen-image img {
-    max-width: 100%;
-    max-height: 100%;
+    max-width: 90%;
+    max-height: 90%;
     bottom: 0;
     left: 0;
     margin: auto;
@@ -425,6 +425,10 @@ a:active  { color: #000; }
     position: fixed;
     right: 0;
     top: 0;
+
+    -webkit-box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.75);
+    -moz-box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.75);
+    box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.75);    
 }
 
 /*** Recents ***/
