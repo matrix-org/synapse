@@ -7,7 +7,7 @@ var eventStreamInfo = {
 var roomInfo = [];
 
 var longpollEventStream = function() {
-    var url = "http://localhost:8080/matrix/client/api/v1/events?access_token=$token&from=$from";
+    var url = "http://localhost:8080/_matrix/client/api/v1/events?access_token=$token&from=$from";
     url = url.replace("$token", accountInfo.access_token);
     url = url.replace("$from", eventStreamInfo.from);
     
@@ -48,7 +48,7 @@ $('.login').live('click', function() {
     var user = $("#userLogin").val();
     var password = $("#passwordLogin").val();
     $.ajax({
-        url: "http://localhost:8080/matrix/client/api/v1/login",
+        url: "http://localhost:8080/_matrix/client/api/v1/login",
         type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify({ user: user, password: password, type: "m.login.password" }),
@@ -65,7 +65,7 @@ $('.login').live('click', function() {
 
 var getCurrentRoomList = function() {
     $("#roomId").val("");
-    var url = "http://localhost:8080/matrix/client/api/v1/initialSync?access_token=" + accountInfo.access_token + "&limit=1";
+    var url = "http://localhost:8080/_matrix/client/api/v1/initialSync?access_token=" + accountInfo.access_token + "&limit=1";
     $.getJSON(url, function(data) {
         var rooms = data.rooms;
         for (var i=0; i<rooms.length; ++i) {
@@ -98,7 +98,7 @@ var sendMessage = function(roomId) {
         return;
     }
     
-    var url = "http://localhost:8080/matrix/client/api/v1/rooms/$roomid/send/m.room.message?access_token=$token";
+    var url = "http://localhost:8080/_matrix/client/api/v1/rooms/$roomid/send/m.room.message?access_token=$token";
     url = url.replace("$token", accountInfo.access_token);
     url = url.replace("$roomid", encodeURIComponent(roomId));
     

@@ -306,11 +306,11 @@ POST requests MUST be submitted as application/json.
 All paths MUST be namespaced by the version of the API being used. This should
 be:
 
-/matrix/client/api/v1
+/_matrix/client/api/v1
 
 All REST paths in this section MUST be prefixed with this. E.g.
   REST Path: /rooms/$room_id
-  Absolute Path: /matrix/client/api/v1/rooms/$room_id
+  Absolute Path: /_matrix/client/api/v1/rooms/$room_id
 
 Registration
 ============

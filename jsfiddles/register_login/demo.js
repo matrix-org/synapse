@@ -11,7 +11,7 @@ $('.register').live('click', function() {
     var user = $("#user").val();
     var password = $("#password").val();
     $.ajax({
-        url: "http://localhost:8080/matrix/client/api/v1/register",
+        url: "http://localhost:8080/_matrix/client/api/v1/register",
         type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify({ user_id: user, password: password }),
@@ -27,7 +27,7 @@ $('.register').live('click', function() {
 
 var login = function(user, password) {
     $.ajax({
-        url: "http://localhost:8080/matrix/client/api/v1/login",
+        url: "http://localhost:8080/_matrix/client/api/v1/login",
         type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify({ user: user, password: password, type: "m.login.password" }),
@@ -44,7 +44,7 @@ var login = function(user, password) {
 $('.login').live('click', function() {
     var user = $("#userLogin").val();
     var password = $("#passwordLogin").val();
-    $.getJSON("http://localhost:8080/matrix/client/api/v1/login", function(data) {
+    $.getJSON("http://localhost:8080/_matrix/client/api/v1/login", function(data) {
         if (data.flows[0].type !== "m.login.password") {
             alert("I don't know how to login with this type: " + data.type);
             return;
@@ -60,7 +60,7 @@ $('.logout').live('click', function() {
 });
 
 $('.testToken').live('click', function() {
-    var url = "http://localhost:8080/matrix/client/api/v1/initialSync?access_token=" + accountInfo.access_token + "&limit=1";
+    var url = "http://localhost:8080/_matrix/client/api/v1/initialSync?access_token=" + accountInfo.access_token + "&limit=1";
     $.getJSON(url, function(data) {
          $("#imSyncText").text(JSON.stringify(data, undefined, 2));
     }).fail(function(err) {

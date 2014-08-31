@@ -26,7 +26,7 @@ from synapse.api.errors import SynapseError, AuthError
 from synapse.server import HomeServer
 
 myid = "@1234ABCD:test"
-PATH_PREFIX = "/matrix/client/api/v1"
+PATH_PREFIX = "/_matrix/client/api/v1"
 
 class ProfileTestCase(unittest.TestCase):
     """ Tests profile management. """

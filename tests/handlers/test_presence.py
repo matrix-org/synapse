@@ -314,7 +314,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("elsewhere",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data=_expect_edu("elsewhere", "m.presence_invite",
                     content={
                         "observer_user": "@apple:test",
@@ -340,7 +340,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("elsewhere",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data=_expect_edu("elsewhere", "m.presence_accept",
                     content={
                         "observer_user": "@cabbage:elsewhere",
@@ -352,7 +352,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         )
 
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence_invite",
                 content={
                     "observer_user": "@cabbage:elsewhere",
@@ -371,7 +371,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("elsewhere",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data=_expect_edu("elsewhere", "m.presence_deny",
                     content={
                         "observer_user": "@cabbage:elsewhere",
@@ -383,7 +383,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         )
 
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence_invite",
                 content={
                     "observer_user": "@cabbage:elsewhere",
@@ -397,7 +397,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_accepted_remote(self):
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence_accept",
                 content={
                     "observer_user": "@apple:test",
@@ -415,7 +415,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_denied_remote(self):
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence_deny",
                 content={
                     "observer_user": "@apple:test",
@@ -720,7 +720,7 @@ class PresencePushTestCase(unittest.TestCase):
         self.assertEquals(self.event_source.get_current_key(), 0)
 
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence",
                 content={
                     "push": [
@@ -836,7 +836,7 @@ class PresencePushTestCase(unittest.TestCase):
 
         put_json.expect_call_and_return(
             call("remote",
-                path="/matrix/federation/v1/send/1000002/",
+                path="/_matrix/federation/v1/send/1000002/",
                 data=_expect_edu("remote", "m.presence",
                     content={
                         "push": [
@@ -1130,7 +1130,7 @@ class PresencePollingTestCase(unittest.TestCase):
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("remote",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data=_expect_edu("remote", "m.presence",
                     content={
                         "push": [
@@ -1145,7 +1145,7 @@ class PresencePollingTestCase(unittest.TestCase):
         )
 
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("remote", "m.presence",
                 content={
                     "poll": [ "@banana:test" ],
@@ -1159,7 +1159,7 @@ class PresencePollingTestCase(unittest.TestCase):
         self.assertTrue(self.u_banana in self.handler._remote_sendmap)
 
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000001/",
+            "/_matrix/federation/v1/send/1000001/",
             _make_edu_json("remote", "m.presence",
                 content={
                     "unpoll": [ "@banana:test" ],

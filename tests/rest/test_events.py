@@ -36,7 +36,7 @@ from mock import Mock
 
 logging.getLogger().addHandler(logging.NullHandler())
 
-PATH_PREFIX = "/matrix/client/api/v1"
+PATH_PREFIX = "/_matrix/client/api/v1"
 
 
 class EventStreamPaginationApiTestCase(unittest.TestCase):
