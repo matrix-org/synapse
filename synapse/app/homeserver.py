@@ -29,6 +29,7 @@ from synapse.http.client import TwistedHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX
 )
+from synapse.config.homeserver import HomeServerConfig
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
@@ -211,32 +212,7 @@ class SynapseHomeServer(HomeServer):
         logger.info("Synapse now listening on port %d", port)
 
 
-def setup_logging(verbosity=0, filename=None, config_path=None):
-    """ Sets up logging with verbosity levels.
 
-    Args:
-        verbosity: The verbosity level.
-        filename: Log to the given file rather than to the console.
-        config_path: Path to a python logging config file.
-    """
-
-    if config_path is None:
-        log_format = (
-            '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
-        )
-
-        level = logging.INFO
-        if verbosity:
-            level = logging.DEBUG
-
-        # FIXME: we need a logging.WARN for a -q quiet option
-
-        logging.basicConfig(level=level, filename=filename, format=log_format)
-    else:
-        logging.config.fileConfig(config_path)
-
-    observer = PythonLoggingObserver()
-    observer.start()
 
 
 def run():
@@ -244,78 +220,49 @@ def run():
 
 
 def setup():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--port", dest="port", type=int, default=8080,
-                        help="The port to listen on.")
-    parser.add_argument("-d", "--database", dest="db", default="homeserver.db",
-                        help="The database name.")
-    parser.add_argument("-H", "--host", dest="host", default="localhost",
-                        help="The hostname of the server.")
-    parser.add_argument('-v', '--verbose', dest="verbose", action='count',
-                        help="The verbosity level.")
-    parser.add_argument('-f', '--log-file', dest="log_file", default=None,
-                        help="File to log to.")
-    parser.add_argument('--log-config', dest="log_config", default=None,
-                        help="Python logging config")
-    parser.add_argument('-D', '--daemonize', action='store_true',
-                        default=False, help="Daemonize the home server")
-    parser.add_argument('--pid-file', dest="pid", help="When running as a "
-                        "daemon, the file to store the pid in",
-                        default="hs.pid")
-    parser.add_argument("-W", "--webclient", dest="webclient", default=True,
-                        action="store_false", help="Don't host a web client.")
-    parser.add_argument("--manhole", dest="manhole", type=int, default=None,
-                        help="Turn on the twisted telnet manhole service.")
-    args = parser.parse_args()
+    config = HomeServerConfig.load_config("Synapse Homeserver", sys.argv[1:])
 
-    verbosity = int(args.verbose) if args.verbose else None
-
-    # Because if/when we daemonize we change to root dir.
-    db_name = os.path.abspath(args.db)
-    log_file = args.log_file
-    if log_file:
-        log_file = os.path.abspath(log_file)
-
-    setup_logging(
+    config.setup_logging(
         verbosity=verbosity,
         filename=log_file,
         config_path=args.log_config,
     )
 
-    logger.info("Server hostname: %s", args.host)
+    logger.info("Server hostname: %s", config.server_name)
 
-    if re.search(":[0-9]+$", args.host):
-        domain_with_port = args.host
+    if re.search(":[0-9]+$", config.server_name):
+        domain_with_port = config.server_name
     else:
-        domain_with_port = "%s:%s" % (args.host, args.port)
+        domain_with_port = "%s:%s" % (args.server_name, config.bind_port)
 
     hs = SynapseHomeServer(
-        args.host,
+        config.server_name,
         domain_with_port=domain_with_port,
         upload_dir=os.path.abspath("uploads"),
-        db_name=db_name,
+        db_name=config.database_path,
     )
 
     hs.register_servlets()
 
     hs.create_resource_tree(
-        web_client=args.webclient,
-        redirect_root_to_web_client=True)
-    hs.start_listening(args.port)
+        web_client=config.webclient,
+        redirect_root_to_web_client=True,
+    )
+    hs.start_listening(config.bind_port)
 
     hs.get_db_pool()
 
-    if args.manhole:
+    if config.manhole:
         f = twisted.manhole.telnet.ShellFactory()
         f.username = "matrix"
         f.password = "rabbithole"
         f.namespace['hs'] = hs
-        reactor.listenTCP(args.manhole, f, interface='127.0.0.1')
+        reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
 
-    if args.daemonize:
+    if config.daemonize:
         daemon = Daemonize(
             app="synapse-homeserver",
-            pid=args.pid,
+            pid=config.pid_file,
             action=run,
             auto_close_fds=False,
             verbose=True,
