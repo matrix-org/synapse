@@ -27,7 +27,7 @@
                     <div class="userName">{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}<br/>{{ member.displayname ? "" : member.id.substr(member.id.indexOf(':')) }}</div>
                 </td>
                 <td class="userPresence" ng-class="(member.presenceState === 'online' ? 'online' : (member.presenceState === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">
-                    {{ member.mtime_age + (now - member.last_updated) | duration }}<br/>{{ member.mtime_age ? "ago" : "" }}
+                    <span ng-show="member.mtime_age">{{ member.mtime_age + (now - member.last_updated) | duration }}<br/>ago</span>
                 </td>
         </table>
     </div>
