@@ -28,7 +28,6 @@ a:active  { color: #000; }
 #wrapper {
     margin: auto;
     max-width: 1280px;
-    height: 100%;
     padding-top: 40px;
     padding-bottom: 40px;
     padding-left: 20px;
