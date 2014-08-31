@@ -4,6 +4,14 @@ var showLoggedIn = function(data) {
     accountInfo = data;
     getCurrentRoomList();
     $(".loggedin").css({visibility: "visible"});
+    $("#membership").change(function() {
+    if ($("#membership").val() === "invite") {
+        $("#targetUser").css({visibility: "visible"});
+    }
+    else {
+        $("#targetUser").css({visibility: "hidden"});
+    }
+});
 };
 
 $('.login').live('click', function() {
@@ -31,10 +39,11 @@ var getCurrentRoomList = function() {
     // solution but that is out of scope of this fiddle.
     $("#rooms").find("tr:gt(0)").remove();
     
-    var url = "http://localhost:8080/matrix/client/api/v1/im/sync?access_token=" + accountInfo.access_token + "&from=END&to=START&limit=1";
+    var url = "http://localhost:8080/matrix/client/api/v1/initialSync?access_token=" + accountInfo.access_token + "&limit=1";
     $.getJSON(url, function(data) {
-        for (var i=0; i<data.length; ++i) {
-            addRoom(data[i]);   
+        var rooms = data.rooms;
+        for (var i=0; i<rooms.length; ++i) {
+            addRoom(rooms[i]);   
         }
     }).fail(function(err) {
         alert(JSON.stringify($.parseJSON(err.responseText)));
@@ -44,7 +53,7 @@ var getCurrentRoomList = function() {
 $('.createRoom').live('click', function() {
     var data = {};
     $.ajax({
-        url: "http://localhost:8080/matrix/client/api/v1/rooms?access_token="+accountInfo.access_token,
+        url: "http://localhost:8080/matrix/client/api/v1/createRoom?access_token="+accountInfo.access_token,
         type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify(data),
@@ -78,44 +87,32 @@ $('.changeMembership').live('click', function() {
         return;
     }
     
-    var url = "http://localhost:8080/matrix/client/api/v1/rooms/$roomid/members/$user/state?access_token=$token";
+    var url = "http://localhost:8080/matrix/client/api/v1/rooms/$roomid/$membership?access_token=$token";
     url = url.replace("$token", accountInfo.access_token);
     url = url.replace("$roomid", encodeURIComponent(roomId));
-    url = url.replace("$user", encodeURIComponent(member));
+    url = url.replace("$membership", membership);
     
-    if (membership === "leave") {
-        $.ajax({
-            url: url,
-            type: "DELETE",
-            contentType: "application/json; charset=utf-8",
-            dataType: "json",
-            success: function(data) {
-                getCurrentRoomList();
-            },
-            error: function(err) {
-                alert(JSON.stringify($.parseJSON(err.responseText)));  
-            }
-        });
-    }
-    else {
-        var data = {
-            membership: membership
+    var data = {};
+    
+    if (membership === "invite") {
+        data = {
+            user_id: member
         };
-        
-        $.ajax({
-            url: url,
-            type: "PUT",
-            contentType: "application/json; charset=utf-8",
-            data: JSON.stringify(data),
-            dataType: "json",
-            success: function(data) {
-                getCurrentRoomList();
-            },
-            error: function(err) {
-                alert(JSON.stringify($.parseJSON(err.responseText)));  
-            }
-        }); 
     }
+
+    $.ajax({
+        url: url,
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify(data),
+        dataType: "json",
+        success: function(data) {
+            getCurrentRoomList();
+        },
+        error: function(err) {
+            alert(JSON.stringify($.parseJSON(err.responseText)));  
+        }
+    }); 
 });
 
 $('.joinAlias').live('click', function() {
@@ -125,7 +122,7 @@ $('.joinAlias').live('click', function() {
     url = url.replace("$roomalias", encodeURIComponent(roomAlias));
     $.ajax({
         url: url,
-        type: "PUT",
+        type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify({}),
         dataType: "json",

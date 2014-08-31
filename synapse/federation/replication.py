@@ -541,7 +541,10 @@ class _TransactionQueue(object):
         )
 
         def eb(failure):
-            deferred.errback(failure)
+            if not deferred.called:
+                deferred.errback(failure)
+            else:
+                logger.exception("Failed to send edu", failure)
         self._attempt_new_transaction(destination).addErrback(eb)
 
         return deferred

@@ -42,7 +42,13 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
         
         matrixService.publicRooms().then(
             function(response) {
-                $scope.public_rooms = matrixService.assignRoomAliases(response.data.chunk);
+                $scope.public_rooms = response.data.chunk;
+                for (var i = 0; i < $scope.public_rooms.length; i++) {
+                    var room = $scope.public_rooms[i];
+
+                    // Add room_alias & room_display_name members
+                    angular.extend(room, matrixService.getRoomAliasAndDisplayName(room));
+                }
             }
         );
     };

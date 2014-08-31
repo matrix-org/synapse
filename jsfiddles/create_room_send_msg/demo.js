@@ -25,11 +25,12 @@ $('.login').live('click', function() {
 });
 
 var getCurrentRoomList = function() {
-    var url = "http://localhost:8080/matrix/client/api/v1/im/sync?access_token=" + accountInfo.access_token + "&from=END&to=START&limit=1";
+    var url = "http://localhost:8080/matrix/client/api/v1/initialSync?access_token=" + accountInfo.access_token + "&limit=1";
     $.getJSON(url, function(data) {
-        for (var i=0; i<data.length; ++i) {
-            data[i].latest_message = data[i].messages.chunk[0].content.body;
-            addRoom(data[i]);   
+        var rooms = data.rooms;
+        for (var i=0; i<rooms.length; ++i) {
+            rooms[i].latest_message = rooms[i].messages.chunk[0].content.body;
+            addRoom(rooms[i]);   
         }
     }).fail(function(err) {
         alert(JSON.stringify($.parseJSON(err.responseText)));
@@ -43,7 +44,7 @@ $('.createRoom').live('click', function() {
         data.room_alias_name = roomAlias;   
     }
     $.ajax({
-        url: "http://localhost:8080/matrix/client/api/v1/rooms?access_token="+accountInfo.access_token,
+        url: "http://localhost:8080/matrix/client/api/v1/createRoom?access_token="+accountInfo.access_token,
         type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify(data),
@@ -78,11 +79,9 @@ $('.sendMessage').live('click', function() {
         return;
     }
     
-    var url = "http://localhost:8080/matrix/client/api/v1/rooms/$roomid/messages/$user/$msgid?access_token=$token";
+    var url = "http://localhost:8080/matrix/client/api/v1/rooms/$roomid/send/m.room.message?access_token=$token";
     url = url.replace("$token", accountInfo.access_token);
     url = url.replace("$roomid", encodeURIComponent(roomId));
-    url = url.replace("$user", encodeURIComponent(accountInfo.user_id));
-    url = url.replace("$msgid", msgId);
     
     var data = {
         msgtype: "m.text",
@@ -91,7 +90,7 @@ $('.sendMessage').live('click', function() {
     
     $.ajax({
         url: url,
-        type: "PUT",
+        type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify(data),
         dataType: "json",

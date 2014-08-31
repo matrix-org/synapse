@@ -81,4 +81,4 @@ class PaginationConfig(object):
         return (
             "<PaginationConfig from_tok=%s, to_tok=%s, "
             "direction=%s, limit=%s>"
-        ) % (self.from_tok, self.to_tok, self.direction, self.limit)
+        ) % (self.from_token, self.to_token, self.direction, self.limit)

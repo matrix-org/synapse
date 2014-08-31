@@ -41,7 +41,7 @@ angular.module('matrixService', [])
     var prefixPath = "/matrix/client/api/v1";
     var MAPPING_PREFIX = "alias_for_";
 
-    var doRequest = function(method, path, params, data) {
+    var doRequest = function(method, path, params, data, $httpParams) {
         if (!config) {
             console.warn("No config exists. Cannot perform request to "+path);
             return;
@@ -58,7 +58,7 @@ angular.module('matrixService', [])
             path = prefixPath + path;
         }
         
-        return doBaseRequest(config.homeserver, method, path, params, data, undefined);
+        return doBaseRequest(config.homeserver, method, path, params, data, undefined, $httpParams);
     };
 
     var doBaseRequest = function(baseUrl, method, path, params, data, headers, $httpParams) {
@@ -172,9 +172,9 @@ angular.module('matrixService', [])
             return doRequest("GET", path, undefined, {});
         },
 
-        sendMessage: function(room_id, txn_id, content) {
+        sendEvent: function(room_id, eventType, txn_id, content) {
             // The REST path spec
-            var path = "/rooms/$room_id/send/m.room.message/$txn_id";
+            var path = "/rooms/$room_id/send/"+eventType+"/$txn_id";
 
             if (!txn_id) {
                 txn_id = "m" + new Date().getTime();
@@ -188,6 +188,10 @@ angular.module('matrixService', [])
             path = path.replace("$txn_id", txn_id);
 
             return doRequest("PUT", path, undefined, content);
+        },
+
+        sendMessage: function(room_id, txn_id, content) {
+            return this.sendEvent(room_id, 'm.room.message', txn_id, content);
         },
 
         // Send a text message
@@ -343,15 +347,31 @@ angular.module('matrixService', [])
 
             return doBaseRequest(config.homeserver, "POST", path, params, file, headers, $httpParams);
         },
-        
-        // start listening on /events
-        getEventStream: function(from, timeout) {
+
+        /**
+         * Start listening on /events
+         * @param {String} from the token from which to listen events to
+         * @param {Integer} serverTimeout the time in ms the server will hold open the connection
+         * @param {Integer} clientTimeout the timeout in ms used at the client HTTP request level
+         * @returns a promise
+         */
+        getEventStream: function(from, serverTimeout, clientTimeout) {
             var path = "/events";
             var params = {
                 from: from,
-                timeout: timeout
+                timeout: serverTimeout
             };
-            return doRequest("GET", path, params);
+
+            var $httpParams;
+            if (clientTimeout) {
+                // If the Internet connection is lost, this timeout is used to be able to
+                // cancel the current request and notify the client so that it can retry with a new request.
+                $httpParams = {
+                    timeout: clientTimeout
+                };
+            }
+
+            return doRequest("GET", path, params, undefined, $httpParams);
         },
 
         // Indicates if user authentications details are stored in cache
@@ -420,34 +440,38 @@ angular.module('matrixService', [])
         /****** Room aliases management ******/
 
         /**
-         * Enhance data returned by rooms() and publicRooms() by adding room_alias
-         *  & room_display_name which are computed from data already retrieved from the server.
-         * @param {Array} data the response of rooms() and publicRooms()
-         * @returns {Array} the same array with enriched objects
+         * Get the room_alias & room_display_name which are computed from data 
+         * already retrieved from the server.
+         * @param {Room object} room one element of the array returned by the response
+         *  of rooms() and publicRooms()
+         * @returns {Object} {room_alias: "...", room_display_name: "..."}
          */
-        assignRoomAliases: function(data) {
-            for (var i=0; i<data.length; i++) {
-                var alias = this.getRoomIdToAliasMapping(data[i].room_id);
-                if (alias) {
-                    // use the existing alias from storage
-                    data[i].room_alias = alias;
-                    data[i].room_display_name = alias;
-                }
-                else if (data[i].aliases && data[i].aliases[0]) {
-                    // save the mapping
-                    // TODO: select the smarter alias from the array
-                    this.createRoomIdToAliasMapping(data[i].room_id, data[i].aliases[0]);
-                    data[i].room_display_name = data[i].aliases[0];
-                }
-                else if (data[i].membership == "invite" && "inviter" in data[i]) {
-                    data[i].room_display_name = data[i].inviter + "'s room"
-                }
-                else {
-                    // last resort use the room id
-                    data[i].room_display_name = data[i].room_id;
-                }
+        getRoomAliasAndDisplayName: function(room) {
+            var result = {
+                room_alias: undefined,
+                room_display_name: undefined
+            };
+            
+            var alias = this.getRoomIdToAliasMapping(room.room_id);
+            if (alias) {
+                // use the existing alias from storage
+                result.room_alias = alias;
+                result.room_display_name = alias;
             }
-            return data;
+            else if (room.aliases && room.aliases[0]) {
+                // save the mapping
+                // TODO: select the smarter alias from the array
+                this.createRoomIdToAliasMapping(room.room_id, room.aliases[0]);
+                result.room_display_name = room.aliases[0];
+            }
+            else if (room.membership === "invite" && "inviter" in room) {
+                result.room_display_name = room.inviter + "'s room";
+            }
+            else {
+                // last resort use the room id
+                result.room_display_name = room.room_id;
+            }
+            return result;
         },
         
         createRoomIdToAliasMapping: function(roomId, alias) {

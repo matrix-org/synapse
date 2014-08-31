@@ -31,6 +31,7 @@ angular.module('eventHandlerService', [])
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
     var PRESENCE_EVENT = "PRESENCE_EVENT";
+    var CALL_EVENT = "CALL_EVENT";
 
     var InitialSyncDeferred = $q.defer();
     
@@ -94,12 +95,16 @@ angular.module('eventHandlerService', [])
         $rootScope.presence[event.content.user_id] = event;
         $rootScope.$broadcast(PRESENCE_EVENT, event, isLiveEvent);
     };
-    
+
+    var handleCallEvent = function(event, isLiveEvent) {
+        $rootScope.$broadcast(CALL_EVENT, event, isLiveEvent);
+    };
     
     return {
         MSG_EVENT: MSG_EVENT,
         MEMBER_EVENT: MEMBER_EVENT,
         PRESENCE_EVENT: PRESENCE_EVENT,
+        CALL_EVENT: CALL_EVENT,
         
     
         handleEvent: function(event, isLiveEvent) {
@@ -116,6 +121,9 @@ angular.module('eventHandlerService', [])
                 default:
                     console.log("Unable to handle event type " + event.type);
                     break;
+            }
+            if (event.type.indexOf('m.call.') == 0) {
+                handleCallEvent(event, isLiveEvent);
             }
         },
         

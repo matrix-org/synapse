@@ -14,12 +14,12 @@
   },
   "apis": [
     {
-      "path": "/rooms/{roomId}/send/{eventType}/{txnId}",
+      "path": "/rooms/{roomId}/send/{eventType}",
       "operations": [
         {
-          "method": "PUT",
+          "method": "POST",
           "summary": "Send a generic non-state event to this room.",
-          "notes": "This operation can also be done as a POST to /rooms/{roomId}/send/{eventType}",
+          "notes": "This operation can also be done as a PUT by suffixing /{txnId}.",
           "type": "EventId",
           "nickname": "send_non_state_event",
           "consumes": [
@@ -43,13 +43,6 @@
             {
               "name": "eventType",
               "description": "The type of event to send.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "txnId",
-              "description": "A client transaction ID to ensure idempotency. This can only be omitted if the HTTP method becomes a POST.",
               "required": true,
               "type": "string",
               "paramType": "path"
@@ -104,12 +97,12 @@
       ]
     },
     {
-      "path": "/rooms/{roomId}/send/m.room.message/{txnId}",
+      "path": "/rooms/{roomId}/send/m.room.message",
       "operations": [
         {
-          "method": "PUT",
+          "method": "POST",
           "summary": "Send a message in this room.",
-          "notes": "This operation can also be done as a POST to /rooms/{roomId}/send/m.room.message",
+          "notes": "This operation can also be done as a PUT by suffixing /{txnId}.",
           "type": "EventId",
           "nickname": "send_message",
           "consumes": [
@@ -126,13 +119,6 @@
             {
               "name": "roomId",
               "description": "The room to send the message in.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "txnId",
-              "description": "A client transaction ID to ensure idempotency. This can only be omitted if the HTTP method becomes a POST.",
               "required": true,
               "type": "string",
               "paramType": "path"
@@ -195,12 +181,12 @@
       ]
     },
     {
-      "path": "/rooms/{roomId}/send/m.room.message.feedback/{txnId}",
+      "path": "/rooms/{roomId}/send/m.room.message.feedback",
       "operations": [
         {
-          "method": "PUT",
+          "method": "POST",
           "summary": "Send feedback to a message.",
-          "notes": "This operation can also be done as a POST to /rooms/{roomId}/send/m.room.message.feedback",
+          "notes": "This operation can also be done as a PUT by suffixing /{txnId}.",
           "type": "EventId",
           "nickname": "send_feedback",
           "consumes": [
@@ -220,13 +206,6 @@
               "required": true,
               "type": "string",
               "paramType": "path"
-            },
-            {
-              "name": "txnId",
-              "description": "A client transaction ID to ensure idempotency. This can only be omitted if the HTTP method becomes a POST.",
-              "required": true,
-              "type": "string",
-              "paramType": "path"
             }
           ],
           "responseMessages": [
@@ -239,12 +218,12 @@
       ]
     },
     {
-      "path": "/rooms/{roomId}/invite/{txnId}",
+      "path": "/rooms/{roomId}/invite",
       "operations": [
         {
-          "method": "PUT",
+          "method": "POST",
           "summary": "Invite a user to this room.",
-          "notes": "This operation can also be done as a POST to /rooms/{roomId}/invite",
+          "notes": "This operation can also be done as a PUT by suffixing /{txnId}.",
           "type": "void",
           "nickname": "invite",
           "consumes": [
@@ -255,13 +234,6 @@
               "name": "roomId",
               "description": "The room which has this user.",
               "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "txnId",
-              "description": "A client transaction ID for this PUT to ensure idempotency. This can only be omitted if the HTTP method becomes a POST. ",
-              "required": false,
               "type": "string",
               "paramType": "path"
             },
@@ -277,12 +249,12 @@
       ]
     },
     {
-      "path": "/rooms/{roomId}/join/{txnId}",
+      "path": "/rooms/{roomId}/join",
       "operations": [
         {
-          "method": "PUT",
+          "method": "POST",
           "summary": "Join this room.",
-          "notes": "This operation can also be done as a POST to /rooms/{roomId}/join",
+          "notes": "This operation can also be done as a PUT by suffixing /{txnId}.",
           "type": "void",
           "nickname": "join_room",
           "consumes": [
@@ -295,25 +267,18 @@
               "required": true,
               "type": "string",
               "paramType": "path"
-            },
-            {
-              "name": "txnId",
-              "description": "A client transaction ID for this PUT to ensure idempotency. This can only be omitted if the HTTP method becomes a POST. ",
-              "required": false,
-              "type": "string",
-              "paramType": "path"
             }
           ]
         }  
       ]
     },
     {
-      "path": "/rooms/{roomId}/leave/{txnId}",
+      "path": "/rooms/{roomId}/leave",
       "operations": [
         {
-          "method": "PUT",
+          "method": "POST",
           "summary": "Leave this room.",
-          "notes": "This operation can also be done as a POST to /rooms/{roomId}/leave",
+          "notes": "This operation can also be done as a PUT by suffixing /{txnId}.",
           "type": "void",
           "nickname": "leave",
           "consumes": [
@@ -324,13 +289,6 @@
               "name": "roomId",
               "description": "The room to leave.",
               "required": true,
-              "type": "string",
-              "paramType": "path"
-            },
-            {
-              "name": "txnId",
-              "description": "A client transaction ID for this PUT to ensure idempotency. This can only be omitted if the HTTP method becomes a POST. ",
-              "required": false,
               "type": "string",
               "paramType": "path"
             }
@@ -476,7 +434,7 @@
           "parameters": [
             {
               "name": "body",
-              "description": "The desired configuration for the room.",
+              "description": "The desired configuration for the room. This operation can also be done as a PUT by suffixing /{txnId}.",
               "required": true,
               "type": "RoomConfig",
               "paramType": "body"

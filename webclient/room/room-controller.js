@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
-.controller('RoomController', ['$scope', '$http', '$timeout', '$routeParams', '$location', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mUtilities', '$rootScope',
-                               function($scope, $http, $timeout, $routeParams, $location, matrixService, eventHandlerService, mFileUpload, mUtilities, $rootScope) {
+angular.module('RoomController', ['ngSanitize', 'mFileInput'])
+.controller('RoomController', ['$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mPresence', 'matrixPhoneService', 'MatrixCall',
+                               function($scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, mPresence, matrixPhoneService, MatrixCall) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -51,21 +51,20 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
             objDiv.scrollTop = objDiv.scrollHeight;
         }, 0);
     };
-    
+
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
         if (isLive && event.room_id === $scope.room_id) {
             scrollToBottom();
             
             if (window.Notification) {
-                // FIXME: we should also notify based on a timer or other heuristics
-                // rather than the window being minimised
-                if (document.hidden) {
+                // Show notification when the user is idle
+                if (matrixService.presence.offline === mPresence.getState()) {
                     var notification = new window.Notification(
                         ($scope.members[event.user_id].displayname || event.user_id) +
                         " (" + ($scope.room_alias || $scope.room_id) + ")", // FIXME: don't leak room_ids here
                     {
                         "body": event.content.body,
-                        "icon": $scope.members[event.user_id].avatar_url,
+                        "icon": $scope.members[event.user_id].avatar_url
                     });
                     $timeout(function() {
                         notification.close();
@@ -82,12 +81,32 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
     $scope.$on(eventHandlerService.PRESENCE_EVENT, function(ngEvent, event, isLive) {
         updatePresence(event);
     });
+
+    $rootScope.$on(matrixPhoneService.INCOMING_CALL_EVENT, function(ngEvent, call) {
+        console.trace("incoming call");
+        call.onError = $scope.onCallError;
+        call.onHangup = $scope.onCallHangup;
+        $scope.currentCall = call;
+    });
+
+    $scope.memberCount = function() {
+        return Object.keys($scope.members).length;
+    };
     
     $scope.paginateMore = function() {
         if ($scope.state.can_paginate) {
             // console.log("Paginating more.");
             paginate(MESSAGES_PER_PAGINATION);
         }
+    };
+
+    $scope.answerCall = function() {
+        $scope.currentCall.answer();
+    };
+
+    $scope.hangupCall = function() {
+        $scope.currentCall.hangup();
+        $scope.currentCall = undefined;
     };
         
     var paginate = function(numItems) {
@@ -214,7 +233,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
             var member = $scope.members[target_user_id];
             member.content.membership = chunk.content.membership;
         }
-    }
+    };
 
     var updatePresence = function(chunk) {
         if (!(chunk.content.user_id in $scope.members)) {
@@ -241,10 +260,10 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
         if ("avatar_url" in chunk.content) {
             member.avatar_url = chunk.content.avatar_url;
         }
-    }
+    };
 
     $scope.send = function() {
-        if ($scope.textInput == "") {
+        if ($scope.textInput === "") {
             return;
         }
 
@@ -253,7 +272,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
         // Send the text message
         var promise;
         // FIXME: handle other commands too
-        if ($scope.textInput.indexOf("/me") == 0) {
+        if ($scope.textInput.indexOf("/me") === 0) {
             promise = matrixService.sendEmoteMessage($scope.room_id, $scope.textInput.substr(4));
         }
         else {
@@ -454,4 +473,21 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput', 'mUtilities'])
     $scope.loadMoreHistory = function() {
         paginate(MESSAGES_PER_PAGINATION);
     };
+
+    $scope.startVoiceCall = function() {
+        var call = new MatrixCall($scope.room_id);
+        call.onError = $scope.onCallError;
+        call.onHangup = $scope.onCallHangup;
+        call.placeCall();
+        $scope.currentCall = call;
+    }
+
+    $scope.onCallError = function(errStr) {
+        $scope.feedback = errStr;
+    }
+
+    $scope.onCallHangup = function() {
+        $scope.feedback = "Call ended";
+        $scope.currentCall = undefined;
+    }
 }]);

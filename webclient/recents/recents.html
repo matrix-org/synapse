@@ -39,6 +39,11 @@
                                     {{ room.lastMsg.user_id }} sent an image
                                 </div>
 
+                                <div ng-switch-when="m.emote">
+                                    <span ng-bind-html="'* ' + (room.lastMsg.user_id) + ' ' + room.lastMsg.content.body | linky:'_blank'">
+                                    </span>
+                                </div>
+
                                 <div ng-switch-default>
                                     {{ room.lastMsg.content }}
                                 </div>

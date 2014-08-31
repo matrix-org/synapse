@@ -81,7 +81,11 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         self.replication = hs.get_replication_layer()
         self.replication.send_edu = Mock()
-        self.replication.send_edu.return_value = defer.succeed((200, "OK"))
+
+        def send_edu(*args, **kwargs):
+            # print "send_edu: %s, %s" % (args, kwargs)
+            return defer.succeed((200, "OK"))
+        self.replication.send_edu.side_effect = send_edu
 
         def get_profile_displayname(user_localpart):
             return defer.succeed("Frank")
@@ -95,11 +99,12 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
             return defer.succeed("http://foo")
         self.datastore.get_profile_avatar_url = get_profile_avatar_url
 
+        self.presence_list = [
+            {"observed_user_id": "@banana:test"},
+            {"observed_user_id": "@clementine:test"},
+        ]
         def get_presence_list(user_localpart, accepted=None):
-            return defer.succeed([
-                {"observed_user_id": "@banana:test"},
-                {"observed_user_id": "@clementine:test"},
-            ])
+            return defer.succeed(self.presence_list)
         self.datastore.get_presence_list = get_presence_list
 
         def do_users_share_a_room(userlist):
@@ -109,7 +114,10 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         self.handlers = hs.get_handlers()
 
         self.mock_update_client = Mock()
-        self.mock_update_client.return_value = defer.succeed(None)
+        def update(*args, **kwargs):
+            # print "mock_update_client: %s, %s" %(args, kwargs)
+            return defer.succeed(None)
+        self.mock_update_client.side_effect = update
 
         self.handlers.presence_handler.push_update_to_clients = (
                 self.mock_update_client)
@@ -130,6 +138,11 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_state(self):
+        self.presence_list = [
+            {"observed_user_id": "@banana:test"},
+            {"observed_user_id": "@clementine:test"},
+        ]
+
         mocked_set = self.datastore.set_presence_state
         mocked_set.return_value = defer.succeed({"state": OFFLINE})
 
@@ -139,10 +152,14 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         mocked_set.assert_called_with("apple",
                 {"state": UNAVAILABLE, "status_msg": "Away"})
-    test_set_my_state.skip = "Presence polling is disabled"
 
     @defer.inlineCallbacks
     def test_push_local(self):
+        self.presence_list = [
+            {"observed_user_id": "@banana:test"},
+            {"observed_user_id": "@clementine:test"},
+        ]
+
         self.datastore.set_presence_state.return_value = defer.succeed(
                 {"state": ONLINE})
 
@@ -174,12 +191,10 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         presence)
 
         self.mock_update_client.assert_has_calls([
-            call(observer_user=self.u_apple,
+            call(users_to_push=set([self.u_apple, self.u_banana, self.u_clementine]),
+                room_ids=[],
                 observed_user=self.u_apple,
                 statuscache=ANY), # self-reflection
-            call(observer_user=self.u_banana,
-                observed_user=self.u_apple,
-                statuscache=ANY),
         ], any_order=True)
 
         statuscache = self.mock_update_client.call_args[1]["statuscache"]
@@ -199,12 +214,10 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 self.u_apple, "I am an Apple")
 
         self.mock_update_client.assert_has_calls([
-            call(observer_user=self.u_apple,
+            call(users_to_push=set([self.u_apple, self.u_banana, self.u_clementine]),
+                room_ids=[],
                 observed_user=self.u_apple,
                 statuscache=ANY), # self-reflection
-            call(observer_user=self.u_banana,
-                observed_user=self.u_apple,
-                statuscache=ANY),
         ], any_order=True)
 
         statuscache = self.mock_update_client.call_args[1]["statuscache"]
@@ -214,11 +227,14 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
             "displayname": "I am an Apple",
             "avatar_url": "http://foo",
         }, statuscache.state)
-    test_push_local.skip = "Presence polling is disabled"
 
 
     @defer.inlineCallbacks
     def test_push_remote(self):
+        self.presence_list = [
+            {"observed_user_id": "@potato:remote"},
+        ]
+
         self.datastore.set_presence_state.return_value = defer.succeed(
                 {"state": ONLINE})
 
@@ -246,10 +262,14 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                     ],
                 },
         )
-    test_push_remote.skip = "Presence polling is disabled"
 
     @defer.inlineCallbacks
     def test_recv_remote(self):
+        self.presence_list = [
+            {"observed_user_id": "@banana:test"},
+            {"observed_user_id": "@clementine:test"},
+        ]
+
         # TODO(paul): Gut-wrenching
         potato_set = self.handlers.presence_handler._remote_recvmap.setdefault(
                 self.u_potato, set())
@@ -267,7 +287,8 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         )
 
         self.mock_update_client.assert_called_with(
-            observer_user=self.u_apple,
+            users_to_push=set([self.u_apple]),
+            room_ids=[],
             observed_user=self.u_potato,
             statuscache=ANY)
 
