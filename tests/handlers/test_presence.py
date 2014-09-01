@@ -632,9 +632,12 @@ class PresencePushTestCase(unittest.TestCase):
             {"presence": ONLINE}
         )
 
+        (events, _) = yield self.event_source.get_new_events_for_user(
+            self.u_apple, 0, None
+        )
+
         self.assertEquals(self.event_source.get_current_key(), 1)
-        self.assertEquals(
-            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+        self.assertEquals(events,
             [
                 {"type": "m.presence",
                  "content": {
@@ -680,11 +683,12 @@ class PresencePushTestCase(unittest.TestCase):
                  "state": OFFLINE},
         ], presence)
 
+        (events, _) = yield self.event_source.get_new_events_for_user(
+            self.u_apple, 1, None
+        )
+
         self.assertEquals(self.event_source.get_current_key(), 2)
-        self.assertEquals(
-            self.event_source.get_new_events_for_user(
-                self.u_banana, 1, None
-            )[0],
+        self.assertEquals(events,
             [
                 {"type": "m.presence",
                  "content": {
@@ -760,11 +764,12 @@ class PresencePushTestCase(unittest.TestCase):
             )
         )
 
+        (events, _) = yield self.event_source.get_new_events_for_user(
+            self.u_apple, 0, None
+        )
+
         self.assertEquals(self.event_source.get_current_key(), 1)
-        self.assertEquals(
-            self.event_source.get_new_events_for_user(
-                self.u_apple, 0, None
-            )[0],
+        self.assertEquals(events,
             [
                 {"type": "m.presence",
                  "content": {
@@ -804,11 +809,12 @@ class PresencePushTestCase(unittest.TestCase):
             "a-room"
         )
 
+        (events, _) = yield self.event_source.get_new_events_for_user(
+            self.u_apple, 0, None
+        )
+
         self.assertEquals(self.event_source.get_current_key(), 1)
-        self.assertEquals(
-            self.event_source.get_new_events_for_user(
-                self.u_apple, 0, None
-            )[0],
+        self.assertEquals(events,
             [
                 {"type": "m.presence",
                  "content": {
