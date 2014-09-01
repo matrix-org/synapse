@@ -51,7 +51,9 @@
                         </div>
 
                         <div ng-switch-default>
-                            {{ room.lastMsg }}
+                            <div ng-if="room.lastMsg.type.indexOf('m.call.') == 0">
+                                Call
+                            </div>
                         </div>
                     </div>
                 </td>

@@ -266,6 +266,12 @@ class PresenceHandler(BaseHandler):
         #   we don't have to do this all the time
         self.changed_presencelike_data(target_user, state)
 
+    def bump_presence_active_time(self, user, now=None):
+        if now is None:
+            now = self.clock.time_msec()
+
+        self.changed_presencelike_data(user, {"last_active": now})
+
     def changed_presencelike_data(self, user, state):
         statuscache = self._get_or_make_usercache(user)
 

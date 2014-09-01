@@ -391,22 +391,101 @@ If all members in a room leave, that room becomes eligible for deletion.
 
 Events in a room
 ----------------
-- Split into state and non-state data
-- Explain what they are, semantics, give examples of clobbering / not, use cases (msgs vs room names).
-  Not too much detail on the actual event contents.
-- API to hit.
-- Extensibility provided by the API for custom events. Examples.
-- How this hooks into ``initialSync``.
-- See the "Room Events" section for actual spec on each type.
+Room events can be split into two categories:
 
-Syncing a room
---------------
-- Single room initial sync. ``rooms/<room id>/initialSync`` API to hit. Why it might be used (lazy loading)
+:State Events:
+  These are events which replace events that came before it, depending on a set of unique keys.
+  These keys are the event ``type`` and a ``state_key``. Events with the same set of keys will
+  be overwritten. Typically, state events are used to store state, hence their name.
 
-Getting grouped state events
-----------------------------
-- ``/members`` and ``/messages`` and the events they return.
-- ``/state`` and it returns ALL THE THINGS.
+:Non-state events:
+  These are events which cannot be overwritten after sending. The list of events continues
+  to grow as more events are sent. As this list grows, it becomes necessary to
+  provide a mechanism for navigating this list. Pagination APIs are used to view the list
+  of historical non-state events. Typically, non-state events are used to send messages.
+
+This specification outlines several events, all with the event type prefix ``m.``. However,
+applications may wish to add their own type of event, and this can be achieved using the 
+REST API detailed in the following sections. If new events are added, the event ``type`` 
+key SHOULD follow the Java package naming convention, e.g. ``com.example.myapp.event``. 
+This ensures event types are suitably namespaced for each application and reduces the 
+risk of clashes.
+
+State events
+------------
+State events can be sent by ``PUT`` ing to ``/rooms/<room id>/state/<event type>/<state key>``.
+These events will be overwritten if ``<room id>``, ``<event type>`` and ``<state key>`` all match.
+If the state event has no ``state_key``, it can be omitted from the path. These requests 
+**cannot use transaction IDs** like other ``PUT`` paths because they cannot be differentiated 
+from the ``state key``. Furthermore, ``POST`` is unsupported on state paths. Valid requests
+look like::
+
+  PUT /rooms/!roomid:domain/state/m.example.event
+  { "key" : "without a state key" }
+
+  PUT /rooms/!roomid:domain/state/m.another.example.event/foo
+  { "key" : "with 'foo' as the state key" }
+
+In contrast, these requests are invalid::
+
+  POST /rooms/!roomid:domain/state/m.example.event/
+  { "key" : "cannot use POST here" }
+
+  PUT /rooms/!roomid:domain/state/m.another.example.event/foo/11
+  { "key" : "txnIds are not supported" }
+
+Care should be taken to avoid setting the wrong ``state key``::
+
+  PUT /rooms/!roomid:domain/state/m.another.example.event/11
+  { "key" : "with '11' as the state key, but was probably intended to be a txnId" }
+
+The ``state_key`` is often used to store state about individual users, by using the user ID as the
+value. For example::
+
+  PUT /rooms/!roomid:domain/state/m.favorite.animal.event/%40my_user%3Adomain.com
+  { "animal" : "cat", "reason": "fluffy" }
+
+In some cases, there may be no need for a ``state_key``, so it can be omitted::
+
+  PUT /rooms/!roomid:domain/state/m.room.bgd.color
+  { "color": "red", "hex": "#ff0000" }
+
+See "Room Events" for the ``m.`` event specification.
+
+Non-state events
+----------------
+Non-state events can be sent by sending a request to ``/rooms/<room id>/send/<event type>``.
+These requests *can* use transaction IDs and ``PUT``/``POST`` methods. Non-state events 
+allow access to historical events and pagination, making it best suited for sending messages.
+For example::
+
+  POST /rooms/!roomid:domain/send/m.custom.example.message
+  { "text": "Hello world!" }
+
+  PUT /rooms/!roomid:domain/send/m.custom.example.message/11
+  { "text": "Goodbye world!" }
+
+See "Room Events" for the ``m.`` event specification.
+
+Syncing rooms
+-------------
+When a client logs in, they may have a list of rooms which they have already joined. These rooms
+may also have a list of events associated with them. The purpose of 'syncing' is to present the
+current room and event information in a convenient, compact manner. There are two APIs provided:
+
+ - ``/initialSync`` : A global sync which will present room and event information for all rooms
+   the user has joined.
+
+ - ``/rooms/<room id>/initialSync`` : A sync scoped to a single room. Presents room and event
+   information for this room only.
+
+- TODO: JSON response format for both types
+- TODO: when would you use global? when would you use scoped?
+
+Getting grouped state events for a room
+---------------------------------------
+- ``/members`` and ``/messages`` and the event types they return. Spec JSON response format.
+- ``/state`` and it returns ALL THE THINGS. 
 
 Room Events
 ===========

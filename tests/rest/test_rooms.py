@@ -51,7 +51,7 @@ class RoomPermissionsTestCase(RestTestCase):
         persistence_service.get_latest_pdus_in_context.return_value = []
 
         hs = HomeServer(
-            "test",
+            "red",
             db_pool=None,
             http_client=None,
             datastore=MemoryDataStore(),
@@ -398,7 +398,7 @@ class RoomsMemberListTestCase(RestTestCase):
         persistence_service.get_latest_pdus_in_context.return_value = []
 
         hs = HomeServer(
-            "test",
+            "red",
             db_pool=None,
             http_client=None,
             datastore=MemoryDataStore(),
@@ -476,7 +476,7 @@ class RoomsCreateTestCase(RestTestCase):
         persistence_service.get_latest_pdus_in_context.return_value = []
 
         hs = HomeServer(
-            "test",
+            "red",
             db_pool=None,
             http_client=None,
             datastore=MemoryDataStore(),
@@ -566,7 +566,7 @@ class RoomTopicTestCase(RestTestCase):
         persistence_service.get_latest_pdus_in_context.return_value = []
 
         hs = HomeServer(
-            "test",
+            "red",
             db_pool=None,
             http_client=None,
             datastore=MemoryDataStore(),
@@ -669,7 +669,7 @@ class RoomMemberStateTestCase(RestTestCase):
         persistence_service.get_latest_pdus_in_context.return_value = []
 
         hs = HomeServer(
-            "test",
+            "red",
             db_pool=None,
             http_client=None,
             datastore=MemoryDataStore(),
@@ -794,7 +794,7 @@ class RoomMessagesTestCase(RestTestCase):
         persistence_service.get_latest_pdus_in_context.return_value = []
 
         hs = HomeServer(
-            "test",
+            "red",
             db_pool=None,
             http_client=None,
             datastore=MemoryDataStore(),
