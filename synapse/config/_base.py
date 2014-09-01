@@ -18,6 +18,7 @@ import ConfigParser as configparser
 import argparse
 import sys
 import os
+import yaml
 
 
 class Config(object):
@@ -35,12 +36,8 @@ class Config(object):
 
     @staticmethod
     def read_config_file(file_path):
-        config = configparser.SafeConfigParser()
-        config.read([file_path])
-        config_dict = {}
-        for section in config.sections():
-            config_dict.update(config.items(section))
-        return config_dict
+        with open(file_path) as file_stream:
+            return yaml.load(file_stream)
 
     @classmethod
     def add_arguments(cls, parser):
@@ -95,15 +92,13 @@ class Config(object):
             config_dir_path = os.path.dirname(config_args.config_path)
             config_dir_path = os.path.abspath(config_dir_path)
             cls.generate_config(args, config_dir_path)
-            config = configparser.SafeConfigParser()
-            config.add_section(generate_section)
+            config = {}
             for key, value in vars(args).items():
                 if (key not in set(["config_path", "generate_config"])
                     and value is not None):
-                    print key, "=", value
-                    config.set(generate_section, key, str(value))
+                    config[key] = value
             with open(config_args.config_path, "w") as config_file:
-                config.write(config_file)
+                yaml.dump(config, config_file, default_flow_style=False)
             sys.exit(0)
 
         return cls(args)
