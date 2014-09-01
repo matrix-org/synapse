@@ -514,8 +514,8 @@ There are several APIs provided to ``GET`` events for a room:
 
 
 
- - ``/rooms/<room id>/messages`` : Get all ``m.room.message`` events.
- - ``/rooms/<room id>/initialSync`` : Get all relevant events for a room.
+- ``/rooms/<room id>/messages`` : Get all ``m.room.message`` events.
+- ``/rooms/<room id>/initialSync`` : Get all relevant events for a room.
 
 
 Room Events
