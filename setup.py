@@ -34,6 +34,7 @@ setup(
         "syutil==0.0.1",
         "Twisted>=14.0.0",
         "service_identity>=1.0.0",
+        "pyyaml",
         "pyasn1",
         "pynacl",
         "daemonize",
