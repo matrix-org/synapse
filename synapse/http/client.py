@@ -113,8 +113,9 @@ class TwistedHttpClient(HttpClient):
             requests.
     """
 
-    def __init__(self):
+    def __init__(self, hs):
         self.agent = MatrixHttpAgent(reactor)
+        self.hs = hs
 
     @defer.inlineCallbacks
     def put_json(self, destination, path, data):
@@ -177,7 +178,10 @@ class TwistedHttpClient(HttpClient):
         retries_left = 5
 
         # TODO: setup and pass in an ssl_context to enable TLS
-        endpoint = matrix_endpoint(reactor, destination, timeout=10)
+        endpoint = matrix_endpoint(
+            reactor, destination, timeout=10,
+            ssl_context_factory=self.hs.tls_tls_context_factory
+        )
 
         while True:
             try:

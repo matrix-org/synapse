@@ -62,7 +62,7 @@ SCHEMA_VERSION = 1
 class SynapseHomeServer(HomeServer):
 
     def build_http_client(self):
-        return TwistedHttpClient()
+        return TwistedHttpClient(self)
 
     def build_resource_for_client(self):
         return JsonResource()
