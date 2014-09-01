@@ -488,10 +488,6 @@ class PresenceHandler(BaseHandler):
     def _start_polling_local(self, user, target_user):
         target_localpart = target_user.localpart
 
-        if not self.is_presence_visible(observer_user=user,
-            observed_user=target_user):
-            return
-
         if target_localpart not in self._local_pushmap:
             self._local_pushmap[target_localpart] = set()
 
