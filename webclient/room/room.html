@@ -100,7 +100,7 @@
                         <button ng-click="inviteUser(userIDToInvite)">Invite</button>
                 </span>
                 <button ng-click="leaveRoom()">Leave</button>
-                <button ng-click="startVoiceCall()" ng-show="currentCall == undefined && memberCount() == 2">Voice Call</button>
+                <button ng-click="startVoiceCall()" ng-show="(currentCall == undefined || currentCall.state == 'ended') && memberCount() == 2">Voice Call</button>
             </div>
         
             {{ feedback }}
