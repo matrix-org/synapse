@@ -33,8 +33,8 @@ angular.module('RegisterController', ['matrixService'])
     
     $scope.account = {
         homeserver: hs_url,
+        desired_user_id: "",
         desired_user_name: "",
-        user_id: "",
         password: "",
         identityServer: "http://matrix.org:8090",
         pwd1: "",
@@ -59,7 +59,7 @@ angular.module('RegisterController', ['matrixService'])
             return;
         }
 
-        matrixService.register($scope.account.desired_user_name, $scope.account.pwd1).then(
+        matrixService.register($scope.account.desired_user_id, $scope.account.pwd1).then(
             function(response) {
                 $scope.feedback = "Success";
                 // Update the current config 
@@ -72,6 +72,10 @@ angular.module('RegisterController', ['matrixService'])
 
                 // And permanently save it
                 matrixService.saveConfig();
+                
+                // Update the global scoped used_id var (used in the app header)
+                $scope.updateHeader();
+                
                 eventStreamService.resume();
                 
                 if ($scope.account.displayName) {
