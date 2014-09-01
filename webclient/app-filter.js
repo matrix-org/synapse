@@ -79,4 +79,43 @@ angular.module('matrixWebClient')
     return function(text) {
         return $sce.trustAsHtml(text);
     };
+}])
+
+// Compute the room name according to information we have
+.filter('roomName', ['$rootScope', 'matrixService', function($rootScope, matrixService) {
+    return function(room_id) {
+        var roomName;
+
+        // If there is an alias, use it
+        // TODO: only one alias is managed for now
+        var alias = matrixService.getRoomIdToAliasMapping(room_id);
+        if (alias) {
+            roomName = alias;
+        }
+
+        if (undefined === roomName) {
+            // Else, build the name from its users
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                if (room.members) {
+                    // Limit the room renaming to 1:1 room
+                    if (2 === Object.keys(room.members).length) {
+                        for (var i in room.members) {
+                            var member = room.members[i];
+                            if (member.user_id !== matrixService.config().user_id) {
+                                roomName = member.content.displayname ?  member.content.displayname : member.user_id;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (undefined === roomName) {
+            // By default, use the room ID
+            roomName = room_id;
+        }
+
+        return roomName;
+    };
 }]);
