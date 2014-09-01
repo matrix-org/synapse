@@ -471,7 +471,8 @@ Syncing rooms
 -------------
 When a client logs in, they may have a list of rooms which they have already joined. These rooms
 may also have a list of events associated with them. The purpose of 'syncing' is to present the
-current room and event information in a convenient, compact manner. There are two APIs provided:
+current room and event information in a convenient, compact manner. The events returned are not
+limited to room events; presence events will also be returned. There are two APIs provided:
 
  - ``/initialSync`` : A global sync which will present room and event information for all rooms
    the user has joined.
@@ -482,10 +483,40 @@ current room and event information in a convenient, compact manner. There are tw
 - TODO: JSON response format for both types
 - TODO: when would you use global? when would you use scoped?
 
-Getting grouped state events for a room
----------------------------------------
-- ``/members`` and ``/messages`` and the event types they return. Spec JSON response format.
-- ``/state`` and it returns ALL THE THINGS. 
+Getting events for a room
+-------------------------
+There are several APIs provided to ``GET`` events for a room:
+
+``/rooms/<room id>/state/<event type>/<state key>``
+  Description:
+    Get the state event identified.
+  Response format:
+    A JSON object representing the state event **content**.
+  Example:
+    ``/rooms/!room:domain.com/state/m.room.name`` returns ``{ "name": "Room name" }``
+
+``/rooms/<room id>/state``
+  Description:
+    Get all state events for a room.
+  Response format:
+    ``[ { state event }, { state event }, ... ]``
+  Example:
+    TODO
+
+
+``/rooms/<room id>/members``
+  Description:
+    Get all ``m.room.member`` state events.
+  Response format:
+    ``{ "start": "token", "end": "token", "chunk": [ { m.room.member event }, ... ] }``
+  Example:
+    TODO
+
+
+
+ - ``/rooms/<room id>/messages`` : Get all ``m.room.message`` events.
+ - ``/rooms/<room id>/initialSync`` : Get all relevant events for a room.
+
 
 Room Events
 ===========
@@ -533,9 +564,12 @@ prefixed with ``m.``
   Example:
     ``{ "membership" : "join" }``
   Description:
-    The membership state of a user is automatically set when using the membership APIs:
-    ``/rooms/<room id>/invite``, ``/rooms/<room id>/join`` and ``/rooms/<room id>/leave``.
-    See the "Rooms" section for how to use those APIs.
+    Adjusts the membership state for a user in a room. It is preferable to use the
+    membership APIs (``/rooms/<room id>/invite`` etc) when performing membership actions
+    rather than adjusting the state directly as there are a restricted set of valid
+    transformations. For example, user A cannot force user B to join a room, and trying
+    to force this state change directly will fail. See the "Rooms" section for how to 
+    use the membership APIs.
 
 ``m.room.config``
   Summary:
