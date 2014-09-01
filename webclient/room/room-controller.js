@@ -82,13 +82,6 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         updatePresence(event);
     });
 
-    $rootScope.$on(matrixPhoneService.INCOMING_CALL_EVENT, function(ngEvent, call) {
-        console.trace("incoming call");
-        call.onError = $scope.onCallError;
-        call.onHangup = $scope.onCallHangup;
-        $scope.currentCall = call;
-    });
-    
     $scope.memberCount = function() {
         return Object.keys($scope.members).length;
     };
@@ -100,15 +93,6 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         }
     };
 
-    $scope.answerCall = function() {
-        $scope.currentCall.answer();
-    };
-
-    $scope.hangupCall = function() {
-        $scope.currentCall.hangup();
-        $scope.currentCall = undefined;
-    };
-        
     var paginate = function(numItems) {
         // console.log("paginate " + numItems);
         if ($scope.state.paginating || !$scope.room_id) {
@@ -181,11 +165,11 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         var isNewMember = !(target_user_id in $scope.members);
         if (isNewMember) {
             // FIXME: why are we copying these fields around inside chunk?
-            if ("state" in chunk.content) {
-                chunk.presenceState = chunk.content.state; // why is this renamed?
+            if ("presence" in chunk.content) {
+                chunk.presence = chunk.content.presence;
             }
-            if ("mtime_age" in chunk.content) {
-                chunk.mtime_age = chunk.content.mtime_age;
+            if ("last_active_ago" in chunk.content) {
+                chunk.last_active_ago = chunk.content.last_active_ago;
             }
             if ("displayname" in chunk.content) {
                 chunk.displayname = chunk.content.displayname;
@@ -201,9 +185,15 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             }
         }
         else {
-            // selectively update membership else it will nuke the picture and displayname too :/
+            // selectively update membership and presence else it will nuke the picture and displayname too :/
             var member = $scope.members[target_user_id];
-            member.content.membership = chunk.content.membership;
+            member.membership = chunk.content.membership;
+            if ("presence" in chunk.content) {
+                member.presence = chunk.content.presence;
+            }
+            if ("last_active_ago" in chunk.content) {
+                member.last_active_ago = chunk.content.last_active_ago;
+            }
         }
     };
     
@@ -221,13 +211,12 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         var member = $scope.members[chunk.content.user_id];
 
         // XXX: why not just pass the chunk straight through?
-        if ("state" in chunk.content) {
-            member.presenceState = chunk.content.state;
+        if ("presence" in chunk.content) {
+            member.presence = chunk.content.presence;
         }
 
-        if ("mtime_age" in chunk.content) {
-            // FIXME: should probably keep updating mtime_age in realtime like FB does
-            member.mtime_age = chunk.content.mtime_age;
+        if ("last_active_ago" in chunk.content) {
+            member.last_active_ago = chunk.content.last_active_ago;
         }
 
         // this may also contain a new display name or avatar url, so check.
@@ -331,6 +320,11 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         // Make sure the initialSync has been before going further
         eventHandlerService.waitForInitialSyncCompletion().then(
             function() {
+                
+                // Some data has been retrieved from the iniialSync request
+                // So, the relative time starts here
+                $scope.now = new Date().getTime();
+                
                 var needsToJoin = true;
                 
                 // The room members is available in the data fetched by initialSync
@@ -377,10 +371,22 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
 
         // Make recents highlight the current room
         $scope.recentsSelectedRoomID = $scope.room_id;
-                
+
+		// Get the up-to-date the current member list
+        matrixService.getMemberList($scope.room_id).then(
+            function(response) {
+                for (var i = 0; i < response.data.chunk.length; i++) {
+                    var chunk = response.data.chunk[i];
+                    updateMemberList(chunk);
+                    updateMemberListPresenceAge();
+                }
+            },
+            function(error) {
+                $scope.feedback = "Failed get member list: " + error.data.error;
+            }
+        );
+
         paginate(MESSAGES_PER_PAGINATION);
-        
-        updateMemberListPresenceAge();
     }; 
     
     $scope.inviteUser = function(user_id) {
@@ -455,16 +461,10 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
 
     $scope.startVoiceCall = function() {
         var call = new MatrixCall($scope.room_id);
-        call.onError = $scope.onCallError;
-        call.onHangup = $scope.onCallHangup;
+        call.onError = $rootScope.onCallError;
+        call.onHangup = $rootScope.onCallHangup;
         call.placeCall();
-        $scope.currentCall = call;
+        $rootScope.currentCall = call;
     }
 
-    $scope.onCallError = function(errStr) {
-        $scope.feedback = errStr;
-    }
-
-    $scope.onCallHangup = function() {
-    }
 }]);

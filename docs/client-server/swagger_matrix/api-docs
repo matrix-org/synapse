@@ -3,31 +3,31 @@
   "swaggerVersion": "1.2",
   "apis": [
     {
-      "path": "/login",
+      "path": "-login",
       "description": "Login operations"
     },
     {
-      "path": "/registration",
+      "path": "-registration",
       "description": "Registration operations"
     },
     {
-      "path": "/rooms",
+      "path": "-rooms",
       "description": "Room operations"
     },
     {
-      "path": "/profile",
+      "path": "-profile",
       "description": "Profile operations"
     },
     {
-      "path": "/presence",
+      "path": "-presence",
       "description": "Presence operations"
     },
     {
-      "path": "/events",
+      "path": "-events",
       "description": "Event operations"
     },
     {
-      "path": "/directory",
+      "path": "-directory",
       "description": "Directory operations"
     }
   ],

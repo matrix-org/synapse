@@ -166,7 +166,11 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         # TODO(paul): Gut-wrenching
         from synapse.handlers.presence import UserPresenceCache
         self.handlers.presence_handler._user_cachemap[self.u_apple] = (
-                UserPresenceCache())
+            UserPresenceCache()
+        )
+        self.handlers.presence_handler._user_cachemap[self.u_apple].update(
+            {"presence": OFFLINE}, serial=0
+        )
         apple_set = self.handlers.presence_handler._local_pushmap.setdefault(
                 "apple", set())
         apple_set.add(self.u_banana)
@@ -182,11 +186,13 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         self.assertEquals([
             {"observed_user": self.u_banana,
+                "presence": ONLINE,
                 "state": ONLINE,
-                "mtime_age": 0,
+                "last_active_ago": 0,
                 "displayname": "Frank",
                 "avatar_url": "http://foo"},
             {"observed_user": self.u_clementine,
+                "presence": OFFLINE,
                 "state": OFFLINE}],
         presence)
 
@@ -199,8 +205,8 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         statuscache = self.mock_update_client.call_args[1]["statuscache"]
         self.assertEquals({
-            "state": ONLINE,
-            "mtime": 1000000, # MockClock
+            "presence": ONLINE,
+            "last_active": 1000000, # MockClock
             "displayname": "Frank",
             "avatar_url": "http://foo",
         }, statuscache.state)
@@ -222,8 +228,8 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         statuscache = self.mock_update_client.call_args[1]["statuscache"]
         self.assertEquals({
-            "state": ONLINE,
-            "mtime": 1000000, # MockClock
+            "presence": ONLINE,
+            "last_active": 1000000, # MockClock
             "displayname": "I am an Apple",
             "avatar_url": "http://foo",
         }, statuscache.state)
@@ -241,7 +247,11 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         # TODO(paul): Gut-wrenching
         from synapse.handlers.presence import UserPresenceCache
         self.handlers.presence_handler._user_cachemap[self.u_apple] = (
-                UserPresenceCache())
+            UserPresenceCache()
+        )
+        self.handlers.presence_handler._user_cachemap[self.u_apple].update(
+            {"presence": OFFLINE}, serial=0
+        )
         apple_set = self.handlers.presence_handler._remote_sendmap.setdefault(
                 "apple", set())
         apple_set.add(self.u_potato.domain)
@@ -255,8 +265,9 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 content={
                     "push": [
                         {"user_id": "@apple:test",
+                         "presence": "online",
                          "state": "online",
-                         "mtime_age": 0,
+                         "last_active_ago": 0,
                          "displayname": "Frank",
                          "avatar_url": "http://foo"},
                     ],
@@ -293,14 +304,16 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
             statuscache=ANY)
 
         statuscache = self.mock_update_client.call_args[1]["statuscache"]
-        self.assertEquals({"state": ONLINE,
+        self.assertEquals({"presence": ONLINE,
                            "displayname": "Frank",
                            "avatar_url": "http://foo"}, statuscache.state)
 
         state = yield self.handlers.presence_handler.get_state(self.u_potato,
                 self.u_apple)
 
-        self.assertEquals({"state": ONLINE,
-                           "displayname": "Frank",
-                           "avatar_url": "http://foo"},
-                state)
+        self.assertEquals(
+                {"presence": ONLINE,
+                 "state": ONLINE,
+                 "displayname": "Frank",
+                 "avatar_url": "http://foo"},
+            state)

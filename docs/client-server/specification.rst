@@ -1007,26 +1007,15 @@ for users from other servers entirely.
 Presence
 ========
 
-In the following messages, the presence state is an integer enumeration of the
-following states:
-  0 : OFFLINE
-  1 : BUSY
-  2 : ONLINE
-  3 : FREE_TO_CHAT
-
-Aside from OFFLINE, the protocol doesn't assign any special meaning to these
-states; they are provided as an approximate signal for users to give to other
-users and for clients to present them in some way that may be useful. Clients
-could have different behaviours for different states of the user's presence, for
-example to decide how much prominence or sound to use for incoming event
-notifications.
+In the following messages, the presence state is a presence string as described in
+the main specification document.
 
 Getting/Setting your own presence state
 ---------------------------------------
   REST Path: /presence/$user_id/status
   Valid methods: GET/PUT
   Required keys:
-    state : [0|1|2|3] - The user's new presence state
+    presence : <string> - The user's new presence state
   Optional keys:
     status_msg : text string provided by the user to explain their status
 
@@ -1039,7 +1028,7 @@ Fetching your presence list
     following keys:
       {
         "user_id" : string giving the observed user's ID
-        "state" : int giving their status
+        "presence" : int giving their status
         "status_msg" : optional text string
         "displayname" : optional text string from the user's profile
         "avatar_url" : optional text string from the user's profile

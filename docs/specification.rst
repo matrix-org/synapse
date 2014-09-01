@@ -168,6 +168,10 @@ Some standard error codes are below:
 :``M_NOT_FOUND``:
   No resource was found for this request.
 
+:``M_LIMIT_EXCEEDED``:
+  Too many requests have been sent in a short period of time. Wait a while then
+  try again.
+
 Some requests have unique error codes:
 
 :``M_USER_IN_USE``:
@@ -273,6 +277,7 @@ Example::
   }
 
 - TODO: This creates a room creation event which serves as the root of the PDU graph for this room.
+- TODO: Keys for speccing a room name / room topic / invite these users?
 
 Modifying aliases
 -----------------
@@ -284,12 +289,37 @@ Permissions
 
 Joining rooms
 -------------
-- What is joining? What permissions / access does it give you? How does this affect /initialSync?
-- API to hit (``/join/$alias or id``). Explain how alias joining works (auto-resolving).  See "Room events" for more info.
-- What does the home server have to do?
-- Rooms that DON'T need an invite to join. This follows through onto inviting users section.
-- Outline invite join dance?
+- TODO: What does the home server have to do to join a user to a room?
 
+Users need to join a room in order to send and receive events in that room. A user can join a
+room by making a request to ``/join/<room alias or id>`` with::
+
+  {}
+
+Alternatively, a user can make a request to ``/rooms/<room id>/join`` with the same request content.
+This is only provided for symmetry with the other membership APIs: ``/rooms/<room id>/invite`` and
+``/rooms/<room id>/leave``. If a room alias was specified, it will be automatically resolved to
+a room ID, which will then be joined. The room ID that was joined will be returned in response::
+
+  {
+    "room_id": "!roomid:domain"
+  }
+
+The membership state for the joining user can also be modified directly to be ``join``
+by sending the following request to 
+``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
+
+  {
+    "membership": "join"
+  }
+
+See the "Room events" section for more information on ``m.room.member``.
+
+After the user has joined a room, they will receive subsequent events in that room. This room
+will now appear as an entry in the ``/initialSync`` API.
+
+Some rooms enforce that a user is *invited* to a room before they can join that room. Other
+rooms will allow anyone to join the room even if they have not received an invite.
 
 Inviting users
 --------------
@@ -331,31 +361,162 @@ See the "Room events" section for more information on ``m.room.member``.
 
 Leaving rooms
 -------------
-- API to hit (``$roomid/leave``). See "Room events" for more info.
-- Must be joined to leave. How does this affect /initialSync?
-- Not ever being in a room is NOT equivalent to have left it (due to membership: leave).
-- Need to be re-invited if invite-only room.
-- If no more HSes in room, can delete room?
-- Is there a dance?
+A user can leave a room to stop receiving events for that room. A user must have
+joined the room before they are eligible to leave the room. If the room is an
+"invite-only" room, they will need to be re-invited before they can re-join the room.
+To leave a room, a request should be made to ``/rooms/<room id>/leave`` with::
+
+  {}
+
+Alternatively, the membership state for this user in this room can be modified 
+directly by sending the following request to 
+``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
+
+  {
+    "membership": "leave"
+  }
+
+See the "Room events" section for more information on ``m.room.member``.
+
+Once a user has left a room, that room will no longer appear on the ``/initialSync``
+API. Be aware that leaving a room is not equivalent to have never been
+in that room. A user who has previously left a room still maintains some residual state in
+that room. Their membership state will be marked as ``leave``. This contrasts with
+a user who has *never been invited or joined to that room* who will not have any
+membership state for that room. 
+
+If all members in a room leave, that room becomes eligible for deletion. 
+ - TODO: Grace period before deletion?
+ - TODO: Under what conditions should a room NOT be purged?
 
 Events in a room
 ----------------
-- Split into state and non-state data
-- Explain what they are, semantics, give examples of clobbering / not, use cases (msgs vs room names).
-  Not too much detail on the actual event contents.
-- API to hit.
-- Extensibility provided by the API for custom events. Examples.
-- How this hooks into ``initialSync``.
-- See the "Room Events" section for actual spec on each type.
+Room events can be split into two categories:
 
-Syncing a room
---------------
-- Single room initial sync. API to hit. Why it might be used (lazy loading)
+:State Events:
+  These are events which replace events that came before it, depending on a set of unique keys.
+  These keys are the event ``type`` and a ``state_key``. Events with the same set of keys will
+  be overwritten. Typically, state events are used to store state, hence their name.
 
-Getting grouped state events
-----------------------------
-- ``/members`` and ``/messages`` and the events they return.
-- ``/state`` and it returns ALL THE THINGS.
+:Non-state events:
+  These are events which cannot be overwritten after sending. The list of events continues
+  to grow as more events are sent. As this list grows, it becomes necessary to
+  provide a mechanism for navigating this list. Pagination APIs are used to view the list
+  of historical non-state events. Typically, non-state events are used to send messages.
+
+This specification outlines several events, all with the event type prefix ``m.``. However,
+applications may wish to add their own type of event, and this can be achieved using the 
+REST API detailed in the following sections. If new events are added, the event ``type`` 
+key SHOULD follow the Java package naming convention, e.g. ``com.example.myapp.event``. 
+This ensures event types are suitably namespaced for each application and reduces the 
+risk of clashes.
+
+State events
+------------
+State events can be sent by ``PUT`` ing to ``/rooms/<room id>/state/<event type>/<state key>``.
+These events will be overwritten if ``<room id>``, ``<event type>`` and ``<state key>`` all match.
+If the state event has no ``state_key``, it can be omitted from the path. These requests 
+**cannot use transaction IDs** like other ``PUT`` paths because they cannot be differentiated 
+from the ``state_key``. Furthermore, ``POST`` is unsupported on state paths. Valid requests
+look like::
+
+  PUT /rooms/!roomid:domain/state/m.example.event
+  { "key" : "without a state key" }
+
+  PUT /rooms/!roomid:domain/state/m.another.example.event/foo
+  { "key" : "with 'foo' as the state key" }
+
+In contrast, these requests are invalid::
+
+  POST /rooms/!roomid:domain/state/m.example.event/
+  { "key" : "cannot use POST here" }
+
+  PUT /rooms/!roomid:domain/state/m.another.example.event/foo/11
+  { "key" : "txnIds are not supported" }
+
+Care should be taken to avoid setting the wrong ``state key``::
+
+  PUT /rooms/!roomid:domain/state/m.another.example.event/11
+  { "key" : "with '11' as the state key, but was probably intended to be a txnId" }
+
+The ``state_key`` is often used to store state about individual users, by using the user ID as the
+``state_key`` value. For example::
+
+  PUT /rooms/!roomid:domain/state/m.favorite.animal.event/%40my_user%3Adomain.com
+  { "animal" : "cat", "reason": "fluffy" }
+
+In some cases, there may be no need for a ``state_key``, so it can be omitted::
+
+  PUT /rooms/!roomid:domain/state/m.room.bgd.color
+  { "color": "red", "hex": "#ff0000" }
+
+See "Room Events" for the ``m.`` event specification.
+
+Non-state events
+----------------
+Non-state events can be sent by sending a request to ``/rooms/<room id>/send/<event type>``.
+These requests *can* use transaction IDs and ``PUT``/``POST`` methods. Non-state events 
+allow access to historical events and pagination, making it best suited for sending messages.
+For example::
+
+  POST /rooms/!roomid:domain/send/m.custom.example.message
+  { "text": "Hello world!" }
+
+  PUT /rooms/!roomid:domain/send/m.custom.example.message/11
+  { "text": "Goodbye world!" }
+
+See "Room Events" for the ``m.`` event specification.
+
+Syncing rooms
+-------------
+When a client logs in, they may have a list of rooms which they have already joined. These rooms
+may also have a list of events associated with them. The purpose of 'syncing' is to present the
+current room and event information in a convenient, compact manner. The events returned are not
+limited to room events; presence events will also be returned. There are two APIs provided:
+
+ - ``/initialSync`` : A global sync which will present room and event information for all rooms
+   the user has joined.
+
+ - ``/rooms/<room id>/initialSync`` : A sync scoped to a single room. Presents room and event
+   information for this room only.
+
+- TODO: JSON response format for both types
+- TODO: when would you use global? when would you use scoped?
+
+Getting events for a room
+-------------------------
+There are several APIs provided to ``GET`` events for a room:
+
+``/rooms/<room id>/state/<event type>/<state key>``
+  Description:
+    Get the state event identified.
+  Response format:
+    A JSON object representing the state event **content**.
+  Example:
+    ``/rooms/!room:domain.com/state/m.room.name`` returns ``{ "name": "Room name" }``
+
+``/rooms/<room id>/state``
+  Description:
+    Get all state events for a room.
+  Response format:
+    ``[ { state event }, { state event }, ... ]``
+  Example:
+    TODO
+
+
+``/rooms/<room id>/members``
+  Description:
+    Get all ``m.room.member`` state events.
+  Response format:
+    ``{ "start": "token", "end": "token", "chunk": [ { m.room.member event }, ... ] }``
+  Example:
+    TODO
+
+
+
+- ``/rooms/<room id>/messages`` : Get all ``m.room.message`` events.
+- ``/rooms/<room id>/initialSync`` : Get all relevant events for a room.
+
 
 Room Events
 ===========
@@ -363,23 +524,109 @@ Room Events
 This specification outlines several standard event types, all of which are
 prefixed with ``m.``
 
-State messages
---------------
-- m.room.name
-- m.room.topic
-- m.room.member
-- m.room.config
-- m.room.invite_join
+``m.room.name``
+  Summary:
+    Set the human-readable name for the room.
+  Type: 
+    State event
+  JSON format:
+    ``{ "name" : "string" }``
+  Example:
+    ``{ "name" : "My Room" }``
+  Description:
+    A room has an opaque room ID which is not human-friendly to read. A room alias is
+    human-friendly, but not all rooms have room aliases. The room name is a human-friendly
+    string designed to be displayed to the end-user. The room name is not *unique*, as
+    multiple rooms can have the same room name set. The room name can also be set when 
+    creating a room using ``/createRoom`` with the ``name`` key.
 
-What are they, when are they used, what do they contain, how should they be used.
-Link back to explanatory sections (e.g. invite/join/leave sections for m.room.member)
+``m.room.topic``
+  Summary:
+    Set a topic for the room.
+  Type: 
+    State event
+  JSON format:
+    ``{ "topic" : "string" }``
+  Example:
+    ``{ "topic" : "Welcome to the real world." }``
+  Description:
+    A topic is a short message detailing what is currently being discussed in the room. 
+    It can also be used as a way to display extra information about the room, which may
+    not be suitable for the room name.
 
-Non-state messages
-------------------
-- m.room.message
-- m.room.message.feedback (and compressed format)
+``m.room.member``
+  Summary:
+    The current membership state of a user in the room.
+  Type: 
+    State event
+  JSON format:
+    ``{ "membership" : "enum[ invite|join|leave|ban ]" }``
+  Example:
+    ``{ "membership" : "join" }``
+  Description:
+    Adjusts the membership state for a user in a room. It is preferable to use the
+    membership APIs (``/rooms/<room id>/invite`` etc) when performing membership actions
+    rather than adjusting the state directly as there are a restricted set of valid
+    transformations. For example, user A cannot force user B to join a room, and trying
+    to force this state change directly will fail. See the "Rooms" section for how to 
+    use the membership APIs.
 
-What are they, when are they used, what do they contain, how should they be used
+``m.room.config``
+  Summary:
+    The room config.
+  Type: 
+    State event
+  JSON format:
+    TODO
+  Example:
+    TODO
+  Description:
+    TODO
+
+``m.room.invite_join``
+  Summary:
+    TODO.
+  Type: 
+    State event
+  JSON format:
+    TODO
+  Example:
+    TODO
+  Description:
+    TODO
+
+``m.room.message``
+  Summary:
+    A message.
+  Type: 
+    Non-state event
+  JSON format:
+    ``{ "msgtype": "string" }``
+  Example:
+    ``{ "msgtype": "m.text", "body": "Testing" }``
+  Description:
+    This event is used when sending messages in a room. Messages are not limited to be text.
+    The ``msgtype`` key outlines the type of message, e.g. text, audio, image, video, etc.
+    Whilst not required, the ``body`` key SHOULD be used with every kind of ``msgtype`` as
+    a fallback mechanism when a client cannot render the message. For more information on 
+    the types of messages which can be sent, see "m.room.message msgtypes".
+
+``m.room.message.feedback``
+  Summary:
+    A receipt for a message.
+  Type: 
+    Non-state event
+  JSON format:
+    ``{ "type": "enum [ delivered|read ]", "target_event_id": "string" }``
+  Example:
+    ``{ "type": "delivered", "target_event_id": "e3b2icys" }``
+  Description:
+    Feedback events are events sent to acknowledge a message in some way. There are two
+    supported acknowledgements: ``delivered`` (sent when the event has been received) and 
+    ``read`` (sent when the event has been observed by the end-user). The ``target_event_id``
+    should reference the ``m.room.message`` event being acknowledged. 
+
+- voip?
 
 m.room.message msgtypes
 -----------------------
@@ -490,7 +737,7 @@ Each user has the concept of presence information. This encodes the
 "availability" of that user, suitable for display on other user's clients. This
 is transmitted as an ``m.presence`` event and is one of the few events which
 are sent *outside the context of a room*. The basic piece of presence information 
-is represented by the ``state`` key, which is an enum of one of the following:
+is represented by the ``presence`` key, which is an enum of one of the following:
 
   - ``online`` : The default state when the user is connected to an event stream.
   - ``unavailable`` : The user is not reachable at this time.
@@ -500,18 +747,26 @@ is represented by the ``state`` key, which is an enum of one of the following:
   - ``hidden`` : TODO. Behaves as offline, but allows the user to see the client 
     state anyway and generally interact with client features.
 
-This basic ``state`` field applies to the user as a whole, regardless of how many
+This basic ``presence`` field applies to the user as a whole, regardless of how many
 client devices they have connected. The home server should synchronise this
 status choice among multiple devices to ensure the user gets a consistent
 experience.
 
+In addition, the server maintains a timestamp of the last time it saw an active
+action from the user; either sending a message to a room, or changing presence
+state from a lower to a higher level of availability (thus: changing state from
+``unavailable`` to ``online`` will count as an action for being active, whereas
+in the other direction will not). This timestamp is presented via a key called
+``last_active_ago``, which gives the relative number of miliseconds since the
+message is generated/emitted, that the user was last seen active.
+
 Idle Time
 ---------
-As well as the basic ``state`` field, the presence information can also show a sense
-of an "idle timer". This should be maintained individually by the user's
-clients, and the home server can take the highest reported time as that to
-report. When a user is offline, the home server can still report when the user was last
-seen online.
+As well as the basic ``presence`` field, the presence information can also show
+a sense of an "idle timer". This should be maintained individually by the
+user's clients, and the home server can take the highest reported time as that
+to report. When a user is offline, the home server can still report when the
+user was last seen online.
 
 Transmission
 ------------

@@ -76,6 +76,10 @@ class MessageHandler(BaseRoomHandler):
         Raises:
             SynapseError if something went wrong.
         """
+        # TODO(paul): Why does 'event' not have a 'user' object?
+        user = self.hs.parse_userid(event.user_id)
+        assert(user.is_mine)
+
         if stamp_event:
             event.content["hsob_ts"] = int(self.clock.time_msec())
 
@@ -85,6 +89,10 @@ class MessageHandler(BaseRoomHandler):
             yield self.auth.check(event, snapshot, raises=True)
 
         yield self._on_new_room_event(event, snapshot)
+
+        self.hs.get_handlers().presence_handler.bump_presence_active_time(
+            user
+        )
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,

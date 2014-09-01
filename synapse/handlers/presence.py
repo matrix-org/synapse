@@ -52,6 +52,13 @@ def partitionbool(l, func):
 
 class PresenceHandler(BaseHandler):
 
+    STATE_LEVELS = {
+        PresenceState.OFFLINE: 0,
+        PresenceState.UNAVAILABLE: 1,
+        PresenceState.ONLINE: 2,
+        PresenceState.FREE_FOR_CHAT: 3,
+    }
+
     def __init__(self, hs):
         super(PresenceHandler, self).__init__(hs)
 
@@ -135,7 +142,7 @@ class PresenceHandler(BaseHandler):
             return self._user_cachemap[user]
         else:
             statuscache = UserPresenceCache()
-            statuscache.update({"state": PresenceState.OFFLINE}, user)
+            statuscache.update({"presence": PresenceState.OFFLINE}, user)
             return statuscache
 
     def registered_user(self, user):
@@ -173,19 +180,24 @@ class PresenceHandler(BaseHandler):
                 observed_user=target_user
             )
 
-            if visible:
-                state = yield self.store.get_presence_state(
-                    target_user.localpart
-                )
-            else:
+            if not visible:
                 raise SynapseError(404, "Presence information not visible")
+            state = yield self.store.get_presence_state(target_user.localpart)
+            if "mtime" in state:
+                del state["mtime"]
+            state["presence"] = state["state"]
+
+            if target_user in self._user_cachemap:
+                state["last_active"] = (
+                    self._user_cachemap[target_user].get_state()["last_active"]
+                )
         else:
             # TODO(paul): Have remote server send us permissions set
             state = self._get_or_offline_usercache(target_user).get_state()
 
-        if "mtime" in state and (state["mtime"] is not None):
-            state["mtime_age"] = int(
-                self.clock.time_msec() - state.pop("mtime")
+        if "last_active" in state:
+            state["last_active_ago"] = int(
+                self.clock.time_msec() - state.pop("last_active")
             )
         defer.returnValue(state)
 
@@ -202,20 +214,33 @@ class PresenceHandler(BaseHandler):
         if target_user != auth_user:
             raise AuthError(400, "Cannot set another user's displayname")
 
-        # TODO(paul): Sanity-check 'state'
         if "status_msg" not in state:
             state["status_msg"] = None
 
         for k in state.keys():
-            if k not in ("state", "status_msg"):
+            if k not in ("presence", "state", "status_msg"):
                 raise SynapseError(
                     400, "Unexpected presence state key '%s'" % (k,)
                 )
 
+        # Handle legacy "state" key for now
+        if "state" in state:
+            state["presence"] = state.pop("state")
+
+        if state["presence"] not in self.STATE_LEVELS:
+            raise SynapseError(400, "'%s' is not a valid presence state" %
+                state["presence"]
+            )
+
         logger.debug("Updating presence state of %s to %s",
-                     target_user.localpart, state["state"])
+                     target_user.localpart, state["presence"])
 
         state_to_store = dict(state)
+        state_to_store["state"] = state_to_store.pop("presence")
+
+        statuscache=self._get_or_offline_usercache(target_user)
+        was_level = self.STATE_LEVELS[statuscache.get_state()["presence"]]
+        now_level = self.STATE_LEVELS[state["presence"]]
 
         yield defer.DeferredList([
             self.store.set_presence_state(
@@ -226,9 +251,10 @@ class PresenceHandler(BaseHandler):
             ),
         ])
 
-        state["mtime"] = self.clock.time_msec()
+        if now_level > was_level:
+            state["last_active"] = self.clock.time_msec()
 
-        now_online = state["state"] != PresenceState.OFFLINE
+        now_online = state["presence"] != PresenceState.OFFLINE
         was_polling = target_user in self._user_cachemap
 
         if now_online and not was_polling:
@@ -239,6 +265,12 @@ class PresenceHandler(BaseHandler):
         # TODO(paul): perform a presence push as part of start/stop poll so
         #   we don't have to do this all the time
         self.changed_presencelike_data(target_user, state)
+
+    def bump_presence_active_time(self, user, now=None):
+        if now is None:
+            now = self.clock.time_msec()
+
+        self.changed_presencelike_data(user, {"last_active": now})
 
     def changed_presencelike_data(self, user, state):
         statuscache = self._get_or_make_usercache(user)
@@ -251,12 +283,12 @@ class PresenceHandler(BaseHandler):
     @log_function
     def started_user_eventstream(self, user):
         # TODO(paul): Use "last online" state
-        self.set_state(user, user, {"state": PresenceState.ONLINE})
+        self.set_state(user, user, {"presence": PresenceState.ONLINE})
 
     @log_function
     def stopped_user_eventstream(self, user):
         # TODO(paul): Save current state as "last online" state
-        self.set_state(user, user, {"state": PresenceState.OFFLINE})
+        self.set_state(user, user, {"presence": PresenceState.OFFLINE})
 
     @defer.inlineCallbacks
     def user_joined_room(self, user, room_id):
@@ -385,9 +417,9 @@ class PresenceHandler(BaseHandler):
             observed_user = self.hs.parse_userid(p.pop("observed_user_id"))
             p["observed_user"] = observed_user
             p.update(self._get_or_offline_usercache(observed_user).get_state())
-            if "mtime" in p:
-                p["mtime_age"] = int(
-                    self.clock.time_msec() - p.pop("mtime")
+            if "last_active" in p:
+                p["last_active_ago"] = int(
+                    self.clock.time_msec() - p.pop("last_active")
                 )
 
         defer.returnValue(presence)
@@ -576,21 +608,30 @@ class PresenceHandler(BaseHandler):
     def _push_presence_remote(self, user, destination, state=None):
         if state is None:
             state = yield self.store.get_presence_state(user.localpart)
+            del state["mtime"]
+            state["presence"] = state["state"]
+
+            if user in self._user_cachemap:
+                state["last_active"] = (
+                    self._user_cachemap[user].get_state()["last_active"]
+                )
 
             yield self.distributor.fire(
                 "collect_presencelike_data", user, state
             )
 
-        if "mtime" in state:
+        if "last_active" in state:
             state = dict(state)
-            state["mtime_age"] = int(
-                self.clock.time_msec() - state.pop("mtime")
+            state["last_active_ago"] = int(
+                self.clock.time_msec() - state.pop("last_active")
             )
 
         user_state = {
             "user_id": user.to_string(),
         }
         user_state.update(**state)
+        if "state" in user_state and "presence" not in user_state:
+            user_state["presence"] = user_state["state"]
 
         yield self.federation.send_edu(
             destination=destination,
@@ -622,9 +663,14 @@ class PresenceHandler(BaseHandler):
             state = dict(push)
             del state["user_id"]
 
-            if "mtime_age" in state:
-                state["mtime"] = int(
-                    self.clock.time_msec() - state.pop("mtime_age")
+            # Legacy handling
+            if "presence" not in state:
+                state["presence"] = state["state"]
+            del state["state"]
+
+            if "last_active_ago" in state:
+                state["last_active"] = int(
+                    self.clock.time_msec() - state.pop("last_active_ago")
                 )
 
             statuscache = self._get_or_make_usercache(user)
@@ -639,7 +685,7 @@ class PresenceHandler(BaseHandler):
                 statuscache=statuscache,
             )
 
-            if state["state"] == PresenceState.OFFLINE:
+            if state["presence"] == PresenceState.OFFLINE:
                 del self._user_cachemap[user]
 
         for poll in content.get("poll", []):
@@ -672,10 +718,9 @@ class PresenceHandler(BaseHandler):
         yield defer.DeferredList(deferreds)
 
     @defer.inlineCallbacks
-    def push_update_to_local_and_remote(self, observed_user,
+    def push_update_to_local_and_remote(self, observed_user, statuscache,
                                         users_to_push=[], room_ids=[],
-                                        remote_domains=[],
-                                        statuscache=None):
+                                        remote_domains=[]):
 
         localusers, remoteusers = partitionbool(
             users_to_push,
@@ -804,6 +849,7 @@ class UserPresenceCache(object):
 
     def update(self, state, serial):
         assert("mtime_age" not in state)
+        assert("state" not in state)
 
         self.state.update(state)
         # Delete keys that are now 'None'
@@ -820,15 +866,21 @@ class UserPresenceCache(object):
 
     def get_state(self):
         # clone it so caller can't break our cache
-        return dict(self.state)
+        state = dict(self.state)
+
+        # Legacy handling
+        if "presence" in state:
+            state["state"] = state["presence"]
+
+        return state
 
     def make_event(self, user, clock):
         content = self.get_state()
         content["user_id"] = user.to_string()
 
-        if "mtime" in content:
-            content["mtime_age"] = int(
-                clock.time_msec() - content.pop("mtime")
+        if "last_active" in content:
+            content["last_active_ago"] = int(
+                clock.time_msec() - content.pop("last_active")
             )
 
         return {"type": "m.presence", "content": content}

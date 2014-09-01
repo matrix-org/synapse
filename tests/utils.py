@@ -188,8 +188,9 @@ class MemoryDataStore(object):
 
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         return [
-            r for r in self.members
-            if self.members[r].get(user_id).membership in membership_list
+            self.members[r].get(user_id) for r in self.members
+            if user_id in self.members[r] and
+                self.members[r][user_id].membership in membership_list
         ]
 
     def get_room_events_stream(self, user_id=None, from_key=None, to_key=None,
