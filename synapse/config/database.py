@@ -18,14 +18,15 @@ import os
 
 class DatabaseConfig(Config):
     def __init__(self, args):
-        self.db_path = os.path.abspath(args.database_path)
+        super(DatabaseConfig, self).__init__(args)
+        self.database_path = self.abspath(args.database_path)
 
     @classmethod
     def add_arguments(cls, parser):
         super(DatabaseConfig, cls).add_arguments(parser)
         db_group = parser.add_argument_group("database")
         db_group.add_argument(
-            "-d", "--database", dest="database_path", default="homeserver.db",
+            "-d", "--database-path", default="homeserver.db",
             help="The database name."
         )
 

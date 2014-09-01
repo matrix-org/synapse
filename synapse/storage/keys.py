@@ -78,7 +78,7 @@ class KeyStore(SQLBaseStore):
             retcols=("tls_certificate",),
         )
         verification_key = nacl.signing.VerifyKey(verification_key_bytes)
-        defer.returnValue(verify_key)
+        defer.returnValue(verification_key)
 
     def store_server_verification_key(self, server_name, key_version,
                                       key_server, ts_now_ms, verification_key):

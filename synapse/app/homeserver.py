@@ -20,7 +20,6 @@ from synapse.server import HomeServer
 
 from twisted.internet import reactor
 from twisted.enterprise import adbapi
-from twisted.python.log import PythonLoggingObserver
 from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
@@ -34,12 +33,11 @@ from synapse.config.homeserver import HomeServerConfig
 from daemonize import Daemonize
 import twisted.manhole.telnet
 
-import argparse
 import logging
-import logging.config
 import sqlite3
 import os
 import re
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -212,28 +210,25 @@ class SynapseHomeServer(HomeServer):
         logger.info("Synapse now listening on port %d", port)
 
 
-
-
-
 def run():
     reactor.run()
 
 
 def setup():
-    config = HomeServerConfig.load_config("Synapse Homeserver", sys.argv[1:])
-
-    config.setup_logging(
-        verbosity=verbosity,
-        filename=log_file,
-        config_path=args.log_config,
+    config = HomeServerConfig.load_config(
+        "Synapse Homeserver",
+        sys.argv[1:],
+        generate_section="Homeserver"
     )
+
+    config.setup_logging()
 
     logger.info("Server hostname: %s", config.server_name)
 
     if re.search(":[0-9]+$", config.server_name):
         domain_with_port = config.server_name
     else:
-        domain_with_port = "%s:%s" % (args.server_name, config.bind_port)
+        domain_with_port = "%s:%s" % (config.server_name, config.bind_port)
 
     hs = SynapseHomeServer(
         config.server_name,
@@ -260,6 +255,7 @@ def setup():
         reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
 
     if config.daemonize:
+        print config.pid_file
         daemon = Daemonize(
             app="synapse-homeserver",
             pid=config.pid_file,

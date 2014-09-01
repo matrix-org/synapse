@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import nacl.signing
-import socket
 import os
 from ._base import Config
 from syutil.base64util import encode_base64, decode_base64
@@ -28,7 +27,9 @@ class ServerConfig(Config):
         self.bind_port = args.bind_port
         self.bind_host = args.bind_host
         self.daemonize = args.daemonize
-        self.pid_file = os.path.abspath(args.pid_file)
+        self.pid_file = self.abspath(args.pid_file)
+        self.webclient = not args.no_webclient
+        self.manhole = args.manhole
 
     @classmethod
     def add_arguments(cls, parser):
@@ -44,11 +45,11 @@ class ServerConfig(Config):
                                   help="Local interface to listen on")
         server_group.add_argument("-D", "--daemonize", action='store_true',
                                   help="Daemonize the home server")
-        server_group.add_argument('--pid-file', default = "hs.pid",
+        server_group.add_argument('--pid-file', default="hs.pid",
                                   help="When running as a daemon, the file to"
                                   " store the pid in")
-        server_group.add_argument("-W", "--no-webclient", dest="webclient",
-                                  default=True, action="store_false",
+        server_group.add_argument("-W", "--no-webclient", default=True,
+                                  action="store_false",
                                   help="Don't host a web client.")
         server_group.add_argument("--manhole", dest="manhole", type=int,
                                   help="Turn on the twisted telnet manhole"

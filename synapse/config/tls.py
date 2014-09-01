@@ -28,7 +28,7 @@ class TlsConfig(Config):
         self.tls_private_key = self.read_tls_private_key(
             args.tls_private_key_path
         )
-        self.tls_dh_params_path = args.tls_dh_params_path
+        self.tls_dh_params_path = self.abspath(args.tls_dh_params_path)
 
     @classmethod
     def add_arguments(cls, parser):

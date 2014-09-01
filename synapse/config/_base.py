@@ -25,6 +25,10 @@ class Config(object):
         pass
 
     @staticmethod
+    def abspath(file_path):
+        return os.path.abspath(file_path) if file_path else file_path
+
+    @staticmethod
     def read_file(file_path):
         with open(file_path) as file_stream:
             return file_stream.read()
@@ -54,9 +58,14 @@ class Config(object):
             metavar="CONFIG_FILE",
             help="Specify config file"
         )
+        config_parser.add_argument(
+            "--generate-config",
+            action="store_true",
+            help="Generate config file"
+        )
         config_args, remaining_args = config_parser.parse_known_args(argv)
 
-        if generate_section:
+        if config_args.generate_config:
             if not config_args.config_path:
                 config_parser.error(
                     "Must specify where to generate the config file"
@@ -64,6 +73,8 @@ class Config(object):
             config_dir_path = os.path.dirname(config_args.config_path)
             if os.path.exists(config_args.config_path):
                 defaults = cls.read_config_file(config_args.config_path)
+            else:
+                defaults = {}
         else:
             if config_args.config_path:
                 defaults = cls.read_config_file(config_args.config_path)
@@ -75,23 +86,25 @@ class Config(object):
             description=description,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
+        cls.add_arguments(parser)
         parser.set_defaults(**defaults)
 
-
-        cls.add_arguments(parser)
         args = parser.parse_args(remaining_args)
 
-        if generate_section:
+        if config_args.generate_config:
             config_dir_path = os.path.dirname(config_args.config_path)
             config_dir_path = os.path.abspath(config_dir_path)
             cls.generate_config(args, config_dir_path)
             config = configparser.SafeConfigParser()
             config.add_section(generate_section)
             for key, value in vars(args).items():
-                if key != "config_path" and value is not None:
+                if (key not in set(["config_path", "generate_config"])
+                    and value is not None):
+                    print key, "=", value
                     config.set(generate_section, key, str(value))
             with open(config_args.config_path, "w") as config_file:
                 config.write(config_file)
+            sys.exit(0)
 
         return cls(args)
 

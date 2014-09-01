@@ -18,13 +18,13 @@ from ._base import Config
 from twisted.python.log import PythonLoggingObserver
 import logging
 import logging.config
-import os
 
 class LoggingConfig(Config):
     def __init__(self, args):
+        super(LoggingConfig, self).__init__(args)
         self.verbosity = int(args.verbose) if args.verbose else None
-        self.log_config = os.path.abspath(args.log_config)
-        self.log_file = os.path.abspath(args.log_file)
+        self.log_config = self.abspath(args.log_config)
+        self.log_file = self.abspath(args.log_file)
 
     @classmethod
     def add_arguments(cls, parser):
@@ -47,21 +47,21 @@ class LoggingConfig(Config):
         log_format = (
             '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
         )
-        if self.config_path is None:
+        if self.log_config is None:
 
             level = logging.INFO
-            if verbosity:
+            if self.verbosity:
                level = logging.DEBUG
 
                # FIXME: we need a logging.WARN for a -q quiet option
 
             logging.basicConfig(
                 level=level,
-                filename=filename,
+                filename=self.log_file,
                 format=log_format
             )
         else:
-            logging.config.fileConfig(config_path)
+            logging.config.fileConfig(self.log_config)
 
         observer = PythonLoggingObserver()
         observer.start()
