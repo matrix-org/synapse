@@ -173,7 +173,11 @@ IDs:
 For the first form, simply pass the required hostname (of the machine) as the
 --host parameter::
 
-    $ python synapse/app/homeserver.py --host machine.my.domain.name
+    $ python synapse/app/homeserver.py \
+        --server-name machine.my.domain.name \
+        --config-path homeserver.config \
+        --generate-config
+    $ python synapse/app/homeserver.py --config-path homeserver.config
 
 For the second form, first create your SRV record and publish it in DNS. This
 needs to be named _matrix._tcp.YOURDOMAIN, and point at at least one hostname
@@ -186,7 +190,13 @@ record would then look something like::
 At this point, you should then run the homeserver with the hostname of this
 SRV record, as that is the name other machines will expect it to have::
 
-    $ python synapse/app/homeserver.py --host my.domain.name --port 8448
+    $ python synapse/app/homeserver.py \
+        --server-name YOURDOMAIN \
+        --bind-port 8448 \
+        --config-path homeserver.config \
+        --generate-config
+    $ python synapse/app/homeserver.py --config-path homeserver.config
+
 
 You may additionally want to pass one or more "-v" options, in order to
 increase the verbosity of logging output; at least for initial testing.
