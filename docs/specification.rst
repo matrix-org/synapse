@@ -282,24 +282,64 @@ Permissions
 -----------
 - TODO : Room permissions / config / power levels. What they are. How do they work. Examples.
 
-Inviting users
---------------
-- API to hit (``$roomid/invite``) with ``user_id`` key. Needs FQ user ID, explain why.
-- Outline invite join dance
-
 Joining rooms
 -------------
-- API to hit (``/join/$alias or id``). Explain how alias joining works (auto-resolving). 
-- Outline invite join dance
+- What is joining? What permissions / access does it give you? How does this affect /initialSync?
+- API to hit (``/join/$alias or id``). Explain how alias joining works (auto-resolving).  See "Room events" for more info.
+- What does the home server have to do?
+- Rooms that DON'T need an invite to join. This follows through onto inviting users section.
+- Outline invite join dance?
+
+
+Inviting users
+--------------
+- Can invite users to a room if the room config key TODO is set to TODO. Must have required power level.
+- Outline invite join dance. What is it? Why is it required? How does it work?
+- What does the home server have to do?
+
+The purpose of inviting users to a room is to notify them that the room exists 
+so they can choose to become a member of that room. Some rooms require that all 
+users who join a room are previously invited to it (an "invite-only" room). 
+Whether a given room is an "invite-only" room is determined by the room config 
+key ``TODO``. It can have one of the following values:
+
+ - TODO Room config invite only value explanation
+ - TODO Room config free-to-join value explanation
+
+Only users who have a membership state of ``join`` in a room can invite new 
+users to said room. The person being invited must not be in the ``join`` state 
+in the room. The fully-qualified user ID must be specified when inviting a user, 
+as the user may reside on a different home server. To invite a user, send the 
+following request to ``/rooms/<room id>/invite``, which will manage the 
+entire invitation process::
+
+  {
+    "user_id": "<user id to invite>"
+  }
+
+Alternatively, the membership state for this user in this room can be modified 
+directly by sending the following request to 
+``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
+
+  {
+    "membership": "invite"
+  }
+
+See the "Room events" section for more information on ``m.room.member``.
+
+- TODO: In what circumstances will this NOT be equivalent to ``/invite``?
 
 Leaving rooms
 -------------
-- API to hit (``$roomid/leave``).
+- API to hit (``$roomid/leave``). See "Room events" for more info.
+- Must be joined to leave. How does this affect /initialSync?
+- Not ever being in a room is NOT equivalent to have left it (due to membership: leave).
+- Need to be re-invited if invite-only room.
 - If no more HSes in room, can delete room?
 - Is there a dance?
 
-Room events
------------
+Events in a room
+----------------
 - Split into state and non-state data
 - Explain what they are, semantics, give examples of clobbering / not, use cases (msgs vs room names).
   Not too much detail on the actual event contents.
@@ -331,7 +371,8 @@ State messages
 - m.room.config
 - m.room.invite_join
 
-What are they, when are they used, what do they contain, how should they be used
+What are they, when are they used, what do they contain, how should they be used.
+Link back to explanatory sections (e.g. invite/join/leave sections for m.room.member)
 
 Non-state messages
 ------------------
