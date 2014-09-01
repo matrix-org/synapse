@@ -90,6 +90,10 @@ class MessageHandler(BaseRoomHandler):
 
         yield self._on_new_room_event(event, snapshot)
 
+        self.hs.get_handlers().presence_handler.bump_presence_active_time(
+            user
+        )
+
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
                      feedback=False):
