@@ -417,7 +417,7 @@ State events can be sent by ``PUT`` ing to ``/rooms/<room id>/state/<event type>
 These events will be overwritten if ``<room id>``, ``<event type>`` and ``<state key>`` all match.
 If the state event has no ``state_key``, it can be omitted from the path. These requests 
 **cannot use transaction IDs** like other ``PUT`` paths because they cannot be differentiated 
-from the ``state key``. Furthermore, ``POST`` is unsupported on state paths. Valid requests
+from the ``state_key``. Furthermore, ``POST`` is unsupported on state paths. Valid requests
 look like::
 
   PUT /rooms/!roomid:domain/state/m.example.event
@@ -440,7 +440,7 @@ Care should be taken to avoid setting the wrong ``state key``::
   { "key" : "with '11' as the state key, but was probably intended to be a txnId" }
 
 The ``state_key`` is often used to store state about individual users, by using the user ID as the
-value. For example::
+``state_key`` value. For example::
 
   PUT /rooms/!roomid:domain/state/m.favorite.animal.event/%40my_user%3Adomain.com
   { "animal" : "cat", "reason": "fluffy" }
@@ -493,24 +493,106 @@ Room Events
 This specification outlines several standard event types, all of which are
 prefixed with ``m.``
 
-State messages
---------------
-- m.room.name
-- m.room.topic
-- m.room.member
-- m.room.config
-- m.room.invite_join
+``m.room.name``
+  Summary:
+    Set the human-readable name for the room.
+  Type: 
+    State event
+  JSON format:
+    ``{ "name" : "string" }``
+  Example:
+    ``{ "name" : "My Room" }``
+  Description:
+    A room has an opaque room ID which is not human-friendly to read. A room alias is
+    human-friendly, but not all rooms have room aliases. The room name is a human-friendly
+    string designed to be displayed to the end-user. The room name is not *unique*, as
+    multiple rooms can have the same room name set. The room name can also be set when 
+    creating a room using ``/createRoom`` with the ``name`` key.
 
-What are they, when are they used, what do they contain, how should they be used.
-Link back to explanatory sections (e.g. invite/join/leave sections for m.room.member)
+``m.room.topic``
+  Summary:
+    Set a topic for the room.
+  Type: 
+    State event
+  JSON format:
+    ``{ "topic" : "string" }``
+  Example:
+    ``{ "topic" : "Welcome to the real world." }``
+  Description:
+    A topic is a short message detailing what is currently being discussed in the room. 
+    It can also be used as a way to display extra information about the room, which may
+    not be suitable for the room name.
 
-Non-state messages
-------------------
-- m.room.message
-- m.room.message.feedback (and compressed format)
+``m.room.member``
+  Summary:
+    The current membership state of a user in the room.
+  Type: 
+    State event
+  JSON format:
+    ``{ "membership" : "enum[ invite|join|leave|ban ]" }``
+  Example:
+    ``{ "membership" : "join" }``
+  Description:
+    The membership state of a user is automatically set when using the membership APIs:
+    ``/rooms/<room id>/invite``, ``/rooms/<room id>/join`` and ``/rooms/<room id>/leave``.
+    See the "Rooms" section for how to use those APIs.
+
+``m.room.config``
+  Summary:
+    The room config.
+  Type: 
+    State event
+  JSON format:
+    TODO
+  Example:
+    TODO
+  Description:
+    TODO
+
+``m.room.invite_join``
+  Summary:
+    TODO.
+  Type: 
+    State event
+  JSON format:
+    TODO
+  Example:
+    TODO
+  Description:
+    TODO
+
+``m.room.message``
+  Summary:
+    A message.
+  Type: 
+    Non-state event
+  JSON format:
+    ``{ "msgtype": "string" }``
+  Example:
+    ``{ "msgtype": "m.text", "body": "Testing" }``
+  Description:
+    This event is used when sending messages in a room. Messages are not limited to be text.
+    The ``msgtype`` key outlines the type of message, e.g. text, audio, image, video, etc.
+    Whilst not required, the ``body`` key SHOULD be used with every kind of ``msgtype`` as
+    a fallback mechanism when a client cannot render the message. For more information on 
+    the types of messages which can be sent, see "m.room.message msgtypes".
+
+``m.room.message.feedback``
+  Summary:
+    A receipt for a message.
+  Type: 
+    Non-state event
+  JSON format:
+    ``{ "type": "enum [ delivered|read ]", "target_event_id": "string" }``
+  Example:
+    ``{ "type": "delivered", "target_event_id": "e3b2icys" }``
+  Description:
+    Feedback events are events sent to acknowledge a message in some way. There are two
+    supported acknowledgements: ``delivered`` (sent when the event has been received) and 
+    ``read`` (sent when the event has been observed by the end-user). The ``target_event_id``
+    should reference the ``m.room.message`` event being acknowledged. 
+
 - voip?
-
-What are they, when are they used, what do they contain, how should they be used
 
 m.room.message msgtypes
 -----------------------
