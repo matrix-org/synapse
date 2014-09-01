@@ -174,6 +174,28 @@ class RoomStore(SQLBaseStore):
         else:
             defer.returnValue(None)
 
+    def get_add_state_level(self, room_id):
+        return self._get_level_from_table("room_add_state_levels", room_id)
+
+    def get_send_event_level(self, room_id):
+        return self._get_level_from_table("room_send_event_levels", room_id)
+
+    @defer.inlineCallbacks
+    def _get_level_from_table(self, table, room_id):
+        sql = (
+            "SELECT level FROM %(table)s as r "
+            "INNER JOIN current_state_events as c "
+            "ON r.event_id = c.event_id "
+            "WHERE c.room_id = ? "
+        ) % {"table": table}
+
+        rows = yield self._execute(None, sql, room_id)
+
+        if len(rows) == 1:
+            defer.returnValue(rows[0][0])
+        else:
+            defer.returnValue(None)
+
     def _store_room_topic_txn(self, txn, event):
         self._simple_insert_txn(
             txn,
@@ -196,38 +218,71 @@ class RoomStore(SQLBaseStore):
             }
         )
 
-    def _store_join_rule(txn, event):
+    def _store_join_rule(self, txn, event):
         self._simple_insert_txn(
             txn,
             "room_join_rules",
             {
                 "event_id": event.event_id,
                 "room_id": event.room_id,
-                "join_rule": event.join_rule,
+                "join_rule": event.content["join_rule"],
             },
         )
 
-    def _store_power_levels(txn, event):
-        for user_id, level in event.content:
-            self._simple_insert_txn(
-                txn,
-                "room_power_levels",
-                {
-                    "event_id": event.event_id,
-                    "room_id": event.room_id,
-                    "user_id": user_id,
-                    "level": level
-                },
-            )
+    def _store_power_levels(self, txn, event):
+        for user_id, level in event.content.items():
+            if user_id == "default":
+                self._simple_insert_txn(
+                    txn,
+                    "room_default_levels",
+                    {
+                        "event_id": event.event_id,
+                        "room_id": event.room_id,
+                        "level": level,
+                    },
+                )
+            else:
+                self._simple_insert_txn(
+                    txn,
+                    "room_power_levels",
+                    {
+                        "event_id": event.event_id,
+                        "room_id": event.room_id,
+                        "user_id": user_id,
+                        "level": level
+                    },
+                )
 
-    def _store_default_level(txn, event):
+    def _store_default_level(self, txn, event):
         self._simple_insert_txn(
             txn,
             "room_default_levels",
             {
                 "event_id": event.event_id,
                 "room_id": event.room_id,
-                "level": level
+                "level": event.content["default_level"],
+            },
+        )
+
+    def _store_add_state_level(self, txn, event):
+        self._simple_insert_txn(
+            txn,
+            "room_add_state_levels",
+            {
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "level": event.content["level"],
+            },
+        )
+
+    def _store_send_event_level(self, txn, event):
+        self._simple_insert_txn(
+            txn,
+            "room_send_event_levels",
+            {
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "level": event.content["level"],
             },
         )
 

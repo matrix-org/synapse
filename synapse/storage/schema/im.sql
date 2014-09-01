@@ -126,6 +126,26 @@ CREATE INDEX IF NOT EXISTS room_default_levels_event_id ON room_default_levels(e
 CREATE INDEX IF NOT EXISTS room_default_levels_room_id ON room_default_levels(room_id);
 
 
+CREATE TABLE IF NOT EXISTS room_add_state_levels(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    level INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS room_add_state_levels_event_id ON room_add_state_levels(event_id);
+CREATE INDEX IF NOT EXISTS room_add_state_levels_room_id ON room_add_state_levels(room_id);
+
+
+CREATE TABLE IF NOT EXISTS room_send_event_levels(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    level INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS room_send_event_levels_event_id ON room_send_event_levels(event_id);
+CREATE INDEX IF NOT EXISTS room_send_event_levels_room_id ON room_send_event_levels(room_id);
+
+
 CREATE TABLE IF NOT EXISTS room_hosts(
     room_id TEXT NOT NULL,
     host TEXT NOT NULL,

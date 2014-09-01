@@ -21,7 +21,8 @@ from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import StoreError, SynapseError
 from synapse.api.events.room import (
     RoomMemberEvent, RoomCreateEvent, RoomPowerLevelsEvent,
-    RoomJoinRulesEvent, RoomDefaultLevelEvent,
+    RoomJoinRulesEvent, RoomAddStateLevelEvent,
+    RoomSendEventLevelEvent,
 )
 from synapse.util import stringutils
 from ._base import BaseRoomHandler
@@ -152,19 +153,13 @@ class RoomCreationHandler(BaseRoomHandler):
 
         creation_event = self.event_factory.create_event(
             etype=RoomCreateEvent.TYPE,
-            content={"creator": creator.to_string()},
+            content={"creator": creator.to_string(), "default": 0},
             **event_keys
         )
 
         power_levels_event = self.event_factory.create_event(
             etype=RoomPowerLevelsEvent.TYPE,
             content={creator.to_string(): 10},
-            **event_keys
-        )
-
-        default_level_event = self.event_factory.create_event(
-            etype=RoomDefaultLevelEvent.TYPE,
-            content={"default_level": 0},
             **event_keys
         )
 
@@ -175,7 +170,25 @@ class RoomCreationHandler(BaseRoomHandler):
             **event_keys
         )
 
-        return [creation_event, power_levels_event, default_level_event, join_rules_event]
+        add_state_event = self.event_factory.create_event(
+            etype=RoomAddStateLevelEvent.TYPE,
+            content={"level": 10},
+            **event_keys
+        )
+
+        send_event = self.event_factory.create_event(
+            etype=RoomSendEventLevelEvent.TYPE,
+            content={"level": 0},
+            **event_keys
+        )
+
+        return [
+            creation_event,
+            power_levels_event,
+            join_rules_event,
+            add_state_event,
+            send_event,
+        ]
 
 
 class RoomMemberHandler(BaseRoomHandler):

@@ -17,9 +17,10 @@
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes
 from synapse.api.events.room import RoomMemberEvent
+from synapse.util.logutils import log_function
 
 import logging
 
@@ -47,13 +48,20 @@ class Auth(object):
                 if event.type == RoomMemberEvent.TYPE:
                     allowed = yield self.is_membership_change_allowed(event)
                     defer.returnValue(allowed)
+                    return
+
+                self._check_joined_room(
+                    member=snapshot.membership_state,
+                    user_id=snapshot.user_id,
+                    room_id=snapshot.room_id,
+                )
+
+                if hasattr(event, "state_key"):
+                    yield self._can_add_state(event)
                 else:
-                    self._check_joined_room(
-                        member=snapshot.membership_state,
-                        user_id=snapshot.user_id,
-                        room_id=snapshot.room_id,
-                    )
-                    defer.returnValue(True)
+                    yield self._can_send_event(event)
+
+                defer.returnValue(True)
             else:
                 raise AuthError(500, "Unknown event: %s" % event)
         except AuthError as e:
@@ -111,7 +119,14 @@ class Auth(object):
 
         membership = event.content["membership"]
 
+        join_rule = yield self.store.get_room_join_rule(event.room_id)
+        if not join_rule:
+            join_rule = JoinRules.INVITE
+
         if Membership.INVITE == membership:
+            # TODO (erikj): We should probably handle this more intelligently
+            # PRIVATE join rules.
+
             # Invites are valid iff caller is in the room and target isn't.
             if not caller_in_room:  # caller isn't joined
                 raise AuthError(403, "You are not in room %s." % event.room_id)
@@ -124,11 +139,18 @@ class Auth(object):
             # joined: It's a NOOP
             if event.user_id != target_user_id:
                 raise AuthError(403, "Cannot force another user to join.")
-            elif room.is_public:
-                pass  # anyone can join public rooms.
-            elif (not caller or caller.membership not in
-                    [Membership.INVITE, Membership.JOIN]):
-                raise AuthError(403, "You are not invited to this room.")
+            elif join_rule == JoinRules.PUBLIC or room.is_public:
+                pass
+            elif join_rule == JoinRules.INVITE:
+                if (
+                    not caller or caller.membership not in
+                    [Membership.INVITE, Membership.JOIN]
+                ):
+                    raise AuthError(403, "You are not invited to this room.")
+            else:
+                # TODO (erikj): may_join list
+                # TODO (erikj): private rooms
+                raise AuthError(403, "You are not allowed to join this room")
         elif Membership.LEAVE == membership:
             if not caller_in_room:  # trying to leave a room you aren't joined
                 raise AuthError(403, "You are not in room %s." % event.room_id)
@@ -176,3 +198,53 @@ class Auth(object):
         except StoreError:
             raise AuthError(403, "Unrecognised access token.",
                             errcode=Codes.UNKNOWN_TOKEN)
+
+    @defer.inlineCallbacks
+    @log_function
+    def _can_send_event(self, event):
+        send_level = yield self.store.get_send_event_level(event.room_id)
+
+        if send_level:
+            send_level = int(send_level)
+        else:
+            send_level = 0
+
+        user_level = yield self.store.get_power_level(
+            event.room_id,
+            event.user_id,
+        )
+
+        if user_level:
+            user_level = int(user_level)
+        else:
+            user_level = 0
+
+        if user_level < send_level:
+            raise AuthError(
+                403, "You don't have permission to post to the room"
+            )
+
+        defer.returnValue(True)
+
+    @defer.inlineCallbacks
+    def _can_add_state(self, event):
+        add_level = yield self.store.get_add_state_level(event.room_id)
+
+        if not add_level:
+            defer.returnValue(True)
+
+        add_level = int(add_level)
+
+        user_level = yield self.store.get_power_level(
+            event.room_id,
+            event.user_id,
+        )
+
+        user_level = int(user_level)
+
+        if user_level < add_level:
+            raise AuthError(
+                403, "You don't have permission to add state to the room"
+            )
+
+        defer.returnValue(True)

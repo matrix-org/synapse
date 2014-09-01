@@ -155,8 +155,15 @@ class RoomPowerLevelsEvent(SynapseStateEvent):
         return {}
 
 
-class RoomDefaultLevelEvent(SynapseStateEvent):
-    TYPE = "m.room.default_level"
+class RoomAddStateLevelEvent(SynapseStateEvent):
+    TYPE = "m.room.add_state_level"
+
+    def get_content_template(self):
+        return {}
+
+
+class RoomSendEventLevelEvent(SynapseStateEvent):
+    TYPE = "m.room.send_event_level"
 
     def get_content_template(self):
         return {}
