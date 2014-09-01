@@ -201,9 +201,15 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             }
         }
         else {
-            // selectively update membership else it will nuke the picture and displayname too :/
+            // selectively update membership and presence else it will nuke the picture and displayname too :/
             var member = $scope.members[target_user_id];
-            member.content.membership = chunk.content.membership;
+            member.membership = chunk.content.membership;
+            if ("state" in chunk.content) {
+                member.presenceState = chunk.content.state;
+            }
+            if ("mtime_age" in chunk.content) {
+                member.mtime_age = chunk.content.mtime_age;
+            }
         }
     };
     
@@ -377,10 +383,22 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
 
         // Make recents highlight the current room
         $scope.recentsSelectedRoomID = $scope.room_id;
-                
+
+		// Get the up-to-date the current member list
+        matrixService.getMemberList($scope.room_id).then(
+            function(response) {
+                for (var i = 0; i < response.data.chunk.length; i++) {
+                    var chunk = response.data.chunk[i];
+                    updateMemberList(chunk);
+                    updateMemberListPresenceAge();
+                }
+            },
+            function(error) {
+                $scope.feedback = "Failed get member list: " + error.data.error;
+            }
+        );
+
         paginate(MESSAGES_PER_PAGINATION);
-        
-        updateMemberListPresenceAge();
     }; 
     
     $scope.inviteUser = function(user_id) {
