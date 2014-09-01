@@ -542,7 +542,7 @@ Each user has the concept of presence information. This encodes the
 "availability" of that user, suitable for display on other user's clients. This
 is transmitted as an ``m.presence`` event and is one of the few events which
 are sent *outside the context of a room*. The basic piece of presence information 
-is represented by the ``state`` key, which is an enum of one of the following:
+is represented by the ``presence`` key, which is an enum of one of the following:
 
   - ``online`` : The default state when the user is connected to an event stream.
   - ``unavailable`` : The user is not reachable at this time.
@@ -552,18 +552,18 @@ is represented by the ``state`` key, which is an enum of one of the following:
   - ``hidden`` : TODO. Behaves as offline, but allows the user to see the client 
     state anyway and generally interact with client features.
 
-This basic ``state`` field applies to the user as a whole, regardless of how many
+This basic ``presence`` field applies to the user as a whole, regardless of how many
 client devices they have connected. The home server should synchronise this
 status choice among multiple devices to ensure the user gets a consistent
 experience.
 
 Idle Time
 ---------
-As well as the basic ``state`` field, the presence information can also show a sense
-of an "idle timer". This should be maintained individually by the user's
-clients, and the home server can take the highest reported time as that to
-report. When a user is offline, the home server can still report when the user was last
-seen online.
+As well as the basic ``presence`` field, the presence information can also show
+a sense of an "idle timer". This should be maintained individually by the
+user's clients, and the home server can take the highest reported time as that
+to report. When a user is offline, the home server can still report when the
+user was last seen online.
 
 Transmission
 ------------

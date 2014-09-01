@@ -98,8 +98,10 @@ class PresenceStateTestCase(unittest.TestCase):
                 "/presence/%s/status" % (myid), None)
 
         self.assertEquals(200, code)
-        self.assertEquals({"state": ONLINE, "status_msg": "Available"},
-                response)
+        self.assertEquals(
+            {"presence": ONLINE, "state": ONLINE, "status_msg": "Available"},
+            response
+        )
         mocked_get.assert_called_with("apple")
 
     @defer.inlineCallbacks
@@ -109,7 +111,7 @@ class PresenceStateTestCase(unittest.TestCase):
 
         (code, response) = yield self.mock_resource.trigger("PUT",
                 "/presence/%s/status" % (myid),
-                '{"state": "unavailable", "status_msg": "Away"}')
+                '{"presence": "unavailable", "status_msg": "Away"}')
 
         self.assertEquals(200, code)
         mocked_set.assert_called_with("apple",
@@ -173,9 +175,9 @@ class PresenceListTestCase(unittest.TestCase):
                 "/presence/list/%s" % (myid), None)
 
         self.assertEquals(200, code)
-        self.assertEquals(
-            [{"user_id": "@banana:test", "state": OFFLINE}], response
-        )
+        self.assertEquals([
+            {"user_id": "@banana:test", "presence": OFFLINE, "state": OFFLINE},
+        ], response)
 
         self.datastore.get_presence_list.assert_called_with(
             "apple", accepted=True
@@ -314,7 +316,8 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 [])
 
         yield self.presence.set_state(self.u_banana, self.u_banana,
-                state={"state": ONLINE})
+            state={"presence": ONLINE}
+        )
 
         (code, response) = yield self.mock_resource.trigger("GET",
                 "/events?from=0_1_0&timeout=0", None)
@@ -324,6 +327,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
             {"type": "m.presence",
              "content": {
                  "user_id": "@banana:test",
+                 "presence": ONLINE,
                  "state": ONLINE,
                  "displayname": "Frank",
                  "mtime_age": 0,

@@ -35,8 +35,6 @@ ONLINE = PresenceState.ONLINE
 
 
 logging.getLogger().addHandler(logging.NullHandler())
-#logging.getLogger().addHandler(logging.StreamHandler())
-#logging.getLogger().setLevel(logging.DEBUG)
 
 
 def _expect_edu(destination, edu_type, content, origin="test"):
@@ -141,7 +139,8 @@ class PresenceStateTestCase(unittest.TestCase):
             target_user=self.u_apple, auth_user=self.u_apple
         )
 
-        self.assertEquals({"state": ONLINE, "status_msg": "Online"},
+        self.assertEquals(
+            {"state": ONLINE, "presence": ONLINE, "status_msg": "Online"},
             state
         )
         mocked_get.assert_called_with("apple")
@@ -157,7 +156,8 @@ class PresenceStateTestCase(unittest.TestCase):
             target_user=self.u_apple, auth_user=self.u_banana
         )
 
-        self.assertEquals({"state": ONLINE, "status_msg": "Online"},
+        self.assertEquals(
+            {"state": ONLINE, "presence": ONLINE, "status_msg": "Online"},
             state
         )
         mocked_get.assert_called_with("apple")
@@ -175,7 +175,10 @@ class PresenceStateTestCase(unittest.TestCase):
             target_user=self.u_apple, auth_user=self.u_clementine
         )
 
-        self.assertEquals({"state": ONLINE, "status_msg": "Online"}, state)
+        self.assertEquals(
+            {"state": ONLINE, "presence": ONLINE, "status_msg": "Online"},
+            state
+        )
 
     @defer.inlineCallbacks
     def test_get_disallowed_state(self):
@@ -202,20 +205,20 @@ class PresenceStateTestCase(unittest.TestCase):
 
         yield self.handler.set_state(
                 target_user=self.u_apple, auth_user=self.u_apple,
-                state={"state": UNAVAILABLE, "status_msg": "Away"})
+                state={"presence": UNAVAILABLE, "status_msg": "Away"})
 
         mocked_set.assert_called_with("apple",
                 {"state": UNAVAILABLE, "status_msg": "Away"})
         self.mock_start.assert_called_with(self.u_apple,
                 state={
-                    "state": UNAVAILABLE,
+                    "presence": UNAVAILABLE,
                     "status_msg": "Away",
                     "mtime": 1000000, # MockClock
                 })
 
         yield self.handler.set_state(
                 target_user=self.u_apple, auth_user=self.u_apple,
-                state={"state": OFFLINE})
+                state={"presence": OFFLINE})
 
         self.mock_stop.assert_called_with(self.u_apple)
 
@@ -449,28 +452,35 @@ class PresenceInvitesTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_presence_list(self):
         self.datastore.get_presence_list.return_value = defer.succeed(
-                [{"observed_user_id": "@banana:test"}]
+            [{"observed_user_id": "@banana:test"}]
         )
 
         presence = yield self.handler.get_presence_list(
                 observer_user=self.u_apple)
 
-        self.assertEquals([{"observed_user": self.u_banana,
-                            "state": OFFLINE}], presence)
+        self.assertEquals([
+            {"observed_user": self.u_banana,
+             "presence": OFFLINE,
+             "state": OFFLINE},
+        ], presence)
 
         self.datastore.get_presence_list.assert_called_with("apple",
-                accepted=None)
-
+            accepted=None
+        )
 
         self.datastore.get_presence_list.return_value = defer.succeed(
-                [{"observed_user_id": "@banana:test"}]
+            [{"observed_user_id": "@banana:test"}]
         )
 
         presence = yield self.handler.get_presence_list(
-                observer_user=self.u_apple, accepted=True)
+            observer_user=self.u_apple, accepted=True
+        )
 
-        self.assertEquals([{"observed_user": self.u_banana,
-                            "state": OFFLINE}], presence)
+        self.assertEquals([
+            {"observed_user": self.u_banana,
+             "presence": OFFLINE,
+             "state": OFFLINE},
+        ], presence)
 
         self.datastore.get_presence_list.assert_called_with("apple",
                 accepted=True)
@@ -618,7 +628,8 @@ class PresencePushTestCase(unittest.TestCase):
         self.assertEquals(self.event_source.get_current_key(), 0)
 
         yield self.handler.set_state(self.u_apple, self.u_apple,
-                {"state": ONLINE})
+            {"presence": ONLINE}
+        )
 
         self.assertEquals(self.event_source.get_current_key(), 1)
         self.assertEquals(
@@ -627,6 +638,7 @@ class PresencePushTestCase(unittest.TestCase):
                 {"type": "m.presence",
                  "content": {
                     "user_id": "@apple:test",
+                    "presence": ONLINE,
                     "state": ONLINE,
                     "mtime_age": 0,
                 }},
@@ -636,13 +648,21 @@ class PresencePushTestCase(unittest.TestCase):
         presence = yield self.handler.get_presence_list(
                 observer_user=self.u_apple, accepted=True)
 
-        self.assertEquals([
-                {"observed_user": self.u_banana, "state": OFFLINE},
-                {"observed_user": self.u_clementine, "state": OFFLINE}],
-            presence)
+        self.assertEquals(
+            [
+                {"observed_user": self.u_banana, 
+                 "presence": OFFLINE,
+                 "state": OFFLINE},
+                {"observed_user": self.u_clementine,
+                 "presence": OFFLINE,
+                 "state": OFFLINE},
+            ],
+            presence
+        )
 
         yield self.handler.set_state(self.u_banana, self.u_banana,
-                {"state": ONLINE})
+            {"presence": ONLINE}
+        )
 
         self.clock.advance_time(2)
 
@@ -651,9 +671,11 @@ class PresencePushTestCase(unittest.TestCase):
 
         self.assertEquals([
                 {"observed_user": self.u_banana,
+                 "presence": ONLINE,
                  "state": ONLINE,
                  "mtime_age": 2000},
                 {"observed_user": self.u_clementine,
+                 "presence": OFFLINE,
                  "state": OFFLINE},
         ], presence)
 
@@ -666,6 +688,7 @@ class PresencePushTestCase(unittest.TestCase):
                 {"type": "m.presence",
                  "content": {
                      "user_id": "@banana:test",
+                     "presence": ONLINE,
                      "state": ONLINE,
                      "mtime_age": 2000
                 }},
@@ -682,6 +705,7 @@ class PresencePushTestCase(unittest.TestCase):
                     content={
                         "push": [
                             {"user_id": "@apple:test",
+                             "presence": u"online",
                              "state": u"online",
                              "mtime_age": 0},
                         ],
@@ -703,7 +727,7 @@ class PresencePushTestCase(unittest.TestCase):
         apple_set.add(self.u_potato.domain)
 
         yield self.handler.set_state(self.u_apple, self.u_apple,
-            {"state": ONLINE}
+            {"presence": ONLINE}
         )
 
         yield put_json.await_calls()
@@ -741,6 +765,7 @@ class PresencePushTestCase(unittest.TestCase):
                 {"type": "m.presence",
                  "content": {
                      "user_id": "@potato:remote",
+                     "presence": ONLINE,
                      "state": ONLINE,
                      "mtime_age": 1000,
                 }}
@@ -751,7 +776,10 @@ class PresencePushTestCase(unittest.TestCase):
 
         state = yield self.handler.get_state(self.u_potato, self.u_apple)
 
-        self.assertEquals({"state": ONLINE, "mtime_age": 3000}, state)
+        self.assertEquals(
+            {"state": ONLINE, "presence": ONLINE, "mtime_age": 3000},
+            state
+        )
 
     @defer.inlineCallbacks
     def test_join_room_local(self):
@@ -763,7 +791,7 @@ class PresencePushTestCase(unittest.TestCase):
         self.handler._user_cachemap[self.u_clementine] = UserPresenceCache()
         self.handler._user_cachemap[self.u_clementine].update(
             {
-                "state": PresenceState.ONLINE,
+                "presence": PresenceState.ONLINE,
                 "mtime": self.clock.time_msec(),
             }, self.u_clementine
         )
@@ -781,6 +809,7 @@ class PresencePushTestCase(unittest.TestCase):
                 {"type": "m.presence",
                  "content": {
                      "user_id": "@clementine:test",
+                     "presence": ONLINE,
                      "state": ONLINE,
                      "mtime_age": 0,
                 }}
@@ -798,7 +827,8 @@ class PresencePushTestCase(unittest.TestCase):
                     content={
                         "push": [
                             {"user_id": "@apple:test",
-                            "state": "online"},
+                             "presence": "online",
+                             "state": "online"},
                         ],
                     }
                 ),
@@ -812,7 +842,8 @@ class PresencePushTestCase(unittest.TestCase):
                     content={
                         "push": [
                             {"user_id": "@banana:test",
-                            "state": "offline"},
+                             "presence": "offline",
+                             "state": "offline"},
                         ],
                     }
                 ),
@@ -823,7 +854,7 @@ class PresencePushTestCase(unittest.TestCase):
         # TODO(paul): Gut-wrenching
         self.handler._user_cachemap[self.u_apple] = UserPresenceCache()
         self.handler._user_cachemap[self.u_apple].update(
-                {"state": PresenceState.ONLINE}, self.u_apple)
+                {"presence": PresenceState.ONLINE}, self.u_apple)
         self.room_members = [self.u_apple, self.u_banana]
 
         yield self.distributor.fire("user_joined_room", self.u_potato,
@@ -841,7 +872,8 @@ class PresencePushTestCase(unittest.TestCase):
                     content={
                         "push": [
                             {"user_id": "@clementine:test",
-                            "state": "online"},
+                             "presence": "online",
+                             "state": "online"},
                         ],
                     }
                 ),
@@ -851,7 +883,7 @@ class PresencePushTestCase(unittest.TestCase):
 
         self.handler._user_cachemap[self.u_clementine] = UserPresenceCache()
         self.handler._user_cachemap[self.u_clementine].update(
-                {"state": ONLINE}, self.u_clementine)
+                {"presence": ONLINE}, self.u_clementine)
         self.room_members.append(self.u_potato)
 
         yield self.distributor.fire("user_joined_room", self.u_clementine,
@@ -969,7 +1001,7 @@ class PresencePollingTestCase(unittest.TestCase):
         # apple goes online
         yield self.handler.set_state(
             target_user=self.u_apple, auth_user=self.u_apple,
-            state={"state": ONLINE}
+            state={"presence": ONLINE}
         )
 
         # apple should see both banana and clementine currently offline
@@ -992,8 +1024,9 @@ class PresencePollingTestCase(unittest.TestCase):
 
         # banana goes online
         yield self.handler.set_state(
-                target_user=self.u_banana, auth_user=self.u_banana,
-                state={"state": ONLINE})
+            target_user=self.u_banana, auth_user=self.u_banana,
+            state={"presence": ONLINE}
+        )
 
         # apple and banana should now both see each other online
         self.mock_update_client.assert_has_calls([
@@ -1013,8 +1046,9 @@ class PresencePollingTestCase(unittest.TestCase):
 
         # apple goes offline
         yield self.handler.set_state(
-                target_user=self.u_apple, auth_user=self.u_apple,
-                state={"state": OFFLINE})
+            target_user=self.u_apple, auth_user=self.u_apple,
+            state={"presence": OFFLINE}
+        )
 
         # banana should now be told apple is offline
         self.mock_update_client.assert_has_calls([
@@ -1026,7 +1060,6 @@ class PresencePollingTestCase(unittest.TestCase):
 
         self.assertFalse("banana" in self.handler._local_pushmap)
         self.assertFalse("clementine" in self.handler._local_pushmap)
-
 
     @defer.inlineCallbacks
     def test_remote_poll_send(self):
@@ -1057,8 +1090,9 @@ class PresencePollingTestCase(unittest.TestCase):
 
         # clementine goes online
         yield self.handler.set_state(
-                target_user=self.u_clementine, auth_user=self.u_clementine,
-                state={"state": ONLINE})
+            target_user=self.u_clementine, auth_user=self.u_clementine,
+            state={"presence": ONLINE}
+        )
 
         yield put_json.await_calls()
 
@@ -1085,7 +1119,7 @@ class PresencePollingTestCase(unittest.TestCase):
         # fig goes online; shouldn't send a second poll
         yield self.handler.set_state(
             target_user=self.u_fig, auth_user=self.u_fig,
-            state={"state": ONLINE}
+            state={"presence": ONLINE}
         )
 
         # reactor.iterate(delay=0)
@@ -1095,7 +1129,7 @@ class PresencePollingTestCase(unittest.TestCase):
         # fig goes offline
         yield self.handler.set_state(
             target_user=self.u_fig, auth_user=self.u_fig,
-            state={"state": OFFLINE}
+            state={"presence": OFFLINE}
         )
 
         reactor.iterate(delay=0)
@@ -1116,8 +1150,9 @@ class PresencePollingTestCase(unittest.TestCase):
 
         # clementine goes offline
         yield self.handler.set_state(
-                target_user=self.u_clementine, auth_user=self.u_clementine,
-                state={"state": OFFLINE})
+            target_user=self.u_clementine, auth_user=self.u_clementine,
+            state={"presence": OFFLINE}
+        )
 
         yield put_json.await_calls()
 
@@ -1135,6 +1170,7 @@ class PresencePollingTestCase(unittest.TestCase):
                     content={
                         "push": [
                             {"user_id": "@banana:test",
+                             "presence": "offline",
                              "state": "offline",
                              "status_msg": None},
                         ],

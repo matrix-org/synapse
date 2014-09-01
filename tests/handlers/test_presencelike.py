@@ -182,11 +182,13 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         self.assertEquals([
             {"observed_user": self.u_banana,
+                "presence": ONLINE,
                 "state": ONLINE,
                 "mtime_age": 0,
                 "displayname": "Frank",
                 "avatar_url": "http://foo"},
             {"observed_user": self.u_clementine,
+                "presence": OFFLINE,
                 "state": OFFLINE}],
         presence)
 
@@ -199,7 +201,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         statuscache = self.mock_update_client.call_args[1]["statuscache"]
         self.assertEquals({
-            "state": ONLINE,
+            "presence": ONLINE,
             "mtime": 1000000, # MockClock
             "displayname": "Frank",
             "avatar_url": "http://foo",
@@ -222,7 +224,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         statuscache = self.mock_update_client.call_args[1]["statuscache"]
         self.assertEquals({
-            "state": ONLINE,
+            "presence": ONLINE,
             "mtime": 1000000, # MockClock
             "displayname": "I am an Apple",
             "avatar_url": "http://foo",
@@ -255,6 +257,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 content={
                     "push": [
                         {"user_id": "@apple:test",
+                         "presence": "online",
                          "state": "online",
                          "mtime_age": 0,
                          "displayname": "Frank",
@@ -293,14 +296,16 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
             statuscache=ANY)
 
         statuscache = self.mock_update_client.call_args[1]["statuscache"]
-        self.assertEquals({"state": ONLINE,
+        self.assertEquals({"presence": ONLINE,
                            "displayname": "Frank",
                            "avatar_url": "http://foo"}, statuscache.state)
 
         state = yield self.handlers.presence_handler.get_state(self.u_potato,
                 self.u_apple)
 
-        self.assertEquals({"state": ONLINE,
-                           "displayname": "Frank",
-                           "avatar_url": "http://foo"},
-                state)
+        self.assertEquals(
+                {"presence": ONLINE,
+                 "state": ONLINE,
+                 "displayname": "Frank",
+                 "avatar_url": "http://foo"},
+            state)
