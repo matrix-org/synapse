@@ -325,7 +325,11 @@ class ContentRepoResource(resource.Resource):
 
             # FIXME (erikj): These should use constants.
             file_name = os.path.basename(fname)
-            url = "http://%s/_matrix/content/%s" % (
+            # FIXME: we can't assume what the public mounted path of the repo is
+            # ...plus self-signed SSL won't work to remote clients anyway
+            # ...and we can't assume that it's SSL anyway, as we might want to
+            # server it via the non-SSL listener...
+            url = "https://%s/_matrix/content/%s" % (
                 self.hs.domain_with_port, file_name
             )
 
