@@ -29,6 +29,7 @@ from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX
 )
 from synapse.config.homeserver import HomeServerConfig
+from synapse.crypto import context_factory
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
@@ -206,7 +207,9 @@ class SynapseHomeServer(HomeServer):
         return "%s-%s" % (resource, path_seg)
 
     def start_listening(self, port):
-        reactor.listenTCP(port, Site(self.root_resource))
+        reactor.listenSSL(
+            port, Site(self.root_resource), self.tls_context_factory
+        )
         logger.info("Synapse now listening on port %d", port)
 
 
@@ -230,11 +233,14 @@ def setup():
     else:
         domain_with_port = "%s:%s" % (config.server_name, config.bind_port)
 
+    tls_context_factory = context_factory.ServerContextFactory(config)
+
     hs = SynapseHomeServer(
         config.server_name,
         domain_with_port=domain_with_port,
         upload_dir=os.path.abspath("uploads"),
         db_name=config.database_path,
+        tls_context_factory=tls_context_factory,
     )
 
     hs.register_servlets()

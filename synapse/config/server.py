@@ -28,7 +28,7 @@ class ServerConfig(Config):
         self.bind_host = args.bind_host
         self.daemonize = args.daemonize
         self.pid_file = self.abspath(args.pid_file)
-        self.webclient = not args.no_webclient
+        self.webclient = args.no_webclient
         self.manhole = args.manhole
 
     @classmethod
