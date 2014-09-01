@@ -337,6 +337,11 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         // Make sure the initialSync has been before going further
         eventHandlerService.waitForInitialSyncCompletion().then(
             function() {
+                
+                // Some data has been retrieved from the iniialSync request
+                // So, the relative time starts here
+                $scope.now = new Date().getTime();
+                
                 var needsToJoin = true;
                 
                 // The room members is available in the data fetched by initialSync
