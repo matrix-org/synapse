@@ -718,6 +718,14 @@ client devices they have connected. The home server should synchronise this
 status choice among multiple devices to ensure the user gets a consistent
 experience.
 
+In addition, the server maintains a timestamp of the last time it saw an active
+action from the user; either sending a message to a room, or changing presence
+state from a lower to a higher level of availability (thus: changing state from
+``unavailable`` to ``online`` will count as an action for being active, whereas
+in the other direction will not). This timestamp is presented via a key called
+``last_active_ago``, which gives the relative number of miliseconds since the
+message is generated/emitted, that the user was last seen active.
+
 Idle Time
 ---------
 As well as the basic ``presence`` field, the presence information can also show
