@@ -43,6 +43,10 @@ a:active  { color: #000; }
     height: 32px;
 }
 
+#callBar {
+   float: left;
+}
+
 #headerContent {
     color: #ccc;
     max-width: 1280px;

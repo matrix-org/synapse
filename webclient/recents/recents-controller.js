@@ -33,8 +33,7 @@ angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
                 console.log("Invited to room " + event.room_id);
                 // FIXME push membership to top level key to match /im/sync
                 event.membership = event.content.membership;
-                // FIXME bodge a nicer name than the room ID for this invite.
-                event.room_display_name = event.user_id + "'s room";
+
                 $scope.rooms[event.room_id] = event;
             }
         });
@@ -88,7 +87,9 @@ angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
     };
 
     $scope.onInit = function() {
-        refresh();
+        eventHandlerService.waitForInitialSyncCompletion().then(function() {
+            refresh();
+        });
     };
     
 }]);
