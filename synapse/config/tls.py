@@ -19,6 +19,9 @@ from OpenSSL import crypto
 import subprocess
 import os
 
+GENERATE_DH_PARAMS=False
+
+
 class TlsConfig(Config):
     def __init__(self, args):
         super(TlsConfig, self).__init__(args)
@@ -97,10 +100,29 @@ class TlsConfig(Config):
                 certifcate_file.write(cert_pem)
 
         if not os.path.exists(args.tls_dh_params_path):
-            subprocess.check_call([
-                "openssl", "dhparam",
-                "-outform", "PEM",
-                "-out", args.tls_dh_params_path,
-                "2048"
-            ])
-
+            if GENERATE_DH_PARAMS:
+                subprocess.check_call([
+                    "openssl", "dhparam",
+                    "-outform", "PEM",
+                    "-out", args.tls_dh_params_path,
+                    "2048"
+                ])
+            else:
+                with open(args.tls_dh_params_path, "w") as dh_params_file:
+                    dh_params_file.write(
+                        "2048-bit DH parameters taken from rfc3526\n"
+                        "-----BEGIN DH PARAMETERS-----\n"
+                        "MIIBCAKCAQEA///////////JD9qiIWjC"
+                        "NMTGYouA3BzRKQJOCIpnzHQCC76mOxOb\n"
+                        "IlFKCHmONATd75UZs806QxswKwpt8l8U"
+                        "N0/hNW1tUcJF5IW1dmJefsb0TELppjft\n"
+                        "awv/XLb0Brft7jhr+1qJn6WunyQRfEsf"
+                        "5kkoZlHs5Fs9wgB8uKFjvwWY2kg2HFXT\n"
+                        "mmkWP6j9JM9fg2VdI9yjrZYcYvNWIIVS"
+                        "u57VKQdwlpZtZww1Tkq8mATxdGwIyhgh\n"
+                        "fDKQXkYuNs474553LBgOhgObJ4Oi7Aei"
+                        "j7XFXfBvTFLJ3ivL9pVYFxg5lUl86pVq\n"
+                        "5RXSJhiY+gUQFXKOWoqsqmj/////////"
+                        "/wIBAg==\n"
+                        "-----END DH PARAMETERS-----\n"
+                    )
