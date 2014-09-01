@@ -39,7 +39,7 @@ class ServerConfig(Config):
                                   help="The name of the server")
         server_group.add_argument("--signing-key-path",
                                   help="The signing key to sign messages with")
-        server_group.add_argument("-p", "--bind-port", type=int,
+        server_group.add_argument("-p", "--bind-port", metavar="PORT", type=int,
                                   help="TCP port to listen on")
         server_group.add_argument("--bind-host", default="",
                                   help="Local interface to listen on")
@@ -51,7 +51,8 @@ class ServerConfig(Config):
         server_group.add_argument("-W", "--no-webclient", default=True,
                                   action="store_false",
                                   help="Don't host a web client.")
-        server_group.add_argument("--manhole", dest="manhole", type=int,
+        server_group.add_argument("--manhole", metavar="PORT", dest="manhole",
+                                  type=int,
                                   help="Turn on the twisted telnet manhole"
                                   " service on the given port.")
 
