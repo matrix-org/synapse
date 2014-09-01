@@ -1,5 +1,6 @@
 from twisted.internet import reactor, ssl
 from OpenSSL import SSL
+from twisted.internet._sslverify import _OpenSSLECCurve, _defaultCurveName
 
 
 class ServerContextFactory(ssl.ContextFactory):
@@ -12,6 +13,11 @@ class ServerContextFactory(ssl.ContextFactory):
 
     @staticmethod
     def configure_context(context, config):
+        try:
+            _ecCurve = _OpenSSLECCurve(_defaultCurveName)
+            _ecCurve.addECKeyToContext(context)
+        except:
+            pass
         context.set_options(SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3)
         context.use_certificate(config.tls_certificate)
         context.use_privatekey(config.tls_private_key)
