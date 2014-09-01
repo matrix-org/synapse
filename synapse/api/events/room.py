@@ -167,3 +167,10 @@ class RoomSendEventLevelEvent(SynapseStateEvent):
 
     def get_content_template(self):
         return {}
+
+
+class RoomOpsPowerLevelsEvent(SynapseStateEvent):
+    TYPE = "m.room.ops_levels"
+
+    def get_content_template(self):
+        return {}

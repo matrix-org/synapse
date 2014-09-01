@@ -27,6 +27,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+OpsLevel = collections.namedtuple("OpsLevel", ("ban_level", "kick_level"))
+
+
 class RoomStore(SQLBaseStore):
 
     @defer.inlineCallbacks
@@ -145,8 +148,13 @@ class RoomStore(SQLBaseStore):
         else:
             defer.returnValue(None)
 
-    @defer.inlineCallbacks
     def get_power_level(self, room_id, user_id):
+        return self._db_pool.runInteraction(
+            self._get_power_level,
+            room_id, user_id,
+        )
+
+    def _get_power_level(self, txn, room_id, user_id):
         sql = (
             "SELECT level FROM room_power_levels as r "
             "INNER JOIN current_state_events as c "
@@ -154,7 +162,7 @@ class RoomStore(SQLBaseStore):
             "WHERE c.room_id = ? AND r.user_id = ? "
         )
 
-        rows = yield self._execute(None, sql, room_id, user_id)
+        rows = txn.execute(sql, (room_id, user_id,)).fetchall()
 
         if len(rows) == 1:
             defer.returnValue(rows[0][0])
@@ -167,12 +175,33 @@ class RoomStore(SQLBaseStore):
             "WHERE c.room_id = ? "
         )
 
-        rows = yield self._execute(None, sql, room_id)
+        rows = txn.execute(sql, (room_id,)).fetchall()
 
         if len(rows) == 1:
-            defer.returnValue(rows[0][0])
+            return rows[0][0]
         else:
-            defer.returnValue(None)
+            return None
+
+    def get_ops_levels(self, room_id):
+        return self._db_pool.runInteraction(
+            self._get_ops_levels,
+            room_id,
+        )
+
+    def _get_ops_levels(self, txn, room_id):
+        sql = (
+            "SELECT ban_level, kick_level FROM room_ops_levels as r "
+            "INNER JOIN current_state_events as c "
+            "ON r.event_id = c.event_id "
+            "WHERE c.room_id = ? "
+        )
+
+        rows = txn.execute(sql, (room_id,)).fetchall()
+
+        if len(rows) == 1:
+            return OpsLevel(rows[0][0], rows[0][1])
+        else:
+            return OpsLevel(None, None)
 
     def get_add_state_level(self, room_id):
         return self._get_level_from_table("room_add_state_levels", room_id)
@@ -284,6 +313,24 @@ class RoomStore(SQLBaseStore):
                 "room_id": event.room_id,
                 "level": event.content["level"],
             },
+        )
+
+    def _store_ops_level(self, txn, event):
+        content = {
+            "event_id": event.event_id,
+            "room_id": event.room_id,
+        }
+
+        if "kick_level" in event.content:
+            content["kick_level"] = event.content["kick_level"]
+
+        if "ban_level" in event.content:
+            content["ban_level"] = event.content["ban_level"]
+
+        self._simple_insert_txn(
+            txn,
+            "room_send_event_levels",
+            content,
         )
 
 

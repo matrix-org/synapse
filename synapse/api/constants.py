@@ -23,7 +23,8 @@ class Membership(object):
     JOIN = u"join"
     KNOCK = u"knock"
     LEAVE = u"leave"
-    LIST = (INVITE, JOIN, KNOCK, LEAVE)
+    BAN = u"ban"
+    LIST = (INVITE, JOIN, KNOCK, LEAVE, BAN)
 
 
 class Feedback(object):

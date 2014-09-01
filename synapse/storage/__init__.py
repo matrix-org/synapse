@@ -127,8 +127,6 @@ class DataStore(RoomMemberStore, RoomStore,
             self._store_room_member_txn(txn, event)
         elif event.type == FeedbackEvent.TYPE:
             self._store_feedback_txn(txn, event)
-#        elif event.type == RoomConfigEvent.TYPE:
-#            self._store_room_config_txn(txn, event)
         elif event.type == RoomNameEvent.TYPE:
             self._store_room_name_txn(txn, event)
         elif event.type == RoomTopicEvent.TYPE:

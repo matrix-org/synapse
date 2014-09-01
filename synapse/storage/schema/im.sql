@@ -146,6 +146,17 @@ CREATE INDEX IF NOT EXISTS room_send_event_levels_event_id ON room_send_event_le
 CREATE INDEX IF NOT EXISTS room_send_event_levels_room_id ON room_send_event_levels(room_id);
 
 
+CREATE TABLE IF NOT EXISTS room_ops_levels(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    ban_level INTEGER,
+    kick_level INTEGER,
+);
+
+CREATE INDEX IF NOT EXISTS room_ops_levels_event_id ON room_ops_levels(event_id);
+CREATE INDEX IF NOT EXISTS room_ops_levels_room_id ON room_ops_levels(room_id);
+
+
 CREATE TABLE IF NOT EXISTS room_hosts(
     room_id TEXT NOT NULL,
     host TEXT NOT NULL,

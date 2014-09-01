@@ -22,7 +22,7 @@ from synapse.api.errors import StoreError, SynapseError
 from synapse.api.events.room import (
     RoomMemberEvent, RoomCreateEvent, RoomPowerLevelsEvent,
     RoomJoinRulesEvent, RoomAddStateLevelEvent,
-    RoomSendEventLevelEvent,
+    RoomSendEventLevelEvent, RoomOpsPowerLevelsEvent,
 )
 from synapse.util import stringutils
 from ._base import BaseRoomHandler
@@ -151,35 +151,44 @@ class RoomCreationHandler(BaseRoomHandler):
             "user_id": creator.to_string(),
         }
 
-        creation_event = self.event_factory.create_event(
+        def create(etype, **content):
+            return self.event_factory.create_event(
+                etype=etype,
+                content=content,
+                **event_keys
+            )
+
+        creation_event = create(
             etype=RoomCreateEvent.TYPE,
-            content={"creator": creator.to_string(), "default": 0},
-            **event_keys
+            creator=creator.to_string(),
+            default=0,
         )
 
-        power_levels_event = self.event_factory.create_event(
+        power_levels_event = create(
             etype=RoomPowerLevelsEvent.TYPE,
-            content={creator.to_string(): 10},
-            **event_keys
+            **{creator.to_string(): 10}
         )
 
         join_rule = JoinRules.PUBLIC if is_public else JoinRules.INVITE
-        join_rules_event = self.event_factory.create_event(
+        join_rules_event = create(
             etype=RoomJoinRulesEvent.TYPE,
-            content={"join_rule": join_rule},
-            **event_keys
+            join_rule=join_rule,
         )
 
-        add_state_event = self.event_factory.create_event(
+        add_state_event = create(
             etype=RoomAddStateLevelEvent.TYPE,
-            content={"level": 10},
-            **event_keys
+            level=10,
         )
 
-        send_event = self.event_factory.create_event(
+        send_event = create(
             etype=RoomSendEventLevelEvent.TYPE,
-            content={"level": 0},
-            **event_keys
+            level=0,
+        )
+
+        ops = create(
+            etype=RoomOpsPowerLevelsEvent.TYPE,
+            ban_level=5,
+            kick_level=5,
         )
 
         return [
@@ -188,6 +197,7 @@ class RoomCreationHandler(BaseRoomHandler):
             join_rules_event,
             add_state_event,
             send_event,
+            ops,
         ]
 
 
@@ -493,10 +503,9 @@ class RoomMemberHandler(BaseRoomHandler):
             host = target_user.domain
             destinations.append(host)
 
-        # If we are joining a remote HS, include that.
-        if membership == Membership.JOIN:
-            host = target_user.domain
-            destinations.append(host)
+        # Always include target domain
+        host = target_user.domain
+        destinations.append(host)
 
         return self._on_new_room_event(
             event, snapshot, extra_destinations=destinations,

@@ -57,6 +57,8 @@ class Auth(object):
                 )
 
                 if hasattr(event, "state_key"):
+                    # TODO (erikj): This really only should be called for *new*
+                    # state
                     yield self._can_add_state(event)
                 else:
                     yield self._can_send_event(event)
@@ -152,12 +154,29 @@ class Auth(object):
                 # TODO (erikj): private rooms
                 raise AuthError(403, "You are not allowed to join this room")
         elif Membership.LEAVE == membership:
+            # TODO (erikj): Implement kicks.
+
             if not caller_in_room:  # trying to leave a room you aren't joined
                 raise AuthError(403, "You are not in room %s." % event.room_id)
             elif target_user_id != event.user_id:
                 # trying to force another user to leave
                 raise AuthError(403, "Cannot force %s to leave." %
                                 target_user_id)
+        elif Membership.BAN == membership:
+            user_level = yield self.store.get_power_level(
+                event.room_id,
+                event.user_id,
+            )
+
+            ban_level, _ = yield self.store.get_ops_levels(event.room_id)
+
+            if ban_level:
+                ban_level = int(ban_level)
+            else:
+                ban_level = 5  # FIXME (erikj): What should we do here?
+
+            if ban_level < user_level:
+                raise AuthError(403, "You don't have permission to ban")
         else:
             raise AuthError(500, "Unknown membership %s" % membership)
 
