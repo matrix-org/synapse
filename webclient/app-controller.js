@@ -21,8 +21,8 @@ limitations under the License.
 'use strict';
 
 angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'eventStreamService'])
-.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventStreamService',
-                               function($scope, $location, $rootScope, matrixService, mPresence, eventStreamService) {
+.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventStreamService', 'matrixPhoneService',
+                               function($scope, $location, $rootScope, matrixService, mPresence, eventStreamService, matrixPhoneService) {
          
     // Check current URL to avoid to display the logout button on the login page
     $scope.location = $location.path();
@@ -88,7 +88,27 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
     $scope.updateHeader = function() {
         $scope.user_id = matrixService.config().user_id;
     };
-    
-}]);
 
-   
+    $rootScope.$on(matrixPhoneService.INCOMING_CALL_EVENT, function(ngEvent, call) {
+        console.trace("incoming call");
+        call.onError = $scope.onCallError;
+        call.onHangup = $scope.onCallHangup;
+        $rootScope.currentCall = call;
+    });
+
+    $scope.answerCall = function() {
+        $scope.currentCall.answer();
+    };
+
+    $scope.hangupCall = function() {
+        $scope.currentCall.hangup();
+        $scope.currentCall = undefined;
+    };
+    
+    $rootScope.onCallError = function(errStr) {
+        $scope.feedback = errStr;
+    }
+
+    $rootScope.onCallHangup = function() {
+    }
+}]);

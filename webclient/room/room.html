@@ -101,17 +101,6 @@
                 </span>
                 <button ng-click="leaveRoom()">Leave</button>
                 <button ng-click="startVoiceCall()" ng-show="currentCall == undefined && memberCount() == 2">Voice Call</button>
-                <div ng-show="currentCall.state == 'ringing'">
-                Incoming call from {{ currentCall.user_id }}
-                <button ng-click="answerCall()">Answer</button>
-                <button ng-click="hangupCall()">Reject</button>
-                </div>
-                <button ng-click="hangupCall()" ng-show="currentCall && currentCall.state != 'ringing' && currentCall.state != 'ended' && currentCall.state != 'fledgling'">Hang up</button>
-                <span ng-show="currentCall.state == 'invite_sent'">Calling...</span>
-                <span ng-show="currentCall.state == 'connecting'">Call Connecting...</span>
-                <span ng-show="currentCall.state == 'connected'">Call Connected</span>
-                <span ng-show="currentCall.state == 'ended'">Call Ended</span>
-                <span style="display: none; ">{{ currentCall.state }}</span>
             </div>
         
             {{ feedback }}
