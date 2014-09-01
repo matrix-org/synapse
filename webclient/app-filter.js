@@ -70,7 +70,7 @@ angular.module('matrixWebClient')
         });
 
         filtered.sort(function (a, b) {
-            return ((a["mtime_age"] || 10e10) > (b["mtime_age"] || 10e10) ? 1 : -1);
+            return ((a["last_active_ago"] || 10e10) > (b["last_active_ago"] || 10e10) ? 1 : -1);
         });
         return filtered;
     };

@@ -26,8 +26,8 @@
                     <img class="userAvatarGradient" src="img/gradient.png" title="{{ member.id }}" width="80" height="24"/>
                     <div class="userName">{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}<br/>{{ member.displayname ? "" : member.id.substr(member.id.indexOf(':')) }}</div>
                 </td>
-                <td class="userPresence" ng-class="(member.presenceState === 'online' ? 'online' : (member.presenceState === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">
-                    <span ng-show="member.mtime_age">{{ member.mtime_age + (now - member.last_updated) | duration }}<br/>ago</span>
+                <td class="userPresence" ng-class="(member.presence === 'online' ? 'online' : (member.presence === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">
+                    <span ng-show="member.last_active_ago">{{ member.last_active_ago + (now - member.last_updated) | duration }}<br/>ago</span>
                 </td>
         </table>
     </div>

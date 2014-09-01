@@ -165,11 +165,11 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         var isNewMember = !(target_user_id in $scope.members);
         if (isNewMember) {
             // FIXME: why are we copying these fields around inside chunk?
-            if ("state" in chunk.content) {
-                chunk.presenceState = chunk.content.state; // why is this renamed?
+            if ("presence" in chunk.content) {
+                chunk.presence = chunk.content.presence;
             }
-            if ("mtime_age" in chunk.content) {
-                chunk.mtime_age = chunk.content.mtime_age;
+            if ("last_active_ago" in chunk.content) {
+                chunk.last_active_ago = chunk.content.last_active_ago;
             }
             if ("displayname" in chunk.content) {
                 chunk.displayname = chunk.content.displayname;
@@ -188,11 +188,11 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             // selectively update membership and presence else it will nuke the picture and displayname too :/
             var member = $scope.members[target_user_id];
             member.membership = chunk.content.membership;
-            if ("state" in chunk.content) {
-                member.presenceState = chunk.content.state;
+            if ("presence" in chunk.content) {
+                member.presence = chunk.content.presence;
             }
-            if ("mtime_age" in chunk.content) {
-                member.mtime_age = chunk.content.mtime_age;
+            if ("last_active_ago" in chunk.content) {
+                member.last_active_ago = chunk.content.last_active_ago;
             }
         }
     };
@@ -211,13 +211,12 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         var member = $scope.members[chunk.content.user_id];
 
         // XXX: why not just pass the chunk straight through?
-        if ("state" in chunk.content) {
-            member.presenceState = chunk.content.state;
+        if ("presence" in chunk.content) {
+            member.presence = chunk.content.presence;
         }
 
-        if ("mtime_age" in chunk.content) {
-            // FIXME: should probably keep updating mtime_age in realtime like FB does
-            member.mtime_age = chunk.content.mtime_age;
+        if ("last_active_ago" in chunk.content) {
+            member.last_active_ago = chunk.content.last_active_ago;
         }
 
         // this may also contain a new display name or avatar url, so check.
