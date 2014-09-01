@@ -196,8 +196,6 @@ class PresenceStateTestCase(unittest.TestCase):
             SynapseError
         )
 
-    test_get_disallowed_state.skip = "Presence permissions are disabled"
-
     @defer.inlineCallbacks
     def test_set_my_state(self):
         mocked_set = self.datastore.set_presence_state
