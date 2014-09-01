@@ -68,6 +68,7 @@ class Pdu(JsonEncodedObject):
         "power_level",
         "prev_state_id",
         "prev_state_origin",
+        "required_power_level",
     ]
 
     internal_keys = [

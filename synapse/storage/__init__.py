@@ -19,6 +19,10 @@ from synapse.api.events.room import (
     RoomMemberEvent, RoomTopicEvent, FeedbackEvent,
 #   RoomConfigEvent,
     RoomNameEvent,
+    RoomJoinRulesEvent,
+    RoomPowerLevelsEvent,
+    RoomAddStateLevelEvent,
+    RoomSendEventLevelEvent,
 )
 
 from synapse.util.logutils import log_function
@@ -123,13 +127,19 @@ class DataStore(RoomMemberStore, RoomStore,
         if event.type == RoomMemberEvent.TYPE:
             self._store_room_member_txn(txn, event)
         elif event.type == FeedbackEvent.TYPE:
-            self._store_feedback_txn(txn,event)
-#        elif event.type == RoomConfigEvent.TYPE:
-#            self._store_room_config_txn(txn, event)
+            self._store_feedback_txn(txn, event)
         elif event.type == RoomNameEvent.TYPE:
             self._store_room_name_txn(txn, event)
         elif event.type == RoomTopicEvent.TYPE:
             self._store_room_topic_txn(txn, event)
+        elif event.type == RoomJoinRulesEvent.TYPE:
+            self._store_join_rule(txn, event)
+        elif event.type == RoomPowerLevelsEvent.TYPE:
+            self._store_power_levels(txn, event)
+        elif event.type == RoomAddStateLevelEvent.TYPE:
+            self._store_add_state_level(txn, event)
+        elif event.type == RoomSendEventLevelEvent.TYPE:
+            self._store_send_event_level(txn, event)
 
         vals = {
             "topological_ordering": event.depth,
@@ -222,7 +232,6 @@ class DataStore(RoomMemberStore, RoomStore,
         logger.debug("min_token is: %s", self.min_token)
 
         defer.returnValue(self.min_token)
-
 
     def snapshot_room(self, room_id, user_id, state_type=None, state_key=None):
         """Snapshot the room for an update by a user

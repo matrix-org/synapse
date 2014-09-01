@@ -330,6 +330,8 @@ class RoomCreationTest(unittest.TestCase):
             datastore=NonCallableMock(spec_set=[
                 "store_room",
                 "snapshot_room",
+                "persist_event",
+                "get_joined_hosts_for_room",
             ]),
             http_client=NonCallableMock(spec_set=[]),
             notifier=NonCallableMock(spec_set=["on_new_room_event"]),
@@ -362,6 +364,10 @@ class RoomCreationTest(unittest.TestCase):
         ])
         self.room_member_handler = self.handlers.room_member_handler
 
+        def hosts(room):
+            return defer.succeed([])
+        self.datastore.get_joined_hosts_for_room.side_effect = hosts
+
     @defer.inlineCallbacks
     def test_room_creation(self):
         user_id = "@foo:red"
@@ -385,9 +391,3 @@ class RoomCreationTest(unittest.TestCase):
         self.assertTrue(self.state_handler.handle_new_event.called)
 
         self.assertTrue(self.federation.handle_new_event.called)
-        config_event = self.federation.handle_new_event.call_args[0][0]
-
-        self.assertEquals(RoomConfigEvent.TYPE, config_event.type)
-        self.assertEquals(room_id, config_event.room_id)
-        self.assertEquals(user_id, config_event.user_id)
-        self.assertEquals(config, config_event.content)

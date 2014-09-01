@@ -17,10 +17,12 @@
 from twisted.internet import defer
 
 from synapse.types import UserID, RoomAlias, RoomID
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import StoreError, SynapseError
 from synapse.api.events.room import (
-    RoomMemberEvent, RoomConfigEvent
+    RoomMemberEvent, RoomCreateEvent, RoomPowerLevelsEvent,
+    RoomJoinRulesEvent, RoomAddStateLevelEvent,
+    RoomSendEventLevelEvent, RoomOpsPowerLevelsEvent,
 )
 from synapse.util import stringutils
 from ._base import BaseRoomHandler
@@ -62,6 +64,8 @@ class RoomCreationHandler(BaseRoomHandler):
         else:
             room_alias = None
 
+        is_public = config.get("visibility", None) == "public"
+
         if room_id:
             # Ensure room_id is the correct type
             room_id_obj = RoomID.from_string(room_id, self.hs)
@@ -71,7 +75,7 @@ class RoomCreationHandler(BaseRoomHandler):
             yield self.store.store_room(
                 room_id=room_id,
                 room_creator_user_id=user_id,
-                is_public=config["visibility"] == "public"
+                is_public=is_public
             )
         else:
             # autogen room IDs and try to create it. We may clash, so just
@@ -85,7 +89,7 @@ class RoomCreationHandler(BaseRoomHandler):
                     yield self.store.store_room(
                         room_id=gen_room_id.to_string(),
                         room_creator_user_id=user_id,
-                        is_public=config["visibility"] == "public"
+                        is_public=is_public
                     )
                     room_id = gen_room_id.to_string()
                     break
@@ -94,18 +98,10 @@ class RoomCreationHandler(BaseRoomHandler):
             if not room_id:
                 raise StoreError(500, "Couldn't generate a room ID.")
 
-        config_event = self.event_factory.create_event(
-            etype=RoomConfigEvent.TYPE,
-            room_id=room_id,
-            user_id=user_id,
-            content=config,
-        )
 
-        snapshot = yield self.store.snapshot_room(
-            room_id=room_id,
-            user_id=user_id,
-            state_type=RoomConfigEvent.TYPE,
-            state_key="",
+        user = self.hs.parse_userid(user_id)
+        creation_events = self._create_events_for_new_room(
+            user, room_id, is_public=is_public
         )
 
         if room_alias:
@@ -115,11 +111,18 @@ class RoomCreationHandler(BaseRoomHandler):
                 servers=[self.hs.hostname],
             )
 
-        yield self.state_handler.handle_new_event(config_event, snapshot)
-        # store_id = persist...
-
         federation_handler = self.hs.get_handlers().federation_handler
-        yield federation_handler.handle_new_event(config_event, snapshot)
+
+        for event in creation_events:
+            snapshot = yield self.store.snapshot_room(
+                room_id=room_id,
+                user_id=user_id,
+            )
+
+            logger.debug("Event: %s", event)
+
+            yield self.state_handler.handle_new_event(event, snapshot)
+            yield self._on_new_room_event(event, snapshot, extra_users=[user])
 
         content = {"membership": Membership.JOIN}
         join_event = self.event_factory.create_event(
@@ -141,6 +144,63 @@ class RoomCreationHandler(BaseRoomHandler):
             result["room_alias"] = room_alias.to_string()
 
         defer.returnValue(result)
+
+    def _create_events_for_new_room(self, creator, room_id, is_public=False):
+        event_keys = {
+            "room_id": room_id,
+            "user_id": creator.to_string(),
+            "required_power_level": 10,
+        }
+
+        def create(etype, **content):
+            return self.event_factory.create_event(
+                etype=etype,
+                content=content,
+                **event_keys
+            )
+
+        creation_event = create(
+            etype=RoomCreateEvent.TYPE,
+            creator=creator.to_string(),
+            default=0,
+        )
+
+        power_levels_event = self.event_factory.create_event(
+            etype=RoomPowerLevelsEvent.TYPE,
+            content={creator.to_string(): 10, "default": 0},
+            **event_keys
+        )
+
+        join_rule = JoinRules.PUBLIC if is_public else JoinRules.INVITE
+        join_rules_event = create(
+            etype=RoomJoinRulesEvent.TYPE,
+            join_rule=join_rule,
+        )
+
+        add_state_event = create(
+            etype=RoomAddStateLevelEvent.TYPE,
+            level=10,
+        )
+
+        send_event = create(
+            etype=RoomSendEventLevelEvent.TYPE,
+            level=0,
+        )
+
+        ops = create(
+            etype=RoomOpsPowerLevelsEvent.TYPE,
+            ban_level=5,
+            kick_level=5,
+        )
+
+        return [
+            creation_event,
+            power_levels_event,
+            join_rules_event,
+            add_state_event,
+            send_event,
+            ops,
+        ]
 
 
 class RoomMemberHandler(BaseRoomHandler):
@@ -284,6 +344,16 @@ class RoomMemberHandler(BaseRoomHandler):
             # This is not a JOIN, so we can handle it normally.
             if do_auth:
                 yield self.auth.check(event, snapshot, raises=True)
+
+            # If we're banning someone, set a req power level
+            if event.membership == Membership.BAN:
+                if not hasattr(event, "required_power_level") or event.required_power_level is None:
+                    # Add some default required_power_level
+                    user_level = yield self.store.get_power_level(
+                        event.room_id,
+                        event.user_id,
+                    )
+                    event.required_power_level = user_level
 
             if prev_state and prev_state.membership == event.membership:
                 # double same action, treat this event as a NOOP.
@@ -445,10 +515,9 @@ class RoomMemberHandler(BaseRoomHandler):
             host = target_user.domain
             destinations.append(host)
 
-        # If we are joining a remote HS, include that.
-        if membership == Membership.JOIN:
-            host = target_user.domain
-            destinations.append(host)
+        # Always include target domain
+        host = target_user.domain
+        destinations.append(host)
 
         return self._on_new_room_event(
             event, snapshot, extra_destinations=destinations,

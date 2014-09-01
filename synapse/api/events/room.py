@@ -15,7 +15,7 @@
 
 from synapse.api.constants import Feedback, Membership
 from synapse.api.errors import SynapseError
-from . import SynapseEvent
+from . import SynapseEvent, SynapseStateEvent
 
 
 class GenericEvent(SynapseEvent):
@@ -129,6 +129,48 @@ class RoomConfigEvent(SynapseEvent):
     def __init__(self, **kwargs):
         kwargs["state_key"] = ""
         super(RoomConfigEvent, self).__init__(**kwargs)
+
+    def get_content_template(self):
+        return {}
+
+
+class RoomCreateEvent(SynapseStateEvent):
+    TYPE = "m.room.create"
+
+    def get_content_template(self):
+        return {}
+
+
+class RoomJoinRulesEvent(SynapseStateEvent):
+    TYPE = "m.room.join_rules"
+
+    def get_content_template(self):
+        return {}
+
+
+class RoomPowerLevelsEvent(SynapseStateEvent):
+    TYPE = "m.room.power_levels"
+
+    def get_content_template(self):
+        return {}
+
+
+class RoomAddStateLevelEvent(SynapseStateEvent):
+    TYPE = "m.room.add_state_level"
+
+    def get_content_template(self):
+        return {}
+
+
+class RoomSendEventLevelEvent(SynapseStateEvent):
+    TYPE = "m.room.send_event_level"
+
+    def get_content_template(self):
+        return {}
+
+
+class RoomOpsPowerLevelsEvent(SynapseStateEvent):
+    TYPE = "m.room.ops_levels"
 
     def get_content_template(self):
         return {}

@@ -23,7 +23,8 @@ class Membership(object):
     JOIN = u"join"
     KNOCK = u"knock"
     LEAVE = u"leave"
-    LIST = (INVITE, JOIN, KNOCK, LEAVE)
+    BAN = u"ban"
+    LIST = (INVITE, JOIN, KNOCK, LEAVE, BAN)
 
 
 class Feedback(object):
@@ -42,3 +43,10 @@ class PresenceState(object):
     UNAVAILABLE = u"unavailable"
     ONLINE = u"online"
     FREE_FOR_CHAT = u"free_for_chat"
+
+
+class JoinRules(object):
+    PUBLIC = u"public"
+    KNOCK = u"knock"
+    INVITE = u"invite"
+    PRIVATE = u"private"

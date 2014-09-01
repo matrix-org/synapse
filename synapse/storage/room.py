@@ -27,6 +27,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+OpsLevel = collections.namedtuple("OpsLevel", ("ban_level", "kick_level"))
+
+
 class RoomStore(SQLBaseStore):
 
     @defer.inlineCallbacks
@@ -129,6 +132,98 @@ class RoomStore(SQLBaseStore):
 
         defer.returnValue(ret)
 
+    @defer.inlineCallbacks
+    def get_room_join_rule(self, room_id):
+        sql = (
+            "SELECT join_rule FROM room_join_rules as r "
+            "INNER JOIN current_state_events as c "
+            "ON r.event_id = c.event_id "
+            "WHERE c.room_id = ? "
+        )
+
+        rows = yield self._execute(None, sql, room_id)
+
+        if len(rows) == 1:
+            defer.returnValue(rows[0][0])
+        else:
+            defer.returnValue(None)
+
+    def get_power_level(self, room_id, user_id):
+        return self._db_pool.runInteraction(
+            self._get_power_level,
+            room_id, user_id,
+        )
+
+    def _get_power_level(self, txn, room_id, user_id):
+        sql = (
+            "SELECT level FROM room_power_levels as r "
+            "INNER JOIN current_state_events as c "
+            "ON r.event_id = c.event_id "
+            "WHERE c.room_id = ? AND r.user_id = ? "
+        )
+
+        rows = txn.execute(sql, (room_id, user_id,)).fetchall()
+
+        if len(rows) == 1:
+            return rows[0][0]
+
+        sql = (
+            "SELECT level FROM room_default_levels as r "
+            "INNER JOIN current_state_events as c "
+            "ON r.event_id = c.event_id "
+            "WHERE c.room_id = ? "
+        )
+
+        rows = txn.execute(sql, (room_id,)).fetchall()
+
+        if len(rows) == 1:
+            return rows[0][0]
+        else:
+            return None
+
+    def get_ops_levels(self, room_id):
+        return self._db_pool.runInteraction(
+            self._get_ops_levels,
+            room_id,
+        )
+
+    def _get_ops_levels(self, txn, room_id):
+        sql = (
+            "SELECT ban_level, kick_level FROM room_ops_levels as r "
+            "INNER JOIN current_state_events as c "
+            "ON r.event_id = c.event_id "
+            "WHERE c.room_id = ? "
+        )
+
+        rows = txn.execute(sql, (room_id,)).fetchall()
+
+        if len(rows) == 1:
+            return OpsLevel(rows[0][0], rows[0][1])
+        else:
+            return OpsLevel(None, None)
+
+    def get_add_state_level(self, room_id):
+        return self._get_level_from_table("room_add_state_levels", room_id)
+
+    def get_send_event_level(self, room_id):
+        return self._get_level_from_table("room_send_event_levels", room_id)
+
+    @defer.inlineCallbacks
+    def _get_level_from_table(self, table, room_id):
+        sql = (
+            "SELECT level FROM %(table)s as r "
+            "INNER JOIN current_state_events as c "
+            "ON r.event_id = c.event_id "
+            "WHERE c.room_id = ? "
+        ) % {"table": table}
+
+        rows = yield self._execute(None, sql, room_id)
+
+        if len(rows) == 1:
+            defer.returnValue(rows[0][0])
+        else:
+            defer.returnValue(None)
+
     def _store_room_topic_txn(self, txn, event):
         self._simple_insert_txn(
             txn,
@@ -149,6 +244,92 @@ class RoomStore(SQLBaseStore):
                 "room_id": event.room_id,
                 "name": event.name,
             }
+        )
+
+    def _store_join_rule(self, txn, event):
+        self._simple_insert_txn(
+            txn,
+            "room_join_rules",
+            {
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "join_rule": event.content["join_rule"],
+            },
+        )
+
+    def _store_power_levels(self, txn, event):
+        for user_id, level in event.content.items():
+            if user_id == "default":
+                self._simple_insert_txn(
+                    txn,
+                    "room_default_levels",
+                    {
+                        "event_id": event.event_id,
+                        "room_id": event.room_id,
+                        "level": level,
+                    },
+                )
+            else:
+                self._simple_insert_txn(
+                    txn,
+                    "room_power_levels",
+                    {
+                        "event_id": event.event_id,
+                        "room_id": event.room_id,
+                        "user_id": user_id,
+                        "level": level
+                    },
+                )
+
+    def _store_default_level(self, txn, event):
+        self._simple_insert_txn(
+            txn,
+            "room_default_levels",
+            {
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "level": event.content["default_level"],
+            },
+        )
+
+    def _store_add_state_level(self, txn, event):
+        self._simple_insert_txn(
+            txn,
+            "room_add_state_levels",
+            {
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "level": event.content["level"],
+            },
+        )
+
+    def _store_send_event_level(self, txn, event):
+        self._simple_insert_txn(
+            txn,
+            "room_send_event_levels",
+            {
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "level": event.content["level"],
+            },
+        )
+
+    def _store_ops_level(self, txn, event):
+        content = {
+            "event_id": event.event_id,
+            "room_id": event.room_id,
+        }
+
+        if "kick_level" in event.content:
+            content["kick_level"] = event.content["kick_level"]
+
+        if "ban_level" in event.content:
+            content["ban_level"] = event.content["ban_level"]
+
+        self._simple_insert_txn(
+            txn,
+            "room_send_event_levels",
+            content,
         )
 
 

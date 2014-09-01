@@ -42,6 +42,7 @@ class SynapseEvent(JsonEncodedObject):
         "user_id",  # sender/initiator
         "content",  # HTTP body, JSON
         "state_key",
+        "required_power_level",
     ]
 
     internal_keys = [
@@ -52,6 +53,7 @@ class SynapseEvent(JsonEncodedObject):
         "destinations",
         "origin",
         "outlier",
+        "power_level",
     ]
 
     required_keys = [
@@ -152,3 +154,10 @@ class SynapseEvent(JsonEncodedObject):
                         msg = self._check_json(entry, template[key][0])
                         if msg:
                             return msg
+
+
+class SynapseStateEvent(SynapseEvent):
+     def __init__(self, **kwargs):
+        if "state_key" not in kwargs:
+            kwargs["state_key"] = ""
+        super(SynapseStateEvent, self).__init__(**kwargs)

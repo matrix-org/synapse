@@ -234,6 +234,20 @@ class MemoryDataStore(object):
     def get_room_events_max_id(self):
         return 0  # TODO (erikj)
 
+    def get_send_event_level(self, room_id):
+        return defer.succeed(0)
+
+    def get_power_level(self, room_id, user_id):
+        return defer.succeed(0)
+
+    def get_add_state_level(self, room_id):
+        return defer.succeed(0)
+
+    def get_room_join_rule(self, room_id):
+        # TODO (erikj): This should be configurable
+        return defer.succeed("invite")
+
+
 def _format_call(args, kwargs):
     return ", ".join(
         ["%r" % (a) for a in args] +
