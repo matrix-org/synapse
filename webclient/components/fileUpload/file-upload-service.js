@@ -30,7 +30,7 @@ angular.module('mFileUpload', ['matrixService', 'mUtilities'])
      */
     this.uploadFile = function(file) {
         var deferred = $q.defer();
-        console.log("Uploading " + file.name + "... to /matrix/content");
+        console.log("Uploading " + file.name + "... to /_matrix/content");
         matrixService.uploadContent(file).then(
             function(response) {
                 var content_url = response.data.content_token;

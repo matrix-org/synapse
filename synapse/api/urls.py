@@ -15,7 +15,7 @@
 
 """Contains the URL paths to prefix various aspects of the server with. """
 
-CLIENT_PREFIX = "/matrix/client/api/v1"
-FEDERATION_PREFIX = "/matrix/federation/v1"
-WEB_CLIENT_PREFIX = "/matrix/client"
-CONTENT_REPO_PREFIX = "/matrix/content"
+CLIENT_PREFIX = "/_matrix/client/api/v1"
+FEDERATION_PREFIX = "/_matrix/federation/v1"
+WEB_CLIENT_PREFIX = "/_matrix/client"
+CONTENT_REPO_PREFIX = "/_matrix/content"

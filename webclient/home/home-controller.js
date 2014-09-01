@@ -37,6 +37,11 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
     $scope.joinAlias = {
         room_alias: ""
     };
+    
+    $scope.profile = {
+        displayName: "",
+        avatarUrl: ""
+    };
 
     var refresh = function() {
         
@@ -53,14 +58,14 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
         );
     };
     
-    $scope.createNewRoom = function(room_id, isPrivate) {
+    $scope.createNewRoom = function(room_alias, isPrivate) {
         
         var visibility = "public";
         if (isPrivate) {
             visibility = "private";
         }
         
-        matrixService.create(room_id, visibility).then(
+        matrixService.create(room_alias, visibility).then(
             function(response) { 
                 // This room has been created. Refresh the rooms list
                 console.log("Created room " + response.data.room_alias + " with id: "+
@@ -108,6 +113,26 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
     };
  
     $scope.onInit = function() {
+        // Load profile data
+        // Display name
+        matrixService.getDisplayName($scope.config.user_id).then(
+            function(response) {
+                $scope.profile.displayName = response.data.displayname;
+            },
+            function(error) {
+                $scope.feedback = "Can't load display name";
+            } 
+        );
+        // Avatar
+        matrixService.getProfilePictureUrl($scope.config.user_id).then(
+            function(response) {
+                $scope.profile.avatarUrl = response.data.avatar_url;
+            },
+            function(error) {
+                $scope.feedback = "Can't load avatar URL";
+            } 
+        );
+
         refresh();
     };
 }]);

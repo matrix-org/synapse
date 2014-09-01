@@ -37,7 +37,7 @@ ONLINE = PresenceState.ONLINE
 
 
 myid = "@apple:test"
-PATH_PREFIX = "/matrix/client/api/v1"
+PATH_PREFIX = "/_matrix/client/api/v1"
 
 
 class JustPresenceHandlers(object):
@@ -229,7 +229,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         # HIDEOUS HACKERY
         # TODO(paul): This should be injected in via the HomeServer DI system
         from synapse.streams.events import (
-            PresenceSource, NullSource, EventSources
+            PresenceEventSource, NullSource, EventSources
         )
 
         old_SOURCE_TYPES = EventSources.SOURCE_TYPES
@@ -240,7 +240,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         EventSources.SOURCE_TYPES = {
             k: NullSource for k in old_SOURCE_TYPES.keys()
         }
-        EventSources.SOURCE_TYPES["presence"] = PresenceSource
+        EventSources.SOURCE_TYPES["presence"] = PresenceEventSource
 
         hs = HomeServer("test",
             db_pool=None,
@@ -274,6 +274,15 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 lambda u: defer.succeed([]))
 
         self.mock_datastore = hs.get_datastore()
+
+        def get_profile_displayname(user_id):
+            return defer.succeed("Frank")
+        self.mock_datastore.get_profile_displayname = get_profile_displayname
+
+        def get_profile_avatar_url(user_id):
+            return defer.succeed(None)
+        self.mock_datastore.get_profile_avatar_url = get_profile_avatar_url
+
         self.presence = hs.get_handlers().presence_handler
 
         self.u_apple = hs.parse_userid("@apple:test")
@@ -295,7 +304,9 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         # all be ours
 
         # I'll already get my own presence state change
-        self.assertEquals({"start": "0_1", "end": "0_1", "chunk": []}, response)
+        self.assertEquals({"start": "0_1_0", "end": "0_1_0", "chunk": []},
+            response
+        )
 
         self.mock_datastore.set_presence_state.return_value = defer.succeed(
                 {"state": ONLINE})
@@ -306,14 +317,15 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 state={"state": ONLINE})
 
         (code, response) = yield self.mock_resource.trigger("GET",
-                "/events?from=0_1&timeout=0", None)
+                "/events?from=0_1_0&timeout=0", None)
 
         self.assertEquals(200, code)
-        self.assertEquals({"start": "0_1", "end": "0_2", "chunk": [
+        self.assertEquals({"start": "0_1_0", "end": "0_2_0", "chunk": [
             {"type": "m.presence",
              "content": {
                  "user_id": "@banana:test",
                  "state": ONLINE,
+                 "displayname": "Frank",
                  "mtime_age": 0,
             }},
         ]}, response)

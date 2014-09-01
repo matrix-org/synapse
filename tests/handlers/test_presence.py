@@ -314,7 +314,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("elsewhere",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data=_expect_edu("elsewhere", "m.presence_invite",
                     content={
                         "observer_user": "@apple:test",
@@ -340,7 +340,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("elsewhere",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data=_expect_edu("elsewhere", "m.presence_accept",
                     content={
                         "observer_user": "@cabbage:elsewhere",
@@ -352,7 +352,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         )
 
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence_invite",
                 content={
                     "observer_user": "@cabbage:elsewhere",
@@ -371,7 +371,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("elsewhere",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data=_expect_edu("elsewhere", "m.presence_deny",
                     content={
                         "observer_user": "@cabbage:elsewhere",
@@ -383,7 +383,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         )
 
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence_invite",
                 content={
                     "observer_user": "@cabbage:elsewhere",
@@ -397,7 +397,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_accepted_remote(self):
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence_accept",
                 content={
                     "observer_user": "@apple:test",
@@ -415,7 +415,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_denied_remote(self):
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence_deny",
                 content={
                     "observer_user": "@apple:test",
@@ -514,13 +514,6 @@ class PresencePushTestCase(unittest.TestCase):
             )
         hs.handlers = JustPresenceHandlers(hs)
 
-        def update(*args,**kwargs):
-            # print "mock_update_client: Args=%s, kwargs=%s" %(args, kwargs,)
-            return defer.succeed(None)
-
-        self.mock_update_client = Mock()
-        self.mock_update_client.side_effect = update
-
         self.datastore = hs.get_datastore()
 
         def get_received_txn_response(*args):
@@ -528,7 +521,7 @@ class PresencePushTestCase(unittest.TestCase):
         self.datastore.get_received_txn_response = get_received_txn_response
 
         self.handler = hs.get_handlers().presence_handler
-        self.handler.push_update_to_clients = self.mock_update_client
+        self.event_source = hs.get_event_sources().sources["presence"]
 
         # Mock the RoomMemberHandler
         hs.handlers.room_member_handler = Mock(spec=[
@@ -622,16 +615,23 @@ class PresencePushTestCase(unittest.TestCase):
         apple_set.add(self.u_banana)
         apple_set.add(self.u_clementine)
 
+        self.assertEquals(self.event_source.get_current_key(), 0)
+
         yield self.handler.set_state(self.u_apple, self.u_apple,
                 {"state": ONLINE})
 
-        self.mock_update_client.assert_has_calls([
-                call(users_to_push=set([self.u_apple, self.u_banana, self.u_clementine]),
-                    room_ids=["a-room"],
-                    observed_user=self.u_apple,
-                    statuscache=ANY), # self-reflection
-        ], any_order=True)
-        self.mock_update_client.reset_mock()
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            [
+                {"type": "m.presence",
+                 "content": {
+                    "user_id": "@apple:test",
+                    "state": ONLINE,
+                    "mtime_age": 0,
+                }},
+            ],
+        )
 
         presence = yield self.handler.get_presence_list(
                 observer_user=self.u_apple, accepted=True)
@@ -657,31 +657,24 @@ class PresencePushTestCase(unittest.TestCase):
                  "state": OFFLINE},
         ], presence)
 
-        self.mock_update_client.assert_has_calls([
-                call(users_to_push=set([self.u_banana]),
-                    room_ids=[],
-                    observed_user=self.u_banana,
-                    statuscache=ANY), # self-reflection
-        ]) # and no others...
+        self.assertEquals(self.event_source.get_current_key(), 2)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(
+                self.u_banana, 1, None
+            )[0],
+            [
+                {"type": "m.presence",
+                 "content": {
+                     "user_id": "@banana:test",
+                     "state": ONLINE,
+                     "mtime_age": 2000
+                }},
+            ]
+        )
 
     @defer.inlineCallbacks
     def test_push_remote(self):
         put_json = self.mock_http_client.put_json
-#        put_json.expect_call_and_return(
-#            call("remote",
-#                path=ANY,  # Can't guarantee which txn ID will be which
-#                data=_expect_edu("remote", "m.presence",
-#                    content={
-#                        "push": [
-#                            {"user_id": "@apple:test",
-#                             "state": "online",
-#                             "mtime_age": 0},
-#                        ],
-#                    }
-#                )
-#            ),
-#            defer.succeed((200, "OK"))
-#        )
         put_json.expect_call_and_return(
             call("farm",
                 path=ANY,  # Can't guarantee which txn ID will be which
@@ -724,8 +717,10 @@ class PresencePushTestCase(unittest.TestCase):
 
         self.room_members = [self.u_banana, self.u_potato]
 
+        self.assertEquals(self.event_source.get_current_key(), 0)
+
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence",
                 content={
                     "push": [
@@ -737,12 +732,20 @@ class PresencePushTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_update_client.assert_has_calls([
-                call(users_to_push=set([self.u_apple]),
-                    room_ids=["a-room"],
-                    observed_user=self.u_potato,
-                    statuscache=ANY),
-        ], any_order=True)
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(
+                self.u_apple, 0, None
+            )[0],
+            [
+                {"type": "m.presence",
+                 "content": {
+                     "user_id": "@potato:remote",
+                     "state": ONLINE,
+                     "mtime_age": 1000,
+                }}
+            ]
+        )
 
         self.clock.advance_time(2)
 
@@ -754,24 +757,35 @@ class PresencePushTestCase(unittest.TestCase):
     def test_join_room_local(self):
         self.room_members = [self.u_apple, self.u_banana]
 
-        yield self.distributor.fire("user_joined_room", self.u_elderberry,
+        self.assertEquals(self.event_source.get_current_key(), 0)
+
+        # TODO(paul): Gut-wrenching
+        self.handler._user_cachemap[self.u_clementine] = UserPresenceCache()
+        self.handler._user_cachemap[self.u_clementine].update(
+            {
+                "state": PresenceState.ONLINE,
+                "mtime": self.clock.time_msec(),
+            }, self.u_clementine
+        )
+
+        yield self.distributor.fire("user_joined_room", self.u_clementine,
             "a-room"
         )
 
-        self.mock_update_client.assert_has_calls([
-            call(room_ids=["a-room"],
-                observed_user=self.u_elderberry,
-                users_to_push=set(),
-                statuscache=ANY),
-            call(users_to_push=set([self.u_elderberry]),
-                observed_user=self.u_apple,
-                room_ids=[],
-                statuscache=ANY),
-            call(users_to_push=set([self.u_elderberry]),
-                observed_user=self.u_banana,
-                room_ids=[],
-                statuscache=ANY),
-        ], any_order=True)
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(
+                self.u_apple, 0, None
+            )[0],
+            [
+                {"type": "m.presence",
+                 "content": {
+                     "user_id": "@clementine:test",
+                     "state": ONLINE,
+                     "mtime_age": 0,
+                }}
+            ]
+        )
 
     @defer.inlineCallbacks
     def test_join_room_remote(self):
@@ -822,7 +836,7 @@ class PresencePushTestCase(unittest.TestCase):
 
         put_json.expect_call_and_return(
             call("remote",
-                path="/matrix/federation/v1/send/1000002/",
+                path="/_matrix/federation/v1/send/1000002/",
                 data=_expect_edu("remote", "m.presence",
                     content={
                         "push": [
@@ -1116,7 +1130,7 @@ class PresencePollingTestCase(unittest.TestCase):
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("remote",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data=_expect_edu("remote", "m.presence",
                     content={
                         "push": [
@@ -1131,7 +1145,7 @@ class PresencePollingTestCase(unittest.TestCase):
         )
 
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("remote", "m.presence",
                 content={
                     "poll": [ "@banana:test" ],
@@ -1145,7 +1159,7 @@ class PresencePollingTestCase(unittest.TestCase):
         self.assertTrue(self.u_banana in self.handler._remote_sendmap)
 
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000001/",
+            "/_matrix/federation/v1/send/1000001/",
             _make_edu_json("remote", "m.presence",
                 content={
                     "unpoll": [ "@banana:test" ],

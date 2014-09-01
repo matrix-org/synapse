@@ -32,7 +32,7 @@ from .utils import RestTestCase
 
 from mock import Mock
 
-PATH_PREFIX = "/matrix/client/api/v1"
+PATH_PREFIX = "/_matrix/client/api/v1"
 
 
 class RoomPermissionsTestCase(RestTestCase):

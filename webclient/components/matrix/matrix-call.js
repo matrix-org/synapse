@@ -36,7 +36,7 @@ var forAllTracksOnStream = function(s, f) {
 }
 
 angular.module('MatrixCall', [])
-.factory('MatrixCall', ['matrixService', 'matrixPhoneService', function MatrixCallFactory(matrixService, matrixPhoneService) {
+.factory('MatrixCall', ['matrixService', 'matrixPhoneService', '$rootScope', function MatrixCallFactory(matrixService, matrixPhoneService, $rootScope) {
     var MatrixCall = function(room_id) {
         this.room_id = room_id;
         this.call_id = "c" + new Date().getTime();
@@ -73,9 +73,7 @@ angular.module('MatrixCall', [])
         this.state = 'wait_local_media';
     };
 
-    MatrixCall.prototype.hangup = function() {
-        console.trace("Ending call "+this.call_id);
-
+    MatrixCall.prototype.stopAllMedia = function() {
         if (this.localAVStream) {
             forAllTracksOnStream(this.localAVStream, function(t) {
                 t.stop();
@@ -86,6 +84,12 @@ angular.module('MatrixCall', [])
                 t.stop();
             });
         }
+    };
+
+    MatrixCall.prototype.hangup = function() {
+        console.trace("Ending call "+this.call_id);
+
+        this.stopAllMedia();
 
         var content = {
             version: 0,
@@ -204,6 +208,7 @@ angular.module('MatrixCall', [])
         // ideally we'd consider the call to be connected when we get media but chrome doesn't implement nay of the 'onstarted' events yet
         if (this.peerConn.iceConnectionState == 'completed' || this.peerConn.iceConnectionState == 'connected') {
             this.state = 'connected';
+            $rootScope.$apply();
         }
     };
 
@@ -232,8 +237,9 @@ angular.module('MatrixCall', [])
             t.onstarted = self.onRemoteStreamTrackStarted;
         });
 
+        event.stream.onended = function(e) { self.onRemoteStreamEnded(e); }; 
         // not currently implemented in chrome
-        event.stream.onstarted = this.onRemoteStreamStarted;
+        event.stream.onstarted = function(e) { self.onRemoteStreamStarted(e); };
         var player = new Audio();
         player.src = URL.createObjectURL(s);
         player.play();
@@ -243,24 +249,19 @@ angular.module('MatrixCall', [])
         this.state = 'connected';
     };
 
+    MatrixCall.prototype.onRemoteStreamEnded = function(event) {
+        this.state = 'ended';
+        this.stopAllMedia();
+        this.onHangup();
+    };
+
     MatrixCall.prototype.onRemoteStreamTrackStarted = function(event) {
         this.state = 'connected';
     };
 
     MatrixCall.prototype.onHangupReceived = function() {
         this.state = 'ended';
-
-        if (this.localAVStream) {
-            forAllTracksOnStream(this.localAVStream, function(t) {
-                t.stop();
-            });
-        }
-        if (this.remoteAVStream) {
-            forAllTracksOnStream(this.remoteAVStream, function(t) {
-                t.stop();
-            });
-        }
-
+        this.stopAllMedia();
         this.onHangup();
     };
 

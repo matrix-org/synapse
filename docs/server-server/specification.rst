@@ -155,7 +155,7 @@ Protocol URLs
 
 All these URLs are namespaced within a prefix of 
 
-  /matrix/federation/v1/...
+  /_matrix/federation/v1/...
 
 For active pushing of messages representing live activity "as it happens":
 

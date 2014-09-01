@@ -120,7 +120,7 @@ def make_graph(pdus, room, filename_prefix):
 def get_pdus(host, room):
     transaction = json.loads(
         urllib2.urlopen(
-            "http://%s/matrix/federation/v1/context/%s/" % (host, room)
+            "http://%s/_matrix/federation/v1/context/%s/" % (host, room)
         ).read()
     )
 

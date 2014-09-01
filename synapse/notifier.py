@@ -95,7 +95,7 @@ class Notifier(object):
         """
         room_id = event.room_id
 
-        source = self.event_sources.sources["room"]
+        room_source = self.event_sources.sources["room"]
 
         listeners = self.rooms_to_listeners.get(room_id, set()).copy()
 
@@ -107,13 +107,17 @@ class Notifier(object):
         # TODO (erikj): Can we make this more efficient by hitting the
         # db once?
         for listener in listeners:
-            events, end_token = yield source.get_new_events_for_user(
+            events, end_key = yield room_source.get_new_events_for_user(
                 listener.user,
-                listener.from_token,
+                listener.from_token.room_key,
                 listener.limit,
             )
 
             if events:
+                end_token = listener.from_token.copy_and_replace(
+                    "room_key", end_key
+                )
+
                 listener.notify(
                     self, events, listener.from_token, end_token
                 )
@@ -126,7 +130,7 @@ class Notifier(object):
 
         Will wake up all listeners for the given users and rooms.
         """
-        source = self.event_sources.sources["presence"]
+        presence_source = self.event_sources.sources["presence"]
 
         listeners = set()
 
@@ -137,13 +141,17 @@ class Notifier(object):
             listeners |= self.rooms_to_listeners.get(room, set()).copy()
 
         for listener in listeners:
-            events, end_token = yield source.get_new_events_for_user(
+            events, end_key = yield presence_source.get_new_events_for_user(
                 listener.user,
-                listener.from_token,
+                listener.from_token.presence_key,
                 listener.limit,
             )
 
             if events:
+                end_token = listener.from_token.copy_and_replace(
+                    "presence_key", end_key
+                )
+
                 listener.notify(
                     self, events, listener.from_token, end_token
                 )
@@ -216,16 +224,18 @@ class Notifier(object):
         limit = listener.limit
 
         # TODO (erikj): DeferredList?
-        for source in self.event_sources.sources.values():
-            stuff, new_token = yield source.get_new_events_for_user(
+        for name, source in self.event_sources.sources.items():
+            keyname = "%s_key" % name
+
+            stuff, new_key = yield source.get_new_events_for_user(
                 listener.user,
-                from_token,
+                getattr(from_token, keyname),
                 limit,
             )
 
             events.extend(stuff)
 
-            from_token = new_token
+            from_token = from_token.copy_and_replace(keyname, new_key)
 
         end_token = from_token
 

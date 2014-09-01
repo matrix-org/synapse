@@ -1,0 +1,92 @@
+/*** Mobile voodoo ***/
+@media all and (max-device-width: 640px) {
+            
+    #messageTableWrapper {
+        margin-right: 0px ! important;
+    }
+    
+    .leftBlock {
+        width: 8em ! important;
+        font-size: 8px ! important;
+    }
+    
+    .rightBlock {
+        width: 0px ! important;
+        display: none ! important;
+    }
+    
+    .avatar {
+        width: 36px ! important;
+    }
+    
+    #header {
+        background-color: transparent;
+    }
+    
+    #headerContent {
+        padding-right: 5px;
+    }
+    
+    #headerContent button {
+        font-size: 8px;
+    }
+    
+    #messageTable,
+    #wrapper,
+    #controls {
+        max-width: 640px ! important;
+    }    
+    
+    #headerUserId,
+    #roomHeader img,
+    #userIdCell,
+    #roomRecentsTableWrapper,
+    #usersTableWrapper,
+    .extraControls {
+        display: none;
+    }
+    
+    #buttonsCell {
+        width: 60px ! important;
+        padding-left: 20px ! important;
+    }
+    
+    #roomLogo {
+        display: none;
+    }
+        
+    .bubble {
+        font-size: 12px ! important;
+        min-height: 20px ! important;
+    }
+
+    #roomHeader {
+        padding-top: 10px;
+    }
+    
+    #roomName {
+        float: left;
+        font-size: 14px ! important;
+        margin-top: 0px ! important;
+    }
+        
+    #roomPage {
+        top: 35px ! important;
+        left: 5px ! important;
+        right: 5px ! important;
+        bottom: 70px ! important;
+    }
+    
+    #controlPanel {
+        height: 70px;
+    }
+        
+    /* stop zoom on select */
+    select:focus,
+    textarea,
+    input
+    {
+        font-size: 16px ! important;
+    }
+    
+}

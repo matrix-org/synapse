@@ -87,7 +87,7 @@ class FederationTestCase(unittest.TestCase):
 
         # Empty context initially
         (code, response) = yield self.mock_resource.trigger("GET",
-                "/matrix/federation/v1/state/my-context/", None)
+                "/_matrix/federation/v1/state/my-context/", None)
         self.assertEquals(200, code)
         self.assertFalse(response["pdus"])
 
@@ -112,7 +112,7 @@ class FederationTestCase(unittest.TestCase):
         )
 
         (code, response) = yield self.mock_resource.trigger("GET",
-                "/matrix/federation/v1/state/my-context/", None)
+                "/_matrix/federation/v1/state/my-context/", None)
         self.assertEquals(200, code)
         self.assertEquals(1, len(response["pdus"]))
 
@@ -123,7 +123,7 @@ class FederationTestCase(unittest.TestCase):
         )
 
         (code, response) = yield self.mock_resource.trigger("GET",
-                "/matrix/federation/v1/pdu/red/abc123def456/", None)
+                "/_matrix/federation/v1/pdu/red/abc123def456/", None)
         self.assertEquals(404, code)
 
         # Now insert such a PDU
@@ -142,7 +142,7 @@ class FederationTestCase(unittest.TestCase):
         )
 
         (code, response) = yield self.mock_resource.trigger("GET",
-                "/matrix/federation/v1/pdu/red/abc123def456/", None)
+                "/_matrix/federation/v1/pdu/red/abc123def456/", None)
         self.assertEquals(200, code)
         self.assertEquals(1, len(response["pdus"]))
         self.assertEquals("m.text", response["pdus"][0]["pdu_type"])
@@ -168,7 +168,7 @@ class FederationTestCase(unittest.TestCase):
 
         self.mock_http_client.put_json.assert_called_with(
                 "remote",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data={
                     "ts": 1000000,
                     "origin": "test",
@@ -203,7 +203,7 @@ class FederationTestCase(unittest.TestCase):
         # MockClock ensures we can guess these timestamps
         self.mock_http_client.put_json.assert_called_with(
                 "remote",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data={
                     "origin": "test",
                     "ts": 1000000,
@@ -226,7 +226,7 @@ class FederationTestCase(unittest.TestCase):
         self.federation.register_edu_handler("m.test", recv_observer)
 
         yield self.mock_resource.trigger("PUT",
-                "/matrix/federation/v1/send/1001000/",
+                "/_matrix/federation/v1/send/1001000/",
                 """{
                     "origin": "remote",
                     "ts": 1001000,
@@ -261,7 +261,7 @@ class FederationTestCase(unittest.TestCase):
 
         self.mock_http_client.get_json.assert_called_with(
             destination="remote",
-            path="/matrix/federation/v1/query/a-question",
+            path="/_matrix/federation/v1/query/a-question",
             args={"one": "1", "two": "2"}
         )
 
@@ -273,7 +273,7 @@ class FederationTestCase(unittest.TestCase):
         self.federation.register_query_handler("a-question", recv_handler)
 
         code, response = yield self.mock_resource.trigger("GET",
-            "/matrix/federation/v1/query/a-question?three=3&four=4", None)
+            "/_matrix/federation/v1/query/a-question?three=3&four=4", None)
 
         self.assertEquals(200, code)
         self.assertEquals({"another": "response"}, response)

@@ -325,7 +325,7 @@ class ContentRepoResource(resource.Resource):
 
             # FIXME (erikj): These should use constants.
             file_name = os.path.basename(fname)
-            url = "http://%s/matrix/content/%s" % (
+            url = "http://%s/_matrix/content/%s" % (
                 self.hs.domain_with_port, file_name
             )
 
