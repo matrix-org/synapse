@@ -165,8 +165,7 @@ class RoomStore(SQLBaseStore):
         rows = txn.execute(sql, (room_id, user_id,)).fetchall()
 
         if len(rows) == 1:
-            defer.returnValue(rows[0][0])
-            return
+            return rows[0][0]
 
         sql = (
             "SELECT level FROM room_default_levels as r "

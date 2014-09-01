@@ -42,6 +42,7 @@ class SynapseEvent(JsonEncodedObject):
         "user_id",  # sender/initiator
         "content",  # HTTP body, JSON
         "state_key",
+        "required_power_level",
     ]
 
     internal_keys = [
@@ -52,6 +53,7 @@ class SynapseEvent(JsonEncodedObject):
         "destinations",
         "origin",
         "outlier",
+        "power_level",
     ]
 
     required_keys = [

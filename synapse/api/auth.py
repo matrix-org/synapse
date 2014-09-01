@@ -45,7 +45,10 @@ class Auth(object):
         """
         try:
             if hasattr(event, "room_id"):
+                is_state = hasattr(event, "state_key")
+
                 if event.type == RoomMemberEvent.TYPE:
+                    yield self._can_replace_state(event)
                     allowed = yield self.is_membership_change_allowed(event)
                     defer.returnValue(allowed)
                     return
@@ -56,10 +59,11 @@ class Auth(object):
                     room_id=snapshot.room_id,
                 )
 
-                if hasattr(event, "state_key"):
+                if is_state:
                     # TODO (erikj): This really only should be called for *new*
                     # state
                     yield self._can_add_state(event)
+                    yield self._can_replace_state(event)
                 else:
                     yield self._can_send_event(event)
 
@@ -175,7 +179,7 @@ class Auth(object):
             else:
                 ban_level = 5  # FIXME (erikj): What should we do here?
 
-            if ban_level < user_level:
+            if user_level < ban_level:
                 raise AuthError(403, "You don't have permission to ban")
         else:
             raise AuthError(500, "Unknown membership %s" % membership)
@@ -267,3 +271,35 @@ class Auth(object):
             )
 
         defer.returnValue(True)
+
+    @defer.inlineCallbacks
+    def _can_replace_state(self, event):
+        current_state = yield self.store.get_current_state(
+            event.room_id,
+            event.type,
+            event.state_key,
+        )
+
+        if current_state:
+            current_state = current_state[0]
+
+        user_level = yield self.store.get_power_level(
+            event.room_id,
+            event.user_id,
+        )
+
+        if user_level:
+            user_level = int(user_level)
+        else:
+            user_level = 0
+
+        logger.debug("Checking power level for %s, %s", event.user_id, user_level)
+        if current_state and hasattr(current_state, "required_power_level"):
+            req = current_state.required_power_level
+
+            logger.debug("Checked power level for %s, %s", event.user_id, req)
+            if user_level < req:
+                raise AuthError(
+                    403,
+                    "You don't have permission to change that state"
+                )

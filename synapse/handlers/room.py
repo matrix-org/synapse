@@ -166,7 +166,7 @@ class RoomCreationHandler(BaseRoomHandler):
 
         power_levels_event = create(
             etype=RoomPowerLevelsEvent.TYPE,
-            **{creator.to_string(): 10}
+            **{creator.to_string(): 10, "default": 0}
         )
 
         join_rule = JoinRules.PUBLIC if is_public else JoinRules.INVITE
@@ -342,6 +342,16 @@ class RoomMemberHandler(BaseRoomHandler):
             # This is not a JOIN, so we can handle it normally.
             if do_auth:
                 yield self.auth.check(event, snapshot, raises=True)
+
+            # If we're banning someone, set a req power level
+            if event.membership == Membership.BAN:
+                if not hasattr(event, "required_power_level") or event.required_power_level is None:
+                    # Add some default required_power_level
+                    user_level = yield self.store.get_power_level(
+                        event.room_id,
+                        event.user_id,
+                    )
+                    event.required_power_level = user_level
 
             if prev_state and prev_state.membership == event.membership:
                 # double same action, treat this event as a NOOP.
