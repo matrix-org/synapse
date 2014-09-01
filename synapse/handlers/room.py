@@ -162,7 +162,6 @@ class RoomCreationHandler(BaseRoomHandler):
         creation_event = create(
             etype=RoomCreateEvent.TYPE,
             creator=creator.to_string(),
-            default=0,
         )
 
         power_levels_event = self.event_factory.create_event(
