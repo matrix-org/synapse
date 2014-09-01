@@ -180,7 +180,7 @@ class TwistedHttpClient(HttpClient):
         # TODO: setup and pass in an ssl_context to enable TLS
         endpoint = matrix_endpoint(
             reactor, destination, timeout=10,
-            ssl_context_factory=self.hs.tls_tls_context_factory
+            ssl_context_factory=self.hs.tls_context_factory
         )
 
         while True:

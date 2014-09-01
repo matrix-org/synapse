@@ -53,7 +53,7 @@ def matrix_endpoint(reactor, destination, ssl_context_factory=None,
         default_port = 8080
     else:
         transport_endpoint = SSL4ClientEndpoint
-        endpoint_kw_args.update(ssl_context_factory=ssl_context_factory)
+        endpoint_kw_args.update(sslContextFactory=ssl_context_factory)
         default_port = 443
 
     if port is None:
