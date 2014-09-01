@@ -206,11 +206,17 @@ class SynapseHomeServer(HomeServer):
         """
         return "%s-%s" % (resource, path_seg)
 
-    def start_listening(self, port):
-        reactor.listenSSL(
-            port, Site(self.root_resource), self.tls_context_factory
-        )
-        logger.info("Synapse now listening on port %d", port)
+    def start_listening(self, secure_port, unsecure_port):
+        if secure_port is not None:
+            reactor.listenSSL(
+                secure_port, Site(self.root_resource), self.tls_context_factory
+            )
+            logger.info("Synapse now listening on port %d", secure_port)
+        if unsecure_port is not None:
+            reactor.listenTCP(
+                unsecure_port, Site(self.root_resource)
+            )
+            logger.info("Synapse now listening on port %d", unsecure_port)
 
 
 def run():
@@ -249,7 +255,7 @@ def setup():
         web_client=config.webclient,
         redirect_root_to_web_client=True,
     )
-    hs.start_listening(config.bind_port)
+    hs.start_listening(config.bind_port, config.unsecure_port)
 
     hs.get_db_pool()
 

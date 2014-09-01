@@ -26,6 +26,7 @@ class ServerConfig(Config):
         self.signing_key = self.read_signing_key(args.signing_key_path)
         self.bind_port = args.bind_port
         self.bind_host = args.bind_host
+        self.unsecure_port = args.unsecure_port
         self.daemonize = args.daemonize
         self.pid_file = self.abspath(args.pid_file)
         self.webclient = args.no_webclient
@@ -39,8 +40,10 @@ class ServerConfig(Config):
                                   help="The name of the server")
         server_group.add_argument("--signing-key-path",
                                   help="The signing key to sign messages with")
-        server_group.add_argument("-p", "--bind-port", metavar="PORT", type=int,
-                                  help="TCP port to listen on")
+        server_group.add_argument("-p", "--bind-port", metavar="PORT",
+                                  type=int, help="https port to listen on")
+        server_group.add_argument("--unsecure-port", metavar="PORT",
+                                  type=int, help="http port to listen on")
         server_group.add_argument("--bind-host", default="",
                                   help="Local interface to listen on")
         server_group.add_argument("-D", "--daemonize", action='store_true',
