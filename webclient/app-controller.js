@@ -36,8 +36,12 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         eventStreamService.resume();
         mPresence.start();
     }
-    
-    $scope.user_id = matrixService.config().user_id;
+
+    $scope.user_id;
+    var config = matrixService.config();
+    if (config) {
+        $scope.user_id = matrixService.config().user_id;
+    }
     
     /**
      * Open a given page.
