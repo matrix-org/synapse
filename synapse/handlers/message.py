@@ -274,11 +274,11 @@ class MessageHandler(BaseRoomHandler):
                 messages, token = yield self.store.get_recent_events_for_room(
                     event.room_id,
                     limit=limit,
-                    end_token=now_token.events_key,
+                    end_token=now_token.room_key,
                 )
 
-                start_token = now_token.copy_and_replace("events_key", token[0])
-                end_token = now_token.copy_and_replace("events_key", token[1])
+                start_token = now_token.copy_and_replace("room_key", token[0])
+                end_token = now_token.copy_and_replace("room_key", token[1])
 
                 d["messages"] = {
                     "chunk": [m.get_dict() for m in messages],

@@ -462,3 +462,49 @@ class RoomListHandler(BaseRoomHandler):
         chunk = yield self.store.get_rooms(is_public=True)
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
+
+
+class RoomEventSource(object):
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def get_new_events_for_user(self, user, from_key, limit):
+        # We just ignore the key for now.
+
+        to_key = yield self.get_current_key()
+
+        events, end_key = yield self.store.get_room_events_stream(
+            user_id=user.to_string(),
+            from_key=from_key,
+            to_key=to_key,
+            room_id=None,
+            limit=limit,
+        )
+
+        defer.returnValue((events, end_key))
+
+    def get_current_key(self):
+        return self.store.get_room_events_max_id()
+
+    @defer.inlineCallbacks
+    def get_pagination_rows(self, user, pagination_config, key):
+        from_token = pagination_config.from_token
+        to_token = pagination_config.to_token
+        limit = pagination_config.limit
+        direction = pagination_config.direction
+
+        to_key = to_token.room_key if to_token else None
+
+        events, next_key = yield self.store.paginate_room_events(
+            room_id=key,
+            from_key=from_token.room_key,
+            to_key=to_key,
+            direction=direction,
+            limit=limit,
+            with_feedback=True
+        )
+
+        next_token = from_token.copy_and_replace("room_key", next_key)
+
+        defer.returnValue((events, next_token))

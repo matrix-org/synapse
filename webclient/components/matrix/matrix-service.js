@@ -38,7 +38,7 @@ angular.module('matrixService', [])
     
     // Current version of permanent storage
     var configVersion = 0;
-    var prefixPath = "/matrix/client/api/v1";
+    var prefixPath = "/_matrix/client/api/v1";
     var MAPPING_PREFIX = "alias_for_";
 
     var doRequest = function(method, path, params, data, $httpParams) {
@@ -95,14 +95,18 @@ angular.module('matrixService', [])
         },
 
         // Create a room
-        create: function(room_id, visibility) {
+        create: function(room_alias, visibility) {
             // The REST path spec
             var path = "/createRoom";
 
-            return doRequest("POST", path, undefined, {
-                visibility: visibility,
-                room_alias_name: room_id
-            });
+            var req = {
+                "visibility": visibility
+            };
+            if (room_alias) {
+                req.room_alias_name = room_alias;
+            }
+            
+            return doRequest("POST", path, undefined, req);
         },
 
         // List all rooms joined or been invited to
@@ -164,7 +168,7 @@ angular.module('matrixService', [])
 
         // Retrieves the room ID corresponding to a room alias
         resolveRoomAlias:function(room_alias) {
-            var path = "/matrix/client/api/v1/directory/room/$room_alias";
+            var path = "/_matrix/client/api/v1/directory/room/$room_alias";
             room_alias = encodeURIComponent(room_alias);
 
             path = path.replace("$room_alias", room_alias);
@@ -304,7 +308,7 @@ angular.module('matrixService', [])
 
         // hit the Identity Server for a 3PID request.
         linkEmail: function(email, clientSecret, sendAttempt) {
-            var path = "/matrix/identity/api/v1/validate/email/requestToken"
+            var path = "/_matrix/identity/api/v1/validate/email/requestToken"
             var data = "clientSecret="+clientSecret+"&email=" + encodeURIComponent(email)+"&sendAttempt="+sendAttempt;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
@@ -312,7 +316,7 @@ angular.module('matrixService', [])
         },
 
         authEmail: function(clientSecret, tokenId, code) {
-            var path = "/matrix/identity/api/v1/validate/email/submitToken";
+            var path = "/_matrix/identity/api/v1/validate/email/submitToken";
             var data = "token="+code+"&sid="+tokenId+"&clientSecret="+clientSecret;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
@@ -320,7 +324,7 @@ angular.module('matrixService', [])
         },
 
         bindEmail: function(userId, tokenId, clientSecret) {
-            var path = "/matrix/identity/api/v1/3pid/bind";
+            var path = "/_matrix/identity/api/v1/3pid/bind";
             var data = "mxid="+encodeURIComponent(userId)+"&sid="+tokenId+"&clientSecret="+clientSecret;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
@@ -328,7 +332,7 @@ angular.module('matrixService', [])
         },
         
         uploadContent: function(file) {
-            var path = "/matrix/content";
+            var path = "/_matrix/content";
             var headers = {
                 "Content-Type": undefined // undefined means angular will figure it out
             };

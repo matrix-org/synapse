@@ -166,7 +166,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("farm",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data=_expect_edu("farm", "m.typing",
                     content={
                         "room_id": self.room_id,
@@ -192,7 +192,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.room_members = [self.u_apple, self.u_onion]
 
         yield self.mock_federation_resource.trigger("PUT",
-            "/matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("farm", "m.typing",
                 content={
                     "room_id": self.room_id,
@@ -216,7 +216,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("farm",
-                path="/matrix/federation/v1/send/1000000/",
+                path="/_matrix/federation/v1/send/1000000/",
                 data=_expect_edu("farm", "m.typing",
                     content={
                         "room_id": self.room_id,

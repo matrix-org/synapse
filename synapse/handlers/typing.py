@@ -145,3 +145,17 @@ class TypingNotificationHandler(BaseHandler):
             typing):
         # TODO(paul) steal this from presence.py
         pass
+
+
+class TypingNotificationEventSource(object):
+    def __init__(self, hs):
+        self.hs = hs
+
+    def get_new_events_for_user(self, user, from_key, limit):
+        return ([], from_key)
+
+    def get_current_key(self):
+        return 0
+
+    def get_pagination_rows(self, user, pagination_config, key):
+        return ([], pagination_config.from_token)

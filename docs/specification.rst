@@ -35,8 +35,8 @@ namespaced to the home server which allocated the account and looks like::
 
   @localpart:domain
 
-The ``localpart`` of a user ID may be a user name, or an opaque ID identifying this user.
-
+The ``localpart`` of a user ID may be a user name, or an opaque ID identifying this user. They are
+case-insensitive.
 
 A "Home Server" is a server which provides C-S APIs and has the ability to federate with other HSes.
 It is typically responsible for multiple clients. "Federation" is the term used to describe the
@@ -60,7 +60,8 @@ identified via a "Room ID", which look like::
 
 There is exactly one room ID for each room. Whilst the room ID does contain a
 domain, it is simply for namespacing room IDs. The room does NOT reside on the
-domain specified. Room IDs are not meant to be human readable.
+domain specified. Room IDs are not meant to be human readable. They ARE
+case-sensitive.
 
 The following diagram shows an ``m.room.message`` event being sent in the room 
 ``!qporfwt:matrix.org``::
@@ -102,10 +103,10 @@ Each room can also have multiple "Room Aliases", which looks like::
 
 A room alias "points" to a room ID. The room ID the alias is pointing to can be obtained
 by visiting the domain specified. Room aliases are designed to be human readable strings
-which can be used to publicise rooms. Note that the mapping from a room alias to a 
-room ID is not fixed, and may change over time to point to a different room ID. For this
-reason, Clients SHOULD resolve the room alias to a room ID once and then use that ID on
-subsequent requests.
+which can be used to publicise rooms. They are case-insensitive. Note that the mapping 
+from a room alias to a room ID is not fixed, and may change over time to point to a 
+different room ID. For this reason, Clients SHOULD resolve the room alias to a room ID 
+once and then use that ID on subsequent requests.
 
 ::
 
@@ -214,24 +215,150 @@ In contrast, these are invalid requests::
       "key": "This is a put but it is missing a txnId."
     }
 
+
+
+- TODO: All strings everywhere are UTF-8
+
+
+
 Receiving live updates on a client
 ----------------------------------
-- C-S longpoll event stream
-- Concept of start/end tokens.
-- Mention /initialSync to get token.
+Clients can receive new events by long-polling the home server. This will hold open the
+HTTP connection for a short period of time waiting for new events, returning early if an
+event occurs. This is called the "Event Stream". All events which the client is authorised 
+to view will appear in the event stream. When the stream is closed, an ``end`` token is 
+returned. This token can be used in the next request to continue where the client left off.
 
+When the client first logs in, they will need to initially synchronise with their home
+server. This is achieved via the ``/initialSync`` API. This API also returns an ``end``
+token which can be used with the event stream.
 
 Rooms
 =====
-- How are they created? PDU anchor point: "root of the tree".
+
+Creation
+--------
+To create a room, a client has to use the ``/createRoom`` API. There are various options
+which can be set when creating a room:
+
+``visibility``
+  Type: 
+    String
+  Optional: 
+    Yes
+  Value:
+    Either ``public`` or ``private``.
+  Description:
+    A ``public`` visibility indicates that the room will be shown in the public room list. A
+    ``private`` visibility will hide the room from the public room list. Rooms default to
+    ``public`` visibility if this key is not included.
+
+``room_alias_name``
+  Type: 
+    String
+  Optional: 
+    Yes
+  Value:
+    The room alias localpart.
+  Description:
+    If this is included, a room alias will be created and mapped to the newly created room.
+    The alias will belong on the same home server which created the room, e.g.
+    ``!qadnasoi:domain.com >>> #room_alias_name:domain.com``
+
+Example::
+
+  {
+    "visibility": "public", 
+    "room_alias_name": "the pub"
+  }
+
+- TODO: This creates a room creation event which serves as the root of the PDU graph for this room.
+
+Modifying aliases
+-----------------
 - Adding / removing aliases.
-- Invite/join dance
-- State and non-state data (+extensibility)
 
-TODO : Room permissions / config / power levels.
+Permissions
+-----------
+- TODO : Room permissions / config / power levels. What they are. How do they work. Examples.
 
-Messages
-========
+Joining rooms
+-------------
+- What is joining? What permissions / access does it give you? How does this affect /initialSync?
+- API to hit (``/join/$alias or id``). Explain how alias joining works (auto-resolving).  See "Room events" for more info.
+- What does the home server have to do?
+- Rooms that DON'T need an invite to join. This follows through onto inviting users section.
+- Outline invite join dance?
+
+
+Inviting users
+--------------
+- Can invite users to a room if the room config key TODO is set to TODO. Must have required power level.
+- Outline invite join dance. What is it? Why is it required? How does it work?
+- What does the home server have to do?
+
+The purpose of inviting users to a room is to notify them that the room exists 
+so they can choose to become a member of that room. Some rooms require that all 
+users who join a room are previously invited to it (an "invite-only" room). 
+Whether a given room is an "invite-only" room is determined by the room config 
+key ``TODO``. It can have one of the following values:
+
+ - TODO Room config invite only value explanation
+ - TODO Room config free-to-join value explanation
+
+Only users who have a membership state of ``join`` in a room can invite new 
+users to said room. The person being invited must not be in the ``join`` state 
+in the room. The fully-qualified user ID must be specified when inviting a user, 
+as the user may reside on a different home server. To invite a user, send the 
+following request to ``/rooms/<room id>/invite``, which will manage the 
+entire invitation process::
+
+  {
+    "user_id": "<user id to invite>"
+  }
+
+Alternatively, the membership state for this user in this room can be modified 
+directly by sending the following request to 
+``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
+
+  {
+    "membership": "invite"
+  }
+
+See the "Room events" section for more information on ``m.room.member``.
+
+- TODO: In what circumstances will this NOT be equivalent to ``/invite``?
+
+Leaving rooms
+-------------
+- API to hit (``$roomid/leave``). See "Room events" for more info.
+- Must be joined to leave. How does this affect /initialSync?
+- Not ever being in a room is NOT equivalent to have left it (due to membership: leave).
+- Need to be re-invited if invite-only room.
+- If no more HSes in room, can delete room?
+- Is there a dance?
+
+Events in a room
+----------------
+- Split into state and non-state data
+- Explain what they are, semantics, give examples of clobbering / not, use cases (msgs vs room names).
+  Not too much detail on the actual event contents.
+- API to hit.
+- Extensibility provided by the API for custom events. Examples.
+- How this hooks into ``initialSync``.
+- See the "Room Events" section for actual spec on each type.
+
+Syncing a room
+--------------
+- Single room initial sync. API to hit. Why it might be used (lazy loading)
+
+Getting grouped state events
+----------------------------
+- ``/members`` and ``/messages`` and the events they return.
+- ``/state`` and it returns ALL THE THINGS.
+
+Room Events
+===========
 
 This specification outlines several standard event types, all of which are
 prefixed with ``m.``
@@ -244,7 +371,8 @@ State messages
 - m.room.config
 - m.room.invite_join
 
-What are they, when are they used, what do they contain, how should they be used
+What are they, when are they used, what do they contain, how should they be used.
+Link back to explanatory sections (e.g. invite/join/leave sections for m.room.member)
 
 Non-state messages
 ------------------

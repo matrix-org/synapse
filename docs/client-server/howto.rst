@@ -30,7 +30,7 @@ Registration
 The aim of registration is to get a user ID and access token which you will need
 when accessing other APIs::
 
-    curl -XPOST -d '{"user_id":"example", "password":"wordpass"}' "http://localhost:8080/matrix/client/api/v1/register"
+    curl -XPOST -d '{"user_id":"example", "password":"wordpass"}' "http://localhost:8080/_matrix/client/api/v1/register"
 
     {
         "access_token": "QGV4YW1wbGU6bG9jYWxob3N0.AqdSzFmFYrLrTmteXc", 
@@ -51,13 +51,13 @@ Login
 -----
 The aim when logging in is to get an access token for your existing user ID::
 
-    curl -XGET "http://localhost:8080/matrix/client/api/v1/login"
+    curl -XGET "http://localhost:8080/_matrix/client/api/v1/login"
 
     {
         "type": "m.login.password"
     }
 
-    curl -XPOST -d '{"type":"m.login.password", "user":"example", "password":"wordpass"}' "http://localhost:8080/matrix/client/api/v1/login"
+    curl -XPOST -d '{"type":"m.login.password", "user":"example", "password":"wordpass"}' "http://localhost:8080/_matrix/client/api/v1/login"
 
     {
         "access_token": "QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd", 
@@ -87,7 +87,7 @@ Creating a room
 If you want to send a message to someone, you have to be in a room with them. To
 create a room::
 
-    curl -XPOST -d '{"room_alias_name":"tutorial"}' "http://localhost:8080/matrix/client/api/v1/rooms?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
+    curl -XPOST -d '{"room_alias_name":"tutorial"}' "http://localhost:8080/_matrix/client/api/v1/rooms?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
 
     {
         "room_alias": "#tutorial:localhost", 
@@ -105,7 +105,7 @@ Sending messages
 ----------------
 You can now send messages to this room::
 
-    curl -XPUT -d '{"msgtype":"m.text", "body":"hello"}' "http://localhost:8080/matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/messages/%40example%3Alocalhost/msgid1?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
+    curl -XPUT -d '{"msgtype":"m.text", "body":"hello"}' "http://localhost:8080/_matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/messages/%40example%3Alocalhost/msgid1?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
     
 NB: There are no limitations to the types of messages which can be exchanged.
 The only requirement is that ``"msgtype"`` is specified.
@@ -127,7 +127,7 @@ Inviting a user to a room
 -------------------------
 You can directly invite a user to a room like so::
 
-    curl -XPUT -d '{"membership":"invite"}' "http://localhost:8080/matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/members/%40myfriend%3Alocalhost/state?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
+    curl -XPUT -d '{"membership":"invite"}' "http://localhost:8080/_matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/members/%40myfriend%3Alocalhost/state?access_token=QGV4YW1wbGU6bG9jYWxob3N0.vRDLTgxefmKWQEtgGd"
     
 This informs ``@myfriend:localhost`` of the room ID 
 ``!CvcvRuDYDzTOzfKKgh:localhost`` and allows them to join the room.
@@ -137,7 +137,7 @@ Joining a room via an invite
 If you receive an invite, you can join the room by changing the membership to
 join::
 
-    curl -XPUT -d '{"membership":"join"}' "http://localhost:8080/matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/members/%40myfriend%3Alocalhost/state?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
+    curl -XPUT -d '{"membership":"join"}' "http://localhost:8080/_matrix/client/api/v1/rooms/%21CvcvRuDYDzTOzfKKgh:localhost/members/%40myfriend%3Alocalhost/state?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
     
 NB: Only the person invited (``@myfriend:localhost``) can change the membership
 state to ``"join"``.
@@ -147,7 +147,7 @@ Joining a room via an alias
 Alternatively, if you know the room alias for this room and the room config 
 allows it, you can directly join a room via the alias::
 
-    curl -XPUT -d '{}' "http://localhost:8080/matrix/client/api/v1/join/%23tutorial%3Alocalhost?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
+    curl -XPUT -d '{}' "http://localhost:8080/_matrix/client/api/v1/join/%23tutorial%3Alocalhost?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
     
     {
         "room_id": "!CvcvRuDYDzTOzfKKgh:localhost"
@@ -173,7 +173,7 @@ Getting all state
 If the client doesn't know any information on the rooms the user is 
 invited/joined on, they can get all the user's state for all rooms::
 
-    curl -XGET "http://localhost:8080/matrix/client/api/v1/im/sync?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
+    curl -XGET "http://localhost:8080/_matrix/client/api/v1/im/sync?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK"
     
     [
         {
@@ -236,7 +236,7 @@ all of the messages and feedback for these rooms. This can be a LOT of data. You
 may just want the most recent message for each room. This can be achieved by 
 applying pagination stream parameters to this request::
 
-    curl -XGET "http://localhost:8080/matrix/client/api/v1/im/sync?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK&from=END&to=START&limit=1"
+    curl -XGET "http://localhost:8080/_matrix/client/api/v1/im/sync?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK&from=END&to=START&limit=1"
     
     [
         {
@@ -271,7 +271,7 @@ Getting live state
 Once you know which rooms the client has previously interacted with, you need to
 listen for incoming events. This can be done like so::
 
-    curl -XGET "http://localhost:8080/matrix/client/api/v1/events?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK&from=END"
+    curl -XGET "http://localhost:8080/_matrix/client/api/v1/events?access_token=QG15ZnJpZW5kOmxvY2FsaG9zdA...XKuGdVsovHmwMyDDvK&from=END"
     
     {
         "chunk": [], 

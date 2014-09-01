@@ -1,29 +1,24 @@
 <div ng-controller="HomeController" data-ng-init="onInit()">
 
-    <div id="page">
     <div id="wrapper">
-        
-    <div>
-        <form>
-            <table>
-                <tr>
-                    <td>
-                        <div class="profile-avatar">
-                            <img ng-src="{{ config.avatarUrl || 'img/default-profile.jpg' }}"/>
-                        </div>
-                    </td>
-                    <td>
-                        <div id="user-ids">
-                            <div id="user-displayname">{{ config.displayName }}</div>
-                            <div>{{ config.user_id }}</div>                        
-                        </div>
-                    </td>
-                </tr>
-            </table>
-        </form>
+    
+    <div id="genericHeading">
+        <a href ng-click="goToPage('/')"><img src="img/logo-small.png" width="100" height="43" alt="[matrix]"/></a>
     </div>
     
-    <h3>Recents</h3>
+    <h1>Welcome to homeserver {{ config.homeserver }}</h1>
+    
+    <div>
+        <div class="profile-avatar">
+            <img ng-src="{{ (null !== profile.avatarUrl) ? profile.avatarUrl : 'img/default-profile.png' }}"/>
+        </div>
+        <div id="user-ids">
+            <div id="user-displayname">{{ profile.displayName }}</div>
+            <div>{{ config.user_id }}</div>
+        </div>
+    </div>
+    
+    <h3>Recent conversations</h3>
         <div ng-include="'recents/recents.html'"></div>
     <br/>
 
@@ -38,9 +33,9 @@
     
     <div>
         <form>
-            <input size="40" ng-model="newRoom.room_id" ng-enter="createNewRoom(newRoom.room_id, newRoom.private)" placeholder="(e.g. foo_channel)"/>
+            <input size="40" ng-model="newRoom.room_alias" ng-enter="createNewRoom(newRoom.room_alias, newRoom.private)" placeholder="(e.g. foo_channel)"/>
             <input type="checkbox" ng-model="newRoom.private">private
-            <button ng-disabled="!newRoom.room_id" ng-click="createNewRoom(newRoom.room_id, newRoom.private)">Create room</button>    
+            <button ng-disabled="!newRoom.room_alias" ng-click="createNewRoom(newRoom.room_alias, newRoom.private)">Create room</button>    
         </form>
     </div>
     <div>
@@ -54,5 +49,4 @@
     {{ feedback }}
 
     </div>    
-    </div>
 </div>

@@ -88,7 +88,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         call.onHangup = $scope.onCallHangup;
         $scope.currentCall = call;
     });
-
+    
     $scope.memberCount = function() {
         return Object.keys($scope.members).length;
     };
@@ -175,6 +175,8 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
 
         // set target_user_id to keep things clear
         var target_user_id = chunk.state_key;
+        
+        var now = new Date().getTime();
 
         var isNewMember = !(target_user_id in $scope.members);
         if (isNewMember) {
@@ -185,44 +187,14 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             if ("mtime_age" in chunk.content) {
                 chunk.mtime_age = chunk.content.mtime_age;
             }
-            // Once the HS reliably returns the displaynames & avatar_urls for both
-            // local and remote users, we should use this rather than the evalAsync block
-            // below
             if ("displayname" in chunk.content) {
                 chunk.displayname = chunk.content.displayname;
             }
             if ("avatar_url" in chunk.content) {
                 chunk.avatar_url = chunk.content.avatar_url;
             }
-            $scope.members[target_user_id] = chunk;
-
-/*
-            // Stale code for explicitly hammering the homeserver for every displayname & avatar_url
-            
-            // get their display name and profile picture and set it to their
-            // member entry in $scope.members. We HAVE to use $timeout with 0 delay 
-            // to make this function run AFTER the current digest cycle, else the 
-            // response may update a STALE VERSION of the member list (manifesting
-            // as no member names appearing, or appearing sporadically).
-            $scope.$evalAsync(function() {
-                matrixService.getDisplayName(chunk.target_user_id).then(
-                    function(response) {
-                        var member = $scope.members[chunk.target_user_id];
-                        if (member !== undefined) {
-                            member.displayname = response.data.displayname;
-                        }
-                    }
-                ); 
-                matrixService.getProfilePictureUrl(chunk.target_user_id).then(
-                    function(response) {
-                         var member = $scope.members[chunk.target_user_id];
-                         if (member !== undefined) {
-                            member.avatar_url = response.data.avatar_url;
-                         }
-                    }
-                );
-            });
-*/            
+            chunk.last_updated = now;
+            $scope.members[target_user_id] = chunk;   
 
             if (target_user_id in $rootScope.presence) {
                 updatePresence($rootScope.presence[target_user_id]);
@@ -233,6 +205,12 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             var member = $scope.members[target_user_id];
             member.content.membership = chunk.content.membership;
         }
+    };
+    
+    var updateMemberListPresenceAge = function() {
+        $scope.now = new Date().getTime();
+        // TODO: don't bother polling every 5s if we know none of our counters are younger than 1 minute
+        $timeout(updateMemberListPresenceAge, 5 * 1000);
     };
 
     var updatePresence = function(chunk) {
@@ -274,6 +252,10 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         // FIXME: handle other commands too
         if ($scope.textInput.indexOf("/me") === 0) {
             promise = matrixService.sendEmoteMessage($scope.room_id, $scope.textInput.substr(4));
+        }
+        else if ($scope.textInput.indexOf("/nick ") === 0) {
+            // Change user display name
+            promise = matrixService.setDisplayName($scope.textInput.substr(6));
         }
         else {
             promise = matrixService.sendTextMessage($scope.room_id, $scope.textInput);
@@ -395,8 +377,10 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
 
         // Make recents highlight the current room
         $scope.recentsSelectedRoomID = $scope.room_id;
-        
+                
         paginate(MESSAGES_PER_PAGINATION);
+        
+        updateMemberListPresenceAge();
     }; 
     
     $scope.inviteUser = function(user_id) {
@@ -404,16 +388,11 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         matrixService.invite($scope.room_id, user_id).then(
             function() {
                 console.log("Invited.");
-                $scope.feedback = "Request for invitation succeeds";
+                $scope.feedback = "Invite sent successfully";
             },
             function(reason) {
                 $scope.feedback = "Failure: " + reason;
             });
-    };
-
-    // Open the user profile page
-    $scope.goToUserPage = function(user_id) {
-        $location.url("/user/" + user_id);
     };
 
     $scope.leaveRoom = function() {
@@ -487,7 +466,5 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     }
 
     $scope.onCallHangup = function() {
-        $scope.feedback = "Call ended";
-        $scope.currentCall = undefined;
     }
 }]);

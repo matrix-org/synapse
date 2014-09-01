@@ -40,7 +40,7 @@
       "path": "/login"
     }
   ], 
-  "basePath": "http://localhost:8080/matrix/client/api/v1", 
+  "basePath": "http://localhost:8080/_matrix/client/api/v1", 
   "consumes": [
     "application/json"
   ], 

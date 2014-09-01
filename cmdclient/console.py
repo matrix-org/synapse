@@ -60,7 +60,7 @@ class SynapseCmd(cmd.Cmd):
             "complete_usernames": "on",
             "send_delivery_receipts": "on"
         }
-        self.path_prefix = "/matrix/client/api/v1"
+        self.path_prefix = "/_matrix/client/api/v1"
         self.event_stream_token = "END"
         self.prompt = ">>> "
 
@@ -252,7 +252,7 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_emailrequest(self, args):
-        url = self._identityServerUrl()+"/matrix/identity/api/v1/validate/email/requestToken"
+        url = self._identityServerUrl()+"/_matrix/identity/api/v1/validate/email/requestToken"
 
         json_res = yield self.http_client.do_request("POST", url, data=urllib.urlencode(args), jsonreq=False,
                                                      headers={'Content-Type': ['application/x-www-form-urlencoded']})
@@ -274,7 +274,7 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_emailvalidate(self, args):
-        url = self._identityServerUrl()+"/matrix/identity/api/v1/validate/email/submitToken"
+        url = self._identityServerUrl()+"/_matrix/identity/api/v1/validate/email/submitToken"
 
         json_res = yield self.http_client.do_request("POST", url, data=urllib.urlencode(args), jsonreq=False,
                                                      headers={'Content-Type': ['application/x-www-form-urlencoded']})
@@ -294,7 +294,7 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_3pidbind(self, args):
-        url = self._identityServerUrl()+"/matrix/identity/api/v1/3pid/bind"
+        url = self._identityServerUrl()+"/_matrix/identity/api/v1/3pid/bind"
 
         json_res = yield self.http_client.do_request("POST", url, data=urllib.urlencode(args), jsonreq=False,
                                                      headers={'Content-Type': ['application/x-www-form-urlencoded']})
@@ -360,14 +360,14 @@ class SynapseCmd(cmd.Cmd):
     def _do_invite(self, roomid, userstring):
         if (not userstring.startswith('@') and
                     self._is_on("complete_usernames")):
-            url = self._identityServerUrl()+"/matrix/identity/api/v1/lookup"
+            url = self._identityServerUrl()+"/_matrix/identity/api/v1/lookup"
 
             json_res = yield self.http_client.do_request("GET", url, qparams={'medium':'email','address':userstring})
 
             mxid = None
 
             if 'mxid' in json_res and 'signatures' in json_res:
-                url = self._identityServerUrl()+"/matrix/identity/api/v1/pubkey/ed25519"
+                url = self._identityServerUrl()+"/_matrix/identity/api/v1/pubkey/ed25519"
 
                 pubKey = None
                 pubKeyObj = yield self.http_client.do_request("GET", url)
