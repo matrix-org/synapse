@@ -330,6 +330,6 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                  "presence": ONLINE,
                  "state": ONLINE,
                  "displayname": "Frank",
-                 "mtime_age": 0,
+                 "last_active_ago": 0,
             }},
         ]}, response)

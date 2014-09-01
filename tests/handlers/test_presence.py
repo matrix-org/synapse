@@ -213,7 +213,7 @@ class PresenceStateTestCase(unittest.TestCase):
                 state={
                     "presence": UNAVAILABLE,
                     "status_msg": "Away",
-                    "mtime": 1000000, # MockClock
+                    "last_active": 1000000, # MockClock
                 })
 
         yield self.handler.set_state(
@@ -621,6 +621,9 @@ class PresencePushTestCase(unittest.TestCase):
 
         # TODO(paul): Gut-wrenching
         self.handler._user_cachemap[self.u_apple] = UserPresenceCache()
+        self.handler._user_cachemap[self.u_apple].update(
+            {"presence": OFFLINE}, serial=0
+        )
         apple_set = self.handler._local_pushmap.setdefault("apple", set())
         apple_set.add(self.u_banana)
         apple_set.add(self.u_clementine)
@@ -640,7 +643,7 @@ class PresencePushTestCase(unittest.TestCase):
                     "user_id": "@apple:test",
                     "presence": ONLINE,
                     "state": ONLINE,
-                    "mtime_age": 0,
+                    "last_active_ago": 0,
                 }},
             ],
         )
@@ -673,7 +676,7 @@ class PresencePushTestCase(unittest.TestCase):
                 {"observed_user": self.u_banana,
                  "presence": ONLINE,
                  "state": ONLINE,
-                 "mtime_age": 2000},
+                 "last_active_ago": 2000},
                 {"observed_user": self.u_clementine,
                  "presence": OFFLINE,
                  "state": OFFLINE},
@@ -690,7 +693,7 @@ class PresencePushTestCase(unittest.TestCase):
                      "user_id": "@banana:test",
                      "presence": ONLINE,
                      "state": ONLINE,
-                     "mtime_age": 2000
+                     "last_active_ago": 2000
                 }},
             ]
         )
@@ -707,7 +710,7 @@ class PresencePushTestCase(unittest.TestCase):
                             {"user_id": "@apple:test",
                              "presence": u"online",
                              "state": u"online",
-                             "mtime_age": 0},
+                             "last_active_ago": 0},
                         ],
                     }
                 )
@@ -723,6 +726,9 @@ class PresencePushTestCase(unittest.TestCase):
 
         # TODO(paul): Gut-wrenching
         self.handler._user_cachemap[self.u_apple] = UserPresenceCache()
+        self.handler._user_cachemap[self.u_apple].update(
+            {"presence": OFFLINE}, serial=0
+        )
         apple_set = self.handler._remote_sendmap.setdefault("apple", set())
         apple_set.add(self.u_potato.domain)
 
@@ -750,7 +756,7 @@ class PresencePushTestCase(unittest.TestCase):
                     "push": [
                         {"user_id": "@potato:remote",
                          "state": "online",
-                         "mtime_age": 1000},
+                         "last_active_ago": 1000},
                     ],
                 }
             )
@@ -767,7 +773,7 @@ class PresencePushTestCase(unittest.TestCase):
                      "user_id": "@potato:remote",
                      "presence": ONLINE,
                      "state": ONLINE,
-                     "mtime_age": 1000,
+                     "last_active_ago": 1000,
                 }}
             ]
         )
@@ -777,7 +783,7 @@ class PresencePushTestCase(unittest.TestCase):
         state = yield self.handler.get_state(self.u_potato, self.u_apple)
 
         self.assertEquals(
-            {"state": ONLINE, "presence": ONLINE, "mtime_age": 3000},
+            {"state": ONLINE, "presence": ONLINE, "last_active_ago": 3000},
             state
         )
 
@@ -792,7 +798,7 @@ class PresencePushTestCase(unittest.TestCase):
         self.handler._user_cachemap[self.u_clementine].update(
             {
                 "presence": PresenceState.ONLINE,
-                "mtime": self.clock.time_msec(),
+                "last_active": self.clock.time_msec(),
             }, self.u_clementine
         )
 
@@ -811,7 +817,7 @@ class PresencePushTestCase(unittest.TestCase):
                      "user_id": "@clementine:test",
                      "presence": ONLINE,
                      "state": ONLINE,
-                     "mtime_age": 0,
+                     "last_active_ago": 0,
                 }}
             ]
         )
@@ -967,7 +973,8 @@ class PresencePollingTestCase(unittest.TestCase):
         def get_presence_state(user_localpart):
             return defer.succeed(
                     {"state": self.current_user_state[user_localpart],
-                     "status_msg": None}
+                     "status_msg": None,
+                     "mtime": 123456000}
             )
         self.datastore.get_presence_state = get_presence_state
 
