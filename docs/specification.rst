@@ -168,6 +168,10 @@ Some standard error codes are below:
 :``M_NOT_FOUND``:
   No resource was found for this request.
 
+:``M_LIMIT_EXCEEDED``:
+  Too many requests have been sent in a short period of time. Wait a while then
+  try again.
+
 Some requests have unique error codes:
 
 :``M_USER_IN_USE``:
@@ -273,6 +277,7 @@ Example::
   }
 
 - TODO: This creates a room creation event which serves as the root of the PDU graph for this room.
+- TODO: Keys for speccing a room name / room topic / invite these users?
 
 Modifying aliases
 -----------------
@@ -284,12 +289,37 @@ Permissions
 
 Joining rooms
 -------------
-- What is joining? What permissions / access does it give you? How does this affect /initialSync?
-- API to hit (``/join/$alias or id``). Explain how alias joining works (auto-resolving).  See "Room events" for more info.
-- What does the home server have to do?
-- Rooms that DON'T need an invite to join. This follows through onto inviting users section.
-- Outline invite join dance?
+- TODO: What does the home server have to do to join a user to a room?
 
+Users need to join a room in order to send and receive events in that room. A user can join a
+room by making a request to ``/join/<room alias or id>`` with::
+
+  {}
+
+Alternatively, a user can make a request to ``/rooms/<room id>/join`` with the same request content.
+This is only provided for symmetry with the other membership APIs: ``/rooms/<room id>/invite`` and
+``/rooms/<room id>/leave``. If a room alias was specified, it will be automatically resolved to
+a room ID, which will then be joined. The room ID that was joined will be returned in response::
+
+  {
+    "room_id": "!roomid:domain"
+  }
+
+The membership state for the joining user can also be modified directly to be ``join``
+by sending the following request to 
+``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
+
+  {
+    "membership": "join"
+  }
+
+See the "Room events" section for more information on ``m.room.member``.
+
+After the user has joined a room, they will receive subsequent events in that room. This room
+will now appear as an entry in the ``/initialSync`` API.
+
+Some rooms enforce that a user is *invited* to a room before they can join that room. Other
+rooms will allow anyone to join the room even if they have not received an invite.
 
 Inviting users
 --------------
@@ -331,12 +361,33 @@ See the "Room events" section for more information on ``m.room.member``.
 
 Leaving rooms
 -------------
-- API to hit (``$roomid/leave``). See "Room events" for more info.
-- Must be joined to leave. How does this affect /initialSync?
-- Not ever being in a room is NOT equivalent to have left it (due to membership: leave).
-- Need to be re-invited if invite-only room.
-- If no more HSes in room, can delete room?
-- Is there a dance?
+A user can leave a room to stop receiving events for that room. A user must have
+joined the room before they are eligible to leave the room. If the room is an
+"invite-only" room, they will need to be re-invited before they can re-join the room.
+To leave a room, a request should be made to ``/rooms/<room id>/leave`` with::
+
+  {}
+
+Alternatively, the membership state for this user in this room can be modified 
+directly by sending the following request to 
+``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
+
+  {
+    "membership": "leave"
+  }
+
+See the "Room events" section for more information on ``m.room.member``.
+
+Once a user has left a room, that room will no longer appear on the ``/initialSync``
+API. Be aware that leaving a room is not equivalent to have never been
+in that room. A user who has previously left a room still maintains some residual state in
+that room. Their membership state will be marked as ``leave``. This contrasts with
+a user who has *never been invited or joined to that room* who will not have any
+membership state for that room. 
+
+If all members in a room leave, that room becomes eligible for deletion. 
+ - TODO: Grace period before deletion?
+ - TODO: Under what conditions should a room NOT be purged?
 
 Events in a room
 ----------------
@@ -350,7 +401,7 @@ Events in a room
 
 Syncing a room
 --------------
-- Single room initial sync. API to hit. Why it might be used (lazy loading)
+- Single room initial sync. ``rooms/<room id>/initialSync`` API to hit. Why it might be used (lazy loading)
 
 Getting grouped state events
 ----------------------------
@@ -378,6 +429,7 @@ Non-state messages
 ------------------
 - m.room.message
 - m.room.message.feedback (and compressed format)
+- voip?
 
 What are they, when are they used, what do they contain, how should they be used
 
