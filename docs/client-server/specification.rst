@@ -1026,7 +1026,7 @@ Getting/Setting your own presence state
   REST Path: /presence/$user_id/status
   Valid methods: GET/PUT
   Required keys:
-    state : [0|1|2|3] - The user's new presence state
+    presence : [0|1|2|3] - The user's new presence state
   Optional keys:
     status_msg : text string provided by the user to explain their status
 
@@ -1039,7 +1039,7 @@ Fetching your presence list
     following keys:
       {
         "user_id" : string giving the observed user's ID
-        "state" : int giving their status
+        "presence" : int giving their status
         "status_msg" : optional text string
         "displayname" : optional text string from the user's profile
         "avatar_url" : optional text string from the user's profile

@@ -48,7 +48,11 @@ class PresenceStatusRestServlet(RestServlet):
         try:
             content = json.loads(request.content.read())
 
-            state["state"] = content.pop("state")
+            # Legacy handling
+            if "state" in content:
+                state["presence"] = content.pop("state")
+            else:
+                state["presence"] = content.pop("presence")
 
             if "status_msg" in content:
                 state["status_msg"] = content.pop("status_msg")

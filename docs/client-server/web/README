@@ -1,0 +1,5 @@
+To get this running:
+  ln -s ../swagger_matrix
+  python -m SimpleHTTPServer
+
+Go to http://localhost:8000/swagger.html

@@ -106,7 +106,7 @@
                 <button ng-click="answerCall()">Answer</button>
                 <button ng-click="hangupCall()">Reject</button>
                 </div>
-                <button ng-click="hangupCall()" ng-show="currentCall && currentCall.state != 'ringing'">Hang up</button>
+                <button ng-click="hangupCall()" ng-show="currentCall && currentCall.state != 'ringing' && currentCall.state != 'ended' && currentCall.state != 'fledgling'">Hang up</button>
                 <span ng-show="currentCall.state == 'invite_sent'">Calling...</span>
                 <span ng-show="currentCall.state == 'connecting'">Call Connecting...</span>
                 <span ng-show="currentCall.state == 'connected'">Call Connected</span>
