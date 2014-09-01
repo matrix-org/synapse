@@ -149,6 +149,7 @@ class RoomCreationHandler(BaseRoomHandler):
         event_keys = {
             "room_id": room_id,
             "user_id": creator.to_string(),
+            "required_power_level": 10,
         }
 
         def create(etype, **content):
@@ -164,9 +165,10 @@ class RoomCreationHandler(BaseRoomHandler):
             default=0,
         )
 
-        power_levels_event = create(
+        power_levels_event = self.event_factory.create_event(
             etype=RoomPowerLevelsEvent.TYPE,
-            **{creator.to_string(): 10, "default": 0}
+            content={creator.to_string(): 10, "default": 0},
+            **event_keys
         )
 
         join_rule = JoinRules.PUBLIC if is_public else JoinRules.INVITE
