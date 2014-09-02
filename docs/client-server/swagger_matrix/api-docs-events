@@ -15,25 +15,26 @@
           "summary": "Listen on the event stream",
           "notes": "This can only be done by the logged in user. This will block until an event is received, or until the timeout is reached.",
           "type": "PaginationChunk",
-          "nickname": "get_event_stream"
+          "nickname": "get_event_stream",
+          "parameters": [
+            {
+              "name": "from",
+              "description": "The token to stream from.",
+              "required": false,
+              "type": "string",
+              "paramType": "query"
+            },
+            {
+              "name": "timeout",
+              "description": "The maximum time in milliseconds to wait for an event.",
+              "required": false,
+              "type": "integer",
+              "paramType": "query"
+            }
+          ]
         }
       ],
-      "parameters": [
-        {
-          "name": "from",
-          "description": "The token to stream from.",
-          "required": false,
-          "type": "string",
-          "paramType": "query"
-        },
-        {
-          "name": "timeout",
-          "description": "The maximum time in milliseconds to wait for an event.",
-          "required": false,
-          "type": "integer",
-          "paramType": "query"
-        }
-      ],
+      
       "responseMessages": [
         {
           "code": 400,
