@@ -23,6 +23,7 @@ from synapse.api.events.room import (
     RoomPowerLevelsEvent,
     RoomAddStateLevelEvent,
     RoomSendEventLevelEvent,
+    RoomOpsPowerLevelsEvent,
 )
 
 from synapse.util.logutils import log_function
@@ -140,6 +141,8 @@ class DataStore(RoomMemberStore, RoomStore,
             self._store_add_state_level(txn, event)
         elif event.type == RoomSendEventLevelEvent.TYPE:
             self._store_send_event_level(txn, event)
+        elif event.type == RoomOpsPowerLevelsEvent.TYPE:
+            self._store_ops_level(txn, event)
 
         vals = {
             "topological_ordering": event.depth,

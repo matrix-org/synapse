@@ -328,7 +328,7 @@ class RoomStore(SQLBaseStore):
 
         self._simple_insert_txn(
             txn,
-            "room_send_event_levels",
+            "room_ops_levels",
             content,
         )
 

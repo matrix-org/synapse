@@ -169,6 +169,11 @@ class Auth(object):
                 )
                 _, kick_level = yield self.store.get_ops_levels(event.room_id)
 
+                if kick_level:
+                    kick_level = int(kick_level)
+                else:
+                    kick_level = 5
+
                 if user_level < kick_level:
                     raise AuthError(
                         403, "You cannot kick user %s." % target_user_id
