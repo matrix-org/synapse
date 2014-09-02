@@ -11,12 +11,14 @@ mkdir -p demo/etc
 for port in 8080 8081 8082; do
     echo "Starting server on port $port... "
 
+    https_port=$((port + 400))
+
     python -m synapse.app.homeserver \
         --generate-config \
         --config-path "demo/etc/$port.config" \
-        -H "localhost:$port" \
-        -p "$port" \
-        -H "localhost:$port" \
+        -p "$https_port" \
+        --unsecure-port "$port" \
+        -H "localhost:$https_port" \
         -f "$DIR/$port.log" \
         -d "$DIR/$port.db" \
         -D --pid-file "$DIR/$port.pid" \
