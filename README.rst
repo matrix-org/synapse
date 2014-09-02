@@ -1,5 +1,5 @@
-Quick Start
-===========
+Introduction
+============
 
 Matrix is an ambitious new ecosystem for open federated Instant Messaging and
 VoIP[1].  The basics you need to know to get up and running are:
@@ -16,6 +16,9 @@ The overall architecture is::
 
       client <----> homeserver <=================> homeserver <-----> client
                 e.g. matrix.org:8080        e.g. mydomain.net:8080
+
+Quick Start
+===========
 
 To get up and running:
       
