@@ -133,6 +133,7 @@ class RoomCreationHandler(BaseRoomHandler):
                 etype=RoomNameEvent.TYPE,
                 room_id=room_id,
                 user_id=user_id,
+                required_power_level=5,
                 content={"name": name},
             )
 
@@ -144,6 +145,7 @@ class RoomCreationHandler(BaseRoomHandler):
                 etype=RoomTopicEvent.TYPE,
                 room_id=room_id,
                 user_id=user_id,
+                required_power_level=5,
                 content={"topic": topic},
             )
 
