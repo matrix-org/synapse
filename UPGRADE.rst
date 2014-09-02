@@ -22,7 +22,8 @@ certificate to use. Once done you can run the home server using::
 
 See the README.rst for more information.
 
-Also note that many config options have been renamed, including:
+Also note that some config options have been renamed, including:
+
  - "host" to "server-name"
  - "database" to "database-path"
  - "port" to "bind-port" and "unsecure-port"
