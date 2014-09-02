@@ -328,11 +328,11 @@ Joining rooms
   - TODO: What does the home server have to do to join a user to a room?
 
 Users need to join a room in order to send and receive events in that room. A user can join a
-room by making a request to ``/join/<room alias or id>`` with::
+room by making a request to |/join/<room_alias_or_id>|_ with::
 
   {}
 
-Alternatively, a user can make a request to ``/rooms/<room id>/join`` with the same request content.
+Alternatively, a user can make a request to |/rooms/<room_id>/join|_ with the same request content.
 This is only provided for symmetry with the other membership APIs: ``/rooms/<room id>/invite`` and
 ``/rooms/<room id>/leave``. If a room alias was specified, it will be automatically resolved to
 a room ID, which will then be joined. The room ID that was joined will be returned in response::
@@ -363,6 +363,7 @@ Inviting users
   - Can invite users to a room if the room config key TODO is set to TODO. Must have required power level.
   - Outline invite join dance. What is it? Why is it required? How does it work?
   - What does the home server have to do?
+  - TODO: In what circumstances will direct member editing NOT be equivalent to ``/invite``?
 
 The purpose of inviting users to a room is to notify them that the room exists 
 so they can choose to become a member of that room. Some rooms require that all 
@@ -377,7 +378,7 @@ Only users who have a membership state of ``join`` in a room can invite new
 users to said room. The person being invited must not be in the ``join`` state 
 in the room. The fully-qualified user ID must be specified when inviting a user, 
 as the user may reside on a different home server. To invite a user, send the 
-following request to ``/rooms/<room id>/invite``, which will manage the 
+following request to |/rooms/<room_id>/invite|_, which will manage the 
 entire invitation process::
 
   {
@@ -394,8 +395,6 @@ directly by sending the following request to
 
 See the `Room events`_ section for more information on ``m.room.member``.
 
-- TODO: In what circumstances will this NOT be equivalent to ``/invite``?
-
 Leaving rooms
 -------------
 .. TODO kegan
@@ -406,7 +405,7 @@ Leaving rooms
 A user can leave a room to stop receiving events for that room. A user must have
 joined the room before they are eligible to leave the room. If the room is an
 "invite-only" room, they will need to be re-invited before they can re-join the room.
-To leave a room, a request should be made to ``/rooms/<room id>/leave`` with::
+To leave a room, a request should be made to |/rooms/<room_id>/leave|_ with::
 
   {}
 
@@ -436,7 +435,7 @@ to leave the room and prevents them from re-joining the room. A banned user will
 not be treated as a joined user, and so will not be able to send or receive events
 in the room. In order to ban someone, the user performing the ban MUST have the 
 required power level. To ban a user, a request should be made to 
-``/rooms/<room id>/ban`` with::
+|/rooms/<room_id>/ban|_ with::
 
   {
     "user_id": "<user id to ban"
@@ -476,7 +475,7 @@ risk of clashes.
 
 State events
 ------------
-State events can be sent by ``PUT`` ing to ``/rooms/<room id>/state/<event type>/<state key>``.
+State events can be sent by ``PUT`` ing to |/rooms/<room_id>/state/<event_type>/<state_key>|_.
 These events will be overwritten if ``<room id>``, ``<event type>`` and ``<state key>`` all match.
 If the state event has no ``state_key``, it can be omitted from the path. These requests 
 **cannot use transaction IDs** like other ``PUT`` paths because they cannot be differentiated 
@@ -517,7 +516,7 @@ See `Room Events`_ for the ``m.`` event specification.
 
 Non-state events
 ----------------
-Non-state events can be sent by sending a request to ``/rooms/<room id>/send/<event type>``.
+Non-state events can be sent by sending a request to |/rooms/<room_id>/send/<event_type>|_.
 These requests *can* use transaction IDs and ``PUT``/``POST`` methods. Non-state events 
 allow access to historical events and pagination, making it best suited for sending messages.
 For example::
@@ -543,7 +542,7 @@ limited to room events; presence events will also be returned. There are two API
  - |initialSync|_ : A global sync which will present room and event information for all rooms
    the user has joined.
 
- - |roomInitialSync|_ : A sync scoped to a single room. Presents room and event
+ - |/rooms/<room_id>/initialSync|_ : A sync scoped to a single room. Presents room and event
    information for this room only.
 
 .. TODO kegan
@@ -562,7 +561,7 @@ There are several APIs provided to ``GET`` events for a room:
   Example:
     ``/rooms/!room:domain.com/state/m.room.name`` returns ``{ "name": "Room name" }``
 
-``/rooms/<room id>/state``
+|/rooms/<room_id>/state|_
   Description:
     Get all state events for a room.
   Response format:
@@ -571,7 +570,7 @@ There are several APIs provided to ``GET`` events for a room:
     TODO
 
 
-``/rooms/<room id>/members``
+|/rooms/<room_id>/members|_
   Description:
     Get all ``m.room.member`` state events.
   Response format:
@@ -579,7 +578,7 @@ There are several APIs provided to ``GET`` events for a room:
   Example:
     TODO
 
-``/rooms/<room id>/messages``
+|/rooms/<room_id>/messages|_
   Description:
     Get all ``m.room.message`` events.
   Response format:
@@ -587,7 +586,7 @@ There are several APIs provided to ``GET`` events for a room:
   Example:
     TODO
     
-|roomInitialSync|_
+|/rooms/<room_id>/initialSync|_
   Description:
     Get all relevant events for a room. This includes state events, paginated non-state
     events and presence events.
@@ -622,7 +621,7 @@ prefixed with ``m.``
     human-friendly, but not all rooms have room aliases. The room name is a human-friendly
     string designed to be displayed to the end-user. The room name is not *unique*, as
     multiple rooms can have the same room name set. The room name can also be set when 
-    creating a room using ``/createRoom`` with the ``name`` key.
+    creating a room using |createRoom|_ with the ``name`` key.
 
 ``m.room.topic``
   Summary:
@@ -636,7 +635,8 @@ prefixed with ``m.``
   Description:
     A topic is a short message detailing what is currently being discussed in the room. 
     It can also be used as a way to display extra information about the room, which may
-    not be suitable for the room name.
+    not be suitable for the room name. The room topic can also be set when creating a
+    room using |createRoom|_ with the ``topic`` key.
 
 ``m.room.member``
   Summary:
@@ -1452,17 +1452,51 @@ User ID:
   An opaque ID which identifies an end-user, which consists of some opaque 
   localpart combined with the domain name of their home server. 
 
+
+.. Links through the external API docs are below
+.. =============================================
+
 .. |createRoom| replace:: ``/createRoom``
 .. _createRoom: /-rooms/create_room
 
 .. |initialSync| replace:: ``/initialSync``
 .. _initialSync: /-events/initial_sync
 
-.. |roomInitialSync| replace:: ``/rooms/<room id>/initialSync``
-.. _roomInitialSync: /-rooms/get_room_sync_data
+.. |/rooms/<room_id>/initialSync| replace:: ``/rooms/<room_id>/initialSync``
+.. _/rooms/<room_id>/initialSync: /-rooms/get_room_sync_data
 
 .. |login| replace:: ``/login``
 .. _login: /-login
+
+.. |/rooms/<room_id>/messages| replace:: ``/rooms/<room_id>/messages``
+.. _/rooms/<room_id>/messages: /-rooms/get_messages
+
+.. |/rooms/<room_id>/members| replace:: ``/rooms/<room_id>/members``
+.. _/rooms/<room_id>/members: /-rooms/get_members
+
+.. |/rooms/<room_id>/state| replace:: ``/rooms/<room_id>/state``
+.. _/rooms/<room_id>/state: /-rooms/get_state_events
+
+.. |/rooms/<room_id>/send/<event_type>| replace:: ``/rooms/<room_id>/send/<event_type>``
+.. _/rooms/<room_id>/send/<event_type>: /-rooms/send_non_state_event
+
+.. |/rooms/<room_id>/state/<event_type>/<state_key>| replace:: ``/rooms/<room_id>/state/<event_type>/<state_key>``
+.. _/rooms/<room_id>/state/<event_type>/<state_key>: /-rooms/send_state_event
+
+.. |/rooms/<room_id>/invite| replace:: ``/rooms/<room_id>/invite``
+.. _/rooms/<room_id>/invite: /-rooms/invite
+
+.. |/rooms/<room_id>/join| replace:: ``/rooms/<room_id>/join``
+.. _/rooms/<room_id>/join: /-rooms/join_room
+
+.. |/rooms/<room_id>/leave| replace:: ``/rooms/<room_id>/leave``
+.. _/rooms/<room_id>/leave: /-rooms/leave
+
+.. |/rooms/<room_id>/ban| replace:: ``/rooms/<room_id>/ban``
+.. _/rooms/<room_id>/ban: /-rooms/ban
+
+.. |/join/<room_alias_or_id>| replace:: ``/join/<room_alias_or_id>``
+.. _/join/<room_alias_or_id>: /-rooms/join
 
 .. _`Event Stream`: /-events/get_event_stream
 .. _`Initial Sync`: /-events/initial_sync
