@@ -693,6 +693,66 @@ prefixed with ``m.``
     TODO
   Description:
     TODO
+    
+``m.room.join_rules``
+  Summary:
+    TODO.
+  Type: 
+    State event
+  JSON format:
+    TODO
+  Example:
+    TODO
+  Description:
+    TODO
+    
+``m.room.power_levels``
+  Summary:
+    TODO.
+  Type: 
+    State event
+  JSON format:
+    TODO
+  Example:
+    TODO
+  Description:
+    TODO
+    
+``m.room.add_state_level``
+  Summary:
+    TODO.
+  Type: 
+    State event
+  JSON format:
+    TODO
+  Example:
+    TODO
+  Description:
+    TODO
+    
+``m.room.send_event_level``
+  Summary:
+    TODO.
+  Type: 
+    State event
+  JSON format:
+    TODO
+  Example:
+    TODO
+  Description:
+    TODO
+    
+``m.room.ops_levels``
+  Summary:
+    TODO.
+  Type: 
+    State event
+  JSON format:
+    TODO
+  Example:
+    TODO
+  Description:
+    TODO
 
 ``m.room.message``
   Summary:
