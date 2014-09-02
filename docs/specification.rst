@@ -287,7 +287,13 @@ Modifying aliases
 
 Permissions
 -----------
-- TODO : Room permissions / config / power levels. What they are. How do they work. Examples.
+- TODO: What is a power level? How do they work? Defaults / required levels for X. How do they change
+  as people join and leave rooms? What do you do if you get a clash? Examples.
+- TODO: List all actions which use power levels (sending msgs, inviting users, banning people, etc...)
+- TODO: Room config - what is the event and what are the keys/values and explanations for them.
+  Link through to respective sections where necessary. How does this tie in with permissions, e.g.
+  give example of creating a read-only room.
+
 
 Joining rooms
 -------------
@@ -403,9 +409,11 @@ Banning users in a room
   actually been banned."?
 
 A user may decide to ban another user in a room. 'Banning' forces the target user
-to leave the room and prevents them from re-joining the room. In order to ban
-someone, the user performing the ban MUST have the required power level. To ban
-a user, a request should be made to ``/rooms/<room id>/ban`` with::
+to leave the room and prevents them from re-joining the room. A banned user will
+not be treated as a joined user, and so will not be able to send or receive events
+in the room. In order to ban someone, the user performing the ban MUST have the 
+required power level. To ban a user, a request should be made to 
+``/rooms/<room id>/ban`` with::
 
   {
     "user_id": "<user id to ban"
@@ -540,14 +548,27 @@ There are several APIs provided to ``GET`` events for a room:
   Example:
     TODO
 
-
-
-- ``/rooms/<room id>/messages`` : Get all ``m.room.message`` events.
-- ``/rooms/<room id>/initialSync`` : Get all relevant events for a room.
+``/rooms/<room id>/messages``
+  Description:
+    Get all ``m.room.message`` events.
+  Response format:
+    ``{ TODO }``
+  Example:
+    TODO
+    
+``/rooms/<room id>/initialSync``
+  Description:
+    Get all relevant events for a room. This includes state events, paginated non-state
+    events and presence events.
+  Response format:
+    `` { TODO } ``
+  Example:
+    TODO
 
 
 Room Events
 ===========
+- voip events?
 
 This specification outlines several standard event types, all of which are
 prefixed with ``m.``
@@ -653,8 +674,6 @@ prefixed with ``m.``
     supported acknowledgements: ``delivered`` (sent when the event has been received) and 
     ``read`` (sent when the event has been observed by the end-user). The ``target_event_id``
     should reference the ``m.room.message`` event being acknowledged. 
-
-- voip?
 
 m.room.message msgtypes
 -----------------------
@@ -824,11 +843,23 @@ presence information in a user list for a room.
 
 Typing notifications
 ====================
+- what is the event type. Are they bundled with other event types? If so, which.
+- what are the valid keys / values. What do they represent. Any gotchas?
+- Timeouts. How do they work, who sets them and how do they expire. Does one
+  have priority over another? Give examples.
 
 TODO : Leo
 
 Voice over IP
 =============
+- what are the event types.
+- what are the valid keys/values. What do they represent. Any gotchas?
+- In what sequence should the events be sent?
+- How do you accept / decline inbound calls? How do you make outbound calls?
+  Give examples.
+- How does negotiation work? Give examples.
+- How do you hang up?
+- What does call log information look like e.g. duration of call?
 
 TODO : Dave
 
@@ -1321,7 +1352,10 @@ Content repository
 
 Address book repository
 =======================
-- format
+- format: POST(?) wodges of json, some possible processing, then return wodges of json on GET.
+- processing may remove dupes, merge contacts, pepper with extra info (e.g. matrix-ability of
+  contacts), etc.
+- Standard json format for contacts? Piggy back off vcards?
 
 
 Glossary
