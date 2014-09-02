@@ -297,6 +297,37 @@
       ]
     },
     {
+      "path": "/rooms/{roomId}/ban",
+      "operations": [
+        {
+          "method": "POST",
+          "summary": "Ban a user in the room.",
+          "notes": "This operation can also be done as a PUT by suffixing /{txnId}. The caller must have the required power level to do this operation.",
+          "type": "void",
+          "nickname": "ban",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "roomId",
+              "description": "The room which has the user to ban.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            },
+            {
+              "name": "body",
+              "description": "The user to ban.",
+              "required": true,
+              "type": "BanRequest",
+              "paramType": "body"
+            }
+          ]
+        }  
+      ]
+    },
+    {
       "path": "/rooms/{roomId}/state/m.room.member/{userId}",
       "operations": [
         {
@@ -657,6 +688,16 @@
           "type": "string",
           "description": "The alias to give the new room.",
           "required": false
+        },
+        "name": {
+          "type": "string",
+          "description": "Sets the name of the room. Send a m.room.name event after creating the room with the 'name' key specified.",
+          "required": false
+        },
+        "topic": {
+          "type": "string",
+          "description": "Sets the topic for the room. Send a m.room.topic event after creating the room with the 'topic' key specified.",
+          "required": false
         }
       }
     },
@@ -786,6 +827,19 @@
         "user_id": {
           "type": "string",
           "description": "The fully-qualified user ID."
+        }
+      }
+    },
+    "BanRequest": {
+      "id": "BanRequest",
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "description": "The fully-qualified user ID."
+        },
+        "reason": {
+          "type": "string",
+          "description": "The reason for the ban."
         }
       }
     },
