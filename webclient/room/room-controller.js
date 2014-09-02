@@ -75,11 +75,15 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     });
     
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
-        updateMemberList(event);
+        if (isLive) {
+            updateMemberList(event);
+        }
     });
     
     $scope.$on(eventHandlerService.PRESENCE_EVENT, function(ngEvent, event, isLive) {
-        updatePresence(event);
+        if (isLive) {
+            updatePresence(event);
+        }
     });
 
     $scope.memberCount = function() {
