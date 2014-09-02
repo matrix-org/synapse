@@ -650,7 +650,7 @@ class PresenceHandler(BaseHandler):
             room_ids = yield rm_handler.get_rooms_for_user(user)
 
             if not observers and not room_ids:
-                break
+                continue
 
             state = dict(push)
             del state["user_id"]
