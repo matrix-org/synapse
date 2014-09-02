@@ -278,7 +278,7 @@ which can be set when creating a room:
     The ``name`` value for the ``m.room.name`` state event.
   Description:
     If this is included, an ``m.room.name`` event will be sent into the room to indicate the
-    name of the room. See "Room Events" for more information on ``m.room.name``.
+    name of the room. See `Room Events`_ for more information on ``m.room.name``.
 
 ``topic``
   Type: 
@@ -289,7 +289,7 @@ which can be set when creating a room:
     The ``topic`` value for the ``m.room.topic`` state event.
   Description:
     If this is included, an ``m.room.topic`` event will be sent into the room to indicate the
-    topic for the room. See "Room Events" for more information on ``m.room.topic``.
+    topic for the room. See `Room Events`_ for more information on ``m.room.topic``.
 
 Example::
 
@@ -301,22 +301,30 @@ Example::
   }
 
 - TODO: This creates a room creation event which serves as the root of the PDU graph for this room.
-- TODO: Keys for speccing a room name / room topic / invite these users?
+- TODO: Key for invite these users?
 
 Modifying aliases
 -----------------
-- path to edit aliases
-- format when retrieving list of aliases. NOT complete list.
-- format for adding aliases.
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO kegan
+    - path to edit aliases
+    - format when retrieving list of aliases. NOT complete list.
+    - format for adding aliases.
 
 Permissions
 -----------
-- TODO: What is a power level? How do they work? Defaults / required levels for X. How do they change
-  as people join and leave rooms? What do you do if you get a clash? Examples.
-- TODO: List all actions which use power levels (sending msgs, inviting users, banning people, etc...)
-- TODO: Room config - what is the event and what are the keys/values and explanations for them.
-  Link through to respective sections where necessary. How does this tie in with permissions, e.g.
-  give example of creating a read-only room.
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO kegan
+    - TODO: What is a power level? How do they work? Defaults / required levels for X. How do they change
+      as people join and leave rooms? What do you do if you get a clash? Examples.
+    - TODO: List all actions which use power levels (sending msgs, inviting users, banning people, etc...)
+    - TODO: Room config - what is the event and what are the keys/values and explanations for them.
+      Link through to respective sections where necessary. How does this tie in with permissions, e.g.
+      give example of creating a read-only room.
 
 
 Joining rooms
@@ -345,7 +353,7 @@ by sending the following request to
     "membership": "join"
   }
 
-See the "Room events" section for more information on ``m.room.member``.
+See the `Room events`_ section for more information on ``m.room.member``.
 
 After the user has joined a room, they will receive subsequent events in that room. This room
 will now appear as an entry in the ``/initialSync`` API.
@@ -387,7 +395,7 @@ directly by sending the following request to
     "membership": "invite"
   }
 
-See the "Room events" section for more information on ``m.room.member``.
+See the `Room events`_ section for more information on ``m.room.member``.
 
 - TODO: In what circumstances will this NOT be equivalent to ``/invite``?
 
@@ -408,7 +416,7 @@ directly by sending the following request to
     "membership": "leave"
   }
 
-See the "Room events" section for more information on ``m.room.member``.
+See the `Room events`_ section for more information on ``m.room.member``.
 
 Once a user has left a room, that room will no longer appear on the ``/initialSync``
 API. Be aware that leaving a room is not equivalent to have never been
@@ -506,7 +514,7 @@ In some cases, there may be no need for a ``state_key``, so it can be omitted::
   PUT /rooms/!roomid:domain/state/m.room.bgd.color
   { "color": "red", "hex": "#ff0000" }
 
-See "Room Events" for the ``m.`` event specification.
+See `Room Events`_ for the ``m.`` event specification.
 
 Non-state events
 ----------------
@@ -521,7 +529,7 @@ For example::
   PUT /rooms/!roomid:domain/send/m.custom.example.message/11
   { "text": "Goodbye world!" }
 
-See "Room Events" for the ``m.`` event specification.
+See `Room Events`_ for the ``m.`` event specification.
 
 Syncing rooms
 -------------
@@ -588,7 +596,11 @@ There are several APIs provided to ``GET`` events for a room:
 
 Room Events
 ===========
-- voip events?
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO dave?
+  - voip events?
 
 This specification outlines several standard event types, all of which are
 prefixed with ``m.``
@@ -637,7 +649,7 @@ prefixed with ``m.``
     membership APIs (``/rooms/<room id>/invite`` etc) when performing membership actions
     rather than adjusting the state directly as there are a restricted set of valid
     transformations. For example, user A cannot force user B to join a room, and trying
-    to force this state change directly will fail. See the "Rooms" section for how to 
+    to force this state change directly will fail. See the `Rooms`_ section for how to 
     use the membership APIs.
 
 ``m.room.config``
@@ -678,7 +690,7 @@ prefixed with ``m.``
     The ``msgtype`` key outlines the type of message, e.g. text, audio, image, video, etc.
     Whilst not required, the ``body`` key SHOULD be used with every kind of ``msgtype`` as
     a fallback mechanism when a client cannot render the message. For more information on 
-    the types of messages which can be sent, see "m.room.message msgtypes".
+    the types of messages which can be sent, see `m.room.message msgtypes`_.
 
 ``m.room.message.feedback``
   Summary:
@@ -799,6 +811,8 @@ The following keys can be attached to any ``m.room.message``:
 
 Presence
 ========
+.. NOTE::
+  This section is a work in progress.
 
 Each user has the concept of presence information. This encodes the
 "availability" of that user, suitable for display on other user's clients. This
@@ -837,8 +851,9 @@ user was last seen online.
 
 Transmission
 ------------
-- Transmitted as an EDU.
-- Presence lists determine who to send to.
+.. TODO:
+  - Transmitted as an EDU.
+  - Presence lists determine who to send to.
 
 Presence List
 -------------
@@ -863,28 +878,43 @@ presence information in a user list for a room.
 
 Typing notifications
 ====================
-- what is the event type. Are they bundled with other event types? If so, which.
-- what are the valid keys / values. What do they represent. Any gotchas?
-- Timeouts. How do they work, who sets them and how do they expire. Does one
-  have priority over another? Give examples.
+.. NOTE::
+  This section is a work in progress.
 
-TODO : Leo
+.. TODO Leo
+    - what is the event type. Are they bundled with other event types? If so, which.
+    - what are the valid keys / values. What do they represent. Any gotchas?
+    - Timeouts. How do they work, who sets them and how do they expire. Does one
+      have priority over another? Give examples.
 
 Voice over IP
 =============
-- what are the event types.
-- what are the valid keys/values. What do they represent. Any gotchas?
-- In what sequence should the events be sent?
-- How do you accept / decline inbound calls? How do you make outbound calls?
-  Give examples.
-- How does negotiation work? Give examples.
-- How do you hang up?
-- What does call log information look like e.g. duration of call?
+.. NOTE::
+  This section is a work in progress.
 
-TODO : Dave
+.. TODO Dave
+    - what are the event types.
+    - what are the valid keys/values. What do they represent. Any gotchas?
+    - In what sequence should the events be sent?
+    - How do you accept / decline inbound calls? How do you make outbound calls?
+      Give examples.
+    - How does negotiation work? Give examples.
+    - How do you hang up?
+    - What does call log information look like e.g. duration of call?
 
 Profiles
 ========
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO
+  - Metadata extensibility
+  - Changing profile info generates m.presence events ("presencelike")
+  - keys on m.presence are optional, except presence which is required
+  - m.room.member is populated with the current displayname at that point in time.
+  - That is added by the HS, not you.
+  - Display name changes also generates m.room.member with displayname key f.e. room
+    the user is in.
 
 Internally within Matrix users are referred to by their user ID, which is not a
 human-friendly string. Profiles grant users the ability to see human-readable 
@@ -896,23 +926,19 @@ metadata fields that the user may wish to publish (email address, phone
 numbers, website URLs, etc...). This specification puts no requirements on the 
 display name other than it being a valid unicode string.
 
-- Metadata extensibility
-- Changing profile info generates m.presence events ("presencelike")
-- keys on m.presence are optional, except presence which is required
-- m.room.member is populated with the current displayname at that point in time.
-- That is added by the HS, not you.
-- Display name changes also generates m.room.member with displayname key f.e. room
-  the user is in.
+
 
 Registration and login
 ======================
+.. WARNING::
+  The registration API is likely to change.
+
+- TODO Kegan : Make registration like login (just omit the "user" key on the 
+  initial request?)
 
 Clients must register with a home server in order to use Matrix. After 
 registering, the client will be given an access token which must be used in ALL
 requests to that home server as a query parameter 'access_token'.
-
-- TODO Kegan : Make registration like login (just omit the "user" key on the 
-  initial request?)
 
 If the client has already registered, they need to be able to login to their
 account. The home server may provide many different ways of logging in, such
@@ -1190,9 +1216,11 @@ This MUST return an HTML page which can perform the entire login process.
 
 Identity
 ========
+.. NOTE::
+  This section is a work in progress.
 
-TODO : Dave
-- 3PIDs and identity server, functions
+.. TODO Dave
+  - 3PIDs and identity server, functions
 
 Federation
 ==========
@@ -1233,6 +1261,9 @@ transferred from the origin to the destination home server using an HTTP PUT req
 
 Transactions
 ------------
+.. WARNING::
+  This section may be misleading or inaccurate.
+
 The transfer of EDUs and PDUs between home servers is performed by an exchange
 of Transaction messages, which are encoded as JSON objects, passed over an 
 HTTP PUT request. A Transaction is meaningful only to the pair of home servers that 
@@ -1275,6 +1306,8 @@ mechanism to encourage peers to continue to replicate content.)
 
 PDUs and EDUs
 -------------
+.. WARNING::
+  This section may be misleading or inaccurate.
 
 All PDUs have:
  - An ID
@@ -1345,43 +1378,69 @@ destination home server names, and the actual nested content.
 
 Backfilling
 -----------
-- What it is, when is it used, how is it done
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO
+  - What it is, when is it used, how is it done
 
 SRV Records
 -----------
-- Why it is needed
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO
+  - Why it is needed
 
 Security
 ========
 - rate limiting
-- crypto (s-s auth)
-- E2E
-- Lawful intercept + Key Escrow
 
-TODO Mark
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO
+  - crypto (s-s auth)
+  - E2E
+  - Lawful intercept + Key Escrow
+  TODO Mark
 
 Policy Servers
 ==============
-TODO
+.. NOTE::
+  This section is a work in progress.
 
 Content repository
 ==================
-- path to upload
-- format for thumbnail paths, mention what it is protecting against.
-- content size limit and associated M_ERROR.
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO
+  - path to upload
+  - format for thumbnail paths, mention what it is protecting against.
+  - content size limit and associated M_ERROR.
 
 Address book repository
 =======================
-- format: POST(?) wodges of json, some possible processing, then return wodges of json on GET.
-- processing may remove dupes, merge contacts, pepper with extra info (e.g. matrix-ability of
-  contacts), etc.
-- Standard json format for contacts? Piggy back off vcards?
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO
+  - format: POST(?) wodges of json, some possible processing, then return wodges of json on GET.
+  - processing may remove dupes, merge contacts, pepper with extra info (e.g. matrix-ability of
+    contacts), etc.
+  - Standard json format for contacts? Piggy back off vcards?
 
 
 Glossary
 ========
-- domain specific words/acronyms with definitions
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO
+  - domain specific words/acronyms with definitions
 
 User ID:
   An opaque ID which identifies an end-user, which consists of some opaque 
   localpart combined with the domain name of their home server. 
+
