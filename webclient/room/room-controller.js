@@ -382,8 +382,10 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                 for (var i = 0; i < response.data.chunk.length; i++) {
                     var chunk = response.data.chunk[i];
                     updateMemberList(chunk);
-                    updateMemberListPresenceAge();
                 }
+
+                // Arm list timing update timer
+                updateMemberListPresenceAge();
             },
             function(error) {
                 $scope.feedback = "Failed get member list: " + error.data.error;
