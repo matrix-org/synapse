@@ -247,6 +247,9 @@ class MemoryDataStore(object):
         # TODO (erikj): This should be configurable
         return defer.succeed("invite")
 
+    def get_ops_levels(self, room_id):
+        return defer.succeed((5, 5))
+
 
 def _format_call(args, kwargs):
     return ", ".join(
