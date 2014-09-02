@@ -155,19 +155,18 @@ class PresenceHandler(BaseHandler):
         if observer_user == observed_user:
             defer.returnValue(True)
 
-        allowed_by_subscription = yield self.store.is_presence_visible(
-            observed_localpart=observed_user.localpart,
-            observer_userid=observer_user.to_string(),
-        )
-
-        if allowed_by_subscription:
+        if (yield self.store.do_users_share_a_room(
+            [observer_user, observed_user]
+        )):
             defer.returnValue(True)
 
-        share_room = yield self.store.do_users_share_a_room(
-            [observer_user, observed_user]
-        )
+        if (yield self.store.is_presence_visible(
+            observed_localpart=observed_user.localpart,
+            observer_userid=observer_user.to_string(),
+        )):
+            defer.returnValue(True)
 
-        defer.returnValue(share_room)
+        defer.returnValue(False)
 
     @defer.inlineCallbacks
     def get_state(self, target_user, auth_user):
