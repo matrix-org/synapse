@@ -103,7 +103,44 @@ angular.module('matrixWebClient')
                         for (var i in room.members) {
                             var member = room.members[i];
                             if (member.user_id !== matrixService.config().user_id) {
-                                roomName = member.content.displayname ?  member.content.displayname : member.user_id;
+
+                                if (member.user_id in $rootScope.presence) {
+                                    // If the user is available in presence, use the displayname there
+                                    // as it is the most uptodate
+                                    roomName = $rootScope.presence[member.user_id].content.displayname;
+                                }
+                                else if (member.content.displayname) {
+                                    roomName = member.content.displayname;
+                                }
+                                else {
+                                    roomName = member.user_id;
+                                }
+                            }
+                        }
+                    }
+                    else if (1 === Object.keys(room.members).length) {
+                        // The other member may be in the invite list, get all invited users
+                        var invitedUserIDs = [];
+                        for (var i in room.messages) {
+                            var message = room.messages[i];
+                            if ("m.room.member" === message.type && "invite" === message.membership) {
+                                // Make sure there is no duplicate user
+                                if (-1 === invitedUserIDs.indexOf(message.state_key)) {
+                                    invitedUserIDs.push(message.state_key);
+                                }
+                            } 
+                        }
+                        
+                        // For now, only 1:1 room needs to be renamed. It means only 1 invited user
+                        if (1 === invitedUserIDs.length) {
+                            var userID = invitedUserIDs[0];
+
+                            // Try to resolve his displayname in presence global data
+                            if (userID in $rootScope.presence) {
+                                roomName = $rootScope.presence[userID].content.displayname;
+                            }
+                            else {
+                                roomName = member.user_id;
                             }
                         }
                     }
