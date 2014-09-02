@@ -21,8 +21,8 @@ from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import StoreError, SynapseError
 from synapse.api.events.room import (
     RoomMemberEvent, RoomCreateEvent, RoomPowerLevelsEvent,
-    RoomJoinRulesEvent, RoomAddStateLevelEvent,
-    RoomSendEventLevelEvent, RoomOpsPowerLevelsEvent,
+    RoomJoinRulesEvent, RoomAddStateLevelEvent, RoomTopicEvent,
+    RoomSendEventLevelEvent, RoomOpsPowerLevelsEvent, RoomNameEvent,
 )
 from synapse.util import stringutils
 from ._base import BaseRoomHandler
@@ -98,7 +98,6 @@ class RoomCreationHandler(BaseRoomHandler):
             if not room_id:
                 raise StoreError(500, "Couldn't generate a room ID.")
 
-
         user = self.hs.parse_userid(user_id)
         creation_events = self._create_events_for_new_room(
             user, room_id, is_public=is_public
@@ -113,7 +112,8 @@ class RoomCreationHandler(BaseRoomHandler):
 
         federation_handler = self.hs.get_handlers().federation_handler
 
-        for event in creation_events:
+        @defer.inlineCallbacks
+        def handle_event(event):
             snapshot = yield self.store.snapshot_room(
                 room_id=room_id,
                 user_id=user_id,
@@ -123,6 +123,31 @@ class RoomCreationHandler(BaseRoomHandler):
 
             yield self.state_handler.handle_new_event(event, snapshot)
             yield self._on_new_room_event(event, snapshot, extra_users=[user])
+
+        for event in creation_events:
+            yield handle_event(event)
+
+        if "name" in config:
+            name = config["name"]
+            name_event = self.event_factory.create_event(
+                etype=RoomNameEvent.TYPE,
+                room_id=room_id,
+                user_id=user_id,
+                content={"name": name},
+            )
+
+            yield handle_event(name_event)
+
+        if "topic" in config:
+            topic = config["topic"]
+            topic_event = self.event_factory.create_event(
+                etype=RoomTopicEvent.TYPE,
+                room_id=room_id,
+                user_id=user_id,
+                content={"topic": topic},
+            )
+
+            yield handle_event(topic_event)
 
         content = {"membership": Membership.JOIN}
         join_event = self.event_factory.create_event(
