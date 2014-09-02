@@ -719,6 +719,22 @@ class PresencePushTestCase(unittest.TestCase):
             ),
             defer.succeed((200, "OK"))
         )
+        put_json.expect_call_and_return(
+            call("remote",
+                path=ANY,  # Can't guarantee which txn ID will be which
+                data=_expect_edu("remote", "m.presence",
+                    content={
+                        "push": [
+                            {"user_id": "@apple:test",
+                             "presence": u"online",
+                             "state": u"online",
+                             "last_active_ago": 0},
+                        ],
+                    }
+                )
+            ),
+            defer.succeed((200, "OK"))
+        )
 
         self.room_members = [self.u_apple, self.u_onion]
 

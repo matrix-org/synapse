@@ -628,7 +628,6 @@ class _TransactionQueue(object):
 
             for deferred in deferreds:
                 deferred.errback(e)
-                yield deferred
 
         finally:
             # We want to be *very* sure we delete this after we stop processing
