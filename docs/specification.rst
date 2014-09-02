@@ -134,8 +134,8 @@ Identity
 API Standards
 -------------
 All communication in Matrix is performed over HTTP[S] using a Content-Type of ``application/json``.
-Any errors which occur on the Matrix API level MUST return a "standard error response". This is a
-JSON object which looks like::
+In addition, all strings MUST be encoded as UTF-8. Any errors which occur on the Matrix API level 
+MUST return a "standard error response". This is a JSON object which looks like::
 
   {
     "errcode": "<error code>",
@@ -219,22 +219,16 @@ In contrast, these are invalid requests::
       "key": "This is a put but it is missing a txnId."
     }
 
-
-
-- TODO: All strings everywhere are UTF-8
-
-
-
 Receiving live updates on a client
 ----------------------------------
 Clients can receive new events by long-polling the home server. This will hold open the
 HTTP connection for a short period of time waiting for new events, returning early if an
-event occurs. This is called the "Event Stream". All events which the client is authorised 
+event occurs. This is called the `Event Stream`_. All events which the client is authorised 
 to view will appear in the event stream. When the stream is closed, an ``end`` token is 
 returned. This token can be used in the next request to continue where the client left off.
 
 When the client first logs in, they will need to initially synchronise with their home
-server. This is achieved via the ``/initialSync`` API. This API also returns an ``end``
+server. This is achieved via the |initialSync|_ API. This API also returns an ``end``
 token which can be used with the event stream.
 
 Rooms
@@ -242,7 +236,11 @@ Rooms
 
 Creation
 --------
-To create a room, a client has to use the ``/createRoom`` API. There are various options
+.. TODO kegan
+  - TODO: This creates a room creation event which serves as the root of the PDU graph for this room.
+  - TODO: Key for invite these users?
+  
+To create a room, a client has to use the |createRoom|_ API. There are various options
 which can be set when creating a room:
 
 ``visibility``
@@ -300,9 +298,6 @@ Example::
     "topic": "All about happy hour"
   }
 
-- TODO: This creates a room creation event which serves as the root of the PDU graph for this room.
-- TODO: Key for invite these users?
-
 Modifying aliases
 -----------------
 .. NOTE::
@@ -329,7 +324,8 @@ Permissions
 
 Joining rooms
 -------------
-- TODO: What does the home server have to do to join a user to a room?
+.. TODO kegan
+  - TODO: What does the home server have to do to join a user to a room?
 
 Users need to join a room in order to send and receive events in that room. A user can join a
 room by making a request to ``/join/<room alias or id>`` with::
@@ -356,16 +352,17 @@ by sending the following request to
 See the `Room events`_ section for more information on ``m.room.member``.
 
 After the user has joined a room, they will receive subsequent events in that room. This room
-will now appear as an entry in the ``/initialSync`` API.
+will now appear as an entry in the |initialSync|_ API.
 
 Some rooms enforce that a user is *invited* to a room before they can join that room. Other
 rooms will allow anyone to join the room even if they have not received an invite.
 
 Inviting users
 --------------
-- Can invite users to a room if the room config key TODO is set to TODO. Must have required power level.
-- Outline invite join dance. What is it? Why is it required? How does it work?
-- What does the home server have to do?
+.. TODO kegan
+  - Can invite users to a room if the room config key TODO is set to TODO. Must have required power level.
+  - Outline invite join dance. What is it? Why is it required? How does it work?
+  - What does the home server have to do?
 
 The purpose of inviting users to a room is to notify them that the room exists 
 so they can choose to become a member of that room. Some rooms require that all 
@@ -401,6 +398,11 @@ See the `Room events`_ section for more information on ``m.room.member``.
 
 Leaving rooms
 -------------
+.. TODO kegan
+  - TODO: Grace period before deletion?
+  - TODO: Under what conditions should a room NOT be purged?
+
+
 A user can leave a room to stop receiving events for that room. A user must have
 joined the room before they are eligible to leave the room. If the room is an
 "invite-only" room, they will need to be re-invited before they can re-join the room.
@@ -418,7 +420,7 @@ directly by sending the following request to
 
 See the `Room events`_ section for more information on ``m.room.member``.
 
-Once a user has left a room, that room will no longer appear on the ``/initialSync``
+Once a user has left a room, that room will no longer appear on the |initialSync|_
 API. Be aware that leaving a room is not equivalent to have never been
 in that room. A user who has previously left a room still maintains some residual state in
 that room. Their membership state will be marked as ``leave``. This contrasts with
@@ -426,12 +428,9 @@ a user who has *never been invited or joined to that room* who will not have any
 membership state for that room. 
 
 If all members in a room leave, that room becomes eligible for deletion. 
- - TODO: Grace period before deletion?
- - TODO: Under what conditions should a room NOT be purged?
 
 Banning users in a room
 -----------------------
-
 A user may decide to ban another user in a room. 'Banning' forces the target user
 to leave the room and prevents them from re-joining the room. A banned user will
 not be treated as a joined user, and so will not be able to send or receive events
@@ -533,19 +532,23 @@ See `Room Events`_ for the ``m.`` event specification.
 
 Syncing rooms
 -------------
+.. NOTE::
+  This section is a work in progress.
+
 When a client logs in, they may have a list of rooms which they have already joined. These rooms
 may also have a list of events associated with them. The purpose of 'syncing' is to present the
 current room and event information in a convenient, compact manner. The events returned are not
 limited to room events; presence events will also be returned. There are two APIs provided:
 
- - ``/initialSync`` : A global sync which will present room and event information for all rooms
+ - |initialSync|_ : A global sync which will present room and event information for all rooms
    the user has joined.
 
- - ``/rooms/<room id>/initialSync`` : A sync scoped to a single room. Presents room and event
+ - |roomInitialSync|_ : A sync scoped to a single room. Presents room and event
    information for this room only.
 
-- TODO: JSON response format for both types
-- TODO: when would you use global? when would you use scoped?
+.. TODO kegan
+  - TODO: JSON response format for both types
+  - TODO: when would you use global? when would you use scoped?
 
 Getting events for a room
 -------------------------
@@ -584,7 +587,7 @@ There are several APIs provided to ``GET`` events for a room:
   Example:
     TODO
     
-``/rooms/<room id>/initialSync``
+|roomInitialSync|_
   Description:
     Get all relevant events for a room. This includes state events, paginated non-state
     events and presence events.
@@ -851,6 +854,9 @@ user was last seen online.
 
 Transmission
 ------------
+.. NOTE::
+  This section is a work in progress.
+
 .. TODO:
   - Transmitted as an EDU.
   - Presence lists determine who to send to.
@@ -933,8 +939,9 @@ Registration and login
 .. WARNING::
   The registration API is likely to change.
 
-- TODO Kegan : Make registration like login (just omit the "user" key on the 
-  initial request?)
+.. TODO
+  - TODO Kegan : Make registration like login (just omit the "user" key on the 
+    initial request?)
 
 Clients must register with a home server in order to use Matrix. After 
 registering, the client will be given an access token which must be used in ALL
@@ -946,7 +953,8 @@ as user/password auth, login via a social network (OAuth2), login by confirming
 a token sent to their email address, etc. This specification does not define how
 home servers should authorise their users who want to login to their existing 
 accounts, but instead defines the standard interface which implementations 
-should follow so that ANY client can login to ANY home server.
+should follow so that ANY client can login to ANY home server. Clients login
+using the |login|_ API.
 
 The login process breaks down into the following:
   1. Determine the requirements for logging in.
@@ -1444,3 +1452,17 @@ User ID:
   An opaque ID which identifies an end-user, which consists of some opaque 
   localpart combined with the domain name of their home server. 
 
+.. |createRoom| replace:: ``/createRoom``
+.. _createRoom: /-rooms/create_room
+
+.. |initialSync| replace:: ``/initialSync``
+.. _initialSync: /-events/initial_sync
+
+.. |roomInitialSync| replace:: ``/rooms/<room id>/initialSync``
+.. _roomInitialSync: /-rooms/get_room_sync_data
+
+.. |login| replace:: ``/login``
+.. _login: /-login
+
+.. _`Event Stream`: /-events/get_event_stream
+.. _`Initial Sync`: /-events/initial_sync
