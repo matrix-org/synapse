@@ -24,9 +24,9 @@ See the README.rst for more information.
 
 Also note that some config options have been renamed, including:
 
- - "host" to "server-name"
- - "database" to "database-path"
- - "port" to "bind-port" and "unsecure-port"
+- "host" to "server-name"
+- "database" to "database-path"
+- "port" to "bind-port" and "unsecure-port"
 
 
 Upgrading to v0.0.1
