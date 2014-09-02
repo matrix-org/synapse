@@ -21,6 +21,10 @@ import os
 import yaml
 
 
+class ConfigError(Exception):
+    pass
+
+
 class Config(object):
     def __init__(self, args):
         pass
@@ -29,8 +33,25 @@ class Config(object):
     def abspath(file_path):
         return os.path.abspath(file_path) if file_path else file_path
 
-    @staticmethod
-    def read_file(file_path):
+    @classmethod
+    def check_file(cls, file_path, config_name):
+        if file_path is None:
+            raise ConfigError(
+                "Missing config for %s."
+                " Try running again with --generate-config"
+                % (config_name,)
+            )
+        if not os.path.exists(file_path):
+            raise ConfigError(
+                "File % config for %s doesn't exist."
+                " Try running again with --generate-config"
+                % (config_name,)
+            )
+        return cls.abspath(file_path)
+
+    @classmethod
+    def read_file(cls, file_path, config_name):
+        cls.check_file(file_path, config_name)
         with open(file_path) as file_stream:
             return file_stream.read()
 

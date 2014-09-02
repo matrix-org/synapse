@@ -31,7 +31,9 @@ class TlsConfig(Config):
         self.tls_private_key = self.read_tls_private_key(
             args.tls_private_key_path
         )
-        self.tls_dh_params_path = self.abspath(args.tls_dh_params_path)
+        self.tls_dh_params_path = self.check_path(
+            args.tls_dh_params_path, "tls_dh_params"
+        )
 
     @classmethod
     def add_arguments(cls, parser):
@@ -45,11 +47,11 @@ class TlsConfig(Config):
                                help="PEM dh parameters for ephemeral keys")
 
     def read_tls_certificate(self, cert_path):
-        cert_pem = self.read_file(cert_path)
+        cert_pem = self.read_file(cert_path, "tls_certificate")
         return crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
 
     def read_tls_private_key(self, private_key_path):
-        private_key_pem = self.read_file(private_key_path)
+        private_key_pem = self.read_file(private_key_path, "tls_private_key")
         return crypto.load_privatekey(crypto.FILETYPE_PEM, private_key_pem)
 
     @classmethod

@@ -60,7 +60,7 @@ class ServerConfig(Config):
                                   " service on the given port.")
 
     def read_signing_key(self, signing_key_path):
-        signing_key_base64 = self.read_file(signing_key_path)
+        signing_key_base64 = self.read_file(signing_key_path, "signing_key")
         signing_key_bytes = decode_base64(signing_key_base64)
         return nacl.signing.SigningKey(signing_key_bytes)
 
