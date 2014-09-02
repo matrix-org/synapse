@@ -155,7 +155,7 @@ class PresenceHandler(BaseHandler):
         if observer_user == observed_user:
             defer.returnValue(True)
 
-        if (yield self.store.do_users_share_a_room(
+        if (yield self.store.user_rooms_intersect(
             [observer_user, observed_user]
         )):
             defer.returnValue(True)

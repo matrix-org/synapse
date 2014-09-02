@@ -107,9 +107,9 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
             return defer.succeed(self.presence_list)
         self.datastore.get_presence_list = get_presence_list
 
-        def do_users_share_a_room(userlist):
+        def user_rooms_intersect(userlist):
             return defer.succeed(False)
-        self.datastore.do_users_share_a_room = do_users_share_a_room
+        self.datastore.user_rooms_intersect = user_rooms_intersect
 
         self.handlers = hs.get_handlers()
 
