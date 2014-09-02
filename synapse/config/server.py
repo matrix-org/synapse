@@ -29,7 +29,7 @@ class ServerConfig(Config):
         self.unsecure_port = args.unsecure_port
         self.daemonize = args.daemonize
         self.pid_file = self.abspath(args.pid_file)
-        self.webclient = args.no_webclient
+        self.webclient = True
         self.manhole = args.manhole
 
     @classmethod
@@ -53,9 +53,6 @@ class ServerConfig(Config):
         server_group.add_argument('--pid-file', default="hs.pid",
                                   help="When running as a daemon, the file to"
                                   " store the pid in")
-        server_group.add_argument("-W", "--no-webclient", default=True,
-                                  action="store_false",
-                                  help="Don't host a web client.")
         server_group.add_argument("--manhole", metavar="PORT", dest="manhole",
                                   type=int,
                                   help="Turn on the twisted telnet manhole"
