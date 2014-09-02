@@ -78,7 +78,7 @@ class MessageHandler(BaseRoomHandler):
         """
         # TODO(paul): Why does 'event' not have a 'user' object?
         user = self.hs.parse_userid(event.user_id)
-        assert(user.is_mine)
+        assert user.is_mine, "User must be our own: %s" % (user,)
 
         if stamp_event:
             event.content["hsob_ts"] = int(self.clock.time_msec())
