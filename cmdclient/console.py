@@ -194,7 +194,7 @@ class SynapseCmd(cmd.Cmd):
                     user = "@" + user + ":" + self._domain()
 
                 reactor.callFromThread(self._do_login, user, p)
-                print " got %s " % p
+                #print " got %s " % p
         except Exception as e:
             print e
 
