@@ -1019,7 +1019,7 @@ This specification defines the following login types:
 Password-based
 --------------
 :Type: 
-  m.login.password
+  ``m.login.password``
 :Description: 
   Login is supported via a username and password.
 
@@ -1037,7 +1037,7 @@ process, or a standard error response.
 OAuth2-based
 ------------
 :Type: 
-  m.login.oauth2
+  ``m.login.oauth2``
 :Description:
   Login is supported via OAuth2 URLs. This login consists of multiple requests.
 
@@ -1090,7 +1090,7 @@ visits the REDIRECT_URI with the auth code= query parameter which returns::
 Email-based (code)
 ------------------
 :Type: 
-  m.login.email.code
+  ``m.login.email.code``
 :Description:
   Login is supported by typing in a code which is sent in an email. This login 
   consists of multiple requests.
@@ -1125,7 +1125,7 @@ the login process, or a standard error response.
 Email-based (url)
 -----------------
 :Type: 
-  m.login.email.url
+  ``m.login.email.url``
 :Description:
   Login is supported by clicking on a URL in an email. This login consists of 
   multiple requests.
