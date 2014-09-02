@@ -1402,10 +1402,23 @@ SRV Records
 
 Security
 ========
-- rate limiting
-
 .. NOTE::
   This section is a work in progress.
+
+Rate limiting
+-------------
+Home servers SHOULD implement rate limiting to reduce the risk of being overloaded. If a
+request is refused due to rate limiting, it should return a standard error response of
+the form::
+
+  {
+    "errcode": "M_LIMIT_EXCEEDED",
+    "error": "string",
+    "retry_after_ms": integer (optional)
+  }
+
+The ``retry_after_ms`` key SHOULD be included to tell the client how long they have to wait
+in milliseconds before they can try again.
 
 .. TODO
   - crypto (s-s auth)
@@ -1499,4 +1512,3 @@ User ID:
 .. _/join/<room_alias_or_id>: /-rooms/join
 
 .. _`Event Stream`: /-events/get_event_stream
-.. _`Initial Sync`: /-events/initial_sync
