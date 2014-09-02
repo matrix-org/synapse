@@ -269,11 +269,16 @@ class PresenceEventStreamTestCase(unittest.TestCase):
 
         hs.register_servlets()
 
-        hs.handlers.room_member_handler = Mock(spec=[
-            "get_rooms_for_user",
-        ])
-        hs.handlers.room_member_handler.get_rooms_for_user = (
-                lambda u: defer.succeed([]))
+        hs.handlers.room_member_handler = Mock(spec=[])
+
+        self.room_members = []
+
+        def get_rooms_for_user(user):
+            if user in self.room_members:
+                return ["a-room"]
+            else:
+                return []
+        hs.handlers.room_member_handler.get_rooms_for_user = get_rooms_for_user
 
         self.mock_datastore = hs.get_datastore()
 
@@ -285,6 +290,17 @@ class PresenceEventStreamTestCase(unittest.TestCase):
             return defer.succeed(None)
         self.mock_datastore.get_profile_avatar_url = get_profile_avatar_url
 
+        def user_rooms_intersect(user_list):
+            room_member_ids = map(lambda u: u.to_string(), self.room_members)
+
+            shared = all(map(lambda i: i in room_member_ids, user_list))
+            return defer.succeed(shared)
+        self.mock_datastore.user_rooms_intersect = user_rooms_intersect
+
+        def get_joined_hosts_for_room(room_id):
+            return []
+        self.mock_datastore.get_joined_hosts_for_room = get_joined_hosts_for_room
+
         self.presence = hs.get_handlers().presence_handler
 
         self.u_apple = hs.parse_userid("@apple:test")
@@ -292,6 +308,8 @@ class PresenceEventStreamTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_shortpoll(self):
+        self.room_members = [self.u_apple, self.u_banana]
+
         self.mock_datastore.set_presence_state.return_value = defer.succeed(
                 {"state": ONLINE})
         self.mock_datastore.get_presence_list.return_value = defer.succeed(
