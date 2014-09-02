@@ -163,8 +163,6 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
 
         // set target_user_id to keep things clear
         var target_user_id = chunk.state_key;
-        
-        var now = new Date().getTime();
 
         var isNewMember = !(target_user_id in $scope.members);
         if (isNewMember) {
@@ -174,6 +172,8 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             }
             if ("last_active_ago" in chunk.content) {
                 chunk.last_active_ago = chunk.content.last_active_ago;
+                $scope.now = new Date().getTime();
+                chunk.last_updated = $scope.now;
             }
             if ("displayname" in chunk.content) {
                 chunk.displayname = chunk.content.displayname;
@@ -181,7 +181,6 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             if ("avatar_url" in chunk.content) {
                 chunk.avatar_url = chunk.content.avatar_url;
             }
-            chunk.last_updated = now;
             $scope.members[target_user_id] = chunk;   
 
             if (target_user_id in $rootScope.presence) {
@@ -197,6 +196,8 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             }
             if ("last_active_ago" in chunk.content) {
                 member.last_active_ago = chunk.content.last_active_ago;
+                $scope.now = new Date().getTime();
+                member.last_updated = $scope.now;
             }
         }
     };
@@ -221,6 +222,8 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
 
         if ("last_active_ago" in chunk.content) {
             member.last_active_ago = chunk.content.last_active_ago;
+            $scope.now = new Date().getTime();
+            member.last_updated = $scope.now;
         }
 
         // this may also contain a new display name or avatar url, so check.
@@ -331,10 +334,6 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         // Make sure the initialSync has been before going further
         eventHandlerService.waitForInitialSyncCompletion().then(
             function() {
-                
-                // Some data has been retrieved from the iniialSync request
-                // So, the relative time starts here
-                $scope.now = new Date().getTime();
                 
                 var needsToJoin = true;
                 
