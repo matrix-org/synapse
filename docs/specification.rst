@@ -281,7 +281,9 @@ Example::
 
 Modifying aliases
 -----------------
-- Adding / removing aliases.
+- path to edit aliases
+- format when retrieving list of aliases. NOT complete list.
+- format for adding aliases.
 
 Permissions
 -----------
@@ -818,8 +820,12 @@ numbers, website URLs, etc...). This specification puts no requirements on the
 display name other than it being a valid unicode string.
 
 - Metadata extensibility
-- Bundled with which events? e.g. m.room.member
-- Generate own events? What type?
+- Changing profile info generates m.presence events ("presencelike")
+- keys on m.presence are optional, except presence which is required
+- m.room.member is populated with the current displayname at that point in time.
+- That is added by the HS, not you.
+- Display name changes also generates m.room.member with displayname key f.e. room
+  the user is in.
 
 Registration and login
 ======================
@@ -1283,7 +1289,9 @@ TODO
 
 Content repository
 ==================
-- thumbnail paths
+- path to upload
+- format for thumbnail paths, mention what it is protecting against.
+- content size limit and associated M_ERROR.
 
 Address book repository
 =======================
