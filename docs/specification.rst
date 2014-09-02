@@ -317,9 +317,11 @@ Modifying aliases
   This section is a work in progress.
 
 .. TODO kegan
-    - path to edit aliases
+    - path to edit aliases 
+    - PUT /directory/room/<room alias>  { room_id : foo }
+    - GET /directory/room/<room alias> { room_id : foo, servers: [a.com, b.com] }
     - format when retrieving list of aliases. NOT complete list.
-    - format for adding aliases.
+    - format for adding/removing aliases.
 
 Permissions
 -----------
