@@ -655,10 +655,20 @@ class PresenceHandler(BaseHandler):
             state = dict(push)
             del state["user_id"]
 
-            # Legacy handling
-            if "presence" not in state:
+            if "presence" in state:
+                # all is OK
+                pass
+            elif "state" in state:
+                # Legacy handling
                 state["presence"] = state["state"]
-            del state["state"]
+            else:
+                logger.warning("Received a presence 'push' EDU from %s without"
+                    + " either a 'presence' or 'state' key", origin
+                )
+                continue
+
+            if "state" in state:
+                del state["state"]
 
             if "last_active_ago" in state:
                 state["last_active"] = int(
