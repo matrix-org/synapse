@@ -351,7 +351,6 @@ Rooms
 Creation
 --------
 .. TODO kegan
-  - TODO: This creates a room creation event which serves as the root of the PDU graph for this room.
   - TODO: Key for invite these users?
   
 To create a room, a client has to use the |createRoom|_ API. There are various options
@@ -411,6 +410,22 @@ Example::
     "name": "The Grand Duke Pub",
     "topic": "All about happy hour"
   }
+
+The home server will create a ``m.room.create`` event when the room is
+created, which serves as the root of the PDU graph for this room. This
+event also has a ``creator`` key which contains the user ID of the room
+creator. It will also generate several other events in order to manage
+permissions in this room. This includes:
+
+ - ``m.room.power_levels`` : Sets the authority of the room creator.
+ - ``m.room.join_rules`` : Whether the room is "invite-only" or not.
+ - ``m.room.add_state_level``
+ - ``m.room.send_event_level`` : The power level required in order to
+   send a message in this room.
+ - ``m.room.ops_level`` : The power level required in order to kick or
+   ban a user from the room.
+
+See `Room Events`_ for more information on these events.
 
 Modifying aliases
 -----------------
