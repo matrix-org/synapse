@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-
 from twisted.internet import defer
+from twisted.trial import unittest
 
 from mock import Mock, patch
 
@@ -75,6 +74,24 @@ class DistributorTestCase(unittest.TestCase):
             self.assertIsInstance(mock_logger.warning.call_args[0][0],
                     str)
 
+    @defer.inlineCallbacks
+    def test_signal_catch_no_suppress(self):
+        # Gut-wrenching
+        self.dist.suppress_failures = False
+
+        self.dist.declare("whail")
+
+        observer = Mock()
+        observer.return_value = defer.fail(
+            Exception("Oopsie")
+        )
+
+        self.dist.observe("whail", observer)
+
+        d = self.dist.fire("whail")
+
+        yield self.assertFailure(d, Exception)
+
     def test_signal_prereg(self):
         observer = Mock()
         self.dist.observe("flare", observer)
@@ -85,5 +102,6 @@ class DistributorTestCase(unittest.TestCase):
         observer.assert_called_with(4, 5)
 
     def test_signal_undeclared(self):
-        with self.assertRaises(KeyError):
+        def code():
             self.dist.fire("notification")
+        self.assertRaises(KeyError, code)
