@@ -12,11 +12,12 @@
                 <div class="profile-avatar">
                     <img ng-src="{{ (null !== profile.avatarUrl) ? profile.avatarUrl : 'img/default-profile.png' }}" m-file-input="profile.avatarFile"/>
                 </div>
-                <div id="user-ids">
-                    <input size="40" ng-model="profile.displayName" placeholder="Your display name"/>
+                <div>
+                    <input id="user-displayname-input" size="40" ng-model="profile.displayName" placeholder="Your display name"/>
                     <br/>
-                    <button ng-disabled="(profile.displayName == profileOnServer.displayName) && (profile.avatarUrl == profileOnServer.avatarUrl)"
-                            ng-click="saveProfile()">Save</button>    
+                    <button id="user-save-button"
+                            ng-disabled="(profile.displayName === profileOnServer.displayName) && (profile.avatarUrl === profileOnServer.avatarUrl)"
+                            ng-click="saveProfile()">Save changes</button>
                 </div>
             </form>
         </div>

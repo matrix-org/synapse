@@ -525,3 +525,13 @@ a:active  { color: #000; }
     font-size: 24px;
 }
 
+#user-displayname-input {
+    width: 160px;
+    max-width: 155px;
+}
+
+#user-save-button {
+    width: 160px;
+    font-size: 14px;
+}
+
