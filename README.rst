@@ -6,7 +6,7 @@ VoIP[1].  The basics you need to know to get up and running are:
 
     - Chatrooms are distributed and do not exist on any single server.  Rooms 
       can be found using names like ``#matrix:matrix.org`` or 
-      ``#test:localhost:8080`` or they can be ephemeral.
+      ``#test:localhost:8008`` or they can be ephemeral.
     
     - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
       you will normally refer to yourself and others using a 3PID: email
@@ -14,8 +14,8 @@ VoIP[1].  The basics you need to know to get up and running are:
 
 The overall architecture is::
 
-      client <----> homeserver <=================> homeserver <-----> client
-                e.g. matrix.org:8080        e.g. mydomain.net:8080
+      client <----> homeserver <=====================> homeserver <----> client
+             https://matrix.org/_matrix      https://mydomain.net/_matrix
 
 Quick Start
 ===========
@@ -25,15 +25,15 @@ To get up and running:
     - To simply play with an **existing** homeserver you can
       just go straight to http://matrix.org/alpha.
     
-    - To run your own **private** homeserver on localhost:8080, install synapse 
+    - To run your own **private** homeserver on localhost:8008, install synapse 
       with ``python setup.py develop --user`` and then run one with
       ``python synapse/app/homeserver.py`` - you will find a webclient running
-      at http://localhost:8080 (use a recent Chrome, Safari or Firefox for now,
+      at http://localhost:8008 (use a recent Chrome, Safari or Firefox for now,
       please...)
              
     - To make the homeserver **public** and let it exchange messages with 
       other homeservers and participate in the overall Matrix federation, open 
-      up port 8080 and run ``python synapse/app/homeserver.py --host 
+      up port 8448 and run ``python synapse/app/homeserver.py --host 
       machine.my.domain.name``.  Then come join ``#matrix:matrix.org`` and
       say hi! :)
 
