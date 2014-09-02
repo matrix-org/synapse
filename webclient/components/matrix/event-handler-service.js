@@ -95,6 +95,15 @@ angular.module('eventHandlerService', [])
         $rootScope.presence[event.content.user_id] = event;
         $rootScope.$broadcast(PRESENCE_EVENT, event, isLiveEvent);
     };
+    
+    var handlePowerLevels = function(event, isLiveEvent) {
+        initRoom(event.room_id);
+
+       $rootScope.events.rooms[event.room_id][event.type] = event;
+
+        //TODO
+        //$rootScope.$broadcast(PRESENCE_EVENT, event, isLiveEvent);
+    };
 
     var handleCallEvent = function(event, isLiveEvent) {
         $rootScope.$broadcast(CALL_EVENT, event, isLiveEvent);
@@ -118,8 +127,17 @@ angular.module('eventHandlerService', [])
                 case "m.presence":
                     handlePresence(event, isLiveEvent);
                     break;
+                case 'm.room.ops_levels':
+                case 'm.room.send_event_level':
+                case 'm.room.add_state_level':
+                case 'm.room.join_rules':
+                case 'm.room.power_levels':
+                    handlePowerLevels(event, isLiveEvent);
+                    break;
+
                 default:
                     console.log("Unable to handle event type " + event.type);
+                    console.log(JSON.stringify(event, undefined, 4));
                     break;
             }
             if (event.type.indexOf('m.call.') == 0) {

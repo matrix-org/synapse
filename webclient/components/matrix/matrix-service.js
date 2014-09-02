@@ -484,6 +484,30 @@ angular.module('matrixService', [])
         
         getRoomIdToAliasMapping: function(roomId) {
             return localStorage.getItem(MAPPING_PREFIX+roomId);
+        },
+
+
+        /****** Power levels management ******/
+
+        /**
+         * Return the power level of an user in a particular room
+         * @param {String} room_id the room id
+         * @param {String} user_id the user id
+         * @returns {Number} a value between 0 and 10
+         */
+        getUserPowerLevel: function(room_id, user_id) {
+            var powerLevel = 0;
+            var room = $rootScope.events.rooms[room_id];
+            if (room && room["m.room.power_levels"]) {
+                if (user_id in room["m.room.power_levels"].content) {
+                    powerLevel = room["m.room.power_levels"].content[user_id];
+                }
+                else {
+                    // Use the room default user power
+                    powerLevel = room["m.room.power_levels"].content["default"];
+                }
+            }
+            return powerLevel;
         }
 
     };

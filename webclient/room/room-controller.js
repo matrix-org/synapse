@@ -233,6 +233,13 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         }
     };
 
+    var updateUserPowerLevel = function(user_id) {
+        var member = $scope.members[user_id];
+        if (member) {
+            member.powerLevel = matrixService.getUserPowerLevel($scope.room_id, user_id);
+        }
+    }
+
     $scope.send = function() {
         if ($scope.textInput === "") {
             return;
@@ -382,6 +389,9 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                 for (var i = 0; i < response.data.chunk.length; i++) {
                     var chunk = response.data.chunk[i];
                     updateMemberList(chunk);
+
+                    // Add his power level
+                    updateUserPowerLevel(chunk.user_id);
                 }
 
                 // Arm list timing update timer
