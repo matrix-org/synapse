@@ -112,7 +112,8 @@ class Config(object):
         if config_args.generate_config:
             config_dir_path = os.path.dirname(config_args.config_path)
             config_dir_path = os.path.abspath(config_dir_path)
-            os.makedirs(config_dir_path)
+            if not os.path.exists(config_dir_path):
+                os.makedirs(config_dir_path)
             cls.generate_config(args, config_dir_path)
             config = {}
             for key, value in vars(args).items():
