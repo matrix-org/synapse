@@ -6,7 +6,7 @@ To upgrade the database schema, run::
     ./database-prepare-for-0.2.0.sh "<database>.db"
 
 
-The home server npw requires setting up of SSL config before it can run. To
+The home server now requires setting up of SSL config before it can run. To
 automatically generate some default config that can be edited use::
 
     $ python synapse/app/homeserver.py \
