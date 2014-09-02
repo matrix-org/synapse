@@ -781,7 +781,7 @@ prefixed with ``m.``
   Example:
     TODO
   Description:
-    TODO
+    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
 
 ``m.room.invite_join``
   Summary:
@@ -793,7 +793,7 @@ prefixed with ``m.``
   Example:
     TODO
   Description:
-    TODO
+    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
     
 ``m.room.join_rules``
   Summary:
@@ -805,7 +805,7 @@ prefixed with ``m.``
   Example:
     TODO
   Description:
-    TODO
+    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
     
 ``m.room.power_levels``
   Summary:
@@ -817,7 +817,7 @@ prefixed with ``m.``
   Example:
     TODO
   Description:
-    TODO
+    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
     
 ``m.room.add_state_level``
   Summary:
@@ -829,7 +829,7 @@ prefixed with ``m.``
   Example:
     TODO
   Description:
-    TODO
+    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
     
 ``m.room.send_event_level``
   Summary:
@@ -841,7 +841,7 @@ prefixed with ``m.``
   Example:
     TODO
   Description:
-    TODO
+    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
     
 ``m.room.ops_levels``
   Summary:
@@ -853,7 +853,7 @@ prefixed with ``m.``
   Example:
     TODO
   Description:
-    TODO
+    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
 
 ``m.room.message``
   Summary:
