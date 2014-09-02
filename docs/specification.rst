@@ -1576,11 +1576,6 @@ SRV Records
 .. TODO
   - Why it is needed
 
-VoIP
-====
-.. NOTE::
-This section is a work in progress.
-
 Security
 ========
 .. NOTE::
