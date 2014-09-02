@@ -28,6 +28,7 @@ class Codes(object):
     UNKNOWN = "M_UNKNOWN"
     NOT_FOUND = "M_NOT_FOUND"
     UNKNOWN_TOKEN = "M_UNKNOWN_TOKEN"
+    LIMIT_EXCEEDED = "M_LIMIT_EXCEEDED"
 
 
 class CodeMessageException(Exception):

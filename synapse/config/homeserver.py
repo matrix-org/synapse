@@ -17,8 +17,10 @@ from .tls import TlsConfig
 from .server import ServerConfig
 from .logger import LoggingConfig
 from .database import DatabaseConfig
+from .ratelimiting import RatelimitConfig
 
-class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig):
+class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
+                       RatelimitConfig):
     pass
 
 if __name__=='__main__':
