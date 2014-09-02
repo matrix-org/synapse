@@ -31,7 +31,7 @@ class TlsConfig(Config):
         self.tls_private_key = self.read_tls_private_key(
             args.tls_private_key_path
         )
-        self.tls_dh_params_path = self.check_path(
+        self.tls_dh_params_path = self.check_file(
             args.tls_dh_params_path, "tls_dh_params"
         )
 
