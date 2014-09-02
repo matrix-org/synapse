@@ -7,7 +7,7 @@ To upgrade the database schema, run::
 
 
 The home server now requires setting up of SSL config before it can run. To
-automatically generate the default config use::
+automatically generate default config use::
 
     $ python synapse/app/homeserver.py \
         --server-name machine.my.domain.name \
