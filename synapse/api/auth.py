@@ -163,9 +163,16 @@ class Auth(object):
             if not caller_in_room:  # trying to leave a room you aren't joined
                 raise AuthError(403, "You are not in room %s." % event.room_id)
             elif target_user_id != event.user_id:
-                # trying to force another user to leave
-                raise AuthError(403, "Cannot force %s to leave." %
-                                target_user_id)
+                user_level = yield self.store.get_power_level(
+                    event.room_id,
+                    event.user_id,
+                )
+                _, kick_level = yield self.store.get_ops_levels(event.room_id)
+
+                if user_level < kick_level:
+                    raise AuthError(
+                        403, "You cannot kick user %s." % target_user_id
+                    )
         elif Membership.BAN == membership:
             user_level = yield self.store.get_power_level(
                 event.room_id,
