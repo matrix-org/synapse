@@ -41,9 +41,11 @@ class ServerConfig(Config):
         server_group.add_argument("--signing-key-path",
                                   help="The signing key to sign messages with")
         server_group.add_argument("-p", "--bind-port", metavar="PORT",
-                                  type=int, help="https port to listen on")
+                                  type=int, help="https port to listen on",
+                                  default=8448)
         server_group.add_argument("--unsecure-port", metavar="PORT",
-                                  type=int, help="http port to listen on")
+                                  type=int, help="http port to listen on",
+                                  default=8008)
         server_group.add_argument("--bind-host", default="",
                                   help="Local interface to listen on")
         server_group.add_argument("-D", "--daemonize", action='store_true',
