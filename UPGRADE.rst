@@ -1,3 +1,29 @@
+Upgrading to v0.2.0
+===================
+
+To upgrade the database schema, run::
+
+    ./database-prepare-for-0.2.0.sh "<database>.db"
+
+
+The home server npw requires setting up of SSL config before it can run. To
+automatically generate some default config that can be edited use::
+
+    $ python synapse/app/homeserver.py \
+        --server-name machine.my.domain.name \
+        --bind-port 8448 \
+        --config-path homeserver.config \
+        --generate-config
+
+After editing the config, you can run the home server using::
+
+    $ python synapse/app/homeserver.py --config-path homeserver.config
+
+See the README.rst for more information.
+
+Also note that many config options have been renamed.
+
+
 Upgrading to v0.0.1
 ===================
 
