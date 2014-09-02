@@ -1,11 +1,73 @@
 Matrix Specification
 ====================
 
-TODO(Introduction) : Matthew
- - Similar to intro paragraph from README.
- - Explaining the overall mission, what this spec describes...
- - "What is Matrix?"
- - Draw parallels with email?
+WARNING
+=======
+
+.. NOTE::
+  The Matrix specification is still very much evolving: the API is not yet frozen
+  and this document is in places incomplete, stale, and may contain security
+  issues. Needless to say, we have made every effort to highlight the problem
+  areas that we're aware of.
+  
+  We're publishing it at this point because it's complete enough to be more than
+  useful and provide a canonical reference to how Matrix is evolving. Our end
+  goal is to mirror WHATWG's "Living Standard" approach (see
+  http://wiki.whatwg.org/wiki/FAQ#What_does_.22Living_Standard.22_mean.3F) -
+  except right now Matrix is more in the process of being born than actually being
+  living!
+
+Introduction
+============
+
+Matrix is a new set of open APIs for open-federated Instant Messaging and VoIP
+functionality, designed to create and support a new global real-time
+communication ecosystem on the internet. This specification is the ongoing
+result of standardising the APIs used by the various components of the Matrix
+ecosystem to communicate with one another.
+
+The principles that Matrix attempts to follow are:
+
+ - Pragmatic Web-friendly APIs (i.e. JSON over REST)
+ - Keep It Simple & Stupid
+   - provide a simple architecture with minimal third-party dependencies.
+ - Fully open:
+   - Fully open federation - anyone should be able to participate in the global Matrix network
+   - Fully open standard - publicly documented standard with no IP or patent licensing encumbrances
+   - Fully open source reference implementation - liberally-licensed example implementations
+     with no IP or patent licensing encumbrances
+ - Empowering the end-user
+   - The user should be able to choose the server and clients they use
+   - The user should be control how private their communication is
+   - The user should know precisely where their data is stored
+ - Fully decentralised - no single points of control over conversations or the network as a whole
+ - Learning from history to avoid repeating it
+   - Trying to take the best aspects of XMPP, SIP, IRC, SMTP, IMAP and NNTP whilst trying to avoid their failings
+
+The functionality that Matrix provides includes:
+
+ - Creation and management of fully distributed chat rooms with no
+   single points of control or failure
+ - Eventually-consistent cryptographically secure synchronisation of room 
+   state across a global open network of federated servers and services
+ - Sending and receiving extensible messages in a room with (optional)
+   end-to-end encryption
+ - Extensible user management (inviting, joining, leaving, kicking, banning)
+   mediated by a power-level based user privilege system.
+ - Extensible room state management (room naming, aliasing, topics, bans)
+ - Extensible user profile management (avatars, displaynames, etc)
+ - Managing user accounts (registration, login, logout)
+ - Use of 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
+   Facebook accounts to authenticate, identify and discover users on Matrix.
+ - Trusted federation of Identity servers for:
+   - Publishing user public keys for PKI
+   - Mapping of 3PIDs to Matrix IDs
+
+The end goal of Matrix is to be a ubiquitous messaging layer for synchronising
+arbitrary data between sets of people, devices and services - be that for instant
+messages, VoIP call setups, or any other objects that need to be reliably and
+persistently pushed from A to B in an interoperable and federated manner.
+
 
 Architecture
 ============
@@ -28,38 +90,43 @@ other directly.
        |                  |<--------( HTTP )-----------|                  |
        +------------------+        Federation          +------------------+
 
-A "Client" is an end-user, typically a human using a web application or mobile app. Clients use the
-"Client-to-Server" (C-S) API to communicate with their home server. A single Client is usually
-responsible for a single user account. A user account is represented by their "User ID". This ID is
-namespaced to the home server which allocated the account and looks like::
+A "Client" typically represents a human using a web application or mobile app. Clients use the
+"Client-to-Server" (C-S) API to communicate with their home server, which stores their profile data and
+their record of the conversations in which they participate. Each client is associated with a user account
+(and may optionally support multiple user accounts). A user account is represented by a unique "User ID". This
+ID is namespaced to the home server which allocated the account and looks like::
 
   @localpart:domain
 
 The ``localpart`` of a user ID may be a user name, or an opaque ID identifying this user. They are
 case-insensitive.
 
+.. TODO
+    - Need to specify precise grammar for Matrix IDs
+
 A "Home Server" is a server which provides C-S APIs and has the ability to federate with other HSes.
 It is typically responsible for multiple clients. "Federation" is the term used to describe the
 sharing of data between two or more home servers.
 
-Data in Matrix is encapsulated in an "Event". An event is an action within the system. Typically each
-action (e.g. sending a message) correlates with exactly one event. Each event has a ``type`` which is
-used to differentiate different kinds of data. ``type`` values SHOULD be namespaced according to standard
-Java package naming conventions, e.g. ``com.example.myapp.event``. Events are usually sent in the context
-of a "Room".
+Data in Matrix is encapsulated in an "event". An event is an action within the system. Typically each
+action (e.g. sending a message) correlates with exactly one event. Each event has a ``type`` which is used
+to differentiate different kinds of data. ``type`` values MUST be uniquely globally namespaced following
+Java's `package naming conventions <http://docs.oracle.com/javase/specs/jls/se5.0/html/packages.html#7.7>`,
+e.g. ``com.example.myapp.event``. The special top-level namespace ``m.`` is reserved for events defined
+in the Matrix specification. Events are usually sent in the context of a "Room".
 
 Room structure
 --------------
 
 A room is a conceptual place where users can send and receive events. Rooms 
 can be created, joined and left. Events are sent to a room, and all 
-participants in that room will receive the event. Rooms are uniquely 
-identified via a "Room ID", which look like::
+participants in that room with sufficient access will receive the event. Rooms are uniquely 
+identified internally via a "Room ID", which look like::
 
   !opaque_id:domain
 
 There is exactly one room ID for each room. Whilst the room ID does contain a
-domain, it is simply for namespacing room IDs. The room does NOT reside on the
+domain, it is simply for globally namespacing room IDs. The room does NOT reside on the
 domain specified. Room IDs are not meant to be human readable. They ARE
 case-sensitive.
 
@@ -101,9 +168,12 @@ Each room can also have multiple "Room Aliases", which looks like::
 
   #room_alias:domain
 
-A room alias "points" to a room ID. The room ID the alias is pointing to can be obtained
-by visiting the domain specified. Room aliases are designed to be human readable strings
-which can be used to publicise rooms. They are case-insensitive. Note that the mapping 
+  .. TODO
+      - Need to specify precise grammar for Room IDs
+
+A room alias "points" to a room ID and is the human-readable label by which rooms are
+publicised and discovered.  The room ID the alias is pointing to can be obtained
+by visiting the domain specified. They are case-insensitive. Note that the mapping 
 from a room alias to a room ID is not fixed, and may change over time to point to a 
 different room ID. For this reason, Clients SHOULD resolve the room alias to a room ID 
 once and then use that ID on subsequent requests.
@@ -122,12 +192,16 @@ once and then use that ID on subsequent requests.
    | #bike   >> !4rguxf:matrix.org  |
    |________________________________|
 
+.. TODO kegan
+   - show the actual API rather than pseudo-API?
+
        
 Identity
 --------
-Users in Matrix are identified via their user ID. However, existing ID namespaces
-can also be used in order to identify Matrix users. A Matrix "Identity" describes
-both the user ID and any other existing ID namespaces *linked* to their account.
+
+Users in Matrix are identified via their user ID. However, existing ID namespaces can also
+be used in order to identify Matrix users. A Matrix "Identity" describes both the user ID
+and any other existing IDs from third party namespaces *linked* to their account.
 
 Matrix users can *link* third-party IDs (3PIDs) such as email addresses, social
 network accounts and phone numbers to their 
@@ -135,10 +209,10 @@ user ID. Linking 3PIDs creates a mapping from a 3PID to a user ID. This mapping
 can then be used by other Matrix users in order to discover other users, according
 to a strict set of privacy permissions.
 
-In order to ensure that the mapping from 3PID to user ID is genuine, dedicated
-trusted servers called "Identity Servers" (IS) are used to perform authentication
-of the 3PID. Identity servers are also used to preserve the mapping indefinitely,
-by replicating the mappings across multiple ISes.
+In order to ensure that the mapping from 3PID to user ID is genuine, a globally federated
+cluster of trusted "Identity Servers" (IS) are used to perform authentication of the 3PID.
+Identity servers are also used to preserve the mapping indefinitely, by replicating the
+mappings across multiple ISes.
 
 Usage of an IS is not required in order for a client application to be part of 
 the Matrix ecosystem. However, by not using an IS, discovery of users is greatly
@@ -146,8 +220,28 @@ impacted.
 
 API Standards
 -------------
-All communication in Matrix is performed over HTTP[S] using a Content-Type of ``application/json``.
-In addition, all strings MUST be encoded as UTF-8. Any errors which occur on the Matrix API level 
+
+The mandatory baseline for communication in Matrix is exchanging JSON objects over RESTful
+HTTP APIs. HTTPS is mandated as the baseline for server-server (federation) communication.
+HTTPS is recommended for client-server communication, although HTTP may be supported as a
+fallback to support basic HTTP clients. More efficient optional transports for
+client-server communication will in future be supported as optional extensions - e.g. a
+packed binary encoding over stream-cipher encrypted TCP socket for
+low-bandwidth/low-roundtrip mobile usage.
+
+.. TODO
+  We need to specify capability negotiation for extensible transports
+
+For the default HTTP transport, all API calls use a Content-Type of ``application/json``.
+In addition, all strings MUST be encoded as UTF-8.
+
+Clients are authenticated using opaque ``access_token`` strings (see `Registration and
+Login`_ for details), passed as a querystring parameter on all requests.
+
+.. TODO
+  Need to specify any HMAC or access_token lifetime/ratcheting tricks
+
+Any errors which occur on the Matrix API level 
 MUST return a "standard error response". This is a JSON object which looks like::
 
   {
@@ -199,46 +293,53 @@ Some requests have unique error codes:
 :``M_LOGIN_EMAIL_URL_NOT_YET``:
   Encountered when polling for an email link which has not been clicked yet.
 
-The C-S API typically uses ``HTTP POST`` to submit requests. This means these requests
-are not idempotent. The C-S API also allows ``HTTP PUT`` to make requests idempotent.
-In order to use a ``PUT``, paths should be suffixed with ``/{txnId}``. ``{txnId}`` is a
-client-generated transaction ID which identifies the request. Crucially, it **only** 
-serves to identify new requests from retransmits. After the request has finished, the
-``{txnId}`` value should be changed (how is not specified, it could be a monotonically
-increasing integer, etc). It is preferable to use ``HTTP PUT`` to make sure requests to 
-send messages do not get sent more than once should clients need to retransmit requests.
+The C-S API typically uses ``HTTP POST`` to submit requests. This means these requests are
+not idempotent. The C-S API also allows ``HTTP PUT`` to make requests idempotent. In order
+to use a ``PUT``, paths should be suffixed with ``/{txnId}``. ``{txnId}`` is a
+unique client-generated transaction ID which identifies the request, and is scoped to a given
+Client (identified by that client's ``access_token``). Crucially, it **only** serves to
+identify new requests from retransmits. After the request has finished, the ``{txnId}``
+value should be changed (how is not specified; a monotonically increasing integer is
+recommended). It is preferable to use ``HTTP PUT`` to make sure requests to send messages
+do not get sent more than once should clients need to retransmit requests.
 
 Valid requests look like::
 
-    POST /some/path/here
+    POST /some/path/here?access_token=secret
     {
       "key": "This is a post."
     }
 
-    PUT /some/path/here/11
+    PUT /some/path/here/11?access_token=secret
     {
       "key": "This is a put with a txnId of 11."
     }
 
 In contrast, these are invalid requests::
 
-    POST /some/path/here/11
+    POST /some/path/here/11?access_token=secret
     {
       "key": "This is a post, but it has a txnId."
     }
 
-    PUT /some/path/here
+    PUT /some/path/here?access_token=secret
     {
       "key": "This is a put but it is missing a txnId."
     }
 
 Receiving live updates on a client
 ----------------------------------
+
 Clients can receive new events by long-polling the home server. This will hold open the
 HTTP connection for a short period of time waiting for new events, returning early if an
-event occurs. This is called the `Event Stream`_. All events which the client is authorised 
-to view will appear in the event stream. When the stream is closed, an ``end`` token is 
-returned. This token can be used in the next request to continue where the client left off.
+event occurs. This is called the `Event Stream`_. All events which are visible to the
+client and match the client's query will appear in the event stream. When the request
+returns, an ``end`` token is included in the response. This token can be used in the next
+request to continue where the client left off.
+
+.. TODO
+  Do we ever return multiple events in a single request? Do we ever support streaming
+  requests? Why not websockets?
 
 When the client first logs in, they will need to initially synchronise with their home
 server. This is achieved via the |initialSync|_ API. This API also returns an ``end``
@@ -1474,6 +1575,11 @@ SRV Records
 
 .. TODO
   - Why it is needed
+
+VoIP
+====
+.. NOTE::
+This section is a work in progress.
 
 Security
 ========
