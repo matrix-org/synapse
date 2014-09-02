@@ -21,26 +21,6 @@ from base import RestServlet, client_path_pattern
 import json
 
 
-class ProfileRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/profile/(?P<user_id>[^/]*)")
-
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
-        user = self.hs.parse_userid(user_id)
-
-        displayname = yield self.handlers.profile_handler.get_displayname(
-            user,
-        )
-        avatar_url = yield self.handlers.profile_handler.get_avatar_url(
-            user,
-        )
-
-        defer.returnValue((200, {
-                                    "displayname": displayname,
-                                    "avatar_url": avatar_url
-                                }))
-
-
 class ProfileDisplaynameRestServlet(RestServlet):
     PATTERN = client_path_pattern("/profile/(?P<user_id>[^/]*)/displayname")
 
@@ -107,7 +87,27 @@ class ProfileAvatarURLRestServlet(RestServlet):
         return (200, {})
 
 
+class ProfileRestServlet(RestServlet):
+    PATTERN = client_path_pattern("/profile/(?P<user_id>[^/]*)")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, user_id):
+        user = self.hs.parse_userid(user_id)
+
+        displayname = yield self.handlers.profile_handler.get_displayname(
+            user,
+        )
+        avatar_url = yield self.handlers.profile_handler.get_avatar_url(
+            user,
+        )
+
+        defer.returnValue((200, {
+                                    "displayname": displayname,
+                                    "avatar_url": avatar_url
+                                }))
+
+
 def register_servlets(hs, http_server):
-    ProfileRestServlet(hs).register(http_server)
     ProfileDisplaynameRestServlet(hs).register(http_server)
     ProfileAvatarURLRestServlet(hs).register(http_server)
+    ProfileRestServlet(hs).register(http_server)
