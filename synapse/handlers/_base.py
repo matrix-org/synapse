@@ -35,12 +35,12 @@ class BaseHandler(object):
         allowed, time_allowed = self.ratelimiter.send_message(
             user_id, time_now,
             msg_rate_hz=self.hs.config.rc_messages_per_second,
-            burst_count=self.hs.config.rc_messsage_burst_count,
+            burst_count=self.hs.config.rc_message_burst_count,
         )
         if not allowed:
             raise cs_error(
                 "Limit exceeded",
-                Codes.M_LIMIT_EXCEEDED,
+                Codes.LIMIT_EXCEEDED,
                 retry_after_ms=1000*(time_allowed - time_now),
             )
 

@@ -12,10 +12,10 @@ class RatelimitConfig(Config):
         super(RatelimitConfig, cls).add_arguments(parser)
         rc_group = parser.add_argument_group("ratelimiting")
         rc_group.add_argument(
-            "--rc-messages-per-second", type=float, default=0.2
+            "--rc-messages-per-second", type=float, default=0.2,
             help="number of messages a client can send per second"
         )
         rc_group.add_argument(
-            "--rc_messsage_burst_count", type=float, default=10
+            "--rc-message-burst-count", type=float, default=10,
             help="number of message a client can send before being throttled"
         )

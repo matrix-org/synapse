@@ -49,6 +49,7 @@ class RoomCreationHandler(BaseRoomHandler):
             SynapseError if the room ID was taken, couldn't be stored, or
             something went horribly wrong.
         """
+        self.ratelimit(user_id)
 
         if "room_alias_name" in config:
             room_alias = RoomAlias.create_local(
