@@ -118,18 +118,31 @@ once and then use that ID on subsequent requests.
    |          domain.com            |
    | Mappings:                      |
    | #matrix >> !aaabaa:matrix.org  |
-   | #golf >> !wfeiofh:sport.com    |
-   | #bike >> !4rguxf:matrix.org    |
+   | #golf   >> !wfeiofh:sport.com  |
+   | #bike   >> !4rguxf:matrix.org  |
    |________________________________|
 
        
 Identity
 --------
-- Identity in relation to 3PIDs. Discovery of users based on 3PIDs.
-- Identity servers; trusted clique of servers which replicate content.
-- They govern the mapping of 3PIDs to user IDs and the creation of said mappings.
-- Not strictly required in order to communicate.
+Users in Matrix are identified via their user ID. However, existing ID namespaces
+can also be used in order to identify Matrix users. A Matrix "Identity" describes
+both the user ID and any other existing ID namespaces *linked* to their account.
 
+Matrix users can *link* third-party IDs (3PIDs) such as email addresses, social
+network accounts and phone numbers to their 
+user ID. Linking 3PIDs creates a mapping from a 3PID to a user ID. This mapping
+can then be used by other Matrix users in order to discover other users, according
+to a strict set of privacy permissions.
+
+In order to ensure that the mapping from 3PID to user ID is genuine, dedicated
+trusted servers called "Identity Servers" (IS) are used to perform authentication
+of the 3PID. Identity servers are also used to preserve the mapping indefinitely,
+by replicating the mappings across multiple ISes.
+
+Usage of an IS is not required in order for a client application to be part of 
+the Matrix ecosystem. However, by not using an IS, discovery of users is greatly
+impacted.
 
 API Standards
 -------------
