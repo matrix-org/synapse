@@ -36,34 +36,27 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
     function($routeProvider, $provide, $httpProvider) {
         $routeProvider.
             when('/login', {
-                templateUrl: 'login/login.html',
-                controller: 'LoginController'
+                templateUrl: 'login/login.html'
             }).
             when('/register', {
-                templateUrl: 'login/register.html',
-                controller: 'RegisterController'
+                templateUrl: 'login/register.html'
             }).
             when('/room/:room_id_or_alias', {
-                templateUrl: 'room/room.html',
-                controller: 'RoomController'
+                templateUrl: 'room/room.html'
             }).
             when('/room/', {    // room URL with room alias in it (ex: http://127.0.0.1:8000/#/room/#public:localhost:8080) will come here.
                                 // The reason is that 2nd hash key breaks routeProvider parameters cutting so that the URL will not match with 
                                 // the previous '/room/:room_id_or_alias' URL rule
-                templateUrl: 'room/room.html',
-                controller: 'RoomController'
+                templateUrl: 'room/room.html'
             }).
             when('/', {
-                templateUrl: 'home/home.html',
-                controller: 'HomeController'
+                templateUrl: 'home/home.html'
             }).
             when('/settings', {
-                templateUrl: 'settings/settings.html',
-                controller: 'SettingsController'
+                templateUrl: 'settings/settings.html'
             }).
             when('/user/:user_matrix_id', {
-                templateUrl: 'user/user.html',
-                controller: 'UserController'
+                templateUrl: 'user/user.html'
             }).
             otherwise({
                 redirectTo: '/'
