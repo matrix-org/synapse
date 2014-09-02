@@ -17,8 +17,8 @@ limitations under the License.
 'use strict';
 
 angular.module('HomeController', ['matrixService', 'eventHandlerService', 'RecentsController'])
-.controller('HomeController', ['$scope', '$location', 'matrixService', 
-                               function($scope, $location, matrixService) {
+.controller('HomeController', ['$scope', '$location', 'matrixService', 'eventHandlerService', 
+                               function($scope, $location, matrixService, eventHandlerService) {
 
     $scope.config = matrixService.config();
     $scope.public_rooms = [];
@@ -72,7 +72,6 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
                 response.data.room_id);
                 matrixService.createRoomIdToAliasMapping(
                     response.data.room_id, response.data.room_alias);
-                refresh();
             },
             function(error) {
                 $scope.feedback = "Failure: " + error.data;
@@ -132,6 +131,14 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
                 $scope.feedback = "Can't load avatar URL";
             } 
         );
+
+        // Listen to room creation event in order to update the public rooms list
+        $scope.$on(eventHandlerService.ROOM_CREATE_EVENT, function(ngEvent, event, isLive) {
+            if (isLive) {
+                // As we do not know if this room is public, do a full list refresh
+                refresh();
+            }
+        });
 
         refresh();
     };

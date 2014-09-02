@@ -47,6 +47,11 @@ angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
                 $scope.rooms[event.room_id].lastMsg = event;
             }
         });
+        $scope.$on(eventHandlerService.ROOM_CREATE_EVENT, function(ngEvent, event, isLive) {
+            if (isLive) {
+                $scope.rooms[event.room_id] = event;
+            }
+        });
     };
 
     

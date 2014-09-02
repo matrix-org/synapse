@@ -28,6 +28,7 @@ if typically all the $on method would do is update its own $scope.
 */
 angular.module('eventHandlerService', [])
 .factory('eventHandlerService', ['matrixService', '$rootScope', '$q', function(matrixService, $rootScope, $q) {
+    var ROOM_CREATE_EVENT = "ROOM_CREATE_EVENT";
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
     var PRESENCE_EVENT = "PRESENCE_EVENT";
@@ -48,7 +49,7 @@ angular.module('eventHandlerService', [])
             $rootScope.events.rooms[room_id].messages = [];
             $rootScope.events.rooms[room_id].members = {};
         }
-    }
+    };
 
     var resetRoomMessages = function(room_id) {
         if ($rootScope.events.rooms[room_id]) {
@@ -56,6 +57,13 @@ angular.module('eventHandlerService', [])
         }
     };
     
+    var handleRoomCreate = function(event, isLiveEvent) {
+        initRoom(event.room_id);
+
+        // For now, we do not use the event data. Simply signal it to the app controllers
+        $rootScope.$broadcast(ROOM_CREATE_EVENT, event, isLiveEvent);
+    };
+
     var handleMessage = function(event, isLiveEvent) {
         initRoom(event.room_id);
         
@@ -110,6 +118,7 @@ angular.module('eventHandlerService', [])
     };
     
     return {
+        ROOM_CREATE_EVENT: ROOM_CREATE_EVENT,
         MSG_EVENT: MSG_EVENT,
         MEMBER_EVENT: MEMBER_EVENT,
         PRESENCE_EVENT: PRESENCE_EVENT,
@@ -118,6 +127,9 @@ angular.module('eventHandlerService', [])
     
         handleEvent: function(event, isLiveEvent) {
             switch(event.type) {
+                case "m.room.create":
+                    handleRoomCreate(event, isLiveEvent);
+                    break;
                 case "m.room.message":
                     handleMessage(event, isLiveEvent);
                     break;
@@ -140,7 +152,7 @@ angular.module('eventHandlerService', [])
                     console.log(JSON.stringify(event, undefined, 4));
                     break;
             }
-            if (event.type.indexOf('m.call.') == 0) {
+            if (event.type.indexOf('m.call.') === 0) {
                 handleCallEvent(event, isLiveEvent);
             }
         },
