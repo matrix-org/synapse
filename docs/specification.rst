@@ -338,7 +338,8 @@ returns, an ``end`` token is included in the response. This token can be used in
 request to continue where the client left off.
 
 .. TODO
-  Do we ever return multiple events in a single request? Do we ever support streaming
+  Do we ever return multiple events in a single request?  Don't we get lots of request
+  setup RTT latency if we only do one event per request? Do we ever support streaming
   requests? Why not websockets?
 
 When the client first logs in, they will need to initially synchronise with their home
