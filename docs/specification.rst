@@ -269,11 +269,35 @@ which can be set when creating a room:
     The alias will belong on the same home server which created the room, e.g.
     ``!qadnasoi:domain.com >>> #room_alias_name:domain.com``
 
+``name``
+  Type: 
+    String
+  Optional: 
+    Yes
+  Value:
+    The ``name`` value for the ``m.room.name`` state event.
+  Description:
+    If this is included, an ``m.room.name`` event will be sent into the room to indicate the
+    name of the room. See "Room Events" for more information on ``m.room.name``.
+
+``topic``
+  Type: 
+    String
+  Optional: 
+    Yes
+  Value:
+    The ``topic`` value for the ``m.room.topic`` state event.
+  Description:
+    If this is included, an ``m.room.topic`` event will be sent into the room to indicate the
+    topic for the room. See "Room Events" for more information on ``m.room.topic``.
+
 Example::
 
   {
     "visibility": "public", 
-    "room_alias_name": "the pub"
+    "room_alias_name": "the pub",
+    "name": "The Grand Duke Pub",
+    "topic": "All about happy hour"
   }
 
 - TODO: This creates a room creation event which serves as the root of the PDU graph for this room.
@@ -399,14 +423,6 @@ If all members in a room leave, that room becomes eligible for deletion.
 
 Banning users in a room
 -----------------------
-- TODO : Needs impl!
-- TODO : How do we expose the ban list? A room state event? How do we handle
-  racing with updating the list? Scoped state_key to user? 
-  E.g. /state/m.room.member.banlist/@user:domain  { reason: foo }
-- TODO: Any safeguards to prevent everyone banning everyone and locking out the
-  room? Or relying on decaying nature of power levels?
-- Should the membership enum be "kick" instead and then use the banlist as "you've
-  actually been banned."?
 
 A user may decide to ban another user in a room. 'Banning' forces the target user
 to leave the room and prevents them from re-joining the room. A banned user will
@@ -420,10 +436,14 @@ required power level. To ban a user, a request should be made to
     "reason": "string: <reason for the ban>"
   }
   
-Banning a user adjusts the banned member's membership state and adds their user ID to
-a ban list. The ban list state event is stored at TODO and looks like TODO. Like with
-other membership changes, a user can directly adjust the target member's state, but
-unless their name is added to the ban list, they will be able to re-join the room.
+Banning a user adjusts the banned member's membership state to ``ban`` and adjusts
+the power level of this event to a level higher than the banned person. Like 
+with other membership changes, a user can directly adjust the target member's 
+state, by making a request to ``/rooms/<room id>/state/m.room.member/<user id>``::
+
+  {
+    "membership": "ban"
+  }
 
 Events in a room
 ----------------
