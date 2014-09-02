@@ -391,6 +391,32 @@ If all members in a room leave, that room becomes eligible for deletion.
  - TODO: Grace period before deletion?
  - TODO: Under what conditions should a room NOT be purged?
 
+Banning users in a room
+-----------------------
+- TODO : Needs impl!
+- TODO : How do we expose the ban list? A room state event? How do we handle
+  racing with updating the list? Scoped state_key to user? 
+  E.g. /state/m.room.member.banlist/@user:domain  { reason: foo }
+- TODO: Any safeguards to prevent everyone banning everyone and locking out the
+  room? Or relying on decaying nature of power levels?
+- Should the membership enum be "kick" instead and then use the banlist as "you've
+  actually been banned."?
+
+A user may decide to ban another user in a room. 'Banning' forces the target user
+to leave the room and prevents them from re-joining the room. In order to ban
+someone, the user performing the ban MUST have the required power level. To ban
+a user, a request should be made to ``/rooms/<room id>/ban`` with::
+
+  {
+    "user_id": "<user id to ban"
+    "reason": "string: <reason for the ban>"
+  }
+  
+Banning a user adjusts the banned member's membership state and adds their user ID to
+a ban list. The ban list state event is stored at TODO and looks like TODO. Like with
+other membership changes, a user can directly adjust the target member's state, but
+unless their name is added to the ban list, they will be able to re-join the room.
+
 Events in a room
 ----------------
 Room events can be split into two categories:
