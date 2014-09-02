@@ -270,9 +270,9 @@ a:active  { color: #000; }
 
 .userAvatar .userPowerLevel {
     position: absolute;
-    bottom: 20px;
-    height: 1px;
-    background-color: red;
+    bottom: 0px;
+    height: 2px;
+    background-color: #f00;
 }
 
 .userPresence {
