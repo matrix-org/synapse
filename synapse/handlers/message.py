@@ -142,7 +142,12 @@ class MessageHandler(BaseRoomHandler):
             SynapseError if something went wrong.
         """
 
-        snapshot = yield self.store.snapshot_room(event.room_id, event.user_id)
+        snapshot = yield self.store.snapshot_room(
+            event.room_id,
+            event.user_id,
+            state_type=event.type,
+            state_key=event.state_key,
+        )
 
         yield self.auth.check(event, snapshot, raises=True)
 
