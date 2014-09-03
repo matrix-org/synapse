@@ -119,6 +119,9 @@ class Config(object):
                     and value is not None):
                     config[key] = value
             with open(config_args.config_path, "w") as config_file:
+                # TODO(paul) it would be lovely if we wrote out vim- and emacs-
+                #   style mode markers into the file, to hint to people that
+                #   this is a YAML file.
                 yaml.dump(config, config_file, default_flow_style=False)
             sys.exit(0)
 
