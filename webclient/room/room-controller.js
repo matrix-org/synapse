@@ -316,7 +316,8 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                     break;
             }
         }
-        else {
+        
+        if (!promise) {
             // Send the text message
             promise = matrixService.sendTextMessage($scope.room_id, $scope.textInput);
         }
