@@ -1,5 +1,5 @@
 /*
-Copyright 2014 matrix.org
+Copyright 2014 OpenMarket Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -283,8 +283,18 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                     }
                     break;
                     
+                case "/kick":
+                    // Kick a user from the room
+                    if (2 === args.length) {
+                        var user_id = args[1];
+
+                        // Set his state in the room as leave
+                        promise = matrixService.setMembership($scope.room_id, user_id, "leave");
+                    }
+                    break;
+                    
                 case "/ban":
-                    // Ban the user id from the room
+                    // Ban a user from the room
                     if (2 <= args.length) {
                         // TODO: The user may have entered the display name
                         // Need display name -> user_id resolution. Pb: how to manage user with same display names?
@@ -299,17 +309,17 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                     break;
                     
                 case "/unban":
-                    // Unban the user id from the room
+                    // Unban a user from the room
                     if (2 === args.length) {
                         var user_id = args[1];
 
                         // Reset the user membership to leave to unban him
-                        promise = matrixService.membershipChange($scope.room_id, user_id, "leave");
+                        promise = matrixService.setMembership($scope.room_id, user_id, "leave");
                     }
                     break;
                     
                 case "/op":
-                    // Define the power level of an user
+                    // Define the power level of a user
                     if (3 === args.length) {
                         var user_id = args[1];
                         var powerLevel = parseInt(args[2]);
@@ -318,7 +328,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                     break;
                     
                 case "/deop":
-                    // Reset the power level of an user
+                    // Reset the power level of a user
                     if (2 === args.length) {
                         var user_id = args[1];
                         promise = matrixService.setUserPowerLevel($scope.room_id, user_id, undefined);

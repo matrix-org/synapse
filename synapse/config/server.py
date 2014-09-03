@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ class ServerConfig(Config):
                                   help="Local interface to listen on")
         server_group.add_argument("-D", "--daemonize", action='store_true',
                                   help="Daemonize the home server")
-        server_group.add_argument('--pid-file', default="hs.pid",
+        server_group.add_argument('--pid-file', default="homeserver.pid",
                                   help="When running as a daemon, the file to"
                                   " store the pid in")
         server_group.add_argument("--manhole", metavar="PORT", dest="manhole",

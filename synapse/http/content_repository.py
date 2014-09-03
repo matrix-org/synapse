@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,6 +56,7 @@ class ContentRepoResource(resource.Resource):
         self.directory = directory
         self.auth = auth
         self.external_addr = external_addr.rstrip('/')
+        self.max_upload_size = hs.config.max_upload_size
 
         if not os.path.isdir(self.directory):
             os.mkdir(self.directory)
@@ -155,6 +156,19 @@ class ContentRepoResource(resource.Resource):
     @defer.inlineCallbacks
     def _async_render(self, request):
         try:
+            # TODO: The checks here are a bit late. The content will have
+            # already been uploaded to a tmp file at this point
+            content_length = request.getHeader("Content-Length")
+            if content_length is None:
+                raise SynapseError(
+                    msg="Request must specify a Content-Length", code=400
+                )
+            if int(content_length) > self.max_upload_size:
+                raise SynapseError(
+                    msg="Upload request body is too large",
+                    code=413,
+                )
+
             fname = yield self.map_request_to_name(request)
 
             # TODO I have a suspcious feeling this is just going to block

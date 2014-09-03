@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,6 +50,7 @@ class DirectoryTestCase(unittest.TestCase):
         hs = HomeServer("test",
             datastore=Mock(spec=[
                 "get_association_from_room_alias",
+                "get_joined_hosts_for_room",
             ]),
             http_client=None,
             resource_for_federation=Mock(),
@@ -60,6 +61,10 @@ class DirectoryTestCase(unittest.TestCase):
         self.handler = hs.get_handlers().directory_handler
 
         self.datastore = hs.get_datastore()
+
+        def hosts(room_id):
+            return defer.succeed([])
+        self.datastore.get_joined_hosts_for_room.side_effect = hosts
 
         self.my_room = hs.parse_roomalias("#my-room:test")
         self.remote_room = hs.parse_roomalias("#another:remote")

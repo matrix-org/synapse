@@ -10,3 +10,5 @@ perl -pi -e 's#<head>#<head><link rel="stylesheet" href="/site.css">#' $MATRIXDO
 perl -pi -e 's#<body>#<body><div id="header"><div id="headerContent">&nbsp;</div></div><div id="page"><div id="wrapper"><div style="text-align: center; padding: 40px;"><img src="/matrix.png" width="305" height="130" alt="[matrix]"/></div>#' $MATRIXDOTORG/docs/spec/index.html $MATRIXDOTORG/docs/howtos/client-server.html
 
 perl -pi -e 's#</body>#</div></div><div id="footer"><div id="footerContent">&copy 2014 Matrix.org</div></div></body>#' $MATRIXDOTORG/docs/spec/index.html $MATRIXDOTORG/docs/howtos/client-server.html
+
+scp -r $MATRIXDOTORG/docs matrix@ldc-prd-matrix-001:/sites/matrix-beta
