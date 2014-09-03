@@ -79,19 +79,21 @@ class SQLBaseStore(object):
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
 
-    def _simple_insert(self, table, values):
+    def _simple_insert(self, table, values, or_replace=False):
         """Executes an INSERT query on the named table.
 
         Args:
             table : string giving the table name
             values : dict of new column names and values for them
+            or_replace : bool; if True performs an INSERT OR REPLACE
         """
         return self._db_pool.runInteraction(
-            self._simple_insert_txn, table, values,
+            self._simple_insert_txn, table, values, or_replace=or_replace
         )
 
-    def _simple_insert_txn(self, txn, table, values):
-        sql = "INSERT INTO %s (%s) VALUES(%s)" % (
+    def _simple_insert_txn(self, txn, table, values, or_replace=False):
+        sql = "%s INTO %s (%s) VALUES(%s)" % (
+            ("INSERT OR REPLACE" if or_replace else "INSERT"),
             table,
             ", ".join(k for k in values),
             ", ".join("?" for k in values)
