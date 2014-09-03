@@ -232,7 +232,11 @@ class FederationHandler(BaseHandler):
         d = defer.Deferred()
         self.waiting_for_join_list.setdefault((joinee, room_id), []).append(d)
         reactor.callLater(10, d.cancel)
-        yield d
+
+        try:
+            yield d
+        except defer.CancelledError:
+            raise SynapseError("500", "Unable to join remote room")
 
         try:
             yield self.store.store_room(
