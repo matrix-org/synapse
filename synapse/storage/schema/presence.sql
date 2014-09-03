@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS presence(
   user_id INTEGER NOT NULL,
   presence INTEGER,
   status_msg TEXT,
-  mtime INTEGER, -- miliseconds since last state change
+  last_active INTEGER,
   FOREIGN KEY(user_id) REFERENCES users(id)
 );
 

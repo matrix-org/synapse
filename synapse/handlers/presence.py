@@ -178,8 +178,6 @@ class PresenceHandler(BaseHandler):
             if not visible:
                 raise SynapseError(404, "Presence information not visible")
             state = yield self.store.get_presence_state(target_user.localpart)
-            if "mtime" in state:
-                del state["mtime"]
 
             if target_user in self._user_cachemap:
                 state["last_active"] = (
@@ -225,11 +223,16 @@ class PresenceHandler(BaseHandler):
         logger.debug("Updating presence state of %s to %s",
                      target_user.localpart, state["presence"])
 
-        state_to_store = dict(state)
-
         statuscache=self._get_or_offline_usercache(target_user)
-        was_level = self.STATE_LEVELS[statuscache.get_state()["presence"]]
+        oldstate = statuscache.get_state()
+
+        was_level = self.STATE_LEVELS[oldstate["presence"]]
         now_level = self.STATE_LEVELS[state["presence"]]
+
+        if now_level > was_level:
+            state["last_active"] = self.clock.time_msec()
+
+        state_to_store = dict(state)
 
         yield defer.DeferredList([
             self.store.set_presence_state(
@@ -239,9 +242,6 @@ class PresenceHandler(BaseHandler):
                 "collect_presencelike_data", target_user, state
             ),
         ])
-
-        if now_level > was_level:
-            state["last_active"] = self.clock.time_msec()
 
         now_online = state["presence"] != PresenceState.OFFLINE
         was_polling = target_user in self._user_cachemap
@@ -593,7 +593,6 @@ class PresenceHandler(BaseHandler):
     def _push_presence_remote(self, user, destination, state=None):
         if state is None:
             state = yield self.store.get_presence_state(user.localpart)
-            del state["mtime"]
 
             if user in self._user_cachemap:
                 state["last_active"] = (
@@ -881,8 +880,6 @@ class UserPresenceCache(object):
         self.serial = None
 
     def update(self, state, serial):
-        assert("mtime_age" not in state)
-
         self.state.update(state)
         # Delete keys that are now 'None'
         for k in self.state.keys():

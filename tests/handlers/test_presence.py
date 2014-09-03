@@ -208,7 +208,10 @@ class PresenceStateTestCase(unittest.TestCase):
                 state={"presence": UNAVAILABLE, "status_msg": "Away"})
 
         mocked_set.assert_called_with("apple",
-            {"presence": UNAVAILABLE, "status_msg": "Away"}
+            {"presence": UNAVAILABLE,
+             "status_msg": "Away",
+             "last_active": 1000000, # MockClock
+            }
         )
         self.mock_start.assert_called_with(self.u_apple,
                 state={
@@ -1045,7 +1048,7 @@ class PresencePollingTestCase(unittest.TestCase):
             return defer.succeed(
                     {"presence": self.current_user_state[user_localpart],
                      "status_msg": None,
-                     "mtime": 123456000}
+                     "last_active": 500000}
             )
         self.datastore.get_presence_state = get_presence_state
 
@@ -1249,7 +1252,8 @@ class PresencePollingTestCase(unittest.TestCase):
                         "push": [
                             {"user_id": "@banana:test",
                              "presence": "offline",
-                             "status_msg": None},
+                             "status_msg": None,
+                             "last_active_ago": 500000},
                         ],
                     },
                 ),

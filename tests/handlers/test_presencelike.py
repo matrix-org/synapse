@@ -151,7 +151,9 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 state={"presence": UNAVAILABLE, "status_msg": "Away"})
 
         mocked_set.assert_called_with("apple",
-            {"presence": UNAVAILABLE, "status_msg": "Away"}
+            {"presence": UNAVAILABLE,
+             "status_msg": "Away",
+             "last_active": 1000000}
         )
 
     @defer.inlineCallbacks

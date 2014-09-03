@@ -20,12 +20,13 @@ CREATE TABLE NEW_presence(
   user_id INTEGER NOT NULL,
   presence INTEGER,
   status_msg TEXT,
-  mtime INTEGER,
+  last_active INTEGER,
   FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
--- rename the 'state' field to 'presence'
-INSERT INTO NEW_presence (user_id, presence, status_msg, mtime)
+-- rename the 'state' field to 'presence'; migrate the old 'mtime' field into
+-- the new 'last_active' field
+INSERT INTO NEW_presence (user_id, presence, status_msg, last_active)
   SELECT user_id, state, status_msg, mtime FROM presence;
 
 DROP TABLE presence;

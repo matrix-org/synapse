@@ -21,7 +21,7 @@ from twisted.internet import defer
 from mock import Mock
 import logging
 
-from ..utils import MockHttpResource
+from ..utils import MockHttpResource, MockClock
 
 from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler
@@ -51,6 +51,7 @@ class PresenceStateTestCase(unittest.TestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
         hs = HomeServer("test",
+            clock=MockClock(),
             db_pool=None,
             datastore=Mock(spec=[
                 "get_presence_state",
@@ -115,7 +116,9 @@ class PresenceStateTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         mocked_set.assert_called_with("apple",
-            {"presence": UNAVAILABLE, "status_msg": "Away"}
+            {"presence": UNAVAILABLE,
+             "status_msg": "Away",
+             "last_active": 1000000}
         )
 
 
