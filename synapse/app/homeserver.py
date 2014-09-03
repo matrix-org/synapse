@@ -93,20 +93,28 @@ class SynapseHomeServer(HomeServer):
             if row and row[0]:
                 user_version = row[0]
 
-                if user_version < SCHEMA_VERSION:
-                    # TODO(paul): add some kind of intelligent fixup here
-                    raise ValueError("Cannot use this database as the " +
-                        "schema version (%d) does not match (%d)" %
-                        (user_version, SCHEMA_VERSION)
+                if user_version > SCHEMA_VERSION:
+                    raise ValueError("Cannot use this database as it is too " +
+                        "new for the server to understand"
                     )
+                elif user_version < SCHEMA_VERSION:
+                    logging.info("Upgrading database from version %d",
+                        user_version
+                    )
+
+                    # Run every version since after the current version.
+                    for v in range(user_version + 1, SCHEMA_VERSION + 1):
+                        sql_script = read_schema("delta/v%d" % (v))
+                        c.executescript(sql_script)
+
+                    db_conn.commit()
 
             else:
                 for sql_loc in SCHEMAS:
                     sql_script = read_schema(sql_loc)
 
                     c.executescript(sql_script)
-                    db_conn.commit()
-
+                db_conn.commit()
                 c.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
 
             c.close()
