@@ -21,6 +21,7 @@ from mock import Mock
 import logging
 
 from synapse.server import HomeServer
+from synapse.http.client import HttpClient
 from synapse.handlers.directory import DirectoryHandler
 from synapse.storage.directory import RoomAliasMapping
 
@@ -92,7 +93,10 @@ class DirectoryTestCase(unittest.TestCase):
         self.mock_federation.make_query.assert_called_with(
             destination="remote",
             query_type="directory",
-            args={"room_alias": "#another:remote"}
+            args={
+                "room_alias": "#another:remote",
+                HttpClient.RETRY_DNS_LOOKUP_FAILURES: False
+            }
         )
 
     @defer.inlineCallbacks

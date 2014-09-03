@@ -18,6 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError
+from synapse.http.client import HttpClient
 
 import logging
 
@@ -68,7 +69,10 @@ class DirectoryHandler(BaseHandler):
             result = yield self.federation.make_query(
                 destination=room_alias.domain,
                 query_type="directory",
-                args={"room_alias": room_alias.to_string()},
+                args={
+                    "room_alias": room_alias.to_string(),
+                    HttpClient.RETRY_DNS_LOOKUP_FAILURES: False
+                }
             )
 
             if result and "room_id" in result and "servers" in result:
