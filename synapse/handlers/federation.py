@@ -21,6 +21,7 @@ from synapse.api.events.room import InviteJoinEvent, RoomMemberEvent
 from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
 from synapse.federation.pdu_codec import PduCodec
+from synapse.api.errors import SynapseError
 
 from twisted.internet import defer, reactor
 
