@@ -316,7 +316,7 @@ class SynapseCmd(cmd.Cmd):
         try:
             args = self._parse(line, ["roomname"], force_keys=True)
             path = "/join/%s" % urllib.quote(args["roomname"])
-            reactor.callFromThread(self._run_and_pprint, "PUT", path, {})
+            reactor.callFromThread(self._run_and_pprint, "POST", path, {})
         except Exception as e:
             print e
 
