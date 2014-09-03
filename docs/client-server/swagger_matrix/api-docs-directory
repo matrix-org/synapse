@@ -13,6 +13,7 @@
         {
           "method": "GET",
           "summary": "Get the room ID corresponding to this room alias.",
+          "notes": "Volatile: This API is likely to change.",
           "type": "DirectoryResponse",
           "nickname": "get_room_id_for_alias",
           "parameters": [
@@ -28,6 +29,7 @@
         {
           "method": "PUT",
           "summary": "Create a new mapping from room alias to room ID.",
+          "notes": "Volatile: This API is likely to change.",
           "type": "void",
           "nickname": "add_room_alias",
           "parameters": [

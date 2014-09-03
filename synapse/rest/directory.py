@@ -16,6 +16,7 @@
 
 from twisted.internet import defer
 
+from synapse.api.errors import SynapseError, Codes
 from base import RestServlet, client_path_pattern
 
 import json
@@ -44,8 +45,10 @@ class ClientDirectoryServer(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_alias):
-        # TODO(erikj): Exceptions
-        content = json.loads(request.content.read())
+        content = _parse_json(request)
+        if not "room_id" in content:
+            raise SynapseError(400, "Missing room_id key",
+                               errcode=Codes.BAD_JSON)
 
         logger.debug("Got content: %s", content)
 
@@ -72,3 +75,14 @@ class ClientDirectoryServer(RestServlet):
             logger.exception("Failed to create association")
 
         defer.returnValue((200, {}))
+
+
+def _parse_json(request):
+    try:
+        content = json.loads(request.content.read())
+        if type(content) != dict:
+            raise SynapseError(400, "Content must be a JSON object.",
+                               errcode=Codes.NOT_JSON)
+        return content
+    except ValueError:
+        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
