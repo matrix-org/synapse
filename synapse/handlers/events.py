@@ -126,5 +126,7 @@ class EventHandler(BaseHandler):
             defer.returnValue(None)
             return
 
-        yield self.auth.check(event, raises=True)
+        if hasattr(event, "room_id"):
+            yield self.auth.check_joined_room(event.room_id, user.to_string())
+
         defer.returnValue(event)

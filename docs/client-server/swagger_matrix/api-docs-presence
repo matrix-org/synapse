@@ -106,7 +106,7 @@
     "PresenceUpdate": {
       "id": "PresenceUpdate",
       "properties": {
-        "state": {
+        "presence": {
           "type": "string",
           "description": "Enum: The presence state.",
           "enum": [

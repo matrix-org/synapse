@@ -52,6 +52,10 @@
         "user_id": {
           "description": "The fully-qualified user ID.", 
           "type": "string"
+        },
+        "home_server": {
+          "description": "The name of the home server.",
+          "type": "string"
         }
       }
     }, 

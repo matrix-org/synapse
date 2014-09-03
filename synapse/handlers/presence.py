@@ -207,7 +207,7 @@ class PresenceHandler(BaseHandler):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         if target_user != auth_user:
-            raise AuthError(400, "Cannot set another user's displayname")
+            raise AuthError(400, "Cannot set another user's presence")
 
         if "status_msg" not in state:
             state["status_msg"] = None

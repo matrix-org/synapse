@@ -19,6 +19,7 @@ from twisted.internet import defer
 from base import RestServlet, client_path_pattern
 
 import json
+import urllib
 
 
 class ProfileDisplaynameRestServlet(RestServlet):
@@ -26,6 +27,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         displayname = yield self.handlers.profile_handler.get_displayname(
@@ -37,6 +39,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         try:
@@ -59,6 +62,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         avatar_url = yield self.handlers.profile_handler.get_avatar_url(
@@ -70,6 +74,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         try:
@@ -92,6 +97,7 @@ class ProfileRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         displayname = yield self.handlers.profile_handler.get_displayname(

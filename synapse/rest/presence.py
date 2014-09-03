@@ -17,11 +17,12 @@
 """
 from twisted.internet import defer
 
+from synapse.api.errors import SynapseError
 from base import RestServlet, client_path_pattern
 
 import json
 import logging
-
+import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class PresenceStatusRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         state = yield self.handlers.presence_handler.get_state(
@@ -42,6 +44,7 @@ class PresenceStatusRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         state = {}
@@ -56,11 +59,15 @@ class PresenceStatusRestServlet(RestServlet):
 
             if "status_msg" in content:
                 state["status_msg"] = content.pop("status_msg")
+                if not isinstance(state["status_msg"], basestring):
+                    raise SynapseError(400, "status_msg must be a string.")
 
             if content:
                 raise KeyError()
+        except SynapseError as e:
+            raise e
         except:
-            defer.returnValue((400, "Unable to parse state"))
+            raise SynapseError(400, "Unable to parse state")
 
         yield self.handlers.presence_handler.set_state(
             target_user=user, auth_user=auth_user, state=state)
@@ -77,13 +84,14 @@ class PresenceListRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         if not user.is_mine:
-            defer.returnValue((400, "User not hosted on this Home Server"))
+            raise SynapseError(400, "User not hosted on this Home Server")
 
         if auth_user != user:
-            defer.returnValue((400, "Cannot get another user's presence list"))
+            raise SynapseError(400, "Cannot get another user's presence list")
 
         presence = yield self.handlers.presence_handler.get_presence_list(
             observer_user=user, accepted=True)
@@ -97,20 +105,21 @@ class PresenceListRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         if not user.is_mine:
-            defer.returnValue((400, "User not hosted on this Home Server"))
+            raise SynapseError(400, "User not hosted on this Home Server")
 
         if auth_user != user:
-            defer.returnValue((
-                400, "Cannot modify another user's presence list"))
+            raise SynapseError(
+                400, "Cannot modify another user's presence list")
 
         try:
             content = json.loads(request.content.read())
         except:
             logger.exception("JSON parse error")
-            defer.returnValue((400, "Unable to parse content"))
+            raise SynapseError(400, "Unable to parse content")
 
         deferreds = []
 
