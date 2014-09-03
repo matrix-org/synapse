@@ -840,6 +840,8 @@ class PresenceEventSource(object):
         from_token = pagination_config.from_token
         to_token = pagination_config.to_token
 
+        observer_user = user
+
         from_key = int(from_token.presence_key)
 
         if to_token:
