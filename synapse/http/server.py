@@ -140,7 +140,8 @@ class JsonResource(HttpServer, resource.Resource):
             self._send_response(
                 request,
                 e.code,
-                cs_exception(e)
+                cs_exception(e),
+                response_code_message=e.response_code_message
             )
         except Exception as e:
             logger.exception(e)
@@ -150,7 +151,8 @@ class JsonResource(HttpServer, resource.Resource):
                 {"error": "Internal server error"}
             )
 
-    def _send_response(self, request, code, response_json_object):
+    def _send_response(self, request, code, response_json_object,
+                       response_code_message=None):
         # could alternatively use request.notifyFinish() and flip a flag when
         # the Deferred fires, but since the flag is RIGHT THERE it seems like
         # a waste.
@@ -166,7 +168,8 @@ class JsonResource(HttpServer, resource.Resource):
             json_bytes = encode_pretty_printed_json(response_json_object)
 
         # TODO: Only enable CORS for the requests that need it.
-        respond_with_json_bytes(request, code, json_bytes, send_cors=True)
+        respond_with_json_bytes(request, code, json_bytes, send_cors=True,
+                                response_code_message=response_code_message)
 
     @staticmethod
     def _request_user_agent_is_curl(request):
@@ -350,7 +353,8 @@ class ContentRepoResource(resource.Resource):
                 send_cors=True)
 
 
-def respond_with_json_bytes(request, code, json_bytes, send_cors=False):
+def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
+                            response_code_message=None):
     """Sends encoded JSON in response to the given request.
 
     Args:
@@ -362,7 +366,7 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False):
     Returns:
         twisted.web.server.NOT_DONE_YET"""
 
-    request.setResponseCode(code)
+    request.setResponseCode(code, message=response_code_message)
     request.setHeader(b"Content-Type", b"application/json")
 
     if send_cors:

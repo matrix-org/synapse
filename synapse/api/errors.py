@@ -39,6 +39,7 @@ class CodeMessageException(Exception):
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
         self.code = code
         self.msg = msg
+        self.response_code_message = None
 
     def error_dict(self):
         return cs_error(self.msg)
@@ -107,6 +108,7 @@ class LimitExceededError(SynapseError):
                  errcode=Codes.LIMIT_EXCEEDED):
         super(LimitExceededError, self).__init__(code, msg, errcode)
         self.retry_after_ms = retry_after_ms
+        self.response_code_message = "Too Many Requests"
 
     def error_dict(self):
         return cs_error(
