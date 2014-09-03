@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from twisted.internet import defer
-from synapse.api.errors import cs_error, Codes
+from synapse.api.errors import LimitExceededError
 
 class BaseHandler(object):
 
@@ -38,9 +38,7 @@ class BaseHandler(object):
             burst_count=self.hs.config.rc_message_burst_count,
         )
         if not allowed:
-            raise cs_error(
-                "Limit exceeded",
-                Codes.LIMIT_EXCEEDED,
+            raise LimitExceededError(
                 retry_after_ms=1000*(time_allowed - time_now),
             )
 
