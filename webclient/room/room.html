@@ -24,7 +24,7 @@
                          title="{{ member.id }}"
                          width="80" height="80"/>
                     <img class="userAvatarGradient" src="img/gradient.png" title="{{ member.id }}" width="80" height="24"/>
-                    <div class="userPowerLevel" ng-style="{'width': (10 * member.powerLevel) +'%'}"></div>
+                    <div class="userPowerLevel" ng-style="{'width': member.powerLevelNorm +'%'}"></div>
                     <div class="userName">{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}<br/>{{ member.displayname ? "" : member.id.substr(member.id.indexOf(':')) }}</div>
                 </td>
                 <td class="userPresence" ng-class="(member.presence === 'online' ? 'online' : (member.presence === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">

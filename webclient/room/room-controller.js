@@ -253,6 +253,29 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         var member = $scope.members[user_id];
         if (member) {
             member.powerLevel = matrixService.getUserPowerLevel($scope.room_id, user_id);
+            
+            normaliseMembersPowerLevels();
+        }
+    }
+
+    // Normalise users power levels so that the user with the higher power level
+    // will have a bar covering 100% of the width of his avatar
+    var normaliseMembersPowerLevels = function() {
+        // Find the max power level
+        var maxPowerLevel = 0;
+        for (var i in $scope.members) {
+            var member = $scope.members[i];
+            if (member.powerLevel) {
+                maxPowerLevel = Math.max(maxPowerLevel, member.powerLevel);
+            }
+        }
+
+        // Normalized them on a 0..100% scale to be use in css width
+        if (maxPowerLevel) {
+            for (var i in $scope.members) {
+                var member = $scope.members[i];
+                member.powerLevelNorm = (member.powerLevel * 100) / maxPowerLevel;
+            }
         }
     }
 
