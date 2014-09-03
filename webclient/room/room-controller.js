@@ -250,28 +250,40 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
 
         $scope.state.sending = true;
         
-        // Send the text message
         var promise;
-        // FIXME: handle other commands too
-        if ($scope.textInput.indexOf("/me") === 0) {
-            promise = matrixService.sendEmoteMessage($scope.room_id, $scope.textInput.substr(4));
-        }
-        else if ($scope.textInput.indexOf("/nick ") === 0) {
-            // Change user display name
-            promise = matrixService.setDisplayName($scope.textInput.substr(6));
+        
+        // Check for IRC style commands first
+        if ($scope.textInput.indexOf("/") === 0) {
+            var args = $scope.textInput.split(' ');
+            var cmd = args[0];
+            
+            switch (cmd) {
+                case "/me":
+                    var emoteMsg = args.slice(1).join(' ');
+                    promise = matrixService.sendEmoteMessage($scope.room_id, emoteMsg);
+                    break;
+                    
+                case "/nick":
+                    // Change user display name
+                    if (2 === args.length) {
+                        promise = matrixService.setDisplayName(args[1]);
+                    }
+                    break;
+            }
         }
         else {
+            // Send the text message
             promise = matrixService.sendTextMessage($scope.room_id, $scope.textInput);
         }
         
         promise.then(
             function() {
-                console.log("Sent message");
+                console.log("Request successfully sent");
                 $scope.textInput = "";
                 $scope.state.sending = false;
             },
             function(error) {
-                $scope.feedback = "Failed to send: " + error.data.error;
+                $scope.feedback = "Request failed: " + error.data.error;
                 $scope.state.sending = false;
             });
     };
