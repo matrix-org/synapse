@@ -21,7 +21,7 @@ from base import RestServlet, client_path_pattern
 
 import json
 import logging
-
+import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ class PresenceStatusRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         state = yield self.handlers.presence_handler.get_state(
@@ -42,6 +43,7 @@ class PresenceStatusRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         state = {}
@@ -77,6 +79,7 @@ class PresenceListRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         if not user.is_mine:
@@ -97,6 +100,7 @@ class PresenceListRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
+        user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
         if not user.is_mine:
