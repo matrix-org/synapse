@@ -18,9 +18,10 @@ from .server import ServerConfig
 from .logger import LoggingConfig
 from .database import DatabaseConfig
 from .ratelimiting import RatelimitConfig
+from .repository import ContentRepositoryConfig
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
-                       RatelimitConfig):
+                       RatelimitConfig, ContentRepositoryConfig):
     pass
 
 if __name__=='__main__':
