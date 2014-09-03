@@ -1,7 +1,8 @@
-TODO(kegan):  Room config (specifically: message history,
-public rooms). /register seems super simplistic compared to /login, maybe it
-would be better if /register used the same technique as /login? /register should
-be "user" not "user_id".
+.. TODO kegan
+  Room config (specifically: message history,
+  public rooms). /register seems super simplistic compared to /login, maybe it
+  would be better if /register used the same technique as /login? /register should
+  be "user" not "user_id".
 
 
 How to use the client-server API
@@ -21,7 +22,9 @@ Accounts
 Before you can send and receive messages, you must **register** for an account. 
 If you already have an account, you must **login** into it.
 
-**Try out the fiddle: http://jsfiddle.net/4q2jyxng/**
+`Try out the fiddle`__
+
+.. __: http://jsfiddle.net/4q2jyxng/
 
 Registration
 ------------
@@ -82,7 +85,9 @@ Communicating
 In order to communicate with another user, you must **create a room** with that 
 user and **send a message** to that room. 
 
-**Try out the fiddle: http://jsfiddle.net/zL3zto9g/**
+`Try out the fiddle`__
+
+.. __: http://jsfiddle.net/zL3zto9g/
 
 Creating a room
 ---------------
@@ -100,7 +105,8 @@ The "room alias" is a human-readable string which can be shared with other users
 so they can join a room, rather than the room ID which is a randomly generated
 string. You can have multiple room aliases per room.
 
-TODO(kegan): How to add/remove aliases from an existing room.
+.. TODO(kegan)
+  How to add/remove aliases from an existing room.
     
 
 Sending messages
@@ -129,7 +135,9 @@ these rules may specify if you require an **invitation** from someone already in
 the room in order to **join the room**. In addition, you may also be able to 
 join a room **via a room alias** if one was set up.
 
-**Try out the fiddle: http://jsfiddle.net/7fhotf1b/**
+`Try out the fiddle`__
+
+.. __: http://jsfiddle.net/7fhotf1b/
 
 Inviting a user to a room
 -------------------------
@@ -173,7 +181,9 @@ An event is some interesting piece of data that a client may be interested in.
 It can be a message in a room, a room invite, etc. There are many different ways
 of getting events, depending on what the client already knows.
 
-**Try out the fiddle: http://jsfiddle.net/vw11mg37/**
+`Try out the fiddle`__
+
+.. __: http://jsfiddle.net/vw11mg37/
 
 Getting all state
 -----------------
@@ -621,4 +631,6 @@ creating and joining rooms, sending messages, getting member lists and getting
 historical messages for a room. This covers most functionality of a messaging
 application.
 
-**Try out the fiddle: http://jsfiddle.net/uztL3yme/**
+`Try out the fiddle`__
+
+.. __: http://jsfiddle.net/uztL3yme/
