@@ -15,7 +15,7 @@
 
 
 from twisted.internet import defer, reactor
-from twisted.web.client import _AgentBase, _URI, readBody
+from twisted.web.client import _AgentBase, _URI, readBody, FileBodyProducer
 from twisted.web.http_headers import Headers
 
 from synapse.http.endpoint import matrix_endpoint
@@ -24,6 +24,8 @@ from synapse.util.async import sleep
 from syutil.jsonutil import encode_canonical_json
 
 from synapse.api.errors import CodeMessageException
+
+from StringIO import StringIO
 
 import json
 import logging
@@ -156,6 +158,26 @@ class TwistedHttpClient(HttpClient):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
+    def post_urlencoded_get_json(self, destination, path, args={}):
+        if destination in _destination_mappings:
+            destination = _destination_mappings[destination]
+
+        logger.debug("post_urlencoded_get_json args: %s", args)
+        query_bytes = urllib.urlencode(args, True)
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "POST",
+            path.encode("ascii"),
+            producer=FileBodyProducer(StringIO(urllib.urlencode(args))),
+            headers_dict={"Content-Type": ["application/x-www-form-urlencoded"]}
+        )
+
+        body = yield readBody(response)
+
+        defer.returnValue(json.loads(body))
+
+    @defer.inlineCallbacks
     def _create_request(self, destination, method, path_bytes, param_bytes=b"",
                         query_bytes=b"", producer=None, headers_dict={}):
         """ Creates and sends a request to the given url
@@ -178,10 +200,7 @@ class TwistedHttpClient(HttpClient):
         retries_left = 5
 
         # TODO: setup and pass in an ssl_context to enable TLS
-        endpoint = matrix_endpoint(
-            reactor, destination, timeout=10,
-            ssl_context_factory=self.hs.tls_context_factory
-        )
+        endpoint = self._getEndpoint(reactor, destination);
 
         while True:
             try:
@@ -223,6 +242,17 @@ class TwistedHttpClient(HttpClient):
 
         defer.returnValue(response)
 
+    def _getEndpoint(self, reactor, destination):
+        return matrix_endpoint(
+            reactor, destination, timeout=10,
+            ssl_context_factory=self.hs.tls_context_factory
+        )
+
+
+class PlainHttpClient(TwistedHttpClient):
+    def _getEndpoint(self, reactor, destination):
+        return matrix_endpoint(reactor, destination, timeout=10)
+    
 
 def _print_ex(e):
     if hasattr(e, "reasons") and e.reasons:

@@ -20,9 +20,13 @@ from synapse.types import UserID
 from synapse.api.errors import SynapseError, RegistrationError
 from ._base import BaseHandler
 import synapse.util.stringutils as stringutils
+from synapse.http.client import PlainHttpClient
 
 import base64
 import bcrypt
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class RegistrationHandler(BaseHandler):
@@ -34,7 +38,7 @@ class RegistrationHandler(BaseHandler):
         self.distributor.declare("registered_user")
 
     @defer.inlineCallbacks
-    def register(self, localpart=None, password=None):
+    def register(self, localpart=None, password=None, threepidCreds=None):
         """Registers a new client on the server.
 
         Args:
@@ -47,6 +51,20 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
+
+        if threepidCreds:
+            for c in threepidCreds:
+                logger.info("validating theeepidcred sid %s on id server %s", c['sid'], c['idServer'])
+                try:
+                    threepid = yield self._threepid_from_creds(c)
+                except:
+                    logger.err()
+                    raise RegistrationError(400, "Couldn't validate 3pid")
+                    
+                if not threepid:
+                    raise RegistrationError(400, "Couldn't validate 3pid")
+                logger.info("got threepid medium %s address %s", threepid['medium'], threepid['address'])
+
         password_hash = None
         if password:
             password_hash = bcrypt.hashpw(password, bcrypt.gensalt())
@@ -61,7 +79,6 @@ class RegistrationHandler(BaseHandler):
                 password_hash=password_hash)
 
             self.distributor.fire("registered_user", user)
-            defer.returnValue((user_id, token))
         else:
             # autogen a random user ID
             attempts = 0
@@ -80,7 +97,6 @@ class RegistrationHandler(BaseHandler):
                         password_hash=password_hash)
 
                     self.distributor.fire("registered_user", user)
-                    defer.returnValue((user_id, token))
                 except SynapseError:
                     # if user id is taken, just generate another
                     user_id = None
@@ -89,6 +105,15 @@ class RegistrationHandler(BaseHandler):
                     if attempts > 5:
                         raise RegistrationError(
                             500, "Cannot generate user ID.")
+
+        # Now we have a matrix ID, bind it to the threepids we were given
+        if threepidCreds:
+            for c in threepidCreds:
+                # XXX: This should be a deferred list, shouldn't it?
+                yield self._bind_threepid(c, user_id)
+                
+
+        defer.returnValue((user_id, token))
 
     def _generate_token(self, user_id):
         # urlsafe variant uses _ and - so use . as the separator and replace
@@ -99,3 +124,34 @@ class RegistrationHandler(BaseHandler):
 
     def _generate_user_id(self):
         return "-" + stringutils.random_string(18)
+
+    @defer.inlineCallbacks
+    def _threepid_from_creds(self, creds):
+        httpCli = PlainHttpClient(self.hs)
+        # XXX: make this configurable!
+        trustedIdServers = [ 'matrix.org:8090' ]
+        if not creds['idServer'] in trustedIdServers:
+            logger.warn('%s is not a trusted ID server: rejecting 3pid credentials', creds['idServer'])
+            defer.returnValue(None)
+        data = yield httpCli.get_json(
+            creds['idServer'],
+            "/_matrix/identity/api/v1/3pid/getValidated3pid",
+            { 'sid': creds['sid'], 'clientSecret': creds['clientSecret'] }
+        )
+        
+        if 'medium' in data:
+            defer.returnValue(data)
+        defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def _bind_threepid(self, creds, mxid):
+        httpCli = PlainHttpClient(self.hs)
+        data = yield httpCli.post_urlencoded_get_json(
+            creds['idServer'],
+            "/_matrix/identity/api/v1/3pid/bind",
+            { 'sid': creds['sid'], 'clientSecret': creds['clientSecret'], 'mxid':mxid }
+        )
+        defer.returnValue(data)
+        
+        
+
