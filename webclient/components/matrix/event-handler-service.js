@@ -97,7 +97,7 @@ angular.module('eventHandlerService', [])
             }
         }
         
-        $rootScope.events.rooms[event.room_id].members[event.user_id] = event;
+        $rootScope.events.rooms[event.room_id].members[event.state_key] = event;
         $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent);
     };
     
