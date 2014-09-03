@@ -180,7 +180,6 @@ class PresenceHandler(BaseHandler):
             state = yield self.store.get_presence_state(target_user.localpart)
             if "mtime" in state:
                 del state["mtime"]
-            state["presence"] = state.pop("state")
 
             if target_user in self._user_cachemap:
                 state["last_active"] = (
@@ -227,7 +226,6 @@ class PresenceHandler(BaseHandler):
                      target_user.localpart, state["presence"])
 
         state_to_store = dict(state)
-        state_to_store["state"] = state_to_store.pop("presence")
 
         statuscache=self._get_or_offline_usercache(target_user)
         was_level = self.STATE_LEVELS[statuscache.get_state()["presence"]]
@@ -596,7 +594,6 @@ class PresenceHandler(BaseHandler):
         if state is None:
             state = yield self.store.get_presence_state(user.localpart)
             del state["mtime"]
-            state["presence"] = state.pop("state")
 
             if user in self._user_cachemap:
                 state["last_active"] = (

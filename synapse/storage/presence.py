@@ -35,17 +35,17 @@ class PresenceStore(SQLBaseStore):
         return self._simple_select_one(
             table="presence",
             keyvalues={"user_id": user_localpart},
-            retcols=["state", "status_msg", "mtime"],
+            retcols=["presence", "status_msg", "mtime"],
         )
 
     def set_presence_state(self, user_localpart, new_state):
         return self._simple_update_one(
             table="presence",
             keyvalues={"user_id": user_localpart},
-            updatevalues={"state": new_state["state"],
+            updatevalues={"presence": new_state["presence"],
                           "status_msg": new_state["status_msg"],
                           "mtime": self._clock.time_msec()},
-            retcols=["state"],
+            retcols=["presence"],
         )
 
     def allow_presence_visible(self, observed_localpart, observer_userid):

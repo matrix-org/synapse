@@ -134,7 +134,7 @@ class PresenceStateTestCase(unittest.TestCase):
     def test_get_my_state(self):
         mocked_get = self.datastore.get_presence_state
         mocked_get.return_value = defer.succeed(
-            {"state": ONLINE, "status_msg": "Online"}
+            {"presence": ONLINE, "status_msg": "Online"}
         )
 
         state = yield self.handler.get_state(
@@ -151,7 +151,7 @@ class PresenceStateTestCase(unittest.TestCase):
     def test_get_allowed_state(self):
         mocked_get = self.datastore.get_presence_state
         mocked_get.return_value = defer.succeed(
-            {"state": ONLINE, "status_msg": "Online"}
+            {"presence": ONLINE, "status_msg": "Online"}
         )
 
         state = yield self.handler.get_state(
@@ -168,7 +168,7 @@ class PresenceStateTestCase(unittest.TestCase):
     def test_get_same_room_state(self):
         mocked_get = self.datastore.get_presence_state
         mocked_get.return_value = defer.succeed(
-            {"state": ONLINE, "status_msg": "Online"}
+            {"presence": ONLINE, "status_msg": "Online"}
         )
 
         self.room_members = [self.u_apple, self.u_clementine]
@@ -186,7 +186,7 @@ class PresenceStateTestCase(unittest.TestCase):
     def test_get_disallowed_state(self):
         mocked_get = self.datastore.get_presence_state
         mocked_get.return_value = defer.succeed(
-            {"state": ONLINE, "status_msg": "Online"}
+            {"presence": ONLINE, "status_msg": "Online"}
         )
 
         self.room_members = []
@@ -201,14 +201,14 @@ class PresenceStateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_set_my_state(self):
         mocked_set = self.datastore.set_presence_state
-        mocked_set.return_value = defer.succeed({"state": OFFLINE})
+        mocked_set.return_value = defer.succeed({"presence": OFFLINE})
 
         yield self.handler.set_state(
                 target_user=self.u_apple, auth_user=self.u_apple,
                 state={"presence": UNAVAILABLE, "status_msg": "Away"})
 
         mocked_set.assert_called_with("apple",
-            {"state": UNAVAILABLE, "status_msg": "Away"}
+            {"presence": UNAVAILABLE, "status_msg": "Away"}
         )
         self.mock_start.assert_called_with(self.u_apple,
                 state={
@@ -624,7 +624,7 @@ class PresencePushTestCase(unittest.TestCase):
         self.room_members = [self.u_apple, self.u_elderberry]
 
         self.datastore.set_presence_state.return_value = defer.succeed(
-            {"state": ONLINE}
+            {"presence": ONLINE}
         )
 
         # TODO(paul): Gut-wrenching
@@ -793,7 +793,7 @@ class PresencePushTestCase(unittest.TestCase):
         self.room_members = [self.u_apple, self.u_onion]
 
         self.datastore.set_presence_state.return_value = defer.succeed(
-            {"state": ONLINE}
+            {"presence": ONLINE}
         )
 
         # TODO(paul): Gut-wrenching
@@ -1043,7 +1043,7 @@ class PresencePollingTestCase(unittest.TestCase):
 
         def get_presence_state(user_localpart):
             return defer.succeed(
-                    {"state": self.current_user_state[user_localpart],
+                    {"presence": self.current_user_state[user_localpart],
                      "status_msg": None,
                      "mtime": 123456000}
             )
@@ -1051,8 +1051,8 @@ class PresencePollingTestCase(unittest.TestCase):
 
         def set_presence_state(user_localpart, new_state):
             was = self.current_user_state[user_localpart]
-            self.current_user_state[user_localpart] = new_state["state"]
-            return defer.succeed({"state": was})
+            self.current_user_state[user_localpart] = new_state["presence"]
+            return defer.succeed({"presence": was})
         self.datastore.set_presence_state = set_presence_state
 
         def get_presence_list(user_localpart, accepted):

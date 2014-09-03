@@ -12,27 +12,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-CREATE TABLE IF NOT EXISTS presence(
+
+-- SQLite3 doesn't support renaming or dropping columns. We'll have to go the
+-- long way round
+
+CREATE TABLE NEW_presence(
   user_id INTEGER NOT NULL,
   presence INTEGER,
   status_msg TEXT,
-  mtime INTEGER, -- miliseconds since last state change
+  mtime INTEGER,
   FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
--- For each of /my/ users which possibly-remote users are allowed to see their
--- presence state
-CREATE TABLE IF NOT EXISTS presence_allow_inbound(
-  observed_user_id INTEGER NOT NULL,
-  observer_user_id TEXT, -- a UserID,
-  FOREIGN KEY(observed_user_id) REFERENCES users(id)
-);
+-- rename the 'state' field to 'presence'
+INSERT INTO NEW_presence (user_id, presence, status_msg, mtime)
+  SELECT user_id, state, status_msg, mtime FROM presence;
 
--- For each of /my/ users (watcher), which possibly-remote users are they
--- watching?
-CREATE TABLE IF NOT EXISTS presence_list(
-  user_id INTEGER NOT NULL,
-  observed_user_id TEXT, -- a UserID,
-  accepted BOOLEAN,
-  FOREIGN KEY(user_id) REFERENCES users(id)
-);
+DROP TABLE presence;
+ALTER TABLE NEW_presence RENAME TO presence;
+
+PRAGMA user_version = 3;

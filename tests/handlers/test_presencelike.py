@@ -144,14 +144,14 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         ]
 
         mocked_set = self.datastore.set_presence_state
-        mocked_set.return_value = defer.succeed({"state": OFFLINE})
+        mocked_set.return_value = defer.succeed({"presence": OFFLINE})
 
         yield self.handlers.presence_handler.set_state(
                 target_user=self.u_apple, auth_user=self.u_apple,
                 state={"presence": UNAVAILABLE, "status_msg": "Away"})
 
         mocked_set.assert_called_with("apple",
-            {"state": UNAVAILABLE, "status_msg": "Away"}
+            {"presence": UNAVAILABLE, "status_msg": "Away"}
         )
 
     @defer.inlineCallbacks
@@ -162,7 +162,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         ]
 
         self.datastore.set_presence_state.return_value = defer.succeed(
-            {"state": ONLINE}
+            {"presence": ONLINE}
         )
 
         # TODO(paul): Gut-wrenching
@@ -244,7 +244,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         ]
 
         self.datastore.set_presence_state.return_value = defer.succeed(
-            {"state": ONLINE}
+            {"presence": ONLINE}
         )
 
         # TODO(paul): Gut-wrenching

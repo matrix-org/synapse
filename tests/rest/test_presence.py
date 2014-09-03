@@ -91,7 +91,7 @@ class PresenceStateTestCase(unittest.TestCase):
     def test_get_my_status(self):
         mocked_get = self.datastore.get_presence_state
         mocked_get.return_value = defer.succeed(
-            {"state": ONLINE, "status_msg": "Available"}
+            {"presence": ONLINE, "status_msg": "Available"}
         )
 
         (code, response) = yield self.mock_resource.trigger("GET",
@@ -107,7 +107,7 @@ class PresenceStateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_set_my_status(self):
         mocked_set = self.datastore.set_presence_state
-        mocked_set.return_value = defer.succeed({"state": OFFLINE})
+        mocked_set.return_value = defer.succeed({"presence": OFFLINE})
 
         (code, response) = yield self.mock_resource.trigger("PUT",
                 "/presence/%s/status" % (myid),
@@ -115,7 +115,7 @@ class PresenceStateTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         mocked_set.assert_called_with("apple",
-            {"state": UNAVAILABLE, "status_msg": "Away"}
+            {"presence": UNAVAILABLE, "status_msg": "Away"}
         )
 
 
@@ -312,7 +312,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         self.room_members = [self.u_apple, self.u_banana]
 
         self.mock_datastore.set_presence_state.return_value = defer.succeed(
-            {"state": ONLINE}
+            {"presence": ONLINE}
         )
         self.mock_datastore.get_presence_list.return_value = defer.succeed(
             []
@@ -332,7 +332,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         )
 
         self.mock_datastore.set_presence_state.return_value = defer.succeed(
-            {"state": ONLINE}
+            {"presence": ONLINE}
         )
         self.mock_datastore.get_presence_list.return_value = defer.succeed(
             []
