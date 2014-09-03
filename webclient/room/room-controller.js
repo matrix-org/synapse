@@ -299,11 +299,19 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                     break;
                     
                 case "/op":
+                    // Define the power level of an user
                     if (3 === args.length) {
                         var user_id = args[1];
                         var powerLevel = parseInt(args[2]);
-
                         promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
+                    }
+                    break;
+                    
+                case "/deop":
+                    // Reset the power level of an user
+                    if (2 === args.length) {
+                        var user_id = args[1];
+                        promise = matrixService.resetUserPowerLevel($scope.room_id, user_id);
                     }
                     break;
             }
