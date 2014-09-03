@@ -298,6 +298,16 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                     }
                     break;
                     
+                case "/unban":
+                    // Unban the user id from the room
+                    if (2 === args.length) {
+                        var user_id = args[1];
+
+                        // Reset the user membership to leave to unban him
+                        promise = matrixService.membershipChange($scope.room_id, user_id, "leave");
+                    }
+                    break;
+                    
                 case "/op":
                     // Define the power level of an user
                     if (3 === args.length) {
