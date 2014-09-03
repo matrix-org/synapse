@@ -1672,45 +1672,45 @@ User ID:
 .. =============================================
 
 .. |createRoom| replace:: ``/createRoom``
-.. _createRoom: /-rooms/create_room
+.. _createRoom: /docs/api/client-server/#!/-rooms/create_room
 
 .. |initialSync| replace:: ``/initialSync``
-.. _initialSync: /-events/initial_sync
+.. _initialSync: /docs/api/client-server/#!/-events/initial_sync
 
 .. |/rooms/<room_id>/initialSync| replace:: ``/rooms/<room_id>/initialSync``
-.. _/rooms/<room_id>/initialSync: /-rooms/get_room_sync_data
+.. _/rooms/<room_id>/initialSync: /docs/api/client-server/#!/-rooms/get_room_sync_data
 
 .. |login| replace:: ``/login``
-.. _login: /-login
+.. _login: /docs/api/client-server/#!/-login
 
 .. |/rooms/<room_id>/messages| replace:: ``/rooms/<room_id>/messages``
-.. _/rooms/<room_id>/messages: /-rooms/get_messages
+.. _/rooms/<room_id>/messages: /docs/api/client-server/#!/-rooms/get_messages
 
 .. |/rooms/<room_id>/members| replace:: ``/rooms/<room_id>/members``
-.. _/rooms/<room_id>/members: /-rooms/get_members
+.. _/rooms/<room_id>/members: /docs/api/client-server/#!/-rooms/get_members
 
 .. |/rooms/<room_id>/state| replace:: ``/rooms/<room_id>/state``
-.. _/rooms/<room_id>/state: /-rooms/get_state_events
+.. _/rooms/<room_id>/state: /docs/api/client-server/#!/-rooms/get_state_events
 
 .. |/rooms/<room_id>/send/<event_type>| replace:: ``/rooms/<room_id>/send/<event_type>``
-.. _/rooms/<room_id>/send/<event_type>: /-rooms/send_non_state_event
+.. _/rooms/<room_id>/send/<event_type>: /docs/api/client-server/#!/-rooms/send_non_state_event
 
 .. |/rooms/<room_id>/state/<event_type>/<state_key>| replace:: ``/rooms/<room_id>/state/<event_type>/<state_key>``
-.. _/rooms/<room_id>/state/<event_type>/<state_key>: /-rooms/send_state_event
+.. _/rooms/<room_id>/state/<event_type>/<state_key>: /docs/api/client-server/#!/-rooms/send_state_event
 
 .. |/rooms/<room_id>/invite| replace:: ``/rooms/<room_id>/invite``
-.. _/rooms/<room_id>/invite: /-rooms/invite
+.. _/rooms/<room_id>/invite: /docs/api/client-server/#!/-rooms/invite
 
 .. |/rooms/<room_id>/join| replace:: ``/rooms/<room_id>/join``
-.. _/rooms/<room_id>/join: /-rooms/join_room
+.. _/rooms/<room_id>/join: /docs/api/client-server/#!/-rooms/join_room
 
 .. |/rooms/<room_id>/leave| replace:: ``/rooms/<room_id>/leave``
-.. _/rooms/<room_id>/leave: /-rooms/leave
+.. _/rooms/<room_id>/leave: /docs/api/client-server/#!/-rooms/leave
 
 .. |/rooms/<room_id>/ban| replace:: ``/rooms/<room_id>/ban``
-.. _/rooms/<room_id>/ban: /-rooms/ban
+.. _/rooms/<room_id>/ban: /docs/api/client-server/#!/-rooms/ban
 
 .. |/join/<room_alias_or_id>| replace:: ``/join/<room_alias_or_id>``
-.. _/join/<room_alias_or_id>: /-rooms/join
+.. _/join/<room_alias_or_id>: /docs/api/client-server/#!/-rooms/join
 
-.. _`Event Stream`: /-events/get_event_stream
+.. _`Event Stream`: /docs/api/client-server/#!/-events/get_event_stream
