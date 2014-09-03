@@ -1626,6 +1626,9 @@ SRV Records
 Security
 ========
 
+.. NOTE::
+  This section is a work in progress.
+
 Threat Model
 ------------
 
@@ -1635,9 +1638,9 @@ Denial of Service
 The attacker could attempt to prevent delivery of messages to or from the
 victim in order to:
 
-    * Disrupt service or marketing campaign of a commercial competitor.
-    * Censor a discussion or censor a participant in a discussion.
-    * Perform general vandalism.
+* Disrupt service or marketing campaign of a commercial competitor.
+* Censor a discussion or censor a participant in a discussion.
+* Perform general vandalism.
 
 Threat: Resource Exhaustion
 +++++++++++++++++++++++++++
@@ -1748,9 +1751,6 @@ Threat: Disclosure to Servers Within Chatroom
 
 An attacker could take control of a server within a chatroom to expose message
 contents or metadata for messages in that room.
-
-.. NOTE::
-  This section is a work in progress.
 
 Rate limiting
 -------------
