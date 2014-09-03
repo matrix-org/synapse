@@ -148,10 +148,11 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         yield self.handlers.presence_handler.set_state(
                 target_user=self.u_apple, auth_user=self.u_apple,
-                state={"state": UNAVAILABLE, "status_msg": "Away"})
+                state={"presence": UNAVAILABLE, "status_msg": "Away"})
 
         mocked_set.assert_called_with("apple",
-                {"state": UNAVAILABLE, "status_msg": "Away"})
+            {"state": UNAVAILABLE, "status_msg": "Away"}
+        )
 
     @defer.inlineCallbacks
     def test_push_local(self):
@@ -161,7 +162,8 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         ]
 
         self.datastore.set_presence_state.return_value = defer.succeed(
-                {"state": ONLINE})
+            {"state": ONLINE}
+        )
 
         # TODO(paul): Gut-wrenching
         from synapse.handlers.presence import UserPresenceCache
@@ -177,9 +179,11 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         apple_set.add(self.u_clementine)
 
         yield self.handlers.presence_handler.set_state(self.u_apple,
-                self.u_apple, {"state": ONLINE})
+            self.u_apple, {"presence": ONLINE}
+        )
         yield self.handlers.presence_handler.set_state(self.u_banana,
-                self.u_banana, {"state": ONLINE})
+            self.u_banana, {"presence": ONLINE}
+        )
 
         presence = yield self.handlers.presence_handler.get_presence_list(
                 observer_user=self.u_apple, accepted=True)
@@ -187,14 +191,12 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         self.assertEquals([
             {"observed_user": self.u_banana,
                 "presence": ONLINE,
-                "state": ONLINE,
                 "last_active_ago": 0,
                 "displayname": "Frank",
                 "avatar_url": "http://foo"},
             {"observed_user": self.u_clementine,
-                "presence": OFFLINE,
-                "state": OFFLINE}],
-        presence)
+                "presence": OFFLINE}
+        ], presence)
 
         self.mock_update_client.assert_has_calls([
             call(users_to_push=set([self.u_apple, self.u_banana, self.u_clementine]),
@@ -242,7 +244,8 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         ]
 
         self.datastore.set_presence_state.return_value = defer.succeed(
-                {"state": ONLINE})
+            {"state": ONLINE}
+        )
 
         # TODO(paul): Gut-wrenching
         from synapse.handlers.presence import UserPresenceCache
@@ -257,7 +260,8 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         apple_set.add(self.u_potato.domain)
 
         yield self.handlers.presence_handler.set_state(self.u_apple,
-                self.u_apple, {"state": ONLINE})
+            self.u_apple, {"presence": ONLINE}
+        )
 
         self.replication.send_edu.assert_called_with(
                 destination="remote",
@@ -266,7 +270,6 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                     "push": [
                         {"user_id": "@apple:test",
                          "presence": "online",
-                         "state": "online",
                          "last_active_ago": 0,
                          "displayname": "Frank",
                          "avatar_url": "http://foo"},
@@ -283,18 +286,19 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         # TODO(paul): Gut-wrenching
         potato_set = self.handlers.presence_handler._remote_recvmap.setdefault(
-                self.u_potato, set())
+            self.u_potato, set()
+        )
         potato_set.add(self.u_apple)
 
         yield self.replication.received_edu(
-                "remote", "m.presence", {
-                    "push": [
-                        {"user_id": "@potato:remote",
-                         "state": "online",
-                         "displayname": "Frank",
-                         "avatar_url": "http://foo"},
-                    ],
-                }
+            "remote", "m.presence", {
+                "push": [
+                    {"user_id": "@potato:remote",
+                     "presence": "online",
+                     "displayname": "Frank",
+                     "avatar_url": "http://foo"},
+                ],
+            }
         )
 
         self.mock_update_client.assert_called_with(
@@ -313,7 +317,6 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
         self.assertEquals(
                 {"presence": ONLINE,
-                 "state": ONLINE,
                  "displayname": "Frank",
                  "avatar_url": "http://foo"},
             state)

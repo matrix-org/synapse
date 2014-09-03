@@ -99,7 +99,7 @@ class PresenceStateTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         self.assertEquals(
-            {"presence": ONLINE, "state": ONLINE, "status_msg": "Available"},
+            {"presence": ONLINE, "status_msg": "Available"},
             response
         )
         mocked_get.assert_called_with("apple")
@@ -115,7 +115,8 @@ class PresenceStateTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         mocked_set.assert_called_with("apple",
-                {"state": UNAVAILABLE, "status_msg": "Away"})
+            {"state": UNAVAILABLE, "status_msg": "Away"}
+        )
 
 
 class PresenceListTestCase(unittest.TestCase):
@@ -176,7 +177,7 @@ class PresenceListTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         self.assertEquals([
-            {"user_id": "@banana:test", "presence": OFFLINE, "state": OFFLINE},
+            {"user_id": "@banana:test", "presence": OFFLINE},
         ], response)
 
         self.datastore.get_presence_list.assert_called_with(
@@ -311,9 +312,11 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         self.room_members = [self.u_apple, self.u_banana]
 
         self.mock_datastore.set_presence_state.return_value = defer.succeed(
-                {"state": ONLINE})
+            {"state": ONLINE}
+        )
         self.mock_datastore.get_presence_list.return_value = defer.succeed(
-                [])
+            []
+        )
 
         (code, response) = yield self.mock_resource.trigger("GET",
                 "/events?timeout=0", None)
@@ -329,9 +332,11 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         )
 
         self.mock_datastore.set_presence_state.return_value = defer.succeed(
-                {"state": ONLINE})
+            {"state": ONLINE}
+        )
         self.mock_datastore.get_presence_list.return_value = defer.succeed(
-                [])
+            []
+        )
 
         yield self.presence.set_state(self.u_banana, self.u_banana,
             state={"presence": ONLINE}
@@ -346,7 +351,6 @@ class PresenceEventStreamTestCase(unittest.TestCase):
              "content": {
                  "user_id": "@banana:test",
                  "presence": ONLINE,
-                 "state": ONLINE,
                  "displayname": "Frank",
                  "last_active_ago": 0,
             }},

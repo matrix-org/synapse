@@ -142,7 +142,7 @@ class PresenceStateTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            {"state": ONLINE, "presence": ONLINE, "status_msg": "Online"},
+            {"presence": ONLINE, "status_msg": "Online"},
             state
         )
         mocked_get.assert_called_with("apple")
@@ -159,7 +159,7 @@ class PresenceStateTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            {"state": ONLINE, "presence": ONLINE, "status_msg": "Online"},
+            {"presence": ONLINE, "status_msg": "Online"},
             state
         )
         mocked_get.assert_called_with("apple")
@@ -178,7 +178,7 @@ class PresenceStateTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            {"state": ONLINE, "presence": ONLINE, "status_msg": "Online"},
+            {"presence": ONLINE, "status_msg": "Online"},
             state
         )
 
@@ -208,7 +208,8 @@ class PresenceStateTestCase(unittest.TestCase):
                 state={"presence": UNAVAILABLE, "status_msg": "Away"})
 
         mocked_set.assert_called_with("apple",
-                {"state": UNAVAILABLE, "status_msg": "Away"})
+            {"state": UNAVAILABLE, "status_msg": "Away"}
+        )
         self.mock_start.assert_called_with(self.u_apple,
                 state={
                     "presence": UNAVAILABLE,
@@ -460,8 +461,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
         self.assertEquals([
             {"observed_user": self.u_banana,
-             "presence": OFFLINE,
-             "state": OFFLINE},
+             "presence": OFFLINE},
         ], presence)
 
         self.datastore.get_presence_list.assert_called_with("apple",
@@ -478,8 +478,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
         self.assertEquals([
             {"observed_user": self.u_banana,
-             "presence": OFFLINE,
-             "state": OFFLINE},
+             "presence": OFFLINE},
         ], presence)
 
         self.datastore.get_presence_list.assert_called_with("apple",
@@ -625,7 +624,8 @@ class PresencePushTestCase(unittest.TestCase):
         self.room_members = [self.u_apple, self.u_elderberry]
 
         self.datastore.set_presence_state.return_value = defer.succeed(
-                {"state": ONLINE})
+            {"state": ONLINE}
+        )
 
         # TODO(paul): Gut-wrenching
         self.handler._user_cachemap[self.u_apple] = UserPresenceCache()
@@ -654,7 +654,6 @@ class PresencePushTestCase(unittest.TestCase):
                  "content": {
                     "user_id": "@apple:test",
                     "presence": ONLINE,
-                    "state": ONLINE,
                     "last_active_ago": 0,
                 }},
             ],
@@ -673,7 +672,6 @@ class PresencePushTestCase(unittest.TestCase):
                  "content": {
                     "user_id": "@apple:test",
                     "presence": ONLINE,
-                    "state": ONLINE,
                     "last_active_ago": 0,
                 }},
             ],
@@ -692,7 +690,6 @@ class PresencePushTestCase(unittest.TestCase):
                  "content": {
                     "user_id": "@apple:test",
                     "presence": ONLINE,
-                    "state": ONLINE,
                     "last_active_ago": 0,
                 }},
             ],
@@ -715,11 +712,9 @@ class PresencePushTestCase(unittest.TestCase):
         self.assertEquals(
             [
                 {"observed_user": self.u_banana, 
-                 "presence": OFFLINE,
-                 "state": OFFLINE},
+                 "presence": OFFLINE},
                 {"observed_user": self.u_clementine,
-                 "presence": OFFLINE,
-                 "state": OFFLINE},
+                 "presence": OFFLINE},
             ],
             presence
         )
@@ -740,11 +735,9 @@ class PresencePushTestCase(unittest.TestCase):
         self.assertEquals([
                 {"observed_user": self.u_banana,
                  "presence": ONLINE,
-                 "state": ONLINE,
                  "last_active_ago": 2000},
                 {"observed_user": self.u_clementine,
-                 "presence": OFFLINE,
-                 "state": OFFLINE},
+                 "presence": OFFLINE},
         ], presence)
 
         (events, _) = yield self.event_source.get_new_events_for_user(
@@ -758,7 +751,6 @@ class PresencePushTestCase(unittest.TestCase):
                  "content": {
                      "user_id": "@banana:test",
                      "presence": ONLINE,
-                     "state": ONLINE,
                      "last_active_ago": 2000
                 }},
             ]
@@ -775,7 +767,6 @@ class PresencePushTestCase(unittest.TestCase):
                         "push": [
                             {"user_id": "@apple:test",
                              "presence": u"online",
-                             "state": u"online",
                              "last_active_ago": 0},
                         ],
                     }
@@ -791,7 +782,6 @@ class PresencePushTestCase(unittest.TestCase):
                         "push": [
                             {"user_id": "@apple:test",
                              "presence": u"online",
-                             "state": u"online",
                              "last_active_ago": 0},
                         ],
                     }
@@ -837,7 +827,7 @@ class PresencePushTestCase(unittest.TestCase):
                 content={
                     "push": [
                         {"user_id": "@potato:remote",
-                         "state": "online",
+                         "presence": "online",
                          "last_active_ago": 1000},
                     ],
                 }
@@ -855,7 +845,6 @@ class PresencePushTestCase(unittest.TestCase):
                  "content": {
                      "user_id": "@potato:remote",
                      "presence": ONLINE,
-                     "state": ONLINE,
                      "last_active_ago": 1000,
                 }}
             ]
@@ -866,7 +855,7 @@ class PresencePushTestCase(unittest.TestCase):
         state = yield self.handler.get_state(self.u_potato, self.u_apple)
 
         self.assertEquals(
-            {"state": ONLINE, "presence": ONLINE, "last_active_ago": 3000},
+            {"presence": ONLINE, "last_active_ago": 3000},
             state
         )
 
@@ -902,7 +891,6 @@ class PresencePushTestCase(unittest.TestCase):
                  "content": {
                      "user_id": "@clementine:test",
                      "presence": ONLINE,
-                     "state": ONLINE,
                      "last_active_ago": 0,
                 }}
             ]
@@ -919,8 +907,7 @@ class PresencePushTestCase(unittest.TestCase):
                     content={
                         "push": [
                             {"user_id": "@apple:test",
-                             "presence": "online",
-                             "state": "online"},
+                             "presence": "online"},
                         ],
                     }
                 ),
@@ -934,8 +921,7 @@ class PresencePushTestCase(unittest.TestCase):
                     content={
                         "push": [
                             {"user_id": "@banana:test",
-                             "presence": "offline",
-                             "state": "offline"},
+                             "presence": "offline"},
                         ],
                     }
                 ),
@@ -964,8 +950,7 @@ class PresencePushTestCase(unittest.TestCase):
                     content={
                         "push": [
                             {"user_id": "@clementine:test",
-                             "presence": "online",
-                             "state": "online"},
+                             "presence": "online"},
                         ],
                     }
                 ),
@@ -1264,7 +1249,6 @@ class PresencePollingTestCase(unittest.TestCase):
                         "push": [
                             {"user_id": "@banana:test",
                              "presence": "offline",
-                             "state": "offline",
                              "status_msg": None},
                         ],
                     },

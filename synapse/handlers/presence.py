@@ -180,7 +180,7 @@ class PresenceHandler(BaseHandler):
             state = yield self.store.get_presence_state(target_user.localpart)
             if "mtime" in state:
                 del state["mtime"]
-            state["presence"] = state["state"]
+            state["presence"] = state.pop("state")
 
             if target_user in self._user_cachemap:
                 state["last_active"] = (
@@ -213,14 +213,10 @@ class PresenceHandler(BaseHandler):
             state["status_msg"] = None
 
         for k in state.keys():
-            if k not in ("presence", "state", "status_msg"):
+            if k not in ("presence", "status_msg"):
                 raise SynapseError(
                     400, "Unexpected presence state key '%s'" % (k,)
                 )
-
-        # Handle legacy "state" key for now
-        if "state" in state:
-            state["presence"] = state.pop("state")
 
         if state["presence"] not in self.STATE_LEVELS:
             raise SynapseError(400, "'%s' is not a valid presence state" %
@@ -600,7 +596,7 @@ class PresenceHandler(BaseHandler):
         if state is None:
             state = yield self.store.get_presence_state(user.localpart)
             del state["mtime"]
-            state["presence"] = state["state"]
+            state["presence"] = state.pop("state")
 
             if user in self._user_cachemap:
                 state["last_active"] = (
@@ -621,8 +617,6 @@ class PresenceHandler(BaseHandler):
             "user_id": user.to_string(),
         }
         user_state.update(**state)
-        if "state" in user_state and "presence" not in user_state:
-            user_state["presence"] = user_state["state"]
 
         yield self.federation.send_edu(
             destination=destination,
@@ -654,20 +648,11 @@ class PresenceHandler(BaseHandler):
             state = dict(push)
             del state["user_id"]
 
-            if "presence" in state:
-                # all is OK
-                pass
-            elif "state" in state:
-                # Legacy handling
-                state["presence"] = state["state"]
-            else:
+            if "presence" not in state:
                 logger.warning("Received a presence 'push' EDU from %s without"
-                    + " either a 'presence' or 'state' key", origin
+                    + " a 'presence' key", origin
                 )
                 continue
-
-            if "state" in state:
-                del state["state"]
 
             if "last_active_ago" in state:
                 state["last_active"] = int(
@@ -900,7 +885,6 @@ class UserPresenceCache(object):
 
     def update(self, state, serial):
         assert("mtime_age" not in state)
-        assert("state" not in state)
 
         self.state.update(state)
         # Delete keys that are now 'None'
@@ -918,11 +902,6 @@ class UserPresenceCache(object):
     def get_state(self):
         # clone it so caller can't break our cache
         state = dict(self.state)
-
-        # Legacy handling
-        if "presence" in state:
-            state["state"] = state["presence"]
-
         return state
 
     def make_event(self, user, clock):
