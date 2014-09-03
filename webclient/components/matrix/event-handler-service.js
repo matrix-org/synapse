@@ -1,5 +1,5 @@
 /*
-Copyright 2014 matrix.org
+Copyright 2014 OpenMarket Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,7 +32,9 @@ angular.module('eventHandlerService', [])
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
     var PRESENCE_EVENT = "PRESENCE_EVENT";
+    var POWERLEVEL_EVENT = "POWERLEVEL_EVENT";
     var CALL_EVENT = "CALL_EVENT";
+    var NAME_EVENT = "NAME_EVENT";
 
     var InitialSyncDeferred = $q.defer();
     
@@ -95,7 +97,7 @@ angular.module('eventHandlerService', [])
             }
         }
         
-        $rootScope.events.rooms[event.room_id].members[event.user_id] = event;
+        $rootScope.events.rooms[event.room_id].members[event.state_key] = event;
         $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent);
     };
     
@@ -107,10 +109,20 @@ angular.module('eventHandlerService', [])
     var handlePowerLevels = function(event, isLiveEvent) {
         initRoom(event.room_id);
 
-       $rootScope.events.rooms[event.room_id][event.type] = event;
+        // Keep the latest data. Do not care of events that come when paginating back
+        if (!$rootScope.events.rooms[event.room_id][event.type] || isLiveEvent) {
+            $rootScope.events.rooms[event.room_id][event.type] = event;
+            $rootScope.$broadcast(POWERLEVEL_EVENT, event, isLiveEvent);   
+        }
+    };
 
-        //TODO
-        //$rootScope.$broadcast(PRESENCE_EVENT, event, isLiveEvent);
+    var handleRoomName = function(event, isLiveEvent) {
+        console.log("handleRoomName " + isLiveEvent);
+
+        initRoom(event.room_id);
+
+        $rootScope.events.rooms[event.room_id][event.type] = event;
+        $rootScope.$broadcast(NAME_EVENT, event, isLiveEvent);
     };
 
     var handleCallEvent = function(event, isLiveEvent) {
@@ -122,7 +134,9 @@ angular.module('eventHandlerService', [])
         MSG_EVENT: MSG_EVENT,
         MEMBER_EVENT: MEMBER_EVENT,
         PRESENCE_EVENT: PRESENCE_EVENT,
+        POWERLEVEL_EVENT: POWERLEVEL_EVENT,
         CALL_EVENT: CALL_EVENT,
+        NAME_EVENT: NAME_EVENT,
         
     
         handleEvent: function(event, isLiveEvent) {
@@ -146,7 +160,9 @@ angular.module('eventHandlerService', [])
                 case 'm.room.power_levels':
                     handlePowerLevels(event, isLiveEvent);
                     break;
-
+                case 'm.room.name':
+                    handleRoomName(event, isLiveEvent);
+                    break;
                 default:
                     console.log("Unable to handle event type " + event.type);
                     console.log(JSON.stringify(event, undefined, 4));

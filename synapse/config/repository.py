@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014 matrix.org
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,22 +16,24 @@
 from ._base import Config
 import os
 
-class DatabaseConfig(Config):
+class ContentRepositoryConfig(Config):
     def __init__(self, args):
-        super(DatabaseConfig, self).__init__(args)
-        self.database_path = self.abspath(args.database_path)
+        super(ContentRepositoryConfig, self).__init__(args)
+        self.max_upload_size = self.parse_size(args.max_upload_size)
+
+    def parse_size(self, string):
+        sizes = {"K": 1024, "M": 1024 * 1024}
+        size = 1
+        suffix = string[-1]
+        if suffix in sizes:
+            string = string[:-1]
+            size = sizes[suffix]
+        return int(string) * size
 
     @classmethod
     def add_arguments(cls, parser):
-        super(DatabaseConfig, cls).add_arguments(parser)
-        db_group = parser.add_argument_group("database")
+        super(ContentRepositoryConfig, cls).add_arguments(parser)
+        db_group = parser.add_argument_group("content_repository")
         db_group.add_argument(
-            "-d", "--database-path", default="homeserver.db",
-            help="The database name."
+            "--max-upload-size", default="1M"
         )
-
-    @classmethod
-    def generate_config(cls, args, config_dir_path):
-        super(DatabaseConfig, cls).generate_config(args, config_dir_path)
-        args.database_path = os.path.abspath(args.database_path)
-

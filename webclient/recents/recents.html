@@ -23,8 +23,8 @@
                     <div ng-hide="room.membership === 'invite'" ng-switch="room.lastMsg.type" >
                          <div ng-switch-when="m.room.member">
                             {{ room.lastMsg.user_id }}
-                            {{ {"join": "joined", "leave": "left", "invite": "invited"}[room.lastMsg.content.membership] }}
-                            {{ room.lastMsg.content.membership === "invite" ? (room.lastMsg.state_key || '') : '' }}
+                            {{ {"join": "joined", "leave": "left", "invite": "invited", "ban": "banned"}[msg.content.membership] }}
+                            {{ (msg.content.membership === "invite" || msg.content.membership === "ban") ? (msg.state_key || '') : '' }}
                         </div>
 
                         <div ng-switch-when="m.room.message">

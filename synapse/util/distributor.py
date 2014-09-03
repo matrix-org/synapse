@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +32,9 @@ class Distributor(object):
       model will do for today.
     """
 
-    def __init__(self):
+    def __init__(self, suppress_failures=True):
+        self.suppress_failures = suppress_failures
+
         self.signals = {}
         self.pre_registration = {}
 
@@ -40,7 +42,9 @@ class Distributor(object):
         if name in self.signals:
             raise KeyError("%r already has a signal named %s" % (self, name))
 
-        self.signals[name] = Signal(name)
+        self.signals[name] = Signal(name,
+            suppress_failures=self.suppress_failures,
+        )
 
         if name in self.pre_registration:
             signal = self.signals[name]
@@ -74,8 +78,9 @@ class Signal(object):
     method into all of the observers.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, suppress_failures):
         self.name = name
+        self.suppress_failures = suppress_failures
         self.observers = []
 
     def observe(self, observer):
@@ -104,6 +109,10 @@ class Signal(object):
                         failure.type,
                         failure.value,
                         failure.getTracebackObject()))
+                if not self.suppress_failures:
+                    raise failure
             deferreds.append(d.addErrback(eb))
 
-        return defer.DeferredList(deferreds)
+        return defer.DeferredList(
+            deferreds, fireOnOneErrback=not self.suppress_failures
+        )

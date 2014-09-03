@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -167,7 +167,12 @@ class Notifier(object):
                 )
 
         def eb(failure):
-            logger.exception("Failed to notify listener", failure)
+            logger.error("Failed to notify listener",
+                exc_info=(
+                    failure.type,
+                    failure.value,
+                    failure.getTracebackObject())
+            )
 
         yield defer.DeferredList(
             [notify(l).addErrback(eb) for l in listeners]

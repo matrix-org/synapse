@@ -1,7 +1,7 @@
 {
   "apiVersion": "1.0.0",
   "swaggerVersion": "1.2",
-  "basePath": "http://localhost:8080/_matrix/client/api/v1", 
+  "basePath": "http://localhost:8008/_matrix/client/api/v1", 
   "resourcePath": "/rooms",
   "produces": [
     "application/json"
@@ -181,6 +181,59 @@
       ]
     },
     {
+      "path": "/rooms/{roomId}/state/m.room.name",
+      "operations": [
+        {
+          "method": "PUT",
+          "summary": "Set the name of this room.",
+          "notes": "Set the name of this room.",
+          "type": "void",
+          "nickname": "set_room_name",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "body",
+              "description": "The name contents",
+              "required": true,
+              "type": "RoomName",
+              "paramType": "body"
+            },
+            {
+              "name": "roomId",
+              "description": "The room to set the name of.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "summary": "Get the room's name.",
+          "notes": "",
+          "type": "RoomName",
+          "nickname": "get_room_name",
+          "parameters": [
+            {
+              "name": "roomId",
+              "description": "The room to get the name of.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            }
+          ],
+          "responseMessages": [
+            {
+              "code": 404,
+              "message": "Name not found."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "path": "/rooms/{roomId}/send/m.room.message.feedback",
       "operations": [
         {
@@ -267,6 +320,12 @@
               "required": true,
               "type": "string",
               "paramType": "path"
+            },
+            {
+              "name": "body",
+              "required": true,
+              "type": "JoinRequest",
+              "paramType": "body"
             }
           ]
         }  
@@ -291,6 +350,12 @@
               "required": true,
               "type": "string",
               "paramType": "path"
+            },
+            {
+              "name": "body",
+              "required": true,
+              "type": "LeaveRequest",
+              "paramType": "body"
             }
           ]
         }  
@@ -424,10 +489,10 @@
       "path": "/join/{roomAliasOrId}",
       "operations": [
         {
-          "method": "PUT",
+          "method": "POST",
           "summary": "Join a room via a room alias or room ID.",
           "notes": "Join a room via a room alias or room ID.",
-          "type": "RoomInfo",
+          "type": "JoinRoomInfo",
           "nickname": "join",
           "consumes": [
             "application/json"
@@ -574,7 +639,7 @@
         {
           "method": "GET",
           "summary": "Get a list of all the current state events for this room.",
-          "notes": "Get a list of all the current state events for this room.",
+          "notes": "NOT YET IMPLEMENTED.",
           "type": "array",
           "items": {
             "$ref": "Event"
@@ -598,7 +663,7 @@
         {
           "method": "GET",
           "summary": "Get all the current information for this room, including messages and state events.",
-          "notes": "Get all the current information for this room, including messages and state events.",
+          "notes": "NOT YET IMPLEMENTED.",
           "type": "InitialSyncRoomData",
           "nickname": "get_room_sync_data",
           "parameters": [
@@ -624,6 +689,15 @@
         }
       }
     },
+    "RoomName": {
+      "id": "RoomName",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The human-readable name for the room. Can contain spaces."
+        }
+      }
+    },
     "Message": {
       "id": "Message",
       "properties": {
@@ -640,6 +714,16 @@
     "Feedback": {
       "id": "Feedback",
       "properties": {
+        "target_event_id": {
+          "type": "string",
+          "description": "The event ID being acknowledged.",
+          "required": true
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of feedback. Either 'delivered' or 'read'.",
+          "required": true
+        }
       }
     },
     "Member": {
@@ -652,7 +736,7 @@
             "invite",
             "join",
             "leave",
-            "knock"
+            "ban"
           ]
         }
       }
@@ -669,6 +753,16 @@
           "type": "string",
           "description": "The alias for the room.",
           "required": false
+        }
+      }
+    },
+    "JoinRoomInfo": {
+      "id": "JoinRoomInfo",
+      "properties": {
+        "room_id": {
+          "type": "string",
+          "description": "The room ID joined, if joined via a room alias only.",
+          "required": true
         }
       }
     },
@@ -829,6 +923,14 @@
           "description": "The fully-qualified user ID."
         }
       }
+    },
+    "JoinRequest": {
+      "id": "JoinRequest",
+      "properties": {}
+    },
+    "LeaveRequest": {
+      "id": "LeaveRequest",
+      "properties": {}
     },
     "BanRequest": {
       "id": "BanRequest",

@@ -30,48 +30,52 @@ ecosystem to communicate with one another.
 
 The principles that Matrix attempts to follow are:
 
- - Pragmatic Web-friendly APIs (i.e. JSON over REST)
- - Keep It Simple & Stupid
+- Pragmatic Web-friendly APIs (i.e. JSON over REST)
+- Keep It Simple & Stupid
 
-   + provide a simple architecture with minimal third-party dependencies.
+  + provide a simple architecture with minimal third-party dependencies.
 
- - Fully open:
+- Fully open:
 
-   + Fully open federation - anyone should be able to participate in the global Matrix network
-   + Fully open standard - publicly documented standard with no IP or patent licensing encumbrances
-   + Fully open source reference implementation - liberally-licensed example implementations with no
-     IP or patent licensing encumbrances
+  + Fully open federation - anyone should be able to participate in the global
+    Matrix network
+  + Fully open standard - publicly documented standard with no IP or patent
+    licensing encumbrances
+  + Fully open source reference implementation - liberally-licensed example
+    implementations with no IP or patent licensing encumbrances
 
- - Empowering the end-user
+- Empowering the end-user
 
-   + The user should be able to choose the server and clients they use
-   + The user should be control how private their communication is
-   + The user should know precisely where their data is stored
+  + The user should be able to choose the server and clients they use
+  + The user should be control how private their communication is
+  + The user should know precisely where their data is stored
 
- - Fully decentralised - no single points of control over conversations or the network as a whole
- - Learning from history to avoid repeating it
+- Fully decentralised - no single points of control over conversations or the
+  network as a whole
+- Learning from history to avoid repeating it
 
-   + Trying to take the best aspects of XMPP, SIP, IRC, SMTP, IMAP and NNTP whilst trying to avoid their failings
+  + Trying to take the best aspects of XMPP, SIP, IRC, SMTP, IMAP and NNTP
+    whilst trying to avoid their failings
 
 The functionality that Matrix provides includes:
 
- - Creation and management of fully distributed chat rooms with no
-   single points of control or failure
- - Eventually-consistent cryptographically secure synchronisation of room 
-   state across a global open network of federated servers and services
- - Sending and receiving extensible messages in a room with (optional)
-   end-to-end encryption
- - Extensible user management (inviting, joining, leaving, kicking, banning)
-   mediated by a power-level based user privilege system.
- - Extensible room state management (room naming, aliasing, topics, bans)
- - Extensible user profile management (avatars, displaynames, etc)
- - Managing user accounts (registration, login, logout)
- - Use of 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
-   Facebook accounts to authenticate, identify and discover users on Matrix.
- - Trusted federation of Identity servers for:
+- Creation and management of fully distributed chat rooms with no
+  single points of control or failure
+- Eventually-consistent cryptographically secure synchronisation of room
+  state across a global open network of federated servers and services
+- Sending and receiving extensible messages in a room with (optional)
+  end-to-end encryption
+- Extensible user management (inviting, joining, leaving, kicking, banning)
+  mediated by a power-level based user privilege system.
+- Extensible room state management (room naming, aliasing, topics, bans)
+- Extensible user profile management (avatars, displaynames, etc)
+- Managing user accounts (registration, login, logout)
+- Use of 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
+  Facebook accounts to authenticate, identify and discover users on Matrix.
+- Trusted federation of Identity servers for:
 
-   + Publishing user public keys for PKI
-   + Mapping of 3PIDs to Matrix IDs
+  + Publishing user public keys for PKI
+  + Mapping of 3PIDs to Matrix IDs
 
 The end goal of Matrix is to be a ubiquitous messaging layer for synchronising
 arbitrary data between sets of people, devices and services - be that for instant
@@ -428,9 +432,10 @@ event also has a ``creator`` key which contains the user ID of the room
 creator. It will also generate several other events in order to manage
 permissions in this room. This includes:
 
- - ``m.room.power_levels`` : Sets the authority of the room creator.
+ - ``m.room.power_levels`` : Sets the power levels of users.
  - ``m.room.join_rules`` : Whether the room is "invite-only" or not.
- - ``m.room.add_state_level``
+ - ``m.room.add_state_level``: The power level required in order to
+   add new state to the room (as opposed to updating exisiting state)
  - ``m.room.send_event_level`` : The power level required in order to
    send a message in this room.
  - ``m.room.ops_level`` : The power level required in order to kick or
@@ -462,6 +467,27 @@ Permissions
     - TODO: Room config - what is the event and what are the keys/values and explanations for them.
       Link through to respective sections where necessary. How does this tie in with permissions, e.g.
       give example of creating a read-only room.
+
+Permissions for rooms are done via the concept of power levels - to do any
+action in a room a user must have a suitable power level. 
+
+Power levels for users are defined in ``m.room.power_levels``, where both
+a default and specific users' power levels can be set. By default all users
+have a power level of 0.
+
+State events may contain a ``required_power_level`` key, which indicates the
+minimum power a user must have before they can update that state key. The only
+exception to this is when a user leaves a room.
+
+To perform certain actions there are additional power level requirements
+defined in the following state events:
+
+- ``m.room.send_event_level`` defines the minimum level for sending non-state 
+  events. Defaults to 5.
+- ``m.room.add_state_level`` defines the minimum level for adding new state,
+  rather than updating existing state. Defaults to 5.
+- ``m.room.ops_level`` defines the minimum levels to ban and kick other users.
+  This defaults to a kick and ban levels of 5 each.
 
 
 Joining rooms
@@ -797,89 +823,88 @@ prefixed with ``m.``
     to force this state change directly will fail. See the `Rooms`_ section for how to 
     use the membership APIs.
 
-``m.room.config``
+``m.room.create``
   Summary:
-    The room config.
+    The first event in the room.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "creator": "string"}``
   Example:
-    TODO
+    ``{ "creator": "@user:example.com" }``
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
+    This is the first event in a room and cannot be changed. It acts as the 
+    root of all other events.
 
-``m.room.invite_join``
-  Summary:
-    TODO.
-  Type: 
-    State event
-  JSON format:
-    TODO
-  Example:
-    TODO
-  Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
-    
 ``m.room.join_rules``
   Summary:
-    TODO.
+    Descripes how/if people are allowed to join.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "join_rule": "enum [ public|knock|invite|private ]" }``
   Example:
-    TODO
+    ``{ "join_rule": "public" }``
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
-    
+    TODO : Use docs/models/rooms.rst
+   
 ``m.room.power_levels``
   Summary:
-    TODO.
+    Defines the power levels of users in the room.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "<user_id>": <int>, ..., "default": <int>}``
   Example:
-    TODO
+    ``{ "@user:example.com": 5, "@user2:example.com": 10, "default": 0 }`` 
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
-    
+    If a user is in the list, then they have the associated power level. 
+    Otherwise they have the default level. If not ``default`` key is supplied,
+    it is assumed to be 0.
+
 ``m.room.add_state_level``
   Summary:
-    TODO.
+    Defines the minimum power level a user needs to add state.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "level": <int> }``
   Example:
-    TODO
+    ``{ "level": 5 }``
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
+    To add a new piece of state to the room a user must have the given power 
+    level. This does not apply to updating current state, which is goverened
+    by the ``required_power_level`` event key.
     
 ``m.room.send_event_level``
   Summary:
-    TODO.
+    Defines the minimum power level a user needs to send an event.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "level": <int> }``
   Example:
-    TODO
+    ``{ "level": 0 }``
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
-    
+    To send a new event into the room a user must have at least this power 
+    level. This allows ops to make the room read only by increasing this level,
+    or muting individual users by lowering their power level below this
+    threshold.
+
 ``m.room.ops_levels``
   Summary:
-    TODO.
+    Defines the minimum power levels that a user must have before they can 
+    kick and/or ban other users.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "ban_level": <int>, "kick_level": <int> }``
   Example:
-    TODO
+    ``{ "ban_level": 5, "kick_level": 5 }``
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
+    This defines who can ban and/or kick people in the room. Most of the time
+    ``ban_level`` will be greater than or equal to ``kick_level`` since 
+    banning is more severe than kicking.
 
 ``m.room.message``
   Summary:
@@ -1485,6 +1510,31 @@ Each transaction has:
  - An origin and destination server name.
  - A list of "previous IDs".
  - A list of PDUs and EDUs - the actual message payload that the Transaction carries.
+ 
+``origin``
+  Type: 
+    String
+  Description:
+    DNS name of homeserver making this transaction.
+    
+``ts``
+  Type: 
+    Integer
+  Description:
+    Timestamp in milliseconds on originating homeserver when this transaction 
+    started.
+    
+``previous_ids``
+  Type:
+    List of strings
+  Description:
+    List of transactions that were sent immediately prior to this transaction.
+    
+``pdus``
+  Type:
+    List of Objects.
+  Description:
+    List of updates contained in this transaction.
 
 ::
 
@@ -1526,8 +1576,98 @@ All PDUs have:
  - A list of other PDU IDs that have been seen recently on that context (regardless of which origin
    sent them)
 
-[[TODO(paul): Update this structure so that 'pdu_id' is a two-element
-[origin,ref] pair like the prev_pdus are]]
+``context``
+  Type:
+    String
+  Description:
+    Event context identifier
+    
+``origin``
+  Type:
+    String
+  Description:
+    DNS name of homeserver that created this PDU.
+    
+``pdu_id``
+  Type:
+    String
+  Description:
+    Unique identifier for PDU within the context for the originating homeserver
+
+``ts``
+  Type:
+    Integer
+  Description:
+    Timestamp in milliseconds on originating homeserver when this PDU was created.
+
+``pdu_type``
+  Type:
+    String
+  Description:
+    PDU event type.
+
+``prev_pdus``
+  Type:
+    List of pairs of strings
+  Description:
+    The originating homeserver and PDU ids of the most recent PDUs the 
+    homeserver was aware of for this context when it made this PDU.
+
+``depth``
+  Type:
+    Integer
+  Description:
+    The maximum depth of the previous PDUs plus one.
+
+
+.. TODO paul
+  [[TODO(paul): Update this structure so that 'pdu_id' is a two-element
+  [origin,ref] pair like the prev_pdus are]]
+  
+
+For state updates:
+
+``is_state``
+  Type:
+    Boolean
+  Description:
+    True if this PDU is updating state.
+    
+``state_key``
+  Type:
+    String
+  Description:
+    Optional key identifying the updated state within the context.
+    
+``power_level``
+  Type:
+    Integer
+  Description:
+    The asserted power level of the user performing the update.
+    
+``min_update``
+  Type:
+    Integer
+  Description:
+    The required power level needed to replace this update.
+
+``prev_state_id``
+  Type:
+    String
+  Description:
+    PDU event type.
+    
+``prev_state_origin``
+  Type:
+    String
+  Description:
+    The PDU id of the update this replaces.
+    
+``user``
+  Type:
+    String
+  Description:
+    The user updating the state.
 
 ::
 
@@ -1568,12 +1708,13 @@ keys exist to support this:
   "prev_state_id":TODO
   "prev_state_origin":TODO}
 
-[[TODO(paul): At this point we should probably have a long description of how
-State management works, with descriptions of clobbering rules, power levels, etc
-etc... But some of that detail is rather up-in-the-air, on the whiteboard, and
-so on. This part needs refining. And writing in its own document as the details
-relate to the server/system as a whole, not specifically to server-server
-federation.]]
+.. TODO paul
+  [[TODO(paul): At this point we should probably have a long description of how
+  State management works, with descriptions of clobbering rules, power levels, etc
+  etc... But some of that detail is rather up-in-the-air, on the whiteboard, and
+  so on. This part needs refining. And writing in its own document as the details
+  relate to the server/system as a whole, not specifically to server-server
+  federation.]]
 
 EDUs, by comparison to PDUs, do not have an ID, a context, or a list of
 "previous" IDs. The only mandatory fields for these are the type, origin and
@@ -1585,6 +1726,79 @@ destination home server names, and the actual nested content.
   "origin":"blue",
   "destination":"orange",
   "content":...}
+  
+  
+Protocol URLs
+=============
+.. WARNING::
+  This section may be misleading or inaccurate.
+
+All these URLs are namespaced within a prefix of::
+
+  /_matrix/federation/v1/...
+
+For active pushing of messages representing live activity "as it happens"::
+
+  PUT .../send/:transaction_id/
+    Body: JSON encoding of a single Transaction
+    Response: TODO
+
+The transaction_id path argument will override any ID given in the JSON body.
+The destination name will be set to that of the receiving server itself. Each
+embedded PDU in the transaction body will be processed.
+
+
+To fetch a particular PDU::
+
+  GET .../pdu/:origin/:pdu_id/
+    Response: JSON encoding of a single Transaction containing one PDU
+
+Retrieves a given PDU from the server. The response will contain a single new
+Transaction, inside which will be the requested PDU.
+  
+
+To fetch all the state of a given context::
+
+  GET .../state/:context/
+    Response: JSON encoding of a single Transaction containing multiple PDUs
+
+Retrieves a snapshot of the entire current state of the given context. The
+response will contain a single Transaction, inside which will be a list of
+PDUs that encode the state.
+
+To backfill events on a given context::
+
+  GET .../backfill/:context/
+    Query args: v, limit
+    Response: JSON encoding of a single Transaction containing multiple PDUs
+
+Retrieves a sliding-window history of previous PDUs that occurred on the
+given context. Starting from the PDU ID(s) given in the "v" argument, the
+PDUs that preceeded it are retrieved, up to a total number given by the
+"limit" argument. These are then returned in a new Transaction containing all
+off the PDUs.
+
+
+To stream events all the events::
+
+  GET .../pull/
+    Query args: origin, v
+    Response: JSON encoding of a single Transaction consisting of multiple PDUs
+
+Retrieves all of the transactions later than any version given by the "v"
+arguments.
+
+
+To make a query::
+
+  GET .../query/:query_type
+    Query args: as specified by the individual query types
+    Response: JSON encoding of a response object
+
+Performs a single query request on the receiving home server. The Query Type
+part of the path specifies the kind of query being made, and its query
+arguments have a meaning specific to that kind of query. The response is a
+JSON-encoded object whose meaning also depends on the kind of query.
 
 Backfilling
 -----------
@@ -1604,8 +1818,132 @@ SRV Records
 
 Security
 ========
+
 .. NOTE::
   This section is a work in progress.
+
+Threat Model
+------------
+
+Denial of Service
+~~~~~~~~~~~~~~~~~
+
+The attacker could attempt to prevent delivery of messages to or from the
+victim in order to:
+
+* Disrupt service or marketing campaign of a commercial competitor.
+* Censor a discussion or censor a participant in a discussion.
+* Perform general vandalism.
+
+Threat: Resource Exhaustion
++++++++++++++++++++++++++++
+
+An attacker could cause the victims server to exhaust a particular resource
+(e.g. open TCP connections, CPU, memory, disk storage)
+
+Threat: Unrecoverable Consistency Violations
+++++++++++++++++++++++++++++++++++++++++++++
+
+An attacker could send messages which created an unrecoverable "split-brain"
+state in the cluster such that the victim's servers could no longer dervive a
+consistent view of the chatroom state.
+
+Threat: Bad History
++++++++++++++++++++
+
+An attacker could convince the victim to accept invalid messages which the
+victim would then include in their view of the chatroom history. Other servers
+in the chatroom would reject the invalid messages and potentially reject the
+victims messages as well since they depended on the invalid messages.
+
+Threat: Block Network Traffic
++++++++++++++++++++++++++++++
+
+An attacker could try to firewall traffic between the victim's server and some
+or all of the other servers in the chatroom.
+
+Threat: High Volume of Messages
++++++++++++++++++++++++++++++++
+
+An attacker could send large volumes of messages to a chatroom with the victim
+making the chatroom unusable.
+
+Threat: Banning users without necessary authorisation
++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+An attacker could attempt to ban a user from a chatroom with the necessary
+authorisation.
+
+Spoofing
+~~~~~~~~
+
+An attacker could try to send a message claiming to be from the victim without
+the victim having sent the message in order to:
+
+* Impersonate the victim while performing illict activity.
+* Obtain privileges of the victim.
+
+Threat: Altering Message Contents
++++++++++++++++++++++++++++++++++
+
+An attacker could try to alter the contents of an existing message from the
+victim.
+
+Threat: Fake Message "origin" Field
++++++++++++++++++++++++++++++++++++
+
+An attacker could try to send a new message purporting to be from the victim
+with a phony "origin" field.
+
+Spamming
+~~~~~~~~
+
+The attacker could try to send a high volume of solicicted or unsolicted
+messages to the victim in order to:
+
+* Find victims for scams.
+* Market unwanted products.
+
+Threat: Unsoliticted Messages
++++++++++++++++++++++++++++++
+
+An attacker could try to send messages to victims who do not wish to receive
+them.
+
+Threat: Abusive Messages
+++++++++++++++++++++++++
+
+An attacker could send abusive or threatening messages to the victim
+
+Spying
+~~~~~~
+
+The attacker could try to access message contents or metadata for messages sent
+by the victim or to the victim that were not intended to reach the attacker in
+order to:
+
+* Gain sensitive personal or commercial information.
+* Impersonate the victim using credentials contained in the messages.
+  (e.g. password reset messages)
+* Discover who the victim was talking to and when.
+
+Threat: Disclosure during Transmission
+++++++++++++++++++++++++++++++++++++++
+
+An attacker could try to expose the message contents or metadata during
+transmission between the servers.
+
+Threat: Disclosure to Servers Outside Chatroom
+++++++++++++++++++++++++++++++++++++++++++++++
+
+An attacker could try to convince servers within a chatroom to send messages to
+a server it controls that was not authorised to be within the chatroom.
+
+Threat: Disclosure to Servers Within Chatroom
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An attacker could take control of a server within a chatroom to expose message
+contents or metadata for messages in that room.
 
 Rate limiting
 -------------
@@ -1660,57 +1998,121 @@ Glossary
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
-  - domain specific words/acronyms with definitions
+Backfilling:
+  The process of synchronising historic state from one home server to another,
+  to backfill the event storage so that scrollback can be presented to the
+  client(s). Not to be confused with pagination.
+
+Context:
+  A single human-level entity of interest (currently, a chat room)
+
+EDU (Ephemeral Data Unit):
+  A message that relates directly to a given pair of home servers that are
+  exchanging it. EDUs are short-lived messages that related only to one single
+  pair of servers; they are not persisted for a long time and are not forwarded
+  on to other servers. Because of this, they have no internal ID nor previous
+  EDUs reference chain.
+
+Event:
+  A record of activity that records a single thing that happened on to a context
+  (currently, a chat room). These are the "chat messages" that Synapse makes
+  available.
+
+PDU (Persistent Data Unit):
+  A message that relates to a single context, irrespective of the server that
+  is communicating it. PDUs either encode a single Event, or a single State
+  change. A PDU is referred to by its PDU ID; the pair of its origin server
+  and local reference from that server.
+
+PDU ID:
+  The pair of PDU Origin and PDU Reference, that together globally uniquely
+  refers to a specific PDU.
+
+PDU Origin:
+  The name of the origin server that generated a given PDU. This may not be the
+  server from which it has been received, due to the way they are copied around
+  from server to server. The origin always records the original server that
+  created it.
+
+PDU Reference:
+  A local ID used to refer to a specific PDU from a given origin server. These
+  references are opaque at the protocol level, but may optionally have some
+  structured meaning within a given origin server or implementation.
+
+Presence:
+  The concept of whether a user is currently online, how available they declare
+  they are, and so on. See also: doc/model/presence
+
+Profile:
+  A set of metadata about a user, such as a display name, provided for the
+  benefit of other users. See also: doc/model/profiles
+
+Room ID:
+  An opaque string (of as-yet undecided format) that identifies a particular
+  room and used in PDUs referring to it.
+
+Room Alias:
+  A human-readable string of the form #name:some.domain that users can use as a
+  pointer to identify a room; a Directory Server will map this to its Room ID
+
+State:
+  A set of metadata maintained about a Context, which is replicated among the
+  servers in addition to the history of Events.
 
 User ID:
-  An opaque ID which identifies an end-user, which consists of some opaque 
-  localpart combined with the domain name of their home server. 
+  A string of the form @localpart:domain.name that identifies a user for
+  wire-protocol purposes. The localpart is meaningless outside of a particular
+  home server. This takes a human-readable form that end-users can use directly
+  if they so wish, avoiding the 3PIDs.
+
+Transaction:
+  A message which relates to the communication between a given pair of servers.
+  A transaction contains possibly-empty lists of PDUs and EDUs.
 
 
 .. Links through the external API docs are below
 .. =============================================
 
 .. |createRoom| replace:: ``/createRoom``
-.. _createRoom: /-rooms/create_room
+.. _createRoom: /docs/api/client-server/#!/-rooms/create_room
 
 .. |initialSync| replace:: ``/initialSync``
-.. _initialSync: /-events/initial_sync
+.. _initialSync: /docs/api/client-server/#!/-events/initial_sync
 
 .. |/rooms/<room_id>/initialSync| replace:: ``/rooms/<room_id>/initialSync``
-.. _/rooms/<room_id>/initialSync: /-rooms/get_room_sync_data
+.. _/rooms/<room_id>/initialSync: /docs/api/client-server/#!/-rooms/get_room_sync_data
 
 .. |login| replace:: ``/login``
-.. _login: /-login
+.. _login: /docs/api/client-server/#!/-login
 
 .. |/rooms/<room_id>/messages| replace:: ``/rooms/<room_id>/messages``
-.. _/rooms/<room_id>/messages: /-rooms/get_messages
+.. _/rooms/<room_id>/messages: /docs/api/client-server/#!/-rooms/get_messages
 
 .. |/rooms/<room_id>/members| replace:: ``/rooms/<room_id>/members``
-.. _/rooms/<room_id>/members: /-rooms/get_members
+.. _/rooms/<room_id>/members: /docs/api/client-server/#!/-rooms/get_members
 
 .. |/rooms/<room_id>/state| replace:: ``/rooms/<room_id>/state``
-.. _/rooms/<room_id>/state: /-rooms/get_state_events
+.. _/rooms/<room_id>/state: /docs/api/client-server/#!/-rooms/get_state_events
 
 .. |/rooms/<room_id>/send/<event_type>| replace:: ``/rooms/<room_id>/send/<event_type>``
-.. _/rooms/<room_id>/send/<event_type>: /-rooms/send_non_state_event
+.. _/rooms/<room_id>/send/<event_type>: /docs/api/client-server/#!/-rooms/send_non_state_event
 
 .. |/rooms/<room_id>/state/<event_type>/<state_key>| replace:: ``/rooms/<room_id>/state/<event_type>/<state_key>``
-.. _/rooms/<room_id>/state/<event_type>/<state_key>: /-rooms/send_state_event
+.. _/rooms/<room_id>/state/<event_type>/<state_key>: /docs/api/client-server/#!/-rooms/send_state_event
 
 .. |/rooms/<room_id>/invite| replace:: ``/rooms/<room_id>/invite``
-.. _/rooms/<room_id>/invite: /-rooms/invite
+.. _/rooms/<room_id>/invite: /docs/api/client-server/#!/-rooms/invite
 
 .. |/rooms/<room_id>/join| replace:: ``/rooms/<room_id>/join``
-.. _/rooms/<room_id>/join: /-rooms/join_room
+.. _/rooms/<room_id>/join: /docs/api/client-server/#!/-rooms/join_room
 
 .. |/rooms/<room_id>/leave| replace:: ``/rooms/<room_id>/leave``
-.. _/rooms/<room_id>/leave: /-rooms/leave
+.. _/rooms/<room_id>/leave: /docs/api/client-server/#!/-rooms/leave
 
 .. |/rooms/<room_id>/ban| replace:: ``/rooms/<room_id>/ban``
-.. _/rooms/<room_id>/ban: /-rooms/ban
+.. _/rooms/<room_id>/ban: /docs/api/client-server/#!/-rooms/ban
 
 .. |/join/<room_alias_or_id>| replace:: ``/join/<room_alias_or_id>``
-.. _/join/<room_alias_or_id>: /-rooms/join
+.. _/join/<room_alias_or_id>: /docs/api/client-server/#!/-rooms/join
 
-.. _`Event Stream`: /-events/get_event_stream
+.. _`Event Stream`: /docs/api/client-server/#!/-events/get_event_stream

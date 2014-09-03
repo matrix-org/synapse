@@ -164,3 +164,5 @@ CREATE TABLE IF NOT EXISTS room_hosts(
 );
 
 CREATE INDEX IF NOT EXISTS room_hosts_room_id ON room_hosts (room_id);
+
+PRAGMA user_version = 2;

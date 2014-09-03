@@ -74,6 +74,21 @@
             <div>Access token: {{ config.access_token }} </div>
         </div>
         <br/>
+        
+        <h3>Commands</h3>
+        <div class="section">
+            The following commands are available in the room chat:
+            <ul>
+                <li>/nick &lt;display_name&gt;: change your display name</li>
+                <li>/me &lt;action&gt;: send the action you are doing. /me will be replaced by your display name</li>
+                <li>/kick &lt;user_id&gt;: kick the user</li>
+                <li>/ban &lt;user_id&gt; [&lt;reason&gt;]: ban the user</li>
+                <li>/unban &lt;user_id&gt;: unban the user</li>
+                <li>/op &lt;user_id&gt; &lt;power_level&gt;: set user power level</li>
+                <li>/deop &lt;user_id&gt;: reset user power level to the room default value</li>
+            </ul>
+        </div>
+        <br/>
 
         {{ feedback }}
 

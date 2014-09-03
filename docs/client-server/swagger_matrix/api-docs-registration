@@ -37,7 +37,7 @@
       "path": "/register"
     }
   ], 
-  "basePath": "http://localhost:8080/_matrix/client/api/v1", 
+  "basePath": "http://localhost:8008/_matrix/client/api/v1", 
   "consumes": [
     "application/json"
   ], 
@@ -51,6 +51,10 @@
         }, 
         "user_id": {
           "description": "The fully-qualified user ID.", 
+          "type": "string"
+        },
+        "home_server": {
+          "description": "The name of the home server.",
           "type": "string"
         }
       }

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -103,8 +103,7 @@ class FeedbackEvent(SynapseEvent):
     def get_content_template(self):
         return {
             "type": u"string",
-            "target_event_id": u"string",
-            "msg_sender_id": u"string"
+            "target_event_id": u"string"
         }
 
 

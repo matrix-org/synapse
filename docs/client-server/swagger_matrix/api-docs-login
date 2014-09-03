@@ -8,7 +8,7 @@
           "nickname": "get_login_info", 
           "notes": "All login stages MUST be mentioned if there is >1 login type.", 
           "summary": "Get the login mechanism to use when logging in.", 
-          "type": "LoginInfo"
+          "type": "LoginFlows"
         }, 
         {
           "method": "POST", 
@@ -40,17 +40,31 @@
       "path": "/login"
     }
   ], 
-  "basePath": "http://localhost:8080/_matrix/client/api/v1", 
+  "basePath": "http://localhost:8008/_matrix/client/api/v1", 
   "consumes": [
     "application/json"
   ], 
   "models": {
+    "LoginFlows": {
+      "id": "LoginFlows",
+      "properties": {
+        "flows": {
+          "description": "A list of valid login flows.",
+          "type": "array",
+          "items": {
+            "$ref": "LoginInfo"
+          }
+        }
+      }
+    },
     "LoginInfo": {
       "id": "LoginInfo", 
       "properties": {
         "stages": {
           "description": "Multi-stage login only: An array of all the login types required to login.", 
-          "format": "string", 
+          "items": {
+            "$ref": "string"
+          }, 
           "type": "array"
         }, 
         "type": {
@@ -64,6 +78,10 @@
       "properties": {
         "access_token": {
           "description": "The access token for this user's login if this is the final stage of the login process.", 
+          "type": "string"
+        },
+        "user_id": {
+          "description": "The user's fully-qualified user ID.",
           "type": "string"
         }, 
         "next": {
