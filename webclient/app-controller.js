@@ -85,7 +85,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         $scope.logout();
     });
     
-    $scope.updateHeader = function() {
+    $rootScope.updateHeader = function() {
         $scope.user_id = matrixService.config().user_id;
     };
 

@@ -84,13 +84,14 @@ angular.module('matrixService', [])
         prefix: prefixPath,
 
         // Register an user
-        register: function(user_name, password) {
+        register: function(user_name, password, threepidCreds) {
             // The REST path spec
             var path = "/register";
 
             return doRequest("POST", path, undefined, {
                  user_id: user_name,
-                 password: password
+                 password: password,
+                 threepidCreds: threepidCreds
             });
         },
 
@@ -315,9 +316,9 @@ angular.module('matrixService', [])
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
         },
 
-        authEmail: function(clientSecret, tokenId, code) {
+        authEmail: function(clientSecret, sid, code) {
             var path = "/_matrix/identity/api/v1/validate/email/submitToken";
-            var data = "token="+code+"&sid="+tokenId+"&clientSecret="+clientSecret;
+            var data = "token="+code+"&sid="+sid+"&clientSecret="+clientSecret;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers);
@@ -329,6 +330,11 @@ angular.module('matrixService', [])
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
+        },
+
+        lookup3pid: function(medium, address) {
+            var path = "/_matrix/identity/api/v1/lookup?medium="+encodeURIComponent(medium)+"&address="+encodeURIComponent(address);
+            return doBaseRequest(config.identityServer, "GET", path, {}, undefined, {}); 
         },
         
         uploadContent: function(file) {
