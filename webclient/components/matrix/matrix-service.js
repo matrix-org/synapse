@@ -523,20 +523,14 @@ angular.module('matrixService', [])
         },
             
         /**
-         * Change the power level of a user
+         * Change or reset the power level of a user
          * @param {String} room_id the room id
          * @param {String} user_id the user id
          * @param {Number} powerLevel a value between 0 and 10
+         *    If undefined, the user power level will be reset, ie he will use the default room user power level
          * @returns {promise} an $http promise
          */
         setUserPowerLevel: function(room_id, user_id, powerLevel) {
-            // Sanity check
-            if (powerLevel < 0 || 10 < powerLevel) {
-                // Format the error as is it was sent by the server
-                var deferred = $q.defer();
-                deferred.reject({data:{error: "Invalid powerLevel: " + powerLevel}});
-                return deferred.promise;
-            }
             
             // Hack: currently, there is no home server API so do it by hand by updating
             // the current m.room.power_levels of the room and send it to the server
@@ -544,32 +538,6 @@ angular.module('matrixService', [])
             if (room && room["m.room.power_levels"]) {
                 var content = angular.copy(room["m.room.power_levels"].content);
                 content[user_id] = powerLevel;
-                
-                var path = "/rooms/$room_id/state/m.room.power_levels";
-                path = path.replace("$room_id", encodeURIComponent(room_id));
-                
-                return doRequest("PUT", path, undefined, content);
-            }
-            
-            // The room does not exist or does not contain power_levels data
-            var deferred = $q.defer();
-            deferred.reject({data:{error: "Invalid room: " + room_id}});
-            return deferred.promise;
-        },
-            
-        /**
-         * reset the power level of a user so that he will use the room default power level
-         * @param {String} room_id the room id
-         * @param {String} user_id the user id
-         * @returns {promise} an $http promise
-         */
-        resetUserPowerLevel: function(room_id, user_id) {
-            // Hack: currently, there is no home server API so do it by hand by updating
-            // the current m.room.power_levels of the room and send it to the server
-            var room = $rootScope.events.rooms[room_id];
-            if (room && room["m.room.power_levels"]) {
-                var content = angular.copy(room["m.room.power_levels"].content);
-                delete content[user_id];
                 
                 var path = "/rooms/$room_id/state/m.room.power_levels";
                 path = path.replace("$room_id", encodeURIComponent(room_id));

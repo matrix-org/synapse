@@ -311,7 +311,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                     // Reset the power level of an user
                     if (2 === args.length) {
                         var user_id = args[1];
-                        promise = matrixService.resetUserPowerLevel($scope.room_id, user_id);
+                        promise = matrixService.setUserPowerLevel($scope.room_id, user_id, undefined);
                     }
                     break;
             }
