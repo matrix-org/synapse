@@ -30,7 +30,7 @@ import urllib
 from ..utils import MockHttpResource, MemoryDataStore
 from .utils import RestTestCase
 
-from mock import Mock
+from mock import Mock, NonCallableMock
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 
@@ -58,7 +58,14 @@ class RoomPermissionsTestCase(RestTestCase):
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=NonCallableMock(),
         )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
+
         hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
@@ -405,7 +412,14 @@ class RoomsMemberListTestCase(RestTestCase):
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=NonCallableMock(),
         )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
+
         hs.get_handlers().federation_handler = Mock()
 
         self.auth_user_id = self.user_id
@@ -483,7 +497,14 @@ class RoomsCreateTestCase(RestTestCase):
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=NonCallableMock(),
         )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
+
         hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
@@ -573,7 +594,14 @@ class RoomTopicTestCase(RestTestCase):
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=NonCallableMock(),
         )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
+
         hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
@@ -676,7 +704,14 @@ class RoomMemberStateTestCase(RestTestCase):
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=NonCallableMock(),
         )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
+
         hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
@@ -801,7 +836,14 @@ class RoomMessagesTestCase(RestTestCase):
             replication_layer=Mock(),
             state_handler=state_handler,
             persistence_service=persistence_service,
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=NonCallableMock(),
         )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
+
         hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):

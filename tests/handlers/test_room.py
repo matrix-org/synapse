@@ -39,6 +39,10 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         hs = HomeServer(
             self.hostname,
             db_pool=None,
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=NonCallableMock(),
             datastore=NonCallableMock(spec_set=[
                 "persist_event",
                 "get_joined_hosts_for_room",
@@ -82,6 +86,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.snapshot = Mock()
         self.datastore.snapshot_room.return_value = self.snapshot
 
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
 
     @defer.inlineCallbacks
     def test_invite(self):
@@ -342,6 +348,10 @@ class RoomCreationTest(unittest.TestCase):
             ]),
             auth=NonCallableMock(spec_set=["check"]),
             state_handler=NonCallableMock(spec_set=["handle_new_event"]),
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=NonCallableMock(),
         )
 
         self.federation = NonCallableMock(spec_set=[
@@ -367,6 +377,9 @@ class RoomCreationTest(unittest.TestCase):
         def hosts(room):
             return defer.succeed([])
         self.datastore.get_joined_hosts_for_room.side_effect = hosts
+
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
 
     @defer.inlineCallbacks
     def test_room_creation(self):
