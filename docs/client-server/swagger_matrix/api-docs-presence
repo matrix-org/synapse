@@ -128,10 +128,10 @@
     "Presence": {
       "id": "Presence",
       "properties": {
-        "mtime_age": {
+        "last_active_ago": {
           "type": "integer",
           "format": "int64",
-          "description": "The last time this user's presence state changed, in milliseconds."
+          "description": "The last time this user performed an action on their home server."
         },
         "user_id": {
           "type": "string",

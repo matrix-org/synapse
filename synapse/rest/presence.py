@@ -125,12 +125,20 @@ class PresenceListRestServlet(RestServlet):
 
         if "invite" in content:
             for u in content["invite"]:
+                if not isinstance(u, basestring):
+                    raise SynapseError(400, "Bad invite value.")
+                if len(u) == 0:
+                    continue
                 invited_user = self.hs.parse_userid(u)
                 deferreds.append(self.handlers.presence_handler.send_invite(
                     observer_user=user, observed_user=invited_user))
 
         if "drop" in content:
             for u in content["drop"]:
+                if not isinstance(u, basestring):
+                    raise SynapseError(400, "Bad drop value.")
+                if len(u) == 0:
+                    continue
                 dropped_user = self.hs.parse_userid(u)
                 deferreds.append(self.handlers.presence_handler.drop(
                     observer_user=user, observed_user=dropped_user))
