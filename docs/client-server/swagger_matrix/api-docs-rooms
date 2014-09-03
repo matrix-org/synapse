@@ -267,6 +267,12 @@
               "required": true,
               "type": "string",
               "paramType": "path"
+            },
+            {
+              "name": "body",
+              "required": true,
+              "type": "JoinRequest",
+              "paramType": "body"
             }
           ]
         }  
@@ -291,6 +297,12 @@
               "required": true,
               "type": "string",
               "paramType": "path"
+            },
+            {
+              "name": "body",
+              "required": true,
+              "type": "LeaveRequest",
+              "paramType": "body"
             }
           ]
         }  
@@ -424,10 +436,10 @@
       "path": "/join/{roomAliasOrId}",
       "operations": [
         {
-          "method": "PUT",
+          "method": "POST",
           "summary": "Join a room via a room alias or room ID.",
           "notes": "Join a room via a room alias or room ID.",
-          "type": "RoomInfo",
+          "type": "JoinRoomInfo",
           "nickname": "join",
           "consumes": [
             "application/json"
@@ -574,7 +586,7 @@
         {
           "method": "GET",
           "summary": "Get a list of all the current state events for this room.",
-          "notes": "Get a list of all the current state events for this room.",
+          "notes": "NOT YET IMPLEMENTED.",
           "type": "array",
           "items": {
             "$ref": "Event"
@@ -598,7 +610,7 @@
         {
           "method": "GET",
           "summary": "Get all the current information for this room, including messages and state events.",
-          "notes": "Get all the current information for this room, including messages and state events.",
+          "notes": "NOT YET IMPLEMENTED.",
           "type": "InitialSyncRoomData",
           "nickname": "get_room_sync_data",
           "parameters": [
@@ -662,7 +674,7 @@
             "invite",
             "join",
             "leave",
-            "knock"
+            "ban"
           ]
         }
       }
@@ -679,6 +691,16 @@
           "type": "string",
           "description": "The alias for the room.",
           "required": false
+        }
+      }
+    },
+    "JoinRoomInfo": {
+      "id": "JoinRoomInfo",
+      "properties": {
+        "room_id": {
+          "type": "string",
+          "description": "The room ID joined, if joined via a room alias only.",
+          "required": true
         }
       }
     },
@@ -839,6 +861,14 @@
           "description": "The fully-qualified user ID."
         }
       }
+    },
+    "JoinRequest": {
+      "id": "JoinRequest",
+      "properties": {}
+    },
+    "LeaveRequest": {
+      "id": "LeaveRequest",
+      "properties": {}
     },
     "BanRequest": {
       "id": "BanRequest",
