@@ -37,7 +37,7 @@ class DirectoryHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def create_association(self, room_alias, room_id, servers):
+    def create_association(self, room_alias, room_id, servers=None):
         # TODO(erikj): Do auth.
 
         if not room_alias.is_mine:
@@ -47,6 +47,12 @@ class DirectoryHandler(BaseHandler):
         # TODO(erikj): Add transactions.
 
         # TODO(erikj): Check if there is a current association.
+
+        if not servers:
+            servers = yield self.store.get_joined_hosts_for_room(room_id)
+
+        if not servers:
+            raise SynapseError(400, "Failed to get server list")
 
         yield self.store.create_room_alias_association(
             room_alias,
@@ -82,6 +88,9 @@ class DirectoryHandler(BaseHandler):
         if not room_id:
             defer.returnValue({})
             return
+
+        extra_servers = yield self.store.get_joined_hosts_for_room(room_id)
+        servers = list(set(extra_servers) | set(servers))
 
         defer.returnValue({
             "room_id": room_id,

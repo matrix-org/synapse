@@ -54,7 +54,7 @@ class ClientDirectoryServer(RestServlet):
         logger.debug("Got room name: %s", room_alias.to_string())
 
         room_id = content["room_id"]
-        servers = content["servers"]
+        servers = content["servers"] if "servers" in content else None
 
         logger.debug("Got room_id: %s", room_id)
         logger.debug("Got servers: %s", servers)
