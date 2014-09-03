@@ -48,14 +48,23 @@
                 </td>
                 <td ng-class="!msg.content.membership ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble">
-                        <span ng-if="'join' === msg.content.membership || 'leave' === msg.content.membership">
-                            {{ members[msg.state_key].displayname || msg.state_key }}
-                            {{ {"join": "joined", "leave": "left"}[msg.content.membership] }}
+                        <span ng-if="'join' === msg.content.membership">
+                            {{ members[msg.state_key].displayname || msg.state_key }} joined
+                        </span>
+                        <span ng-if="'leave' === msg.content.membership">
+                            <span ng-if="msg.user_id === msg.state_key">
+                                {{ members[msg.state_key].displayname || msg.state_key }} left
+                            </span>
+                            <span ng-if="msg.user_id !== msg.state_key">
+                                {{ members[msg.user_id].displayname || msg.user_id }}
+                                {{ {"join": "kicked", "ban": "unbanned"}[msg.content.prev] }}
+                                {{ members[msg.state_key].displayname || msg.state_key }}
+                            </span>
                         </span>
                         <span ng-if="'invite' === msg.content.membership || 'ban' === msg.content.membership">
                             {{ members[msg.user_id].displayname || msg.user_id }}
                             {{ {"invite": "invited", "ban": "banned"}[msg.content.membership] }}
-                            {{ msg.state_key }}
+                            {{ members[msg.state_key].displayname || msg.state_key }}
                         </span>
                         <span ng-show='msg.content.msgtype === "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
                         <span ng-show='msg.content.msgtype === "m.text"' ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
