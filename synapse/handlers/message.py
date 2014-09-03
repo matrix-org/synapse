@@ -76,6 +76,8 @@ class MessageHandler(BaseRoomHandler):
         Raises:
             SynapseError if something went wrong.
         """
+
+        self.ratelimit(event.user_id)
         # TODO(paul): Why does 'event' not have a 'user' object?
         user = self.hs.parse_userid(event.user_id)
         assert user.is_mine, "User must be our own: %s" % (user,)

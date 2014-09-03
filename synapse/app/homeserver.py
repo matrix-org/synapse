@@ -247,6 +247,7 @@ def setup():
         upload_dir=os.path.abspath("uploads"),
         db_name=config.database_path,
         tls_context_factory=tls_context_factory,
+        config=config,
     )
 
     hs.register_servlets()

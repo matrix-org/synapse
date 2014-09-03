@@ -32,7 +32,7 @@ import logging
 from ..utils import MockHttpResource, MemoryDataStore
 from .utils import RestTestCase
 
-from mock import Mock
+from mock import Mock, NonCallableMock
 
 logging.getLogger().addHandler(logging.NullHandler())
 
@@ -136,8 +136,15 @@ class EventStreamPermissionsTestCase(RestTestCase):
                 "call_later",
                 "cancel_call_later",
                 "time_msec",
+                "time"
             ]),
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=NonCallableMock(),
         )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
 
         hs.get_handlers().federation_handler = Mock()
 

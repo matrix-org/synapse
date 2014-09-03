@@ -32,6 +32,7 @@ from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.lockutils import LockManager
 from synapse.streams.events import EventSources
+from synapse.api.ratelimiting import Ratelimiter
 
 
 class BaseHomeServer(object):
@@ -73,6 +74,7 @@ class BaseHomeServer(object):
         'resource_for_web_client',
         'resource_for_content_repo',
         'event_sources',
+        'ratelimiter',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -189,6 +191,9 @@ class HomeServer(BaseHomeServer):
 
     def build_event_sources(self):
         return EventSources(self)
+
+    def build_ratelimiter(self):
+        return Ratelimiter()
 
     def register_servlets(self):
         """ Register all servlets associated with this HomeServer.
