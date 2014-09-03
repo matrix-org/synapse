@@ -74,7 +74,9 @@ class SynapseHomeServer(HomeServer):
         return File("webclient")  # TODO configurable?
 
     def build_resource_for_content_repo(self):
-        return ContentRepoResource(self, self.upload_dir, self.auth)
+        return ContentRepoResource(
+            self, self.upload_dir, self.auth, self.content_addr
+        )
 
     def build_db_pool(self):
         """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
@@ -248,6 +250,7 @@ def setup():
         db_name=config.database_path,
         tls_context_factory=tls_context_factory,
         config=config,
+        content_addr=config.content_addr,
     )
 
     hs.register_servlets()

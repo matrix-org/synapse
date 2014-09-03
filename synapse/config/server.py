@@ -32,6 +32,14 @@ class ServerConfig(Config):
         self.webclient = True
         self.manhole = args.manhole
 
+        if not args.content_addr:
+            host = args.server_name
+            if ':' not in host:
+                host  = "%s:%d" % (host, args.bind_port)
+            args.content_addr = "https://%s" % (host,)
+
+        self.content_addr = args.content_addr
+
     @classmethod
     def add_arguments(cls, parser):
         super(ServerConfig, cls).add_arguments(parser)
@@ -57,6 +65,9 @@ class ServerConfig(Config):
                                   type=int,
                                   help="Turn on the twisted telnet manhole"
                                   " service on the given port.")
+        server_group.add_argument("--content-addr", default=None,
+                                  help="The host and scheme to use for the "
+                                  "content repository")
 
     def read_signing_key(self, signing_key_path):
         signing_key_base64 = self.read_file(signing_key_path, "signing_key")
@@ -77,3 +88,4 @@ class ServerConfig(Config):
             with open(args.signing_key_path, "w") as signing_key_file:
                 key = nacl.signing.SigningKey.generate()
                 signing_key_file.write(encode_base64(key.encode()))
+

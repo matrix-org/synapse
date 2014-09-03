@@ -215,11 +215,12 @@ class ContentRepoResource(resource.Resource):
     """
     isLeaf = True
 
-    def __init__(self, hs, directory, auth):
+    def __init__(self, hs, directory, auth, external_addr):
         resource.Resource.__init__(self)
         self.hs = hs
         self.directory = directory
         self.auth = auth
+        self.external_addr = external_addr.rstrip('/')
 
         if not os.path.isdir(self.directory):
             os.mkdir(self.directory)
@@ -332,8 +333,8 @@ class ContentRepoResource(resource.Resource):
             # ...plus self-signed SSL won't work to remote clients anyway
             # ...and we can't assume that it's SSL anyway, as we might want to
             # server it via the non-SSL listener...
-            url = "https://%s/_matrix/content/%s" % (
-                self.hs.domain_with_port, file_name
+            url = "%s/_matrix/content/%s" % (
+                self.external_addr, file_name
             )
 
             respond_with_json_bytes(request, 200,
