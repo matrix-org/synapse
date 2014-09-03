@@ -169,8 +169,8 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     var updateMemberList = function(chunk) {
         if (chunk.room_id != $scope.room_id) return;
 
-        // Ignore banned people
-        if ("ban" === chunk.membership) {
+        // Ignore banned and kicked (leave) people
+        if ("ban" === chunk.membership || "leave" === chunk.membership) {
             return;
         }
 
