@@ -32,6 +32,7 @@ angular.module('eventHandlerService', [])
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
     var PRESENCE_EVENT = "PRESENCE_EVENT";
+    var POWERLEVEL_EVENT = "POWERLEVEL_EVENT";
     var CALL_EVENT = "CALL_EVENT";
 
     var InitialSyncDeferred = $q.defer();
@@ -107,10 +108,8 @@ angular.module('eventHandlerService', [])
     var handlePowerLevels = function(event, isLiveEvent) {
         initRoom(event.room_id);
 
-       $rootScope.events.rooms[event.room_id][event.type] = event;
-
-        //TODO
-        //$rootScope.$broadcast(PRESENCE_EVENT, event, isLiveEvent);
+        $rootScope.events.rooms[event.room_id][event.type] = event;
+        $rootScope.$broadcast(POWERLEVEL_EVENT, event, isLiveEvent);
     };
 
     var handleCallEvent = function(event, isLiveEvent) {
@@ -122,6 +121,7 @@ angular.module('eventHandlerService', [])
         MSG_EVENT: MSG_EVENT,
         MEMBER_EVENT: MEMBER_EVENT,
         PRESENCE_EVENT: PRESENCE_EVENT,
+        POWERLEVEL_EVENT: POWERLEVEL_EVENT,
         CALL_EVENT: CALL_EVENT,
         
     

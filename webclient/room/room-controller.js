@@ -85,6 +85,14 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             updatePresence(event);
         }
     });
+    
+    $scope.$on(eventHandlerService.POWERLEVEL_EVENT, function(ngEvent, event, isLive) {
+        if (isLive && event.room_id === $scope.room_id) {
+            for (var user_id in event.content) {
+                updateUserPowerLevel(user_id);
+            }
+        }
+    });
 
     $scope.memberCount = function() {
         return Object.keys($scope.members).length;
@@ -278,7 +286,6 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                 case "/ban":
                     // Ban the user id from the room
                     if (2 <= args.length) {
-
                         // TODO: The user may have entered the display name
                         // Need display name -> user_id resolution. Pb: how to manage user with same display names?
                         var user_id = args[1];
@@ -288,6 +295,15 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                             var reason = args.slice(2).join(' ');
                         }
                         promise = matrixService.ban($scope.room_id, user_id, reason);
+                    }
+                    break;
+                    
+                case "/op":
+                    if (3 === args.length) {
+                        var user_id = args[1];
+                        var powerLevel = parseInt(args[2]);
+
+                        promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
                     }
                     break;
             }
