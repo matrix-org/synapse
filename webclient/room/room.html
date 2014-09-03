@@ -48,11 +48,14 @@
                 </td>
                 <td ng-class="!msg.content.membership ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble">
-                        <span ng-show='msg.type === "m.room.member"'>
+                        <span ng-if="'join' === msg.content.membership || 'leave' === msg.content.membership">
+                            {{ members[msg.state_key].displayname || msg.state_key }}
+                            {{ {"join": "joined", "leave": "left"}[msg.content.membership] }}
+                        </span>
+                        <span ng-if="'invite' === msg.content.membership || 'ban' === msg.content.membership">
                             {{ members[msg.user_id].displayname || msg.user_id }}
-                            {{ {"join": "joined", "leave": "left", "invite": "invited", "ban": "banned"}[msg.content.membership] }}
-                            {{ (msg.content.membership === "invite" || msg.content.membership === "ban") ? (msg.state_key || '') : '' }}
-
+                            {{ {"invite": "invited", "ban": "banned"}[msg.content.membership] }}
+                            {{ msg.state_key }}
                         </span>
                         <span ng-show='msg.content.msgtype === "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
                         <span ng-show='msg.content.msgtype === "m.text"' ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
