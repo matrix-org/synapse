@@ -71,6 +71,8 @@ class ClientDirectoryServer(RestServlet):
             yield dir_handler.create_association(
                 room_alias, room_id, servers
             )
+        except SynapseError as e:
+            raise e
         except:
             logger.exception("Failed to create association")
 
