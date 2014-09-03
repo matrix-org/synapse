@@ -58,7 +58,7 @@ class ServerConfig(Config):
                                   help="Local interface to listen on")
         server_group.add_argument("-D", "--daemonize", action='store_true',
                                   help="Daemonize the home server")
-        server_group.add_argument('--pid-file', default="hs.pid",
+        server_group.add_argument('--pid-file', default="homeserver.pid",
                                   help="When running as a daemon, the file to"
                                   " store the pid in")
         server_group.add_argument("--manhole", metavar="PORT", dest="manhole",
