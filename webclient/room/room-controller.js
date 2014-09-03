@@ -289,7 +289,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                         var user_id = args[1];
 
                         // Set his state in the room as leave
-                        promise = matrixService.membershipChange($scope.room_id, user_id, "leave");
+                        promise = matrixService.setMembership($scope.room_id, user_id, "leave");
                     }
                     break;
                     
@@ -314,7 +314,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                         var user_id = args[1];
 
                         // Reset the user membership to leave to unban him
-                        promise = matrixService.membershipChange($scope.room_id, user_id, "leave");
+                        promise = matrixService.setMembership($scope.room_id, user_id, "leave");
                     }
                     break;
                     

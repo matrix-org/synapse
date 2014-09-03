@@ -165,13 +165,25 @@ angular.module('matrixService', [])
             // TODO: Use PUT with transaction IDs
             return doRequest("POST", path, undefined, data);
         },
+
+        // Change the membership of an another user
+        setMembership: function(room_id, user_id, membershipValue) {
+            // The REST path spec
+            var path = "/rooms/$room_id/state/m.room.member/$user_id";
+            path = path.replace("$room_id", encodeURIComponent(room_id));
+            path = path.replace("$user_id", user_id);
+
+            return doRequest("PUT", path, undefined, {
+                membership: membershipValue
+            });
+        },
            
         // Bans a user from from a room
         ban: function(room_id, user_id, reason) {
             var path = "/rooms/$room_id/ban/";
             path = path.replace("$room_id", encodeURIComponent(room_id));
             
-            return doRequest("PUT", path, undefined, {
+            return doRequest("POST", path, undefined, {
                 user_id: user_id,
                 reason: reason
             });
