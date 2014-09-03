@@ -105,7 +105,7 @@ class FederationTestCase(unittest.TestCase):
             lambda event, do_auth: None,
             mem_handler.change_membership
         )
-        self.assertEquals(True, call_args["do_auth"])
+        self.assertEquals(False, call_args["do_auth"])
 
         new_event = call_args["event"]
         self.assertEquals(RoomMemberEvent.TYPE, new_event.type)
