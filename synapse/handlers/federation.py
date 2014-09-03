@@ -22,7 +22,7 @@ from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
 from synapse.federation.pdu_codec import PduCodec
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 import logging
 
@@ -133,7 +133,7 @@ class FederationHandler(BaseHandler):
 
             yield self.hs.get_handlers().room_member_handler.change_membership(
                 new_event,
-                do_auth=True
+                do_auth=False,
             )
 
         else:
@@ -231,6 +231,7 @@ class FederationHandler(BaseHandler):
         # TODO (erikj): Time out here.
         d = defer.Deferred()
         self.waiting_for_join_list.setdefault((joinee, room_id), []).append(d)
+        reactor.callLater(10, d.cancel)
         yield d
 
         try:
