@@ -396,7 +396,8 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                             onInit3();
                         },
                         function(reason) {
-                            $scope.feedback = "Can't join room: " + reason;
+                            console.log("Can't join room: " + JSON.stringify(reason));
+                            $scope.feedback = "You do not have permission to join this room";
                         });
                 }
                 else {
