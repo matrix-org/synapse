@@ -388,7 +388,7 @@ class RoomMembershipRestServlet(RestServlet):
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
         PATTERN = ("/rooms/(?P<room_id>[^/]*)/" +
-            "(?P<membership_action>join|invite|leave)")
+            "(?P<membership_action>join|invite|leave|ban)")
         register_txn_path(self, PATTERN, http_server)
 
     @defer.inlineCallbacks
@@ -399,7 +399,7 @@ class RoomMembershipRestServlet(RestServlet):
 
         # target user is you unless it is an invite
         state_key = user.to_string()
-        if membership_action == "invite":
+        if membership_action in ["invite", "ban"]:
             if "user_id" not in content:
                 raise SynapseError(400, "Missing user_id key.")
             state_key = content["user_id"]
