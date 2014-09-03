@@ -180,7 +180,7 @@ angular.module('matrixService', [])
            
         // Bans a user from from a room
         ban: function(room_id, user_id, reason) {
-            var path = "/rooms/$room_id/ban/";
+            var path = "/rooms/$room_id/ban";
             path = path.replace("$room_id", encodeURIComponent(room_id));
             
             return doRequest("POST", path, undefined, {
