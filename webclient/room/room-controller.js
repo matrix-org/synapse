@@ -161,6 +161,11 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     var updateMemberList = function(chunk) {
         if (chunk.room_id != $scope.room_id) return;
 
+        // Ignore banned people
+        if ("ban" === chunk.membership) {
+            return;
+        }
+
         // set target_user_id to keep things clear
         var target_user_id = chunk.state_key;
 
