@@ -12,26 +12,34 @@
                 
                 <div style="text-align: center">
                     <br/>
-                    <input id="email" size="32" type="text" ng-focus="true" ng-model="account.email" placeholder="Email address (optional)" style="display: none"/>
-                    <div class="smallPrint" style="display: none;">Specifying an email address lets other users find you on Matrix more easily,<br/>
-                        and gives you a way to reset your password</div>
-                    <input id="desired_user_id" size="32" type="text" ng-model="account.desired_user_id" placeholder="Matrix ID (e.g. bob)"/>
-                    <br/>
-                    <input id="pwd1" size="32" type="password" ng-model="account.pwd1" placeholder="Type a password"/>
-                    <br/>
-                    <input id="pwd2" size="32" type="password" ng-model="account.pwd2" placeholder="Confirm your password"/>
-                    <br/>
-                    <input id="displayName" size="32" type="text" ng-model="account.displayName" placeholder="Display name (e.g. Bob Obson)"/>
-                    <br/>
-                    <br/>
+
+                    <input ng-show="!wait_3pid_code" id="email" size="32" type="text" ng-focus="true" ng-model="account.email" placeholder="Email address (optional)"/>
+                    <div ng-show="!wait_3pid_code" class="smallPrint">Specifying an email address lets other users find you on Matrix more easily,<br/>
+                        and will give you a way to reset your password in the future</div>
+                    <span ng-show="reenter_username">Choose another username:</span>
+                    <input ng-show="!wait_3pid_code || reenter_username" id="desired_user_id" size="32" type="text" ng-model="account.desired_user_id" placeholder="Matrix ID (e.g. bob)"/>
+                    <br ng-show="!wait_3pid_code" />
+                    <input ng-show="!wait_3pid_code" id="pwd1" size="32" type="password" ng-model="account.pwd1" placeholder="Type a password"/>
+                    <br ng-show="!wait_3pid_code" />
+                    <input ng-show="!wait_3pid_code" id="pwd2" size="32" type="password" ng-model="account.pwd2" placeholder="Confirm your password"/>
+                    <br ng-show="!wait_3pid_code" />
+                    <input ng-show="!wait_3pid_code" id="displayName" size="32" type="text" ng-model="account.displayName" placeholder="Display name (e.g. Bob Obson)"/>
+                    <br ng-show="!wait_3pid_code" />
+                    <br ng-show="!wait_3pid_code" />
                     
-                    <button ng-click="register()" ng-disabled="!account.desired_user_id || !account.homeserver || !account.pwd1 || !account.pwd2 || account.pwd1 !== account.pwd2">Sign up</button>
+                    <button ng-show="!wait_3pid_code" ng-click="register()" ng-disabled="!account.desired_user_id || !account.homeserver || !account.pwd1 || !account.pwd2 || account.pwd1 !== account.pwd2">Sign up</button>
+
+                    <div ng-show="wait_3pid_code">
+                    <span>Please enter the verification code sent to {{ account.email }}</span><br />
+                    <input id="threepidtoken" size="32" type="text" ng-focus="true" ng-model="account.threepidtoken" placeholder="Verification Code"/><br />
+                    <button ng-click="verifyToken()" ng-disabled="!account.threepidtoken">Validate</button>
+                    </div>
                     <br/><br/>
                 </div>
 
                 <div class="feedback">{{ feedback }} {{ login_error_msg }}</div>
                 
-                <div id="serverConfig">
+                <div id="serverConfig" ng-show="!wait_3pid_code">
                     <label for="homeserver">Home Server:</label> 
                     <input id="homeserver" size="32" type="text" ng-model="account.homeserver" placeholder="URL (e.g. http://matrix.org:8080)"/>
                     <div class="smallPrint">Your home server stores all your conversation and account data.</div>

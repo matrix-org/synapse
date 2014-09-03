@@ -270,9 +270,9 @@ a:active  { color: #000; }
 
 .userAvatar .userPowerLevel {
     position: absolute;
-    bottom: 20px;
-    height: 1px;
-    background-color: red;
+    bottom: 0px;
+    height: 2px;
+    background-color: #f00;
 }
 
 .userPresence {
@@ -523,5 +523,15 @@ a:active  { color: #000; }
 
 #user-displayname {
     font-size: 24px;
+}
+
+#user-displayname-input {
+    width: 160px;
+    max-width: 155px;
+}
+
+#user-save-button {
+    width: 160px;
+    font-size: 14px;
 }
 

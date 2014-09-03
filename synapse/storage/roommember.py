@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -165,7 +165,7 @@ class RoomMemberStore(SQLBaseStore):
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def do_users_share_a_room(self, user_list):
+    def user_rooms_intersect(self, user_list):
         """ Checks whether a list of users share a room.
         """
         user_list_clause = " OR ".join(["m.user_id = ?"] * len(user_list))

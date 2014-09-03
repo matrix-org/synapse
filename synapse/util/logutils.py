@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ from functools import wraps
 
 import logging
 import inspect
-import traceback
 
 
 def log_function(f):

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import logging
 from ..utils import MockHttpResource, MemoryDataStore
 from .utils import RestTestCase
 
-from mock import Mock
+from mock import Mock, NonCallableMock
 
 logging.getLogger().addHandler(logging.NullHandler())
 
@@ -136,8 +136,15 @@ class EventStreamPermissionsTestCase(RestTestCase):
                 "call_later",
                 "cancel_call_later",
                 "time_msec",
+                "time"
             ]),
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=NonCallableMock(),
         )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
 
         hs.get_handlers().federation_handler = Mock()
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,8 +21,9 @@ from synapse.api.events.room import InviteJoinEvent, RoomMemberEvent
 from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
 from synapse.federation.pdu_codec import PduCodec
+from synapse.api.errors import SynapseError
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 import logging
 
@@ -133,7 +134,7 @@ class FederationHandler(BaseHandler):
 
             yield self.hs.get_handlers().room_member_handler.change_membership(
                 new_event,
-                do_auth=True
+                do_auth=False,
             )
 
         else:
@@ -231,7 +232,12 @@ class FederationHandler(BaseHandler):
         # TODO (erikj): Time out here.
         d = defer.Deferred()
         self.waiting_for_join_list.setdefault((joinee, room_id), []).append(d)
-        yield d
+        reactor.callLater(10, d.cancel)
+
+        try:
+            yield d
+        except defer.CancelledError:
+            raise SynapseError(500, "Unable to join remote room")
 
         try:
             yield self.store.store_room(

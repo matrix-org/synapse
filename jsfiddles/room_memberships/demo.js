@@ -18,7 +18,7 @@ $('.login').live('click', function() {
     var user = $("#userLogin").val();
     var password = $("#passwordLogin").val();
     $.ajax({
-        url: "http://localhost:8080/_matrix/client/api/v1/login",
+        url: "http://localhost:8008/_matrix/client/api/v1/login",
         type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify({ user: user, password: password, type: "m.login.password" }),
@@ -39,7 +39,7 @@ var getCurrentRoomList = function() {
     // solution but that is out of scope of this fiddle.
     $("#rooms").find("tr:gt(0)").remove();
     
-    var url = "http://localhost:8080/_matrix/client/api/v1/initialSync?access_token=" + accountInfo.access_token + "&limit=1";
+    var url = "http://localhost:8008/_matrix/client/api/v1/initialSync?access_token=" + accountInfo.access_token + "&limit=1";
     $.getJSON(url, function(data) {
         var rooms = data.rooms;
         for (var i=0; i<rooms.length; ++i) {
@@ -53,7 +53,7 @@ var getCurrentRoomList = function() {
 $('.createRoom').live('click', function() {
     var data = {};
     $.ajax({
-        url: "http://localhost:8080/_matrix/client/api/v1/createRoom?access_token="+accountInfo.access_token,
+        url: "http://localhost:8008/_matrix/client/api/v1/createRoom?access_token="+accountInfo.access_token,
         type: "POST",
         contentType: "application/json; charset=utf-8",
         data: JSON.stringify(data),
@@ -87,7 +87,7 @@ $('.changeMembership').live('click', function() {
         return;
     }
     
-    var url = "http://localhost:8080/_matrix/client/api/v1/rooms/$roomid/$membership?access_token=$token";
+    var url = "http://localhost:8008/_matrix/client/api/v1/rooms/$roomid/$membership?access_token=$token";
     url = url.replace("$token", accountInfo.access_token);
     url = url.replace("$roomid", encodeURIComponent(roomId));
     url = url.replace("$membership", membership);
@@ -117,7 +117,7 @@ $('.changeMembership').live('click', function() {
 
 $('.joinAlias').live('click', function() {
     var roomAlias = $("#roomAlias").val();
-    var url = "http://localhost:8080/_matrix/client/api/v1/join/$roomalias?access_token=$token";
+    var url = "http://localhost:8008/_matrix/client/api/v1/join/$roomalias?access_token=$token";
     url = url.replace("$token", accountInfo.access_token);
     url = url.replace("$roomalias", encodeURIComponent(roomAlias));
     $.ajax({

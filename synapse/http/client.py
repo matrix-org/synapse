@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,8 @@
 
 
 from twisted.internet import defer, reactor
-from twisted.web.client import _AgentBase, _URI, readBody
+from twisted.internet.error import DNSLookupError
+from twisted.web.client import _AgentBase, _URI, readBody, FileBodyProducer
 from twisted.web.http_headers import Headers
 
 from synapse.http.endpoint import matrix_endpoint
@@ -23,7 +24,9 @@ from synapse.util.async import sleep
 
 from syutil.jsonutil import encode_canonical_json
 
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import CodeMessageException, SynapseError
+
+from StringIO import StringIO
 
 import json
 import logging
@@ -43,6 +46,7 @@ _destination_mappings = {
 class HttpClient(object):
     """ Interface for talking json over http
     """
+    RETRY_DNS_LOOKUP_FAILURES = "__retry_dns"
 
     def put_json(self, destination, path, data):
         """ Sends the specifed json data using PUT
@@ -142,13 +146,43 @@ class TwistedHttpClient(HttpClient):
             destination = _destination_mappings[destination]
 
         logger.debug("get_json args: %s", args)
+
+        retry_on_dns_fail = True
+        if HttpClient.RETRY_DNS_LOOKUP_FAILURES in args:
+            # FIXME: This isn't ideal, but the interface exposed in get_json
+            # isn't comprehensive enough to give caller's any control over
+            # their connection mechanics.
+            retry_on_dns_fail = args.pop(HttpClient.RETRY_DNS_LOOKUP_FAILURES)
+
         query_bytes = urllib.urlencode(args, True)
+        logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
 
         response = yield self._create_request(
             destination.encode("ascii"),
             "GET",
             path.encode("ascii"),
-            query_bytes=query_bytes
+            query_bytes=query_bytes,
+            retry_on_dns_fail=retry_on_dns_fail
+        )
+
+        body = yield readBody(response)
+
+        defer.returnValue(json.loads(body))
+
+    @defer.inlineCallbacks
+    def post_urlencoded_get_json(self, destination, path, args={}):
+        if destination in _destination_mappings:
+            destination = _destination_mappings[destination]
+
+        logger.debug("post_urlencoded_get_json args: %s", args)
+        query_bytes = urllib.urlencode(args, True)
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "POST",
+            path.encode("ascii"),
+            producer=FileBodyProducer(StringIO(urllib.urlencode(args))),
+            headers_dict={"Content-Type": ["application/x-www-form-urlencoded"]}
         )
 
         body = yield readBody(response)
@@ -157,7 +191,8 @@ class TwistedHttpClient(HttpClient):
 
     @defer.inlineCallbacks
     def _create_request(self, destination, method, path_bytes, param_bytes=b"",
-                        query_bytes=b"", producer=None, headers_dict={}):
+                        query_bytes=b"", producer=None, headers_dict={},
+                        retry_on_dns_fail=True):
         """ Creates and sends a request to the given url
         """
         headers_dict[b"User-Agent"] = [b"Synapse"]
@@ -178,10 +213,7 @@ class TwistedHttpClient(HttpClient):
         retries_left = 5
 
         # TODO: setup and pass in an ssl_context to enable TLS
-        endpoint = matrix_endpoint(
-            reactor, destination, timeout=10,
-            ssl_context_factory=self.hs.tls_context_factory
-        )
+        endpoint = self._getEndpoint(reactor, destination);
 
         while True:
             try:
@@ -199,6 +231,11 @@ class TwistedHttpClient(HttpClient):
                 logger.debug("Got response to %s", method)
                 break
             except Exception as e:
+                if not retry_on_dns_fail and isinstance(e, DNSLookupError):
+                    logger.warn("DNS Lookup failed to %s with %s", destination,
+                                e)
+                    raise SynapseError(400, "Domain specified not found.")
+
                 logger.exception("Got error in _create_request")
                 _print_ex(e)
 
@@ -223,6 +260,17 @@ class TwistedHttpClient(HttpClient):
 
         defer.returnValue(response)
 
+    def _getEndpoint(self, reactor, destination):
+        return matrix_endpoint(
+            reactor, destination, timeout=10,
+            ssl_context_factory=self.hs.tls_context_factory
+        )
+
+
+class PlainHttpClient(TwistedHttpClient):
+    def _getEndpoint(self, reactor, destination):
+        return matrix_endpoint(reactor, destination, timeout=10)
+    
 
 def _print_ex(e):
     if hasattr(e, "reasons") and e.reasons:

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import ConfigParser as configparser
 import argparse
 import sys
 import os
@@ -121,6 +119,9 @@ class Config(object):
                     and value is not None):
                     config[key] = value
             with open(config_args.config_path, "w") as config_file:
+                # TODO(paul) it would be lovely if we wrote out vim- and emacs-
+                #   style mode markers into the file, to hint to people that
+                #   this is a YAML file.
                 yaml.dump(config, config_file, default_flow_style=False)
             sys.exit(0)
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 matrix.org
+Copyright 2014 OpenMarket Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -84,13 +84,14 @@ angular.module('matrixService', [])
         prefix: prefixPath,
 
         // Register an user
-        register: function(user_name, password) {
+        register: function(user_name, password, threepidCreds) {
             // The REST path spec
             var path = "/register";
 
             return doRequest("POST", path, undefined, {
                  user_id: user_name,
-                 password: password
+                 password: password,
+                 threepidCreds: threepidCreds
             });
         },
 
@@ -164,6 +165,29 @@ angular.module('matrixService', [])
 
             // TODO: Use PUT with transaction IDs
             return doRequest("POST", path, undefined, data);
+        },
+
+        // Change the membership of an another user
+        setMembership: function(room_id, user_id, membershipValue) {
+            // The REST path spec
+            var path = "/rooms/$room_id/state/m.room.member/$user_id";
+            path = path.replace("$room_id", encodeURIComponent(room_id));
+            path = path.replace("$user_id", user_id);
+
+            return doRequest("PUT", path, undefined, {
+                membership: membershipValue
+            });
+        },
+           
+        // Bans a user from from a room
+        ban: function(room_id, user_id, reason) {
+            var path = "/rooms/$room_id/ban";
+            path = path.replace("$room_id", encodeURIComponent(room_id));
+            
+            return doRequest("POST", path, undefined, {
+                user_id: user_id,
+                reason: reason
+            });
         },
 
         // Retrieves the room ID corresponding to a room alias
@@ -252,7 +276,7 @@ angular.module('matrixService', [])
 
         // get a list of public rooms on your home server
         publicRooms: function() {
-            var path = "/publicRooms"
+            var path = "/publicRooms";
             return doRequest("GET", path);
         },
         
@@ -308,16 +332,16 @@ angular.module('matrixService', [])
 
         // hit the Identity Server for a 3PID request.
         linkEmail: function(email, clientSecret, sendAttempt) {
-            var path = "/_matrix/identity/api/v1/validate/email/requestToken"
+            var path = "/_matrix/identity/api/v1/validate/email/requestToken";
             var data = "clientSecret="+clientSecret+"&email=" + encodeURIComponent(email)+"&sendAttempt="+sendAttempt;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
         },
 
-        authEmail: function(clientSecret, tokenId, code) {
+        authEmail: function(clientSecret, sid, code) {
             var path = "/_matrix/identity/api/v1/validate/email/submitToken";
-            var data = "token="+code+"&sid="+tokenId+"&clientSecret="+clientSecret;
+            var data = "token="+code+"&sid="+sid+"&clientSecret="+clientSecret;
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers);
@@ -329,6 +353,11 @@ angular.module('matrixService', [])
             var headers = {};
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             return doBaseRequest(config.identityServer, "POST", path, {}, data, headers); 
+        },
+
+        lookup3pid: function(medium, address) {
+            var path = "/_matrix/identity/api/v1/lookup?medium="+encodeURIComponent(medium)+"&address="+encodeURIComponent(address);
+            return doBaseRequest(config.identityServer, "GET", path, {}, undefined, {}); 
         },
         
         uploadContent: function(file) {
@@ -408,7 +437,8 @@ angular.module('matrixService', [])
                 state: presence
             });
         },
-
+        
+        
         /****** Permanent storage of user information ******/
         
         // Returns the current config
@@ -508,6 +538,35 @@ angular.module('matrixService', [])
                 }
             }
             return powerLevel;
+        },
+            
+        /**
+         * Change or reset the power level of a user
+         * @param {String} room_id the room id
+         * @param {String} user_id the user id
+         * @param {Number} powerLevel a value between 0 and 10
+         *    If undefined, the user power level will be reset, ie he will use the default room user power level
+         * @returns {promise} an $http promise
+         */
+        setUserPowerLevel: function(room_id, user_id, powerLevel) {
+            
+            // Hack: currently, there is no home server API so do it by hand by updating
+            // the current m.room.power_levels of the room and send it to the server
+            var room = $rootScope.events.rooms[room_id];
+            if (room && room["m.room.power_levels"]) {
+                var content = angular.copy(room["m.room.power_levels"].content);
+                content[user_id] = powerLevel;
+                
+                var path = "/rooms/$room_id/state/m.room.power_levels";
+                path = path.replace("$room_id", encodeURIComponent(room_id));
+                
+                return doRequest("PUT", path, undefined, content);
+            }
+            
+            // The room does not exist or does not contain power_levels data
+            var deferred = $q.defer();
+            deferred.reject({data:{error: "Invalid room: " + room_id}});
+            return deferred.promise;
         }
 
     };

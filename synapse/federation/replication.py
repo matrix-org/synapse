@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -628,7 +628,6 @@ class _TransactionQueue(object):
 
             for deferred in deferreds:
                 deferred.errback(e)
-                yield deferred
 
         finally:
             # We want to be *very* sure we delete this after we stop processing

@@ -1,3 +1,20 @@
+Changes in synapse 0.2.1 (2014-09-03)
+=====================================
+
+Homeserver:
+ * Added support for signing up with a third party id.
+ * Add synctl scripts.
+ * Added rate limiting.
+ * Add option to change the external address the content repo uses.
+ * Presence bug fixes.
+
+Webclient:
+ * Added support for signing up with a third party id.
+ * Added support for banning and kicking users.
+ * Added support for displaying and setting ops.
+ * Added support for room names.
+ * Fix bugs with room membership event display.
+
 Changes in synapse 0.2.0 (2014-09-02)
 =====================================
 This update changes many configuration options, updates the

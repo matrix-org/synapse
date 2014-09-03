@@ -12,18 +12,19 @@
                 <div class="profile-avatar">
                     <img ng-src="{{ (null !== profile.avatarUrl) ? profile.avatarUrl : 'img/default-profile.png' }}" m-file-input="profile.avatarFile"/>
                 </div>
-                <div id="user-ids">
-                    <input size="40" ng-model="profile.displayName" placeholder="Your display name"/>
+                <div>
+                    <input id="user-displayname-input" size="40" ng-model="profile.displayName" placeholder="Your display name"/>
                     <br/>
-                    <button ng-disabled="(profile.displayName == profileOnServer.displayName) && (profile.avatarUrl == profileOnServer.avatarUrl)"
-                            ng-click="saveProfile()">Save</button>    
+                    <button id="user-save-button"
+                            ng-disabled="(profile.displayName === profileOnServer.displayName) && (profile.avatarUrl === profileOnServer.avatarUrl)"
+                            ng-click="saveProfile()">Save changes</button>
                 </div>
             </form>
         </div>
         <br/>
 
-        <h3>Linked emails</h3>
-        <div class="section">
+        <h3 style="display: none; ">Linked emails</h3>
+        <div class="section" style="display: none; ">
             <form>
                 <input size="40" ng-model="linkedEmails.linkNewEmail" ng-enter="linkEmail(linkedEmails.linkNewEmail)" />
                 <button ng-disabled="!linkedEmails.linkNewEmail" ng-click="linkEmail(linkedEmails.linkNewEmail)">
@@ -71,6 +72,21 @@
             <div>Identity server: {{ config.identityServer }} </div>
             <div>User ID: {{ config.user_id }} </div>
             <div>Access token: {{ config.access_token }} </div>
+        </div>
+        <br/>
+        
+        <h3>Commands</h3>
+        <div class="section">
+            The following commands are available in the room chat:
+            <ul>
+                <li>/nick &lt;display_name&gt;: change your display name</li>
+                <li>/me &lt;action&gt;: send the action you are doing. /me will be replaced by your display name</li>
+                <li>/kick &lt;user_id&gt;: kick the user</li>
+                <li>/ban &lt;user_id&gt; [&lt;reason&gt;]: ban the user</li>
+                <li>/unban &lt;user_id&gt;: unban the user</li>
+                <li>/op &lt;user_id&gt; &lt;power_level&gt;: set user power level</li>
+                <li>/deop &lt;user_id&gt;: reset user power level to the room default value</li>
+            </ul>
         </div>
         <br/>
 

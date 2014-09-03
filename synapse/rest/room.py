@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -388,7 +388,7 @@ class RoomMembershipRestServlet(RestServlet):
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
         PATTERN = ("/rooms/(?P<room_id>[^/]*)/" +
-            "(?P<membership_action>join|invite|leave)")
+            "(?P<membership_action>join|invite|leave|ban|kick)")
         register_txn_path(self, PATTERN, http_server)
 
     @defer.inlineCallbacks
@@ -399,10 +399,13 @@ class RoomMembershipRestServlet(RestServlet):
 
         # target user is you unless it is an invite
         state_key = user.to_string()
-        if membership_action == "invite":
+        if membership_action in ["invite", "ban", "kick"]:
             if "user_id" not in content:
                 raise SynapseError(400, "Missing user_id key.")
             state_key = content["user_id"]
+
+            if membership_action == "kick":
+                membership_action = "leave"
 
         event = self.event_factory.create_event(
             etype=RoomMemberEvent.TYPE,

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -155,19 +155,18 @@ class PresenceHandler(BaseHandler):
         if observer_user == observed_user:
             defer.returnValue(True)
 
-        allowed_by_subscription = yield self.store.is_presence_visible(
-            observed_localpart=observed_user.localpart,
-            observer_userid=observer_user.to_string(),
-        )
-
-        if allowed_by_subscription:
+        if (yield self.store.user_rooms_intersect(
+            [u.to_string() for u in observer_user, observed_user]
+        )):
             defer.returnValue(True)
 
-        share_room = yield self.store.do_users_share_a_room(
-            [observer_user, observed_user]
-        )
+        if (yield self.store.is_presence_visible(
+            observed_localpart=observed_user.localpart,
+            observer_userid=observer_user.to_string(),
+        )):
+            defer.returnValue(True)
 
-        defer.returnValue(share_room)
+        defer.returnValue(False)
 
     @defer.inlineCallbacks
     def get_state(self, target_user, auth_user):
@@ -181,7 +180,7 @@ class PresenceHandler(BaseHandler):
             state = yield self.store.get_presence_state(target_user.localpart)
             if "mtime" in state:
                 del state["mtime"]
-            state["presence"] = state["state"]
+            state["presence"] = state.pop("state")
 
             if target_user in self._user_cachemap:
                 state["last_active"] = (
@@ -208,20 +207,16 @@ class PresenceHandler(BaseHandler):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         if target_user != auth_user:
-            raise AuthError(400, "Cannot set another user's displayname")
+            raise AuthError(400, "Cannot set another user's presence")
 
         if "status_msg" not in state:
             state["status_msg"] = None
 
         for k in state.keys():
-            if k not in ("presence", "state", "status_msg"):
+            if k not in ("presence", "status_msg"):
                 raise SynapseError(
                     400, "Unexpected presence state key '%s'" % (k,)
                 )
-
-        # Handle legacy "state" key for now
-        if "state" in state:
-            state["presence"] = state.pop("state")
 
         if state["presence"] not in self.STATE_LEVELS:
             raise SynapseError(400, "'%s' is not a valid presence state" %
@@ -601,7 +596,7 @@ class PresenceHandler(BaseHandler):
         if state is None:
             state = yield self.store.get_presence_state(user.localpart)
             del state["mtime"]
-            state["presence"] = state["state"]
+            state["presence"] = state.pop("state")
 
             if user in self._user_cachemap:
                 state["last_active"] = (
@@ -622,8 +617,6 @@ class PresenceHandler(BaseHandler):
             "user_id": user.to_string(),
         }
         user_state.update(**state)
-        if "state" in user_state and "presence" not in user_state:
-            user_state["presence"] = user_state["state"]
 
         yield self.federation.send_edu(
             destination=destination,
@@ -655,20 +648,11 @@ class PresenceHandler(BaseHandler):
             state = dict(push)
             del state["user_id"]
 
-            if "presence" in state:
-                # all is OK
-                pass
-            elif "state" in state:
-                # Legacy handling
-                state["presence"] = state["state"]
-            else:
+            if "presence" not in state:
                 logger.warning("Received a presence 'push' EDU from %s without"
-                    + " either a 'presence' or 'state' key", origin
+                    + " a 'presence' key", origin
                 )
                 continue
-
-            if "state" in state:
-                del state["state"]
 
             if "last_active_ago" in state:
                 state["last_active"] = int(
@@ -773,15 +757,52 @@ class PresenceEventSource(object):
         self.hs = hs
         self.clock = hs.get_clock()
 
+    @defer.inlineCallbacks
+    def is_visible(self, observer_user, observed_user):
+        if observer_user == observed_user:
+            defer.returnValue(True)
+
+        presence = self.hs.get_handlers().presence_handler
+
+        if (yield presence.store.user_rooms_intersect(
+            [u.to_string() for u in observer_user, observed_user]
+        )):
+            defer.returnValue(True)
+
+        if observed_user.is_mine:
+            pushmap = presence._local_pushmap
+
+            defer.returnValue(
+                observed_user.localpart in pushmap and
+                observer_user in pushmap[observed_user.localpart]
+            )
+        else:
+            recvmap = presence._remote_recvmap
+
+            defer.returnValue(
+                observed_user in recvmap and
+                observer_user in recvmap[observed_user]
+            )
+
+    @defer.inlineCallbacks
     def get_new_events_for_user(self, user, from_key, limit):
         from_key = int(from_key)
+
+        observer_user = user
 
         presence = self.hs.get_handlers().presence_handler
         cachemap = presence._user_cachemap
 
-        # TODO(paul): limit, and filter by visibility
-        updates = [(k, cachemap[k]) for k in cachemap
-                   if from_key < cachemap[k].serial]
+        updates = []
+        # TODO(paul): use a DeferredList ? How to limit concurrency.
+        for observed_user in cachemap.keys():
+            if not (from_key < cachemap[observed_user].serial):
+                continue
+
+            if (yield self.is_visible(observer_user, observed_user)):
+                updates.append((observed_user, cachemap[observed_user]))
+
+        # TODO(paul): limit
 
         if updates:
             clock = self.clock
@@ -789,19 +810,22 @@ class PresenceEventSource(object):
             latest_serial = max([x[1].serial for x in updates])
             data = [x[1].make_event(user=x[0], clock=clock) for x in updates]
 
-            return ((data, latest_serial))
+            defer.returnValue((data, latest_serial))
         else:
-            return (([], presence._user_cachemap_latest_serial))
+            defer.returnValue(([], presence._user_cachemap_latest_serial))
 
     def get_current_key(self):
         presence = self.hs.get_handlers().presence_handler
         return presence._user_cachemap_latest_serial
 
+    @defer.inlineCallbacks
     def get_pagination_rows(self, user, pagination_config, key):
         # TODO (erikj): Does this make sense? Ordering?
 
         from_token = pagination_config.from_token
         to_token = pagination_config.to_token
+
+        observer_user = user
 
         from_key = int(from_token.presence_key)
 
@@ -813,7 +837,17 @@ class PresenceEventSource(object):
         presence = self.hs.get_handlers().presence_handler
         cachemap = presence._user_cachemap
 
-        # TODO(paul): limit, and filter by visibility
+        updates = []
+        # TODO(paul): use a DeferredList ? How to limit concurrency.
+        for observed_user in cachemap.keys():
+            if not (to_key < cachemap[observed_user].serial < from_key):
+                continue
+
+            if (yield self.is_visible(observer_user, observed_user)):
+                updates.append((observed_user, cachemap[observed_user]))
+
+        # TODO(paul): limit
+
         updates = [(k, cachemap[k]) for k in cachemap
                    if to_key < cachemap[k].serial < from_key]
 
@@ -831,13 +865,13 @@ class PresenceEventSource(object):
             next_token = next_token.copy_and_replace(
                 "presence_key", earliest_serial
             )
-            return ((data, next_token))
+            defer.returnValue((data, next_token))
         else:
             if not to_token:
                 to_token = from_token.copy_and_replace(
                     "presence_key", 0
                 )
-            return (([], to_token))
+            defer.returnValue(([], to_token))
 
 
 class UserPresenceCache(object):
@@ -851,7 +885,6 @@ class UserPresenceCache(object):
 
     def update(self, state, serial):
         assert("mtime_age" not in state)
-        assert("state" not in state)
 
         self.state.update(state)
         # Delete keys that are now 'None'
@@ -869,11 +902,6 @@ class UserPresenceCache(object):
     def get_state(self):
         # clone it so caller can't break our cache
         state = dict(self.state)
-
-        # Legacy handling
-        if "presence" in state:
-            state["state"] = state["presence"]
-
         return state
 
     def make_event(self, user, clock):

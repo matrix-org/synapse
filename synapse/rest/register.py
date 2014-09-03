@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,10 +47,15 @@ class RegisterRestServlet(RestServlet):
         except KeyError:
             pass  # user_id is optional
 
+        threepidCreds = None
+        if 'threepidCreds' in register_json:
+            threepidCreds = register_json['threepidCreds']
+
         handler = self.handlers.registration_handler
         (user_id, token) = yield handler.register(
             localpart=desired_user_id,
-            password=password)
+            password=password,
+            threepidCreds=threepidCreds)
 
         result = {
             "user_id": user_id,

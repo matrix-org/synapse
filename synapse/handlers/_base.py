@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from twisted.internet import defer
+from synapse.api.errors import LimitExceededError
 
 class BaseHandler(object):
 
@@ -25,7 +26,21 @@ class BaseHandler(object):
         self.room_lock = hs.get_room_lock_manager()
         self.state_handler = hs.get_state_handler()
         self.distributor = hs.get_distributor()
+        self.ratelimiter = hs.get_ratelimiter()
+        self.clock = hs.get_clock()
         self.hs = hs
+
+    def ratelimit(self, user_id):
+        time_now = self.clock.time()
+        allowed, time_allowed = self.ratelimiter.send_message(
+            user_id, time_now,
+            msg_rate_hz=self.hs.config.rc_messages_per_second,
+            burst_count=self.hs.config.rc_message_burst_count,
+        )
+        if not allowed:
+            raise LimitExceededError(
+                retry_after_ms=int(1000*(time_allowed - time_now)),
+            )
 
 
 class BaseRoomHandler(BaseHandler):

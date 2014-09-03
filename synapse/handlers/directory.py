@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError
+from synapse.http.client import HttpClient
 
 import logging
 
@@ -36,7 +37,7 @@ class DirectoryHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def create_association(self, room_alias, room_id, servers):
+    def create_association(self, room_alias, room_id, servers=None):
         # TODO(erikj): Do auth.
 
         if not room_alias.is_mine:
@@ -46,6 +47,12 @@ class DirectoryHandler(BaseHandler):
         # TODO(erikj): Add transactions.
 
         # TODO(erikj): Check if there is a current association.
+
+        if not servers:
+            servers = yield self.store.get_joined_hosts_for_room(room_id)
+
+        if not servers:
+            raise SynapseError(400, "Failed to get server list")
 
         yield self.store.create_room_alias_association(
             room_alias,
@@ -68,7 +75,10 @@ class DirectoryHandler(BaseHandler):
             result = yield self.federation.make_query(
                 destination=room_alias.domain,
                 query_type="directory",
-                args={"room_alias": room_alias.to_string()},
+                args={
+                    "room_alias": room_alias.to_string(),
+                    HttpClient.RETRY_DNS_LOOKUP_FAILURES: False
+                }
             )
 
             if result and "room_id" in result and "servers" in result:
@@ -78,6 +88,9 @@ class DirectoryHandler(BaseHandler):
         if not room_id:
             defer.returnValue({})
             return
+
+        extra_servers = yield self.store.get_joined_hosts_for_room(room_id)
+        servers = list(set(extra_servers) | set(servers))
 
         defer.returnValue({
             "room_id": room_id,

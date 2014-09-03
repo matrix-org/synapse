@@ -2,11 +2,11 @@ Introduction
 ============
 
 Matrix is an ambitious new ecosystem for open federated Instant Messaging and
-VoIP[1].  The basics you need to know to get up and running are:
+VoIP.  The basics you need to know to get up and running are:
 
     - Chatrooms are distributed and do not exist on any single server.  Rooms 
       can be found using names like ``#matrix:matrix.org`` or 
-      ``#test:localhost:8080`` or they can be ephemeral.
+      ``#test:localhost:8008`` or they can be ephemeral.
     
     - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
       you will normally refer to yourself and others using a 3PID: email
@@ -14,8 +14,8 @@ VoIP[1].  The basics you need to know to get up and running are:
 
 The overall architecture is::
 
-      client <----> homeserver <=================> homeserver <-----> client
-                e.g. matrix.org:8080        e.g. mydomain.net:8080
+      client <----> homeserver <=====================> homeserver <----> client
+             https://matrix.org/_matrix      https://mydomain.net/_matrix
 
 Quick Start
 ===========
@@ -25,21 +25,19 @@ To get up and running:
     - To simply play with an **existing** homeserver you can
       just go straight to http://matrix.org/alpha.
     
-    - To run your own **private** homeserver on localhost:8080, install synapse 
+    - To run your own **private** homeserver on localhost:8008, install synapse 
       with ``python setup.py develop --user`` and then run one with
       ``python synapse/app/homeserver.py`` - you will find a webclient running
-      at http://localhost:8080 (use a recent Chrome, Safari or Firefox for now,
+      at http://localhost:8008 (use a recent Chrome, Safari or Firefox for now,
       please...)
              
     - To make the homeserver **public** and let it exchange messages with 
       other homeservers and participate in the overall Matrix federation, open 
-      up port 8080 and run ``python synapse/app/homeserver.py --host 
+      up port 8448 and run ``python synapse/app/homeserver.py --host 
       machine.my.domain.name``.  Then come join ``#matrix:matrix.org`` and
       say hi! :)
 
 For more detailed setup instructions, please see further down this document.
-
-[1] VoIP currently in development
 
    
 About Matrix
@@ -50,15 +48,15 @@ which handle:
 
     - Creating and managing fully distributed chat rooms with no
       single points of control or failure
-    - Eventually-consistent cryptographically secure[2] synchronisation of room 
+    - Eventually-consistent cryptographically secure[1] synchronisation of room 
       state across a global open network of federated servers and services
     - Sending and receiving extensible messages in a room with (optional)
-      end-to-end encryption[3]
+      end-to-end encryption[2]
     - Inviting, joining, leaving, kicking, banning room members
     - Managing user accounts (registration, login, logout)
     - Using 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
       Facebook accounts to authenticate, identify and discover users on Matrix.
-    - Placing 1:1 VoIP and Video calls (in development)
+    - Placing 1:1 VoIP and Video calls
 
 These APIs are intended to be implemented on a wide range of servers, services
 and clients, letting developers build messaging and VoIP functionality on top of
@@ -92,9 +90,9 @@ https://github.com/matrix-org/synapse/issues or at matrix@matrix.org.
 
 Thanks for trying Matrix!
 
-[2] Cryptographic signing of messages isn't turned on yet
+[1] Cryptographic signing of messages isn't turned on yet
 
-[3] End-to-end encryption is currently in development
+[2] End-to-end encryption is currently in development
 
 
 Homeserver Installation

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 matrix.org
+Copyright 2014 OpenMarket Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -85,6 +85,14 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             updatePresence(event);
         }
     });
+    
+    $scope.$on(eventHandlerService.POWERLEVEL_EVENT, function(ngEvent, event, isLive) {
+        if (isLive && event.room_id === $scope.room_id) {
+            for (var user_id in event.content) {
+                updateUserPowerLevel(user_id);
+            }
+        }
+    });
 
     $scope.memberCount = function() {
         return Object.keys($scope.members).length;
@@ -161,10 +169,13 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     var updateMemberList = function(chunk) {
         if (chunk.room_id != $scope.room_id) return;
 
+        // Ignore banned and kicked (leave) people
+        if ("ban" === chunk.membership || "leave" === chunk.membership) {
+            return;
+        }
+
         // set target_user_id to keep things clear
         var target_user_id = chunk.state_key;
-        
-        var now = new Date().getTime();
 
         var isNewMember = !(target_user_id in $scope.members);
         if (isNewMember) {
@@ -174,6 +185,8 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             }
             if ("last_active_ago" in chunk.content) {
                 chunk.last_active_ago = chunk.content.last_active_ago;
+                $scope.now = new Date().getTime();
+                chunk.last_updated = $scope.now;
             }
             if ("displayname" in chunk.content) {
                 chunk.displayname = chunk.content.displayname;
@@ -181,7 +194,6 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             if ("avatar_url" in chunk.content) {
                 chunk.avatar_url = chunk.content.avatar_url;
             }
-            chunk.last_updated = now;
             $scope.members[target_user_id] = chunk;   
 
             if (target_user_id in $rootScope.presence) {
@@ -197,6 +209,8 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             }
             if ("last_active_ago" in chunk.content) {
                 member.last_active_ago = chunk.content.last_active_ago;
+                $scope.now = new Date().getTime();
+                member.last_updated = $scope.now;
             }
         }
     };
@@ -221,6 +235,8 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
 
         if ("last_active_ago" in chunk.content) {
             member.last_active_ago = chunk.content.last_active_ago;
+            $scope.now = new Date().getTime();
+            member.last_updated = $scope.now;
         }
 
         // this may also contain a new display name or avatar url, so check.
@@ -237,6 +253,29 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         var member = $scope.members[user_id];
         if (member) {
             member.powerLevel = matrixService.getUserPowerLevel($scope.room_id, user_id);
+            
+            normaliseMembersPowerLevels();
+        }
+    }
+
+    // Normalise users power levels so that the user with the higher power level
+    // will have a bar covering 100% of the width of his avatar
+    var normaliseMembersPowerLevels = function() {
+        // Find the max power level
+        var maxPowerLevel = 0;
+        for (var i in $scope.members) {
+            var member = $scope.members[i];
+            if (member.powerLevel) {
+                maxPowerLevel = Math.max(maxPowerLevel, member.powerLevel);
+            }
+        }
+
+        // Normalized them on a 0..100% scale to be use in css width
+        if (maxPowerLevel) {
+            for (var i in $scope.members) {
+                var member = $scope.members[i];
+                member.powerLevelNorm = (member.powerLevel * 100) / maxPowerLevel;
+            }
         }
     }
 
@@ -247,28 +286,93 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
 
         $scope.state.sending = true;
         
-        // Send the text message
         var promise;
-        // FIXME: handle other commands too
-        if ($scope.textInput.indexOf("/me") === 0) {
-            promise = matrixService.sendEmoteMessage($scope.room_id, $scope.textInput.substr(4));
+        
+        // Check for IRC style commands first
+        if ($scope.textInput.indexOf("/") === 0) {
+            var args = $scope.textInput.split(' ');
+            var cmd = args[0];
+            
+            switch (cmd) {
+                case "/me":
+                    var emoteMsg = args.slice(1).join(' ');
+                    promise = matrixService.sendEmoteMessage($scope.room_id, emoteMsg);
+                    break;
+                    
+                case "/nick":
+                    // Change user display name
+                    if (2 === args.length) {
+                        promise = matrixService.setDisplayName(args[1]);
+                    }
+                    break;
+                    
+                case "/kick":
+                    // Kick a user from the room
+                    if (2 === args.length) {
+                        var user_id = args[1];
+
+                        // Set his state in the room as leave
+                        promise = matrixService.setMembership($scope.room_id, user_id, "leave");
+                    }
+                    break;
+                    
+                case "/ban":
+                    // Ban a user from the room
+                    if (2 <= args.length) {
+                        // TODO: The user may have entered the display name
+                        // Need display name -> user_id resolution. Pb: how to manage user with same display names?
+                        var user_id = args[1];
+
+                        // Does the user provide a reason?
+                        if (3 <= args.length) {
+                            var reason = args.slice(2).join(' ');
+                        }
+                        promise = matrixService.ban($scope.room_id, user_id, reason);
+                    }
+                    break;
+                    
+                case "/unban":
+                    // Unban a user from the room
+                    if (2 === args.length) {
+                        var user_id = args[1];
+
+                        // Reset the user membership to leave to unban him
+                        promise = matrixService.setMembership($scope.room_id, user_id, "leave");
+                    }
+                    break;
+                    
+                case "/op":
+                    // Define the power level of a user
+                    if (3 === args.length) {
+                        var user_id = args[1];
+                        var powerLevel = parseInt(args[2]);
+                        promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
+                    }
+                    break;
+                    
+                case "/deop":
+                    // Reset the power level of a user
+                    if (2 === args.length) {
+                        var user_id = args[1];
+                        promise = matrixService.setUserPowerLevel($scope.room_id, user_id, undefined);
+                    }
+                    break;
+            }
         }
-        else if ($scope.textInput.indexOf("/nick ") === 0) {
-            // Change user display name
-            promise = matrixService.setDisplayName($scope.textInput.substr(6));
-        }
-        else {
+        
+        if (!promise) {
+            // Send the text message
             promise = matrixService.sendTextMessage($scope.room_id, $scope.textInput);
         }
         
         promise.then(
             function() {
-                console.log("Sent message");
+                console.log("Request successfully sent");
                 $scope.textInput = "";
                 $scope.state.sending = false;
             },
             function(error) {
-                $scope.feedback = "Failed to send: " + error.data.error;
+                $scope.feedback = "Request failed: " + error.data.error;
                 $scope.state.sending = false;
             });
     };
@@ -332,10 +436,6 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         eventHandlerService.waitForInitialSyncCompletion().then(
             function() {
                 
-                // Some data has been retrieved from the iniialSync request
-                // So, the relative time starts here
-                $scope.now = new Date().getTime();
-                
                 var needsToJoin = true;
                 
                 // The room members is available in the data fetched by initialSync
@@ -364,7 +464,8 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                             onInit3();
                         },
                         function(reason) {
-                            $scope.feedback = "Can't join room: " + reason;
+                            console.log("Can't join room: " + JSON.stringify(reason));
+                            $scope.feedback = "You do not have permission to join this room";
                         });
                 }
                 else {

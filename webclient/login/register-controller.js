@@ -1,5 +1,5 @@
 /*
- Copyright 2014 matrix.org
+ Copyright 2014 OpenMarket Ltd
  
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
  
 angular.module('RegisterController', ['matrixService'])
-.controller('RegisterController', ['$scope', '$location', 'matrixService', 'eventStreamService',
-                                    function($scope, $location, matrixService, eventStreamService) {
+.controller('RegisterController', ['$scope', '$rootScope', '$location', 'matrixService', 'eventStreamService',
+                                    function($scope, $rootScope, $location, matrixService, eventStreamService) {
     'use strict';
     
     // FIXME: factor out duplication with login-controller.js
@@ -30,6 +30,17 @@ angular.module('RegisterController', ['matrixService'])
     {
         hs_url += ":" + $location.port();
     }
+
+    var generateClientSecret = function() {
+        var ret = "";
+        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+        for (var i = 0; i < 32; i++) {
+            ret += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        return ret;
+    };
     
     $scope.account = {
         homeserver: hs_url,
@@ -43,7 +54,6 @@ angular.module('RegisterController', ['matrixService'])
     };
     
     $scope.register = function() {
-
         // Set the urls
         matrixService.setConfig({
             homeserver: $scope.account.homeserver,
@@ -59,7 +69,25 @@ angular.module('RegisterController', ['matrixService'])
             return;
         }
 
-        matrixService.register($scope.account.desired_user_id, $scope.account.pwd1).then(
+        if ($scope.account.email) {
+            $scope.clientSecret = generateClientSecret();
+            matrixService.linkEmail($scope.account.email, $scope.clientSecret, 1).then(
+                function(response) {
+                    $scope.wait_3pid_code = true;
+                    $scope.sid = response.data.sid;
+                    $scope.feedback = "";
+                },
+                function(response) {
+                    $scope.feedback = "Couldn't request verification email!";
+                }
+            );
+        } else {
+            registerWithMxidAndPassword($scope.account.desired_user_id, $scope.account.pwd1);
+        }
+    };
+
+    $scope.registerWithMxidAndPassword = function(mxid, password, threepidCreds) {
+        matrixService.register(mxid, password, threepidCreds).then(
             function(response) {
                 $scope.feedback = "Success";
                 // Update the current config 
@@ -74,7 +102,7 @@ angular.module('RegisterController', ['matrixService'])
                 matrixService.saveConfig();
                 
                 // Update the global scoped used_id var (used in the app header)
-                $scope.updateHeader();
+                $rootScope.updateHeader();
                 
                 eventStreamService.resume();
                 
@@ -87,15 +115,32 @@ angular.module('RegisterController', ['matrixService'])
                 $location.url("home");
             },
             function(error) {
+                console.trace("Registration error: "+error);
                 if (error.data) {
                     if (error.data.errcode === "M_USER_IN_USE") {
                         $scope.feedback = "Username already taken.";
+                        $scope.reenter_username = true;
                     }
                 }
                 else if (error.status === 0) {
                     $scope.feedback = "Unable to talk to the server.";
                 }
             });
+    }
+
+    $scope.verifyToken = function() {
+        matrixService.authEmail($scope.clientSecret, $scope.sid, $scope.account.threepidtoken).then(
+            function(response) {
+                if (!response.data.success) {
+                    $scope.feedback = "Unable to verify code.";
+                } else {
+                    $scope.registerWithMxidAndPassword($scope.account.desired_user_id, $scope.account.pwd1, [{'sid':$scope.sid, 'clientSecret':$scope.clientSecret, 'idServer': $scope.account.identityServer.split('//')[1]}]);
+                }
+            },
+            function(error) {
+                $scope.feedback = "Unable to verify code.";
+            }
+        );
     };
 
 }]);

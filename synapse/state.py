@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -178,6 +178,18 @@ class StateHandler(object):
                 new_branch[-1], current_branch[-1],
                 key=lambda x: x.depth
             )
+
+            if not hasattr(missing_prev, "prev_state_id"):
+                # FIXME Hmm
+                # temporary fallback
+                for algo in conflict_res:
+                    new_res, curr_res = algo(new_branch, current_branch)
+
+                    if new_res < curr_res:
+                        defer.returnValue(False)
+                    elif new_res > curr_res:
+                        defer.returnValue(True)
+                return
 
             pdu_id = missing_prev.prev_state_id
             origin = missing_prev.prev_state_origin

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ class Codes(object):
     UNKNOWN = "M_UNKNOWN"
     NOT_FOUND = "M_NOT_FOUND"
     UNKNOWN_TOKEN = "M_UNKNOWN_TOKEN"
+    LIMIT_EXCEEDED = "M_LIMIT_EXCEEDED"
 
 
 class CodeMessageException(Exception):
@@ -38,11 +39,15 @@ class CodeMessageException(Exception):
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
         self.code = code
         self.msg = msg
+        self.response_code_message = None
+
+    def error_dict(self):
+        return cs_error(self.msg)
 
 
 class SynapseError(CodeMessageException):
     """A base error which can be caught for all synapse events."""
-    def __init__(self, code, msg, errcode=""):
+    def __init__(self, code, msg, errcode=Codes.UNKNOWN):
         """Constructs a synapse error.
 
         Args:
@@ -53,6 +58,11 @@ class SynapseError(CodeMessageException):
         super(SynapseError, self).__init__(code, msg)
         self.errcode = errcode
 
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+        )
 
 class RoomError(SynapseError):
     """An error raised when a room event fails."""
@@ -91,13 +101,26 @@ class StoreError(SynapseError):
     pass
 
 
-def cs_exception(exception):
-    if isinstance(exception, SynapseError):
+class LimitExceededError(SynapseError):
+    """A client has sent too many requests and is being throttled.
+    """
+    def __init__(self, code=429, msg="Too Many Requests", retry_after_ms=None,
+                 errcode=Codes.LIMIT_EXCEEDED):
+        super(LimitExceededError, self).__init__(code, msg, errcode)
+        self.retry_after_ms = retry_after_ms
+        self.response_code_message = "Too Many Requests"
+
+    def error_dict(self):
         return cs_error(
-            exception.msg,
-            Codes.UNKNOWN if not exception.errcode else exception.errcode)
-    elif isinstance(exception, CodeMessageException):
-        return cs_error(exception.msg)
+            self.msg,
+            self.errcode,
+            retry_after_ms=self.retry_after_ms,
+        )
+
+
+def cs_exception(exception):
+    if isinstance(exception, CodeMessageException):
+        return exception.error_dict()
     else:
         logging.error("Unknown exception type: %s", type(exception))
 

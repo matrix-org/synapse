@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,6 +49,7 @@ class RoomCreationHandler(BaseRoomHandler):
             SynapseError if the room ID was taken, couldn't be stored, or
             something went horribly wrong.
         """
+        self.ratelimit(user_id)
 
         if "room_alias_name" in config:
             room_alias = RoomAlias.create_local(
@@ -110,8 +111,6 @@ class RoomCreationHandler(BaseRoomHandler):
                 servers=[self.hs.hostname],
             )
 
-        federation_handler = self.hs.get_handlers().federation_handler
-
         @defer.inlineCallbacks
         def handle_event(event):
             snapshot = yield self.store.snapshot_room(
@@ -129,6 +128,17 @@ class RoomCreationHandler(BaseRoomHandler):
 
         if "name" in config:
             name = config["name"]
+            name_event = self.event_factory.create_event(
+                etype=RoomNameEvent.TYPE,
+                room_id=room_id,
+                user_id=user_id,
+                required_power_level=5,
+                content={"name": name},
+            )
+
+            yield handle_event(name_event)
+        elif room_alias:
+            name = room_alias.to_string()
             name_event = self.event_factory.create_event(
                 etype=RoomNameEvent.TYPE,
                 room_id=room_id,

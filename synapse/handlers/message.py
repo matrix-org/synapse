@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -76,6 +76,8 @@ class MessageHandler(BaseRoomHandler):
         Raises:
             SynapseError if something went wrong.
         """
+
+        self.ratelimit(event.user_id)
         # TODO(paul): Why does 'event' not have a 'user' object?
         user = self.hs.parse_userid(event.user_id)
         assert user.is_mine, "User must be our own: %s" % (user,)
@@ -140,7 +142,12 @@ class MessageHandler(BaseRoomHandler):
             SynapseError if something went wrong.
         """
 
-        snapshot = yield self.store.snapshot_room(event.room_id, event.user_id)
+        snapshot = yield self.store.snapshot_room(
+            event.room_id,
+            event.user_id,
+            state_type=event.type,
+            state_key=event.state_key,
+        )
 
         yield self.auth.check(event, snapshot, raises=True)
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,8 +17,11 @@ from .tls import TlsConfig
 from .server import ServerConfig
 from .logger import LoggingConfig
 from .database import DatabaseConfig
+from .ratelimiting import RatelimitConfig
+from .repository import ContentRepositoryConfig
 
-class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig):
+class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
+                       RatelimitConfig, ContentRepositoryConfig):
     pass
 
 if __name__=='__main__':

@@ -24,7 +24,7 @@
                          title="{{ member.id }}"
                          width="80" height="80"/>
                     <img class="userAvatarGradient" src="img/gradient.png" title="{{ member.id }}" width="80" height="24"/>
-                    <div class="userPowerLevel" ng-style="{'width': (10 * member.powerLevel) +'%'}"></div>
+                    <div class="userPowerLevel" ng-style="{'width': member.powerLevelNorm +'%'}"></div>
                     <div class="userName">{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}<br/>{{ member.displayname ? "" : member.id.substr(member.id.indexOf(':')) }}</div>
                 </td>
                 <td class="userPresence" ng-class="(member.presence === 'online' ? 'online' : (member.presence === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">
@@ -48,10 +48,23 @@
                 </td>
                 <td ng-class="!msg.content.membership ? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble">
-                        <span ng-show='msg.type === "m.room.member"'>
+                        <span ng-if="'join' === msg.content.membership">
+                            {{ members[msg.state_key].displayname || msg.state_key }} joined
+                        </span>
+                        <span ng-if="'leave' === msg.content.membership">
+                            <span ng-if="msg.user_id === msg.state_key">
+                                {{ members[msg.state_key].displayname || msg.state_key }} left
+                            </span>
+                            <span ng-if="msg.user_id !== msg.state_key">
+                                {{ members[msg.user_id].displayname || msg.user_id }}
+                                {{ {"join": "kicked", "ban": "unbanned"}[msg.content.prev] }}
+                                {{ members[msg.state_key].displayname || msg.state_key }}
+                            </span>
+                        </span>
+                        <span ng-if="'invite' === msg.content.membership || 'ban' === msg.content.membership">
                             {{ members[msg.user_id].displayname || msg.user_id }}
-                            {{ {"join": "joined", "leave": "left", "invite": "invited"}[msg.content.membership] }}
-                            {{ msg.content.membership === "invite" ? (msg.state_key || '') : '' }}
+                            {{ {"invite": "invited", "ban": "banned"}[msg.content.membership] }}
+                            {{ members[msg.state_key].displayname || msg.state_key }}
                         </span>
                         <span ng-show='msg.content.msgtype === "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
                         <span ng-show='msg.content.msgtype === "m.text"' ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ from twisted.enterprise import adbapi
 from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
-from synapse.http.server import JsonResource, RootRedirect, ContentRepoResource
+from synapse.http.server import JsonResource, RootRedirect
+from synapse.http.content_repository import ContentRepoResource
 from synapse.http.client import TwistedHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX
@@ -74,7 +75,9 @@ class SynapseHomeServer(HomeServer):
         return File("webclient")  # TODO configurable?
 
     def build_resource_for_content_repo(self):
-        return ContentRepoResource(self, self.upload_dir, self.auth)
+        return ContentRepoResource(
+            self, self.upload_dir, self.auth, self.content_addr
+        )
 
     def build_db_pool(self):
         """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
@@ -90,20 +93,28 @@ class SynapseHomeServer(HomeServer):
             if row and row[0]:
                 user_version = row[0]
 
-                if user_version < SCHEMA_VERSION:
-                    # TODO(paul): add some kind of intelligent fixup here
-                    raise ValueError("Cannot use this database as the " +
-                        "schema version (%d) does not match (%d)" %
-                        (user_version, SCHEMA_VERSION)
+                if user_version > SCHEMA_VERSION:
+                    raise ValueError("Cannot use this database as it is too " +
+                        "new for the server to understand"
                     )
+                elif user_version < SCHEMA_VERSION:
+                    logging.info("Upgrading database from version %d",
+                        user_version
+                    )
+
+                    # Run every version since after the current version.
+                    for v in range(user_version + 1, SCHEMA_VERSION + 1):
+                        sql_script = read_schema("delta/v%d" % (v))
+                        c.executescript(sql_script)
+
+                    db_conn.commit()
 
             else:
                 for sql_loc in SCHEMAS:
                     sql_script = read_schema(sql_loc)
 
                     c.executescript(sql_script)
-                    db_conn.commit()
-
+                db_conn.commit()
                 c.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
 
             c.close()
@@ -247,6 +258,8 @@ def setup():
         upload_dir=os.path.abspath("uploads"),
         db_name=config.database_path,
         tls_context_factory=tls_context_factory,
+        config=config,
+        content_addr=config.content_addr,
     )
 
     hs.register_servlets()

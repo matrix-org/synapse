@@ -1,5 +1,5 @@
 /*
- Copyright 2014 matrix.org
+ Copyright 2014 OpenMarket Ltd
  
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
  
 angular.module('LoginController', ['matrixService'])
-.controller('LoginController', ['$scope', '$location', 'matrixService', 'eventStreamService',
-                                    function($scope, $location, matrixService, eventStreamService) {
+.controller('LoginController', ['$scope', '$rootScope', '$location', 'matrixService', 'eventStreamService',
+                                    function($scope, $rootScope, $location, matrixService, eventStreamService) {
     'use strict';
     
     
@@ -51,10 +51,36 @@ angular.module('LoginController', ['matrixService'])
         matrixService.setConfig({
             homeserver: $scope.account.homeserver,
             identityServer: $scope.account.identityServer,
+        });
+        switch ($scope.login_type) {
+            case 'mxid':
+                $scope.login_with_mxid($scope.account.user_id, $scope.account.password);
+                break;
+            case 'email':
+                matrixService.lookup3pid('email', $scope.account.user_id).then(
+                    function(response) {
+                        if (response.data['address'] == undefined) {
+                            $scope.login_error_msg = "Invalid email address / password";
+                        } else {
+                            console.log("Got address "+response.data['mxid']+" for email "+$scope.account.user_id);
+                            $scope.login_with_mxid(response.data['mxid'], $scope.account.password);
+                        }
+                    },
+                    function() {
+                        $scope.login_error_msg = "Couldn't look up email address. Is your identity server set correctly?";
+                    }
+                );
+        }
+    };
+
+    $scope.login_with_mxid = function(mxid, password) {
+        matrixService.setConfig({
+            homeserver: $scope.account.homeserver,
+            identityServer: $scope.account.identityServer,
             user_id: $scope.account.user_id
         });
         // try to login
-        matrixService.login($scope.account.user_id, $scope.account.password).then(
+        matrixService.login(mxid, password).then(
             function(response) {
                 if ("access_token" in response.data) {
                     $scope.feedback = "Login successful.";
@@ -65,6 +91,7 @@ angular.module('LoginController', ['matrixService'])
                         access_token: response.data.access_token
                     });
                     matrixService.saveConfig();
+                    $rootScope.updateHeader();
                     eventStreamService.resume();
                     $location.url("home");
                 }

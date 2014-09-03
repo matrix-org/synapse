@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -126,5 +126,7 @@ class EventHandler(BaseHandler):
             defer.returnValue(None)
             return
 
-        yield self.auth.check(event, raises=True)
+        if hasattr(event, "room_id"):
+            yield self.auth.check_joined_room(event.room_id, user.to_string())
+
         defer.returnValue(event)

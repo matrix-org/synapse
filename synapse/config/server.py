@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +32,14 @@ class ServerConfig(Config):
         self.webclient = True
         self.manhole = args.manhole
 
+        if not args.content_addr:
+            host = args.server_name
+            if ':' not in host:
+                host  = "%s:%d" % (host, args.bind_port)
+            args.content_addr = "https://%s" % (host,)
+
+        self.content_addr = args.content_addr
+
     @classmethod
     def add_arguments(cls, parser):
         super(ServerConfig, cls).add_arguments(parser)
@@ -50,13 +58,16 @@ class ServerConfig(Config):
                                   help="Local interface to listen on")
         server_group.add_argument("-D", "--daemonize", action='store_true',
                                   help="Daemonize the home server")
-        server_group.add_argument('--pid-file', default="hs.pid",
+        server_group.add_argument('--pid-file', default="homeserver.pid",
                                   help="When running as a daemon, the file to"
                                   " store the pid in")
         server_group.add_argument("--manhole", metavar="PORT", dest="manhole",
                                   type=int,
                                   help="Turn on the twisted telnet manhole"
                                   " service on the given port.")
+        server_group.add_argument("--content-addr", default=None,
+                                  help="The host and scheme to use for the "
+                                  "content repository")
 
     def read_signing_key(self, signing_key_path):
         signing_key_base64 = self.read_file(signing_key_path, "signing_key")
@@ -77,3 +88,4 @@ class ServerConfig(Config):
             with open(args.signing_key_path, "w") as signing_key_file:
                 key = nacl.signing.SigningKey.generate()
                 signing_key_file.write(encode_base64(key.encode()))
+
