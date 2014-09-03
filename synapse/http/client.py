@@ -15,6 +15,7 @@
 
 
 from twisted.internet import defer, reactor
+from twisted.internet.error import DNSLookupError
 from twisted.web.client import _AgentBase, _URI, readBody
 from twisted.web.http_headers import Headers
 
@@ -23,7 +24,7 @@ from synapse.util.async import sleep
 
 from syutil.jsonutil import encode_canonical_json
 
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import CodeMessageException, SynapseError
 
 import json
 import logging
@@ -198,6 +199,10 @@ class TwistedHttpClient(HttpClient):
 
                 logger.debug("Got response to %s", method)
                 break
+            except DNSLookupError as dns:
+                logger.warn("DNS Lookup failed to %s with %s", destination,
+                            dns)
+                raise SynapseError(400, "Domain specified not found.")
             except Exception as e:
                 logger.exception("Got error in _create_request")
                 _print_ex(e)
