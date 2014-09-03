@@ -1726,6 +1726,79 @@ destination home server names, and the actual nested content.
   "origin":"blue",
   "destination":"orange",
   "content":...}
+  
+  
+Protocol URLs
+=============
+.. WARNING::
+  This section may be misleading or inaccurate.
+
+All these URLs are namespaced within a prefix of::
+
+  /_matrix/federation/v1/...
+
+For active pushing of messages representing live activity "as it happens"::
+
+  PUT .../send/:transaction_id/
+    Body: JSON encoding of a single Transaction
+    Response: TODO
+
+The transaction_id path argument will override any ID given in the JSON body.
+The destination name will be set to that of the receiving server itself. Each
+embedded PDU in the transaction body will be processed.
+
+
+To fetch a particular PDU::
+
+  GET .../pdu/:origin/:pdu_id/
+    Response: JSON encoding of a single Transaction containing one PDU
+
+Retrieves a given PDU from the server. The response will contain a single new
+Transaction, inside which will be the requested PDU.
+  
+
+To fetch all the state of a given context::
+
+  GET .../state/:context/
+    Response: JSON encoding of a single Transaction containing multiple PDUs
+
+Retrieves a snapshot of the entire current state of the given context. The
+response will contain a single Transaction, inside which will be a list of
+PDUs that encode the state.
+
+To backfill events on a given context::
+
+  GET .../backfill/:context/
+    Query args: v, limit
+    Response: JSON encoding of a single Transaction containing multiple PDUs
+
+Retrieves a sliding-window history of previous PDUs that occurred on the
+given context. Starting from the PDU ID(s) given in the "v" argument, the
+PDUs that preceeded it are retrieved, up to a total number given by the
+"limit" argument. These are then returned in a new Transaction containing all
+off the PDUs.
+
+
+To stream events all the events::
+
+  GET .../pull/
+    Query args: origin, v
+    Response: JSON encoding of a single Transaction consisting of multiple PDUs
+
+Retrieves all of the transactions later than any version given by the "v"
+arguments.
+
+
+To make a query::
+
+  GET .../query/:query_type
+    Query args: as specified by the individual query types
+    Response: JSON encoding of a response object
+
+Performs a single query request on the receiving home server. The Query Type
+part of the path specifies the kind of query being made, and its query
+arguments have a meaning specific to that kind of query. The response is a
+JSON-encoded object whose meaning also depends on the kind of query.
 
 Backfilling
 -----------
