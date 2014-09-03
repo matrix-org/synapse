@@ -30,48 +30,52 @@ ecosystem to communicate with one another.
 
 The principles that Matrix attempts to follow are:
 
- - Pragmatic Web-friendly APIs (i.e. JSON over REST)
- - Keep It Simple & Stupid
+- Pragmatic Web-friendly APIs (i.e. JSON over REST)
+- Keep It Simple & Stupid
 
-   + provide a simple architecture with minimal third-party dependencies.
+  + provide a simple architecture with minimal third-party dependencies.
 
- - Fully open:
+- Fully open:
 
-   + Fully open federation - anyone should be able to participate in the global Matrix network
-   + Fully open standard - publicly documented standard with no IP or patent licensing encumbrances
-   + Fully open source reference implementation - liberally-licensed example implementations with no
-     IP or patent licensing encumbrances
+  + Fully open federation - anyone should be able to participate in the global
+    Matrix network
+  + Fully open standard - publicly documented standard with no IP or patent
+    licensing encumbrances
+  + Fully open source reference implementation - liberally-licensed example
+    implementations with no IP or patent licensing encumbrances
 
- - Empowering the end-user
+- Empowering the end-user
 
-   + The user should be able to choose the server and clients they use
-   + The user should be control how private their communication is
-   + The user should know precisely where their data is stored
+  + The user should be able to choose the server and clients they use
+  + The user should be control how private their communication is
+  + The user should know precisely where their data is stored
 
- - Fully decentralised - no single points of control over conversations or the network as a whole
- - Learning from history to avoid repeating it
+- Fully decentralised - no single points of control over conversations or the
+  network as a whole
+- Learning from history to avoid repeating it
 
-   + Trying to take the best aspects of XMPP, SIP, IRC, SMTP, IMAP and NNTP whilst trying to avoid their failings
+  + Trying to take the best aspects of XMPP, SIP, IRC, SMTP, IMAP and NNTP
+    whilst trying to avoid their failings
 
 The functionality that Matrix provides includes:
 
- - Creation and management of fully distributed chat rooms with no
-   single points of control or failure
- - Eventually-consistent cryptographically secure synchronisation of room 
-   state across a global open network of federated servers and services
- - Sending and receiving extensible messages in a room with (optional)
-   end-to-end encryption
- - Extensible user management (inviting, joining, leaving, kicking, banning)
-   mediated by a power-level based user privilege system.
- - Extensible room state management (room naming, aliasing, topics, bans)
- - Extensible user profile management (avatars, displaynames, etc)
- - Managing user accounts (registration, login, logout)
- - Use of 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
-   Facebook accounts to authenticate, identify and discover users on Matrix.
- - Trusted federation of Identity servers for:
+- Creation and management of fully distributed chat rooms with no
+  single points of control or failure
+- Eventually-consistent cryptographically secure synchronisation of room
+  state across a global open network of federated servers and services
+- Sending and receiving extensible messages in a room with (optional)
+  end-to-end encryption
+- Extensible user management (inviting, joining, leaving, kicking, banning)
+  mediated by a power-level based user privilege system.
+- Extensible room state management (room naming, aliasing, topics, bans)
+- Extensible user profile management (avatars, displaynames, etc)
+- Managing user accounts (registration, login, logout)
+- Use of 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
+  Facebook accounts to authenticate, identify and discover users on Matrix.
+- Trusted federation of Identity servers for:
 
-   + Publishing user public keys for PKI
-   + Mapping of 3PIDs to Matrix IDs
+  + Publishing user public keys for PKI
+  + Mapping of 3PIDs to Matrix IDs
 
 The end goal of Matrix is to be a ubiquitous messaging layer for synchronising
 arbitrary data between sets of people, devices and services - be that for instant
@@ -1506,6 +1510,31 @@ Each transaction has:
  - An origin and destination server name.
  - A list of "previous IDs".
  - A list of PDUs and EDUs - the actual message payload that the Transaction carries.
+ 
+``origin``
+  Type: 
+    String
+  Description:
+    DNS name of homeserver making this transaction.
+    
+``ts``
+  Type: 
+    Integer
+  Description:
+    Timestamp in milliseconds on originating homeserver when this transaction 
+    started.
+    
+``previous_ids``
+  Type:
+    List of strings
+  Description:
+    List of transactions that were sent immediately prior to this transaction.
+    
+``pdus``
+  Type:
+    List of Objects.
+  Description:
+    List of updates contained in this transaction.
 
 ::
 
@@ -1547,8 +1576,98 @@ All PDUs have:
  - A list of other PDU IDs that have been seen recently on that context (regardless of which origin
    sent them)
 
-[[TODO(paul): Update this structure so that 'pdu_id' is a two-element
-[origin,ref] pair like the prev_pdus are]]
+``context``
+  Type:
+    String
+  Description:
+    Event context identifier
+    
+``origin``
+  Type:
+    String
+  Description:
+    DNS name of homeserver that created this PDU.
+    
+``pdu_id``
+  Type:
+    String
+  Description:
+    Unique identifier for PDU within the context for the originating homeserver
+
+``ts``
+  Type:
+    Integer
+  Description:
+    Timestamp in milliseconds on originating homeserver when this PDU was created.
+
+``pdu_type``
+  Type:
+    String
+  Description:
+    PDU event type.
+
+``prev_pdus``
+  Type:
+    List of pairs of strings
+  Description:
+    The originating homeserver and PDU ids of the most recent PDUs the 
+    homeserver was aware of for this context when it made this PDU.
+
+``depth``
+  Type:
+    Integer
+  Description:
+    The maximum depth of the previous PDUs plus one.
+
+
+.. TODO paul
+  [[TODO(paul): Update this structure so that 'pdu_id' is a two-element
+  [origin,ref] pair like the prev_pdus are]]
+  
+
+For state updates:
+
+``is_state``
+  Type:
+    Boolean
+  Description:
+    True if this PDU is updating state.
+    
+``state_key``
+  Type:
+    String
+  Description:
+    Optional key identifying the updated state within the context.
+    
+``power_level``
+  Type:
+    Integer
+  Description:
+    The asserted power level of the user performing the update.
+    
+``min_update``
+  Type:
+    Integer
+  Description:
+    The required power level needed to replace this update.
+
+``prev_state_id``
+  Type:
+    String
+  Description:
+    PDU event type.
+    
+``prev_state_origin``
+  Type:
+    String
+  Description:
+    The PDU id of the update this replaces.
+    
+``user``
+  Type:
+    String
+  Description:
+    The user updating the state.
 
 ::
 
@@ -1589,12 +1708,13 @@ keys exist to support this:
   "prev_state_id":TODO
   "prev_state_origin":TODO}
 
-[[TODO(paul): At this point we should probably have a long description of how
-State management works, with descriptions of clobbering rules, power levels, etc
-etc... But some of that detail is rather up-in-the-air, on the whiteboard, and
-so on. This part needs refining. And writing in its own document as the details
-relate to the server/system as a whole, not specifically to server-server
-federation.]]
+.. TODO paul
+  [[TODO(paul): At this point we should probably have a long description of how
+  State management works, with descriptions of clobbering rules, power levels, etc
+  etc... But some of that detail is rather up-in-the-air, on the whiteboard, and
+  so on. This part needs refining. And writing in its own document as the details
+  relate to the server/system as a whole, not specifically to server-server
+  federation.]]
 
 EDUs, by comparison to PDUs, do not have an ID, a context, or a list of
 "previous" IDs. The only mandatory fields for these are the type, origin and
@@ -1606,6 +1726,79 @@ destination home server names, and the actual nested content.
   "origin":"blue",
   "destination":"orange",
   "content":...}
+  
+  
+Protocol URLs
+=============
+.. WARNING::
+  This section may be misleading or inaccurate.
+
+All these URLs are namespaced within a prefix of::
+
+  /_matrix/federation/v1/...
+
+For active pushing of messages representing live activity "as it happens"::
+
+  PUT .../send/:transaction_id/
+    Body: JSON encoding of a single Transaction
+    Response: TODO
+
+The transaction_id path argument will override any ID given in the JSON body.
+The destination name will be set to that of the receiving server itself. Each
+embedded PDU in the transaction body will be processed.
+
+
+To fetch a particular PDU::
+
+  GET .../pdu/:origin/:pdu_id/
+    Response: JSON encoding of a single Transaction containing one PDU
+
+Retrieves a given PDU from the server. The response will contain a single new
+Transaction, inside which will be the requested PDU.
+  
+
+To fetch all the state of a given context::
+
+  GET .../state/:context/
+    Response: JSON encoding of a single Transaction containing multiple PDUs
+
+Retrieves a snapshot of the entire current state of the given context. The
+response will contain a single Transaction, inside which will be a list of
+PDUs that encode the state.
+
+To backfill events on a given context::
+
+  GET .../backfill/:context/
+    Query args: v, limit
+    Response: JSON encoding of a single Transaction containing multiple PDUs
+
+Retrieves a sliding-window history of previous PDUs that occurred on the
+given context. Starting from the PDU ID(s) given in the "v" argument, the
+PDUs that preceeded it are retrieved, up to a total number given by the
+"limit" argument. These are then returned in a new Transaction containing all
+off the PDUs.
+
+
+To stream events all the events::
+
+  GET .../pull/
+    Query args: origin, v
+    Response: JSON encoding of a single Transaction consisting of multiple PDUs
+
+Retrieves all of the transactions later than any version given by the "v"
+arguments.
+
+
+To make a query::
+
+  GET .../query/:query_type
+    Query args: as specified by the individual query types
+    Response: JSON encoding of a response object
+
+Performs a single query request on the receiving home server. The Query Type
+part of the path specifies the kind of query being made, and its query
+arguments have a meaning specific to that kind of query. The response is a
+JSON-encoded object whose meaning also depends on the kind of query.
 
 Backfilling
 -----------
@@ -1805,12 +1998,76 @@ Glossary
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
-  - domain specific words/acronyms with definitions
+Backfilling:
+  The process of synchronising historic state from one home server to another,
+  to backfill the event storage so that scrollback can be presented to the
+  client(s). Not to be confused with pagination.
+
+Context:
+  A single human-level entity of interest (currently, a chat room)
+
+EDU (Ephemeral Data Unit):
+  A message that relates directly to a given pair of home servers that are
+  exchanging it. EDUs are short-lived messages that related only to one single
+  pair of servers; they are not persisted for a long time and are not forwarded
+  on to other servers. Because of this, they have no internal ID nor previous
+  EDUs reference chain.
+
+Event:
+  A record of activity that records a single thing that happened on to a context
+  (currently, a chat room). These are the "chat messages" that Synapse makes
+  available.
+
+PDU (Persistent Data Unit):
+  A message that relates to a single context, irrespective of the server that
+  is communicating it. PDUs either encode a single Event, or a single State
+  change. A PDU is referred to by its PDU ID; the pair of its origin server
+  and local reference from that server.
+
+PDU ID:
+  The pair of PDU Origin and PDU Reference, that together globally uniquely
+  refers to a specific PDU.
+
+PDU Origin:
+  The name of the origin server that generated a given PDU. This may not be the
+  server from which it has been received, due to the way they are copied around
+  from server to server. The origin always records the original server that
+  created it.
+
+PDU Reference:
+  A local ID used to refer to a specific PDU from a given origin server. These
+  references are opaque at the protocol level, but may optionally have some
+  structured meaning within a given origin server or implementation.
+
+Presence:
+  The concept of whether a user is currently online, how available they declare
+  they are, and so on. See also: doc/model/presence
+
+Profile:
+  A set of metadata about a user, such as a display name, provided for the
+  benefit of other users. See also: doc/model/profiles
+
+Room ID:
+  An opaque string (of as-yet undecided format) that identifies a particular
+  room and used in PDUs referring to it.
+
+Room Alias:
+  A human-readable string of the form #name:some.domain that users can use as a
+  pointer to identify a room; a Directory Server will map this to its Room ID
+
+State:
+  A set of metadata maintained about a Context, which is replicated among the
+  servers in addition to the history of Events.
 
 User ID:
-  An opaque ID which identifies an end-user, which consists of some opaque 
-  localpart combined with the domain name of their home server. 
+  A string of the form @localpart:domain.name that identifies a user for
+  wire-protocol purposes. The localpart is meaningless outside of a particular
+  home server. This takes a human-readable form that end-users can use directly
+  if they so wish, avoiding the 3PIDs.
+
+Transaction:
+  A message which relates to the communication between a given pair of servers.
+  A transaction contains possibly-empty lists of PDUs and EDUs.
 
 
 .. Links through the external API docs are below

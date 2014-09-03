@@ -107,18 +107,18 @@ angular.module('matrixWebClient')
                     if (2 === Object.keys(room.members).length) {
                         for (var i in room.members) {
                             var member = room.members[i];
-                            if (member.user_id !== matrixService.config().user_id) {
+                            if (member.state_key !== matrixService.config().user_id) {
 
-                                if (member.user_id in $rootScope.presence) {
+                                if (member.state_key in $rootScope.presence) {
                                     // If the user is available in presence, use the displayname there
                                     // as it is the most uptodate
-                                    roomName = $rootScope.presence[member.user_id].content.displayname;
+                                    roomName = $rootScope.presence[member.state_key].content.displayname;
                                 }
                                 else if (member.content.displayname) {
                                     roomName = member.content.displayname;
                                 }
                                 else {
-                                    roomName = member.user_id;
+                                    roomName = member.state_key;
                                 }
                             }
                         }
@@ -145,7 +145,7 @@ angular.module('matrixWebClient')
                                 roomName = $rootScope.presence[userID].content.displayname;
                             }
                             else {
-                                roomName = member.user_id;
+                                roomName = userID;
                             }
                         }
                     }

@@ -2,6 +2,20 @@
 Matrix Client-Server API
 ========================
 
+
+.. WARNING::
+  This specification is old. Please see /docs/specification.rst instead.
+
+
+
+
+
+
+
+
+
+
+
 The following specification outlines how a client can send and receive data from 
 a home server.
 
