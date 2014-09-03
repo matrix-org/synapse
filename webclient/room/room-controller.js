@@ -269,6 +269,22 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                         promise = matrixService.setDisplayName(args[1]);
                     }
                     break;
+                    
+                case "/ban":
+                    // Ban the user id from the room
+                    if (2 <= args.length) {
+
+                        // TODO: The user may have entered the display name
+                        // Need display name -> user_id resolution. Pb: how to manage user with same display names?
+                        var user_id = args[1];
+
+                        // Does the user provide a reason?
+                        if (3 <= args.length) {
+                            var reason = args.slice(2).join(' ');
+                        }
+                        promise = matrixService.ban($scope.room_id, user_id, reason);
+                    }
+                    break;
             }
         }
         else {

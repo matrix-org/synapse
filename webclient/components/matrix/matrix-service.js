@@ -165,6 +165,17 @@ angular.module('matrixService', [])
             // TODO: Use PUT with transaction IDs
             return doRequest("POST", path, undefined, data);
         },
+           
+        // Bans a user from from a room
+        ban: function(room_id, user_id, reason) {
+            var path = "/rooms/$room_id/ban/";
+            path = path.replace("$room_id", encodeURIComponent(room_id));
+            
+            return doRequest("PUT", path, undefined, {
+                user_id: user_id,
+                reason: reason
+            });
+        },
 
         // Retrieves the room ID corresponding to a room alias
         resolveRoomAlias:function(room_alias) {
@@ -408,7 +419,8 @@ angular.module('matrixService', [])
                 state: presence
             });
         },
-
+        
+        
         /****** Permanent storage of user information ******/
         
         // Returns the current config
