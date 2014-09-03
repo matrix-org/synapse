@@ -1510,6 +1510,31 @@ Each transaction has:
  - An origin and destination server name.
  - A list of "previous IDs".
  - A list of PDUs and EDUs - the actual message payload that the Transaction carries.
+ 
+``origin``
+  Type: 
+    String
+  Description:
+    DNS name of homeserver making this transaction.
+    
+``ts``
+  Type: 
+    Integer
+  Description:
+    Timestamp in milliseconds on originating homeserver when this transaction 
+    started.
+    
+``previous_ids``
+  Type:
+    List of strings
+  Description:
+    List of transactions that were sent immediately prior to this transaction.
+    
+``pdus``
+  Type:
+    List of Objects.
+  Description:
+    List of updates contained in this transaction.
 
 ::
 
@@ -1551,8 +1576,98 @@ All PDUs have:
  - A list of other PDU IDs that have been seen recently on that context (regardless of which origin
    sent them)
 
-[[TODO(paul): Update this structure so that 'pdu_id' is a two-element
-[origin,ref] pair like the prev_pdus are]]
+``context``
+  Type:
+    String
+  Description:
+    Event context identifier
+    
+``origin``
+  Type:
+    String
+  Description:
+    DNS name of homeserver that created this PDU.
+    
+``pdu_id``
+  Type:
+    String
+  Description:
+    Unique identifier for PDU within the context for the originating homeserver
+
+``ts``
+  Type:
+    Integer
+  Description:
+    Timestamp in milliseconds on originating homeserver when this PDU was created.
+
+``pdu_type``
+  Type:
+    String
+  Description:
+    PDU event type.
+
+``prev_pdus``
+  Type:
+    List of pairs of strings
+  Description:
+    The originating homeserver and PDU ids of the most recent PDUs the 
+    homeserver was aware of for this context when it made this PDU.
+
+``depth``
+  Type:
+    Integer
+  Description:
+    The maximum depth of the previous PDUs plus one.
+
+
+.. TODO paul
+  [[TODO(paul): Update this structure so that 'pdu_id' is a two-element
+  [origin,ref] pair like the prev_pdus are]]
+  
+
+For state updates:
+
+``is_state``
+  Type:
+    Boolean
+  Description:
+    True if this PDU is updating state.
+    
+``state_key``
+  Type:
+    String
+  Description:
+    Optional key identifying the updated state within the context.
+    
+``power_level``
+  Type:
+    Integer
+  Description:
+    The asserted power level of the user performing the update.
+    
+``min_update``
+  Type:
+    Integer
+  Description:
+    The required power level needed to replace this update.
+
+``prev_state_id``
+  Type:
+    String
+  Description:
+    PDU event type.
+    
+``prev_state_origin``
+  Type:
+    String
+  Description:
+    The PDU id of the update this replaces.
+    
+``user``
+  Type:
+    String
+  Description:
+    The user updating the state.
 
 ::
 
@@ -1593,12 +1708,13 @@ keys exist to support this:
   "prev_state_id":TODO
   "prev_state_origin":TODO}
 
-[[TODO(paul): At this point we should probably have a long description of how
-State management works, with descriptions of clobbering rules, power levels, etc
-etc... But some of that detail is rather up-in-the-air, on the whiteboard, and
-so on. This part needs refining. And writing in its own document as the details
-relate to the server/system as a whole, not specifically to server-server
-federation.]]
+.. TODO paul
+  [[TODO(paul): At this point we should probably have a long description of how
+  State management works, with descriptions of clobbering rules, power levels, etc
+  etc... But some of that detail is rather up-in-the-air, on the whiteboard, and
+  so on. This part needs refining. And writing in its own document as the details
+  relate to the server/system as a whole, not specifically to server-server
+  federation.]]
 
 EDUs, by comparison to PDUs, do not have an ID, a context, or a list of
 "previous" IDs. The only mandatory fields for these are the type, origin and
