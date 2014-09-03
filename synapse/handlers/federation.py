@@ -237,7 +237,7 @@ class FederationHandler(BaseHandler):
         try:
             yield d
         except defer.CancelledError:
-            raise SynapseError("500", "Unable to join remote room")
+            raise SynapseError(500, "Unable to join remote room")
 
         try:
             yield self.store.store_room(
