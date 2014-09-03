@@ -640,6 +640,16 @@
     "Feedback": {
       "id": "Feedback",
       "properties": {
+        "target_event_id": {
+          "type": "string",
+          "description": "The event ID being acknowledged.",
+          "required": true
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of feedback. Either 'delivered' or 'read'.",
+          "required": true
+        }
       }
     },
     "Member": {

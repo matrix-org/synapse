@@ -103,8 +103,7 @@ class FeedbackEvent(SynapseEvent):
     def get_content_template(self):
         return {
             "type": u"string",
-            "target_event_id": u"string",
-            "msg_sender_id": u"string"
+            "target_event_id": u"string"
         }
 
 
