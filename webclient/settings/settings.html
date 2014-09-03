@@ -23,8 +23,8 @@
         </div>
         <br/>
 
-        <h3>Linked emails</h3>
-        <div class="section">
+        <h3 style="display: none; ">Linked emails</h3>
+        <div class="section" style="display: none; ">
             <form>
                 <input size="40" ng-model="linkedEmails.linkNewEmail" ng-enter="linkEmail(linkedEmails.linkNewEmail)" />
                 <button ng-disabled="!linkedEmails.linkNewEmail" ng-click="linkEmail(linkedEmails.linkNewEmail)">
