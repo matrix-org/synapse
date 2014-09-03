@@ -4,6 +4,7 @@ SYNAPSE="synapse/app/homeserver.py"
 
 CONFIGFILE="homeserver.yaml"
 PIDFILE="homeserver.pid"
+LOGFILE="homeserver.log"
 
 GREEN=$'\e[1;32m'
 NORMAL=$'\e[m'
@@ -21,13 +22,12 @@ case "$1" in
     fi
 
     echo -n "Starting ..."
-    $SYNAPSE --daemonize -c "$CONFIGFILE" --pid-file "$PIDFILE" --log-file synapse.log
+    $SYNAPSE --daemonize -c "$CONFIGFILE" --pid-file "$PIDFILE" --log-file "$LOGFILE"
     echo "${GREEN}started${NORMAL}"
     ;;
   stop)
     echo -n "Stopping ..."
-    test -f $PIDFILE && kill `cat $PIDFILE`
-    echo "${GREEN}stopped${NORMAL}"
+    test -f $PIDFILE && kill `cat $PIDFILE` && echo "${GREEN}stopped${NORMAL}"
     ;;
   restart)
     $0 stop && $0 start
