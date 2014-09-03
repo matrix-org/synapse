@@ -108,8 +108,11 @@ angular.module('eventHandlerService', [])
     var handlePowerLevels = function(event, isLiveEvent) {
         initRoom(event.room_id);
 
-        $rootScope.events.rooms[event.room_id][event.type] = event;
-        $rootScope.$broadcast(POWERLEVEL_EVENT, event, isLiveEvent);
+        // Keep the latest data. Do not care of events that come when paginating back
+        if (!$rootScope.events.rooms[event.room_id][event.type] || isLiveEvent) {
+            $rootScope.events.rooms[event.room_id][event.type] = event;
+            $rootScope.$broadcast(POWERLEVEL_EVENT, event, isLiveEvent);   
+        }
     };
 
     var handleCallEvent = function(event, isLiveEvent) {
