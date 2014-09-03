@@ -88,6 +88,8 @@ class SynapseCmd(cmd.Cmd):
         return False
 
     def _domain(self):
+        if "user" not in self.config or not self.config["user"]:
+            return None
         return self.config["user"].split(":")[1]
 
     def do_config(self, line):
@@ -191,8 +193,10 @@ class SynapseCmd(cmd.Cmd):
                 p = getpass.getpass("Enter your password: ")
                 user = args["user_id"]
                 if self._is_on("complete_usernames") and not user.startswith("@"):
-                    user = "@" + user + ":" + self._domain()
-
+                    domain = self._domain()
+                    if domain:
+                        user = "@" + user + ":" + domain
+                
                 reactor.callFromThread(self._do_login, user, p)
                 #print " got %s " % p
         except Exception as e:
@@ -700,7 +704,7 @@ def main(server_url, identity_server_url, username, token, config_path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Starts a synapse client.")
     parser.add_argument(
-        "-s", "--server", dest="server", default="http://localhost:8080",
+        "-s", "--server", dest="server", default="http://localhost:8008",
         help="The URL of the home server to talk to.")
     parser.add_argument(
         "-i", "--identity-server", dest="identityserver", default="http://localhost:8090",
