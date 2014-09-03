@@ -74,7 +74,7 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
                     response.data.room_id, response.data.room_alias);
             },
             function(error) {
-                $scope.feedback = "Failure: " + error.data;
+                $scope.feedback = "Failure: " + JSON.stringify(error.data);
             });
     };
     
@@ -94,7 +94,7 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
                 $location.url("room/" + room_id);
             },
             function(error) {
-                $scope.feedback = "Can't join room: " + error.data;
+                $scope.feedback = "Can't join room: " + JSON.stringify(error.data);
             }
         );
     };
@@ -106,7 +106,7 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
                 $location.url("room/" + room_alias);
             },
             function(error) {
-                $scope.feedback = "Can't join room: " + error.data;
+                $scope.feedback = "Can't join room: " + JSON.stringify(error.data);
             }
         );
     };
