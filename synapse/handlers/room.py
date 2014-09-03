@@ -137,6 +137,17 @@ class RoomCreationHandler(BaseRoomHandler):
             )
 
             yield handle_event(name_event)
+        elif room_alias:
+            name = room_alias.to_string()
+            name_event = self.event_factory.create_event(
+                etype=RoomNameEvent.TYPE,
+                room_id=room_id,
+                user_id=user_id,
+                required_power_level=5,
+                content={"name": name},
+            )
+
+            yield handle_event(name_event)
 
         if "topic" in config:
             topic = config["topic"]
