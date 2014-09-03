@@ -1,3 +1,25 @@
+Changes in synapse 0.2.0 (2014-09-02)
+=====================================
+This update changes many configuration options, updates the
+database schema and mandates SSL for server-server connections.
+
+Homeserver:
+ * Require SSL for server-server connections.
+ * Add SSL listener for client-server connections.
+ * Add ability to use config files.
+ * Add support for kicking/banning and power levels.
+ * Allow setting of room names and topics on creation.
+ * Change presence to include last seen time of the user.
+ * Change url path prefix to /_matrix/...
+ * Bug fixes to presence.
+
+Webclient:
+ * Reskin the CSS for registration and login.
+ * Various improvements to rooms CSS.
+ * Support changes in client-server API.
+ * Bug fixes to VOIP UI.
+ * Various bug fixes to handling of changes to room member list.
+
 Changes in synapse 0.1.2 (2014-08-29)
 =====================================
 

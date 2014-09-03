@@ -1,3 +1,34 @@
+Upgrading to v0.2.0
+===================
+
+To upgrade the database schema, run::
+
+    ./database-prepare-for-0.2.0.sh "<database>.db"
+
+
+The home server now requires setting up of SSL config before it can run. To
+automatically generate default config use::
+
+    $ python synapse/app/homeserver.py \
+        --server-name machine.my.domain.name \
+        --bind-port 8448 \
+        --config-path homeserver.config \
+        --generate-config
+
+This config can be edited if desired, for example to specify a different SSL 
+certificate to use. Once done you can run the home server using::
+
+    $ python synapse/app/homeserver.py --config-path homeserver.config
+
+See the README.rst for more information.
+
+Also note that some config options have been renamed, including:
+
+- "host" to "server-name"
+- "database" to "database-path"
+- "port" to "bind-port" and "unsecure-port"
+
+
 Upgrading to v0.0.1
 ===================
 
