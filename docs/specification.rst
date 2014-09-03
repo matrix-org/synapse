@@ -428,9 +428,10 @@ event also has a ``creator`` key which contains the user ID of the room
 creator. It will also generate several other events in order to manage
 permissions in this room. This includes:
 
- - ``m.room.power_levels`` : Sets the authority of the room creator.
+ - ``m.room.power_levels`` : Sets the power levels of users.
  - ``m.room.join_rules`` : Whether the room is "invite-only" or not.
- - ``m.room.add_state_level``
+ - ``m.room.add_state_level``: The power level required in order to
+   add new state to the room (as opposed to updating exisiting state)
  - ``m.room.send_event_level`` : The power level required in order to
    send a message in this room.
  - ``m.room.ops_level`` : The power level required in order to kick or
@@ -462,6 +463,27 @@ Permissions
     - TODO: Room config - what is the event and what are the keys/values and explanations for them.
       Link through to respective sections where necessary. How does this tie in with permissions, e.g.
       give example of creating a read-only room.
+
+Permissions for rooms are done via the concept of power levels - to do any
+action in a room a user must have a suitable power level. 
+
+Power levels for users are defined in ``m.room.power_levels``, where both
+a default and specific users' power levels can be set. By default all users
+have a power level of 0.
+
+State events may contain a ``required_power_level`` key, which indicates the
+minimum power a user must have before they can update that state key. The only
+exception to this is when a user leaves a room.
+
+To perform certain actions there are additional power level requirements
+defined in the following state events:
+
+- ``m.room.send_event_level`` defines the minimum level for sending non-state 
+  events. Defaults to 5.
+- ``m.room.add_state_level`` defines the minimum level for adding new state,
+  rather than updating existing state. Defaults to 5.
+- ``m.room.ops_level`` defines the minimum levels to ban and kick other users.
+  This defaults to a kick and ban levels of 5 each.
 
 
 Joining rooms
@@ -797,89 +819,88 @@ prefixed with ``m.``
     to force this state change directly will fail. See the `Rooms`_ section for how to 
     use the membership APIs.
 
-``m.room.config``
+``m.room.create``
   Summary:
-    The room config.
+    The first event in the room.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "creator": "string"}``
   Example:
-    TODO
+    ``{ "creator": "@user:example.com" }``
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
+    This is the first event in a room and cannot be changed. It acts as the 
+    root of all other events.
 
-``m.room.invite_join``
-  Summary:
-    TODO.
-  Type: 
-    State event
-  JSON format:
-    TODO
-  Example:
-    TODO
-  Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
-    
 ``m.room.join_rules``
   Summary:
-    TODO.
+    Descripes how/if people are allowed to join.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "join_rule": "enum [ public|knock|invite|private ]" }``
   Example:
-    TODO
+    ``{ "join_rule": "public" }``
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
-    
+    TODO : Use docs/models/rooms.rst
+   
 ``m.room.power_levels``
   Summary:
-    TODO.
+    Defines the power levels of users in the room.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "<user_id>": <int>, ..., "default": <int>}``
   Example:
-    TODO
+    ``{ "@user:example.com": 5, "@user2:example.com": 10, "default": 0 }`` 
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
-    
+    If a user is in the list, then they have the associated power level. 
+    Otherwise they have the default level. If not ``default`` key is supplied,
+    it is assumed to be 0.
+
 ``m.room.add_state_level``
   Summary:
-    TODO.
+    Defines the minimum power level a user needs to add state.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "level": <int> }``
   Example:
-    TODO
+    ``{ "level": 5 }``
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
+    To add a new piece of state to the room a user must have the given power 
+    level. This does not apply to updating current state, which is goverened
+    by the ``required_power_level`` event key.
     
 ``m.room.send_event_level``
   Summary:
-    TODO.
+    Defines the minimum power level a user needs to send an event.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "level": <int> }``
   Example:
-    TODO
+    ``{ "level": 0 }``
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
-    
+    To send a new event into the room a user must have at least this power 
+    level. This allows ops to make the room read only by increasing this level,
+    or muting individual users by lowering their power level below this
+    threshold.
+
 ``m.room.ops_levels``
   Summary:
-    TODO.
+    Defines the minimum power levels that a user must have before they can 
+    kick and/or ban other users.
   Type: 
     State event
   JSON format:
-    TODO
+    ``{ "ban_level": <int>, "kick_level": <int> }``
   Example:
-    TODO
+    ``{ "ban_level": 5, "kick_level": 5 }``
   Description:
-    TODO : What it represents, What are the valid keys / values and what they represent, When is this event emitted and by what
+    This defines who can ban and/or kick people in the room. Most of the time
+    ``ban_level`` will be greater than or equal to ``kick_level`` since 
+    banning is more severe than kicking.
 
 ``m.room.message``
   Summary:
