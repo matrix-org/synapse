@@ -4,18 +4,20 @@ Matrix Specification
 WARNING
 =======
 
-.. NOTE::
+.. WARNING::
   The Matrix specification is still very much evolving: the API is not yet frozen
   and this document is in places incomplete, stale, and may contain security
   issues. Needless to say, we have made every effort to highlight the problem
   areas that we're aware of.
-  
+
   We're publishing it at this point because it's complete enough to be more than
   useful and provide a canonical reference to how Matrix is evolving. Our end
-  goal is to mirror WHATWG's "Living Standard" approach (see
-  http://wiki.whatwg.org/wiki/FAQ#What_does_.22Living_Standard.22_mean.3F) -
-  except right now Matrix is more in the process of being born than actually being
+  goal is to mirror WHATWG's `Living Standard <http://wiki.whatwg.org/wiki/FAQ#What_does_.22Living_Standard.22_mean.3F>`_   
+  approach except right now Matrix is more in the process of being born than actually being
   living!
+
+.. contents:: Table of Contents
+.. sectnum::
 
 Introduction
 ============
@@ -30,19 +32,26 @@ The principles that Matrix attempts to follow are:
 
  - Pragmatic Web-friendly APIs (i.e. JSON over REST)
  - Keep It Simple & Stupid
-   - provide a simple architecture with minimal third-party dependencies.
+
+   + provide a simple architecture with minimal third-party dependencies.
+
  - Fully open:
-   - Fully open federation - anyone should be able to participate in the global Matrix network
-   - Fully open standard - publicly documented standard with no IP or patent licensing encumbrances
-   - Fully open source reference implementation - liberally-licensed example implementations
-     with no IP or patent licensing encumbrances
+
+   + Fully open federation - anyone should be able to participate in the global Matrix network
+   + Fully open standard - publicly documented standard with no IP or patent licensing encumbrances
+   + Fully open source reference implementation - liberally-licensed example implementations with no
+     IP or patent licensing encumbrances
+
  - Empowering the end-user
-   - The user should be able to choose the server and clients they use
-   - The user should be control how private their communication is
-   - The user should know precisely where their data is stored
+
+   + The user should be able to choose the server and clients they use
+   + The user should be control how private their communication is
+   + The user should know precisely where their data is stored
+
  - Fully decentralised - no single points of control over conversations or the network as a whole
  - Learning from history to avoid repeating it
-   - Trying to take the best aspects of XMPP, SIP, IRC, SMTP, IMAP and NNTP whilst trying to avoid their failings
+
+   + Trying to take the best aspects of XMPP, SIP, IRC, SMTP, IMAP and NNTP whilst trying to avoid their failings
 
 The functionality that Matrix provides includes:
 
@@ -60,8 +69,9 @@ The functionality that Matrix provides includes:
  - Use of 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
    Facebook accounts to authenticate, identify and discover users on Matrix.
  - Trusted federation of Identity servers for:
-   - Publishing user public keys for PKI
-   - Mapping of 3PIDs to Matrix IDs
+
+   + Publishing user public keys for PKI
+   + Mapping of 3PIDs to Matrix IDs
 
 The end goal of Matrix is to be a ubiquitous messaging layer for synchronising
 arbitrary data between sets of people, devices and services - be that for instant
