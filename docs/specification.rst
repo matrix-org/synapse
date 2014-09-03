@@ -30,48 +30,52 @@ ecosystem to communicate with one another.
 
 The principles that Matrix attempts to follow are:
 
- - Pragmatic Web-friendly APIs (i.e. JSON over REST)
- - Keep It Simple & Stupid
+- Pragmatic Web-friendly APIs (i.e. JSON over REST)
+- Keep It Simple & Stupid
 
-   + provide a simple architecture with minimal third-party dependencies.
+  + provide a simple architecture with minimal third-party dependencies.
 
- - Fully open:
+- Fully open:
 
-   + Fully open federation - anyone should be able to participate in the global Matrix network
-   + Fully open standard - publicly documented standard with no IP or patent licensing encumbrances
-   + Fully open source reference implementation - liberally-licensed example implementations with no
-     IP or patent licensing encumbrances
+  + Fully open federation - anyone should be able to participate in the global
+    Matrix network
+  + Fully open standard - publicly documented standard with no IP or patent
+    licensing encumbrances
+  + Fully open source reference implementation - liberally-licensed example
+    implementations with no IP or patent licensing encumbrances
 
- - Empowering the end-user
+- Empowering the end-user
 
-   + The user should be able to choose the server and clients they use
-   + The user should be control how private their communication is
-   + The user should know precisely where their data is stored
+  + The user should be able to choose the server and clients they use
+  + The user should be control how private their communication is
+  + The user should know precisely where their data is stored
 
- - Fully decentralised - no single points of control over conversations or the network as a whole
- - Learning from history to avoid repeating it
+- Fully decentralised - no single points of control over conversations or the
+  network as a whole
+- Learning from history to avoid repeating it
 
-   + Trying to take the best aspects of XMPP, SIP, IRC, SMTP, IMAP and NNTP whilst trying to avoid their failings
+  + Trying to take the best aspects of XMPP, SIP, IRC, SMTP, IMAP and NNTP
+    whilst trying to avoid their failings
 
 The functionality that Matrix provides includes:
 
- - Creation and management of fully distributed chat rooms with no
-   single points of control or failure
- - Eventually-consistent cryptographically secure synchronisation of room 
-   state across a global open network of federated servers and services
- - Sending and receiving extensible messages in a room with (optional)
-   end-to-end encryption
- - Extensible user management (inviting, joining, leaving, kicking, banning)
-   mediated by a power-level based user privilege system.
- - Extensible room state management (room naming, aliasing, topics, bans)
- - Extensible user profile management (avatars, displaynames, etc)
- - Managing user accounts (registration, login, logout)
- - Use of 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
-   Facebook accounts to authenticate, identify and discover users on Matrix.
- - Trusted federation of Identity servers for:
+- Creation and management of fully distributed chat rooms with no
+  single points of control or failure
+- Eventually-consistent cryptographically secure synchronisation of room
+  state across a global open network of federated servers and services
+- Sending and receiving extensible messages in a room with (optional)
+  end-to-end encryption
+- Extensible user management (inviting, joining, leaving, kicking, banning)
+  mediated by a power-level based user privilege system.
+- Extensible room state management (room naming, aliasing, topics, bans)
+- Extensible user profile management (avatars, displaynames, etc)
+- Managing user accounts (registration, login, logout)
+- Use of 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
+  Facebook accounts to authenticate, identify and discover users on Matrix.
+- Trusted federation of Identity servers for:
 
-   + Publishing user public keys for PKI
-   + Mapping of 3PIDs to Matrix IDs
+  + Publishing user public keys for PKI
+  + Mapping of 3PIDs to Matrix IDs
 
 The end goal of Matrix is to be a ubiquitous messaging layer for synchronising
 arbitrary data between sets of people, devices and services - be that for instant
