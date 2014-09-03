@@ -97,7 +97,12 @@ angular.module('matrixWebClient')
             // Else, build the name from its users
             var room = $rootScope.events.rooms[room_id];
             if (room) {
-                if (room.members) {
+                var room_name_event = room["m.room.name"];
+
+                if (room_name_event) {
+                    roomName = room_name_event.content.name;
+                }
+                else if (room.members) {
                     // Limit the room renaming to 1:1 room
                     if (2 === Object.keys(room.members).length) {
                         for (var i in room.members) {

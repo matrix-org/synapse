@@ -34,6 +34,7 @@ angular.module('eventHandlerService', [])
     var PRESENCE_EVENT = "PRESENCE_EVENT";
     var POWERLEVEL_EVENT = "POWERLEVEL_EVENT";
     var CALL_EVENT = "CALL_EVENT";
+    var NAME_EVENT = "NAME_EVENT";
 
     var InitialSyncDeferred = $q.defer();
     
@@ -115,6 +116,15 @@ angular.module('eventHandlerService', [])
         }
     };
 
+    var handleRoomName = function(event, isLiveEvent) {
+        console.log("handleRoomName " + isLiveEvent);
+
+        initRoom(event.room_id);
+
+        $rootScope.events.rooms[event.room_id][event.type] = event;
+        $rootScope.$broadcast(NAME_EVENT, event, isLiveEvent);
+    };
+
     var handleCallEvent = function(event, isLiveEvent) {
         $rootScope.$broadcast(CALL_EVENT, event, isLiveEvent);
     };
@@ -126,6 +136,7 @@ angular.module('eventHandlerService', [])
         PRESENCE_EVENT: PRESENCE_EVENT,
         POWERLEVEL_EVENT: POWERLEVEL_EVENT,
         CALL_EVENT: CALL_EVENT,
+        NAME_EVENT: NAME_EVENT,
         
     
         handleEvent: function(event, isLiveEvent) {
@@ -149,7 +160,9 @@ angular.module('eventHandlerService', [])
                 case 'm.room.power_levels':
                     handlePowerLevels(event, isLiveEvent);
                     break;
-
+                case 'm.room.name':
+                    handleRoomName(event, isLiveEvent);
+                    break;
                 default:
                     console.log("Unable to handle event type " + event.type);
                     console.log(JSON.stringify(event, undefined, 4));
