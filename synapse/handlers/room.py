@@ -111,8 +111,6 @@ class RoomCreationHandler(BaseRoomHandler):
                 servers=[self.hs.hostname],
             )
 
-        federation_handler = self.hs.get_handlers().federation_handler
-
         @defer.inlineCallbacks
         def handle_event(event):
             snapshot = yield self.store.snapshot_room(

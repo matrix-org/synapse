@@ -19,7 +19,6 @@ from functools import wraps
 
 import logging
 import inspect
-import traceback
 
 
 def log_function(f):
