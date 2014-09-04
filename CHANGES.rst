@@ -1,3 +1,19 @@
+Changes in synapse 0.2.1 (2014-09-03)
+=====================================
+Webclient:
+ * Implement 3PID login via email address
+ * Support for user management via IRC-style /kick, /ban/, /op
+   style slash commands
+ * Display user power levels in room member list as a red bar
+
+Homeserver:
+ * Add synctl init.d style control script
+ * Implement identity server integration for 3PID signup
+ * Implement rate limiting
+ * Implement content upload size limiting
+ * Bug fixes to power_levels
+
+
 Changes in synapse 0.2.0 (2014-09-02)
 =====================================
 This update changes many configuration options, updates the
