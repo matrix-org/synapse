@@ -17,6 +17,23 @@ The overall architecture is::
       client <----> homeserver <=====================> homeserver <----> client
              https://somewhere.org/_matrix      https://elsewhere.net/_matrix
 
+WARNING
+=======
+
+**Synapse is currently in a state of rapid development, and not all features are yet functional.
+Critically, some security features are still in development, which means Synapse can *not*
+be considered secure or reliable at this point.**  For instance:
+
+- **SSL Certificates used by server-server federation are not yet validated.**
+- **Room permissions are not yet enforced on traffic received via federation.**
+- **Homeservers do not yet cryptographically sign their events to avoid tampering**
+- Default configuration provides open signup to the service from the internet
+
+Despite this, we believe Synapse is more than useful as a way for experimenting and
+exploring Synapse, and the missing features will land shortly.  **Until then, please do *NOT*
+use Synapse for any remotely important or secure communication.**
+
+
 Quick Start
 ===========
 
