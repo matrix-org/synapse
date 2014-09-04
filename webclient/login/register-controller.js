@@ -82,7 +82,7 @@ angular.module('RegisterController', ['matrixService'])
                 }
             );
         } else {
-            registerWithMxidAndPassword($scope.account.desired_user_id, $scope.account.pwd1);
+            $scope.registerWithMxidAndPassword($scope.account.desired_user_id, $scope.account.pwd1);
         }
     };
 
