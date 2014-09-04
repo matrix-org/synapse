@@ -16,7 +16,7 @@
 
 'use strict';
 
-angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
+angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHandlerService'])
 .controller('RecentsController', ['$scope', 'matrixService', 'eventHandlerService', 
                                function($scope,  matrixService, eventHandlerService) {
     $scope.rooms = {};
