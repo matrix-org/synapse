@@ -434,7 +434,7 @@ angular.module('matrixService', [])
             var path = "/presence/$user_id/status";
             path = path.replace("$user_id", config.user_id);
             return doRequest("PUT", path, undefined, {
-                state: presence
+                presence: presence
             });
         },
         
