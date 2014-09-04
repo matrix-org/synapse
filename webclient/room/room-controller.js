@@ -287,94 +287,130 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         $scope.state.sending = true;
         
         var promise;
+        var isCmd = false;
         
         // Check for IRC style commands first
-        if ($scope.textInput.indexOf("/") === 0) {
-            var args = $scope.textInput.split(' ');
-            var cmd = args[0];
+        var line = $scope.textInput;
+        
+        // trim any trailing whitespace, as it can confuse the parser for IRC-style commands
+        line = line.replace(/\s+$/, "");
+        
+        if (line[0] === "/" && line[1] !== "/") {
+            isCmd = true;
+            
+            var bits = line.match(/^(\S+?)( +(.*))?$/);
+            var cmd = bits[1];
+            var args = bits[3];
+            
+            console.log("cmd: " + cmd + ", args: " + args);
             
             switch (cmd) {
                 case "/me":
-                    var emoteMsg = args.slice(1).join(' ');
-                    promise = matrixService.sendEmoteMessage($scope.room_id, emoteMsg);
+                    promise = matrixService.sendEmoteMessage($scope.room_id, args);
                     break;
                     
                 case "/nick":
                     // Change user display name
-                    if (2 === args.length) {
-                        promise = matrixService.setDisplayName(args[1]);
-                    }
+                    promise = matrixService.setDisplayName(args);
                     break;
                     
                 case "/kick":
-                    // Kick a user from the room
-                    if (2 === args.length) {
-                        var user_id = args[1];
-
-                        // Set his state in the room as leave
-                        promise = matrixService.setMembership($scope.room_id, user_id, "leave");
+                    var matches = args.match(/^(\S+?)( +(.*))?$/);
+                    if (matches.length === 2) {
+                        promise = matrixService.setMembership($scope.room_id, matches[1], "leave");                        
+                    }
+                    else if (matches.length === 4) {
+                        promise = matrixService.setMembershipObject($scope.room_id, matches[1], {
+                            membership: "leave",
+                            reason: matches[3] // TODO: we need to specify resaon in the spec
+                        });
+                    }
+                    else {
+                        $scope.feedback = "Usage: /kick <userId> [<reason>]";
                     }
                     break;
-                    
+
                 case "/ban":
-                    // Ban a user from the room
-                    if (2 <= args.length) {
-                        // TODO: The user may have entered the display name
-                        // Need display name -> user_id resolution. Pb: how to manage user with same display names?
-                        var user_id = args[1];
-
-                        // Does the user provide a reason?
-                        if (3 <= args.length) {
-                            var reason = args.slice(2).join(' ');
-                        }
-                        promise = matrixService.ban($scope.room_id, user_id, reason);
+                    // Ban a user from the room with optional reason
+                    var matches = args.match(/^(\S+?)( +(.*))?$/);
+                    if (matches) {
+                        promise = matrixService.ban($scope.room_id, matches[1], matches[3]);
+                    }
+                    else {
+                        $scope.feedback = "Usage: /ban <userId> [<reason>]";
                     }
                     break;
-                    
+
                 case "/unban":
                     // Unban a user from the room
-                    if (2 === args.length) {
-                        var user_id = args[1];
-
-                        // Reset the user membership to leave to unban him
-                        promise = matrixService.setMembership($scope.room_id, user_id, "leave");
+                    // FIXME: this feels horribly asymmetrical - why are we banning via RPC
+                    // and unbanning by editing the membership list?
+                    // Why can't we specify a reason?
+                    var matches = args.match(/^(\S+)$/);
+                    if (matches) {
+                        // Reset the user membership to "leave" to unban him
+                        promise = matrixService.setMembership($scope.room_id, args, "leave");
+                    }
+                    else {
+                        $scope.feedback = "Usage: /unban <userId>";
                     }
                     break;
                     
                 case "/op":
                     // Define the power level of a user
-                    if (3 === args.length) {
-                        var user_id = args[1];
-                        var powerLevel = parseInt(args[2]);
-                        promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
+                    var matches = args.match(/^(\S+?)( +(\d+))?$/);
+                    var powerLevel = 50; // default power level for op
+                    if (matches) {
+                        var user_id = matches[1];
+                        if (matches.length == 4) {
+                            powerLevel = parseInt(matches[3]);
+                        }
+                        if (powerLevel !== NaN) {
+                            promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
+                        }
+                    }
+                    if (!promise) {
+                        $scope.feedback = "Usage: /op <userId> [<power level>]";
                     }
                     break;
                     
                 case "/deop":
                     // Reset the power level of a user
-                    if (2 === args.length) {
-                        var user_id = args[1];
-                        promise = matrixService.setUserPowerLevel($scope.room_id, user_id, undefined);
+                    var matches = args.match(/^(\S+)$/);
+                    if (matches) {
+                        promise = matrixService.setUserPowerLevel($scope.room_id, args, undefined);
                     }
+                    else {
+                        $scope.feedback = "Usage: /deop <userId>";
+                    }
+                    break;
+                
+                default:
+                    $scope.feedback = ("Unrecognised IRC-style command: " + cmd);
                     break;
             }
         }
         
-        if (!promise) {
-            // Send the text message
+        // By default send this as a message unless it's an IRC-style command
+        if (!promise && !isCmd) {
             promise = matrixService.sendTextMessage($scope.room_id, $scope.textInput);
         }
-        
-        promise.then(
-            function() {
-                console.log("Request successfully sent");
-                $scope.textInput = "";
-                $scope.state.sending = false;
-            },
-            function(error) {
-                $scope.feedback = "Request failed: " + error.data.error;
-                $scope.state.sending = false;
-            });
+
+        if (promise) {
+            promise.then(
+                function() {
+                    console.log("Request successfully sent");
+                    $scope.textInput = "";
+                    $scope.state.sending = false;
+                },
+                function(error) {
+                    $scope.feedback = "Request failed: " + error.data.error;
+                    $scope.state.sending = false;
+                });
+        }
+        else {
+            $scope.state.sending = false;
+        }
     };
 
     $scope.onInit = function() {

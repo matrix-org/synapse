@@ -169,14 +169,19 @@ angular.module('matrixService', [])
 
         // Change the membership of an another user
         setMembership: function(room_id, user_id, membershipValue) {
+            return this.setMemberShipObject(room_id, user_id, {
+                membership : membershipValue
+            });
+        },
+           
+        // Change the membership of an another user
+        setMembershipObject: function(room_id, user_id, membershipObject) {
             // The REST path spec
             var path = "/rooms/$room_id/state/m.room.member/$user_id";
             path = path.replace("$room_id", encodeURIComponent(room_id));
             path = path.replace("$user_id", user_id);
 
-            return doRequest("PUT", path, undefined, {
-                membership: membershipValue
-            });
+            return doRequest("PUT", path, undefined, membershipObject);
         },
            
         // Bans a user from from a room
