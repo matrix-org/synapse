@@ -1122,18 +1122,103 @@ Typing notifications
 
 Voice over IP
 =============
-.. NOTE::
-  This section is a work in progress.
+Matrix can also be used to set up VoIP calls. This is part of the core specification,
+although is still in a very early stage. Voice (and video) over Matrix is based on
+the WebRTC standards.
 
-.. TODO Dave
-    - what are the event types.
-    - what are the valid keys/values. What do they represent. Any gotchas?
-    - In what sequence should the events be sent?
-    - How do you accept / decline inbound calls? How do you make outbound calls?
-      Give examples.
-    - How does negotiation work? Give examples.
-    - How do you hang up?
-    - What does call log information look like e.g. duration of call?
+Call events are sent to a room, like any other event. This means that clients
+must only send call events to rooms with exactly two participants as currently
+the WebRTC standard is based around two-party communication.
+
+Events
+------
+``m.call.invite``
+This event is sent by the caller when they wish to establish a call.
+
+  Required keys:
+    - ``call_id`` : "string" - A unique identifier for the call
+    - ``offer`` : "offer object" - The session description
+    - ``version`` : "integer" - The version of the VoIP specification this message
+                                adheres to. This specification is version 0.
+      
+  Optional keys:
+    None.
+  Example:
+    ``{ "version" : 0, "call_id": "12345", "offer": { "type" : "offer", "sdp" : "v=0\r\no=- 6584580628695956864 2 IN IP4 127.0.0.1[...]" } }``
+
+``Offer Object``
+  Required keys:
+    - ``type`` : "string" - The type of session description, in this case 'offer'
+    - ``sdp`` : "string" - The SDP text of the session description
+
+``m.call.candidate``
+This event is sent by callers after sending an invite and by the callee after answering.
+Its purpose is to give the other party an additional ICE candidate to try using to
+communicate.
+
+  Required keys:
+    - ``call_id`` : "string" - The ID of the call this event relates to
+    - ``version`` : "integer" - The version of the VoIP specification this messages
+                                adheres to. his specification is version 0.
+    - ``candidate`` : "candidate object" - Object describing the candidate.
+
+``Candidate Object``
+
+  Required Keys:
+    - ``sdpMid`` : "string" - The SDP media type this candidate is intended for.
+    - ``sdpMLineIndex`` : "integer" - The index of the SDP 'm' line this
+                                      candidate is intended for
+    - ``candidate`` : "string" - The SDP 'a' line of the candidate
+
+``m.call.answer``
+
+  Required keys:
+    - ``call_id`` : "string" - The ID of the call this event relates to
+    - ``version`` : "integer" - The version of the VoIP specification this messages
+    - ``answer`` : "answer object" - Object giving the SDK answer
+
+``Answer Object``
+
+  Required keys:
+    - ``type`` : "string" - The type of session description. 'answer' in this case.
+    - ``sdp`` : "string" - The SDP text of the session description
+
+``m.call.hangup``
+Sent by either party to signal their termination of the call. This can be sent either once
+the call has has been established or before to abort the call.
+
+  Required keys:
+    - ``call_id`` : "string" - The ID of the call this event relates to
+    - ``version`` : "integer" - The version of the VoIP specification this messages
+
+Message Exchange
+----------------
+A call is set up with messages exchanged as follows:
+
+::
+
+   Caller                   Callee
+ m.call.invite ----------->
+ m.call.candidate -------->
+ [more candidates events]
+                         User answers call
+                  <------ m.call.answer
+               [...]
+                  <------ m.call.hangup
+                  
+Or a rejected call:
+
+::
+
+   Caller                   Callee
+ m.call.invite ----------->
+ m.call.candidate -------->
+ [more candidates events]
+                        User rejects call
+                 <------- m.call.hangup
+
+Calls are negotiated according to the WebRTC specification.
+ 
 
 Profiles
 ========
@@ -2116,3 +2201,4 @@ Transaction:
 .. _/join/<room_alias_or_id>: /docs/api/client-server/#!/-rooms/join
 
 .. _`Event Stream`: /docs/api/client-server/#!/-events/get_event_stream
+
