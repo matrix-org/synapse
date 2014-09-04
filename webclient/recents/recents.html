@@ -19,35 +19,35 @@
                     <div ng-hide="room.membership === 'invite'" ng-switch="room.lastMsg.type" >
                         <div ng-switch-when="m.room.member">
                             <span ng-if="'join' === room.lastMsg.content.membership">
-                                {{ room.lastMsg.state_key }} joined
+                                {{ room.lastMsg.state_key | mUserDisplayName: room.room_id}} joined
                             </span>
                             <span ng-if="'leave' === room.lastMsg.content.membership">
                                 <span ng-if="room.lastMsg.user_id === room.lastMsg.state_key">
-                                    {{room.lastMsg.state_key }} left
+                                    {{room.lastMsg.state_key | mUserDisplayName: room.room_id }} left
                                 </span>
                                 <span ng-if="room.lastMsg.user_id !== room.lastMsg.state_key">
-                                    {{ room.lastMsg.user_id }}
+                                    {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }}
                                     {{ {"join": "kicked", "ban": "unbanned"}[room.lastMsg.content.prev] }}
-                                    {{ room.lastMsg.state_key }}
+                                    {{ room.lastMsg.state_key | mUserDisplayName: room.room_id }}
                                 </span>
                             </span>
                             <span ng-if="'invite' === room.lastMsg.content.membership || 'ban' === room.lastMsg.content.membership">
-                                {{ room.lastMsg.user_id }}
+                                {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }}
                                 {{ {"invite": "invited", "ban": "banned"}[room.lastMsg.content.membership] }}
-                                {{ room.lastMsg.state_key }}
+                                {{ room.lastMsg.state_key | mUserDisplayName: room.room_id }}
                             </span>
                         </div>
 
                         <div ng-switch-when="m.room.message">
                             <div ng-switch="room.lastMsg.content.msgtype">
                                 <div ng-switch-when="m.text">
-                                    {{ room.lastMsg.user_id }} :
+                                    {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }} :
                                     <span ng-bind-html="(room.lastMsg.content.body) | linky:'_blank'">
                                     </span>
                                 </div>
 
                                 <div ng-switch-when="m.image">
-                                    {{ room.lastMsg.user_id }} sent an image
+                                    {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }} sent an image
                                 </div>
 
                                 <div ng-switch-when="m.emote">
@@ -62,7 +62,7 @@
                         </div>
 
                         <div ng-switch-default>
-                            <div ng-if="room.lastMsg.type.indexOf('m.call.') == 0">
+                            <div ng-if="room.lastMsg.type.indexOf('m.call.') === 0">
                                 Call
                             </div>
                         </div>
