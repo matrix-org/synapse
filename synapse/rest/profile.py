@@ -51,7 +51,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
         yield self.handlers.profile_handler.set_displayname(
             user, auth_user, new_name)
 
-        defer.returnValue((200, ""))
+        defer.returnValue((200, {}))
 
     def on_OPTIONS(self, request, user_id):
         return (200, {})
@@ -86,7 +86,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
         yield self.handlers.profile_handler.set_avatar_url(
             user, auth_user, new_name)
 
-        defer.returnValue((200, ""))
+        defer.returnValue((200, {}))
 
     def on_OPTIONS(self, request, user_id):
         return (200, {})
