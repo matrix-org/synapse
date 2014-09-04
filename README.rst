@@ -5,7 +5,7 @@ Matrix is an ambitious new ecosystem for open federated Instant Messaging and
 VoIP.  The basics you need to know to get up and running are:
 
     - Chatrooms are distributed and do not exist on any single server.  Rooms 
-      can be found using names like ``#matrix:matrix.org`` or 
+      can be found using aliases like ``#matrix:matrix.org`` or 
       ``#test:localhost:8008`` or they can be ephemeral.
     
     - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
@@ -15,27 +15,31 @@ VoIP.  The basics you need to know to get up and running are:
 The overall architecture is::
 
       client <----> homeserver <=====================> homeserver <----> client
-             https://matrix.org/_matrix      https://mydomain.net/_matrix
+             https://somewhere.org/_matrix      https://elsewhere.net/_matrix
 
 Quick Start
 ===========
+
+System requirements:
+    - POSIX-compliant system (tested on Linux & OSX)
+    - Python 2.7
 
 To get up and running:
       
     - To simply play with an **existing** homeserver you can
       just go straight to http://matrix.org/alpha.
     
-    - To run your own **private** homeserver on localhost:8008, install synapse 
-      with ``python setup.py develop --user`` and then run one with
-      ``python synapse/app/homeserver.py`` - you will find a webclient running
-      at http://localhost:8008 (use a recent Chrome, Safari or Firefox for now,
-      please...)
+    - To run your own **private** homeserver on localhost:8008, install synapse with
+      ``python setup.py develop --user`` and then run ``./synctl start`` twice (once to
+      generate a config; once to actually run) - you will find a webclient running at
+      http://localhost:8008. Please use a recent Chrome, Safari or Firefox for now...
              
-    - To make the homeserver **public** and let it exchange messages with 
-      other homeservers and participate in the overall Matrix federation, open 
-      up port 8448 and run ``python synapse/app/homeserver.py --host 
-      machine.my.domain.name``.  Then come join ``#matrix:matrix.org`` and
-      say hi! :)
+    - To run a **public** homeserver and let it exchange messages with other homeservers
+      and participate in the global Matrix federation, you must expose port 8448 to the
+      internet and edit homeserver.yaml to specify server_name (the public DNS entry for
+      this server) and then run ``synctl start``. If you changed the server_name, you may
+      need to move the old database (homeserver.db) out of the way first. Then come join
+      ``#matrix:matrix.org`` and say hi! :)
 
 For more detailed setup instructions, please see further down this document.
 
@@ -100,7 +104,6 @@ Homeserver Installation
 
 First, the dependencies need to be installed.  Start by installing 
 'python2.7-dev' and the various tools of the compiler toolchain.
-N.B. synapse requires python 2.x where x >= 7
 
   Installing prerequisites on ubuntu::
 
@@ -130,6 +133,9 @@ manually install a newer PyNaCl via pip as setuptools installs an old one. Or
 you can check PyNaCl out of git directly (https://github.com/pyca/pynacl) and
 installing it. Installing PyNaCl using pip may also work (remember to remove any
 other versions installed by setuputils in, for example, ~/.local/lib).
+
+On OSX, if you encounter ``clang: error: unknown argument: '-mno-fused-madd'`` you will
+need to ``export CFLAGS=-Qunused-arguments``.
 
 This will run a process of downloading and installing into your
 user's .local/lib directory all of the required dependencies that are
@@ -179,6 +185,10 @@ For the first form, simply pass the required hostname (of the machine) as the
         --config-path homeserver.config \
         --generate-config
     $ python synapse/app/homeserver.py --config-path homeserver.config
+    
+Alternatively, you can run synapse via synctl - running ``synctl start`` to generate a
+homeserver.yaml config file, where you can then edit server-name to specify
+machine.my.domain.name, and then set the actual server running again with synctl start.
 
 For the second form, first create your SRV record and publish it in DNS. This
 needs to be named _matrix._tcp.YOURDOMAIN, and point at at least one hostname
@@ -266,7 +276,7 @@ track 3PID logins and publish end-user public keys.
 
 It's currently early days for identity servers as Matrix is not yet using 3PIDs
 as the primary means of identity and E2E encryption is not complete. As such,
-we're not yet running an identity server in public.
+we are running a single identity server (http://matrix.org:8090) at the current time.
 
 
 Where's the spec?!
