@@ -172,7 +172,7 @@ class Auth(object):
                 if kick_level:
                     kick_level = int(kick_level)
                 else:
-                    kick_level = 5
+                    kick_level = 50
 
                 if user_level < kick_level:
                     raise AuthError(
@@ -189,7 +189,7 @@ class Auth(object):
             if ban_level:
                 ban_level = int(ban_level)
             else:
-                ban_level = 5  # FIXME (erikj): What should we do here?
+                ban_level = 50  # FIXME (erikj): What should we do here?
 
             if user_level < ban_level:
                 raise AuthError(403, "You don't have permission to ban")

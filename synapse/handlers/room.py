@@ -132,7 +132,7 @@ class RoomCreationHandler(BaseRoomHandler):
                 etype=RoomNameEvent.TYPE,
                 room_id=room_id,
                 user_id=user_id,
-                required_power_level=5,
+                required_power_level=50,
                 content={"name": name},
             )
 
@@ -143,7 +143,7 @@ class RoomCreationHandler(BaseRoomHandler):
                 etype=RoomNameEvent.TYPE,
                 room_id=room_id,
                 user_id=user_id,
-                required_power_level=5,
+                required_power_level=50,
                 content={"name": name},
             )
 
@@ -155,7 +155,7 @@ class RoomCreationHandler(BaseRoomHandler):
                 etype=RoomTopicEvent.TYPE,
                 room_id=room_id,
                 user_id=user_id,
-                required_power_level=5,
+                required_power_level=50,
                 content={"topic": topic},
             )
 
@@ -186,7 +186,7 @@ class RoomCreationHandler(BaseRoomHandler):
         event_keys = {
             "room_id": room_id,
             "user_id": creator.to_string(),
-            "required_power_level": 10,
+            "required_power_level": 100,
         }
 
         def create(etype, **content):
@@ -203,7 +203,7 @@ class RoomCreationHandler(BaseRoomHandler):
 
         power_levels_event = self.event_factory.create_event(
             etype=RoomPowerLevelsEvent.TYPE,
-            content={creator.to_string(): 10, "default": 0},
+            content={creator.to_string(): 100, "default": 0},
             **event_keys
         )
 
@@ -215,7 +215,7 @@ class RoomCreationHandler(BaseRoomHandler):
 
         add_state_event = create(
             etype=RoomAddStateLevelEvent.TYPE,
-            level=10,
+            level=100,
         )
 
         send_event = create(
@@ -225,8 +225,8 @@ class RoomCreationHandler(BaseRoomHandler):
 
         ops = create(
             etype=RoomOpsPowerLevelsEvent.TYPE,
-            ban_level=5,
-            kick_level=5,
+            ban_level=50,
+            kick_level=50,
         )
 
         return [
