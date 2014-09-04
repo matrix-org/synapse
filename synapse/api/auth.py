@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes
-from synapse.api.events.room import RoomMemberEvent
+from synapse.api.events.room import RoomMemberEvent, RoomPowerLevelsEvent
 from synapse.util.logutils import log_function
 
 import logging
@@ -66,6 +66,9 @@ class Auth(object):
                     yield self._can_replace_state(event)
                 else:
                     yield self._can_send_event(event)
+
+                if event.type == RoomPowerLevelsEvent.TYPE:
+                    yield self._check_power_levels(event)
 
                 defer.returnValue(True)
             else:
@@ -315,3 +318,71 @@ class Auth(object):
                     403,
                     "You don't have permission to change that state"
                 )
+
+    @defer.inlineCallbacks
+    def _check_power_levels(self, event):
+        current_state = yield self.store.get_current_state(
+            event.room_id,
+            event.type,
+            event.state_key,
+        )
+
+        user_level = yield self.store.get_power_level(
+            event.room_id,
+            event.user_id,
+        )
+
+        if user_level:
+            user_level = int(user_level)
+        else:
+            user_level = 0
+
+        old_list = current_state.content
+
+        # FIXME (erikj)
+        old_people = {k: v for k, v in old_list.items() if k.startswith("@")}
+        new_people = {k: v for k, v in event.content if k.startswith("@")}
+
+        removed = set(old_people.keys()) - set(new_people.keys())
+        added = set(old_people.keys()) - set(new_people.keys())
+        same = set(old_people.keys()) & set(new_people.keys())
+
+        for r in removed:
+            if int(old_list.content[r]) > user_level:
+                raise AuthError(
+                    403,
+                    "You don't have permission to change that state"
+                )
+
+        for n in new_people:
+            if int(event.content[n]) > user_level:
+                raise AuthError(
+                    403,
+                    "You don't have permission to change that state"
+                )
+
+        for s in same:
+            if int(event.content[s]) != int(old_list[s]):
+                if int(old_list[s]) > user_level:
+                    raise AuthError(
+                        403,
+                        "You don't have permission to change that state"
+                    )
+
+        if "default" in old_list:
+            old_default = int(old_list["default"])
+
+            if old_default > user_level:
+                raise AuthError(
+                    403,
+                    "You don't have permission to change that state"
+                )
+
+            if "default" in event.content:
+                new_default = int(event.content["default"])
+
+                if new_default > user_level:
+                    raise AuthError(
+                        403,
+                        "You don't have permission to change that state"
+                    )
