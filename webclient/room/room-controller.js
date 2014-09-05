@@ -313,32 +313,44 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     
                 case "/nick":
                     // Change user display name
-                    promise = matrixService.setDisplayName(args);
+                    if (args) {
+                        promise = matrixService.setDisplayName(args);                     
+                    }
+                    else {
+                        $scope.feedback = "Usage: /nick <display_name>";
+                    }
                     break;
                     
                 case "/kick":
-                    var matches = args.match(/^(\S+?)( +(.*))?$/);
-                    if (matches.length === 2) {
-                        promise = matrixService.setMembership($scope.room_id, matches[1], "leave");                        
+                    // Kick a user from the room with an optional reason
+                    if (args) {
+                        var matches = args.match(/^(\S+?)( +(.*))?$/);
+                        if (matches.length === 2) {
+                            promise = matrixService.setMembership($scope.room_id, matches[1], "leave");                        
+                        }
+                        else if (matches.length === 4) {
+                            promise = matrixService.setMembershipObject($scope.room_id, matches[1], {
+                                membership: "leave",
+                                reason: matches[3] // TODO: we need to specify resaon in the spec
+                            });
+                        }        
                     }
-                    else if (matches.length === 4) {
-                        promise = matrixService.setMembershipObject($scope.room_id, matches[1], {
-                            membership: "leave",
-                            reason: matches[3] // TODO: we need to specify resaon in the spec
-                        });
-                    }
-                    else {
+
+                    if (!promise) {
                         $scope.feedback = "Usage: /kick <userId> [<reason>]";
                     }
                     break;
 
                 case "/ban":
-                    // Ban a user from the room with optional reason
-                    var matches = args.match(/^(\S+?)( +(.*))?$/);
-                    if (matches) {
-                        promise = matrixService.ban($scope.room_id, matches[1], matches[3]);
+                    // Ban a user from the room with an optional reason
+                    if (args) {
+                        var matches = args.match(/^(\S+?)( +(.*))?$/);
+                        if (matches) {
+                            promise = matrixService.ban($scope.room_id, matches[1], matches[3]);
+                        }
                     }
-                    else {
+                    
+                    if (!promise) {
                         $scope.feedback = "Usage: /ban <userId> [<reason>]";
                     }
                     break;
@@ -348,29 +360,35 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     // FIXME: this feels horribly asymmetrical - why are we banning via RPC
                     // and unbanning by editing the membership list?
                     // Why can't we specify a reason?
-                    var matches = args.match(/^(\S+)$/);
-                    if (matches) {
-                        // Reset the user membership to "leave" to unban him
-                        promise = matrixService.setMembership($scope.room_id, matches[1], "leave");
+                    if (args) {
+                        var matches = args.match(/^(\S+)$/);
+                        if (matches) {
+                            // Reset the user membership to "leave" to unban him
+                            promise = matrixService.setMembership($scope.room_id, matches[1], "leave");
+                        }
                     }
-                    else {
+                    
+                    if (!promise) {
                         $scope.feedback = "Usage: /unban <userId>";
                     }
                     break;
                     
                 case "/op":
                     // Define the power level of a user
-                    var matches = args.match(/^(\S+?)( +(\d+))?$/);
-                    var powerLevel = 50; // default power level for op
-                    if (matches) {
-                        var user_id = matches[1];
-                        if (matches.length === 4) {
-                            powerLevel = parseInt(matches[3]);
-                        }
-                        if (powerLevel !== NaN) {
-                            promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
+                    if (args) {
+                        var matches = args.match(/^(\S+?)( +(\d+))?$/);
+                        var powerLevel = 50; // default power level for op
+                        if (matches) {
+                            var user_id = matches[1];
+                            if (matches.length === 4) {
+                                powerLevel = parseInt(matches[3]);
+                            }
+                            if (powerLevel !== NaN) {
+                                promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
+                            }
                         }
                     }
+                    
                     if (!promise) {
                         $scope.feedback = "Usage: /op <userId> [<power level>]";
                     }
@@ -378,11 +396,14 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     
                 case "/deop":
                     // Reset the power level of a user
-                    var matches = args.match(/^(\S+)$/);
-                    if (matches) {
-                        promise = matrixService.setUserPowerLevel($scope.room_id, args, undefined);
+                    if (args) {
+                        var matches = args.match(/^(\S+)$/);
+                        if (matches) {
+                            promise = matrixService.setUserPowerLevel($scope.room_id, args, undefined);
+                        }
                     }
-                    else {
+                    
+                    if (!promise) {
                         $scope.feedback = "Usage: /deop <userId>";
                     }
                     break;
