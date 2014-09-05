@@ -33,8 +33,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         can_paginate: true, // this is toggled off when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
         stream_failure: undefined, // the response when the stream fails
-        // FIXME: sending has been disabled, as surely messages should be sent in the background rather than locking the UI synchronously --Matthew
-        sending: false // true when a message is being sent. It helps to disable the UI when a process is running
     };
     $scope.members = {};
     $scope.autoCompleting = false;
@@ -262,7 +260,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             
             normaliseMembersPowerLevels();
         }
-    }
+    };
 
     // Normalise users power levels so that the user with the higher power level
     // will have a bar covering 100% of the width of his avatar
@@ -283,14 +281,12 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 member.powerLevelNorm = (member.powerLevel * 100) / maxPowerLevel;
             }
         }
-    }
+    };
 
     $scope.send = function() {
         if ($scope.textInput === "") {
             return;
         }
-
-        $scope.state.sending = true;
         
         var promise;
         var isCmd = false;
@@ -368,7 +364,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     var powerLevel = 50; // default power level for op
                     if (matches) {
                         var user_id = matches[1];
-                        if (matches.length == 4) {
+                        if (matches.length === 4) {
                             powerLevel = parseInt(matches[3]);
                         }
                         if (powerLevel !== NaN) {
@@ -407,15 +403,10 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 function() {
                     console.log("Request successfully sent");
                     $scope.textInput = "";
-                    $scope.state.sending = false;
                 },
                 function(error) {
                     $scope.feedback = "Request failed: " + error.data.error;
-                    $scope.state.sending = false;
                 });
-        }
-        else {
-            $scope.state.sending = false;
         }
     };
 
@@ -573,25 +564,19 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     $scope.sendImage = function(url, body) {
-        $scope.state.sending = true;
 
         matrixService.sendImageMessage($scope.room_id, url, body).then(
             function() {
                 console.log("Image sent");
-                $scope.state.sending = false;
             },
             function(error) {
                 $scope.feedback = "Failed to send image: " + error.data.error;
-                $scope.state.sending = false;
             });
     };
     
     $scope.imageFileToSend;
     $scope.$watch("imageFileToSend", function(newValue, oldValue) {
         if ($scope.imageFileToSend) {
-
-            $scope.state.sending = true;
-
             // Upload this image with its thumbnail to Internet
             mFileUpload.uploadImageAndThumbnail($scope.imageFileToSend, THUMBNAIL_SIZE).then(
                 function(imageMessage) {
@@ -599,16 +584,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     matrixService.sendMessage($scope.room_id, undefined, imageMessage).then(
                         function() {
                             console.log("Image message sent");
-                            $scope.state.sending = false;
                         },
                         function(error) {
                             $scope.feedback = "Failed to send image message: " + error.data.error;
-                            $scope.state.sending = false;
                         });
                 },
                 function(error) {
                     $scope.feedback = "Can't upload image";
-                    $scope.state.sending = false;
                 }
             );
         }
@@ -624,6 +606,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         call.onHangup = $rootScope.onCallHangup;
         call.placeCall();
         $rootScope.currentCall = call;
-    }
+    };
 
 }]);
