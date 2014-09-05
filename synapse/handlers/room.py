@@ -25,14 +25,14 @@ from synapse.api.events.room import (
     RoomSendEventLevelEvent, RoomOpsPowerLevelsEvent, RoomNameEvent,
 )
 from synapse.util import stringutils
-from ._base import BaseRoomHandler
+from ._base import BaseHandler
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class RoomCreationHandler(BaseRoomHandler):
+class RoomCreationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def create_room(self, user_id, room_id, config):
@@ -105,7 +105,9 @@ class RoomCreationHandler(BaseRoomHandler):
         )
 
         if room_alias:
-            yield self.store.create_room_alias_association(
+            directory_handler = self.hs.get_handlers().directory_handler
+            yield directory_handler.create_association(
+                user_id=user_id,
                 room_id=room_id,
                 room_alias=room_alias,
                 servers=[self.hs.hostname],
@@ -239,7 +241,7 @@ class RoomCreationHandler(BaseRoomHandler):
         ]
 
 
-class RoomMemberHandler(BaseRoomHandler):
+class RoomMemberHandler(BaseHandler):
     # TODO(paul): This handler currently contains a messy conflation of
     #   low-level API that works on UserID objects and so on, and REST-level
     #   API that takes ID strings and returns pagination chunks. These concerns
@@ -560,7 +562,7 @@ class RoomMemberHandler(BaseRoomHandler):
             extra_users=[target_user]
         )
 
-class RoomListHandler(BaseRoomHandler):
+class RoomListHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_public_room_list(self):

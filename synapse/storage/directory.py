@@ -92,3 +92,10 @@ class DirectoryStore(SQLBaseStore):
                     "server": server,
                 }
             )
+
+    def get_aliases_for_room(self, room_id):
+        return self._simple_select_onecol(
+            "room_aliases",
+            {"room_id": room_id},
+            "room_alias",
+        )

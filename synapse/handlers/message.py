@@ -19,7 +19,7 @@ from synapse.api.constants import Membership
 from synapse.api.events.room import RoomTopicEvent
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
-from ._base import BaseRoomHandler
+from ._base import BaseHandler
 
 import logging
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 
-class MessageHandler(BaseRoomHandler):
+class MessageHandler(BaseHandler):
 
     def __init__(self, hs):
         super(MessageHandler, self).__init__(hs)

@@ -327,6 +327,11 @@ class Auth(object):
             event.state_key,
         )
 
+        if not current_state:
+            return
+        else:
+            current_state = current_state[0]
+
         user_level = yield self.store.get_power_level(
             event.room_id,
             event.user_id,
@@ -341,7 +346,7 @@ class Auth(object):
 
         # FIXME (erikj)
         old_people = {k: v for k, v in old_list.items() if k.startswith("@")}
-        new_people = {k: v for k, v in event.content if k.startswith("@")}
+        new_people = {k: v for k, v in event.content.items() if k.startswith("@")}
 
         removed = set(old_people.keys()) - set(new_people.keys())
         added = set(old_people.keys()) - set(new_people.keys())
