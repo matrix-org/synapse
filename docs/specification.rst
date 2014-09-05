@@ -909,6 +909,22 @@ prefixed with ``m.``
     ``ban_level`` will be greater than or equal to ``kick_level`` since 
     banning is more severe than kicking.
 
+``m.room.aliases``
+  Summary:
+    These state events are used to inform the room about what room aliases it has.
+  Type:
+    State event
+  JSON format:
+    ``{ "aliases": ["string", ...] }``
+  Example:
+    ``{ "aliases": ["#foo:example.com"] }``
+  Description:
+    A server `may` inform the room that it has added or removed an alias for 
+    the room. This is purely for informational purposes and may become stale.
+    Clients `should` check that the room alias is still valid before using it.
+    The ``state_key`` of the event is the homeserver which owns the room 
+    alias.
+
 ``m.room.message``
   Summary:
     A message.
