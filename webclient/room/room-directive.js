@@ -48,6 +48,9 @@ angular.module('RoomController')
                 var search = /@?([a-zA-Z0-9_\-:\.]+)$/.exec(text);
                 if (targetIndex === 0) {
                     element[0].value = text;
+                    
+                    // Force angular to wake up and update the input ng-model by firing up input event
+                    angular.element(element[0]).triggerHandler('input');
                 }
                 else if (search && search[1]) {
                     // console.log("search found: " + search);
@@ -81,7 +84,10 @@ angular.module('RoomController')
                             expansion += " ";
                         element[0].value = text.replace(/@?([a-zA-Z0-9_\-:\.]+)$/, expansion);
                         // cancel blink
-                        element[0].className = "";                        
+                        element[0].className = "";     
+                        
+                        // Force angular to wake up and update the input ng-model by firing up input event
+                        angular.element(element[0]).triggerHandler('input');
                     }
                     else {
                         // console.log("wrapped!");
@@ -91,6 +97,9 @@ angular.module('RoomController')
                         }, 150);
                         element[0].value = text;
                         scope.tabCompleteIndex = 0;
+                        
+                        // Force angular to wake up and update the input ng-model by firing up input event
+                        angular.element(element[0]).triggerHandler('input');
                     }
                 }
                 else {
