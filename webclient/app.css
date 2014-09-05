@@ -251,12 +251,14 @@ a:active  { color: #000; }
 .userAvatar .userAvatarImage {
     position: absolute;
     top: 0px;
-    object-fit: cover;    
+    object-fit: cover;
+    width: 100%;
 }
 
 .userAvatar .userAvatarGradient {
     position: absolute;
     bottom: 20px;
+    width: 100%;
 }
 
 .userAvatar .userName {
