@@ -168,23 +168,20 @@ angular.module('matrixService', [])
         },
 
         // Change the membership of an another user
-        setMembership: function(room_id, user_id, membershipValue) {
-            return this.setMembershipObject(room_id, user_id, {
-                membership : membershipValue
-            });
-        },
-           
-        // Change the membership of an another user
-        setMembershipObject: function(room_id, user_id, membershipObject) {
+        setMembership: function(room_id, user_id, membershipValue, reason) {
+            
             // The REST path spec
             var path = "/rooms/$room_id/state/m.room.member/$user_id";
             path = path.replace("$room_id", encodeURIComponent(room_id));
             path = path.replace("$user_id", user_id);
 
-            return doRequest("PUT", path, undefined, membershipObject);
+            return doRequest("PUT", path, undefined, {
+                membership : membershipValue,
+                reason: reason
+            });
         },
            
-        // Bans a user from from a room
+        // Bans a user from a room
         ban: function(room_id, user_id, reason) {
             var path = "/rooms/$room_id/ban";
             path = path.replace("$room_id", encodeURIComponent(room_id));
@@ -194,7 +191,20 @@ angular.module('matrixService', [])
                 reason: reason
             });
         },
-
+        
+        // Unbans a user in a room
+        unban: function(room_id, user_id) {
+            // FIXME: To update when there will be homeserver API for unban 
+            // For now, do an unban by resetting the user membership to "leave"
+            return this.setMembership(room_id, user_id, "leave");
+        },
+        
+        // Kicks a user from a room
+        kick: function(room_id, user_id, reason) {
+            // Set the user membership to "leave" to kick him
+            return this.setMembership(room_id, user_id, "leave", reason);
+        },
+        
         // Retrieves the room ID corresponding to a room alias
         resolveRoomAlias:function(room_alias) {
             var path = "/_matrix/client/api/v1/directory/room/$room_alias";

@@ -325,15 +325,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     // Kick a user from the room with an optional reason
                     if (args) {
                         var matches = args.match(/^(\S+?)( +(.*))?$/);
-                        if (matches.length === 2) {
-                            promise = matrixService.setMembership($scope.room_id, matches[1], "leave");                        
+                        if (matches) {
+                            promise = matrixService.kick($scope.room_id, matches[1], matches[3]);
                         }
-                        else if (matches.length === 4) {
-                            promise = matrixService.setMembershipObject($scope.room_id, matches[1], {
-                                membership: "leave",
-                                reason: matches[3] // TODO: we need to specify resaon in the spec
-                            });
-                        }        
                     }
 
                     if (!promise) {
@@ -357,14 +351,11 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
                 case "/unban":
                     // Unban a user from the room
-                    // FIXME: this feels horribly asymmetrical - why are we banning via RPC
-                    // and unbanning by editing the membership list?
-                    // Why can't we specify a reason?
                     if (args) {
                         var matches = args.match(/^(\S+)$/);
                         if (matches) {
                             // Reset the user membership to "leave" to unban him
-                            promise = matrixService.setMembership($scope.room_id, matches[1], "leave");
+                            promise = matrixService.unban($scope.room_id, matches[1]);
                         }
                     }
                     
