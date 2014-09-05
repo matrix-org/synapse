@@ -4,7 +4,7 @@ Signing JSON
 JSON is signed by encoding the JSON object without ``signatures`` or ``meta``
 keys using a canonical encoding. The JSON bytes are then signed using the
 signature algorithm and the signature encoded using base64 with the padding
-striped. The resulting base64 signature is added to an object under the
+stripped. The resulting base64 signature is added to an object under the
 *signing key identifier* which is added to the ``signatures`` object under the
 name of the server signing it which is added back to the original JSON object
 along with the ``meta`` object.
