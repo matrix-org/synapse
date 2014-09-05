@@ -19,6 +19,8 @@ angular.module('RegisterController', ['matrixService'])
                                     function($scope, $rootScope, $location, matrixService, eventStreamService) {
     'use strict';
     
+    var useCaptcha = false;
+    
     // FIXME: factor out duplication with login-controller.js
     
     // Assume that this is hosted on the home server, in which case the URL
@@ -87,7 +89,7 @@ angular.module('RegisterController', ['matrixService'])
     };
 
     $scope.registerWithMxidAndPassword = function(mxid, password, threepidCreds) {
-        matrixService.register(mxid, password, threepidCreds).then(
+        matrixService.register(mxid, password, threepidCreds, useCaptcha).then(
             function(response) {
                 $scope.feedback = "Success";
                 // Update the current config 
@@ -154,7 +156,9 @@ angular.module('RegisterController', ['matrixService'])
 	};
 
 	$scope.init = function() {
-	    setupCaptcha();
+        if (useCaptcha) {
+	        setupCaptcha();
+        }
 	};
     
 }]);
