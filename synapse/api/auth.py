@@ -18,7 +18,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import Membership, JoinRules
-from synapse.api.errors import AuthError, StoreError, Codes
+from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.api.events.room import RoomMemberEvent, RoomPowerLevelsEvent
 from synapse.util.logutils import log_function
 
@@ -308,7 +308,9 @@ class Auth(object):
         else:
             user_level = 0
 
-        logger.debug("Checking power level for %s, %s", event.user_id, user_level)
+        logger.debug(
+            "Checking power level for %s, %s", event.user_id, user_level
+        )
         if current_state and hasattr(current_state, "required_power_level"):
             req = current_state.required_power_level
 
@@ -321,6 +323,24 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def _check_power_levels(self, event):
+        for k, v in event.content.items():
+            if k == "default":
+                continue
+
+            # FIXME (erikj): We don't want hsob_Ts in content.
+            if k == "hsob_ts":
+                continue
+
+            try:
+                self.hs.parse_userid(k)
+            except:
+                raise SynapseError(400, "Not a valid user_id: %s" % (k,))
+
+            try:
+                int(v)
+            except:
+                raise SynapseError(400, "Not a valid power level: %s" % (v,))
+
         current_state = yield self.store.get_current_state(
             event.room_id,
             event.type,
@@ -346,7 +366,10 @@ class Auth(object):
 
         # FIXME (erikj)
         old_people = {k: v for k, v in old_list.items() if k.startswith("@")}
-        new_people = {k: v for k, v in event.content.items() if k.startswith("@")}
+        new_people = {
+            k: v for k, v in event.content.items()
+            if k.startswith("@")
+        }
 
         removed = set(old_people.keys()) - set(new_people.keys())
         added = set(old_people.keys()) - set(new_people.keys())
@@ -356,22 +379,24 @@ class Auth(object):
             if int(old_list.content[r]) > user_level:
                 raise AuthError(
                     403,
-                    "You don't have permission to change that state"
+                    "You don't have permission to remove user: %s" % (r, )
                 )
 
-        for n in new_people:
+        for n in added:
             if int(event.content[n]) > user_level:
                 raise AuthError(
                     403,
-                    "You don't have permission to change that state"
+                    "You don't have permission to add ops level greater "
+                    "than your own"
                 )
 
         for s in same:
             if int(event.content[s]) != int(old_list[s]):
-                if int(old_list[s]) > user_level:
+                if int(event.content[s]) > user_level:
                     raise AuthError(
                         403,
-                        "You don't have permission to change that state"
+                        "You don't have permission to add ops level greater "
+                        "than your own"
                     )
 
         if "default" in old_list:
@@ -380,7 +405,8 @@ class Auth(object):
             if old_default > user_level:
                 raise AuthError(
                     403,
-                    "You don't have permission to change that state"
+                    "You don't have permission to add ops level greater than "
+                    "your own"
                 )
 
             if "default" in event.content:
@@ -389,5 +415,6 @@ class Auth(object):
                 if new_default > user_level:
                     raise AuthError(
                         403,
-                        "You don't have permission to change that state"
+                        "You don't have permission to add ops level greater "
+                        "than your own"
                     )
