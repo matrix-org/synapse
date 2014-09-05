@@ -32,7 +32,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         first_pagination: true, // this is toggled off when the first pagination is done
         can_paginate: true, // this is toggled off when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
-        stream_failure: undefined, // the response when the stream fails
+        stream_failure: undefined // the response when the stream fails
     };
     $scope.members = {};
     $scope.autoCompleting = false;
@@ -395,17 +395,55 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         
         // By default send this as a message unless it's an IRC-style command
         if (!promise && !isCmd) {
-            promise = matrixService.sendTextMessage($scope.room_id, $scope.textInput);
+            var message = $scope.textInput;
+            $scope.textInput = "";
+
+            // Echo the message to the room
+            // To do so, create a minimalist fake text message event and add it to the in-memory list of room messages
+            var echoMessage = {
+                content: {
+                    body: message,
+                    hsob_ts: "Sending...",      // Hack timestamp to display this text in place of the message time
+                    msgtype: "m.text"
+                },
+                room_id: $scope.room_id,
+                type: "m.room.message",
+                user_id: $scope.state.user_id,
+                echo_msg_state: "messagePending"     // Add custom field to indicate the state of this fake message to HTML
+            };
+
+            $rootScope.events.rooms[$scope.room_id].messages.push(echoMessage);
+            scrollToBottom();
+
+            // Make the request
+            promise = matrixService.sendTextMessage($scope.room_id, message);
         }
 
         if (promise) {
             promise.then(
                 function() {
                     console.log("Request successfully sent");
-                    $scope.textInput = "";
+
+                    if (echoMessage) {
+                        // Remove the fake echo message from the room messages
+                        // It will be replaced by the one acknowledged by the server
+                        var index = $rootScope.events.rooms[$scope.room_id].messages.indexOf(echoMessage);
+                        if (index > -1) {
+                            $rootScope.events.rooms[$scope.room_id].messages.splice(index, 1);
+                        }
+                    }
+                    else {
+                        $scope.textInput = "";
+                    }
                 },
                 function(error) {
                     $scope.feedback = "Request failed: " + error.data.error;
+
+                    if (echoMessage) {
+                        // Mark the message as unsent for the rest of the page life
+                        echoMessage.content.hsob_ts = "Unsent";
+                        echoMessage.echo_msg_state = "messageUnSent";
+                    }
                 });
         }
     };

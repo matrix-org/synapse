@@ -417,6 +417,13 @@ a:active  { color: #000; }
     text-align: left ! important;
 }
 
+.bubble .messagePending {
+    opacity: 0.3
+}
+.messageUnSent {
+    color: #F00;
+}
+
 #room-fullscreen-image {
     position: absolute;
     top: 0px;
