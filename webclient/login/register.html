@@ -12,7 +12,6 @@
                 
                 <div style="text-align: center">
                     <br/>
-
                     <input ng-show="!wait_3pid_code" id="email" size="32" type="text" ng-focus="true" ng-model="account.email" placeholder="Email address (optional)"/>
                     <div ng-show="!wait_3pid_code" class="smallPrint">Specifying an email address lets other users find you on Matrix more easily,<br/>
                         and will give you a way to reset your password in the future</div>
@@ -26,7 +25,10 @@
                     <input ng-show="!wait_3pid_code" id="displayName" size="32" type="text" ng-model="account.displayName" placeholder="Display name (e.g. Bob Obson)"/>
                     <br ng-show="!wait_3pid_code" />
                     <br ng-show="!wait_3pid_code" />
-                    
+
+
+                    <div id="regcaptcha" ng-init="init()" />
+
                     <button ng-show="!wait_3pid_code" ng-click="register()" ng-disabled="!account.desired_user_id || !account.homeserver || !account.pwd1 || !account.pwd2 || account.pwd1 !== account.pwd2">Sign up</button>
 
                     <div ng-show="wait_3pid_code">

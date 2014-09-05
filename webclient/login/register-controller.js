@@ -142,6 +142,20 @@ angular.module('RegisterController', ['matrixService'])
             }
         );
     };
+	
+	var setupCaptcha = function() {
+	    console.log("Setting up ReCaptcha")
+	    Recaptcha.create("6Le31_kSAAAAAK-54VKccKamtr-MFA_3WS1d_fGV",
+	    "regcaptcha",
+	    {
+	      theme: "red",
+	      callback: Recaptcha.focus_response_field
+	    });
+	};
 
+	$scope.init = function() {
+	    setupCaptcha();
+	};
+    
 }]);
 
