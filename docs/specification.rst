@@ -742,15 +742,17 @@ There are several APIs provided to ``GET`` events for a room:
   Description:
     Get all ``m.room.member`` state events.
   Response format:
-    ``{ "start": "token", "end": "token", "chunk": [ { m.room.member event }, ... ] }``
+    ``{ "start": "<token>", "end": "<token>", "chunk": [ { m.room.member event }, ... ] }``
   Example:
     TODO
 
 |/rooms/<room_id>/messages|_
   Description:
-    Get all ``m.room.message`` events.
+    Get all ``m.room.message`` and ``m.room.member`` events. This API supports pagination
+	using ``from`` and ``to`` query parameters, coupled with the ``start`` and ``end``
+	tokens from an |initialSync|_ API.
   Response format:
-    ``{ TODO }``
+    ``{ "start": "<token>", "end": "<token>" }``
   Example:
     TODO
     
