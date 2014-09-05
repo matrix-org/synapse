@@ -16,7 +16,7 @@
 
 'use strict';
 
-angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
+angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHandlerService'])
 .controller('RecentsController', ['$scope', 'matrixService', 'eventHandlerService', 
                                function($scope,  matrixService, eventHandlerService) {
     $scope.rooms = {};
@@ -28,13 +28,8 @@ angular.module('RecentsController', ['matrixService', 'eventHandlerService'])
     var listenToEventStream = function() {
         // Refresh the list on matrix invitation and message event
         $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
-            var config = matrixService.config();
-            if (isLive && event.state_key === config.user_id && event.content.membership === "invite") {
-                console.log("Invited to room " + event.room_id);
-                // FIXME push membership to top level key to match /im/sync
-                event.membership = event.content.membership;
-
-                $scope.rooms[event.room_id] = event;
+            if (isLive) {
+                $scope.rooms[event.room_id].lastMsg = event;
             }
         });
         $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {

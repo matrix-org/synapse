@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-angular.module('RoomController', ['ngSanitize', 'mFileInput'])
+angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 .controller('RoomController', ['$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mPresence', 'matrixPhoneService', 'MatrixCall',
                                function($scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, mPresence, matrixPhoneService, MatrixCall) {
    'use strict';
@@ -32,9 +32,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         first_pagination: true, // this is toggled off when the first pagination is done
         can_paginate: true, // this is toggled off when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
-        stream_failure: undefined, // the response when the stream fails
-        // FIXME: sending has been disabled, as surely messages should be sent in the background rather than locking the UI synchronously --Matthew
-        sending: false // true when a message is being sent. It helps to disable the UI when a process is running
+        stream_failure: undefined // the response when the stream fails
     };
     $scope.members = {};
     $scope.autoCompleting = false;
@@ -44,18 +42,25 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     $scope.imageURLToSend = "";
     $scope.userIDToInvite = "";
     
-    var scrollToBottom = function() {
+    var scrollToBottom = function(force) {
         console.log("Scrolling to bottom");
-        $timeout(function() {
-            var objDiv = document.getElementById("messageTableWrapper");
-            objDiv.scrollTop = objDiv.scrollHeight;
-        }, 0);
+        
+        // Do not autoscroll to the bottom to display the new event if the user is not at the bottom.
+        // Exception: in case where the event is from the user, we want to force scroll to the bottom
+        var objDiv = document.getElementById("messageTableWrapper");
+        if ((objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || force) {
+            
+            $timeout(function() {
+                objDiv.scrollTop = objDiv.scrollHeight;
+            }, 0);
+        }
     };
 
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
         if (isLive && event.room_id === $scope.room_id) {
-            scrollToBottom();
             
+            scrollToBottom();
+
             if (window.Notification) {
                 // Show notification when the user is idle
                 if (matrixService.presence.offline === mPresence.getState()) {
@@ -76,6 +81,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
         if (isLive) {
+            scrollToBottom();
             updateMemberList(event);
         }
     });
@@ -169,16 +175,18 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     var updateMemberList = function(chunk) {
         if (chunk.room_id != $scope.room_id) return;
 
-        // Ignore banned and kicked (leave) people
-        if ("ban" === chunk.membership || "leave" === chunk.membership) {
-            return;
-        }
 
         // set target_user_id to keep things clear
         var target_user_id = chunk.state_key;
 
         var isNewMember = !(target_user_id in $scope.members);
         if (isNewMember) {
+            
+            // Ignore banned and kicked (leave) people
+            if ("ban" === chunk.membership || "leave" === chunk.membership) {
+                return;
+            }
+        
             // FIXME: why are we copying these fields around inside chunk?
             if ("presence" in chunk.content) {
                 chunk.presence = chunk.content.presence;
@@ -202,6 +210,13 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         }
         else {
             // selectively update membership and presence else it will nuke the picture and displayname too :/
+            
+            // Remove banned and kicked (leave) people
+            if ("ban" === chunk.membership || "leave" === chunk.membership) {
+                delete $scope.members[target_user_id];
+                return;
+            }
+            
             var member = $scope.members[target_user_id];
             member.membership = chunk.content.membership;
             if ("presence" in chunk.content) {
@@ -256,7 +271,7 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
             
             normaliseMembersPowerLevels();
         }
-    }
+    };
 
     // Normalise users power levels so that the user with the higher power level
     // will have a bar covering 100% of the width of his avatar
@@ -277,104 +292,185 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                 member.powerLevelNorm = (member.powerLevel * 100) / maxPowerLevel;
             }
         }
-    }
+    };
 
     $scope.send = function() {
         if ($scope.textInput === "") {
             return;
         }
-
-        $scope.state.sending = true;
+        
+        scrollToBottom(true);
         
         var promise;
+        var isCmd = false;
         
         // Check for IRC style commands first
-        if ($scope.textInput.indexOf("/") === 0) {
-            var args = $scope.textInput.split(' ');
-            var cmd = args[0];
+        var line = $scope.textInput;
+        
+        // trim any trailing whitespace, as it can confuse the parser for IRC-style commands
+        line = line.replace(/\s+$/, "");
+        
+        if (line[0] === "/" && line[1] !== "/") {
+            isCmd = true;
+            
+            var bits = line.match(/^(\S+?)( +(.*))?$/);
+            var cmd = bits[1];
+            var args = bits[3];
+            
+            console.log("cmd: " + cmd + ", args: " + args);
             
             switch (cmd) {
                 case "/me":
-                    var emoteMsg = args.slice(1).join(' ');
-                    promise = matrixService.sendEmoteMessage($scope.room_id, emoteMsg);
+                    promise = matrixService.sendEmoteMessage($scope.room_id, args);
                     break;
                     
                 case "/nick":
                     // Change user display name
-                    if (2 === args.length) {
-                        promise = matrixService.setDisplayName(args[1]);
+                    if (args) {
+                        promise = matrixService.setDisplayName(args);                     
+                    }
+                    else {
+                        $scope.feedback = "Usage: /nick <display_name>";
                     }
                     break;
                     
                 case "/kick":
-                    // Kick a user from the room
-                    if (2 === args.length) {
-                        var user_id = args[1];
-
-                        // Set his state in the room as leave
-                        promise = matrixService.setMembership($scope.room_id, user_id, "leave");
-                    }
-                    break;
-                    
-                case "/ban":
-                    // Ban a user from the room
-                    if (2 <= args.length) {
-                        // TODO: The user may have entered the display name
-                        // Need display name -> user_id resolution. Pb: how to manage user with same display names?
-                        var user_id = args[1];
-
-                        // Does the user provide a reason?
-                        if (3 <= args.length) {
-                            var reason = args.slice(2).join(' ');
+                    // Kick a user from the room with an optional reason
+                    if (args) {
+                        var matches = args.match(/^(\S+?)( +(.*))?$/);
+                        if (matches) {
+                            promise = matrixService.kick($scope.room_id, matches[1], matches[3]);
                         }
-                        promise = matrixService.ban($scope.room_id, user_id, reason);
+                    }
+
+                    if (!promise) {
+                        $scope.feedback = "Usage: /kick <userId> [<reason>]";
                     }
                     break;
+
+                case "/ban":
+                    // Ban a user from the room with an optional reason
+                    if (args) {
+                        var matches = args.match(/^(\S+?)( +(.*))?$/);
+                        if (matches) {
+                            promise = matrixService.ban($scope.room_id, matches[1], matches[3]);
+                        }
+                    }
                     
+                    if (!promise) {
+                        $scope.feedback = "Usage: /ban <userId> [<reason>]";
+                    }
+                    break;
+
                 case "/unban":
                     // Unban a user from the room
-                    if (2 === args.length) {
-                        var user_id = args[1];
-
-                        // Reset the user membership to leave to unban him
-                        promise = matrixService.setMembership($scope.room_id, user_id, "leave");
+                    if (args) {
+                        var matches = args.match(/^(\S+)$/);
+                        if (matches) {
+                            // Reset the user membership to "leave" to unban him
+                            promise = matrixService.unban($scope.room_id, matches[1]);
+                        }
+                    }
+                    
+                    if (!promise) {
+                        $scope.feedback = "Usage: /unban <userId>";
                     }
                     break;
                     
                 case "/op":
                     // Define the power level of a user
-                    if (3 === args.length) {
-                        var user_id = args[1];
-                        var powerLevel = parseInt(args[2]);
-                        promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
+                    if (args) {
+                        var matches = args.match(/^(\S+?)( +(\d+))?$/);
+                        var powerLevel = 50; // default power level for op
+                        if (matches) {
+                            var user_id = matches[1];
+                            if (matches.length === 4) {
+                                powerLevel = parseInt(matches[3]);
+                            }
+                            if (powerLevel !== NaN) {
+                                promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
+                            }
+                        }
+                    }
+                    
+                    if (!promise) {
+                        $scope.feedback = "Usage: /op <userId> [<power level>]";
                     }
                     break;
                     
                 case "/deop":
                     // Reset the power level of a user
-                    if (2 === args.length) {
-                        var user_id = args[1];
-                        promise = matrixService.setUserPowerLevel($scope.room_id, user_id, undefined);
+                    if (args) {
+                        var matches = args.match(/^(\S+)$/);
+                        if (matches) {
+                            promise = matrixService.setUserPowerLevel($scope.room_id, args, undefined);
+                        }
                     }
+                    
+                    if (!promise) {
+                        $scope.feedback = "Usage: /deop <userId>";
+                    }
+                    break;
+                
+                default:
+                    $scope.feedback = ("Unrecognised IRC-style command: " + cmd);
                     break;
             }
         }
         
-        if (!promise) {
-            // Send the text message
-            promise = matrixService.sendTextMessage($scope.room_id, $scope.textInput);
+        // By default send this as a message unless it's an IRC-style command
+        if (!promise && !isCmd) {
+            var message = $scope.textInput;
+            $scope.textInput = "";
+
+            // Echo the message to the room
+            // To do so, create a minimalist fake text message event and add it to the in-memory list of room messages
+            var echoMessage = {
+                content: {
+                    body: message,
+                    hsob_ts: "Sending...",      // Hack timestamp to display this text in place of the message time
+                    msgtype: "m.text"
+                },
+                room_id: $scope.room_id,
+                type: "m.room.message",
+                user_id: $scope.state.user_id,
+                echo_msg_state: "messagePending"     // Add custom field to indicate the state of this fake message to HTML
+            };
+
+            $rootScope.events.rooms[$scope.room_id].messages.push(echoMessage);
+            scrollToBottom();
+
+            // Make the request
+            promise = matrixService.sendTextMessage($scope.room_id, message);
         }
-        
-        promise.then(
-            function() {
-                console.log("Request successfully sent");
-                $scope.textInput = "";
-                $scope.state.sending = false;
-            },
-            function(error) {
-                $scope.feedback = "Request failed: " + error.data.error;
-                $scope.state.sending = false;
-            });
+
+        if (promise) {
+            promise.then(
+                function() {
+                    console.log("Request successfully sent");
+
+                    if (echoMessage) {
+                        // Remove the fake echo message from the room messages
+                        // It will be replaced by the one acknowledged by the server
+                        var index = $rootScope.events.rooms[$scope.room_id].messages.indexOf(echoMessage);
+                        if (index > -1) {
+                            $rootScope.events.rooms[$scope.room_id].messages.splice(index, 1);
+                        }
+                    }
+                    else {
+                        $scope.textInput = "";
+                    }
+                },
+                function(error) {
+                    $scope.feedback = "Request failed: " + error.data.error;
+
+                    if (echoMessage) {
+                        // Mark the message as unsent for the rest of the page life
+                        echoMessage.content.hsob_ts = "Unsent";
+                        echoMessage.echo_msg_state = "messageUnSent";
+                    }
+                });
+        }
     };
 
     $scope.onInit = function() {
@@ -531,25 +627,20 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
     };
 
     $scope.sendImage = function(url, body) {
-        $scope.state.sending = true;
-
+        scrollToBottom(true);
+        
         matrixService.sendImageMessage($scope.room_id, url, body).then(
             function() {
                 console.log("Image sent");
-                $scope.state.sending = false;
             },
             function(error) {
                 $scope.feedback = "Failed to send image: " + error.data.error;
-                $scope.state.sending = false;
             });
     };
     
     $scope.imageFileToSend;
     $scope.$watch("imageFileToSend", function(newValue, oldValue) {
         if ($scope.imageFileToSend) {
-
-            $scope.state.sending = true;
-
             // Upload this image with its thumbnail to Internet
             mFileUpload.uploadImageAndThumbnail($scope.imageFileToSend, THUMBNAIL_SIZE).then(
                 function(imageMessage) {
@@ -557,16 +648,13 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
                     matrixService.sendMessage($scope.room_id, undefined, imageMessage).then(
                         function() {
                             console.log("Image message sent");
-                            $scope.state.sending = false;
                         },
                         function(error) {
                             $scope.feedback = "Failed to send image message: " + error.data.error;
-                            $scope.state.sending = false;
                         });
                 },
                 function(error) {
                     $scope.feedback = "Can't upload image";
-                    $scope.state.sending = false;
                 }
             );
         }
@@ -582,6 +670,6 @@ angular.module('RoomController', ['ngSanitize', 'mFileInput'])
         call.onHangup = $rootScope.onCallHangup;
         call.placeCall();
         $rootScope.currentCall = call;
-    }
+    };
 
 }]);

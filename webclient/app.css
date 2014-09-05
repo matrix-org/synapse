@@ -251,12 +251,14 @@ a:active  { color: #000; }
 .userAvatar .userAvatarImage {
     position: absolute;
     top: 0px;
-    object-fit: cover;    
+    object-fit: cover;
+    width: 100%;
 }
 
 .userAvatar .userAvatarGradient {
     position: absolute;
     bottom: 20px;
+    width: 100%;
 }
 
 .userAvatar .userName {
@@ -415,6 +417,13 @@ a:active  { color: #000; }
 .mine .text .bubble {
     background-color: #f8f8ff ! important;    
     text-align: left ! important;
+}
+
+.bubble .messagePending {
+    opacity: 0.3
+}
+.messageUnSent {
+    color: #F00;
 }
 
 #room-fullscreen-image {

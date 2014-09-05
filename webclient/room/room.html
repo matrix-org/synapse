@@ -3,7 +3,7 @@
     <div id="roomHeader">
         <a href ng-click="goToPage('/')"><img src="img/logo-small.png" width="100" height="43" alt="[matrix]"/></a>
         <div id="roomName">
-            {{ room_id  | roomName }}
+            {{ room_id  | mRoomName }}
         </div>
     </div>
 
@@ -40,7 +40,10 @@
                 ng-class="(events.rooms[room_id].messages[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
                 <td class="leftBlock">
                     <div class="sender" ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id">{{ members[msg.user_id].displayname || msg.user_id }}</div>
-                    <div class="timestamp">{{ (msg.content.hsob_ts || msg.ts) | date:'MMM d HH:mm' }}</div>
+                    <div class="timestamp"
+                         ng-class="msg.echo_msg_state">
+                        {{ (msg.content.hsob_ts || msg.ts) | date:'MMM d HH:mm' }}
+                    </div>
                 </td>
                 <td class="avatar">
                     <img class="avatarImage" ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.png' }}" width="32" height="32"
@@ -59,15 +62,24 @@
                                 {{ members[msg.user_id].displayname || msg.user_id }}
                                 {{ {"join": "kicked", "ban": "unbanned"}[msg.content.prev] }}
                                 {{ members[msg.state_key].displayname || msg.state_key }}
+                                <span ng-if="'join' === msg.content.prev && msg.content.reason">
+                                    : {{ msg.content.reason }}
+                                </span>
                             </span>
                         </span>
                         <span ng-if="'invite' === msg.content.membership || 'ban' === msg.content.membership">
                             {{ members[msg.user_id].displayname || msg.user_id }}
                             {{ {"invite": "invited", "ban": "banned"}[msg.content.membership] }}
                             {{ members[msg.state_key].displayname || msg.state_key }}
-                        </span>
+                            <span ng-if="'ban' === msg.content.prev && msg.content.reason">
+                                : {{ msg.content.reason }}
+                            </span>
+                        </span>                        
+                        
                         <span ng-show='msg.content.msgtype === "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
-                        <span ng-show='msg.content.msgtype === "m.text"' ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
+                        <span ng-show='msg.content.msgtype === "m.text"' 
+                              ng-class="msg.echo_msg_state"
+                              ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
                         <div ng-show='msg.content.msgtype === "m.image"'>
                             <div ng-hide='msg.content.thumbnail_url' ng-style="msg.content.body.h && { 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
                                 <img class="image" ng-src="{{ msg.content.url }}"/>
