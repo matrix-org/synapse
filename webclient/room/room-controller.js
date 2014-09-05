@@ -42,23 +42,24 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     $scope.imageURLToSend = "";
     $scope.userIDToInvite = "";
     
-    var scrollToBottom = function() {
+    var scrollToBottom = function(force) {
         console.log("Scrolling to bottom");
-        $timeout(function() {
-            var objDiv = document.getElementById("messageTableWrapper");
-            objDiv.scrollTop = objDiv.scrollHeight;
-        }, 0);
+        
+        // Do not autoscroll to the bottom to display the new event if the user is not at the bottom.
+        // Exception: in case where the event is from the user, we want to force scroll to the bottom
+        var objDiv = document.getElementById("messageTableWrapper");
+        if ((objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || force) {
+            
+            $timeout(function() {
+                objDiv.scrollTop = objDiv.scrollHeight;
+            }, 0);
+        }
     };
 
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
         if (isLive && event.room_id === $scope.room_id) {
-
-            // Do not autoscroll to the bottom to display this new event if the user is not at the bottom.
-            // Exception: if the event is from the user, scroll to the bottom
-            var objDiv = document.getElementById("messageTableWrapper");
-            if ( (objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || event.user_id === $scope.state.user_id) {
-                scrollToBottom();
-            }
+            
+            scrollToBottom();
 
             if (window.Notification) {
                 // Show notification when the user is idle
@@ -80,6 +81,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
         if (isLive) {
+            scrollToBottom();
             updateMemberList(event);
         }
     });
@@ -287,6 +289,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         if ($scope.textInput === "") {
             return;
         }
+        
+        scrollToBottom(true);
         
         var promise;
         var isCmd = false;
@@ -614,7 +618,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     $scope.sendImage = function(url, body) {
-
+        scrollToBottom(true);
+        
         matrixService.sendImageMessage($scope.room_id, url, body).then(
             function() {
                 console.log("Image sent");
