@@ -45,18 +45,29 @@
     <div id="header">
         <!-- Do not show buttons on the login page -->
         <div id="headerContent" ng-hide="'/login' == location || '/register' == location">
-            <div id="callBar">
-                <div ng-show="currentCall.state == 'ringing'">
-                Incoming call from {{ currentCall.user_id }}
-                <button ng-click="answerCall()">Answer</button>
-                <button ng-click="hangupCall()">Reject</button>
+            <div id="callBar" ng-show="currentCall">
+                <img id="callPeerImage" ng-show="currentCall.userProfile.avatar_url" ngSrc="{{ currentCall.userProfile.avatar_url }}" />
+                <img class="callIcon" src="img/green_phone.png" ng-show="currentCall.state != 'ended'" />
+                <img class="callIcon" id="callEndedIcon" src="img/red_phone.png" ng-show="currentCall.state == 'ended'" />
+                <div id="callPeerNameAndState">
+                    <span id="callPeerName">{{ currentCall.userProfile.displayname }}</span>
+                    <br />
+                    <span id="callState">
+                        <span ng-show="currentCall.state == 'invite_sent'">Calling...</span>
+                        <span ng-show="currentCall.state == 'connecting'">Call Connecting...</span>
+                        <span ng-show="currentCall.state == 'connected'">Call Connected</span>
+                        <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound'">Call Rejected</span>
+                        <span ng-show="currentCall.state == 'ended' && currentCall.didConnect && currentCall.direction == 'outbound'">Call Ended</span>
+                        <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'inbound'">Call Canceled</span>
+                        <span ng-show="currentCall.state == 'ended' && currentCall.didConnect && currentCall.direction == 'inbound'">Call Ended</span>
+                        <span ng-show="currentCall.state == 'wait_local_media'">Waiting for media permission...</span>
+                    </span>
                 </div>
+                <span ng-show="currentCall.state == 'ringing'">
+                    <button ng-click="answerCall()">Answer</button>
+                    <button ng-click="hangupCall()">Reject</button>
+                </span>
                 <button ng-click="hangupCall()" ng-show="currentCall && currentCall.state != 'ringing' && currentCall.state != 'ended' && currentCall.state != 'fledgling'">Hang up</button>
-                <span ng-show="currentCall.state == 'invite_sent'">Calling...</span>
-                <span ng-show="currentCall.state == 'connecting'">Call Connecting...</span>
-                <span ng-show="currentCall.state == 'connected'">Call Connected</span>
-                <span ng-show="currentCall.state == 'ended'">Call Ended</span>
-                <span style="display: none; ">{{ currentCall.state }}</span>
             </div>
             <a href id="headerUserId" ng-click='goToUserPage(user_id)'>{{ user_id }}</a>
             &nbsp;

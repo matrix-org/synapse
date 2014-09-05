@@ -295,6 +295,11 @@ angular.module('matrixService', [])
             return doRequest("GET", path);
         },
         
+        // get a user's profile
+        getProfile: function(userId) {
+            return this.getProfileInfo(userId);
+        },
+
         // get a display name for this user ID
         getDisplayName: function(userId) {
             return this.getProfileInfo(userId, "displayname");
@@ -328,8 +333,8 @@ angular.module('matrixService', [])
         },
 
         getProfileInfo: function(userId, info_segment) {
-            var path = "/profile/$user_id/" + info_segment;
-            path = path.replace("$user_id", userId);
+            var path = "/profile/"+userId
+            if (info_segment) path += '/' + info_segment;
             return doRequest("GET", path);
         },
         
