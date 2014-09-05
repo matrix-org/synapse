@@ -120,7 +120,9 @@ angular.module('matrixFilter', [])
             var room = $rootScope.events.rooms[room_id];
             if (room && (user_id in room.members)) {
                 var member = room.members[user_id];
-                displayName = member.content.displayname;
+                if (member.content.displayname) {
+                    displayName = member.content.displayname;
+                }
             }
         }
         
