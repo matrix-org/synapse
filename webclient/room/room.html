@@ -62,13 +62,20 @@
                                 {{ members[msg.user_id].displayname || msg.user_id }}
                                 {{ {"join": "kicked", "ban": "unbanned"}[msg.content.prev] }}
                                 {{ members[msg.state_key].displayname || msg.state_key }}
+                                <span ng-if="'join' === msg.content.prev && msg.content.reason">
+                                    : {{ msg.content.reason }}
+                                </span>
                             </span>
                         </span>
                         <span ng-if="'invite' === msg.content.membership || 'ban' === msg.content.membership">
                             {{ members[msg.user_id].displayname || msg.user_id }}
                             {{ {"invite": "invited", "ban": "banned"}[msg.content.membership] }}
                             {{ members[msg.state_key].displayname || msg.state_key }}
-                        </span>
+                            <span ng-if="'ban' === msg.content.prev && msg.content.reason">
+                                : {{ msg.content.reason }}
+                            </span>
+                        </span>                        
+                        
                         <span ng-show='msg.content.msgtype === "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
                         <span ng-show='msg.content.msgtype === "m.text"' 
                               ng-class="msg.echo_msg_state"

@@ -34,11 +34,17 @@
                                     {{ {"join": "kicked", "ban": "unbanned"}[room.lastMsg.content.prev] }}
                                     {{ room.lastMsg.state_key | mUserDisplayName: room.room_id }}
                                 </span>
+                                <span ng-if="'join' === room.lastMsg.content.prev && room.lastMsg.content.reason">
+                                    : {{ room.lastMsg.content.reason }}
+                                </span>
                             </span>
                             <span ng-if="'invite' === room.lastMsg.content.membership || 'ban' === room.lastMsg.content.membership">
                                 {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }}
                                 {{ {"invite": "invited", "ban": "banned"}[room.lastMsg.content.membership] }}
                                 {{ room.lastMsg.state_key | mUserDisplayName: room.room_id }}
+                                <span ng-if="'ban' === room.lastMsg.content.prev && room.lastMsg.content.reason">
+                                    : {{ room.lastMsg.content.reason }}
+                                </span>
                             </span>
                         </div>
 
