@@ -351,7 +351,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     var matches = args.match(/^(\S+)$/);
                     if (matches) {
                         // Reset the user membership to "leave" to unban him
-                        promise = matrixService.setMembership($scope.room_id, args, "leave");
+                        promise = matrixService.setMembership($scope.room_id, matches[1], "leave");
                     }
                     else {
                         $scope.feedback = "Usage: /unban <userId>";

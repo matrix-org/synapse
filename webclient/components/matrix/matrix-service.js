@@ -169,7 +169,7 @@ angular.module('matrixService', [])
 
         // Change the membership of an another user
         setMembership: function(room_id, user_id, membershipValue) {
-            return this.setMemberShipObject(room_id, user_id, {
+            return this.setMembershipObject(room_id, user_id, {
                 membership : membershipValue
             });
         },
