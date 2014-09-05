@@ -54,8 +54,14 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
         if (isLive && event.room_id === $scope.room_id) {
-            scrollToBottom();
-            
+
+            // Do not autoscroll to the bottom to display this new event if the user is not at the bottom.
+            // Exception: if the event is from the user, scroll to the bottom
+            var objDiv = document.getElementById("messageTableWrapper");
+            if ( (objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || event.user_id === $scope.state.user_id) {
+                scrollToBottom();
+            }
+
             if (window.Notification) {
                 // Show notification when the user is idle
                 if (matrixService.presence.offline === mPresence.getState()) {
