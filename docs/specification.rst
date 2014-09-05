@@ -347,11 +347,12 @@ Receiving live updates on a client
 Clients can receive new events by long-polling the home server. This will hold open the
 HTTP connection for a short period of time waiting for new events, returning early if an
 event occurs. This is called the `Event Stream`_. All events which are visible to the
-client and match the client's query will appear in the event stream. When the request
+client will appear in the event stream. When the request
 returns, an ``end`` token is included in the response. This token can be used in the next
 request to continue where the client left off.
 
 .. TODO
+  How do we filter the event stream?
   Do we ever return multiple events in a single request?  Don't we get lots of request
   setup RTT latency if we only do one event per request? Do we ever support streaming
   requests? Why not websockets?
@@ -473,7 +474,9 @@ action in a room a user must have a suitable power level.
 
 Power levels for users are defined in ``m.room.power_levels``, where both
 a default and specific users' power levels can be set. By default all users
-have a power level of 0.
+have a power level of 0, other than the room creator whose power level defaults to 100.
+Power levels for users are tracked per-room even if the user is not present in 
+the room.
 
 State events may contain a ``required_power_level`` key, which indicates the
 minimum power a user must have before they can update that state key. The only
@@ -483,11 +486,11 @@ To perform certain actions there are additional power level requirements
 defined in the following state events:
 
 - ``m.room.send_event_level`` defines the minimum level for sending non-state 
-  events. Defaults to 5.
+  events. Defaults to 50.
 - ``m.room.add_state_level`` defines the minimum level for adding new state,
-  rather than updating existing state. Defaults to 5.
+  rather than updating existing state. Defaults to 50.
 - ``m.room.ops_level`` defines the minimum levels to ban and kick other users.
-  This defaults to a kick and ban levels of 5 each.
+  This defaults to a kick and ban levels of 50 each.
 
 
 Joining rooms
@@ -1219,7 +1222,7 @@ Or a rejected call:
 
 Calls are negotiated according to the WebRTC specification.
  
-
+ 
 Profiles
 ========
 .. NOTE::
@@ -1234,8 +1237,8 @@ Profiles
   - Display name changes also generates m.room.member with displayname key f.e. room
     the user is in.
 
-Internally within Matrix users are referred to by their user ID, which is not a
-human-friendly string. Profiles grant users the ability to see human-readable 
+Internally within Matrix users are referred to by their user ID, which is typically
+a compact unique identifier. Profiles grant users the ability to see human-readable 
 names for other users that are in some way meaningful to them. Additionally, 
 profiles can publish additional information, such as the user's age or location.
 
@@ -1549,17 +1552,19 @@ Federation is the term used to describe how to communicate between Matrix home
 servers. Federation is a mechanism by which two home servers can exchange
 Matrix event messages, both as a real-time push of current events, and as a
 historic fetching mechanism to synchronise past history for clients to view. It
-uses HTTP connections between each pair of servers involved as the underlying
+uses HTTPS connections between each pair of servers involved as the underlying
 transport. Messages are exchanged between servers in real-time by active pushing
 from each server's HTTP client into the server of the other. Queries to fetch
 historic data for the purpose of back-filling scrollback buffers and the like
-can also be performed.
+can also be performed. Currently routing of messages between homeservers is full
+mesh (like email) - however, fan-out refinements to this design are currently
+under consideration.
 
 There are three main kinds of communication that occur between home servers:
 
 :Queries:
    These are single request/response interactions between a given pair of
-   servers, initiated by one side sending an HTTP GET request to obtain some
+   servers, initiated by one side sending an HTTPS GET request to obtain some
    information, and responded by the other. They are not persisted and contain
    no long-term significant history. They simply request a snapshot state at the
    instant the query is made.
@@ -1775,7 +1780,7 @@ by the same origin as the current one, or other origins.
 Because of the distributed nature of participants in a Matrix conversation, it
 is impossible to establish a globally-consistent total ordering on the events.
 However, by annotating each outbound PDU at its origin with IDs of other PDUs it
-has received, a partial ordering can be constructed allowing causallity
+has received, a partial ordering can be constructed allowing causality
 relationships to be preserved. A client can then display these messages to the
 end-user in some order consistent with their content and ensure that no message
 that is semantically in reply of an earlier one is ever displayed before it.
@@ -1861,7 +1866,7 @@ Retrieves a sliding-window history of previous PDUs that occurred on the
 given context. Starting from the PDU ID(s) given in the "v" argument, the
 PDUs that preceeded it are retrieved, up to a total number given by the
 "limit" argument. These are then returned in a new Transaction containing all
-off the PDUs.
+of the PDUs.
 
 
 To stream events all the events::
@@ -2046,6 +2051,9 @@ The ``retry_after_ms`` key SHOULD be included to tell the client how long they h
 in milliseconds before they can try again.
 
 .. TODO
+  - Surely we should recommend an algorithm for the rate limiting, rather than letting every
+    homeserver come up with their own idea, causing totally unpredictable performance over
+    federated rooms?
   - crypto (s-s auth)
   - E2E
   - Lawful intercept + Key Escrow
@@ -2056,6 +2064,9 @@ Policy Servers
 .. NOTE::
   This section is a work in progress.
 
+.. TODO
+  We should mention them in the Architecture section at least...
+  
 Content repository
 ==================
 .. NOTE::
@@ -2154,6 +2165,9 @@ Transaction:
   A message which relates to the communication between a given pair of servers.
   A transaction contains possibly-empty lists of PDUs and EDUs.
 
+.. TODO
+  This glossary contradicts the terms used above - especially on State Events v. "State"
+  and Non-State Events v. "Events".  We need better consistent names.
 
 .. Links through the external API docs are below
 .. =============================================
