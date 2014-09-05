@@ -175,16 +175,18 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     var updateMemberList = function(chunk) {
         if (chunk.room_id != $scope.room_id) return;
 
-        // Ignore banned and kicked (leave) people
-        if ("ban" === chunk.membership || "leave" === chunk.membership) {
-            return;
-        }
 
         // set target_user_id to keep things clear
         var target_user_id = chunk.state_key;
 
         var isNewMember = !(target_user_id in $scope.members);
         if (isNewMember) {
+            
+            // Ignore banned and kicked (leave) people
+            if ("ban" === chunk.membership || "leave" === chunk.membership) {
+                return;
+            }
+        
             // FIXME: why are we copying these fields around inside chunk?
             if ("presence" in chunk.content) {
                 chunk.presence = chunk.content.presence;
@@ -208,6 +210,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         }
         else {
             // selectively update membership and presence else it will nuke the picture and displayname too :/
+            
+            // Remove banned and kicked (leave) people
+            if ("ban" === chunk.membership || "leave" === chunk.membership) {
+                delete $scope.members[target_user_id];
+                return;
+            }
+            
             var member = $scope.members[target_user_id];
             member.membership = chunk.content.membership;
             if ("presence" in chunk.content) {
