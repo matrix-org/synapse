@@ -26,9 +26,6 @@ Typically, this service will store events or broadcast them to any listeners
 (e.g. controllers) via $broadcast. Alternatively, it may update the $rootScope
 if typically all the $on method would do is update its own $scope.
 */
-
-var toto;
-
 angular.module('eventHandlerService', [])
 .factory('eventHandlerService', ['matrixService', '$rootScope', '$q', function(matrixService, $rootScope, $q) {
     var ROOM_CREATE_EVENT = "ROOM_CREATE_EVENT";
@@ -40,9 +37,6 @@ angular.module('eventHandlerService', [])
     var NAME_EVENT = "NAME_EVENT";
 
     var InitialSyncDeferred = $q.defer();
-    
-    
-    toto = $rootScope;
     
     $rootScope.events = {
         rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
