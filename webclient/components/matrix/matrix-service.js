@@ -525,7 +525,6 @@ angular.module('matrixService', [])
                 room_alias: undefined,
                 room_display_name: undefined
             };
-            
             var alias = this.getRoomIdToAliasMapping(room.room_id);
             if (alias) {
                 // use the existing alias from storage
@@ -539,6 +538,7 @@ angular.module('matrixService', [])
                 // TODO: select the smarter alias from the array
                 this.createRoomIdToAliasMapping(room.room_id, room.aliases[0]);
                 result.room_display_name = room.aliases[0];
+                result.room_alias = room.aliases[0];
             }
             else if (room.membership === "invite" && "inviter" in room) {
                 result.room_display_name = room.inviter + "'s room";
@@ -551,7 +551,6 @@ angular.module('matrixService', [])
         },
         
         createRoomIdToAliasMapping: function(roomId, alias) {
-            //console.log("creating mapping between " + roomId + " and " + alias);
             roomIdToAlias[roomId] = alias;
             aliasToRoomId[alias] = roomId;
             // localStorage.setItem(MAPPING_PREFIX+roomId, alias);
