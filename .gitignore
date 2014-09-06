@@ -24,4 +24,6 @@ graph/*.svg
 graph/*.png
 graph/*.dot
 
+webclient/config.js
+
 uploads

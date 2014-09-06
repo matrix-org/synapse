@@ -84,15 +84,32 @@ angular.module('matrixService', [])
         prefix: prefixPath,
 
         // Register an user
-        register: function(user_name, password, threepidCreds) {
+        register: function(user_name, password, threepidCreds, useCaptcha) {         
             // The REST path spec
             var path = "/register";
-
-            return doRequest("POST", path, undefined, {
+            
+            var data = {
                  user_id: user_name,
                  password: password,
                  threepidCreds: threepidCreds
-            });
+            };
+            
+            if (useCaptcha) {
+                // Not all home servers will require captcha on signup, but if this flag is checked,
+                // send captcha information.
+                // TODO: Might be nice to make this a bit more flexible..
+                var challengeToken = Recaptcha.get_challenge();
+                var captchaEntry = Recaptcha.get_response();
+                var captchaType = "m.login.recaptcha";
+                
+                data.captcha = {
+                    type: captchaType,
+                    challenge: challengeToken,
+                    response: captchaEntry
+                };
+            }   
+
+            return doRequest("POST", path, undefined, data);
         },
 
         // Create a room
