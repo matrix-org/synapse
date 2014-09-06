@@ -16,7 +16,7 @@
 
 from twisted.internet import defer
 
-from synapse.federation.pdu_codec import encode_event_id
+from synapse.federation.pdu_codec import encode_event_id, decode_event_id
 from synapse.util.logutils import log_function
 
 from collections import namedtuple
@@ -87,9 +87,11 @@ class StateHandler(object):
         # than the power level of the user
         # power_level = self._get_power_level_for_event(event)
 
+        pdu_id, origin = decode_event_id(event.event_id, self.server_name)
+
         yield self.store.update_current_state(
-            pdu_id=event.event_id,
-            origin=self.server_name,
+            pdu_id=pdu_id,
+            origin=origin,
             context=key.context,
             pdu_type=key.type,
             state_key=key.state_key
