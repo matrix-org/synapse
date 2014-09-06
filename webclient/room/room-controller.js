@@ -333,6 +333,40 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                         $scope.feedback = "Usage: /nick <display_name>";
                     }
                     break;
+
+                case "/join":
+                    // Join a room
+                    if (args) {
+                        var matches = args.match(/^(\S+)$/);
+                        if (matches) {
+                            var room_alias = matches[1];
+                            if (room_alias.indexOf(':') == -1) {
+                                // FIXME: actually track the :domain style name of our homeserver
+                                // with or without port as is appropriate and append it at this point
+                            }
+                            
+                            var room_id = matrixService.getAliasToRoomIdMapping(room_alias);
+                            console.log("joining " + room_alias + " id=" + room_id);
+                            if ($rootScope.events.rooms[room_id]) {
+                                // don't send a join event for a room you're already in.
+                                $location.url("room/" + room_alias);
+                            }
+                            else {
+                                promise = matrixService.joinAlias(room_alias).then(
+                                    function(response) {
+                                        $location.url("room/" + room_alias);
+                                    },
+                                    function(error) {
+                                        $scope.feedback = "Can't join room: " + JSON.stringify(error.data);
+                                    }
+                                );
+                            }
+                        }
+                    }
+                    else {
+                        $scope.feedback = "Usage: /join <room_alias>";
+                    }
+                    break;
                     
                 case "/kick":
                     // Kick a user from the room with an optional reason
@@ -428,13 +462,14 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             var echoMessage = {
                 content: {
                     body: message,
-                    hsob_ts: "Sending...",      // Hack timestamp to display this text in place of the message time
+                    hsob_ts: new Date().getTime(), // fake a timestamp
                     msgtype: "m.text"
                 },
                 room_id: $scope.room_id,
                 type: "m.room.message",
                 user_id: $scope.state.user_id,
-                echo_msg_state: "messagePending"     // Add custom field to indicate the state of this fake message to HTML
+                // FIXME: re-enable echo_msg_state when we have a nice way to turn the field off again
+                // echo_msg_state: "messagePending"     // Add custom field to indicate the state of this fake message to HTML
             };
 
             $rootScope.events.rooms[$scope.room_id].messages.push(echoMessage);
@@ -448,18 +483,21 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             promise.then(
                 function() {
                     console.log("Request successfully sent");
-
+                    $scope.textInput = "";
+/*
                     if (echoMessage) {
                         // Remove the fake echo message from the room messages
                         // It will be replaced by the one acknowledged by the server
-                        var index = $rootScope.events.rooms[$scope.room_id].messages.indexOf(echoMessage);
-                        if (index > -1) {
-                            $rootScope.events.rooms[$scope.room_id].messages.splice(index, 1);
-                        }
+                        // ...except this causes a nasty flicker.  So don't swap messages for now. --matthew
+                        // var index = $rootScope.events.rooms[$scope.room_id].messages.indexOf(echoMessage);
+                        // if (index > -1) {
+                        //     $rootScope.events.rooms[$scope.room_id].messages.splice(index, 1);
+                        // }
                     }
                     else {
                         $scope.textInput = "";
                     }
+*/                    
                 },
                 function(error) {
                     $scope.feedback = "Request failed: " + error.data.error;

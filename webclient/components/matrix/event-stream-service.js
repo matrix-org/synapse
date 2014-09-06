@@ -110,6 +110,7 @@ angular.module('eventStreamService', [])
                 var rooms = response.data.rooms;
                 for (var i = 0; i < rooms.length; ++i) {
                     var room = rooms[i];
+                    // console.log("got room: " + room.room_id);
                     if ("state" in room) {
                         eventHandlerService.handleEvents(room.state, false);
                     }

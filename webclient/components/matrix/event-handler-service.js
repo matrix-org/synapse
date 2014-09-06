@@ -66,11 +66,21 @@ angular.module('eventHandlerService', [])
         $rootScope.$broadcast(ROOM_CREATE_EVENT, event, isLiveEvent);
     };
 
+    var handleRoomAliases = function(event, isLiveEvent) {
+        matrixService.createRoomIdToAliasMapping(event.room_id, event.content.aliases[0]);
+    };
+
     var handleMessage = function(event, isLiveEvent) {
         initRoom(event.room_id);
         
         if (isLiveEvent) {
-            $rootScope.events.rooms[event.room_id].messages.push(event);
+            if (event.user_id === matrixService.config().user_id) {
+                // assume we've already echoed it
+                // FIXME: track events by ID and ungrey the right message to show it's been delivered
+            }
+            else {
+                $rootScope.events.rooms[event.room_id].messages.push(event);
+            }
         }
         else {
             $rootScope.events.rooms[event.room_id].messages.unshift(event);
@@ -86,6 +96,14 @@ angular.module('eventHandlerService', [])
     
     var handleRoomMember = function(event, isLiveEvent) {
         initRoom(event.room_id);
+        
+        // if the server is stupidly re-relaying a no-op join, discard it.
+        if (event.prev_content && 
+            event.content.membership === "join" &&
+            event.content.membership === event.prev_content.membership)
+        {
+            return;
+        }
         
         // add membership changes as if they were a room message if something interesting changed
         if (event.content.prev !== event.content.membership) {
@@ -143,6 +161,9 @@ angular.module('eventHandlerService', [])
             switch(event.type) {
                 case "m.room.create":
                     handleRoomCreate(event, isLiveEvent);
+                    break;
+                case "m.room.aliases":
+                    handleRoomAliases(event, isLiveEvent);
                     break;
                 case "m.room.message":
                     handleMessage(event, isLiveEvent);

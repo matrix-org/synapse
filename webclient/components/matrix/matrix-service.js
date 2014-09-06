@@ -36,6 +36,9 @@ angular.module('matrixService', [])
     */    
     var config;
     
+    var roomIdToAlias = {};
+    var aliasToRoomId = {};
+    
     // Current version of permanent storage
     var configVersion = 0;
     var prefixPath = "/_matrix/client/api/v1";
@@ -529,6 +532,8 @@ angular.module('matrixService', [])
                 result.room_alias = alias;
                 result.room_display_name = alias;
             }
+            // XXX: this only lets us learn aliases from our local HS - we should
+            // make the client stop returning this if we can trust m.room.aliases state events
             else if (room.aliases && room.aliases[0]) {
                 // save the mapping
                 // TODO: select the smarter alias from the array
@@ -546,13 +551,23 @@ angular.module('matrixService', [])
         },
         
         createRoomIdToAliasMapping: function(roomId, alias) {
-            localStorage.setItem(MAPPING_PREFIX+roomId, alias);
+            //console.log("creating mapping between " + roomId + " and " + alias);
+            roomIdToAlias[roomId] = alias;
+            aliasToRoomId[alias] = roomId;
+            // localStorage.setItem(MAPPING_PREFIX+roomId, alias);
         },
         
         getRoomIdToAliasMapping: function(roomId) {
-            return localStorage.getItem(MAPPING_PREFIX+roomId);
+            var alias = roomIdToAlias[roomId]; // was localStorage.getItem(MAPPING_PREFIX+roomId)
+            //console.log("looking for alias for " + roomId + "; found: " + alias);
+            return alias;
         },
 
+        getAliasToRoomIdMapping: function(alias) {
+            var roomId = aliasToRoomId[alias];
+            //console.log("looking for roomId for " + alias + "; found: " + roomId);
+            return roomId;
+        },
 
         /****** Power levels management ******/
 
