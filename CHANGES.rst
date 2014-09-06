@@ -1,3 +1,24 @@
+Changes in synapse 0.2.2 (2014-09-06)
+=====================================
+
+Homeserver:
+ * When the server returns state events it now also includes the previous 
+   content.
+ * Add support for inviting people when creating a new room.
+ * Make the homeserver inform the room via `m.room.aliases` when a new alias
+   is added for a room.
+ * Validate `m.room.power_level` events.
+
+Webclient:
+ * Add support for captchas on registration.
+ * Handle `m.room.aliases` events.
+ * Asynchronously send messages and show a local echo.
+ * Inform the UI when a message failed to send.
+ * Only autoscroll on receiving a new message if the user was already at the 
+   bottom of the screen.
+ * Add support for ban/kick reasons.
+ * Fix bug where we occaisonally saw duplicated join messages.
+
 Changes in synapse 0.2.1 (2014-09-03)
 =====================================
 
