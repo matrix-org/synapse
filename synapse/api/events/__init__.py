@@ -157,7 +157,12 @@ class SynapseEvent(JsonEncodedObject):
 
 
 class SynapseStateEvent(SynapseEvent):
-     def __init__(self, **kwargs):
+
+    valid_keys = SynapseEvent.valid_keys + [
+        "prev_content",
+    ]
+
+    def __init__(self, **kwargs):
         if "state_key" not in kwargs:
             kwargs["state_key"] = ""
         super(SynapseStateEvent, self).__init__(**kwargs)

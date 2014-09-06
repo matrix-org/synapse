@@ -312,6 +312,25 @@ class SQLBaseStore(object):
             **d
         )
 
+    def _parse_events(self, rows):
+        return self._db_pool.runInteraction(self._parse_events_txn, rows)
+
+    def _parse_events_txn(self, txn, rows):
+        events = [self._parse_event_from_row(r) for r in rows]
+
+        sql = "SELECT * FROM events WHERE event_id = ?"
+
+        for ev in events:
+           if hasattr(ev, "prev_state"):
+                # Load previous state_content. 
+                # TODO: Should we be pulling this out above?
+                cursor = txn.execute(sql, (ev.prev_state,))
+                prevs = self.cursor_to_dict(cursor)
+                if prevs:
+                    prev = self._parse_event_from_row(prevs[0])
+                    ev.prev_content = prev.content
+
+        return events
 
 class Table(object):
     """ A base class used to store information about a particular table.

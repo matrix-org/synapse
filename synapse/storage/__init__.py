@@ -81,7 +81,7 @@ class DataStore(RoomMemberStore, RoomStore,
         defer.returnValue(latest)
 
     @defer.inlineCallbacks
-    def get_event(self, event_id):
+    def get_event(self, event_id, allow_none=False):
         events_dict = yield self._simple_select_one(
             "events",
             {"event_id": event_id},
@@ -92,7 +92,11 @@ class DataStore(RoomMemberStore, RoomStore,
                 "content",
                 "unrecognized_keys"
             ],
+            allow_none=allow_none,
         )
+
+        if not events_dict:
+            defer.returnValue(None)
 
         event = self._parse_event_from_row(events_dict)
         defer.returnValue(event)
@@ -220,7 +224,8 @@ class DataStore(RoomMemberStore, RoomStore,
 
         results = yield self._execute_and_decode(sql, *args)
 
-        defer.returnValue([self._parse_event_from_row(r) for r in results])
+        events = yield self._parse_events(results)
+        defer.returnValue(events)
 
     @defer.inlineCallbacks
     def _get_min_token(self):
