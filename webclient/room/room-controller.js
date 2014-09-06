@@ -62,8 +62,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             scrollToBottom();
 
             if (window.Notification) {
-                // Show notification when the user is idle
-                if (matrixService.presence.offline === mPresence.getState()) {
+                // Show notification when the window is hidden, or the user is idle
+                if (document.hidden || matrixService.presence.unavailable === mPresence.getState()) {
                     var notification = new window.Notification(
                         ($scope.members[event.user_id].displayname || event.user_id) +
                         " (" + ($scope.room_alias || $scope.room_id) + ")", // FIXME: don't leak room_ids here

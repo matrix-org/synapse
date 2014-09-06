@@ -24,7 +24,7 @@ angular.module('mPresence', [])
 .service('mPresence', ['$timeout', 'matrixService', function ($timeout, matrixService) {
 
     // Time in ms after that a user is considered as unavailable/away
-    var UNAVAILABLE_TIME = 5 * 60000; // 5 mins
+    var UNAVAILABLE_TIME = 3 * 60000; // 3 mins
    
     // The current presence state
     var state = undefined;
