@@ -19,7 +19,11 @@ angular.module('RegisterController', ['matrixService'])
                                     function($scope, $rootScope, $location, matrixService, eventStreamService) {
     'use strict';
     
+    var config = window.webClientConfig;
     var useCaptcha = true;
+    if (config !== undefined) {
+        useCaptcha = config.useCaptcha;
+    }
     
     // FIXME: factor out duplication with login-controller.js
     
@@ -131,6 +135,10 @@ angular.module('RegisterController', ['matrixService'])
                     }
                     else if (error.data.errcode == "M_CAPTCHA_INVALID") {
                         $scope.feedback = "Failed captcha.";
+                    }
+                    else if (error.data.errcode == "M_CAPTCHA_NEEDED") {
+                        $scope.feedback = "Captcha is required on this home " +
+                                          "server.";
                     }
                 }
                 else if (error.status === 0) {
