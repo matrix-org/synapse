@@ -418,6 +418,16 @@ which can be set when creating a room:
     If this is included, an ``m.room.topic`` event will be sent into the room to indicate the
     topic for the room. See `Room Events`_ for more information on ``m.room.topic``.
 
+``invite``
+  Type:
+    List
+  Optional:
+    Yes
+  Value:
+    A list of user ids to invite.
+  Description:
+    This will tell the server to invite everyone in the list to the newly created room.
+
 Example::
 
   {
