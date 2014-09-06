@@ -41,6 +41,11 @@ angular.module('eventHandlerService', [])
     $rootScope.events = {
         rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
     };
+    
+    // used for dedupping events - could be expanded in future...
+    // FIXME: means that we leak memory over time (along with lots of the rest
+    // of the app, given we never try to reap memory yet)
+    var eventMap = {};
 
     $rootScope.presence = {};
     
@@ -155,42 +160,48 @@ angular.module('eventHandlerService', [])
         POWERLEVEL_EVENT: POWERLEVEL_EVENT,
         CALL_EVENT: CALL_EVENT,
         NAME_EVENT: NAME_EVENT,
-        
     
         handleEvent: function(event, isLiveEvent) {
-            switch(event.type) {
-                case "m.room.create":
-                    handleRoomCreate(event, isLiveEvent);
-                    break;
-                case "m.room.aliases":
-                    handleRoomAliases(event, isLiveEvent);
-                    break;
-                case "m.room.message":
-                    handleMessage(event, isLiveEvent);
-                    break;
-                case "m.room.member":
-                    handleRoomMember(event, isLiveEvent);
-                    break;
-                case "m.presence":
-                    handlePresence(event, isLiveEvent);
-                    break;
-                case 'm.room.ops_levels':
-                case 'm.room.send_event_level':
-                case 'm.room.add_state_level':
-                case 'm.room.join_rules':
-                case 'm.room.power_levels':
-                    handlePowerLevels(event, isLiveEvent);
-                    break;
-                case 'm.room.name':
-                    handleRoomName(event, isLiveEvent);
-                    break;
-                default:
-                    console.log("Unable to handle event type " + event.type);
-                    console.log(JSON.stringify(event, undefined, 4));
-                    break;
+            if (eventMap[event.event_id]) {
+                console.log("discarding duplicate event: " + JSON.stringify(event));
+                return;
             }
+            
             if (event.type.indexOf('m.call.') === 0) {
                 handleCallEvent(event, isLiveEvent);
+            }
+            else {            
+                switch(event.type) {
+                    case "m.room.create":
+                        handleRoomCreate(event, isLiveEvent);
+                        break;
+                    case "m.room.aliases":
+                        handleRoomAliases(event, isLiveEvent);
+                        break;
+                    case "m.room.message":
+                        handleMessage(event, isLiveEvent);
+                        break;
+                    case "m.room.member":
+                        handleRoomMember(event, isLiveEvent);
+                        break;
+                    case "m.presence":
+                        handlePresence(event, isLiveEvent);
+                        break;
+                    case 'm.room.ops_levels':
+                    case 'm.room.send_event_level':
+                    case 'm.room.add_state_level':
+                    case 'm.room.join_rules':
+                    case 'm.room.power_levels':
+                        handlePowerLevels(event, isLiveEvent);
+                        break;
+                    case 'm.room.name':
+                        handleRoomName(event, isLiveEvent);
+                        break;
+                    default:
+                        console.log("Unable to handle event type " + event.type);
+                        console.log(JSON.stringify(event, undefined, 4));
+                        break;
+                }
             }
         },
         
