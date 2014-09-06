@@ -58,11 +58,13 @@ class RegisterRestServlet(RestServlet):
             try:
                 captcha_type = register_json["captcha"]["type"]
                 if captcha_type != "m.login.recaptcha":
-                    raise SynapseError(400, "Sorry, only m.login.recaptcha requests are supported.")
+                    raise SynapseError(400, "Sorry, only m.login.recaptcha " +
+                                       "requests are supported.")
                 challenge = register_json["captcha"]["challenge"]
                 user_response = register_json["captcha"]["response"]
             except KeyError:
-                raise SynapseError(400, "Captcha response is required", errcode=Codes.CAPTCHA_NEEDED)
+                raise SynapseError(400, "Captcha response is required",
+                                   errcode=Codes.CAPTCHA_NEEDED)
             
             # TODO determine the source IP : May be an X-Forwarding-For header depending on config
             ip_addr = request.getClientIP()
