@@ -1972,6 +1972,10 @@ victim would then include in their view of the chatroom history. Other servers
 in the chatroom would reject the invalid messages and potentially reject the
 victims messages as well since they depended on the invalid messages.
 
+.. TODO
+  Track trustworthiness of HS or users based on if they try to pretend they
+  haven't seen recent events, and fake a splitbrain... --M
+
 Threat: Block Network Traffic
 +++++++++++++++++++++++++++++
 
