@@ -79,7 +79,8 @@ angular.module('eventHandlerService', [])
         initRoom(event.room_id);
         
         if (isLiveEvent) {
-            if (event.user_id === matrixService.config().user_id) {
+            if (event.user_id === matrixService.config().user_id &&
+                (event.content.msgtype === "m.text" || event.content.msgtype === "m.emote") ) {
                 // assume we've already echoed it
                 // FIXME: track events by ID and ungrey the right message to show it's been delivered
             }
@@ -162,11 +163,17 @@ angular.module('eventHandlerService', [])
         NAME_EVENT: NAME_EVENT,
     
         handleEvent: function(event, isLiveEvent) {
+            // FIXME: event duplication suppression is all broken as the code currently expect to handles
+            // events multiple times to get their side-effects...
+/*            
             if (eventMap[event.event_id]) {
                 console.log("discarding duplicate event: " + JSON.stringify(event));
                 return;
             }
-            
+            else {
+                eventMap[event.event_id] = 1;
+            }
+*/            
             if (event.type.indexOf('m.call.') === 0) {
                 handleCallEvent(event, isLiveEvent);
             }
