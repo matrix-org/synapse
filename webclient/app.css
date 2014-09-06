@@ -147,6 +147,10 @@ a:active  { color: #000; }
     text-align: center;
 }
 
+#recaptcha_area { 
+    margin: auto
+}
+
 #loginForm {
     text-align: left;
     padding: 1em;
