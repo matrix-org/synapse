@@ -36,6 +36,9 @@ angular.module('matrixService', [])
     */    
     var config;
     
+    var roomIdToAlias = {};
+    var aliasToRoomId = {};
+    
     // Current version of permanent storage
     var configVersion = 0;
     var prefixPath = "/_matrix/client/api/v1";
@@ -84,15 +87,32 @@ angular.module('matrixService', [])
         prefix: prefixPath,
 
         // Register an user
-        register: function(user_name, password, threepidCreds) {
+        register: function(user_name, password, threepidCreds, useCaptcha) {         
             // The REST path spec
             var path = "/register";
-
-            return doRequest("POST", path, undefined, {
+            
+            var data = {
                  user_id: user_name,
                  password: password,
                  threepidCreds: threepidCreds
-            });
+            };
+            
+            if (useCaptcha) {
+                // Not all home servers will require captcha on signup, but if this flag is checked,
+                // send captcha information.
+                // TODO: Might be nice to make this a bit more flexible..
+                var challengeToken = Recaptcha.get_challenge();
+                var captchaEntry = Recaptcha.get_response();
+                var captchaType = "m.login.recaptcha";
+                
+                data.captcha = {
+                    type: captchaType,
+                    challenge: challengeToken,
+                    response: captchaEntry
+                };
+            }   
+
+            return doRequest("POST", path, undefined, data);
         },
 
         // Create a room
@@ -168,18 +188,20 @@ angular.module('matrixService', [])
         },
 
         // Change the membership of an another user
-        setMembership: function(room_id, user_id, membershipValue) {
+        setMembership: function(room_id, user_id, membershipValue, reason) {
+            
             // The REST path spec
             var path = "/rooms/$room_id/state/m.room.member/$user_id";
             path = path.replace("$room_id", encodeURIComponent(room_id));
             path = path.replace("$user_id", user_id);
 
             return doRequest("PUT", path, undefined, {
-                membership: membershipValue
+                membership : membershipValue,
+                reason: reason
             });
         },
            
-        // Bans a user from from a room
+        // Bans a user from a room
         ban: function(room_id, user_id, reason) {
             var path = "/rooms/$room_id/ban";
             path = path.replace("$room_id", encodeURIComponent(room_id));
@@ -189,7 +211,20 @@ angular.module('matrixService', [])
                 reason: reason
             });
         },
-
+        
+        // Unbans a user in a room
+        unban: function(room_id, user_id) {
+            // FIXME: To update when there will be homeserver API for unban 
+            // For now, do an unban by resetting the user membership to "leave"
+            return this.setMembership(room_id, user_id, "leave");
+        },
+        
+        // Kicks a user from a room
+        kick: function(room_id, user_id, reason) {
+            // Set the user membership to "leave" to kick him
+            return this.setMembership(room_id, user_id, "leave", reason);
+        },
+        
         // Retrieves the room ID corresponding to a room alias
         resolveRoomAlias:function(room_alias) {
             var path = "/_matrix/client/api/v1/directory/room/$room_alias";
@@ -280,6 +315,11 @@ angular.module('matrixService', [])
             return doRequest("GET", path);
         },
         
+        // get a user's profile
+        getProfile: function(userId) {
+            return this.getProfileInfo(userId);
+        },
+
         // get a display name for this user ID
         getDisplayName: function(userId) {
             return this.getProfileInfo(userId, "displayname");
@@ -313,8 +353,8 @@ angular.module('matrixService', [])
         },
 
         getProfileInfo: function(userId, info_segment) {
-            var path = "/profile/$user_id/" + info_segment;
-            path = path.replace("$user_id", userId);
+            var path = "/profile/"+userId
+            if (info_segment) path += '/' + info_segment;
             return doRequest("GET", path);
         },
         
@@ -485,18 +525,20 @@ angular.module('matrixService', [])
                 room_alias: undefined,
                 room_display_name: undefined
             };
-            
             var alias = this.getRoomIdToAliasMapping(room.room_id);
             if (alias) {
                 // use the existing alias from storage
                 result.room_alias = alias;
                 result.room_display_name = alias;
             }
+            // XXX: this only lets us learn aliases from our local HS - we should
+            // make the client stop returning this if we can trust m.room.aliases state events
             else if (room.aliases && room.aliases[0]) {
                 // save the mapping
                 // TODO: select the smarter alias from the array
                 this.createRoomIdToAliasMapping(room.room_id, room.aliases[0]);
                 result.room_display_name = room.aliases[0];
+                result.room_alias = room.aliases[0];
             }
             else if (room.membership === "invite" && "inviter" in room) {
                 result.room_display_name = room.inviter + "'s room";
@@ -509,13 +551,22 @@ angular.module('matrixService', [])
         },
         
         createRoomIdToAliasMapping: function(roomId, alias) {
-            localStorage.setItem(MAPPING_PREFIX+roomId, alias);
+            roomIdToAlias[roomId] = alias;
+            aliasToRoomId[alias] = roomId;
+            // localStorage.setItem(MAPPING_PREFIX+roomId, alias);
         },
         
         getRoomIdToAliasMapping: function(roomId) {
-            return localStorage.getItem(MAPPING_PREFIX+roomId);
+            var alias = roomIdToAlias[roomId]; // was localStorage.getItem(MAPPING_PREFIX+roomId)
+            //console.log("looking for alias for " + roomId + "; found: " + alias);
+            return alias;
         },
 
+        getAliasToRoomIdMapping: function(alias) {
+            var roomId = aliasToRoomId[alias];
+            //console.log("looking for roomId for " + alias + "; found: " + roomId);
+            return roomId;
+        },
 
         /****** Power levels management ******/
 

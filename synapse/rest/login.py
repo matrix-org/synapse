@@ -70,7 +70,7 @@ class LoginFallbackRestServlet(RestServlet):
     def on_GET(self, request):
         # TODO(kegan): This should be returning some HTML which is capable of
         # hitting LoginRestServlet
-        return (200, "")
+        return (200, {})
 
 
 def _parse_json(request):

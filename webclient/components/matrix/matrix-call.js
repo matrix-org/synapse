@@ -41,6 +41,7 @@ angular.module('MatrixCall', [])
         this.room_id = room_id;
         this.call_id = "c" + new Date().getTime();
         this.state = 'fledgling';
+        this.didConnect = false;
     }
 
     navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
@@ -52,6 +53,7 @@ angular.module('MatrixCall', [])
         matrixPhoneService.callPlaced(this);
         navigator.getUserMedia({audio: true, video: false}, function(s) { self.gotUserMediaForInvite(s); }, function(e) { self.getUserMediaFailed(e); });
         self.state = 'wait_local_media';
+        this.direction = 'outbound';
     };
 
     MatrixCall.prototype.initWithInvite = function(msg) {
@@ -64,6 +66,7 @@ angular.module('MatrixCall', [])
         this.peerConn.onaddstream = function(s) { self.onAddStream(s); };
         this.peerConn.setRemoteDescription(new RTCSessionDescription(this.msg.offer), self.onSetRemoteDescriptionSuccess, self.onSetRemoteDescriptionError);
         this.state = 'ringing';
+        this.direction = 'inbound';
     };
 
     MatrixCall.prototype.answer = function() {
@@ -204,10 +207,12 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.onIceConnectionStateChanged = function() {
+        if (this.state == 'ended') return; // because ICE can still complete as we're ending the call
         console.trace("Ice connection state changed to: "+this.peerConn.iceConnectionState);
         // ideally we'd consider the call to be connected when we get media but chrome doesn't implement nay of the 'onstarted' events yet
         if (this.peerConn.iceConnectionState == 'completed' || this.peerConn.iceConnectionState == 'connected') {
             this.state = 'connected';
+            this.didConnect = true;
             $rootScope.$apply();
         }
     };

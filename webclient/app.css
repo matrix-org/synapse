@@ -44,7 +44,49 @@ a:active  { color: #000; }
 }
 
 #callBar {
-   float: left;
+    float: left;
+    height: 32px;
+    margin: auto;
+    text-align: right;
+    line-height: 16px;
+}
+
+.callIcon {
+    margin-left: 4px;
+    margin-right: 4px;
+    margin-top: 8px;
+    -webkit-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
+    -moz-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
+    -o-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
+    transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
+}
+
+.callIconRotate {
+    -webkit-transform: rotateZ(45deg);
+    -moz-transform: rotateZ(45deg);
+    -ms-transform: rotateZ(45deg);
+    -o-transform: rotateZ(45deg);
+    transform: rotateZ(45deg);
+}
+
+#callPeerImage {
+    width: 32px;
+    height: 32px;
+    border: none;
+    float: left;
+}
+
+#callPeerNameAndState {
+    float: left;
+    margin-left: 4px;
+}
+
+#callState {
+    font-size: 60%;
+}
+
+#callPeerName {
+    font-size: 80%;
 }
 
 #headerContent {
@@ -103,6 +145,10 @@ a:active  { color: #000; }
 
 .loginWrapper {
     text-align: center;
+}
+
+#recaptcha_area { 
+    margin: auto
 }
 
 #loginForm {
@@ -251,12 +297,14 @@ a:active  { color: #000; }
 .userAvatar .userAvatarImage {
     position: absolute;
     top: 0px;
-    object-fit: cover;    
+    object-fit: cover;
+    width: 100%;
 }
 
 .userAvatar .userAvatarGradient {
     position: absolute;
     bottom: 20px;
+    width: 100%;
 }
 
 .userAvatar .userName {
@@ -415,6 +463,13 @@ a:active  { color: #000; }
 .mine .text .bubble {
     background-color: #f8f8ff ! important;    
     text-align: left ! important;
+}
+
+.bubble .messagePending {
+    opacity: 0.3
+}
+.messageUnSent {
+    color: #F00;
 }
 
 #room-fullscreen-image {

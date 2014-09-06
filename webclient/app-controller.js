@@ -21,8 +21,8 @@ limitations under the License.
 'use strict';
 
 angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'eventStreamService'])
-.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventStreamService', 'matrixPhoneService',
-                               function($scope, $location, $rootScope, matrixService, mPresence, eventStreamService, matrixPhoneService) {
+.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', '$timeout', '$animate', 'matrixService', 'mPresence', 'eventStreamService', 'matrixPhoneService',
+                               function($scope, $location, $rootScope, $timeout, $animate, matrixService, mPresence, eventStreamService, matrixPhoneService) {
          
     // Check current URL to avoid to display the logout button on the login page
     $scope.location = $location.path();
@@ -89,6 +89,23 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         $scope.user_id = matrixService.config().user_id;
     };
 
+    $rootScope.$watch('currentCall', function(newVal, oldVal) {
+        if (!$rootScope.currentCall) return;
+
+        var roomMembers = angular.copy($rootScope.events.rooms[$rootScope.currentCall.room_id].members);
+        delete roomMembers[matrixService.config().user_id];
+
+        $rootScope.currentCall.user_id = Object.keys(roomMembers)[0];
+        matrixService.getProfile($rootScope.currentCall.user_id).then(
+            function(response) {
+                $rootScope.currentCall.userProfile = response.data;
+            },
+            function(error) {
+                $scope.feedback = "Can't load user profile";
+            }
+        );
+    });
+
     $rootScope.$on(matrixPhoneService.INCOMING_CALL_EVENT, function(ngEvent, call) {
         console.trace("incoming call");
         call.onError = $scope.onCallError;
@@ -97,12 +114,19 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
     });
 
     $scope.answerCall = function() {
-        $scope.currentCall.answer();
+        $rootScope.currentCall.answer();
     };
 
     $scope.hangupCall = function() {
-        $scope.currentCall.hangup();
-        $scope.currentCall = undefined;
+        $rootScope.currentCall.hangup();
+
+        $timeout(function() {
+            var icon = angular.element('#callEndedIcon');
+            $animate.addClass(icon, 'callIconRotate');
+            $timeout(function(){
+                $rootScope.currentCall = undefined;
+            }, 2000);
+        }, 100);
     };
     
     $rootScope.onCallError = function(errStr) {
@@ -110,5 +134,12 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
     }
 
     $rootScope.onCallHangup = function() {
+        $timeout(function() {
+            var icon = angular.element('#callEndedIcon');
+            $animate.addClass(icon, 'callIconRotate');
+            $timeout(function(){
+                $rootScope.currentCall = undefined;
+            }, 2000);
+        }, 100);
     }
 }]);

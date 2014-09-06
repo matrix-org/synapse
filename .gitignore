@@ -18,9 +18,12 @@ htmlcov
 demo/*.db
 demo/*.log
 demo/*.pid
+demo/etc
 
 graph/*.svg
 graph/*.png
 graph/*.dot
+
+webclient/config.js
 
 uploads

@@ -796,11 +796,12 @@ class PresenceEventSource(object):
         updates = []
         # TODO(paul): use a DeferredList ? How to limit concurrency.
         for observed_user in cachemap.keys():
-            if not (from_key < cachemap[observed_user].serial):
+            cached = cachemap[observed_user]
+            if not (from_key < cached.serial):
                 continue
 
             if (yield self.is_visible(observer_user, observed_user)):
-                updates.append((observed_user, cachemap[observed_user]))
+                updates.append((observed_user, cached))
 
         # TODO(paul): limit
 

@@ -16,7 +16,7 @@
 
 from twisted.internet import defer, reactor
 from twisted.internet.error import DNSLookupError
-from twisted.web.client import _AgentBase, _URI, readBody, FileBodyProducer
+from twisted.web.client import _AgentBase, _URI, readBody, FileBodyProducer, PartialDownloadError
 from twisted.web.http_headers import Headers
 
 from synapse.http.endpoint import matrix_endpoint
@@ -188,6 +188,32 @@ class TwistedHttpClient(HttpClient):
         body = yield readBody(response)
 
         defer.returnValue(json.loads(body))
+        
+    # XXX FIXME : I'm so sorry.
+    @defer.inlineCallbacks
+    def post_urlencoded_get_raw(self, destination, path, accept_partial=False, args={}):
+        if destination in _destination_mappings:
+            destination = _destination_mappings[destination]
+
+        query_bytes = urllib.urlencode(args, True)
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "POST",
+            path.encode("ascii"),
+            producer=FileBodyProducer(StringIO(urllib.urlencode(args))),
+            headers_dict={"Content-Type": ["application/x-www-form-urlencoded"]}
+        )
+
+        try:
+            body = yield readBody(response)
+            defer.returnValue(body)
+        except PartialDownloadError as e:
+            if accept_partial:
+                defer.returnValue(e.response)
+            else:
+                raise e
+        
 
     @defer.inlineCallbacks
     def _create_request(self, destination, method, path_bytes, param_bytes=b"",

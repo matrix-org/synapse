@@ -41,6 +41,11 @@ angular.module('eventHandlerService', [])
     $rootScope.events = {
         rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
     };
+    
+    // used for dedupping events - could be expanded in future...
+    // FIXME: means that we leak memory over time (along with lots of the rest
+    // of the app, given we never try to reap memory yet)
+    var eventMap = {};
 
     $rootScope.presence = {};
     
@@ -66,11 +71,22 @@ angular.module('eventHandlerService', [])
         $rootScope.$broadcast(ROOM_CREATE_EVENT, event, isLiveEvent);
     };
 
+    var handleRoomAliases = function(event, isLiveEvent) {
+        matrixService.createRoomIdToAliasMapping(event.room_id, event.content.aliases[0]);
+    };
+
     var handleMessage = function(event, isLiveEvent) {
         initRoom(event.room_id);
         
         if (isLiveEvent) {
-            $rootScope.events.rooms[event.room_id].messages.push(event);
+            if (event.user_id === matrixService.config().user_id &&
+                (event.content.msgtype === "m.text" || event.content.msgtype === "m.emote") ) {
+                // assume we've already echoed it
+                // FIXME: track events by ID and ungrey the right message to show it's been delivered
+            }
+            else {
+                $rootScope.events.rooms[event.room_id].messages.push(event);
+            }
         }
         else {
             $rootScope.events.rooms[event.room_id].messages.unshift(event);
@@ -86,6 +102,14 @@ angular.module('eventHandlerService', [])
     
     var handleRoomMember = function(event, isLiveEvent) {
         initRoom(event.room_id);
+        
+        // if the server is stupidly re-relaying a no-op join, discard it.
+        if (event.prev_content && 
+            event.content.membership === "join" &&
+            event.content.membership === event.prev_content.membership)
+        {
+            return;
+        }
         
         // add membership changes as if they were a room message if something interesting changed
         if (event.content.prev !== event.content.membership) {
@@ -137,39 +161,54 @@ angular.module('eventHandlerService', [])
         POWERLEVEL_EVENT: POWERLEVEL_EVENT,
         CALL_EVENT: CALL_EVENT,
         NAME_EVENT: NAME_EVENT,
-        
     
         handleEvent: function(event, isLiveEvent) {
-            switch(event.type) {
-                case "m.room.create":
-                    handleRoomCreate(event, isLiveEvent);
-                    break;
-                case "m.room.message":
-                    handleMessage(event, isLiveEvent);
-                    break;
-                case "m.room.member":
-                    handleRoomMember(event, isLiveEvent);
-                    break;
-                case "m.presence":
-                    handlePresence(event, isLiveEvent);
-                    break;
-                case 'm.room.ops_levels':
-                case 'm.room.send_event_level':
-                case 'm.room.add_state_level':
-                case 'm.room.join_rules':
-                case 'm.room.power_levels':
-                    handlePowerLevels(event, isLiveEvent);
-                    break;
-                case 'm.room.name':
-                    handleRoomName(event, isLiveEvent);
-                    break;
-                default:
-                    console.log("Unable to handle event type " + event.type);
-                    console.log(JSON.stringify(event, undefined, 4));
-                    break;
+            // FIXME: event duplication suppression is all broken as the code currently expect to handles
+            // events multiple times to get their side-effects...
+/*            
+            if (eventMap[event.event_id]) {
+                console.log("discarding duplicate event: " + JSON.stringify(event));
+                return;
             }
+            else {
+                eventMap[event.event_id] = 1;
+            }
+*/            
             if (event.type.indexOf('m.call.') === 0) {
                 handleCallEvent(event, isLiveEvent);
+            }
+            else {            
+                switch(event.type) {
+                    case "m.room.create":
+                        handleRoomCreate(event, isLiveEvent);
+                        break;
+                    case "m.room.aliases":
+                        handleRoomAliases(event, isLiveEvent);
+                        break;
+                    case "m.room.message":
+                        handleMessage(event, isLiveEvent);
+                        break;
+                    case "m.room.member":
+                        handleRoomMember(event, isLiveEvent);
+                        break;
+                    case "m.presence":
+                        handlePresence(event, isLiveEvent);
+                        break;
+                    case 'm.room.ops_levels':
+                    case 'm.room.send_event_level':
+                    case 'm.room.add_state_level':
+                    case 'm.room.join_rules':
+                    case 'm.room.power_levels':
+                        handlePowerLevels(event, isLiveEvent);
+                        break;
+                    case 'm.room.name':
+                        handleRoomName(event, isLiveEvent);
+                        break;
+                    default:
+                        console.log("Unable to handle event type " + event.type);
+                        console.log(JSON.stringify(event, undefined, 4));
+                        break;
+                }
             }
         },
         

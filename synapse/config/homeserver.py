@@ -19,9 +19,10 @@ from .logger import LoggingConfig
 from .database import DatabaseConfig
 from .ratelimiting import RatelimitConfig
 from .repository import ContentRepositoryConfig
+from .captcha import CaptchaConfig
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
-                       RatelimitConfig, ContentRepositoryConfig):
+                       RatelimitConfig, ContentRepositoryConfig, CaptchaConfig):
     pass
 
 if __name__=='__main__':

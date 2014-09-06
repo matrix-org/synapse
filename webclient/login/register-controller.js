@@ -19,6 +19,12 @@ angular.module('RegisterController', ['matrixService'])
                                     function($scope, $rootScope, $location, matrixService, eventStreamService) {
     'use strict';
     
+    var config = window.webClientConfig;
+    var useCaptcha = true;
+    if (config !== undefined) {
+        useCaptcha = config.useCaptcha;
+    }
+    
     // FIXME: factor out duplication with login-controller.js
     
     // Assume that this is hosted on the home server, in which case the URL
@@ -87,9 +93,12 @@ angular.module('RegisterController', ['matrixService'])
     };
 
     $scope.registerWithMxidAndPassword = function(mxid, password, threepidCreds) {
-        matrixService.register(mxid, password, threepidCreds).then(
+        matrixService.register(mxid, password, threepidCreds, useCaptcha).then(
             function(response) {
                 $scope.feedback = "Success";
+                if (useCaptcha) {
+                    Recaptcha.destroy();
+                }
                 // Update the current config 
                 var config = matrixService.config();
                 angular.extend(config, {
@@ -116,10 +125,20 @@ angular.module('RegisterController', ['matrixService'])
             },
             function(error) {
                 console.trace("Registration error: "+error);
+                if (useCaptcha) {
+                    Recaptcha.reload();
+                }
                 if (error.data) {
                     if (error.data.errcode === "M_USER_IN_USE") {
                         $scope.feedback = "Username already taken.";
                         $scope.reenter_username = true;
+                    }
+                    else if (error.data.errcode == "M_CAPTCHA_INVALID") {
+                        $scope.feedback = "Failed captcha.";
+                    }
+                    else if (error.data.errcode == "M_CAPTCHA_NEEDED") {
+                        $scope.feedback = "Captcha is required on this home " +
+                                          "server.";
                     }
                 }
                 else if (error.status === 0) {
@@ -142,6 +161,33 @@ angular.module('RegisterController', ['matrixService'])
             }
         );
     };
+	
+	var setupCaptcha = function() {
+	    console.log("Setting up ReCaptcha")
+        var config = window.webClientConfig;
+        var public_key = undefined;
+        if (config === undefined) {
+            console.error("Couldn't find webClientConfig. Cannot get public key for captcha.");
+        }
+        else {
+            public_key = webClientConfig.recaptcha_public_key;
+            if (public_key === undefined) {
+                console.error("No public key defined for captcha!")
+            }
+        }
+	    Recaptcha.create(public_key,
+	    "regcaptcha",
+	    {
+	      theme: "red",
+	      callback: Recaptcha.focus_response_field
+	    });
+	};
 
+	$scope.init = function() {
+        if (useCaptcha) {
+	        setupCaptcha();
+        }
+	};
+    
 }]);
 

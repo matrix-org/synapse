@@ -188,7 +188,7 @@ class StreamStore(SQLBaseStore):
             user_id, user_id, from_id, to_id
         )
 
-        ret = [self._parse_event_from_row(r) for r in rows]
+        ret = yield self._parse_events(rows)
 
         if rows:
             key = "s%d" % max([r["stream_ordering"] for r in rows])
@@ -243,9 +243,11 @@ class StreamStore(SQLBaseStore):
             # TODO (erikj): We should work out what to do here instead.
             next_token = to_key if to_key else from_key
 
+        events = yield self._parse_events(rows)
+
         defer.returnValue(
             (
-                [self._parse_event_from_row(r) for r in rows],
+                events,
                 next_token
             )
         )
@@ -277,12 +279,11 @@ class StreamStore(SQLBaseStore):
         else:
             token = (end_token, end_token)
 
-        defer.returnValue(
-            (
-                [self._parse_event_from_row(r) for r in rows],
-                token
-            )
-        )
+        events = yield self._parse_events(rows)
+
+        ret = (events, token)
+
+        defer.returnValue(ret)
 
     def get_room_events_max_id(self):
         return self._db_pool.runInteraction(self._get_room_events_max_id_txn)

@@ -88,7 +88,7 @@ class RoomMemberStore(SQLBaseStore):
         txn.execute(sql, (user_id, room_id))
         rows = self.cursor_to_dict(txn)
         if rows:
-            return self._parse_event_from_row(rows[0])
+            return self._parse_events_txn(txn, rows)[0]
         else:
             return None
 
@@ -161,7 +161,7 @@ class RoomMemberStore(SQLBaseStore):
 
         # logger.debug("_get_members_query Got rows %s", rows)
 
-        results = [self._parse_event_from_row(r) for r in rows]
+        results = yield self._parse_events(rows)
         defer.returnValue(results)
 
     @defer.inlineCallbacks

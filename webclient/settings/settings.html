@@ -23,14 +23,14 @@
         </div>
         <br/>
 
-        <h3 style="display: none; ">Linked emails</h3>
-        <div class="section" style="display: none; ">
+        <h3>Linked emails</h3>
+        <div class="section">
             <form>
                 <input size="40" ng-model="linkedEmails.linkNewEmail" ng-enter="linkEmail(linkedEmails.linkNewEmail)" />
                 <button ng-disabled="!linkedEmails.linkNewEmail" ng-click="linkEmail(linkedEmails.linkNewEmail)">
                     Link Email
                 </button>
-                {{ emailFeedback }}    
+                {{ emailFeedback }}
             </form>
             <form ng-hide="!linkedEmails.emailBeingAuthed">
                 Enter validation token for {{ linkedEmails.emailBeingAuthed }}:
@@ -81,7 +81,7 @@
             <ul>
                 <li>/nick &lt;display_name&gt;: change your display name</li>
                 <li>/me &lt;action&gt;: send the action you are doing. /me will be replaced by your display name</li>
-                <li>/kick &lt;user_id&gt;: kick the user</li>
+                <li>/kick &lt;user_id&gt; [&lt;reason&gt;]: kick the user</li>
                 <li>/ban &lt;user_id&gt; [&lt;reason&gt;]: ban the user</li>
                 <li>/unban &lt;user_id&gt;: unban the user</li>
                 <li>/op &lt;user_id&gt; &lt;power_level&gt;: set user power level</li>
