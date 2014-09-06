@@ -62,8 +62,8 @@ class RegistrationHandler(BaseHandler):
                 captcha_info["response"]
             )
             if not captcha_response["valid"]:
-                logger.info("Invalid captcha entered from %s", 
-                            captcha_info["ip"])
+                logger.info("Invalid captcha entered from %s. Error: %s", 
+                            captcha_info["ip"], captcha_response["error_url"])
                 raise InvalidCaptchaError(
                     error_url=captcha_response["error_url"]
                 )

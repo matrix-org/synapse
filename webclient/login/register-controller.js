@@ -92,6 +92,9 @@ angular.module('RegisterController', ['matrixService'])
         matrixService.register(mxid, password, threepidCreds, useCaptcha).then(
             function(response) {
                 $scope.feedback = "Success";
+                if (useCaptcha) {
+                    Recaptcha.destroy();
+                }
                 // Update the current config 
                 var config = matrixService.config();
                 angular.extend(config, {
@@ -118,10 +121,16 @@ angular.module('RegisterController', ['matrixService'])
             },
             function(error) {
                 console.trace("Registration error: "+error);
+                if (useCaptcha) {
+                    Recaptcha.reload();
+                }
                 if (error.data) {
                     if (error.data.errcode === "M_USER_IN_USE") {
                         $scope.feedback = "Username already taken.";
                         $scope.reenter_username = true;
+                    }
+                    else if (error.data.errcode == "M_CAPTCHA_INVALID") {
+                        $scope.feedback = "Failed captcha.";
                     }
                 }
                 else if (error.status === 0) {
