@@ -29,6 +29,7 @@ class Codes(object):
     NOT_FOUND = "M_NOT_FOUND"
     UNKNOWN_TOKEN = "M_UNKNOWN_TOKEN"
     LIMIT_EXCEEDED = "M_LIMIT_EXCEEDED"
+    NEEDS_CAPTCHA = "M_NEEDS_CAPTCHA"
 
 
 class CodeMessageException(Exception):

@@ -107,7 +107,6 @@ angular.module('matrixService', [])
                     challenge: challengeToken,
                     response: captchaEntry
                 };
-                console.log("Sending Captcha info: " + JSON.stringify(data.captcha));
             }   
 
             return doRequest("POST", path, undefined, data);

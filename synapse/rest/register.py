@@ -16,7 +16,7 @@
 """This module contains REST servlets to do with registration: /register"""
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, Codes
 from base import RestServlet, client_path_pattern
 
 import json
@@ -50,6 +50,10 @@ class RegisterRestServlet(RestServlet):
         threepidCreds = None
         if 'threepidCreds' in register_json:
             threepidCreds = register_json['threepidCreds']
+            
+        if self.hs.config.enable_registration_captcha:
+            if not "challenge" in register_json or not "response" in register_json:
+                raise SynapseError(400, "Captcha response is required", errcode=Codes.NEEDS_CAPTCHA)
 
         handler = self.handlers.registration_handler
         (user_id, token) = yield handler.register(
