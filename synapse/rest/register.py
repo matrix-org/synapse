@@ -51,15 +51,38 @@ class RegisterRestServlet(RestServlet):
         if 'threepidCreds' in register_json:
             threepidCreds = register_json['threepidCreds']
             
+        captcha = {}
         if self.hs.config.enable_registration_captcha:
-            if not "challenge" in register_json or not "response" in register_json:
-                raise SynapseError(400, "Captcha response is required", errcode=Codes.NEEDS_CAPTCHA)
+            challenge = None
+            user_response = None
+            try:
+                captcha_type = register_json["captcha"]["type"]
+                if captcha_type != "m.login.recaptcha":
+                    raise SynapseError(400, "Sorry, only m.login.recaptcha requests are supported.")
+                challenge = register_json["captcha"]["challenge"]
+                user_response = register_json["captcha"]["response"]
+            except KeyError:
+                raise SynapseError(400, "Captcha response is required", errcode=Codes.CAPTCHA_NEEDED)
+            
+            # TODO determine the source IP : May be an X-Forwarding-For header depending on config
+            ip_addr = request.getClientIP()
+            #if self.hs.config.captcha_ip_origin_is_x_forwarded:
+            #    # use the header
+            
+            captcha = {
+                "ip": ip_addr,
+                "private_key": self.hs.config.recaptcha_private_key,
+                "challenge": challenge,
+                "response": user_response
+            }
+            
 
         handler = self.handlers.registration_handler
         (user_id, token) = yield handler.register(
             localpart=desired_user_id,
             password=password,
-            threepidCreds=threepidCreds)
+            threepidCreds=threepidCreds,
+            captcha_info=captcha)
 
         result = {
             "user_id": user_id,
