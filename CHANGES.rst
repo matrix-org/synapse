@@ -17,7 +17,6 @@ Webclient:
  * Only autoscroll on receiving a new message if the user was already at the 
    bottom of the screen.
  * Add support for ban/kick reasons.
- * Fix bug where we occaisonally saw duplicated join messages.
 
 Changes in synapse 0.2.1 (2014-09-03)
 =====================================
