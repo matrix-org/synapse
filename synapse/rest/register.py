@@ -66,8 +66,11 @@ class RegisterRestServlet(RestServlet):
             
             # TODO determine the source IP : May be an X-Forwarding-For header depending on config
             ip_addr = request.getClientIP()
-            #if self.hs.config.captcha_ip_origin_is_x_forwarded:
-            #    # use the header
+            if self.hs.config.captcha_ip_origin_is_x_forwarded:
+                # use the header
+                if request.requestHeaders.hasHeader("X-Forwarded-For"):
+                    ip_addr = request.requestHeaders.getRawHeaders(
+                        "X-Forwarded-For")[0]
             
             captcha = {
                 "ip": ip_addr,
