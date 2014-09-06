@@ -240,6 +240,7 @@ class StateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_new_event(self):
         event = Mock()
+        event.event_id = "12123123@test"
 
         state_pdu = new_fake_pdu_entry("C", "test", "mem", "x", "A", 20)
 
