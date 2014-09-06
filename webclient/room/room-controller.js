@@ -302,7 +302,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         scrollToBottom(true);
         
         var promise;
-        var isCmd = false;
+        var cmd;
+        var args;
+        var echo = false;
         
         // Check for IRC style commands first
         var line = $scope.textInput;
@@ -311,17 +313,16 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         line = line.replace(/\s+$/, "");
         
         if (line[0] === "/" && line[1] !== "/") {
-            isCmd = true;
-            
             var bits = line.match(/^(\S+?)( +(.*))?$/);
-            var cmd = bits[1];
-            var args = bits[3];
+            cmd = bits[1];
+            args = bits[3];
             
             console.log("cmd: " + cmd + ", args: " + args);
             
             switch (cmd) {
                 case "/me":
                     promise = matrixService.sendEmoteMessage($scope.room_id, args);
+                    echo = true;
                     break;
                     
                 case "/nick":
@@ -453,17 +454,20 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         }
         
         // By default send this as a message unless it's an IRC-style command
-        if (!promise && !isCmd) {
-            var message = $scope.textInput;
-            $scope.textInput = "";
-
+        if (!promise && !cmd) {
+            // Make the request
+            promise = matrixService.sendTextMessage($scope.room_id, line);
+            echo = true;
+        }
+        
+        if (echo) {
             // Echo the message to the room
             // To do so, create a minimalist fake text message event and add it to the in-memory list of room messages
             var echoMessage = {
                 content: {
-                    body: message,
+                    body: (cmd === "/me" ? args : line),
                     hsob_ts: new Date().getTime(), // fake a timestamp
-                    msgtype: "m.text"
+                    msgtype: (cmd === "/me" ? "m.emote" : "m.text"),
                 },
                 room_id: $scope.room_id,
                 type: "m.room.message",
@@ -472,11 +476,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 // echo_msg_state: "messagePending"     // Add custom field to indicate the state of this fake message to HTML
             };
 
+            $scope.textInput = "";
             $rootScope.events.rooms[$scope.room_id].messages.push(echoMessage);
             scrollToBottom();
-
-            // Make the request
-            promise = matrixService.sendTextMessage($scope.room_id, message);
         }
 
         if (promise) {
