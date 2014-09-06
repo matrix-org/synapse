@@ -1,12 +1,24 @@
 Basic Usage
 -----------
 
-The Synapse web client needs to be hosted by a basic HTTP server.
-
-You can use the Python simple HTTP server::
+The web client should automatically run when running the home server. Alternatively, you can run
+it stand-alone:
 
     $ python -m SimpleHTTPServer
 
 Then, open this URL in a WEB browser::
 
     http://127.0.0.1:8000/
+
+
+ReCaptcha Keys
+--------------
+The web client will look for the global variable webClientConfig for config options. You should
+put your ReCaptcha public key there like so:
+
+webClientConfig = {
+        recaptcha_public_key: "YOUR_PUBLIC_KEY"
+}
+
+This should be put in webclient/config.js which is already .gitignored, rather than in the web
+client source files.

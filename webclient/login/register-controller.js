@@ -19,7 +19,7 @@ angular.module('RegisterController', ['matrixService'])
                                     function($scope, $rootScope, $location, matrixService, eventStreamService) {
     'use strict';
     
-    var useCaptcha = false;
+    var useCaptcha = true;
     
     // FIXME: factor out duplication with login-controller.js
     
@@ -147,7 +147,18 @@ angular.module('RegisterController', ['matrixService'])
 	
 	var setupCaptcha = function() {
 	    console.log("Setting up ReCaptcha")
-	    Recaptcha.create("6Le31_kSAAAAAK-54VKccKamtr-MFA_3WS1d_fGV",
+        var config = window.webClientConfig;
+        var public_key = undefined;
+        if (config === undefined) {
+            console.error("Couldn't find webClientConfig. Cannot get public key for captcha.");
+        }
+        else {
+            public_key = webClientConfig.recaptcha_public_key;
+            if (public_key === undefined) {
+                console.error("No public key defined for captcha!")
+            }
+        }
+	    Recaptcha.create(public_key,
 	    "regcaptcha",
 	    {
 	      theme: "red",
