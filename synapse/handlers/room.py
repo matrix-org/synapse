@@ -65,6 +65,13 @@ class RoomCreationHandler(BaseHandler):
         else:
             room_alias = None
 
+        invite_list = config.get("invite", [])
+        for i in invite_list:
+            try:
+                self.hs.parse_userid(i)
+            except:
+                raise SynapseError(400, "Invalid user_id: %s" % (i,))
+
         is_public = config.get("visibility", None) == "public"
 
         if room_id:
@@ -178,6 +185,25 @@ class RoomCreationHandler(BaseHandler):
             do_auth=False
         )
 
+        content = {"membership": Membership.INVITE}
+        for invitee in invite_list:
+            invite_event = self.event_factory.create_event(
+                etype=RoomMemberEvent.TYPE,
+                state_key=invitee,
+                room_id=room_id,
+                user_id=user_id,
+                content=content
+            )
+
+            yield self.hs.get_handlers().room_member_handler.change_membership(
+                invite_event,
+                do_auth=False
+            )
+
+        yield self.hs.get_handlers().room_member_handler.change_membership(
+            join_event,
+            do_auth=False
+        )
         result = {"room_id": room_id}
         if room_alias:
             result["room_alias"] = room_alias.to_string()
