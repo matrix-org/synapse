@@ -485,7 +485,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             promise.then(
                 function() {
                     console.log("Request successfully sent");
-                    $scope.textInput = "";
+                    if (!echo) {
+                        $scope.textInput = "";
+                    }
 /*
                     if (echoMessage) {
                         // Remove the fake echo message from the room messages
