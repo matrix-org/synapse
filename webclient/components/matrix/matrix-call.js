@@ -120,7 +120,9 @@ angular.module('MatrixCall', [])
         }, function(e) {
             self.getLocalOfferFailed(e);
         });
-        this.state = 'create_offer';
+        $rootScope.$apply(function() {
+            self.state = 'create_offer';
+        });
     };
 
     MatrixCall.prototype.gotUserMediaForAnswer = function(stream) {
@@ -138,7 +140,9 @@ angular.module('MatrixCall', [])
             },
         };
         this.peerConn.createAnswer(function(d) { self.createdAnswer(d); }, function(e) {}, constraints);
-        this.state = 'create_answer';
+        $rootScope.$apply(function() {
+            self.state = 'create_answer';
+        });
     };
 
     MatrixCall.prototype.gotLocalIceCandidate = function(event) {
@@ -177,7 +181,11 @@ angular.module('MatrixCall', [])
             offer: description
         };
         matrixService.sendEvent(this.room_id, 'm.call.invite', undefined, content).then(this.messageSent, this.messageSendFailed);
-        this.state = 'invite_sent';
+
+        self = this;
+        $rootScope.$apply(function() {
+            self.state = 'invite_sent';
+        });
     };
 
     MatrixCall.prototype.createdAnswer = function(description) {
@@ -189,7 +197,10 @@ angular.module('MatrixCall', [])
             answer: description
         };
         matrixService.sendEvent(this.room_id, 'm.call.answer', undefined, content).then(this.messageSent, this.messageSendFailed);
-        this.state = 'connecting';
+        self = this;
+        $rootScope.$apply(function() {
+            self.state = 'connecting';
+        });
     };
 
     MatrixCall.prototype.messageSent = function() {
@@ -211,9 +222,11 @@ angular.module('MatrixCall', [])
         console.trace("Ice connection state changed to: "+this.peerConn.iceConnectionState);
         // ideally we'd consider the call to be connected when we get media but chrome doesn't implement nay of the 'onstarted' events yet
         if (this.peerConn.iceConnectionState == 'completed' || this.peerConn.iceConnectionState == 'connected') {
-            this.state = 'connected';
-            this.didConnect = true;
-            $rootScope.$apply();
+            self = this;
+            $rootScope.$apply(function() {
+                self.state = 'connected';
+                self.didConnect = true;
+            });
         }
     };
 
@@ -251,17 +264,26 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.onRemoteStreamStarted = function(event) {
-        this.state = 'connected';
+        self = this;
+        $rootScope.$apply(function() {
+            self.state = 'connected';
+        });
     };
 
     MatrixCall.prototype.onRemoteStreamEnded = function(event) {
-        this.state = 'ended';
-        this.stopAllMedia();
-        this.onHangup();
+        self = this;
+        $rootScope.$apply(function() {
+            self.state = 'ended';
+            self.stopAllMedia();
+            self.onHangup();
+        });
     };
 
     MatrixCall.prototype.onRemoteStreamTrackStarted = function(event) {
-        this.state = 'connected';
+        self = this;
+        $rootScope.$apply(function() {
+            self.state = 'connected';
+        });
     };
 
     MatrixCall.prototype.onHangupReceived = function() {

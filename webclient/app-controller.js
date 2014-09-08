@@ -105,6 +105,29 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
             }
         );
     });
+    $rootScope.$watch('currentCall.state', function(newVal, oldVal) {
+        if (newVal == 'ringing') {
+            angular.element('#ringbackAudio')[0].pause();
+            angular.element('#ringAudio')[0].load();
+            angular.element('#ringAudio')[0].play();
+        } else if (newVal == 'invite_sent') {
+            angular.element('#ringAudio')[0].pause();
+            angular.element('#ringbackAudio')[0].load();
+            angular.element('#ringbackAudio')[0].play();
+        } else if (newVal == 'ended' && oldVal == 'connected') {
+            angular.element('#ringAudio')[0].pause();
+            angular.element('#ringbackAudio')[0].pause();
+            angular.element('#callendAudio')[0].play();
+        } else if (newVal == 'ended' && oldVal == 'invite_sent') {
+            angular.element('#ringAudio')[0].pause();
+            angular.element('#ringbackAudio')[0].pause();
+            angular.element('#busyAudio')[0].play();
+        } else if (oldVal == 'invite_sent') {
+            angular.element('#ringbackAudio')[0].pause();
+        } else if (oldVal == 'ringing') {
+            angular.element('#ringAudio')[0].pause();
+        }
+    });
 
     $rootScope.$on(matrixPhoneService.INCOMING_CALL_EVENT, function(ngEvent, call) {
         console.trace("incoming call");
@@ -125,7 +148,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
             $animate.addClass(icon, 'callIconRotate');
             $timeout(function(){
                 $rootScope.currentCall = undefined;
-            }, 2000);
+            }, 4070);
         }, 100);
     };
     
@@ -139,7 +162,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
             $animate.addClass(icon, 'callIconRotate');
             $timeout(function(){
                 $rootScope.currentCall = undefined;
-            }, 2000);
+            }, 4070);
         }, 100);
     }
 }]);

@@ -70,6 +70,22 @@
                     <button ng-click="hangupCall()">Reject</button>
                 </span>
                 <button ng-click="hangupCall()" ng-show="currentCall && currentCall.state != 'ringing' && currentCall.state != 'ended' && currentCall.state != 'fledgling'">Hang up</button>
+                <audio id="ringAudio" loop>
+                    <source src="media/ring.ogg" type="audio/ogg" />
+                    <source src="media/ring.mp3" type="audio/mpeg" />
+                </audio>
+                <audio id="ringbackAudio" loop>
+                    <source src="media/ringback.ogg" type="audio/ogg" />
+                    <source src="media/ringback.mp3" type="audio/mpeg" />
+                </audio>
+                <audio id="callendAudio">
+                    <source src="media/callend.ogg" type="audio/ogg" />
+                    <source src="media/callend.mp3" type="audio/mpeg" />
+                </audio>
+                <audio id="busyAudio">
+                    <source src="media/busy.ogg" type="audio/ogg" />
+                    <source src="media/busy.mp3" type="audio/mpeg" />
+                </audio>
             </div>
             <a href id="headerUserId" ng-click='goToUserPage(user_id)'>{{ user_id }}</a>
             &nbsp;
