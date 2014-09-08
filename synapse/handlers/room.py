@@ -593,6 +593,12 @@ class RoomListHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_public_room_list(self):
         chunk = yield self.store.get_rooms(is_public=True)
+        for room in chunk:
+            joined_members = yield self.store.get_room_members(
+                room_id=room["room_id"],
+                membership=Membership.JOIN
+            )
+            room["num_joined_members"] = len(joined_members)
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
 

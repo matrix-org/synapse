@@ -273,6 +273,10 @@ a:active  { color: #000; }
     font-weight: bold;
 }
 
+.publicRoomEntry {
+    margin-bottom: 5px;
+}
+
 /*** Participant list ***/
 
 #usersTableWrapper {

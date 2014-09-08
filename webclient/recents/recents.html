@@ -9,7 +9,7 @@
                     {{ room.room_id | mRoomName }}
                 </td>
                 <td class="recentsRoomSummaryTS">
-                    {{ room.numUsersInRoom }} users
+                    {{ room.numUsersInRoom }} {{ room.numUsersInRoom == 1 ? 'user' : 'users' }}
                 </td>
                 <td class="recentsRoomSummaryTS">
                     {{ (room.lastMsg.ts) | date:'MMM d HH:mm' }}
