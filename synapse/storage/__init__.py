@@ -47,6 +47,11 @@ import os
 
 logger = logging.getLogger(__name__)
 
+class _RollbackButIsFineException(Exception):
+    """ This exception is used to rollback a transaction without implying
+    something went wrong.
+    """
+    pass
 
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
@@ -71,13 +76,16 @@ class DataStore(RoomMemberStore, RoomStore,
             self.min_token -= 1
             stream_ordering = self.min_token
 
-        latest = yield self._db_pool.runInteraction(
-            self._persist_pdu_event_txn,
-            pdu=pdu,
-            event=event,
-            backfilled=backfilled,
-            stream_ordering=stream_ordering,
-        )
+        try:
+            latest = yield self._db_pool.runInteraction(
+                self._persist_pdu_event_txn,
+                pdu=pdu,
+                event=event,
+                backfilled=backfilled,
+                stream_ordering=stream_ordering,
+            )
+        except _RollbackButIsFineException as e:
+            pass
         defer.returnValue(latest)
 
     @defer.inlineCallbacks
@@ -175,12 +183,12 @@ class DataStore(RoomMemberStore, RoomStore,
         try:
             self._simple_insert_txn(txn, "events", vals)
         except:
-            logger.exception(
+            logger.warn(
                 "Failed to persist, probably duplicate: %s",
-                event.event_id
+                event.event_id,
+                exc_info=True,
             )
-            txn.rollback()
-            return
+            raise _RollbackButIsFineException("_persist_event")
 
         if not backfilled and hasattr(event, "state_key"):
             vals = {
