@@ -130,8 +130,9 @@ angular.module('matrixService', [])
             return doRequest("POST", path, undefined, req);
         },
 
-        // List all rooms joined or been invited to
-        rooms: function(limit, feedback) {
+        // Get the user's current state: his presence, the list of his rooms with
+        // the last {limit} events
+        initialSync: function(limit, feedback) {
             // The REST path spec
 
             var path = "/initialSync";
