@@ -82,6 +82,11 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
         eventHandlerService.waitForInitialSyncCompletion().then(
             function(initialSyncData) {
             
+                // XXX FIXME TODO:
+                // Any assignments to the rootScope here should be done in
+                // event handler service and not here, because we could have
+                // many controllers manipulating and clobbering each other, and
+                // are unecessarily repeating http requests.
                 var rooms = initialSyncData.data.rooms;
                 for (var i=0; i<rooms.length; i++) {
                     var room = rooms[i];
