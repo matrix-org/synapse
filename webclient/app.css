@@ -274,7 +274,12 @@ a:active  { color: #000; }
 }
 
 .publicRoomEntry {
+    max-width: 480px;
     margin-bottom: 5px;
+}
+
+.publicRoomJoinedUsers {
+    float: right;
 }
 
 /*** Participant list ***/
