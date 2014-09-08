@@ -441,6 +441,30 @@ class StateTestCase(unittest.TestCase):
         self.assertEqual(1, self.persistence.update_current_state.call_count)
 
     @defer.inlineCallbacks
+    def test_no_common_ancestor(self):
+        # We do a direct overwriting of the old state, i.e., the new state
+        # points to the old state.
+
+        old_pdu = new_fake_pdu_entry("A", "test", "mem", "x", None, 5)
+        new_pdu = new_fake_pdu_entry("B", "test", "mem", "x", None, 10)
+
+        self.persistence.get_unresolved_state_tree.return_value = (
+            (ReturnType([new_pdu], [old_pdu]), None)
+        )
+
+        is_new = yield self.state.handle_new_state(new_pdu)
+
+        self.assertTrue(is_new)
+
+        self.persistence.get_unresolved_state_tree.assert_called_once_with(
+            new_pdu
+        )
+
+        self.assertEqual(1, self.persistence.update_current_state.call_count)
+
+        self.assertFalse(self.replication.get_pdu.called)
+
+    @defer.inlineCallbacks
     def test_new_event(self):
         event = Mock()
         event.event_id = "12123123@test"
