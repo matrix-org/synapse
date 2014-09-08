@@ -269,6 +269,10 @@ a:active  { color: #000; }
     background-color: #faa;
 }
 
+.roomHighlight {
+    font-weight: bold;
+}
+
 /*** Participant list ***/
 
 #usersTableWrapper {

@@ -26,7 +26,10 @@
     
     <div class="public_rooms" ng-repeat="room in public_rooms | orderBy:'room_display_name'">
         <div>
-            <a href="#/room/{{ room.room_alias ? room.room_alias : room.room_id }}" >{{ room.room_display_name }}</a>
+            <a href="#/room/{{ room.room_alias ? room.room_alias : room.room_id }}" 
+                ng-class="room.room_display_name.toLowerCase().indexOf('#matrix:') === 0 ? 'roomHighlight' : ''">
+                {{ room.room_display_name }}
+            </a>
         </div>
     </div>
     <br/>
