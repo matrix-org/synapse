@@ -30,7 +30,7 @@
                 ng-class="room.room_display_name.toLowerCase().indexOf('#matrix:') === 0 ? 'roomHighlight' : ''">
                 {{ room.room_display_name }}
             </a>
-            <div ng-show="'num_joined_members' in room">
+            <div ng-show="room.num_joined_members">
                 {{ room.num_joined_members }} {{ room.num_joined_members == 1 ? 'user' : 'users' }}
             </div>
         </div>
