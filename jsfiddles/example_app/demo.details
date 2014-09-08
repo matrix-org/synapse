@@ -1,0 +1,7 @@
+ name: Example Matrix Client
+ description: Includes login, live event streaming, creating rooms, sending messages and viewing member lists.
+ authors:
+   - matrix.org
+ resources:
+   - http://matrix.org
+ normalize_css: no
