@@ -4,7 +4,6 @@ SYNAPSE="synapse/app/homeserver.py"
 
 CONFIGFILE="homeserver.yaml"
 PIDFILE="homeserver.pid"
-LOGFILE="homeserver.log"
 
 GREEN=$'\e[1;32m'
 NORMAL=$'\e[m'
@@ -14,15 +13,12 @@ set -e
 case "$1" in
   start)
     if [ ! -f "$CONFIGFILE" ]; then
-      echo "No config file found - generating a default one..."
-      $SYNAPSE -c "$CONFIGFILE" --generate-config
-      echo "Wrote $CONFIGFILE"
-      echo "You must now edit this file before continuing"
+      echo "No config file found"
       exit 1
     fi
 
     echo -n "Starting ..."
-    $SYNAPSE --daemonize -c "$CONFIGFILE" --pid-file "$PIDFILE" --log-file "$LOGFILE"
+    $SYNAPSE --daemonize -c "$CONFIGFILE" --pid-file "$PIDFILE"
     echo "${GREEN}started${NORMAL}"
     ;;
   stop)
