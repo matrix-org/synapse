@@ -179,6 +179,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 "Failed to persist, probably duplicate: %s",
                 event.event_id
             )
+            txn.rollback()
             return
 
         if not backfilled and hasattr(event, "state_key"):
