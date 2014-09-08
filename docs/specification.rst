@@ -1279,12 +1279,6 @@ display name other than it being a valid unicode string.
 
 Registration and login
 ======================
-.. WARNING::
-  The registration API is likely to change.
-
-.. TODO
-  - TODO Kegan : Make registration like login (just omit the "user" key on the 
-    initial request?)
 
 Clients must register with a home server in order to use Matrix. After 
 registering, the client will be given an access token which must be used in ALL
@@ -1297,9 +1291,11 @@ a token sent to their email address, etc. This specification does not define how
 home servers should authorise their users who want to login to their existing 
 accounts, but instead defines the standard interface which implementations 
 should follow so that ANY client can login to ANY home server. Clients login
-using the |login|_ API.
+using the |login|_ API. Clients register using the |register|_ API. Registration
+follows the same procedure as login, but the path requests are sent to are
+different.
 
-The login process breaks down into the following:
+The registration/login process breaks down into the following:
   1. Determine the requirements for logging in.
   2. Submit the login stage credentials.
   3. Get credentials or be told the next stage in the login process and repeat 
@@ -2215,6 +2211,9 @@ Transaction:
 
 .. |login| replace:: ``/login``
 .. _login: /docs/api/client-server/#!/-login
+
+.. |register| replace:: ``/register``
+.. _register: /docs/api/client-server/#!/-registration
 
 .. |/rooms/<room_id>/messages| replace:: ``/rooms/<room_id>/messages``
 .. _/rooms/<room_id>/messages: /docs/api/client-server/#!/-rooms/get_messages

@@ -4,34 +4,37 @@
     {
       "operations": [
         {
+          "method": "GET", 
+          "nickname": "get_registration_info", 
+          "notes": "All login stages MUST be mentioned if there is >1 login type.", 
+          "summary": "Get the login mechanism to use when registering.", 
+          "type": "RegistrationFlows"
+        }, 
+        {
           "method": "POST", 
-          "nickname": "register", 
-          "notes": "Volatile: This API is likely to change.", 
+          "nickname": "submit_registration", 
+          "notes": "If this is part of a multi-stage registration, there MUST be a 'session' key.", 
           "parameters": [
             {
-              "description": "A registration request", 
+              "description": "A registration submission", 
               "name": "body", 
               "paramType": "body", 
               "required": true, 
-              "type": "RegistrationRequest"
+              "type": "RegistrationSubmission"
             }
           ], 
           "responseMessages": [
             {
               "code": 400, 
-              "message": "No JSON object."
+              "message": "Bad login type"
             }, 
             {
               "code": 400, 
-              "message": "User ID must only contain characters which do not require url encoding."
-            },
-            {
-              "code": 400, 
-              "message": "User ID already taken."
+              "message": "Missing JSON keys"
             }
           ], 
-          "summary": "Register with the home server.", 
-          "type": "RegistrationResponse"
+          "summary": "Submit a registration action.", 
+          "type": "RegistrationResult"
         }
       ], 
       "path": "/register"
@@ -42,30 +45,68 @@
     "application/json"
   ], 
   "models": {
-    "RegistrationResponse": {
-      "id": "RegistrationResponse", 
+    "RegistrationFlows": {
+      "id": "RegistrationFlows",
       "properties": {
-        "access_token": {
-          "description": "The access token for this user.", 
-          "type": "string"
+        "flows": {
+          "description": "A list of valid registration flows.",
+          "type": "array",
+          "items": {
+            "$ref": "RegistrationInfo"
+          }
+        }
+      }
+    },
+    "RegistrationInfo": {
+      "id": "RegistrationInfo", 
+      "properties": {
+        "stages": {
+          "description": "Multi-stage registration only: An array of all the login types required to registration.", 
+          "items": {
+            "$ref": "string"
+          }, 
+          "type": "array"
         }, 
-        "user_id": {
-          "description": "The fully-qualified user ID.", 
-          "type": "string"
-        },
-        "home_server": {
-          "description": "The name of the home server.",
+        "type": {
+          "description": "The first login type that must be used when logging in.", 
           "type": "string"
         }
       }
     }, 
-    "RegistrationRequest": {
-      "id": "RegistrationRequest", 
+    "RegistrationResult": {
+      "id": "RegistrationResult", 
       "properties": {
+        "access_token": {
+          "description": "The access token for this user's registration if this is the final stage of the registration process.", 
+          "type": "string"
+        },
         "user_id": {
-          "description": "The desired user ID. If not specified, a random user ID will be allocated.", 
-          "type": "string",
-          "required": false
+          "description": "The user's fully-qualified user ID.",
+          "type": "string"
+        }, 
+        "next": {
+          "description": "Multi-stage registration only: The next registration type to submit.", 
+          "type": "string"
+        },
+        "session": {
+          "description": "Multi-stage registration only: The session token to send when submitting the next registration type.",
+          "type": "string"
+        }
+      }
+    }, 
+    "RegistrationSubmission": {
+      "id": "RegistrationSubmission", 
+      "properties": {
+        "type": {
+          "description": "The type of registration being submitted.", 
+          "type": "string"
+        },
+        "session": {
+          "description": "Multi-stage registration only: The session token from an earlier registration stage.",
+          "type": "string"
+        },
+        "_registration_type_defined_keys_": {
+          "description": "Keys as defined by the specified registration type, e.g. \"user\", \"password\""
         }
       }
     }
