@@ -76,12 +76,25 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
                     if (room.messages && room.messages.chunk && room.messages.chunk[0]) {
                         $rootScope.rooms[room.room_id].lastMsg = room.messages.chunk[0];
                     }
+                    
+                    
+                    var numUsersInRoom = 0;
+                    if (room.state) {
+                        for (var j=0; j<room.state.length; j++) {
+                            var stateEvent = room.state[j];
+                            if (stateEvent.type == "m.room.member" && stateEvent.content.membership == "join") {
+                                numUsersInRoom += 1;
+                            }
+                        }
+                    }
+                    $rootScope.rooms[room.room_id].numUsersInRoom = numUsersInRoom;
                 }
 
                 var presence = initialSyncData.data.presence;
                 for (var i = 0; i < presence.length; ++i) {
                     eventHandlerService.handleEvent(presence[i], false);
                 }
+                
 
                 // From now, update recents from the stream
                 listenToEventStream();
