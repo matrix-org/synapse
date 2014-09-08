@@ -308,8 +308,8 @@ class PduStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_oldest_pdus_in_context(self, context):
-        """Get a list of Pdus that we haven't backfilled beyond yet (and haven't    
-        seen). This list is used when we want to backfill backwards and is the 
+        """Get a list of Pdus that we haven't backfilled beyond yet (and havent
+        seen). This list is used when we want to backfill backwards and is the
         list we send to the remote server.
 
         Args:
@@ -524,13 +524,16 @@ class StatePduStore(SQLBaseStore):
             txn, new_pdu, current
         )
 
+        missing_branch = None
         for branch, prev_state, state in enum_branches:
             if state:
                 return_value[branch].append(state)
             else:
+                # We don't have prev_state :(
+                missing_branch = branch
                 break
 
-        return return_value
+        return (return_value, missing_branch)
 
     def update_current_state(self, pdu_id, origin, context, pdu_type,
                              state_key):

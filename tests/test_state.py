@@ -24,6 +24,8 @@ from collections import namedtuple
 
 from mock import Mock
 
+import mock
+
 
 ReturnType = namedtuple(
     "StateReturnType", ["new_branch", "current_branch"]
@@ -54,7 +56,7 @@ class StateTestCase(unittest.TestCase):
         new_pdu = new_fake_pdu_entry("A", "test", "mem", "x", None, 10)
 
         self.persistence.get_unresolved_state_tree.return_value = (
-            ReturnType([new_pdu], [])
+            (ReturnType([new_pdu], []), None)
         )
 
         is_new = yield self.state.handle_new_state(new_pdu)
@@ -78,7 +80,7 @@ class StateTestCase(unittest.TestCase):
         new_pdu = new_fake_pdu_entry("B", "test", "mem", "x", "A", 5)
 
         self.persistence.get_unresolved_state_tree.return_value = (
-            ReturnType([new_pdu, old_pdu], [old_pdu])
+            (ReturnType([new_pdu, old_pdu], [old_pdu]), None)
         )
 
         is_new = yield self.state.handle_new_state(new_pdu)
@@ -103,7 +105,7 @@ class StateTestCase(unittest.TestCase):
         new_pdu = new_fake_pdu_entry("C", "test", "mem", "x", "A", 5)
 
         self.persistence.get_unresolved_state_tree.return_value = (
-            ReturnType([new_pdu, old_pdu_1], [old_pdu_2, old_pdu_1])
+            (ReturnType([new_pdu, old_pdu_1], [old_pdu_2, old_pdu_1]), None)
         )
 
         is_new = yield self.state.handle_new_state(new_pdu)
@@ -128,7 +130,7 @@ class StateTestCase(unittest.TestCase):
         new_pdu = new_fake_pdu_entry("C", "test", "mem", "x", "A", 15)
 
         self.persistence.get_unresolved_state_tree.return_value = (
-            ReturnType([new_pdu, old_pdu_1], [old_pdu_2, old_pdu_1])
+            (ReturnType([new_pdu, old_pdu_1], [old_pdu_2, old_pdu_1]), None)
         )
 
         is_new = yield self.state.handle_new_state(new_pdu)
@@ -153,7 +155,7 @@ class StateTestCase(unittest.TestCase):
         new_pdu = new_fake_pdu_entry("C", "test", "mem", "x", "A", 10)
 
         self.persistence.get_unresolved_state_tree.return_value = (
-            ReturnType([new_pdu, old_pdu_1], [old_pdu_2, old_pdu_1])
+            (ReturnType([new_pdu, old_pdu_1], [old_pdu_2, old_pdu_1]), None)
         )
 
         is_new = yield self.state.handle_new_state(new_pdu)
@@ -179,7 +181,13 @@ class StateTestCase(unittest.TestCase):
         new_pdu = new_fake_pdu_entry("D", "test", "mem", "x", "C", 10)
 
         self.persistence.get_unresolved_state_tree.return_value = (
-            ReturnType([new_pdu, old_pdu_3, old_pdu_1], [old_pdu_2, old_pdu_1])
+            (
+                ReturnType(
+                    [new_pdu, old_pdu_3, old_pdu_1],
+                    [old_pdu_2, old_pdu_1]
+                ),
+                None
+            )
         )
 
         is_new = yield self.state.handle_new_state(new_pdu)
@@ -200,22 +208,32 @@ class StateTestCase(unittest.TestCase):
         # triggering a get_pdu request
 
         # The pdu we haven't seen
-        old_pdu_1 = new_fake_pdu_entry("A", "test", "mem", "x", None, 10)
+        old_pdu_1 = new_fake_pdu_entry(
+            "A", "test", "mem", "x", None, 10, depth=0
+        )
 
-        old_pdu_2 = new_fake_pdu_entry("B", "test", "mem", "x", None, 10)
-        new_pdu = new_fake_pdu_entry("C", "test", "mem", "x", "A", 20)
+        old_pdu_2 = new_fake_pdu_entry(
+            "B", "test", "mem", "x", "A", 10, depth=1
+        )
+        new_pdu = new_fake_pdu_entry(
+            "C", "test", "mem", "x", "A", 20, depth=2
+        )
 
         # The return_value of `get_unresolved_state_tree`, which changes after
         # the call to get_pdu
-        tree_to_return = [ReturnType([new_pdu], [old_pdu_2])]
+        tree_to_return = [(ReturnType([new_pdu], [old_pdu_2]), 0)]
 
         def return_tree(p):
             return tree_to_return[0]
 
-        def set_return_tree(*args, **kwargs):
-            tree_to_return[0] = ReturnType(
-                [new_pdu, old_pdu_1], [old_pdu_2, old_pdu_1]
+        def set_return_tree(destination, pdu_origin, pdu_id, outlier=False):
+            tree_to_return[0] = (
+                ReturnType(
+                    [new_pdu, old_pdu_1], [old_pdu_2, old_pdu_1]
+                ),
+                None
             )
+            return defer.succeed(None)
 
         self.persistence.get_unresolved_state_tree.side_effect = return_tree
 
@@ -227,12 +245,197 @@ class StateTestCase(unittest.TestCase):
 
         self.assertTrue(is_new)
 
+        self.replication.get_pdu.assert_called_with(
+            destination=new_pdu.origin,
+            pdu_origin=old_pdu_1.origin,
+            pdu_id=old_pdu_1.pdu_id,
+            outlier=True
+        )
+
         self.persistence.get_unresolved_state_tree.assert_called_with(
             new_pdu
         )
 
         self.assertEquals(
             2, self.persistence.get_unresolved_state_tree.call_count
+        )
+
+        self.assertEqual(1, self.persistence.update_current_state.call_count)
+
+    @defer.inlineCallbacks
+    def test_missing_pdu_depth_1(self):
+        # We try to update state against a PDU we haven't yet seen,
+        # triggering a get_pdu request
+
+        # The pdu we haven't seen
+        old_pdu_1 = new_fake_pdu_entry(
+            "A", "test", "mem", "x", None, 10, depth=0
+        )
+
+        old_pdu_2 = new_fake_pdu_entry(
+            "B", "test", "mem", "x", "A", 10, depth=2
+        )
+        old_pdu_3 = new_fake_pdu_entry(
+            "C", "test", "mem", "x", "B", 10, depth=3
+        )
+        new_pdu = new_fake_pdu_entry(
+            "D", "test", "mem", "x", "A", 20, depth=4
+        )
+
+        # The return_value of `get_unresolved_state_tree`, which changes after
+        # the call to get_pdu
+        tree_to_return = [
+            (
+                ReturnType([new_pdu], [old_pdu_3]),
+                0
+            ),
+            (
+                ReturnType(
+                    [new_pdu, old_pdu_1], [old_pdu_3]
+                ),
+                1
+            ),
+            (
+                ReturnType(
+                    [new_pdu, old_pdu_1], [old_pdu_3, old_pdu_2, old_pdu_1]
+                ),
+                None
+            ),
+        ]
+
+        to_return = [0]
+
+        def return_tree(p):
+            return tree_to_return[to_return[0]]
+
+        def set_return_tree(destination, pdu_origin, pdu_id, outlier=False):
+            to_return[0] += 1
+            return defer.succeed(None)
+
+        self.persistence.get_unresolved_state_tree.side_effect = return_tree
+
+        self.replication.get_pdu.side_effect = set_return_tree
+
+        self.persistence.get_pdu.return_value = None
+
+        is_new = yield self.state.handle_new_state(new_pdu)
+
+        self.assertTrue(is_new)
+
+        self.assertEqual(2, self.replication.get_pdu.call_count)
+
+        self.replication.get_pdu.assert_has_calls(
+            [
+                mock.call(
+                    destination=new_pdu.origin,
+                    pdu_origin=old_pdu_1.origin,
+                    pdu_id=old_pdu_1.pdu_id,
+                    outlier=True
+                ),
+                mock.call(
+                    destination=old_pdu_3.origin,
+                    pdu_origin=old_pdu_2.origin,
+                    pdu_id=old_pdu_2.pdu_id,
+                    outlier=True
+                ),
+            ]
+        )
+
+        self.persistence.get_unresolved_state_tree.assert_called_with(
+            new_pdu
+        )
+
+        self.assertEquals(
+            3, self.persistence.get_unresolved_state_tree.call_count
+        )
+
+        self.assertEqual(1, self.persistence.update_current_state.call_count)
+
+    @defer.inlineCallbacks
+    def test_missing_pdu_depth_2(self):
+        # We try to update state against a PDU we haven't yet seen,
+        # triggering a get_pdu request
+
+        # The pdu we haven't seen
+        old_pdu_1 = new_fake_pdu_entry(
+            "A", "test", "mem", "x", None, 10, depth=0
+        )
+
+        old_pdu_2 = new_fake_pdu_entry(
+            "B", "test", "mem", "x", "A", 10, depth=2
+        )
+        old_pdu_3 = new_fake_pdu_entry(
+            "C", "test", "mem", "x", "B", 10, depth=3
+        )
+        new_pdu = new_fake_pdu_entry(
+            "D", "test", "mem", "x", "A", 20, depth=1
+        )
+
+        # The return_value of `get_unresolved_state_tree`, which changes after
+        # the call to get_pdu
+        tree_to_return = [
+            (
+                ReturnType([new_pdu], [old_pdu_3]),
+                1,
+            ),
+            (
+                ReturnType(
+                    [new_pdu], [old_pdu_3, old_pdu_2]
+                ),
+                0,
+            ),
+            (
+                ReturnType(
+                    [new_pdu, old_pdu_1], [old_pdu_3, old_pdu_2, old_pdu_1]
+                ),
+                None
+            ),
+        ]
+
+        to_return = [0]
+
+        def return_tree(p):
+            return tree_to_return[to_return[0]]
+
+        def set_return_tree(destination, pdu_origin, pdu_id, outlier=False):
+            to_return[0] += 1
+            return defer.succeed(None)
+
+        self.persistence.get_unresolved_state_tree.side_effect = return_tree
+
+        self.replication.get_pdu.side_effect = set_return_tree
+
+        self.persistence.get_pdu.return_value = None
+
+        is_new = yield self.state.handle_new_state(new_pdu)
+
+        self.assertTrue(is_new)
+
+        self.assertEqual(2, self.replication.get_pdu.call_count)
+
+        self.replication.get_pdu.assert_has_calls(
+            [
+                mock.call(
+                    destination=old_pdu_3.origin,
+                    pdu_origin=old_pdu_2.origin,
+                    pdu_id=old_pdu_2.pdu_id,
+                    outlier=True
+                ),
+                mock.call(
+                    destination=new_pdu.origin,
+                    pdu_origin=old_pdu_1.origin,
+                    pdu_id=old_pdu_1.pdu_id,
+                    outlier=True
+                ),
+            ]
+        )
+
+        self.persistence.get_unresolved_state_tree.assert_called_with(
+            new_pdu
+        )
+
+        self.assertEquals(
+            3, self.persistence.get_unresolved_state_tree.call_count
         )
 
         self.assertEqual(1, self.persistence.update_current_state.call_count)
@@ -270,7 +473,7 @@ class StateTestCase(unittest.TestCase):
 
 
 def new_fake_pdu_entry(pdu_id, context, pdu_type, state_key, prev_state_id,
-                 power_level):
+                       power_level, depth=0):
     new_pdu = PduEntry(
         pdu_id=pdu_id,
         pdu_type=pdu_type,
@@ -280,7 +483,7 @@ def new_fake_pdu_entry(pdu_id, context, pdu_type, state_key, prev_state_id,
         origin="example.com",
         context="context",
         ts=1405353060021,
-        depth=0,
+        depth=depth,
         content_json="{}",
         unrecognized_keys="{}",
         outlier=True,
