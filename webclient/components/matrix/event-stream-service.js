@@ -105,7 +105,7 @@ angular.module('eventStreamService', [])
         var deferred = $q.defer();
 
         // FIXME: We are discarding all the messages.
-        matrixService.rooms().then(
+        matrixService.rooms(1, false).then(
             function(response) {
                 var rooms = response.data.rooms;
                 for (var i = 0; i < rooms.length; ++i) {
@@ -120,7 +120,7 @@ angular.module('eventStreamService', [])
                 eventHandlerService.handleEvents(presence, false);
 
                 // Initial sync is done
-                eventHandlerService.handleInitialSyncDone();
+                eventHandlerService.handleInitialSyncDone(response);
 
                 settings.from = response.data.end;
                 doEventStream(deferred);        

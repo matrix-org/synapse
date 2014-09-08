@@ -36,7 +36,7 @@ angular.module('eventHandlerService', [])
     var CALL_EVENT = "CALL_EVENT";
     var NAME_EVENT = "NAME_EVENT";
 
-    var InitialSyncDeferred = $q.defer();
+    var initialSyncDeferred = $q.defer();
     
     $rootScope.events = {
         rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
@@ -220,14 +220,14 @@ angular.module('eventHandlerService', [])
             }
         },
 
-        handleInitialSyncDone: function() {
+        handleInitialSyncDone: function(initialSyncData) {
             console.log("# handleInitialSyncDone");
-            InitialSyncDeferred.resolve($rootScope.events, $rootScope.presence);
+            initialSyncDeferred.resolve(initialSyncData);
         },
 
         // Returns a promise that resolves when the initialSync request has been processed
         waitForInitialSyncCompletion: function() {
-            return InitialSyncDeferred.promise;
+            return initialSyncDeferred.promise;
         },
 
         resetRoomMessages: function(room_id) {
