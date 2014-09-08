@@ -24,7 +24,7 @@
 
     <h3>Public rooms</h3>
     
-    <div class="public_rooms" ng-repeat="room in public_rooms">
+    <div class="public_rooms" ng-repeat="room in public_rooms | orderBy:'room_display_name'">
         <div>
             <a href="#/room/{{ room.room_alias ? room.room_alias : room.room_id }}" >{{ room.room_display_name }}</a>
         </div>
