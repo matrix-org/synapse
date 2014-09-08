@@ -16,6 +16,12 @@
 
 'use strict';
 
+// XXX FIXME TODO
+// We should NOT be dumping things into $rootScope!!!! We should NOT be
+// making any requests here, and should READ what is already in the 
+// rootScope from the event handler service!!!
+// XXX FIXME TODO
+
 angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHandlerService'])
 .controller('RecentsController', ['$rootScope', '$scope', 'matrixService', 'eventHandlerService', 
                                function($rootScope, $scope, matrixService, eventHandlerService) {
@@ -28,6 +34,11 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
     // in order to highlight a specific room in the list
     $rootScope.recentsSelectedRoomID;
 
+    // XXX FIXME TODO : We should NOT be doing this here, which could be
+    // repeated for every controller instance. We should be doing this in
+    // event handler service instead. In additon, this will break if there
+    // isn't a recents controller visible when the last message comes in :/
+    
     var listenToEventStream = function() {
         // Refresh the list on matrix invitation and message event
         $rootScope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
@@ -58,7 +69,13 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
         if ($rootScope.rooms) {
             return;
         }
-
+        
+        // XXX FIXME TODO
+        // We should NOT be dumping things into $rootScope!!!! We should NOT be
+        // making any requests here, and should READ what is already in the 
+        // rootScope from the event handler service!!!
+        // XXX FIXME TODO
+        
         $rootScope.rooms = {};
         
         // Use initialSync data to init the recents list
