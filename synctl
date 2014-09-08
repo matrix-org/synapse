@@ -14,6 +14,7 @@ case "$1" in
   start)
     if [ ! -f "$CONFIGFILE" ]; then
       echo "No config file found"
+      echo "To generate a config file, run 'python --generate-config'"
       exit 1
     fi
 
