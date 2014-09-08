@@ -2,8 +2,13 @@
 
     <div id="roomHeader">
         <a href ng-click="goToPage('/')"><img src="img/logo-small.png" width="100" height="43" alt="[matrix]"/></a>
-        <div id="roomName">
-            {{ room_id  | mRoomName }}
+        <div class="roomHeaderInfo">
+            <div id="roomName">
+                {{ room_id  | mRoomName }}
+            </div>
+            <div id="roomTopic" ng-show="events.rooms[room_id]['m.room.topic'].content.topic">
+                {{ events.rooms[room_id]['m.room.topic'].content.topic }}
+            </div>
         </div>
     </div>
 

@@ -148,6 +148,14 @@ angular.module('eventHandlerService', [])
         $rootScope.events.rooms[event.room_id][event.type] = event;
         $rootScope.$broadcast(NAME_EVENT, event, isLiveEvent);
     };
+    
+    var handleRoomTopic = function(event, isLiveEvent) {
+        console.log("handleRoomTopic " + isLiveEvent);
+
+        initRoom(event.room_id);
+
+        $rootScope.events.rooms[event.room_id][event.type] = event;
+    };
 
     var handleCallEvent = function(event, isLiveEvent) {
         $rootScope.$broadcast(CALL_EVENT, event, isLiveEvent);
@@ -203,6 +211,9 @@ angular.module('eventHandlerService', [])
                         break;
                     case 'm.room.name':
                         handleRoomName(event, isLiveEvent);
+                        break;
+                    case 'm.room.topic':
+                        handleRoomTopic(event, isLiveEvent);
                         break;
                     default:
                         console.log("Unable to handle event type " + event.type);

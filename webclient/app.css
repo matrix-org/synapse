@@ -220,12 +220,6 @@ a:active  { color: #000; }
     height: 100%;
 }
 
-#roomName {
-    float: right;
-    font-size: 16px;
-    margin-top: 15px;
-}
-
 #roomHeader {
     margin: auto;
     padding-left: 20px;
@@ -280,6 +274,21 @@ a:active  { color: #000; }
 
 .publicRoomJoinedUsers {
     float: right;
+}
+
+#roomName {
+    font-size: 16px;
+    text-align: right;
+}
+
+#roomTopic {
+    text-align: right;
+    font-size: 13px;
+}
+
+.roomHeaderInfo {
+    float: right;
+    margin-top: 15px;
 }
 
 /*** Participant list ***/
