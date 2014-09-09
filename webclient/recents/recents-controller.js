@@ -112,12 +112,6 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
                     $rootScope.rooms[room.room_id].numUsersInRoom = numUsersInRoom;
                 }
 
-                var presence = initialSyncData.data.presence;
-                for (var i = 0; i < presence.length; ++i) {
-                    eventHandlerService.handleEvent(presence[i], false);
-                }
-                
-
                 // From now, update recents from the stream
                 listenToEventStream();
             },
