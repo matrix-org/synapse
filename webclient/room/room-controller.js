@@ -32,7 +32,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         first_pagination: true, // this is toggled off when the first pagination is done
         can_paginate: true, // this is toggled off when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
-        stream_failure: undefined // the response when the stream fails
+        stream_failure: undefined, // the response when the stream fails
+        waiting_for_joined_event: false  // true when the join request is pending. Back to false once the corresponding m.room.member event is received
     };
     $scope.members = {};
     $scope.autoCompleting = false;
@@ -113,8 +114,15 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
         if (isLive) {
-            scrollToBottom();
-            updateMemberList(event);
+            if ($scope.state.waiting_for_joined_event) {
+                // The user has successfully joined the room, we can getting data for this room
+                $scope.state.waiting_for_joined_event = false;
+                onInit3();
+            }
+            else {
+                scrollToBottom();
+                updateMemberList(event); 
+            }
         }
     });
     
@@ -628,10 +636,14 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 
                 // Do we to join the room before starting?
                 if (needsToJoin) {
+                    $scope.state.waiting_for_joined_event = true;
                     matrixService.join($scope.room_id).then(
                         function() {
+                            // onInit3 will be called once the joined m.room.member event is received from the events stream
+                            // This avoids to get the joined information twice in parallel:
+                            //    - one from the events stream
+                            //    - one from the pagination because the pagination window covers this event ts
                             console.log("Joined room "+$scope.room_id);
-                            onInit3();
                         },
                         function(reason) {
                             console.log("Can't join room: " + JSON.stringify(reason));
