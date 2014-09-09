@@ -276,6 +276,13 @@ a:active  { color: #000; }
     float: right;
 }
 
+.publicRoomTopic {
+    color: #888;
+    font-size: 12px;
+    padding-right: 5px;
+    float: right;
+}
+
 #roomName {
     font-size: 16px;
     text-align: right;

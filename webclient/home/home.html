@@ -34,6 +34,9 @@
             ng-show="room.num_joined_members">
                 {{ room.num_joined_members }} {{ room.num_joined_members == 1 ? 'user' : 'users' }}
             </div>
+            <div class="publicRoomTopic" ng-show="room.topic">
+                {{ room.topic }}
+            </div>
         </div>
     </div>
     <br/>
