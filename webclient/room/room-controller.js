@@ -42,6 +42,31 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     $scope.imageURLToSend = "";
     $scope.userIDToInvite = "";
     
+    // vars and functions for updating the topic
+    $scope.topic = {
+        isEditing: false,
+        newTopicText: "",
+        editTopic: function() {
+            if ($scope.topic.isEditing) {
+                console.log("Warning: Already editing topic.");
+                return;
+            }
+            $scope.topic.newTopicText = $rootScope.events.rooms[$scope.room_id]['m.room.topic'].content.topic;
+            $scope.topic.isEditing = true;
+        },
+        updateTopic: function() {
+            console.log("Updating topic to "+$scope.topic.newTopicText);
+            matrixService.setTopic($scope.room_id, $scope.topic.newTopicText);
+            $scope.topic.isEditing = false;
+        },
+        cancelEdit: function() {
+            $scope.topic.isEditing = false;
+        }
+    };
+    
+    
+    
+    
     var scrollToBottom = function(force) {
         console.log("Scrolling to bottom");
         

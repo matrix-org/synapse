@@ -149,6 +149,7 @@ angular.module('eventHandlerService', [])
         $rootScope.$broadcast(NAME_EVENT, event, isLiveEvent);
     };
     
+    // TODO: Can this just be a generic "I am a room state event, can haz store?"
     var handleRoomTopic = function(event, isLiveEvent) {
         console.log("handleRoomTopic live="+isLiveEvent);
 

@@ -235,6 +235,25 @@ angular.module('matrixService', [])
 
             return doRequest("GET", path, undefined, {});
         },
+        
+        setTopic: function(room_id, topic) {
+            var data = {
+                topic: topic
+            };
+            return this.sendStateEvent(room_id, "m.room.topic", data);
+        },
+        
+        
+        sendStateEvent: function(room_id, eventType, content, state_key) {
+            var path = "/rooms/$room_id/state/"+eventType;
+            if (state_key !== undefined) {
+                path += "/" + state_key;
+            }
+            room_id = encodeURIComponent(room_id);
+            path = path.replace("$room_id", room_id);
+
+            return doRequest("PUT", path, undefined, content);
+        },
 
         sendEvent: function(room_id, eventType, txn_id, content) {
             // The REST path spec

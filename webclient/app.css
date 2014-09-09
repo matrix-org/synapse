@@ -297,9 +297,14 @@ a:active  { color: #000; }
     font-size: 13px;
 }
 
+.roomTopicInput {
+    width: 100%;
+}
+
 .roomHeaderInfo {
     float: right;
     margin-top: 15px;
+    width: 50%;
 }
 
 /*** Participant list ***/
