@@ -117,6 +117,8 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.gotUserMediaForInvite = function(stream) {
+        if (!$rootScope.currentCall || $rootScope.currentCall.state == 'ended') return;
+
         this.localAVStream = stream;
         var audioTracks = stream.getAudioTracks();
         for (var i = 0; i < audioTracks.length; i++) {
@@ -140,6 +142,8 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.gotUserMediaForAnswer = function(stream) {
+        if (!$rootScope.currentCall || $rootScope.currentCall.state == 'ended') return;
+
         this.localAVStream = stream;
         var audioTracks = stream.getAudioTracks();
         for (var i = 0; i < audioTracks.length; i++) {
