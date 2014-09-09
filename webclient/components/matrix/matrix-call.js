@@ -104,7 +104,7 @@ angular.module('MatrixCall', [])
         console.trace("Ending call "+this.call_id);
 
         this.stopAllMedia();
-        this.peerConn.close();
+        if (this.peerConn) this.peerConn.close();
 
         this.hangupParty = 'local';
 
