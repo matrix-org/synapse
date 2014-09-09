@@ -270,6 +270,7 @@ a:active  { color: #000; }
 .publicRoomEntry {
     max-width: 480px;
     margin-bottom: 5px;
+    border-bottom: 1px #ddd solid;
 }
 
 .publicRoomJoinedUsers {
@@ -281,6 +282,8 @@ a:active  { color: #000; }
     font-size: 12px;
     padding-right: 5px;
     width: 15em;
+    float: right;
+    text-align: right;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
