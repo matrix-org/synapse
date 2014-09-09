@@ -7,23 +7,23 @@ such, Matrix requires that all strings MUST be encoded as UTF-8. However,
 using Unicode as the character set for human-readable IDs is troublesome. There
 are many different characters which appear identical to each other, but would
 identify different users. In addition, there are non-printable characters which
-cannot be rendered the the end-user. This opens up a security vulnerability with
+cannot be rendered by the end-user. This opens up a security vulnerability with
 phishing/spoofing of IDs, commonly known as a homograph attack.
 
 Web browers encountered this problem when International Domain Names were
 introduced. A variety of checks were put in place in order to protect users. If
 an address failed the check, the raw punycode would be displayed to disambiguate
-the address. Similar checks are performed by home servers in Matrix, which will
-then warn the client about the potentially misleading ID. However, Matrix does
-not use punycode, and so does not show raw punycode on a failed check. Instead,
-home servers must outright reject these misleading IDs.
+the address. Similar checks are performed by home servers in Matrix. However, 
+Matrix does not use punycode representations, and so does not show raw punycode 
+on a failed check. Instead, home servers must outright reject these misleading 
+IDs.
 
 Types of human-readable IDs
 ---------------------------
 There are two main human-readable IDs in question:
 
- - Room aliases
- - User IDs
+- Room aliases
+- User IDs
  
 Room aliases look like ``#localpart:domain``. These aliases point to opaque
 non human-readable room IDs. These pointers can change, so there is already an
