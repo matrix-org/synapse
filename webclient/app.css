@@ -281,6 +281,10 @@ a:active  { color: #000; }
     font-size: 12px;
     padding-right: 5px;
     float: right;
+    width: 15em;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 #roomName {
