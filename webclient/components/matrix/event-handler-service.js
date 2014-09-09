@@ -150,10 +150,22 @@ angular.module('eventHandlerService', [])
     };
     
     var handleRoomTopic = function(event, isLiveEvent) {
-        console.log("handleRoomTopic " + isLiveEvent);
+        console.log("handleRoomTopic live="+isLiveEvent);
 
         initRoom(event.room_id);
 
+        // live events always update, but non-live events only update if the
+        // ts is later.
+        if (!isLiveEvent) {
+            var eventTs = event.ts;
+            var storedEvent = $rootScope.events.rooms[event.room_id][event.type];
+            if (storedEvent) {
+                if (storedEvent.ts > eventTs) {
+                    // ignore it, we have a newer one already.
+                    return;
+                }
+            }
+        }
         $rootScope.events.rooms[event.room_id][event.type] = event;
     };
 
