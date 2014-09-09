@@ -41,6 +41,9 @@ Checks
 - mix of language sets from 'preferred' language not allowed. 
 - Language sets from CLDR dataset.
 - Treated in segments (localpart, domain)
+- Additional restrictions for ease of processing IDs.
+  - Room alias localparts MUST NOT have ``#`` or ``:``.
+  - User ID localparts MUST NOT have ``@`` or ``:``.
 
 Rejecting
 ---------
@@ -50,9 +53,13 @@ Rejecting
   on creation and on events.
 - Any home server whose domain does not pass this check, MUST use their punycode
   domain name instead of the IDN, to prevent other home servers rejecting you.
-- Error code is M_FAILED_HOMOGRAPH_CHECK.
+- Error code is ``M_FAILED_HUMAN_ID_CHECK``. (generic enough for both failing 
+  due to homograph attacks, and failing due to including ``:``s, etc)
 - Error message MAY go into further information about which characters were
   rejected and why.
+- Error message SHOULD contain a ``failed_keys`` key which contains an array
+  of strings which represent the keys which failed the check e.g:
+   - ``failed_keys: [ user_id, room_alias ]``
   
 Other considerations
 --------------------
