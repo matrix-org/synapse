@@ -77,7 +77,7 @@ class DataStore(RoomMemberStore, RoomStore,
             stream_ordering = self.min_token
 
         try:
-            latest = yield self._db_pool.runInteraction(
+            yield self._db_pool.runInteraction(
                 self._persist_pdu_event_txn,
                 pdu=pdu,
                 event=event,
@@ -86,7 +86,6 @@ class DataStore(RoomMemberStore, RoomStore,
             )
         except _RollbackButIsFineException as e:
             pass
-        defer.returnValue(latest)
 
     @defer.inlineCallbacks
     def get_event(self, event_id, allow_none=False):
@@ -213,8 +212,6 @@ class DataStore(RoomMemberStore, RoomStore,
                     "state_key": event.state_key,
                 }
             )
-
-        return self._get_room_events_max_id_txn(txn)
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
