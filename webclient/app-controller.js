@@ -142,14 +142,6 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
 
     $scope.hangupCall = function() {
         $rootScope.currentCall.hangup();
-
-        $timeout(function() {
-            var icon = angular.element('#callEndedIcon');
-            $animate.addClass(icon, 'callIconRotate');
-            $timeout(function(){
-                $rootScope.currentCall = undefined;
-            }, 4070);
-        }, 100);
     };
     
     $rootScope.onCallError = function(errStr) {

@@ -114,6 +114,7 @@ angular.module('MatrixCall', [])
         };
         matrixService.sendEvent(this.room_id, 'm.call.hangup', undefined, content).then(this.messageSent, this.messageSendFailed);
         this.state = 'ended';
+        self.onHangup();
     };
 
     MatrixCall.prototype.gotUserMediaForInvite = function(stream) {
@@ -233,6 +234,7 @@ angular.module('MatrixCall', [])
 
     MatrixCall.prototype.getUserMediaFailed = function() {
         this.onError("Couldn't start capturing audio! Is your microphone set up?");
+        this.hangup();
     };
 
     MatrixCall.prototype.onIceConnectionStateChanged = function() {
