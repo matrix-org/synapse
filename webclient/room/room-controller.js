@@ -30,7 +30,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         events_from: "END", // when to start the event stream from.
         earliest_token: "END", // stores how far back we've paginated.
         first_pagination: true, // this is toggled off when the first pagination is done
-        can_paginate: true, // this is toggled off when we run out of items
+        can_paginate: false, // this is toggled off when we are not ready yet to paginate or when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
         stream_failure: undefined, // the response when the stream fails
         waiting_for_joined_event: false  // true when the join request is pending. Back to false once the corresponding m.room.member event is received
@@ -679,13 +679,15 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
                 // Arm list timing update timer
                 updateMemberListPresenceAge();
+
+                // Start pagination
+                $scope.state.can_paginate = true;
+                paginate(MESSAGES_PER_PAGINATION);
             },
             function(error) {
                 $scope.feedback = "Failed get member list: " + error.data.error;
             }
         );
-
-        paginate(MESSAGES_PER_PAGINATION);
     }; 
     
     $scope.inviteUser = function(user_id) {
