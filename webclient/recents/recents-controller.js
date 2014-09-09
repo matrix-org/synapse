@@ -51,7 +51,14 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
                         room_id:event.room_id
                     };
                 }
-                $rootScope.rooms[event.room_id].lastMsg = event;
+                else if (event.state_key === matrixService.config().user_id && "invite" !== event.membership && "join" !== event.membership) {
+                    // The user has been kicked or banned from the room, remove this room from the recents
+                    delete $rootScope.rooms[event.room_id];
+                }
+                
+                if ($rootScope.rooms[event.room_id]) {
+                    $rootScope.rooms[event.room_id].lastMsg = event;
+                }
             }
         });
         $rootScope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
