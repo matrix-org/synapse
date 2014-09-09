@@ -43,6 +43,14 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
         // Refresh the list on matrix invitation and message event
         $rootScope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
             if (isLive) {
+                if (!$rootScope.rooms[event.room_id]) {
+                    // The user has joined a new room, which we do not have data yet. The reason is that
+                    // the room has appeared in the scope of the user rooms after the global initialSync
+                    // FIXME: an initialSync on this specific room should be done
+                    $rootScope.rooms[event.room_id] = {
+                        room_id:event.room_id
+                    };
+                }
                 $rootScope.rooms[event.room_id].lastMsg = event;
             }
         });
