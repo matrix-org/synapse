@@ -51,7 +51,14 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 console.log("Warning: Already editing topic.");
                 return;
             }
-            $scope.topic.newTopicText = $rootScope.events.rooms[$scope.room_id]['m.room.topic'].content.topic;
+            var topicEvent = $rootScope.events.rooms[$scope.room_id]['m.room.topic'];
+            if (topicEvent) {
+                $scope.topic.newTopicText = topicEvent.content.topic;
+            }
+            else {
+                $scope.topic.newTopicText = "";
+            }
+            
             $scope.topic.isEditing = true;
         },
         updateTopic: function() {

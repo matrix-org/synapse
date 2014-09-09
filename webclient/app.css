@@ -280,7 +280,6 @@ a:active  { color: #000; }
     color: #888;
     font-size: 12px;
     padding-right: 5px;
-    float: right;
     width: 15em;
     overflow: hidden;
     white-space: nowrap;
@@ -299,6 +298,15 @@ a:active  { color: #000; }
 
 .roomTopicInput {
     width: 100%;
+}
+
+.roomTopicSection {
+    float: right;
+    width: 100%;
+}
+
+.roomTopicSetNew {
+    float: right;
 }
 
 .roomHeaderInfo {
