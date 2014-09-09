@@ -97,6 +97,10 @@
                         <span ng-show='msg.content.msgtype === "m.text"' 
                               ng-class="msg.echo_msg_state"
                               ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
+
+                        <span ng-show='msg.type === "m.call.invite" && msg.user_id == state.user_id'>Outgoing Call</span>
+                        <span ng-show='msg.type === "m.call.invite" && msg.user_id != state.user_id'>Incoming Call</span>
+
                         <div ng-show='msg.content.msgtype === "m.image"'>
                             <div ng-hide='msg.content.thumbnail_url' ng-style="msg.content.body.h && { 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
                                 <img class="image" ng-src="{{ msg.content.url }}"/>

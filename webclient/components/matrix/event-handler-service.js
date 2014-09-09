@@ -172,6 +172,9 @@ angular.module('eventHandlerService', [])
 
     var handleCallEvent = function(event, isLiveEvent) {
         $rootScope.$broadcast(CALL_EVENT, event, isLiveEvent);
+        if (event.type == 'm.call.invite') {
+            $rootScope.events.rooms[event.room_id].messages.push(event);
+        }
     };
     
     return {
