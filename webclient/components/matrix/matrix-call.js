@@ -35,6 +35,20 @@ var forAllTracksOnStream = function(s, f) {
     forAllAudioTracksOnStream(s, f);
 }
 
+navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+window.RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection; // but not mozRTCPeerConnection because its interface is not compatible
+window.RTCSessionDescription = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription;
+window.RTCIceCandidate = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate;
+
+var createPeerConnection = function() {
+    var stunServer = 'stun:stun.l.google.com:19302';
+    if (window.mozRTCPeerConnection) {
+        return new window.mozRTCPeerConnection({'url': stunServer});
+    } else {
+        return new window.RTCPeerConnection({"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]});
+    }
+}
+
 angular.module('MatrixCall', [])
 .factory('MatrixCall', ['matrixService', 'matrixPhoneService', '$rootScope', function MatrixCallFactory(matrixService, matrixPhoneService, $rootScope) {
     var MatrixCall = function(room_id) {
@@ -43,10 +57,6 @@ angular.module('MatrixCall', [])
         this.state = 'fledgling';
         this.didConnect = false;
     }
-
-    navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
-
-    window.RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
 
     MatrixCall.prototype.placeCall = function() {
         self = this;
@@ -58,7 +68,7 @@ angular.module('MatrixCall', [])
 
     MatrixCall.prototype.initWithInvite = function(msg) {
         this.msg = msg;
-        this.peerConn = new window.RTCPeerConnection({"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]})
+        this.peerConn = createPeerConnection();
         self= this;
         this.peerConn.oniceconnectionstatechange = function() { self.onIceConnectionStateChanged(); };
         this.peerConn.onicecandidate = function(c) { self.gotLocalIceCandidate(c); };
@@ -79,12 +89,12 @@ angular.module('MatrixCall', [])
     MatrixCall.prototype.stopAllMedia = function() {
         if (this.localAVStream) {
             forAllTracksOnStream(this.localAVStream, function(t) {
-                t.stop();
+                if (t.stop) t.stop();
             });
         }
         if (this.remoteAVStream) {
             forAllTracksOnStream(this.remoteAVStream, function(t) {
-                t.stop();
+                if (t.stop) t.stop();
             });
         }
     };
@@ -93,6 +103,7 @@ angular.module('MatrixCall', [])
         console.trace("Ending call "+this.call_id);
 
         this.stopAllMedia();
+        this.peerConn.close();
 
         var content = {
             version: 0,
@@ -108,7 +119,7 @@ angular.module('MatrixCall', [])
         for (var i = 0; i < audioTracks.length; i++) {
             audioTracks[i].enabled = true;
         }
-        this.peerConn = new window.RTCPeerConnection({"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]})
+        this.peerConn = createPeerConnection();
         self = this;
         this.peerConn.oniceconnectionstatechange = function() { self.onIceConnectionStateChanged(); };
         this.peerConn.onsignalingstatechange = function() { self.onSignallingStateChanged(); };
@@ -275,6 +286,7 @@ angular.module('MatrixCall', [])
         $rootScope.$apply(function() {
             self.state = 'ended';
             self.stopAllMedia();
+            this.peerConn.close();
             self.onHangup();
         });
     };
@@ -289,6 +301,7 @@ angular.module('MatrixCall', [])
     MatrixCall.prototype.onHangupReceived = function() {
         this.state = 'ended';
         this.stopAllMedia();
+        this.peerConn.close();
         this.onHangup();
     };
 
