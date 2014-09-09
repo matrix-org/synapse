@@ -118,7 +118,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
             angular.element('#ringAudio')[0].pause();
             angular.element('#ringbackAudio')[0].pause();
             angular.element('#callendAudio')[0].play();
-        } else if (newVal == 'ended' && oldVal == 'invite_sent') {
+        } else if (newVal == 'ended' && oldVal == 'invite_sent' && $rootScope.currentCall.hangupParty == 'remote') {
             angular.element('#ringAudio')[0].pause();
             angular.element('#ringbackAudio')[0].pause();
             angular.element('#busyAudio')[0].play();

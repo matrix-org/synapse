@@ -58,12 +58,13 @@ angular.module('MatrixCall', [])
         this.didConnect = false;
     }
 
-    MatrixCall.prototype.placeCall = function() {
+    MatrixCall.prototype.placeCall = function(config) {
         self = this;
         matrixPhoneService.callPlaced(this);
-        navigator.getUserMedia({audio: true, video: false}, function(s) { self.gotUserMediaForInvite(s); }, function(e) { self.getUserMediaFailed(e); });
-        self.state = 'wait_local_media';
+        navigator.getUserMedia({audio: config.audio, video: config.video}, function(s) { self.gotUserMediaForInvite(s); }, function(e) { self.getUserMediaFailed(e); });
+        this.state = 'wait_local_media';
         this.direction = 'outbound';
+        this.config = config;
     };
 
     MatrixCall.prototype.initWithInvite = function(msg) {
@@ -104,6 +105,8 @@ angular.module('MatrixCall', [])
 
         this.stopAllMedia();
         this.peerConn.close();
+
+        this.hangupParty = 'local';
 
         var content = {
             version: 0,
@@ -285,6 +288,7 @@ angular.module('MatrixCall', [])
         self = this;
         $rootScope.$apply(function() {
             self.state = 'ended';
+            this.hangupParty = 'remote';
             self.stopAllMedia();
             this.peerConn.close();
             self.onHangup();
@@ -300,6 +304,7 @@ angular.module('MatrixCall', [])
 
     MatrixCall.prototype.onHangupReceived = function() {
         this.state = 'ended';
+        this.hangupParty = 'remote';
         this.stopAllMedia();
         this.peerConn.close();
         this.onHangup();
