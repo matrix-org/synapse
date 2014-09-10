@@ -513,8 +513,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 room_id: $scope.room_id,
                 type: "m.room.message",
                 user_id: $scope.state.user_id,
-                // FIXME: re-enable echo_msg_state when we have a nice way to turn the field off again
-                // echo_msg_state: "messagePending"     // Add custom field to indicate the state of this fake message to HTML
+                echo_msg_state: "messagePending"     // Add custom field to indicate the state of this fake message to HTML
             };
 
             $scope.textInput = "";
@@ -527,25 +526,17 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             $scope.feedback = "";
 
             promise.then(
-                function() {
+                function(response) {
                     console.log("Request successfully sent");
-                    if (!echo) {
-                        $scope.textInput = "";
-                    }
-/*
-                    if (echoMessage) {
-                        // Remove the fake echo message from the room messages
-                        // It will be replaced by the one acknowledged by the server
-                        // ...except this causes a nasty flicker.  So don't swap messages for now. --matthew
-                        // var index = $rootScope.events.rooms[$scope.room_id].messages.indexOf(echoMessage);
-                        // if (index > -1) {
-                        //     $rootScope.events.rooms[$scope.room_id].messages.splice(index, 1);
-                        // }
+                    if (echo) {
+                        // Mark this fake message event with its allocated event_id
+                        // When the true message event will come from the events stream (in handleMessage),
+                        // we will be able to replace the fake one by the true one
+                        echoMessage.event_id = response.data.event_id;
                     }
                     else {
                         $scope.textInput = "";
-                    }
-*/                    
+                    }         
                 },
                 function(error) {
                     $scope.feedback = "Request failed: " + error.data.error;

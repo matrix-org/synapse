@@ -86,8 +86,15 @@ angular.module('eventHandlerService', [])
         if (isLiveEvent) {
             if (event.user_id === matrixService.config().user_id &&
                 (event.content.msgtype === "m.text" || event.content.msgtype === "m.emote") ) {
-                // assume we've already echoed it
-                // FIXME: track events by ID and ungrey the right message to show it's been delivered
+                // Assume we've already echoed it. So, there is a fake event in the messages list of the room
+                // Replace this fake event by the true one
+                var index = getRoomEventIndex(event.room_id, event.event_id);
+                if (index) {
+                    $rootScope.events.rooms[event.room_id].messages[index] = event;
+                }
+                else {
+                    $rootScope.events.rooms[event.room_id].messages.push(event);
+                }
             }
             else {
                 $rootScope.events.rooms[event.room_id].messages.push(event);
@@ -189,6 +196,29 @@ angular.module('eventHandlerService', [])
             $rootScope.events.rooms[event.room_id].messages.push(event);
         }
     };
+    
+    /**
+     * Get the index of the event in $rootScope.events.rooms[room_id].messages
+     * @param {type} room_id the room id
+     * @param {type} event_id the event id to look for
+     * @returns {Number | undefined} the index. undefined if not found.
+     */
+    var getRoomEventIndex = function(room_id, event_id) {
+        var index;
+        
+        var room = $rootScope.events.rooms[room_id];
+        if (room) {
+            for (var i = 0; i < room.messages.length; i++) {
+                var message = room.messages[i];
+                console.log(message.event_id);
+                if (event_id === message.event_id) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        return index;
+    }
     
     return {
         ROOM_CREATE_EVENT: ROOM_CREATE_EVENT,
