@@ -105,7 +105,7 @@ angular.module('eventHandlerService', [])
         $rootScope.$broadcast(MSG_EVENT, event, isLiveEvent);
     };
     
-    var handleRoomMember = function(event, isLiveEvent) {
+    var handleRoomMember = function(event, isLiveEvent, isStateEvent) {
         initRoom(event.room_id);
         
         // if the server is stupidly re-relaying a no-op join, discard it.
@@ -117,7 +117,10 @@ angular.module('eventHandlerService', [])
         }
         
         // add membership changes as if they were a room message if something interesting changed
-        if (event.content.prev !== event.content.membership) {
+        // Exception: Do not do this if the event is a room state event because such events already come
+        // as room messages events. Moreover, when they come as room messages events, they are relatively ordered
+        // with other other room messages
+        if (event.content.prev !== event.content.membership && !isStateEvent) {
             if (isLiveEvent) {
                 $rootScope.events.rooms[event.room_id].messages.push(event);
             }
@@ -191,7 +194,7 @@ angular.module('eventHandlerService', [])
         CALL_EVENT: CALL_EVENT,
         NAME_EVENT: NAME_EVENT,
     
-        handleEvent: function(event, isLiveEvent) {
+        handleEvent: function(event, isLiveEvent, isStateEvent) {
             // Avoid duplicated events
             // Needed for rooms where initialSync has not been done. 
             // In this case, we do not know where to start pagination. So, it starts from the END
@@ -222,7 +225,7 @@ angular.module('eventHandlerService', [])
                         handleMessage(event, isLiveEvent);
                         break;
                     case "m.room.member":
-                        handleRoomMember(event, isLiveEvent);
+                        handleRoomMember(event, isLiveEvent, isStateEvent);
                         break;
                     case "m.presence":
                         handlePresence(event, isLiveEvent);
@@ -250,9 +253,9 @@ angular.module('eventHandlerService', [])
         
         // isLiveEvents determines whether notifications should be shown, whether
         // messages get appended to the start/end of lists, etc.
-        handleEvents: function(events, isLiveEvents) {
+        handleEvents: function(events, isLiveEvents, isStateEvents) {
             for (var i=0; i<events.length; i++) {
-                this.handleEvent(events[i], isLiveEvents);
+                this.handleEvent(events[i], isLiveEvents, isStateEvents);
             }
         },
 
