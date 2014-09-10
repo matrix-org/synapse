@@ -53,11 +53,14 @@ class SQLiteMemoryDbPool(ConnectionPool, object):
 
 
 class ProfileStoreTestCase(unittest.TestCase):
+
+    @defer.inlineCallbacks
     def setUp(self):
         hs = HomeServer("test",
             db_pool=SQLiteMemoryDbPool(),
         )
-        hs.get_db_pool().prepare()
+
+        yield hs.get_db_pool().prepare()
 
         self.store = ProfileStore(hs)
 
