@@ -202,14 +202,16 @@ angular.module('eventHandlerService', [])
             // AND from the event stream.
             // FIXME: This workaround should be no more required when /initialSync on a particular room
             // will be available (as opposite to the global /initialSync done at startup)
-            if (event.event_id && eventMap[event.event_id]) {
-                console.log("discarding duplicate event: " + JSON.stringify(event, undefined, 4));
-                return;
+            if (!isStateEvent) {    // Do not consider state events
+                if (event.event_id && eventMap[event.event_id]) {
+                    console.log("discarding duplicate event: " + JSON.stringify(event, undefined, 4));
+                    return;
+                }
+                else {
+                    eventMap[event.event_id] = 1;
+                }
             }
-            else {
-                eventMap[event.event_id] = 1;
-            }
-  
+
             if (event.type.indexOf('m.call.') === 0) {
                 handleCallEvent(event, isLiveEvent);
             }
