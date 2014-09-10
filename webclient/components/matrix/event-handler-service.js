@@ -55,6 +55,11 @@ angular.module('eventHandlerService', [])
             $rootScope.events.rooms[room_id] = {};
             $rootScope.events.rooms[room_id].messages = [];
             $rootScope.events.rooms[room_id].members = {};
+
+            // Pagination information
+            $rootScope.events.rooms[room_id].pagination = {
+                earliest_token: "END"   // how far back we've paginated
+            }
         }
     };
 
@@ -187,17 +192,21 @@ angular.module('eventHandlerService', [])
         NAME_EVENT: NAME_EVENT,
     
         handleEvent: function(event, isLiveEvent) {
-            // FIXME: event duplication suppression is all broken as the code currently expect to handles
-            // events multiple times to get their side-effects...
-/*            
+            // Avoid duplicated events
+            // Needed for rooms where initialSync has not been done. 
+            // In this case, we do not know where to start pagination. So, it starts from the END
+            // and we can have the same event (ex: joined, invitation) coming from the pagination
+            // AND from the event stream.
+            // FIXME: This workaround should be no more required when /initialSync on a particular room
+            // will be available (as opposite to the global /initialSync done at startup)
             if (eventMap[event.event_id]) {
-                console.log("discarding duplicate event: " + JSON.stringify(event));
+                console.log("discarding duplicate event: " + JSON.stringify(event, undefined, 4));
                 return;
             }
             else {
                 eventMap[event.event_id] = 1;
             }
-*/            
+  
             if (event.type.indexOf('m.call.') === 0) {
                 handleCallEvent(event, isLiveEvent);
             }
@@ -245,6 +254,15 @@ angular.module('eventHandlerService', [])
             for (var i=0; i<events.length; i++) {
                 this.handleEvent(events[i], isLiveEvents);
             }
+        },
+
+        // Handle messages from /initialSync or /messages
+        handleRoomMessages: function(room_id, messages, isLiveEvents) {
+            this.handleEvents(messages.chunk);
+
+            // Store how far back we've paginated
+            // This assumes the paginations requests are contiguous and in reverse chronological order
+            $rootScope.events.rooms[room_id].pagination.earliest_token = messages.end;
         },
 
         handleInitialSyncDone: function(initialSyncData) {

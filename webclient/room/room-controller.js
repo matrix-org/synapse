@@ -27,8 +27,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
     $scope.state = {
         user_id: matrixService.config().user_id,
-        events_from: "END", // when to start the event stream from.
-        earliest_token: "END", // stores how far back we've paginated.
         first_pagination: true, // this is toggled off when the first pagination is done
         can_paginate: false, // this is toggled off when we are not ready yet to paginate or when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
@@ -159,12 +157,15 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         else {
             $scope.state.paginating = true;
         }
-        // console.log("paginateBackMessages from " + $scope.state.earliest_token + " for " + numItems);
+        
+        console.log("paginateBackMessages from " + $rootScope.events.rooms[$scope.room_id].pagination.earliest_token + " for " + numItems);
         var originalTopRow = $("#messageTable>tbody>tr:first")[0];
-        matrixService.paginateBackMessages($scope.room_id, $scope.state.earliest_token, numItems).then(
+        
+        // Paginate events from the point in cache
+        matrixService.paginateBackMessages($scope.room_id, $rootScope.events.rooms[$scope.room_id].pagination.earliest_token, numItems).then(
             function(response) {
-                eventHandlerService.handleEvents(response.data.chunk, false);
-                $scope.state.earliest_token = response.data.end;
+
+                eventHandlerService.handleRoomMessages($scope.room_id, response.data, false);
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
                     // no more messages to paginate. this currently never gets turned true again, as we never
                     // expire paginated contents in the current implementation.
@@ -659,9 +660,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
     var onInit3 = function() {
         console.log("onInit3");
-        
-        // TODO: We should be able to keep them
-        eventHandlerService.resetRoomMessages($scope.room_id); 
 
         // Make recents highlight the current room
         $scope.recentsSelectedRoomID = $scope.room_id;
