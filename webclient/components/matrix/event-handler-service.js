@@ -199,7 +199,7 @@ angular.module('eventHandlerService', [])
             // AND from the event stream.
             // FIXME: This workaround should be no more required when /initialSync on a particular room
             // will be available (as opposite to the global /initialSync done at startup)
-            if (eventMap[event.event_id]) {
+            if (event.event_id && eventMap[event.event_id]) {
                 console.log("discarding duplicate event: " + JSON.stringify(event, undefined, 4));
                 return;
             }
@@ -258,7 +258,7 @@ angular.module('eventHandlerService', [])
 
         // Handle messages from /initialSync or /messages
         handleRoomMessages: function(room_id, messages, isLiveEvents) {
-            this.handleEvents(messages.chunk);
+            this.handleEvents(messages.chunk, isLiveEvents);
 
             // Store how far back we've paginated
             // This assumes the paginations requests are contiguous and in reverse chronological order
