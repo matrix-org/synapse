@@ -523,6 +523,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         }
 
         if (promise) {
+            // Reset previous feedback
+            $scope.feedback = "";
+
             promise.then(
                 function() {
                     console.log("Request successfully sent");
