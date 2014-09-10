@@ -131,6 +131,10 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
 
     $rootScope.$on(matrixPhoneService.INCOMING_CALL_EVENT, function(ngEvent, call) {
         console.trace("incoming call");
+        if ($rootScope.currentCall && $rootScope.currentCall.state != 'ended') {
+            console.trace("rejecting call because we're already in a call");
+            call.hangup();
+        }
         call.onError = $scope.onCallError;
         call.onHangup = $scope.onCallHangup;
         $rootScope.currentCall = call;
