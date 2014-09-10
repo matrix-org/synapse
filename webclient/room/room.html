@@ -93,7 +93,10 @@
                             </span>
                         </span>                        
                         
-                        <span ng-show='msg.content.msgtype === "m.emote"' ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
+                        <span ng-show='msg.content.msgtype === "m.emote"'
+                              ng-class="msg.echo_msg_state"
+                              ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
+                        
                         <span ng-show='msg.content.msgtype === "m.text"' 
                               ng-class="msg.echo_msg_state"
                               ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
