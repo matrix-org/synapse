@@ -39,6 +39,7 @@ import logging
 import os
 import re
 import sys
+import sqlite3
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +209,14 @@ def setup():
         redirect_root_to_web_client=True,
     )
 
-    prepare_database(hs.get_db_name())
+    db_name = hs.get_db_name()
+
+    logging.info("Preparing database: %s...", db_name)
+
+    with sqlite3.connect(db_name) as db_conn:
+        prepare_database(db_conn)
+
+    logging.info("Database prepared in %s.", db_name)
 
     hs.get_db_pool()
 
