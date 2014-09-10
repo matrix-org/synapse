@@ -460,7 +460,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                         var powerLevel = 50; // default power level for op
                         if (matches) {
                             var user_id = matches[1];
-                            if (matches.length === 4) {
+                            if (matches.length === 4 && undefined !== matches[3]) {
                                 powerLevel = parseInt(matches[3]);
                             }
                             if (powerLevel !== NaN) {
