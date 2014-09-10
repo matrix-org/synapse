@@ -114,7 +114,7 @@ angular.module('MatrixCall', [])
         };
         matrixService.sendEvent(this.room_id, 'm.call.hangup', undefined, content).then(this.messageSent, this.messageSendFailed);
         this.state = 'ended';
-        self.onHangup();
+        if (self.onHangup) self.onHangup(self);
     };
 
     MatrixCall.prototype.gotUserMediaForInvite = function(stream) {
@@ -178,6 +178,10 @@ angular.module('MatrixCall', [])
 
     MatrixCall.prototype.gotRemoteIceCandidate = function(cand) {
         console.trace("Got ICE candidate from remote: "+cand);
+        if (this.state == 'ended') {
+            console.trace("Ignoring remote ICE candidate because call has ended");
+            return;
+        }
         var candidateObject = new RTCIceCandidate({
             sdpMLineIndex: cand.label,
             candidate: cand.candidate
@@ -294,10 +298,10 @@ angular.module('MatrixCall', [])
         self = this;
         $rootScope.$apply(function() {
             self.state = 'ended';
-            this.hangupParty = 'remote';
+            self.hangupParty = 'remote';
             self.stopAllMedia();
-            this.peerConn.close();
-            self.onHangup();
+            if (self.peerConn.signalingState != 'closed') self.peerConn.close();
+            if (self.onHangup) self.onHangup(self);
         });
     };
 
@@ -313,7 +317,7 @@ angular.module('MatrixCall', [])
         this.hangupParty = 'remote';
         this.stopAllMedia();
         this.peerConn.close();
-        this.onHangup();
+        if (this.onHangup) this.onHangup(self);
     };
 
     return MatrixCall;

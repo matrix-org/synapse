@@ -96,9 +96,14 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         delete roomMembers[matrixService.config().user_id];
 
         $rootScope.currentCall.user_id = Object.keys(roomMembers)[0];
+
+        // set it to the user ID until we fetch the display name
+        $rootScope.currentCall.userProfile = { displayname: $rootScope.currentCall.user_id };
+
         matrixService.getProfile($rootScope.currentCall.user_id).then(
             function(response) {
-                $rootScope.currentCall.userProfile = response.data;
+                if (response.data.displayname) $rootScope.currentCall.userProfile.displayname = response.data.displayname;
+                if (response.data.avatar_url) $rootScope.currentCall.userProfile.avatar_url = response.data.avatar_url;
             },
             function(error) {
                 $scope.feedback = "Can't load user profile";
@@ -131,6 +136,11 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
 
     $rootScope.$on(matrixPhoneService.INCOMING_CALL_EVENT, function(ngEvent, call) {
         console.trace("incoming call");
+        if ($rootScope.currentCall && $rootScope.currentCall.state != 'ended') {
+            console.trace("rejecting call because we're already in a call");
+            call.hangup();
+            return;
+        }
         call.onError = $scope.onCallError;
         call.onHangup = $scope.onCallHangup;
         $rootScope.currentCall = call;
@@ -148,13 +158,11 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         $scope.feedback = errStr;
     }
 
-    $rootScope.onCallHangup = function() {
-        $timeout(function() {
-            var icon = angular.element('#callEndedIcon');
-            $animate.addClass(icon, 'callIconRotate');
+    $rootScope.onCallHangup = function(call) {
+        if (call == $rootScope.currentCall) {
             $timeout(function(){
                 $rootScope.currentCall = undefined;
             }, 4070);
-        }, 100);
+        }
     }
 }]);
