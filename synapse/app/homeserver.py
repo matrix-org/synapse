@@ -207,7 +207,6 @@ def setup():
         web_client=config.webclient,
         redirect_root_to_web_client=True,
     )
-    hs.start_listening(config.bind_port, config.unsecure_port)
 
     prepare_database(hs.get_db_name())
 
@@ -219,6 +218,8 @@ def setup():
         f.password = "rabbithole"
         f.namespace['hs'] = hs
         reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
+
+    hs.start_listening(config.bind_port, config.unsecure_port)
 
     if config.daemonize:
         print config.pid_file
