@@ -173,10 +173,6 @@ class SynapseHomeServer(HomeServer):
             logger.info("Synapse now listening on port %d", unsecure_port)
 
 
-def run():
-    reactor.run()
-
-
 def setup():
     config = HomeServerConfig.load_config(
         "Synapse Homeserver",
@@ -229,7 +225,7 @@ def setup():
         daemon = Daemonize(
             app="synapse-homeserver",
             pid=config.pid_file,
-            action=run,
+            action=reactor.run,
             auto_close_fds=False,
             verbose=True,
             logger=logger,
@@ -237,7 +233,7 @@ def setup():
 
         daemon.start()
     else:
-        run()
+        reactor.run()
 
 
 if __name__ == '__main__':
