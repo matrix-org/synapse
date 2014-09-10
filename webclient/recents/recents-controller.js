@@ -48,6 +48,9 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
                 if ($rootScope.rooms[event.room_id]) {
                     $rootScope.rooms[event.room_id].lastMsg = event;
                 }
+                
+                // Update room users count
+                $rootScope.rooms[event.room_id].numUsersInRoom = getUsersCountInRoom(event.room_id);
             }
         });
         $rootScope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
@@ -67,6 +70,29 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
         });
     };
     
+    /**
+     * Compute the room users number, ie the number of members who has joined the room.
+     * @param {String} room_id the room id
+     * @returns {undefined | Number} the room users number if available
+     */
+    var getUsersCountInRoom = function(room_id) {
+        var memberCount;
+        
+        var room = $rootScope.events.rooms[room_id];
+        if (room) {
+            memberCount = 0;
+            
+            for (var i in room.members) {
+                var member = room.members[i];
+                
+                if ("join" === member.membership) {
+                    memberCount = memberCount + 1;
+                }
+            }
+        }
+        
+        return memberCount;
+    }
 
     $scope.onInit = function() {
         // Init recents list only once
@@ -92,17 +118,7 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
                         $rootScope.rooms[room.room_id].lastMsg = room.messages.chunk[0];
                     }
                     
-                    
-                    var numUsersInRoom = 0;
-                    if (room.state) {
-                        for (var j=0; j<room.state.length; j++) {
-                            var stateEvent = room.state[j];
-                            if (stateEvent.type == "m.room.member" && stateEvent.content.membership == "join") {
-                                numUsersInRoom += 1;
-                            }
-                        }
-                    }
-                    $rootScope.rooms[room.room_id].numUsersInRoom = numUsersInRoom;
+                    $rootScope.rooms[room.room_id].numUsersInRoom = getUsersCountInRoom(room.room_id);
                 }
 
                 // From now, update recents from the stream

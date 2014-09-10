@@ -9,7 +9,9 @@
                     {{ room.room_id | mRoomName }}
                 </td>
                 <td class="recentsRoomSummaryTS">
-                    {{ room.numUsersInRoom || '1' }} {{ room.numUsersInRoom == 1 ? 'user' : 'users' }}
+                    <span ng-show="undefined !== room.numUsersInRoom">
+                        {{ room.numUsersInRoom || '1' }} {{ room.numUsersInRoom == 1 ? 'user' : 'users' }}                     
+                    </span>
                 </td>
                 <td class="recentsRoomSummaryTS">
                     {{ (room.lastMsg.ts) | date:'MMM d HH:mm' }}
