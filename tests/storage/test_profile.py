@@ -18,38 +18,12 @@ from twisted.trial import unittest
 from twisted.internet import defer
 
 from mock import Mock, call
-from twisted.enterprise.adbapi import ConnectionPool
 
 from synapse.server import HomeServer
 from synapse.storage import prepare_database
 from synapse.storage.profile import ProfileStore
 
-
-class SQLiteMemoryDbPool(ConnectionPool, object):
-    def __init__(self):
-        super(SQLiteMemoryDbPool, self).__init__(
-            "sqlite3", ":memory:",
-            cp_min=1,
-            cp_max=1,
-        )
-
-    def prepare(self):
-        return self.runWithConnection(prepare_database)
-
-    #def runInteraction(self, interaction, *args, **kwargs):
-    #    # Just use a cursor as the txn directly
-    #    txn = self.db.cursor()
-
-    #    def _on_success(result):
-    #        txn.commit()
-    #        return result
-    #    def _on_failure(failure):
-    #        txn.rollback()
-    #        raise failure
-
-    #    d = interaction(txn, *args, **kwargs)
-    #    d.addCallbacks(_on_success, _on_failure)
-    #    return d
+from tests.utils import SQLiteMemoryDbPool
 
 
 class ProfileStoreTestCase(unittest.TestCase):
