@@ -129,8 +129,13 @@ angular.module('eventHandlerService', [])
             }
         }
         
-        $rootScope.events.rooms[event.room_id].members[event.state_key] = event;
-        $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent);
+        // Use data from state event or the latest data from the stream.
+        // Do not care of events that come when paginating back
+        if (isStateEvent || isLiveEvent) {
+            $rootScope.events.rooms[event.room_id].members[event.state_key] = event;
+        }
+        
+        $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent, isStateEvent);
     };
     
     var handlePresence = function(event, isLiveEvent) {
