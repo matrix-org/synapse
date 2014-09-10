@@ -20,7 +20,6 @@ from twisted.internet import defer
 from mock import Mock, call
 
 from synapse.server import HomeServer
-from synapse.storage import prepare_database
 from synapse.storage.profile import ProfileStore
 
 from tests.utils import SQLiteMemoryDbPool
