@@ -16,12 +16,6 @@
 
 'use strict';
 
-// XXX FIXME TODO
-// We should NOT be dumping things into $rootScope!!!! We should NOT be
-// making any requests here, and should READ what is already in the 
-// rootScope from the event handler service!!!
-// XXX FIXME TODO
-
 angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHandlerService'])
 .controller('RecentsController', ['$rootScope', '$scope', 'matrixService', 'eventHandlerService', 
                                function($rootScope, $scope, matrixService, eventHandlerService) {
@@ -33,11 +27,6 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
     // $rootScope of the parent where the recents component is included can override this value
     // in order to highlight a specific room in the list
     $rootScope.recentsSelectedRoomID;
-
-    // XXX FIXME TODO : We should NOT be doing this here, which could be
-    // repeated for every controller instance. We should be doing this in
-    // event handler service instead. In additon, this will break if there
-    // isn't a recents controller visible when the last message comes in :/
     
     var listenToEventStream = function() {
         // Refresh the list on matrix invitation and message event
@@ -85,23 +74,12 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
             return;
         }
         
-        // XXX FIXME TODO
-        // We should NOT be dumping things into $rootScope!!!! We should NOT be
-        // making any requests here, and should READ what is already in the 
-        // rootScope from the event handler service!!!
-        // XXX FIXME TODO
-        
         $rootScope.rooms = {};
         
         // Use initialSync data to init the recents list
         eventHandlerService.waitForInitialSyncCompletion().then(
             function(initialSyncData) {
             
-                // XXX FIXME TODO:
-                // Any assignments to the rootScope here should be done in
-                // event handler service and not here, because we could have
-                // many controllers manipulating and clobbering each other, and
-                // are unecessarily repeating http requests.
                 var rooms = initialSyncData.data.rooms;
                 for (var i=0; i<rooms.length; i++) {
                     var room = rooms[i];

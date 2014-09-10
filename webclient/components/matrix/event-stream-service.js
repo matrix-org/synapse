@@ -104,9 +104,7 @@ angular.module('eventStreamService', [])
         settings.isActive = true;
         var deferred = $q.defer();
 
-        // FIXME: We are discarding all the messages.
-        // XXX FIXME TODO : The discard works because we are doing this all over
-        // again on EVERY INSTANTIATION of the recents controller.
+        // Initial sync: get all information and the last message of all rooms of the user
         matrixService.initialSync(1, false).then(
             function(response) {
                 var rooms = response.data.rooms;
@@ -128,6 +126,7 @@ angular.module('eventStreamService', [])
                 // Initial sync is done
                 eventHandlerService.handleInitialSyncDone(response);
 
+                // Start event streaming from that point
                 settings.from = response.data.end;
                 doEventStream(deferred);        
             },
