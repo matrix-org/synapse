@@ -17,8 +17,6 @@
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from mock import Mock, call
-
 from synapse.server import HomeServer
 from synapse.storage.profile import ProfileStore
 

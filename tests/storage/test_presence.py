@@ -1,0 +1,166 @@
+# -*- coding: utf-8 -*-
+# Copyright 2014 OpenMarket Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+from twisted.trial import unittest
+from twisted.internet import defer
+
+from synapse.server import HomeServer
+from synapse.storage.presence import PresenceStore
+
+from tests.utils import SQLiteMemoryDbPool, MockClock
+
+
+class PresenceStoreTestCase(unittest.TestCase):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        hs = HomeServer("test",
+            clock=MockClock(),
+            db_pool=SQLiteMemoryDbPool(),
+        )
+
+        yield hs.get_db_pool().prepare()
+
+        self.store = PresenceStore(hs)
+
+        self.u_apple = hs.parse_userid("@apple:test")
+        self.u_banana = hs.parse_userid("@banana:test")
+
+    @defer.inlineCallbacks
+    def test_state(self):
+        yield self.store.create_presence(
+            self.u_apple.localpart
+        )
+
+        state = yield self.store.get_presence_state(
+            self.u_apple.localpart
+        )
+
+        self.assertEquals(
+            {"state": None, "status_msg": None, "mtime": None}, state
+        )
+
+        yield self.store.set_presence_state(
+            self.u_apple.localpart, {"state": "online", "status_msg": "Here"}
+        )
+
+        state = yield self.store.get_presence_state(
+            self.u_apple.localpart
+        )
+
+        self.assertEquals(
+            {"state": "online", "status_msg": "Here", "mtime": 1000000}, state
+        )
+
+    @defer.inlineCallbacks
+    def test_visibility(self):
+        self.assertFalse((yield self.store.is_presence_visible(
+            observed_localpart=self.u_apple.localpart,
+            observer_userid=self.u_banana.to_string(),
+        )))
+
+        yield self.store.allow_presence_visible(
+            observed_localpart=self.u_apple.localpart,
+            observer_userid=self.u_banana.to_string(),
+        )
+
+        self.assertTrue((yield self.store.is_presence_visible(
+            observed_localpart=self.u_apple.localpart,
+            observer_userid=self.u_banana.to_string(),
+        )))
+
+        yield self.store.disallow_presence_visible(
+            observed_localpart=self.u_apple.localpart,
+            observer_userid=self.u_banana.to_string(),
+        )
+
+        self.assertFalse((yield self.store.is_presence_visible(
+            observed_localpart=self.u_apple.localpart,
+            observer_userid=self.u_banana.to_string(),
+        )))
+
+    @defer.inlineCallbacks
+    def test_presence_list(self):
+        self.assertEquals(
+            [],
+            (yield self.store.get_presence_list(
+                observer_localpart=self.u_apple.localpart,
+            ))
+        )
+        self.assertEquals(
+            [],
+            (yield self.store.get_presence_list(
+                observer_localpart=self.u_apple.localpart,
+                accepted=True,
+            ))
+        )
+
+        yield self.store.add_presence_list_pending(
+            observer_localpart=self.u_apple.localpart,
+            observed_userid=self.u_banana.to_string(),
+        )
+
+        self.assertEquals(
+            [{"observed_user_id": "@banana:test", "accepted": 0}],
+            (yield self.store.get_presence_list(
+                observer_localpart=self.u_apple.localpart,
+            ))
+        )
+        self.assertEquals(
+            [],
+            (yield self.store.get_presence_list(
+                observer_localpart=self.u_apple.localpart,
+                accepted=True,
+            ))
+        )
+
+        yield self.store.set_presence_list_accepted(
+            observer_localpart=self.u_apple.localpart,
+            observed_userid=self.u_banana.to_string(),
+        )
+
+        self.assertEquals(
+            [{"observed_user_id": "@banana:test", "accepted": 1}],
+            (yield self.store.get_presence_list(
+                observer_localpart=self.u_apple.localpart,
+            ))
+        )
+        self.assertEquals(
+            [{"observed_user_id": "@banana:test", "accepted": 1}],
+            (yield self.store.get_presence_list(
+                observer_localpart=self.u_apple.localpart,
+                accepted=True,
+            ))
+        )
+
+        yield self.store.del_presence_list(
+            observer_localpart=self.u_apple.localpart,
+            observed_userid=self.u_banana.to_string(),
+        )
+
+        self.assertEquals(
+            [],
+            (yield self.store.get_presence_list(
+                observer_localpart=self.u_apple.localpart,
+            ))
+        )
+        self.assertEquals(
+            [],
+            (yield self.store.get_presence_list(
+                observer_localpart=self.u_apple.localpart,
+                accepted=True,
+            ))
+        )
