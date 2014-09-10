@@ -96,9 +96,14 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         delete roomMembers[matrixService.config().user_id];
 
         $rootScope.currentCall.user_id = Object.keys(roomMembers)[0];
+
+        // set it to the user ID until we fetch the display name
+        $rootScope.currentCall.userProfile = { displayname: $rootScope.currentCall.user_id };
+
         matrixService.getProfile($rootScope.currentCall.user_id).then(
             function(response) {
-                $rootScope.currentCall.userProfile = response.data;
+                if (response.data.displayname) $rootScope.currentCall.userProfile.displayname = response.data.displayname;
+                if (response.data.avatar_url) $rootScope.currentCall.userProfile.avatar_url = response.data.avatar_url;
             },
             function(error) {
                 $scope.feedback = "Can't load user profile";
