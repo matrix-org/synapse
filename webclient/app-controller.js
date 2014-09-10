@@ -134,6 +134,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         if ($rootScope.currentCall && $rootScope.currentCall.state != 'ended') {
             console.trace("rejecting call because we're already in a call");
             call.hangup();
+            return;
         }
         call.onError = $scope.onCallError;
         call.onHangup = $scope.onCallHangup;
@@ -152,13 +153,15 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         $scope.feedback = errStr;
     }
 
-    $rootScope.onCallHangup = function() {
-        $timeout(function() {
-            var icon = angular.element('#callEndedIcon');
-            $animate.addClass(icon, 'callIconRotate');
-            $timeout(function(){
-                $rootScope.currentCall = undefined;
-            }, 4070);
-        }, 100);
+    $rootScope.onCallHangup = function(call) {
+        if (call == $rootScope.currentCall) {
+            $timeout(function() {
+                var icon = angular.element('#callEndedIcon');
+                $animate.addClass(icon, 'callIconRotate');
+                $timeout(function(){
+                    $rootScope.currentCall = undefined;
+                }, 4070);
+            }, 100);
+        }
     }
 }]);
