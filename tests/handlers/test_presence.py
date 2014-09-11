@@ -68,16 +68,17 @@ class PresenceStateTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+
         hs = HomeServer("test",
             clock=MockClock(),
-            db_pool=SQLiteMemoryDbPool(),
+            db_pool=db_pool,
             handlers=None,
             resource_for_federation=Mock(),
             http_client=None,
         )
         hs.handlers = JustPresenceHandlers(hs)
-
-        yield hs.get_db_pool().prepare()
 
         self.store = hs.get_datastore()
 

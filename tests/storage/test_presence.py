@@ -27,12 +27,13 @@ class PresenceStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+
         hs = HomeServer("test",
             clock=MockClock(),
-            db_pool=SQLiteMemoryDbPool(),
+            db_pool=db_pool,
         )
-
-        yield hs.get_db_pool().prepare()
 
         self.store = PresenceStore(hs)
 

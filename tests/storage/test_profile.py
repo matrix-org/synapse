@@ -27,11 +27,12 @@ class ProfileStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        hs = HomeServer("test",
-            db_pool=SQLiteMemoryDbPool(),
-        )
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
 
-        yield hs.get_db_pool().prepare()
+        hs = HomeServer("test",
+            db_pool=db_pool,
+        )
 
         self.store = ProfileStore(hs)
 

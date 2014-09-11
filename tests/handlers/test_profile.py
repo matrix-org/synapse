@@ -49,16 +49,17 @@ class ProfileTestCase(unittest.TestCase):
             self.query_handlers[query_type] = handler
         self.mock_federation.register_query_handler = register_query_handler
 
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+
         hs = HomeServer("test",
-                db_pool=SQLiteMemoryDbPool(),
+                db_pool=db_pool,
                 http_client=None,
                 handlers=None,
                 resource_for_federation=Mock(),
                 replication_layer=self.mock_federation,
             )
         hs.handlers = ProfileHandlers(hs)
-
-        yield hs.get_db_pool().prepare()
 
         self.store = hs.get_datastore()
 
