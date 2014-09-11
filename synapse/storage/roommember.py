@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class RoomMemberStore(SQLBaseStore):
 
-    def _store_room_member_txn(self, txn, event):
+    def _store_room_member_from_event_txn(self, txn, event):
         """Store a room member in the database.
         """
         target_user_id = event.state_key
