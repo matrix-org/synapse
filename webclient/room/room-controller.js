@@ -58,6 +58,11 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 $scope.topic.newTopicText = "";
             }
             
+            // Force focus to the input
+            $timeout(function() {
+                angular.element('.roomTopicInput').focus(); 
+            }, 0);
+            
             $scope.topic.isEditing = true;
         },
         updateTopic: function() {
