@@ -35,6 +35,7 @@ angular.module('eventHandlerService', [])
     var POWERLEVEL_EVENT = "POWERLEVEL_EVENT";
     var CALL_EVENT = "CALL_EVENT";
     var NAME_EVENT = "NAME_EVENT";
+    var TOPIC_EVENT = "TOPIC_EVENT";
 
     var initialSyncDeferred = $q.defer();
     
@@ -170,24 +171,39 @@ angular.module('eventHandlerService', [])
     };
     
     // TODO: Can this just be a generic "I am a room state event, can haz store?"
-    var handleRoomTopic = function(event, isLiveEvent) {
+    var handleRoomTopic = function(event, isLiveEvent, isStateEvent) {
         console.log("handleRoomTopic live="+isLiveEvent);
 
         initRoom(event.room_id);
 
+        // Add topic changes as if they were a room message
+        if (!isStateEvent) {
+            if (isLiveEvent) {
+                $rootScope.events.rooms[event.room_id].messages.push(event);
+            }
+            else {
+                $rootScope.events.rooms[event.room_id].messages.unshift(event);
+            }
+        }
+
         // live events always update, but non-live events only update if the
         // ts is later.
+        var latestData = true;
         if (!isLiveEvent) {
             var eventTs = event.ts;
             var storedEvent = $rootScope.events.rooms[event.room_id][event.type];
             if (storedEvent) {
                 if (storedEvent.ts > eventTs) {
                     // ignore it, we have a newer one already.
-                    return;
+                    latestData = false;
                 }
             }
         }
-        $rootScope.events.rooms[event.room_id][event.type] = event;
+        if (latestData) {
+            $rootScope.events.rooms[event.room_id][event.type] = event;         
+        }
+
+        $rootScope.$broadcast(TOPIC_EVENT, event, isLiveEvent);
     };
 
     var handleCallEvent = function(event, isLiveEvent) {
@@ -229,6 +245,7 @@ angular.module('eventHandlerService', [])
         POWERLEVEL_EVENT: POWERLEVEL_EVENT,
         CALL_EVENT: CALL_EVENT,
         NAME_EVENT: NAME_EVENT,
+        TOPIC_EVENT: TOPIC_EVENT,
     
         handleEvent: function(event, isLiveEvent, isStateEvent) {
             // Avoid duplicated events
@@ -279,7 +296,7 @@ angular.module('eventHandlerService', [])
                         handleRoomName(event, isLiveEvent);
                         break;
                     case 'm.room.topic':
-                        handleRoomTopic(event, isLiveEvent);
+                        handleRoomTopic(event, isLiveEvent, isStateEvent);
                         break;
                     default:
                         console.log("Unable to handle event type " + event.type);

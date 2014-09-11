@@ -113,6 +113,11 @@
                                      ng-click="$parent.fullScreenImageURL = msg.content.url"/>
                             </div>
                         </div>
+
+                        <span ng-if="'m.room.topic' === msg.type">
+                            {{ members[msg.user_id].displayname || msg.user_id }} changed the topic to: {{ msg.content.topic }}
+                        </span>
+
                     </div>
                 </td>
                 <td class="rightBlock">

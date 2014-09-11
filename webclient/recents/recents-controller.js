@@ -68,6 +68,11 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
                 $rootScope.rooms[event.room_id] = event;
             }
         });
+        $rootScope.$on(eventHandlerService.TOPIC_EVENT, function(ngEvent, event, isLive) {
+            if (isLive) {
+                $rootScope.rooms[event.room_id].lastMsg = event;
+            }
+        });
     };
     
     /**
