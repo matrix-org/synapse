@@ -150,8 +150,8 @@
             <div class="extraControls">
                 <span>
                    Invite a user: 
-                        <input ng-model="userIDToInvite" size="32" type="text"  ng-enter="inviteUser(userIDToInvite)" placeholder="User ID (ex:@user:homeserver)"/>     
-                        <button ng-click="inviteUser(userIDToInvite)">Invite</button>
+                        <input ng-model="userIDToInvite" size="32" type="text"  ng-enter="inviteUser()" placeholder="User ID (ex:@user:homeserver)"/>     
+                        <button ng-click="inviteUser()">Invite</button>
                 </span>
                 <button ng-click="leaveRoom()">Leave</button>
                 <button ng-click="startVoiceCall()" ng-show="(currentCall == undefined || currentCall.state == 'ended') && memberCount() == 2">Voice Call</button>

@@ -694,12 +694,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         );
     }; 
     
-    $scope.inviteUser = function(user_id) {
+    $scope.inviteUser = function() {
         
-        matrixService.invite($scope.room_id, user_id).then(
+        matrixService.invite($scope.room_id, $scope.userIDToInvite).then(
             function() {
                 console.log("Invited.");
-                $scope.feedback = "Invite sent successfully";
+                $scope.feedback = "Invite successfully sent to " + $scope.userIDToInvite;
+                $scope.userIDToInvite = "";
             },
             function(reason) {
                 $scope.feedback = "Failure: " + reason;
