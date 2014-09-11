@@ -37,7 +37,7 @@
                     <img class="userAvatarImage" 
                          ng-src="{{member.avatar_url || 'img/default-profile.png'}}" 
                          alt="{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
-                         title="{{ member.id }}"
+                         title="{{ member.id }} - power: {{ member.powerLevel }}"
                          width="80" height="80"/>
                     <img class="userAvatarGradient" src="img/gradient.png" title="{{ member.id }}" width="80" height="24"/>
                     <div class="userPowerLevel" ng-style="{'width': member.powerLevelNorm +'%'}"></div>
