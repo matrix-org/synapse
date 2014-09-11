@@ -147,7 +147,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
     });
 
     $rootScope.$on(matrixPhoneService.REPLACED_CALL_EVENT, function(ngEvent, oldCall, newCall) {
-        console.log("call ID "+oldCall+" has been replaced by call ID "+newCall+"!");
+        console.log("call ID "+oldCall.call_id+" has been replaced by call ID "+newCall.call_id+"!");
         newCall.onError = $scope.onCallError;
         newCall.onHangup = $scope.onCallHangup;
         $rootScope.currentCall = newCall;

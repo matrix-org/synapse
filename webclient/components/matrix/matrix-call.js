@@ -167,9 +167,8 @@ angular.module('MatrixCall', [])
             },
         };
         this.peerConn.createAnswer(function(d) { self.createdAnswer(d); }, function(e) {}, constraints);
-        $rootScope.$apply(function() {
-            self.state = 'create_answer';
-        });
+        // This can't be in an apply() because it's called by a predecessor call under glare conditions :(
+        self.state = 'create_answer';
     };
 
     MatrixCall.prototype.gotLocalIceCandidate = function(event) {
@@ -326,7 +325,7 @@ angular.module('MatrixCall', [])
         this.state = 'ended';
         this.hangupParty = 'remote';
         this.stopAllMedia();
-        this.peerConn.close();
+        if (this.peerConn.signalingState != 'closed') this.peerConn.close();
         if (this.onHangup) this.onHangup(this);
     };
 
