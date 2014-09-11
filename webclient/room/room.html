@@ -150,7 +150,7 @@
             <div class="extraControls">
                 <span>
                    Invite a user: 
-                        <input ng-model="userIDToInvite" size="32" type="text" placeholder="User ID (ex:@user:homeserver)"/>     
+                        <input ng-model="userIDToInvite" size="32" type="text"  ng-enter="inviteUser(userIDToInvite)" placeholder="User ID (ex:@user:homeserver)"/>     
                         <button ng-click="inviteUser(userIDToInvite)">Invite</button>
                 </span>
                 <button ng-click="leaveRoom()">Leave</button>
