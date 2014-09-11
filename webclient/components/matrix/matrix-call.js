@@ -138,6 +138,7 @@ angular.module('MatrixCall', [])
             audioTracks[i].enabled = true;
         }
         this.peerConn = this.createPeerConnection();
+        this.peerConn.addStream(stream);
         var self = this;
         this.peerConn.createOffer(function(d) {
             self.gotLocalOffer(d);
