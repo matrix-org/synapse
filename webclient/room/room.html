@@ -30,7 +30,7 @@
         <div ng-include="'recents/recents.html'"></div>
     </div>
 
-    <div id="usersTableWrapper">
+    <div id="usersTableWrapper" ng-hide="state.permission_denied">
         <table id="usersTable">
             <tr ng-repeat="member in members | orderMembersList">
                 <td class="userAvatar mouse-pointer" ng-click="$parent.goToUserPage(member.id)" ng-class="member.membership == 'invite' ? 'invited' : ''">
@@ -49,7 +49,7 @@
         </table>
     </div>
     
-    <div id="messageTableWrapper" keep-scroll>
+    <div id="messageTableWrapper" ng-hide="state.permission_denied" keep-scroll>
         <!-- FIXME: need to have better timestamp semantics than the (msg.content.hsob_ts || msg.ts) hack below -->
         <table id="messageTable" infinite-scroll="paginateMore()">
             <tr ng-repeat="msg in events.rooms[room_id].messages"
@@ -127,6 +127,10 @@
             </tr>
         </table>
     </div>
+        
+    <div ng-show="state.permission_denied">
+        {{ state.permission_denied }}
+    </div>
     
     </div>
     </div>
@@ -139,11 +143,13 @@
                         {{ state.user_id }} 
                     </td>
                     <td width="*">
-                        <textarea id="mainInput" rows="1" ng-model="textInput" ng-enter="send()" ng-focus="true" autocomplete="off" tab-complete/>
+                        <textarea id="mainInput" rows="1" ng-model="textInput" ng-enter="send()"
+                                  ng-disabled="state.permission_denied"
+                                  ng-focus="true"  autocomplete="off" tab-complete/>
                     </td>
                     <td id="buttonsCell">
-                        <button ng-click="send()">Send</button>
-                        <button m-file-input="imageFileToSend" class="extraControls">Image</button>
+                        <button ng-click="send()" ng-disabled="state.permission_denied">Send</button>
+                        <button m-file-input="imageFileToSend" class="extraControls" ng-disabled="state.permission_denied">Image</button>
                     </td>
                 </tr>
             </table>
@@ -151,11 +157,11 @@
             <div class="extraControls">
                 <span>
                    Invite a user: 
-                        <input ng-model="userIDToInvite" size="32" type="text"  ng-enter="inviteUser()" placeholder="User ID (ex:@user:homeserver)"/>     
-                        <button ng-click="inviteUser()">Invite</button>
+                        <input ng-model="userIDToInvite" size="32" type="text" ng-enter="inviteUser()" ng-disabled="state.permission_denied" placeholder="User ID (ex:@user:homeserver)"/>     
+                        <button ng-click="inviteUser()" ng-disabled="state.permission_denied">Invite</button>
                 </span>
-                <button ng-click="leaveRoom()">Leave</button>
-                <button ng-click="startVoiceCall()" ng-show="(currentCall == undefined || currentCall.state == 'ended') && memberCount() == 2">Voice Call</button>
+                <button ng-click="leaveRoom()" ng-disabled="state.permission_denied">Leave</button>
+                <button ng-click="startVoiceCall()" ng-show="(currentCall == undefined || currentCall.state == 'ended') && memberCount() == 2" ng-disabled="state.permission_denied">Voice Call</button>
             </div>
         
             {{ feedback }}

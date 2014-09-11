@@ -27,6 +27,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
     $scope.state = {
         user_id: matrixService.config().user_id,
+        permission_denied: undefined, // If defined, this string contains the reason why the user cannot join the room
         first_pagination: true, // this is toggled off when the first pagination is done
         can_paginate: false, // this is toggled off when we are not ready yet to paginate or when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
@@ -128,6 +129,28 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 // The user has successfully joined the room, we can getting data for this room
                 $scope.state.waiting_for_joined_event = false;
                 onInit3();
+            }
+            else if (event.state_key === $scope.state.user_id && "invite" !== event.membership && "join" !== event.membership) {
+                var user;
+                        
+                if ($scope.members[event.user_id]) {
+                    user = $scope.members[event.user_id].displayname;
+                }
+                if (user) {
+                    user = user + " (" + event.user_id + ")";
+                }
+                else {
+                    user = event.user_id;
+                }
+
+                 
+                if ("ban" === event.membership) {
+                    $scope.state.permission_denied = "You have been banned by " + user;
+                }
+                else {
+                    $scope.state.permission_denied = "You have been kicked by " + user;
+                }
+                
             }
             else {
                 scrollToBottom();
@@ -654,7 +677,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                         },
                         function(reason) {
                             console.log("Can't join room: " + JSON.stringify(reason));
-                            $scope.feedback = "You do not have permission to join this room";
+                            $scope.state.permission_denied = "You do not have permission to join this room";
                         });
                 }
                 else {
