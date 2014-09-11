@@ -71,8 +71,6 @@ angular.module('eventHandlerService', [])
     };
     
     var handleRoomCreate = function(event, isLiveEvent) {
-        initRoom(event.room_id);
-
         // For now, we do not use the event data. Simply signal it to the app controllers
         $rootScope.$broadcast(ROOM_CREATE_EVENT, event, isLiveEvent);
     };
@@ -82,8 +80,6 @@ angular.module('eventHandlerService', [])
     };
 
     var handleMessage = function(event, isLiveEvent) {
-        initRoom(event.room_id);
-        
         if (isLiveEvent) {
             if (event.user_id === matrixService.config().user_id &&
                 (event.content.msgtype === "m.text" || event.content.msgtype === "m.emote") ) {
@@ -114,8 +110,6 @@ angular.module('eventHandlerService', [])
     };
     
     var handleRoomMember = function(event, isLiveEvent, isStateEvent) {
-        initRoom(event.room_id);
-        
         // if the server is stupidly re-relaying a no-op join, discard it.
         if (event.prev_content && 
             event.content.membership === "join" &&
@@ -152,8 +146,6 @@ angular.module('eventHandlerService', [])
     };
     
     var handlePowerLevels = function(event, isLiveEvent) {
-        initRoom(event.room_id);
-
         // Keep the latest data. Do not care of events that come when paginating back
         if (!$rootScope.events.rooms[event.room_id][event.type] || isLiveEvent) {
             $rootScope.events.rooms[event.room_id][event.type] = event;
@@ -164,8 +156,6 @@ angular.module('eventHandlerService', [])
     var handleRoomName = function(event, isLiveEvent) {
         console.log("handleRoomName " + isLiveEvent);
 
-        initRoom(event.room_id);
-
         $rootScope.events.rooms[event.room_id][event.type] = event;
         $rootScope.$broadcast(NAME_EVENT, event, isLiveEvent);
     };
@@ -173,8 +163,6 @@ angular.module('eventHandlerService', [])
     // TODO: Can this just be a generic "I am a room state event, can haz store?"
     var handleRoomTopic = function(event, isLiveEvent, isStateEvent) {
         console.log("handleRoomTopic live="+isLiveEvent);
-
-        initRoom(event.room_id);
 
         // Add topic changes as if they were a room message
         if (!isStateEvent) {
@@ -316,6 +304,7 @@ angular.module('eventHandlerService', [])
 
         // Handle messages from /initialSync or /messages
         handleRoomMessages: function(room_id, messages, isLiveEvents) {
+            initRoom(room_id);
             this.handleEvents(messages.chunk, isLiveEvents);
 
             // Store how far back we've paginated
