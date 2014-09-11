@@ -67,7 +67,14 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         },
         updateTopic: function() {
             console.log("Updating topic to "+$scope.topic.newTopicText);
-            matrixService.setTopic($scope.room_id, $scope.topic.newTopicText);
+            matrixService.setTopic($scope.room_id, $scope.topic.newTopicText).then(
+                function() {
+                },
+                function(error) {
+                    $scope.feedback = "Request failed: " + error.data.error;
+                }
+            );
+
             $scope.topic.isEditing = false;
         },
         cancelEdit: function() {
