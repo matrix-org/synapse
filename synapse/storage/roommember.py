@@ -27,36 +27,49 @@ logger = logging.getLogger(__name__)
 class RoomMemberStore(SQLBaseStore):
 
     def _store_room_member_from_event_txn(self, txn, event):
+        self._store_room_member_txn(txn,
+            target_user_id=event.state_key,
+            sender_user_id=event.user_id,
+            room_id=event.room_id,
+            event_id=event.event_id,
+            membership=event.membership,
+        )
+
+    def _store_room_member_txn(self, txn, target_user_id, sender_user_id,
+            room_id, event_id, membership):
         """Store a room member in the database.
         """
-        target_user_id = event.state_key
         domain = self.hs.parse_userid(target_user_id).domain
 
         self._simple_insert_txn(
             txn,
             "room_memberships",
             {
-                "event_id": event.event_id,
+                "event_id": event_id,
                 "user_id": target_user_id,
-                "sender": event.user_id,
-                "room_id": event.room_id,
-                "membership": event.membership,
+                "sender": sender_user_id,
+                "room_id": room_id,
+                "membership": membership,
             }
         )
 
         # Update room hosts table
-        if event.membership == Membership.JOIN:
+        # TODO(paul): This code is massively broken currently as it doesn't
+        #   count users per room - meaning it'll delete on the FIRST user to
+        #   have a membership other than JOIN - say, LEAVE, or even INVITE.
+        # FIXME
+        if membership == Membership.JOIN:
             sql = (
                 "INSERT OR IGNORE INTO room_hosts (room_id, host) "
                 "VALUES (?, ?)"
             )
-            txn.execute(sql, (event.room_id, domain))
+            txn.execute(sql, (room_id, domain))
         else:
             sql = (
                 "DELETE FROM room_hosts WHERE room_id = ? AND host = ?"
             )
 
-            txn.execute(sql, (event.room_id, domain))
+            txn.execute(sql, (room_id, domain))
 
     @defer.inlineCallbacks
     def get_room_member(self, user_id, room_id):
