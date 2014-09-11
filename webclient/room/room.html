@@ -97,6 +97,7 @@
                               ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
                         
                         <span ng-show='msg.content.msgtype === "m.text"' 
+                              class="message"
                               ng-class="msg.echo_msg_state"
                               ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
 
@@ -138,7 +139,7 @@
                         {{ state.user_id }} 
                     </td>
                     <td width="*">
-                        <input id="mainInput" ng-model="textInput" ng-enter="send()" ng-focus="true" autocomplete="off" tab-complete/>
+                        <textarea id="mainInput" rows="1" ng-model="textInput" ng-enter="send()" ng-focus="true" autocomplete="off" tab-complete/>
                     </td>
                     <td id="buttonsCell">
                         <button ng-click="send()">Send</button>

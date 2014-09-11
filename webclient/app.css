@@ -257,6 +257,7 @@ a:active  { color: #000; }
 
 #mainInput {
     width: 100%;
+    resize: none;
 }
 
 .blink {
@@ -514,6 +515,10 @@ a:active  { color: #000; }
     text-align: left ! important;
 }
 
+.bubble .message {
+    /* Break lines when encountering CR+LF */
+    white-space: pre;
+}
 .bubble .messagePending {
     opacity: 0.3
 }
