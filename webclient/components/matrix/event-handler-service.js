@@ -205,12 +205,13 @@ angular.module('eventHandlerService', [])
      */
     var getRoomEventIndex = function(room_id, event_id) {
         var index;
-        
+
         var room = $rootScope.events.rooms[room_id];
         if (room) {
-            for (var i = 0; i < room.messages.length; i++) {
+            // Start looking from the tail since the first goal of this function 
+            // is to find a messaged among the latest ones
+            for (var i = room.messages.length - 1; i > 0; i--) {
                 var message = room.messages[i];
-                console.log(message.event_id);
                 if (event_id === message.event_id) {
                     index = i;
                     break;
