@@ -102,7 +102,7 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
         }
         
         return memberCount;
-    }
+    };
 
     $scope.onInit = function() {
         // Init recents list only once
@@ -139,6 +139,11 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
             }
         );
     };
-    
+
+    // Clean data when user logs out
+    $scope.$on(eventHandlerService.RESET_EVENT, function() {
+
+        delete $rootScope.rooms;
+    });
 }]);
 

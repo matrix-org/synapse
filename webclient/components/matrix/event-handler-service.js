@@ -36,13 +36,19 @@ angular.module('eventHandlerService', [])
     var CALL_EVENT = "CALL_EVENT";
     var NAME_EVENT = "NAME_EVENT";
     var TOPIC_EVENT = "TOPIC_EVENT";
+    var RESET_EVENT = "RESET_EVENT";    // eventHandlerService has been resetted
 
-    var initialSyncDeferred = $q.defer();
-    
-    $rootScope.events = {
-        rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
-    };
-    
+    var initialSyncDeferred;
+
+    var reset = function() {
+        initialSyncDeferred = $q.defer();
+
+        $rootScope.events = {
+            rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
+        };
+    }
+    reset();
+
     // used for dedupping events - could be expanded in future...
     // FIXME: means that we leak memory over time (along with lots of the rest
     // of the app, given we never try to reap memory yet)
@@ -236,6 +242,12 @@ angular.module('eventHandlerService', [])
         CALL_EVENT: CALL_EVENT,
         NAME_EVENT: NAME_EVENT,
         TOPIC_EVENT: TOPIC_EVENT,
+        RESET_EVENT: RESET_EVENT,
+        
+        reset: function() {
+            reset();
+            $rootScope.$broadcast(RESET_EVENT);
+        },
     
         handleEvent: function(event, isLiveEvent, isStateEvent) {
 
