@@ -25,6 +25,44 @@ import json
 
 logger = logging.getLogger(__name__)
 
+sql_logger = logging.getLogger("synapse.storage.SQL")
+
+
+class LoggingTransaction(object):
+    """An object that almost-transparently proxies for the 'txn' object
+    passed to the constructor. Adds logging to the .execute() method."""
+    __slots__ = ["txn"]
+
+    def __init__(self, txn):
+        object.__setattr__(self, "txn", txn)
+
+    def __getattribute__(self, name):
+        if name == "execute":
+            return object.__getattribute__(self, "execute")
+
+        return getattr(object.__getattribute__(self, "txn"), name)
+
+    def __setattr__(self, name, value):
+        setattr(object.__getattribute__(self, "txn"), name, value)
+
+    def execute(self, sql, *args, **kwargs):
+        # TODO(paul): Maybe use 'info' and 'debug' for values?
+        sql_logger.debug("[SQL] %s", sql)
+        try:
+            if args and args[0]:
+                values = args[0]
+                sql_logger.debug("[SQL values] " +
+                    ", ".join(("<%s>",) * len(values)), *values)
+        except:
+            # Don't let logging failures stop SQL from working
+            pass
+
+        # TODO(paul): Here would be an excellent place to put some timing
+        #   measurements, and log (warning?) slow queries.
+        return object.__getattribute__(self, "txn").execute(
+            sql, *args, **kwargs
+        )
+
 
 class SQLBaseStore(object):
 
@@ -34,9 +72,12 @@ class SQLBaseStore(object):
         self.event_factory = hs.get_event_factory()
         self._clock = hs.get_clock()
 
-    def runInteraction(self, txn, *args, **kwargs):
+    def runInteraction(self, func, *args, **kwargs):
         """Wraps the .runInteraction() method on the underlying db_pool."""
-        return self._db_pool.runInteraction(txn, *args, **kwargs)
+        def inner_func(txn, *args, **kwargs):
+            return func(LoggingTransaction(txn), *args, **kwargs)
+
+        return self._db_pool.runInteraction(inner_func, *args, **kwargs)
 
     def cursor_to_dict(self, cursor):
         """Converts a SQL cursor into an list of dicts.
