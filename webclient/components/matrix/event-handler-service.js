@@ -236,6 +236,11 @@ angular.module('eventHandlerService', [])
         TOPIC_EVENT: TOPIC_EVENT,
     
         handleEvent: function(event, isLiveEvent, isStateEvent) {
+
+            // FIXME: /initialSync on a particular room is not yet available
+            // So initRoom on a new room is not called. Make sure the room data is initialised here
+            initRoom(event.room_id);
+
             // Avoid duplicated events
             // Needed for rooms where initialSync has not been done. 
             // In this case, we do not know where to start pagination. So, it starts from the END
