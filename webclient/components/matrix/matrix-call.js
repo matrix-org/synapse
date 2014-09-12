@@ -41,7 +41,7 @@ window.RTCSessionDescription = window.RTCSessionDescription || window.webkitRTCS
 window.RTCIceCandidate = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate;
 
 angular.module('MatrixCall', [])
-.factory('MatrixCall', ['matrixService', 'matrixPhoneService', '$rootScope', function MatrixCallFactory(matrixService, matrixPhoneService, $rootScope) {
+.factory('MatrixCall', ['matrixService', 'matrixPhoneService', '$rootScope', '$timeout', function MatrixCallFactory(matrixService, matrixPhoneService, $rootScope, $timeout) {
     var MatrixCall = function(room_id) {
         this.room_id = room_id;
         this.call_id = "c" + new Date().getTime();
@@ -120,7 +120,7 @@ angular.module('MatrixCall', [])
             version: 0,
             call_id: this.call_id,
         };
-        matrixService.sendEvent(this.room_id, 'm.call.hangup', undefined, content).then(this.messageSent, this.messageSendFailed);
+        this.sendEventWithRetry('m.call.hangup', content);
         this.state = 'ended';
         if (this.onHangup && !suppressEvent) this.onHangup(this);
     };
@@ -179,7 +179,7 @@ angular.module('MatrixCall', [])
                 call_id: this.call_id,
                 candidate: event.candidate
             };
-            matrixService.sendEvent(this.room_id, 'm.call.candidate', undefined, content).then(this.messageSent, this.messageSendFailed);
+            this.sendEventWithRetry('m.call.candidate', content);
         }
     }
 
@@ -216,7 +216,7 @@ angular.module('MatrixCall', [])
             call_id: this.call_id,
             offer: description
         };
-        matrixService.sendEvent(this.room_id, 'm.call.invite', undefined, content).then(this.messageSent, this.messageSendFailed);
+        this.sendEventWithRetry('m.call.invite', content);
 
         var self = this;
         $rootScope.$apply(function() {
@@ -232,17 +232,11 @@ angular.module('MatrixCall', [])
             call_id: this.call_id,
             answer: description
         };
-        matrixService.sendEvent(this.room_id, 'm.call.answer', undefined, content).then(this.messageSent, this.messageSendFailed);
+        this.sendEventWithRetry('m.call.answer', content);
         var self = this;
         $rootScope.$apply(function() {
             self.state = 'connecting';
         });
-    };
-
-    MatrixCall.prototype.messageSent = function() {
-    };
-    
-    MatrixCall.prototype.messageSendFailed = function(error) {
     };
 
     MatrixCall.prototype.getLocalOfferFailed = function(error) {
@@ -351,6 +345,29 @@ angular.module('MatrixCall', [])
         }
         this.successor = newCall;
         this.hangup(true);
+    };
+
+    MatrixCall.prototype.sendEventWithRetry = function(evType, content) {
+        var ev = { type:evType, content:content, tries:1 };
+        var self = this;
+        matrixService.sendEvent(this.room_id, evType, undefined, content).then(this.eventSent, function(error) { self.eventSendFailed(ev, error); } );
+    };
+
+    MatrixCall.prototype.eventSent = function() {
+    };
+
+    MatrixCall.prototype.eventSendFailed = function(ev, error) {
+        if (ev.tries > 5) {
+            console.log("Failed to send event of type "+ev.type+" on attempt "+ev.tries+". Giving up.");
+            return;
+        }
+        var delayMs = 500 * Math.pow(2, ev.tries);
+        console.log("Failed to send event of type "+ev.type+". Retrying in "+delayMs+"ms");
+        ++ev.tries;
+        var self = this;
+        $timeout(function() {
+            matrixService.sendEvent(self.room_id, ev.type, undefined, ev.content).then(self.eventSent, function(error) { self.eventSendFailed(ev, error); } );
+        }, delayMs);
     };
 
     return MatrixCall;
