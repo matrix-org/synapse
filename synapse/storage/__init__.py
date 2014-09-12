@@ -94,7 +94,7 @@ class DataStore(RoomMemberStore, RoomStore,
             stream_ordering = self.min_token
 
         try:
-            yield self._db_pool.runInteraction(
+            yield self.runInteraction(
                 self._persist_pdu_event_txn,
                 pdu=pdu,
                 event=event,
@@ -297,7 +297,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 prev_state_pdu=prev_state_pdu,
             )
 
-        return self._db_pool.runInteraction(_snapshot)
+        return self.runInteraction(_snapshot)
 
 
 class Snapshot(object):

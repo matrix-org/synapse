@@ -41,7 +41,7 @@ class TransactionStore(SQLBaseStore):
             this transaction or a 2-tuple of (int, dict)
         """
 
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._get_received_txn_response, transaction_id, origin
         )
 
@@ -72,7 +72,7 @@ class TransactionStore(SQLBaseStore):
             response_json (str)
         """
 
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._set_received_txn_response,
             transaction_id, origin, code, response_dict
         )
@@ -104,7 +104,7 @@ class TransactionStore(SQLBaseStore):
             list: A list of previous transaction ids.
         """
 
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._prep_send_transaction,
             transaction_id, destination, ts, pdu_list
         )
@@ -159,7 +159,7 @@ class TransactionStore(SQLBaseStore):
             code (int)
             response_json (str)
         """
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._delivered_txn,
             transaction_id, destination, code, response_dict
         )
@@ -184,7 +184,7 @@ class TransactionStore(SQLBaseStore):
         Returns:
             list: A list of `ReceivedTransactionsTable.EntryType`
         """
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._get_transactions_after, transaction_id, destination
         )
 
@@ -214,7 +214,7 @@ class TransactionStore(SQLBaseStore):
         Returns
             list: A list of PduTuple
         """
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._get_pdus_after_transaction,
             transaction_id, destination
         )

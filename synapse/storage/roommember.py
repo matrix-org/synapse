@@ -71,6 +71,11 @@ class RoomMemberStore(SQLBaseStore):
 
             txn.execute(sql, (room_id, domain))
 
+    def store_room_member(self, user_id, room_id, event_id, membership):
+        return self.runInteraction(self._store_room_member_txn,
+            user_id, user_id, room_id, event_id, membership
+        )
+
     @defer.inlineCallbacks
     def get_room_member(self, user_id, room_id):
         """Retrieve the current state of a room member.
