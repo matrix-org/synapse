@@ -27,4 +27,25 @@ logging.getLogger().setLevel(NEVER)
 
 
 class TestCase(unittest.TestCase):
-    pass
+    def __init__(self, *args, **kwargs):
+        super(TestCase, self).__init__(*args, **kwargs)
+
+        level = getattr(self, "loglevel", NEVER)
+
+        orig_setUp = self.setUp
+
+        def setUp():
+            old_level = logging.getLogger().level
+
+            if old_level != level:
+                orig_tearDown = self.tearDown
+
+                def tearDown():
+                    ret = orig_tearDown()
+                    logging.getLogger().setLevel(old_level)
+                    return ret
+                self.tearDown = tearDown
+
+            logging.getLogger().setLevel(level)
+            return orig_setUp()
+        self.setUp = setUp
