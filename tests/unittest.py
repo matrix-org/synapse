@@ -27,10 +27,14 @@ logging.getLogger().setLevel(NEVER)
 
 
 class TestCase(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(TestCase, self).__init__(*args, **kwargs)
+    def __init__(self, methodName, *args, **kwargs):
+        super(TestCase, self).__init__(methodName, *args, **kwargs)
 
-        level = getattr(self, "loglevel", NEVER)
+        method = getattr(self, methodName)
+
+        level = getattr(method, "loglevel",
+                    getattr(self, "loglevel",
+                        NEVER))
 
         orig_setUp = self.setUp
 
