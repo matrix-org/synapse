@@ -49,3 +49,8 @@ class TestCase(unittest.TestCase):
             logging.getLogger().setLevel(level)
             return orig_setUp()
         self.setUp = setUp
+
+
+def DEBUG(target):
+    target.loglevel = logging.DEBUG
+    return target
