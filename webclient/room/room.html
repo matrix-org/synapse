@@ -3,9 +3,16 @@
     <div id="roomHeader">
         <a href ng-click="goToPage('/')"><img src="img/logo-small.png" width="100" height="43" alt="[matrix]"/></a>
         <div class="roomHeaderInfo">
-            <div id="roomName">
-                {{ room_id  | mRoomName }}
+
+            <div class="roomNameSection">
+                <div ng-hide="name.isEditing" ng-dblclick="name.editName()" id="roomName">
+                    {{ room_id | mRoomName }}
+                </div>
+                <form ng-submit="name.updateName()" ng-show="name.isEditing" class="roomNameForm">
+                    <input ng-model="name.newNameText" ng-blur="name.cancelEdit()" class="roomNameInput" />
+                </form>
             </div>
+
             <div class="roomTopicSection">
                 <button ng-hide="events.rooms[room_id]['m.room.topic'].content.topic || topic.isEditing"
                     ng-click="topic.editTopic()" class="roomTopicSetNew">

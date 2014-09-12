@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
-.controller('RoomController', ['$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mPresence', 'matrixPhoneService', 'MatrixCall',
-                               function($scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, mPresence, matrixPhoneService, MatrixCall) {
+.controller('RoomController', ['$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mPresence', 'matrixPhoneService', 'MatrixCall',
+                               function($filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, mPresence, matrixPhoneService, MatrixCall) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -42,6 +42,44 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     $scope.imageURLToSend = "";
     $scope.userIDToInvite = "";
     
+
+    // vars and functions for updating the name
+    $scope.name = {
+        isEditing: false,
+        newNameText: "",
+        editName: function() {
+            if ($scope.name.isEditing) {
+                console.log("Warning: Already editing name.");
+                return;
+            };
+
+            // Use the filter applied in html to set the input value
+            $scope.name.newNameText = $filter('mRoomName')($scope.room_id);
+
+            // Force focus to the input
+            $timeout(function() {
+                angular.element('.roomNameInput').focus(); 
+            }, 0);
+
+            $scope.name.isEditing = true;
+        },
+        updateName: function() {
+            console.log("Updating name to "+$scope.name.newNameText);
+            matrixService.setName($scope.room_id, $scope.name.newNameText).then(
+                function() {
+                },
+                function(error) {
+                    $scope.feedback = "Request failed: " + error.data.error;
+                }
+            );
+
+            $scope.name.isEditing = false;
+        },
+        cancelEdit: function() {
+            $scope.name.isEditing = false;
+        }
+    };
+
     // vars and functions for updating the topic
     $scope.topic = {
         isEditing: false,
@@ -81,10 +119,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         cancelEdit: function() {
             $scope.topic.isEditing = false;
         }
-    };
-    
-    
-    
+    };  
     
     var scrollToBottom = function(force) {
         console.log("Scrolling to bottom");

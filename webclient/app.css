@@ -296,20 +296,20 @@ a:active  { color: #000; }
 }
 
 #roomTopic {
-    text-align: right;
     font-size: 13px;
+    text-align: right;
 }
 
-.roomTopicInput {
+.roomNameInput, .roomTopicInput {
     width: 100%;
 }
 
-.roomTopicSection {
+.roomNameSection, .roomTopicSection {
     float: right;
     width: 100%;
 }
 
-.roomTopicSetNew {
+.roomNameSetNew, .roomTopicSetNew {
     float: right;
 }
 
