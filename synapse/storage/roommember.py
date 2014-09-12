@@ -66,8 +66,8 @@ class RoomMemberStore(SQLBaseStore):
             # Check if this was the last person to have left.
             member_events = self._get_members_query_txn(
                 txn,
-                where_clause="c.room_id = ? AND m.membership = ?",
-                where_values=(event.room_id, Membership.JOIN,)
+                where_clause="c.room_id = ? AND m.membership = ? AND m.user_id != ?",
+                where_values=(event.room_id, Membership.JOIN, target_user_id,)
             )
 
             joined_domains = set()
