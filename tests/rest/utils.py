@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 # trial imports
-from twisted.trial import unittest
+from tests import unittest
 
 from synapse.api.constants import Membership
 

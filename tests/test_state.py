@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from tests import unittest
 from twisted.internet import defer
-from twisted.trial import unittest
 from twisted.python.log import PythonLoggingObserver
 
 from synapse.state import StateHandler
@@ -26,7 +26,6 @@ from collections import namedtuple
 
 from mock import Mock
 
-import logging
 import mock
 
 
