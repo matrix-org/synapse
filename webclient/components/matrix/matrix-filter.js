@@ -31,15 +31,17 @@ angular.module('matrixFilter', [])
         }
 
         if (undefined === roomName) {
-            // Else, build the name from its users
+
             var room = $rootScope.events.rooms[room_id];
             if (room) {
+                // Get name from room state date
                 var room_name_event = room["m.room.name"];
-
                 if (room_name_event) {
                     roomName = room_name_event.content.name;
                 }
                 else if (room.members) {
+                    // Else, build the name from its users
+                    // FIXME: Is it still required?
                     // Limit the room renaming to 1:1 room
                     if (2 === Object.keys(room.members).length) {
                         for (var i in room.members) {

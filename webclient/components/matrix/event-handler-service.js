@@ -60,13 +60,43 @@ angular.module('eventHandlerService', [])
             // Pagination information
             $rootScope.events.rooms[room_id].pagination = {
                 earliest_token: "END"   // how far back we've paginated
-            }
+            };
         }
     };
 
     var resetRoomMessages = function(room_id) {
         if ($rootScope.events.rooms[room_id]) {
             $rootScope.events.rooms[room_id].messages = [];
+        }
+    };
+    
+    // Generic method to handle events data
+    var handleRoomDateEvent = function(event, isLiveEvent, addToRoomMessages) {
+        // Add topic changes as if they were a room message
+        if (addToRoomMessages) {
+            if (isLiveEvent) {
+                $rootScope.events.rooms[event.room_id].messages.push(event);
+            }
+            else {
+                $rootScope.events.rooms[event.room_id].messages.unshift(event);
+            }
+        }
+
+        // live events always update, but non-live events only update if the
+        // ts is later.
+        var latestData = true;
+        if (!isLiveEvent) {
+            var eventTs = event.ts;
+            var storedEvent = $rootScope.events.rooms[event.room_id][event.type];
+            if (storedEvent) {
+                if (storedEvent.ts > eventTs) {
+                    // ignore it, we have a newer one already.
+                    latestData = false;
+                }
+            }
+        }
+        if (latestData) {
+            $rootScope.events.rooms[event.room_id][event.type] = event;         
         }
     };
     
@@ -153,44 +183,16 @@ angular.module('eventHandlerService', [])
         }
     };
 
-    var handleRoomName = function(event, isLiveEvent) {
-        console.log("handleRoomName " + isLiveEvent);
-
-        $rootScope.events.rooms[event.room_id][event.type] = event;
+    var handleRoomName = function(event, isLiveEvent, isStateEvent) {
+        console.log("handleRoomName room_id: " + event.room_id + " - isLiveEvent: " + isLiveEvent + " - name: " + event.content.name);
+        handleRoomDateEvent(event, isLiveEvent, !isStateEvent);
         $rootScope.$broadcast(NAME_EVENT, event, isLiveEvent);
     };
     
-    // TODO: Can this just be a generic "I am a room state event, can haz store?"
+
     var handleRoomTopic = function(event, isLiveEvent, isStateEvent) {
-        console.log("handleRoomTopic live="+isLiveEvent);
-
-        // Add topic changes as if they were a room message
-        if (!isStateEvent) {
-            if (isLiveEvent) {
-                $rootScope.events.rooms[event.room_id].messages.push(event);
-            }
-            else {
-                $rootScope.events.rooms[event.room_id].messages.unshift(event);
-            }
-        }
-
-        // live events always update, but non-live events only update if the
-        // ts is later.
-        var latestData = true;
-        if (!isLiveEvent) {
-            var eventTs = event.ts;
-            var storedEvent = $rootScope.events.rooms[event.room_id][event.type];
-            if (storedEvent) {
-                if (storedEvent.ts > eventTs) {
-                    // ignore it, we have a newer one already.
-                    latestData = false;
-                }
-            }
-        }
-        if (latestData) {
-            $rootScope.events.rooms[event.room_id][event.type] = event;         
-        }
-
+        console.log("handleRoomTopic room_id: " + event.room_id + " - isLiveEvent: " + isLiveEvent + " - topic: " + event.content.topic);
+        handleRoomDateEvent(event, isLiveEvent, !isStateEvent);
         $rootScope.$broadcast(TOPIC_EVENT, event, isLiveEvent);
     };
 
@@ -286,7 +288,7 @@ angular.module('eventHandlerService', [])
                         handlePowerLevels(event, isLiveEvent);
                         break;
                     case 'm.room.name':
-                        handleRoomName(event, isLiveEvent);
+                        handleRoomName(event, isLiveEvent, isStateEvent);
                         break;
                     case 'm.room.topic':
                         handleRoomTopic(event, isLiveEvent, isStateEvent);

@@ -80,6 +80,10 @@
                             {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }} changed the topic to: {{ room.lastMsg.content.topic }}
                         </div>
 
+                        <div ng-switch-when="m.room.name">
+                            {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }} changed the room name to: {{ room.lastMsg.content.name }}
+                        </div>
+
                         <div ng-switch-default>
                             <div ng-if="room.lastMsg.type.indexOf('m.call.') === 0">
                                 Call

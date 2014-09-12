@@ -118,6 +118,10 @@
                             {{ members[msg.user_id].displayname || msg.user_id }} changed the topic to: {{ msg.content.topic }}
                         </span>
 
+                        <span ng-if="'m.room.name' === msg.type">
+                            {{ members[msg.user_id].displayname || msg.user_id }} changed the room name to: {{ msg.content.name }}
+                        </span>
+
                     </div>
                 </td>
                 <td class="rightBlock">
