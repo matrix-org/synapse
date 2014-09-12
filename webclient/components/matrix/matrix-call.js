@@ -203,6 +203,12 @@ angular.module('MatrixCall', [])
 
     MatrixCall.prototype.gotLocalOffer = function(description) {
         console.log("Created offer: "+description);
+
+        if (this.state == 'ended') {
+            console.log("Ignoring newly created offer on call ID "+this.call_id+" because the call has ended");
+            return;
+        }
+
         this.peerConn.setLocalDescription(description);
 
         var content = {

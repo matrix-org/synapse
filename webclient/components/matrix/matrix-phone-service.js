@@ -48,21 +48,24 @@ angular.module('matrixPhoneService', [])
                 var thisCall = matrixPhoneService.allCalls[thisCallId];
 
                 if (call.room_id == thisCall.room_id && thisCall.direction == 'outbound'
-                     && (thisCall.state == 'wait_local_media' || thisCall.state == 'invite_sent' || thisCall.state == 'create_offer')) {
+                     && (thisCall.state == 'wait_local_media' || thisCall.state == 'create_offer' || thisCall.state == 'invite_sent')) {
                     existingCall = thisCall;
                     break;
                 }
             }
 
             if (existingCall) {
-                if (existingCall.call_id < call.call_id) {
-                    console.log("Glare detected: rejecting incoming call "+call.call_id+" and keeping outgoing call "+existingCall.call_id);
-                    call.hangup();
-                } else {
+                // If we've only got to wait_local_media or create_offer and we've got an invite,
+                // pick the incoming call because we know we haven't sent our invite yet
+                // otherwise, pick whichever call has the lowest call ID (by string comparison)
+                if (existingCall.state == 'wait_local_media' || existingCall.state == 'create_offer' || existingCall.call_id > call.call_id) {
                     console.log("Glare detected: answering incoming call "+call.call_id+" and canceling outgoing call "+existingCall.call_id);
                     existingCall.replacedBy(call);
                     call.answer();
                     $rootScope.$broadcast(matrixPhoneService.REPLACED_CALL_EVENT, existingCall, call);
+                } else {
+                    console.log("Glare detected: rejecting incoming call "+call.call_id+" and keeping outgoing call "+existingCall.call_id);
+                    call.hangup();
                 }
             } else {
                 $rootScope.$broadcast(matrixPhoneService.INCOMING_CALL_EVENT, call);
