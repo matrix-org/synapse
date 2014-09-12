@@ -17,6 +17,9 @@ Webclient:
  * Add glare support for VoIP.
  * Improvements to initial startup speed.
  * Don't display duplicate join events.
+ * Local echo of messages.
+ * Differentiate sending and sent of local echo.
+ * Various minor bug fixes.
 
 Changes in synapse 0.2.2 (2014-09-06)
 =====================================
