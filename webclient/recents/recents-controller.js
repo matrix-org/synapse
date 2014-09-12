@@ -16,12 +16,6 @@
 
 'use strict';
 
-// XXX FIXME TODO
-// We should NOT be dumping things into $rootScope!!!! We should NOT be
-// making any requests here, and should READ what is already in the 
-// rootScope from the event handler service!!!
-// XXX FIXME TODO
-
 angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHandlerService'])
 .controller('RecentsController', ['$rootScope', '$scope', 'matrixService', 'eventHandlerService', 
                                function($rootScope, $scope, matrixService, eventHandlerService) {
@@ -33,11 +27,6 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
     // $rootScope of the parent where the recents component is included can override this value
     // in order to highlight a specific room in the list
     $rootScope.recentsSelectedRoomID;
-
-    // XXX FIXME TODO : We should NOT be doing this here, which could be
-    // repeated for every controller instance. We should be doing this in
-    // event handler service instead. In additon, this will break if there
-    // isn't a recents controller visible when the last message comes in :/
     
     var listenToEventStream = function() {
         // Refresh the list on matrix invitation and message event
@@ -59,6 +48,9 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
                 if ($rootScope.rooms[event.room_id]) {
                     $rootScope.rooms[event.room_id].lastMsg = event;
                 }
+                
+                // Update room users count
+                $rootScope.rooms[event.room_id].numUsersInRoom = getUsersCountInRoom(event.room_id);
             }
         });
         $rootScope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
@@ -76,8 +68,41 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
                 $rootScope.rooms[event.room_id] = event;
             }
         });
+        $rootScope.$on(eventHandlerService.NAME_EVENT, function(ngEvent, event, isLive) {
+            if (isLive) {
+                $rootScope.rooms[event.room_id].lastMsg = event;
+            }
+        });
+        $rootScope.$on(eventHandlerService.TOPIC_EVENT, function(ngEvent, event, isLive) {
+            if (isLive) {
+                $rootScope.rooms[event.room_id].lastMsg = event;
+            }
+        });
     };
     
+    /**
+     * Compute the room users number, ie the number of members who has joined the room.
+     * @param {String} room_id the room id
+     * @returns {undefined | Number} the room users number if available
+     */
+    var getUsersCountInRoom = function(room_id) {
+        var memberCount;
+        
+        var room = $rootScope.events.rooms[room_id];
+        if (room) {
+            memberCount = 0;
+            
+            for (var i in room.members) {
+                var member = room.members[i];
+                
+                if ("join" === member.membership) {
+                    memberCount = memberCount + 1;
+                }
+            }
+        }
+        
+        return memberCount;
+    };
 
     $scope.onInit = function() {
         // Init recents list only once
@@ -85,23 +110,12 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
             return;
         }
         
-        // XXX FIXME TODO
-        // We should NOT be dumping things into $rootScope!!!! We should NOT be
-        // making any requests here, and should READ what is already in the 
-        // rootScope from the event handler service!!!
-        // XXX FIXME TODO
-        
         $rootScope.rooms = {};
         
         // Use initialSync data to init the recents list
         eventHandlerService.waitForInitialSyncCompletion().then(
             function(initialSyncData) {
             
-                // XXX FIXME TODO:
-                // Any assignments to the rootScope here should be done in
-                // event handler service and not here, because we could have
-                // many controllers manipulating and clobbering each other, and
-                // are unecessarily repeating http requests.
                 var rooms = initialSyncData.data.rooms;
                 for (var i=0; i<rooms.length; i++) {
                     var room = rooms[i];
@@ -114,17 +128,7 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
                         $rootScope.rooms[room.room_id].lastMsg = room.messages.chunk[0];
                     }
                     
-                    
-                    var numUsersInRoom = 0;
-                    if (room.state) {
-                        for (var j=0; j<room.state.length; j++) {
-                            var stateEvent = room.state[j];
-                            if (stateEvent.type == "m.room.member" && stateEvent.content.membership == "join") {
-                                numUsersInRoom += 1;
-                            }
-                        }
-                    }
-                    $rootScope.rooms[room.room_id].numUsersInRoom = numUsersInRoom;
+                    $rootScope.rooms[room.room_id].numUsersInRoom = getUsersCountInRoom(room.room_id);
                 }
 
                 // From now, update recents from the stream
@@ -135,6 +139,11 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter', 'eventHand
             }
         );
     };
-    
+
+    // Clean data when user logs out
+    $scope.$on(eventHandlerService.RESET_EVENT, function() {
+
+        delete $rootScope.rooms;
+    });
 }]);
 

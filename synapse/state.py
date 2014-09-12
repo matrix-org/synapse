@@ -115,6 +115,8 @@ class StateHandler(object):
 
         is_new = yield self._handle_new_state(new_pdu)
 
+        logger.debug("is_new: %s %s %s", is_new, new_pdu.pdu_id, new_pdu.origin)
+
         if is_new:
             yield self.store.update_current_state(
                 pdu_id=new_pdu.pdu_id,
@@ -187,11 +189,12 @@ class StateHandler(object):
             # We didn't find a common ancestor. This is probably fine.
             pass
 
-        result = self._do_conflict_res(
+        result = yield self._do_conflict_res(
             new_branch, current_branch, common_ancestor
         )
         defer.returnValue(result)
 
+    @defer.inlineCallbacks
     def _do_conflict_res(self, new_branch, current_branch, common_ancestor):
         conflict_res = [
             self._do_power_level_conflict_res,
@@ -200,7 +203,8 @@ class StateHandler(object):
         ]
 
         for algo in conflict_res:
-            new_res, curr_res = algo(
+            new_res, curr_res = yield defer.maybeDeferred(
+                algo,
                 new_branch, current_branch, common_ancestor
             )
 
@@ -211,19 +215,39 @@ class StateHandler(object):
 
         raise Exception("Conflict resolution failed.")
 
+    @defer.inlineCallbacks
     def _do_power_level_conflict_res(self, new_branch, current_branch,
                                      common_ancestor):
-        max_power_new = max(
-            new_branch[:-1] if common_ancestor else new_branch,
-            key=lambda t: t.power_level
-        ).power_level
+        new_powers_deferreds = []
+        for e in new_branch[:-1] if common_ancestor else new_branch:
+            if hasattr(e, "user_id"):
+                new_powers_deferreds.append(
+                    self.store.get_power_level(e.context, e.user_id)
+                )
 
-        max_power_current = max(
-            current_branch[:-1] if common_ancestor else current_branch,
-            key=lambda t: t.power_level
-        ).power_level
+        current_powers_deferreds = []
+        for e in current_branch[:-1] if common_ancestor else current_branch:
+            if hasattr(e, "user_id"):
+                current_powers_deferreds.append(
+                    self.store.get_power_level(e.context, e.user_id)
+                )
 
-        return (max_power_new, max_power_current)
+        new_powers = yield defer.gatherResults(
+            new_powers_deferreds,
+            consumeErrors=True
+        )
+
+        current_powers = yield defer.gatherResults(
+            current_powers_deferreds,
+            consumeErrors=True
+        )
+
+        max_power_new = max(new_powers)
+        max_power_current = max(current_powers)
+
+        defer.returnValue(
+            (max_power_new, max_power_current)
+        )
 
     def _do_chain_length_conflict_res(self, new_branch, current_branch,
                                       common_ancestor):

@@ -142,4 +142,9 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
 
         refresh();
     };
+
+    // Clean data when user logs out
+    $scope.$on(eventHandlerService.RESET_EVENT, function() {
+        $scope.public_rooms = [];
+    });
 }]);

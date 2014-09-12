@@ -24,21 +24,30 @@
 
     <h3>Public rooms</h3>
     
-    <div class="public_rooms" ng-repeat="room in public_rooms | orderBy:'room_display_name'">
-        <div class="publicRoomEntry">
-            <a href="#/room/{{ room.room_alias ? room.room_alias : room.room_id }}" 
-                ng-class="room.room_display_name.toLowerCase().indexOf('#matrix:') === 0 ? 'roomHighlight' : ''">
-                {{ room.room_display_name }}
-            </a>
-            <div ng-class="room.room_display_name.toLowerCase().indexOf('#matrix:') === 0 ? 'publicRoomJoinedUsers roomHighlight' : 'publicRoomJoinedUsers'"
-            ng-show="room.num_joined_members">
-                {{ room.num_joined_members }} {{ room.num_joined_members == 1 ? 'user' : 'users' }}
-            </div>
-            <div class="publicRoomTopic" ng-show="room.topic">
-                {{ room.topic }}
-            </div>
-        </div>
-    </div>
+    <table class="publicTable">
+        <tbody ng-repeat="room in public_rooms | orderBy:'room_display_name'"
+               class="publicRoomEntry"
+               ng-class="room.room_display_name.toLowerCase().indexOf('#matrix:') === 0 ? 'roomHighlight' : ''">
+            <tr>
+                <td class="publicRoomEntry">
+                    <a href="#/room/{{ room.room_alias ? room.room_alias : room.room_id }}"  >
+                        {{ room.room_display_name }}
+                    </a>
+                </td>
+                <td>
+                    <div class="publicRoomJoinedUsers"
+                         ng-show="room.num_joined_members">
+                        {{ room.num_joined_members }} {{ room.num_joined_members == 1 ? 'user' : 'users' }}
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" class="publicRoomTopic">
+                    {{ room.topic }}
+                </td>
+            </tr>
+        </tbody>
+    </table>
     <br/>
     
     <div>

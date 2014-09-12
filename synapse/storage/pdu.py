@@ -17,6 +17,7 @@ from twisted.internet import defer
 
 from ._base import SQLBaseStore, Table, JoinHelper
 
+from synapse.federation.units import Pdu
 from synapse.util.logutils import log_function
 
 from collections import namedtuple
@@ -516,7 +517,7 @@ class StatePduStore(SQLBaseStore):
 
         if not current:
             logger.debug("get_unresolved_state_tree No current state.")
-            return return_value
+            return (return_value, None)
 
         return_value.current_branch.append(current)
 
@@ -625,53 +626,6 @@ class StatePduStore(SQLBaseStore):
 
         return result
 
-    def get_next_missing_pdu(self, new_pdu):
-        """When we get a new state pdu we need to check whether we need to do
-        any conflict resolution, if we do then we need to check if we need
-        to go back and request some more state pdus that we haven't seen yet.
-
-        Args:
-            txn
-            new_pdu
-
-        Returns:
-            PduIdTuple: A pdu that we are missing, or None if we have all the
-                pdus required to do the conflict resolution.
-        """
-        return self.runInteraction(
-            self._get_next_missing_pdu, new_pdu
-        )
-
-    def _get_next_missing_pdu(self, txn, new_pdu):
-        logger.debug(
-            "get_next_missing_pdu %s %s",
-            new_pdu.pdu_id, new_pdu.origin
-        )
-
-        current = self._get_current_interaction(
-            txn,
-            new_pdu.context, new_pdu.pdu_type, new_pdu.state_key
-        )
-
-        if (not current or not current.prev_state_id
-                or not current.prev_state_origin):
-            return None
-
-        # Oh look, it's a straight clobber, so wooooo almost no-op.
-        if (new_pdu.prev_state_id == current.pdu_id
-                and new_pdu.prev_state_origin == current.origin):
-            return None
-
-        enum_branches = self._enumerate_state_branches(txn, new_pdu, current)
-        for branch, prev_state, state in enum_branches:
-            if not state:
-                return PduIdTuple(
-                    prev_state.prev_state_id,
-                    prev_state.prev_state_origin
-                )
-
-        return None
-
     def handle_new_state(self, new_pdu):
         """Actually perform conflict resolution on the new_pdu on the
         assumption we have all the pdus required to perform it.
@@ -755,23 +709,10 @@ class StatePduStore(SQLBaseStore):
 
         return is_current
 
-    @classmethod
     @log_function
-    def _enumerate_state_branches(cls, txn, pdu_a, pdu_b):
+    def _enumerate_state_branches(self, txn, pdu_a, pdu_b):
         branch_a = pdu_a
         branch_b = pdu_b
-
-        get_query = (
-            "SELECT %(fields)s FROM %(pdus)s as p "
-            "LEFT JOIN %(state)s as s "
-            "ON p.pdu_id = s.pdu_id AND p.origin = s.origin "
-            "WHERE p.pdu_id = ? AND p.origin = ? "
-        ) % {
-            "fields": _pdu_state_joiner.get_fields(
-                PdusTable="p", StatePdusTable="s"),
-            "pdus": PdusTable.table_name,
-            "state": StatePdusTable.table_name,
-        }
 
         while True:
             if (branch_a.pdu_id == branch_b.pdu_id
@@ -804,13 +745,12 @@ class StatePduStore(SQLBaseStore):
                     branch_a.prev_state_origin
                 )
 
-                logger.debug("getting branch_a prev %s", pdu_tuple)
-                txn.execute(get_query, pdu_tuple)
-
                 prev_branch = branch_a
 
-                res = txn.fetchone()
-                branch_a = PduEntry(*res) if res else None
+                logger.debug("getting branch_a prev %s", pdu_tuple)
+                branch_a = self._get_pdu_tuple(txn, *pdu_tuple)
+                if branch_a:
+                    branch_a = Pdu.from_pdu_tuple(branch_a)
 
                 logger.debug("branch_a=%s", branch_a)
 
@@ -823,14 +763,13 @@ class StatePduStore(SQLBaseStore):
                     branch_b.prev_state_id,
                     branch_b.prev_state_origin
                 )
-                txn.execute(get_query, pdu_tuple)
-
-                logger.debug("getting branch_b prev %s", pdu_tuple)
 
                 prev_branch = branch_b
 
-                res = txn.fetchone()
-                branch_b = PduEntry(*res) if res else None
+                logger.debug("getting branch_b prev %s", pdu_tuple)
+                branch_b = self._get_pdu_tuple(txn, *pdu_tuple)
+                if branch_b:
+                    branch_b = Pdu.from_pdu_tuple(branch_b)
 
                 logger.debug("branch_b=%s", branch_b)
 

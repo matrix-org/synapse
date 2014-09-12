@@ -15,15 +15,18 @@
 
 from twisted.internet import defer
 from twisted.trial import unittest
+from twisted.python.log import PythonLoggingObserver
 
 from synapse.state import StateHandler
 from synapse.storage.pdu import PduEntry
 from synapse.federation.pdu_codec import encode_event_id
+from synapse.federation.units import Pdu
 
 from collections import namedtuple
 
 from mock import Mock
 
+import logging
 import mock
 
 
@@ -31,6 +34,11 @@ ReturnType = namedtuple(
     "StateReturnType", ["new_branch", "current_branch"]
 )
 
+
+def _gen_get_power_level(power_level_list):
+    def get_power_level(room_id, user_id):
+        return defer.succeed(power_level_list.get(user_id, None))
+    return get_power_level
 
 class StateTestCase(unittest.TestCase):
     def setUp(self):
@@ -40,6 +48,7 @@ class StateTestCase(unittest.TestCase):
             "get_latest_pdus_in_context",
             "get_current_state_pdu",
             "get_pdu",
+            "get_power_level",
         ])
         self.replication = Mock(spec=["get_pdu"])
 
@@ -53,7 +62,9 @@ class StateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_new_state_key(self):
         # We've never seen anything for this state before
-        new_pdu = new_fake_pdu_entry("A", "test", "mem", "x", None, 10)
+        new_pdu = new_fake_pdu("A", "test", "mem", "x", None, "u")
+
+        self.persistence.get_power_level.side_effect = _gen_get_power_level({})
 
         self.persistence.get_unresolved_state_tree.return_value = (
             (ReturnType([new_pdu], []), None)
@@ -76,11 +87,44 @@ class StateTestCase(unittest.TestCase):
         # We do a direct overwriting of the old state, i.e., the new state
         # points to the old state.
 
-        old_pdu = new_fake_pdu_entry("A", "test", "mem", "x", None, 10)
-        new_pdu = new_fake_pdu_entry("B", "test", "mem", "x", "A", 5)
+        old_pdu = new_fake_pdu("A", "test", "mem", "x", None, "u1")
+        new_pdu = new_fake_pdu("B", "test", "mem", "x", "A", "u2")
+
+        self.persistence.get_power_level.side_effect = _gen_get_power_level({
+            "u1": 10,
+            "u2": 5,
+        })
 
         self.persistence.get_unresolved_state_tree.return_value = (
             (ReturnType([new_pdu, old_pdu], [old_pdu]), None)
+        )
+
+        is_new = yield self.state.handle_new_state(new_pdu)
+
+        self.assertTrue(is_new)
+
+        self.persistence.get_unresolved_state_tree.assert_called_once_with(
+            new_pdu
+        )
+
+        self.assertEqual(1, self.persistence.update_current_state.call_count)
+
+        self.assertFalse(self.replication.get_pdu.called)
+
+    @defer.inlineCallbacks
+    def test_overwrite(self):
+        old_pdu_1 = new_fake_pdu("A", "test", "mem", "x", None, "u1")
+        old_pdu_2 = new_fake_pdu("B", "test", "mem", "x", "A", "u2")
+        new_pdu = new_fake_pdu("C", "test", "mem", "x", "B", "u3")
+
+        self.persistence.get_power_level.side_effect = _gen_get_power_level({
+            "u1": 10,
+            "u2": 5,
+            "u3": 0,
+        })
+
+        self.persistence.get_unresolved_state_tree.return_value = (
+            (ReturnType([new_pdu, old_pdu_2, old_pdu_1], [old_pdu_1]), None)
         )
 
         is_new = yield self.state.handle_new_state(new_pdu)
@@ -100,9 +144,15 @@ class StateTestCase(unittest.TestCase):
         # We try to update the state based on an outdated state, and have a
         # too low power level.
 
-        old_pdu_1 = new_fake_pdu_entry("A", "test", "mem", "x", None, 10)
-        old_pdu_2 = new_fake_pdu_entry("B", "test", "mem", "x", None, 10)
-        new_pdu = new_fake_pdu_entry("C", "test", "mem", "x", "A", 5)
+        old_pdu_1 = new_fake_pdu("A", "test", "mem", "x", None, "u1")
+        old_pdu_2 = new_fake_pdu("B", "test", "mem", "x", None, "u2")
+        new_pdu = new_fake_pdu("C", "test", "mem", "x", "A", "u3")
+
+        self.persistence.get_power_level.side_effect = _gen_get_power_level({
+            "u1": 10,
+            "u2": 10,
+            "u3": 5,
+        })
 
         self.persistence.get_unresolved_state_tree.return_value = (
             (ReturnType([new_pdu, old_pdu_1], [old_pdu_2, old_pdu_1]), None)
@@ -125,9 +175,15 @@ class StateTestCase(unittest.TestCase):
         # We try to update the state based on an outdated state, but have
         # sufficient power level to force the update.
 
-        old_pdu_1 = new_fake_pdu_entry("A", "test", "mem", "x", None, 10)
-        old_pdu_2 = new_fake_pdu_entry("B", "test", "mem", "x", None, 10)
-        new_pdu = new_fake_pdu_entry("C", "test", "mem", "x", "A", 15)
+        old_pdu_1 = new_fake_pdu("A", "test", "mem", "x", None, "u1")
+        old_pdu_2 = new_fake_pdu("B", "test", "mem", "x", None, "u2")
+        new_pdu = new_fake_pdu("C", "test", "mem", "x", "A", "u3")
+
+        self.persistence.get_power_level.side_effect = _gen_get_power_level({
+            "u1": 10,
+            "u2": 10,
+            "u3": 15,
+        })
 
         self.persistence.get_unresolved_state_tree.return_value = (
             (ReturnType([new_pdu, old_pdu_1], [old_pdu_2, old_pdu_1]), None)
@@ -150,9 +206,15 @@ class StateTestCase(unittest.TestCase):
         # We try to update the state based on an outdated state, the power
         # levels are the same and so are the branch lengths
 
-        old_pdu_1 = new_fake_pdu_entry("A", "test", "mem", "x", None, 10)
-        old_pdu_2 = new_fake_pdu_entry("B", "test", "mem", "x", None, 10)
-        new_pdu = new_fake_pdu_entry("C", "test", "mem", "x", "A", 10)
+        old_pdu_1 = new_fake_pdu("A", "test", "mem", "x", None, "u1")
+        old_pdu_2 = new_fake_pdu("B", "test", "mem", "x", None, "u2")
+        new_pdu = new_fake_pdu("C", "test", "mem", "x", "A", "u3")
+
+        self.persistence.get_power_level.side_effect = _gen_get_power_level({
+            "u1": 10,
+            "u2": 10,
+            "u3": 10,
+        })
 
         self.persistence.get_unresolved_state_tree.return_value = (
             (ReturnType([new_pdu, old_pdu_1], [old_pdu_2, old_pdu_1]), None)
@@ -175,10 +237,17 @@ class StateTestCase(unittest.TestCase):
         # We try to update the state based on an outdated state, the power
         # levels are the same but the branch length of the new one is longer.
 
-        old_pdu_1 = new_fake_pdu_entry("A", "test", "mem", "x", None, 10)
-        old_pdu_2 = new_fake_pdu_entry("B", "test", "mem", "x", None, 10)
-        old_pdu_3 = new_fake_pdu_entry("C", "test", "mem", "x", "A", 10)
-        new_pdu = new_fake_pdu_entry("D", "test", "mem", "x", "C", 10)
+        old_pdu_1 = new_fake_pdu("A", "test", "mem", "x", None, "u1")
+        old_pdu_2 = new_fake_pdu("B", "test", "mem", "x", None, "u2")
+        old_pdu_3 = new_fake_pdu("C", "test", "mem", "x", "A", "u3")
+        new_pdu = new_fake_pdu("D", "test", "mem", "x", "C", "u4")
+
+        self.persistence.get_power_level.side_effect = _gen_get_power_level({
+            "u1": 10,
+            "u2": 10,
+            "u3": 10,
+            "u4": 10,
+        })
 
         self.persistence.get_unresolved_state_tree.return_value = (
             (
@@ -208,16 +277,22 @@ class StateTestCase(unittest.TestCase):
         # triggering a get_pdu request
 
         # The pdu we haven't seen
-        old_pdu_1 = new_fake_pdu_entry(
-            "A", "test", "mem", "x", None, 10, depth=0
+        old_pdu_1 = new_fake_pdu(
+            "A", "test", "mem", "x", None, "u1", depth=0
         )
 
-        old_pdu_2 = new_fake_pdu_entry(
-            "B", "test", "mem", "x", "A", 10, depth=1
+        old_pdu_2 = new_fake_pdu(
+            "B", "test", "mem", "x", "A", "u2", depth=1
         )
-        new_pdu = new_fake_pdu_entry(
-            "C", "test", "mem", "x", "A", 20, depth=2
+        new_pdu = new_fake_pdu(
+            "C", "test", "mem", "x", "A", "u3", depth=2
         )
+
+        self.persistence.get_power_level.side_effect = _gen_get_power_level({
+            "u1": 10,
+            "u2": 10,
+            "u3": 20,
+        })
 
         # The return_value of `get_unresolved_state_tree`, which changes after
         # the call to get_pdu
@@ -268,19 +343,26 @@ class StateTestCase(unittest.TestCase):
         # triggering a get_pdu request
 
         # The pdu we haven't seen
-        old_pdu_1 = new_fake_pdu_entry(
-            "A", "test", "mem", "x", None, 10, depth=0
+        old_pdu_1 = new_fake_pdu(
+            "A", "test", "mem", "x", None, "u1", depth=0
         )
 
-        old_pdu_2 = new_fake_pdu_entry(
-            "B", "test", "mem", "x", "A", 10, depth=2
+        old_pdu_2 = new_fake_pdu(
+            "B", "test", "mem", "x", "A", "u2", depth=2
         )
-        old_pdu_3 = new_fake_pdu_entry(
-            "C", "test", "mem", "x", "B", 10, depth=3
+        old_pdu_3 = new_fake_pdu(
+            "C", "test", "mem", "x", "B", "u3", depth=3
         )
-        new_pdu = new_fake_pdu_entry(
-            "D", "test", "mem", "x", "A", 20, depth=4
+        new_pdu = new_fake_pdu(
+            "D", "test", "mem", "x", "A", "u4", depth=4
         )
+
+        self.persistence.get_power_level.side_effect = _gen_get_power_level({
+            "u1": 10,
+            "u2": 10,
+            "u3": 10,
+            "u4": 20,
+        })
 
         # The return_value of `get_unresolved_state_tree`, which changes after
         # the call to get_pdu
@@ -357,19 +439,26 @@ class StateTestCase(unittest.TestCase):
         # triggering a get_pdu request
 
         # The pdu we haven't seen
-        old_pdu_1 = new_fake_pdu_entry(
-            "A", "test", "mem", "x", None, 10, depth=0
+        old_pdu_1 = new_fake_pdu(
+            "A", "test", "mem", "x", None, "u1", depth=0
         )
 
-        old_pdu_2 = new_fake_pdu_entry(
-            "B", "test", "mem", "x", "A", 10, depth=2
+        old_pdu_2 = new_fake_pdu(
+            "B", "test", "mem", "x", "A", "u2", depth=2
         )
-        old_pdu_3 = new_fake_pdu_entry(
-            "C", "test", "mem", "x", "B", 10, depth=3
+        old_pdu_3 = new_fake_pdu(
+            "C", "test", "mem", "x", "B", "u3", depth=3
         )
-        new_pdu = new_fake_pdu_entry(
-            "D", "test", "mem", "x", "A", 20, depth=1
+        new_pdu = new_fake_pdu(
+            "D", "test", "mem", "x", "A", "u4", depth=1
         )
+
+        self.persistence.get_power_level.side_effect = _gen_get_power_level({
+            "u1": 10,
+            "u2": 10,
+            "u3": 10,
+            "u4": 20,
+        })
 
         # The return_value of `get_unresolved_state_tree`, which changes after
         # the call to get_pdu
@@ -445,8 +534,13 @@ class StateTestCase(unittest.TestCase):
         # We do a direct overwriting of the old state, i.e., the new state
         # points to the old state.
 
-        old_pdu = new_fake_pdu_entry("A", "test", "mem", "x", None, 5)
-        new_pdu = new_fake_pdu_entry("B", "test", "mem", "x", None, 10)
+        old_pdu = new_fake_pdu("A", "test", "mem", "x", None, "u1")
+        new_pdu = new_fake_pdu("B", "test", "mem", "x", None, "u2")
+
+        self.persistence.get_power_level.side_effect = _gen_get_power_level({
+            "u1": 5,
+            "u2": 10,
+        })
 
         self.persistence.get_unresolved_state_tree.return_value = (
             (ReturnType([new_pdu], [old_pdu]), None)
@@ -469,7 +563,7 @@ class StateTestCase(unittest.TestCase):
         event = Mock()
         event.event_id = "12123123@test"
 
-        state_pdu = new_fake_pdu_entry("C", "test", "mem", "x", "A", 20)
+        state_pdu = new_fake_pdu("C", "test", "mem", "x", "A", 20)
 
         snapshot = Mock()
         snapshot.prev_state_pdu = state_pdu
@@ -496,13 +590,13 @@ class StateTestCase(unittest.TestCase):
         )
 
 
-def new_fake_pdu_entry(pdu_id, context, pdu_type, state_key, prev_state_id,
-                       power_level, depth=0):
-    new_pdu = PduEntry(
+def new_fake_pdu(pdu_id, context, pdu_type, state_key, prev_state_id,
+                 user_id, depth=0):
+    new_pdu = Pdu(
         pdu_id=pdu_id,
         pdu_type=pdu_type,
         state_key=state_key,
-        power_level=power_level,
+        user_id=user_id,
         prev_state_id=prev_state_id,
         origin="example.com",
         context="context",
@@ -514,6 +608,7 @@ def new_fake_pdu_entry(pdu_id, context, pdu_type, state_key, prev_state_id,
         is_state=True,
         prev_state_origin="example.com",
         have_processed=True,
+        content={},
     )
 
     return new_pdu

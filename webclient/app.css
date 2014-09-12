@@ -55,18 +55,18 @@ a:active  { color: #000; }
     margin-left: 4px;
     margin-right: 4px;
     margin-top: 8px;
-    -webkit-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
-    -moz-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
-    -o-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
-    transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
 }
 
-.callIconRotate {
-    -webkit-transform: rotateZ(45deg);
-    -moz-transform: rotateZ(45deg);
-    -ms-transform: rotateZ(45deg);
-    -o-transform: rotateZ(45deg);
+#callEndedIcon {
+    transition:all linear 0.5s;
+}
+
+#callEndedIcon {
     transform: rotateZ(45deg);
+}
+
+#callEndedIcon.ng-hide {
+    transform: rotateZ(0deg);
 }
 
 #callPeerImage {
@@ -257,6 +257,7 @@ a:active  { color: #000; }
 
 #mainInput {
     width: 100%;
+    resize: none;
 }
 
 .blink {
@@ -267,26 +268,38 @@ a:active  { color: #000; }
     font-weight: bold;
 }
 
-.publicRoomEntry {
+.publicTable {
     max-width: 480px;
-    margin-bottom: 5px;
-    border-bottom: 1px #ddd solid;
+    width: 100%;
+    border-collapse: collapse;
+}
+.publicTable tr {
+    width: 100%;
+}
+.publicTable td {
+    vertical-align: text-top;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.publicRoomEntry {
+    max-width: 430px;
 }
 
 .publicRoomJoinedUsers {
-    float: right;
+    width: 5em;
+    text-align: right;
+    font-size: 12px;
+    color: #888;
 }
 
 .publicRoomTopic {
     color: #888;
     font-size: 12px;
-    padding-right: 5px;
-    width: 15em;
-    float: right;
-    text-align: right;
     overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    padding-bottom: 5px;
+    border-bottom: 1px #ddd solid;
 }
 
 #roomName {
@@ -295,20 +308,20 @@ a:active  { color: #000; }
 }
 
 #roomTopic {
-    text-align: right;
     font-size: 13px;
+    text-align: right;
 }
 
-.roomTopicInput {
+.roomNameInput, .roomTopicInput {
     width: 100%;
 }
 
-.roomTopicSection {
+.roomNameSection, .roomTopicSection {
     float: right;
     width: 100%;
 }
 
-.roomTopicSetNew {
+.roomNameSetNew, .roomTopicSetNew {
     float: right;
 }
 
@@ -514,6 +527,10 @@ a:active  { color: #000; }
     text-align: left ! important;
 }
 
+.bubble .message {
+    /* Break lines when encountering CR+LF */
+    white-space: pre;
+}
 .bubble .messagePending {
     opacity: 0.3
 }

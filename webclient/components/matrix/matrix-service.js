@@ -236,6 +236,13 @@ angular.module('matrixService', [])
             return doRequest("GET", path, undefined, {});
         },
         
+        setName: function(room_id, name) {
+            var data = {
+                name: name
+            };
+            return this.sendStateEvent(room_id, "m.room.name", data);
+        },
+        
         setTopic: function(room_id, topic) {
             var data = {
                 topic: topic
