@@ -1182,16 +1182,16 @@ This event is sent by the caller when they wish to establish a call.
     - ``type`` : "string" - The type of session description, in this case 'offer'
     - ``sdp`` : "string" - The SDP text of the session description
 
-``m.call.candidate``
+``m.call.candidates``
 This event is sent by callers after sending an invite and by the callee after answering.
-Its purpose is to give the other party an additional ICE candidate to try using to
+Its purpose is to give the other party additional ICE candidates to try using to
 communicate.
 
   Required keys:
     - ``call_id`` : "string" - The ID of the call this event relates to
     - ``version`` : "integer" - The version of the VoIP specification this messages
                                 adheres to. his specification is version 0.
-    - ``candidate`` : "candidate object" - Object describing the candidate.
+    - ``candidates`` : "array of candidate objects" - Array of object describing the candidates.
 
 ``Candidate Object``
 
