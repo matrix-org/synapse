@@ -13,7 +13,7 @@ Webclient:
  * Allow setting/editing of room names and topics.
  * Display information about rooms on the main page.
  * Handle ban and kick events in real time.
- * VoIP UI and reliabilty improvements.
+ * VoIP UI and reliability improvements.
  * Add glare support for VoIP.
  * Improvements to initial startup speed.
  * Don't display duplicate join events.
