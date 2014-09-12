@@ -330,12 +330,18 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.replacedBy = function(newCall) {
+        console.log(this.call_id+" being replaced by "+newCall.call_id);
         if (this.state == 'wait_local_media') {
+            console.log("Telling new call to wait for local media");
             newCall.waitForLocalAVStream = true;
         } else if (this.state == 'create_offer') {
+            console.log("Handing local stream to new call");
             newCall.localAVStream = this.localAVStream;
+            delete(this.localAVStream);
         } else if (this.state == 'invite_sent') {
+            console.log("Handing local stream to new call");
             newCall.localAVStream = this.localAVStream;
+            delete(this.localAVStream);
         }
         this.successor = newCall;
         this.hangup(true);
