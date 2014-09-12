@@ -120,7 +120,7 @@ class RoomMemberStore(SQLBaseStore):
             membership_list (list): A list of synapse.api.constants.Membership
             values which the user must be in.
         Returns:
-            A list of dicts with "room_id" and "membership" keys.
+            A list of RoomMemberEvent objects
         """
         if not membership_list:
             return defer.succeed(None)
@@ -165,10 +165,11 @@ class RoomMemberStore(SQLBaseStore):
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def user_rooms_intersect(self, user_list):
-        """ Checks whether a list of users share a room.
+    def user_rooms_intersect(self, user_id_list):
+        """ Checks whether all the users whose IDs are given in a list share a
+        room.
         """
-        user_list_clause = " OR ".join(["m.user_id = ?"] * len(user_list))
+        user_list_clause = " OR ".join(["m.user_id = ?"] * len(user_id_list))
         sql = (
             "SELECT m.room_id FROM room_memberships as m "
             "INNER JOIN current_state_events as c "
@@ -178,8 +179,8 @@ class RoomMemberStore(SQLBaseStore):
             "GROUP BY m.room_id HAVING COUNT(m.room_id) = ?"
         ) % {"clause": user_list_clause}
 
-        args = user_list
-        args.append(len(user_list))
+        args = list(user_id_list)
+        args.append(len(user_id_list))
 
         rows = yield self._execute(None, sql, *args)
 
