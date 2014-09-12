@@ -516,7 +516,7 @@ class StatePduStore(SQLBaseStore):
 
         if not current:
             logger.debug("get_unresolved_state_tree No current state.")
-            return return_value
+            return (return_value, None)
 
         return_value.current_branch.append(current)
 
