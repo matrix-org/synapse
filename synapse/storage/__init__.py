@@ -154,7 +154,7 @@ class DataStore(RoomMemberStore, RoomStore,
     @log_function
     def _persist_event_txn(self, txn, event, backfilled, stream_ordering=None):
         if event.type == RoomMemberEvent.TYPE:
-            self._store_room_member_from_event_txn(txn, event)
+            self._store_room_member_txn(txn, event)
         elif event.type == FeedbackEvent.TYPE:
             self._store_feedback_txn(txn, event)
         elif event.type == RoomNameEvent.TYPE:
