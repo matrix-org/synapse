@@ -268,26 +268,38 @@ a:active  { color: #000; }
     font-weight: bold;
 }
 
-.publicRoomEntry {
+.publicTable {
     max-width: 480px;
-    margin-bottom: 5px;
-    border-bottom: 1px #ddd solid;
+    width: 100%;
+    border-collapse: collapse;
+}
+.publicTable tr {
+    width: 100%;
+}
+.publicTable td {
+    vertical-align: text-top;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.publicRoomEntry {
+    max-width: 430px;
 }
 
 .publicRoomJoinedUsers {
-    float: right;
+    width: 5em;
+    text-align: right;
+    font-size: 12px;
+    color: #888;
 }
 
 .publicRoomTopic {
     color: #888;
     font-size: 12px;
-    padding-right: 5px;
-    width: 15em;
-    float: right;
-    text-align: right;
     overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    padding-bottom: 5px;
+    border-bottom: 1px #ddd solid;
 }
 
 #roomName {
