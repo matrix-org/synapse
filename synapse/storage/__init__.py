@@ -36,7 +36,7 @@ from .registration import RegistrationStore
 from .room import RoomStore
 from .roommember import RoomMemberStore
 from .stream import StreamStore
-from .pdu import StatePduStore, PduStore
+from .pdu import StatePduStore, PduStore, PdusTable
 from .transactions import TransactionStore
 from .keys import KeyStore
 
@@ -123,6 +123,12 @@ class DataStore(RoomMemberStore, RoomStore,
         del cols["content"]
         del cols["prev_pdus"]
         cols["content_json"] = json.dumps(pdu.content)
+
+        unrec_keys.update({
+            k: v for k, v in cols.items()
+            if k not in PdusTable.fields
+        })
+
         cols["unrecognized_keys"] = json.dumps(unrec_keys)
 
         logger.debug("Persisting: %s", repr(cols))
