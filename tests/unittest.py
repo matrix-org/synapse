@@ -27,6 +27,10 @@ logging.getLogger().setLevel(NEVER)
 
 
 class TestCase(unittest.TestCase):
+    """A subclass of twisted.trial's TestCase which looks for 'loglevel'
+    attributes on both itself and its individual test methods, to override the
+    root logger's logging level while that test (case|method) runs."""
+
     def __init__(self, methodName, *args, **kwargs):
         super(TestCase, self).__init__(methodName, *args, **kwargs)
 
@@ -56,5 +60,7 @@ class TestCase(unittest.TestCase):
 
 
 def DEBUG(target):
+    """A decorator to set the .loglevel attribute to logging.DEBUG.
+    Can apply to either a TestCase or an individual test method."""
     target.loglevel = logging.DEBUG
     return target
