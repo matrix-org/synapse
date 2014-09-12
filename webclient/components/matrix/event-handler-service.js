@@ -35,13 +35,20 @@ angular.module('eventHandlerService', [])
     var POWERLEVEL_EVENT = "POWERLEVEL_EVENT";
     var CALL_EVENT = "CALL_EVENT";
     var NAME_EVENT = "NAME_EVENT";
+    var TOPIC_EVENT = "TOPIC_EVENT";
+    var RESET_EVENT = "RESET_EVENT";    // eventHandlerService has been resetted
 
-    var InitialSyncDeferred = $q.defer();
-    
-    $rootScope.events = {
-        rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
-    };
-    
+    var initialSyncDeferred;
+
+    var reset = function() {
+        initialSyncDeferred = $q.defer();
+
+        $rootScope.events = {
+            rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
+        };
+    }
+    reset();
+
     // used for dedupping events - could be expanded in future...
     // FIXME: means that we leak memory over time (along with lots of the rest
     // of the app, given we never try to reap memory yet)
@@ -55,6 +62,11 @@ angular.module('eventHandlerService', [])
             $rootScope.events.rooms[room_id] = {};
             $rootScope.events.rooms[room_id].messages = [];
             $rootScope.events.rooms[room_id].members = {};
+
+            // Pagination information
+            $rootScope.events.rooms[room_id].pagination = {
+                earliest_token: "END"   // how far back we've paginated
+            };
         }
     };
 
@@ -64,9 +76,37 @@ angular.module('eventHandlerService', [])
         }
     };
     
-    var handleRoomCreate = function(event, isLiveEvent) {
-        initRoom(event.room_id);
+    // Generic method to handle events data
+    var handleRoomDateEvent = function(event, isLiveEvent, addToRoomMessages) {
+        // Add topic changes as if they were a room message
+        if (addToRoomMessages) {
+            if (isLiveEvent) {
+                $rootScope.events.rooms[event.room_id].messages.push(event);
+            }
+            else {
+                $rootScope.events.rooms[event.room_id].messages.unshift(event);
+            }
+        }
 
+        // live events always update, but non-live events only update if the
+        // ts is later.
+        var latestData = true;
+        if (!isLiveEvent) {
+            var eventTs = event.ts;
+            var storedEvent = $rootScope.events.rooms[event.room_id][event.type];
+            if (storedEvent) {
+                if (storedEvent.ts > eventTs) {
+                    // ignore it, we have a newer one already.
+                    latestData = false;
+                }
+            }
+        }
+        if (latestData) {
+            $rootScope.events.rooms[event.room_id][event.type] = event;         
+        }
+    };
+    
+    var handleRoomCreate = function(event, isLiveEvent) {
         // For now, we do not use the event data. Simply signal it to the app controllers
         $rootScope.$broadcast(ROOM_CREATE_EVENT, event, isLiveEvent);
     };
@@ -76,13 +116,18 @@ angular.module('eventHandlerService', [])
     };
 
     var handleMessage = function(event, isLiveEvent) {
-        initRoom(event.room_id);
-        
         if (isLiveEvent) {
             if (event.user_id === matrixService.config().user_id &&
                 (event.content.msgtype === "m.text" || event.content.msgtype === "m.emote") ) {
-                // assume we've already echoed it
-                // FIXME: track events by ID and ungrey the right message to show it's been delivered
+                // Assume we've already echoed it. So, there is a fake event in the messages list of the room
+                // Replace this fake event by the true one
+                var index = getRoomEventIndex(event.room_id, event.event_id);
+                if (index) {
+                    $rootScope.events.rooms[event.room_id].messages[index] = event;
+                }
+                else {
+                    $rootScope.events.rooms[event.room_id].messages.push(event);
+                }
             }
             else {
                 $rootScope.events.rooms[event.room_id].messages.push(event);
@@ -100,9 +145,7 @@ angular.module('eventHandlerService', [])
         $rootScope.$broadcast(MSG_EVENT, event, isLiveEvent);
     };
     
-    var handleRoomMember = function(event, isLiveEvent) {
-        initRoom(event.room_id);
-        
+    var handleRoomMember = function(event, isLiveEvent, isStateEvent) {
         // if the server is stupidly re-relaying a no-op join, discard it.
         if (event.prev_content && 
             event.content.membership === "join" &&
@@ -112,7 +155,10 @@ angular.module('eventHandlerService', [])
         }
         
         // add membership changes as if they were a room message if something interesting changed
-        if (event.content.prev !== event.content.membership) {
+        // Exception: Do not do this if the event is a room state event because such events already come
+        // as room messages events. Moreover, when they come as room messages events, they are relatively ordered
+        // with other other room messages
+        if (event.content.prev !== event.content.membership && !isStateEvent) {
             if (isLiveEvent) {
                 $rootScope.events.rooms[event.room_id].messages.push(event);
             }
@@ -121,8 +167,13 @@ angular.module('eventHandlerService', [])
             }
         }
         
-        $rootScope.events.rooms[event.room_id].members[event.state_key] = event;
-        $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent);
+        // Use data from state event or the latest data from the stream.
+        // Do not care of events that come when paginating back
+        if (isStateEvent || isLiveEvent) {
+            $rootScope.events.rooms[event.room_id].members[event.state_key] = event;
+        }
+        
+        $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent, isStateEvent);
     };
     
     var handlePresence = function(event, isLiveEvent) {
@@ -131,8 +182,6 @@ angular.module('eventHandlerService', [])
     };
     
     var handlePowerLevels = function(event, isLiveEvent) {
-        initRoom(event.room_id);
-
         // Keep the latest data. Do not care of events that come when paginating back
         if (!$rootScope.events.rooms[event.room_id][event.type] || isLiveEvent) {
             $rootScope.events.rooms[event.room_id][event.type] = event;
@@ -140,18 +189,49 @@ angular.module('eventHandlerService', [])
         }
     };
 
-    var handleRoomName = function(event, isLiveEvent) {
-        console.log("handleRoomName " + isLiveEvent);
-
-        initRoom(event.room_id);
-
-        $rootScope.events.rooms[event.room_id][event.type] = event;
+    var handleRoomName = function(event, isLiveEvent, isStateEvent) {
+        console.log("handleRoomName room_id: " + event.room_id + " - isLiveEvent: " + isLiveEvent + " - name: " + event.content.name);
+        handleRoomDateEvent(event, isLiveEvent, !isStateEvent);
         $rootScope.$broadcast(NAME_EVENT, event, isLiveEvent);
+    };
+    
+
+    var handleRoomTopic = function(event, isLiveEvent, isStateEvent) {
+        console.log("handleRoomTopic room_id: " + event.room_id + " - isLiveEvent: " + isLiveEvent + " - topic: " + event.content.topic);
+        handleRoomDateEvent(event, isLiveEvent, !isStateEvent);
+        $rootScope.$broadcast(TOPIC_EVENT, event, isLiveEvent);
     };
 
     var handleCallEvent = function(event, isLiveEvent) {
         $rootScope.$broadcast(CALL_EVENT, event, isLiveEvent);
+        if (event.type == 'm.call.invite') {
+            $rootScope.events.rooms[event.room_id].messages.push(event);
+        }
     };
+    
+    /**
+     * Get the index of the event in $rootScope.events.rooms[room_id].messages
+     * @param {type} room_id the room id
+     * @param {type} event_id the event id to look for
+     * @returns {Number | undefined} the index. undefined if not found.
+     */
+    var getRoomEventIndex = function(room_id, event_id) {
+        var index;
+
+        var room = $rootScope.events.rooms[room_id];
+        if (room) {
+            // Start looking from the tail since the first goal of this function 
+            // is to find a messaged among the latest ones
+            for (var i = room.messages.length - 1; i > 0; i--) {
+                var message = room.messages[i];
+                if (event_id === message.event_id) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        return index;
+    }
     
     return {
         ROOM_CREATE_EVENT: ROOM_CREATE_EVENT,
@@ -161,19 +241,37 @@ angular.module('eventHandlerService', [])
         POWERLEVEL_EVENT: POWERLEVEL_EVENT,
         CALL_EVENT: CALL_EVENT,
         NAME_EVENT: NAME_EVENT,
+        TOPIC_EVENT: TOPIC_EVENT,
+        RESET_EVENT: RESET_EVENT,
+        
+        reset: function() {
+            reset();
+            $rootScope.$broadcast(RESET_EVENT);
+        },
     
-        handleEvent: function(event, isLiveEvent) {
-            // FIXME: event duplication suppression is all broken as the code currently expect to handles
-            // events multiple times to get their side-effects...
-/*            
-            if (eventMap[event.event_id]) {
-                console.log("discarding duplicate event: " + JSON.stringify(event));
-                return;
+        handleEvent: function(event, isLiveEvent, isStateEvent) {
+
+            // FIXME: /initialSync on a particular room is not yet available
+            // So initRoom on a new room is not called. Make sure the room data is initialised here
+            initRoom(event.room_id);
+
+            // Avoid duplicated events
+            // Needed for rooms where initialSync has not been done. 
+            // In this case, we do not know where to start pagination. So, it starts from the END
+            // and we can have the same event (ex: joined, invitation) coming from the pagination
+            // AND from the event stream.
+            // FIXME: This workaround should be no more required when /initialSync on a particular room
+            // will be available (as opposite to the global /initialSync done at startup)
+            if (!isStateEvent) {    // Do not consider state events
+                if (event.event_id && eventMap[event.event_id]) {
+                    console.log("discarding duplicate event: " + JSON.stringify(event, undefined, 4));
+                    return;
+                }
+                else {
+                    eventMap[event.event_id] = 1;
+                }
             }
-            else {
-                eventMap[event.event_id] = 1;
-            }
-*/            
+
             if (event.type.indexOf('m.call.') === 0) {
                 handleCallEvent(event, isLiveEvent);
             }
@@ -189,7 +287,7 @@ angular.module('eventHandlerService', [])
                         handleMessage(event, isLiveEvent);
                         break;
                     case "m.room.member":
-                        handleRoomMember(event, isLiveEvent);
+                        handleRoomMember(event, isLiveEvent, isStateEvent);
                         break;
                     case "m.presence":
                         handlePresence(event, isLiveEvent);
@@ -202,7 +300,10 @@ angular.module('eventHandlerService', [])
                         handlePowerLevels(event, isLiveEvent);
                         break;
                     case 'm.room.name':
-                        handleRoomName(event, isLiveEvent);
+                        handleRoomName(event, isLiveEvent, isStateEvent);
+                        break;
+                    case 'm.room.topic':
+                        handleRoomTopic(event, isLiveEvent, isStateEvent);
                         break;
                     default:
                         console.log("Unable to handle event type " + event.type);
@@ -214,20 +315,30 @@ angular.module('eventHandlerService', [])
         
         // isLiveEvents determines whether notifications should be shown, whether
         // messages get appended to the start/end of lists, etc.
-        handleEvents: function(events, isLiveEvents) {
+        handleEvents: function(events, isLiveEvents, isStateEvents) {
             for (var i=0; i<events.length; i++) {
-                this.handleEvent(events[i], isLiveEvents);
+                this.handleEvent(events[i], isLiveEvents, isStateEvents);
             }
         },
 
-        handleInitialSyncDone: function() {
+        // Handle messages from /initialSync or /messages
+        handleRoomMessages: function(room_id, messages, isLiveEvents) {
+            initRoom(room_id);
+            this.handleEvents(messages.chunk, isLiveEvents);
+
+            // Store how far back we've paginated
+            // This assumes the paginations requests are contiguous and in reverse chronological order
+            $rootScope.events.rooms[room_id].pagination.earliest_token = messages.end;
+        },
+
+        handleInitialSyncDone: function(initialSyncData) {
             console.log("# handleInitialSyncDone");
-            InitialSyncDeferred.resolve($rootScope.events, $rootScope.presence);
+            initialSyncDeferred.resolve(initialSyncData);
         },
 
         // Returns a promise that resolves when the initialSync request has been processed
         waitForInitialSyncCompletion: function() {
-            return InitialSyncDeferred.promise;
+            return initialSyncDeferred.promise;
         },
 
         resetRoomMessages: function(room_id) {

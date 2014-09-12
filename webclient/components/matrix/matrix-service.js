@@ -130,8 +130,9 @@ angular.module('matrixService', [])
             return doRequest("POST", path, undefined, req);
         },
 
-        // List all rooms joined or been invited to
-        rooms: function(limit, feedback) {
+        // Get the user's current state: his presence, the list of his rooms with
+        // the last {limit} events
+        initialSync: function(limit, feedback) {
             // The REST path spec
 
             var path = "/initialSync";
@@ -233,6 +234,32 @@ angular.module('matrixService', [])
             path = path.replace("$room_alias", room_alias);
 
             return doRequest("GET", path, undefined, {});
+        },
+        
+        setName: function(room_id, name) {
+            var data = {
+                name: name
+            };
+            return this.sendStateEvent(room_id, "m.room.name", data);
+        },
+        
+        setTopic: function(room_id, topic) {
+            var data = {
+                topic: topic
+            };
+            return this.sendStateEvent(room_id, "m.room.topic", data);
+        },
+        
+        
+        sendStateEvent: function(room_id, eventType, content, state_key) {
+            var path = "/rooms/$room_id/state/"+eventType;
+            if (state_key !== undefined) {
+                path += "/" + state_key;
+            }
+            room_id = encodeURIComponent(room_id);
+            path = path.replace("$room_id", room_id);
+
+            return doRequest("PUT", path, undefined, content);
         },
 
         sendEvent: function(room_id, eventType, txn_id, content) {

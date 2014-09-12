@@ -58,7 +58,12 @@ $('.login').live('click', function() {
             showLoggedIn(data);
         },
         error: function(err) {
-            alert(JSON.stringify($.parseJSON(err.responseText)));  
+            var errMsg = "To try this, you need a home server running!";
+            var errJson = $.parseJSON(err.responseText);
+            if (errJson) {
+                errMsg = JSON.stringify(errJson);   
+            }
+            alert(errMsg);  
         }
     }); 
 });

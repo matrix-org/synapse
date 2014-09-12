@@ -21,8 +21,8 @@ limitations under the License.
 'use strict';
 
 angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'eventStreamService'])
-.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', '$timeout', '$animate', 'matrixService', 'mPresence', 'eventStreamService', 'matrixPhoneService',
-                               function($scope, $location, $rootScope, $timeout, $animate, matrixService, mPresence, eventStreamService, matrixPhoneService) {
+.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', '$timeout', '$animate', 'matrixService', 'mPresence', 'eventStreamService', 'eventHandlerService', 'matrixPhoneService',
+                               function($scope, $location, $rootScope, $timeout, $animate, matrixService, mPresence, eventStreamService, eventHandlerService, matrixPhoneService) {
          
     // Check current URL to avoid to display the logout button on the login page
     $scope.location = $location.path();
@@ -73,7 +73,10 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         // Clean permanent data
         matrixService.setConfig({});
         matrixService.saveConfig();
-        
+
+        // Reset cached data
+        eventHandlerService.reset();
+
         // And go to the login page
         $location.url("login");
     };
@@ -96,21 +99,61 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         delete roomMembers[matrixService.config().user_id];
 
         $rootScope.currentCall.user_id = Object.keys(roomMembers)[0];
+
+        // set it to the user ID until we fetch the display name
+        $rootScope.currentCall.userProfile = { displayname: $rootScope.currentCall.user_id };
+
         matrixService.getProfile($rootScope.currentCall.user_id).then(
             function(response) {
-                $rootScope.currentCall.userProfile = response.data;
+                if (response.data.displayname) $rootScope.currentCall.userProfile.displayname = response.data.displayname;
+                if (response.data.avatar_url) $rootScope.currentCall.userProfile.avatar_url = response.data.avatar_url;
             },
             function(error) {
                 $scope.feedback = "Can't load user profile";
             }
         );
     });
+    $rootScope.$watch('currentCall.state', function(newVal, oldVal) {
+        if (newVal == 'ringing') {
+            angular.element('#ringbackAudio')[0].pause();
+            angular.element('#ringAudio')[0].load();
+            angular.element('#ringAudio')[0].play();
+        } else if (newVal == 'invite_sent') {
+            angular.element('#ringAudio')[0].pause();
+            angular.element('#ringbackAudio')[0].load();
+            angular.element('#ringbackAudio')[0].play();
+        } else if (newVal == 'ended' && oldVal == 'connected') {
+            angular.element('#ringAudio')[0].pause();
+            angular.element('#ringbackAudio')[0].pause();
+            angular.element('#callendAudio')[0].play();
+        } else if (newVal == 'ended' && oldVal == 'invite_sent' && $rootScope.currentCall.hangupParty == 'remote') {
+            angular.element('#ringAudio')[0].pause();
+            angular.element('#ringbackAudio')[0].pause();
+            angular.element('#busyAudio')[0].play();
+        } else if (oldVal == 'invite_sent') {
+            angular.element('#ringbackAudio')[0].pause();
+        } else if (oldVal == 'ringing') {
+            angular.element('#ringAudio')[0].pause();
+        }
+    });
 
     $rootScope.$on(matrixPhoneService.INCOMING_CALL_EVENT, function(ngEvent, call) {
-        console.trace("incoming call");
+        console.log("incoming call");
+        if ($rootScope.currentCall && $rootScope.currentCall.state != 'ended') {
+            console.log("rejecting call because we're already in a call");
+            call.hangup();
+            return;
+        }
         call.onError = $scope.onCallError;
         call.onHangup = $scope.onCallHangup;
         $rootScope.currentCall = call;
+    });
+
+    $rootScope.$on(matrixPhoneService.REPLACED_CALL_EVENT, function(ngEvent, oldCall, newCall) {
+        console.log("call ID "+oldCall.call_id+" has been replaced by call ID "+newCall.call_id+"!");
+        newCall.onError = $scope.onCallError;
+        newCall.onHangup = $scope.onCallHangup;
+        $rootScope.currentCall = newCall;
     });
 
     $scope.answerCall = function() {
@@ -119,27 +162,17 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
 
     $scope.hangupCall = function() {
         $rootScope.currentCall.hangup();
-
-        $timeout(function() {
-            var icon = angular.element('#callEndedIcon');
-            $animate.addClass(icon, 'callIconRotate');
-            $timeout(function(){
-                $rootScope.currentCall = undefined;
-            }, 2000);
-        }, 100);
     };
     
     $rootScope.onCallError = function(errStr) {
         $scope.feedback = errStr;
     }
 
-    $rootScope.onCallHangup = function() {
-        $timeout(function() {
-            var icon = angular.element('#callEndedIcon');
-            $animate.addClass(icon, 'callIconRotate');
+    $rootScope.onCallHangup = function(call) {
+        if (call == $rootScope.currentCall) {
             $timeout(function(){
-                $rootScope.currentCall = undefined;
-            }, 2000);
-        }, 100);
+                if (call == $rootScope.currentCall) $rootScope.currentCall = undefined;
+            }, 4070);
+        }
     }
 }]);

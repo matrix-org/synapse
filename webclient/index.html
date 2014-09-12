@@ -15,7 +15,9 @@
     <script src="js/angular.min.js"></script>
     <script src="js/angular-route.min.js"></script>
     <script src="js/angular-sanitize.min.js"></script>
+    <script src="js/angular-animate.min.js"></script>
     <script type='text/javascript' src='js/ng-infinite-scroll-matrix.js'></script>
+    <script type='text/javascript' src='js/autofill-event.js'></script>
     <script src="app.js"></script>
     <script src="config.js"></script>
     <script src="app-controller.js"></script>
@@ -56,9 +58,11 @@
                     <br />
                     <span id="callState">
                         <span ng-show="currentCall.state == 'invite_sent'">Calling...</span>
+                        <span ng-show="currentCall.state == 'ringing'">Incoming Call</span>
                         <span ng-show="currentCall.state == 'connecting'">Call Connecting...</span>
                         <span ng-show="currentCall.state == 'connected'">Call Connected</span>
-                        <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound'">Call Rejected</span>
+                        <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'remote'">Call Rejected</span>
+                        <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'local'">Call Canceled</span>
                         <span ng-show="currentCall.state == 'ended' && currentCall.didConnect && currentCall.direction == 'outbound'">Call Ended</span>
                         <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'inbound'">Call Canceled</span>
                         <span ng-show="currentCall.state == 'ended' && currentCall.didConnect && currentCall.direction == 'inbound'">Call Ended</span>
@@ -70,6 +74,22 @@
                     <button ng-click="hangupCall()">Reject</button>
                 </span>
                 <button ng-click="hangupCall()" ng-show="currentCall && currentCall.state != 'ringing' && currentCall.state != 'ended' && currentCall.state != 'fledgling'">Hang up</button>
+                <audio id="ringAudio" loop>
+                    <source src="media/ring.ogg" type="audio/ogg" />
+                    <source src="media/ring.mp3" type="audio/mpeg" />
+                </audio>
+                <audio id="ringbackAudio" loop>
+                    <source src="media/ringback.ogg" type="audio/ogg" />
+                    <source src="media/ringback.mp3" type="audio/mpeg" />
+                </audio>
+                <audio id="callendAudio">
+                    <source src="media/callend.ogg" type="audio/ogg" />
+                    <source src="media/callend.mp3" type="audio/mpeg" />
+                </audio>
+                <audio id="busyAudio">
+                    <source src="media/busy.ogg" type="audio/ogg" />
+                    <source src="media/busy.mp3" type="audio/mpeg" />
+                </audio>
             </div>
             <a href id="headerUserId" ng-click='goToUserPage(user_id)'>{{ user_id }}</a>
             &nbsp;

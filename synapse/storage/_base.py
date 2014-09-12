@@ -17,6 +17,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.util.logutils import log_function
 
 import collections
 import copy
@@ -91,6 +92,7 @@ class SQLBaseStore(object):
             self._simple_insert_txn, table, values, or_replace=or_replace
         )
 
+    @log_function
     def _simple_insert_txn(self, txn, table, values, or_replace=False):
         sql = "%s INTO %s (%s) VALUES(%s)" % (
             ("INSERT OR REPLACE" if or_replace else "INSERT"),
@@ -98,6 +100,12 @@ class SQLBaseStore(object):
             ", ".join(k for k in values),
             ", ".join("?" for k in values)
         )
+
+        logger.debug(
+            "[SQL] %s  Args=%s Func=%s",
+            sql, values.values(),
+        )
+
         txn.execute(sql, values.values())
         return txn.lastrowid
 

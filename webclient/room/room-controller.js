@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
-.controller('RoomController', ['$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mPresence', 'matrixPhoneService', 'MatrixCall',
-                               function($scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, mPresence, matrixPhoneService, MatrixCall) {
+.controller('RoomController', ['$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mPresence', 'matrixPhoneService', 'MatrixCall',
+                               function($filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, mPresence, matrixPhoneService, MatrixCall) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -27,12 +27,12 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
     $scope.state = {
         user_id: matrixService.config().user_id,
-        events_from: "END", // when to start the event stream from.
-        earliest_token: "END", // stores how far back we've paginated.
+        permission_denied: undefined, // If defined, this string contains the reason why the user cannot join the room
         first_pagination: true, // this is toggled off when the first pagination is done
-        can_paginate: true, // this is toggled off when we run out of items
+        can_paginate: false, // this is toggled off when we are not ready yet to paginate or when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
-        stream_failure: undefined // the response when the stream fails
+        stream_failure: undefined, // the response when the stream fails
+        waiting_for_joined_event: false  // true when the join request is pending. Back to false once the corresponding m.room.member event is received
     };
     $scope.members = {};
     $scope.autoCompleting = false;
@@ -41,6 +41,85 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
     $scope.imageURLToSend = "";
     $scope.userIDToInvite = "";
+    
+
+    // vars and functions for updating the name
+    $scope.name = {
+        isEditing: false,
+        newNameText: "",
+        editName: function() {
+            if ($scope.name.isEditing) {
+                console.log("Warning: Already editing name.");
+                return;
+            };
+
+            // Use the filter applied in html to set the input value
+            $scope.name.newNameText = $filter('mRoomName')($scope.room_id);
+
+            // Force focus to the input
+            $timeout(function() {
+                angular.element('.roomNameInput').focus(); 
+            }, 0);
+
+            $scope.name.isEditing = true;
+        },
+        updateName: function() {
+            console.log("Updating name to "+$scope.name.newNameText);
+            matrixService.setName($scope.room_id, $scope.name.newNameText).then(
+                function() {
+                },
+                function(error) {
+                    $scope.feedback = "Request failed: " + error.data.error;
+                }
+            );
+
+            $scope.name.isEditing = false;
+        },
+        cancelEdit: function() {
+            $scope.name.isEditing = false;
+        }
+    };
+
+    // vars and functions for updating the topic
+    $scope.topic = {
+        isEditing: false,
+        newTopicText: "",
+        editTopic: function() {
+            if ($scope.topic.isEditing) {
+                console.log("Warning: Already editing topic.");
+                return;
+            }
+            var topicEvent = $rootScope.events.rooms[$scope.room_id]['m.room.topic'];
+            if (topicEvent) {
+                $scope.topic.newTopicText = topicEvent.content.topic;
+            }
+            else {
+                $scope.topic.newTopicText = "";
+            }
+            
+            // Force focus to the input
+            $timeout(function() {
+                angular.element('.roomTopicInput').focus(); 
+            }, 0);
+            
+            $scope.topic.isEditing = true;
+        },
+        updateTopic: function() {
+            console.log("Updating topic to "+$scope.topic.newTopicText);
+            matrixService.setTopic($scope.room_id, $scope.topic.newTopicText).then(
+                function() {
+                },
+                function(error) {
+                    $scope.feedback = "Request failed: " + error.data.error;
+                }
+            );
+
+            $scope.topic.isEditing = false;
+        },
+        cancelEdit: function() {
+            $scope.topic.isEditing = false;
+        }
+    };  
     
     var scrollToBottom = function(force) {
         console.log("Scrolling to bottom");
@@ -81,8 +160,37 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
         if (isLive) {
-            scrollToBottom();
-            updateMemberList(event);
+            if ($scope.state.waiting_for_joined_event) {
+                // The user has successfully joined the room, we can getting data for this room
+                $scope.state.waiting_for_joined_event = false;
+                onInit3();
+            }
+            else if (event.state_key === $scope.state.user_id && "invite" !== event.membership && "join" !== event.membership) {
+                var user;
+                        
+                if ($scope.members[event.user_id]) {
+                    user = $scope.members[event.user_id].displayname;
+                }
+                if (user) {
+                    user = user + " (" + event.user_id + ")";
+                }
+                else {
+                    user = event.user_id;
+                }
+
+                 
+                if ("ban" === event.membership) {
+                    $scope.state.permission_denied = "You have been banned by " + user;
+                }
+                else {
+                    $scope.state.permission_denied = "You have been kicked by " + user;
+                }
+                
+            }
+            else {
+                scrollToBottom();
+                updateMemberList(event); 
+            }
         }
     });
     
@@ -119,12 +227,15 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         else {
             $scope.state.paginating = true;
         }
-        // console.log("paginateBackMessages from " + $scope.state.earliest_token + " for " + numItems);
+        
+        console.log("paginateBackMessages from " + $rootScope.events.rooms[$scope.room_id].pagination.earliest_token + " for " + numItems);
         var originalTopRow = $("#messageTable>tbody>tr:first")[0];
-        matrixService.paginateBackMessages($scope.room_id, $scope.state.earliest_token, numItems).then(
+        
+        // Paginate events from the point in cache
+        matrixService.paginateBackMessages($scope.room_id, $rootScope.events.rooms[$scope.room_id].pagination.earliest_token, numItems).then(
             function(response) {
-                eventHandlerService.handleEvents(response.data.chunk, false);
-                $scope.state.earliest_token = response.data.end;
+
+                eventHandlerService.handleRoomMessages($scope.room_id, response.data, false);
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
                     // no more messages to paginate. this currently never gets turned true again, as we never
                     // expire paginated contents in the current implementation.
@@ -419,7 +530,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                         var powerLevel = 50; // default power level for op
                         if (matches) {
                             var user_id = matches[1];
-                            if (matches.length === 4) {
+                            if (matches.length === 4 && undefined !== matches[3]) {
                                 powerLevel = parseInt(matches[3]);
                             }
                             if (powerLevel !== NaN) {
@@ -472,8 +583,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 room_id: $scope.room_id,
                 type: "m.room.message",
                 user_id: $scope.state.user_id,
-                // FIXME: re-enable echo_msg_state when we have a nice way to turn the field off again
-                // echo_msg_state: "messagePending"     // Add custom field to indicate the state of this fake message to HTML
+                echo_msg_state: "messagePending"     // Add custom field to indicate the state of this fake message to HTML
             };
 
             $scope.textInput = "";
@@ -482,26 +592,22 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         }
 
         if (promise) {
+            // Reset previous feedback
+            $scope.feedback = "";
+
             promise.then(
-                function() {
+                function(response) {
                     console.log("Request successfully sent");
-                    if (!echo) {
-                        $scope.textInput = "";
-                    }
-/*
-                    if (echoMessage) {
-                        // Remove the fake echo message from the room messages
-                        // It will be replaced by the one acknowledged by the server
-                        // ...except this causes a nasty flicker.  So don't swap messages for now. --matthew
-                        // var index = $rootScope.events.rooms[$scope.room_id].messages.indexOf(echoMessage);
-                        // if (index > -1) {
-                        //     $rootScope.events.rooms[$scope.room_id].messages.splice(index, 1);
-                        // }
+
+                    if (echo) {
+                        // Mark this fake message event with its allocated event_id
+                        // When the true message event will come from the events stream (in handleMessage),
+                        // we will be able to replace the fake one by the true one
+                        echoMessage.event_id = response.data.event_id;
                     }
                     else {
                         $scope.textInput = "";
-                    }
-*/                    
+                    }         
                 },
                 function(error) {
                     $scope.feedback = "Request failed: " + error.data.error;
@@ -596,14 +702,18 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 
                 // Do we to join the room before starting?
                 if (needsToJoin) {
+                    $scope.state.waiting_for_joined_event = true;
                     matrixService.join($scope.room_id).then(
                         function() {
+                            // onInit3 will be called once the joined m.room.member event is received from the events stream
+                            // This avoids to get the joined information twice in parallel:
+                            //    - one from the events stream
+                            //    - one from the pagination because the pagination window covers this event ts
                             console.log("Joined room "+$scope.room_id);
-                            onInit3();
                         },
                         function(reason) {
                             console.log("Can't join room: " + JSON.stringify(reason));
-                            $scope.feedback = "You do not have permission to join this room";
+                            $scope.state.permission_denied = "You do not have permission to join this room";
                         });
                 }
                 else {
@@ -615,9 +725,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
     var onInit3 = function() {
         console.log("onInit3");
-        
-        // TODO: We should be able to keep them
-        eventHandlerService.resetRoomMessages($scope.room_id); 
 
         // Make recents highlight the current room
         $scope.recentsSelectedRoomID = $scope.room_id;
@@ -635,21 +742,24 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
                 // Arm list timing update timer
                 updateMemberListPresenceAge();
+
+                // Start pagination
+                $scope.state.can_paginate = true;
+                paginate(MESSAGES_PER_PAGINATION);
             },
             function(error) {
                 $scope.feedback = "Failed get member list: " + error.data.error;
             }
         );
-
-        paginate(MESSAGES_PER_PAGINATION);
     }; 
     
-    $scope.inviteUser = function(user_id) {
+    $scope.inviteUser = function() {
         
-        matrixService.invite($scope.room_id, user_id).then(
+        matrixService.invite($scope.room_id, $scope.userIDToInvite).then(
             function() {
                 console.log("Invited.");
-                $scope.feedback = "Invite sent successfully";
+                $scope.feedback = "Invite successfully sent to " + $scope.userIDToInvite;
+                $scope.userIDToInvite = "";
             },
             function(reason) {
                 $scope.feedback = "Failure: " + reason;
@@ -710,7 +820,15 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         var call = new MatrixCall($scope.room_id);
         call.onError = $rootScope.onCallError;
         call.onHangup = $rootScope.onCallHangup;
-        call.placeCall();
+        call.placeCall({audio: true, video: false});
+        $rootScope.currentCall = call;
+    };
+
+    $scope.startVideoCall = function() {
+        var call = new MatrixCall($scope.room_id);
+        call.onError = $rootScope.onCallError;
+        call.onHangup = $rootScope.onCallHangup;
+        call.placeCall({audio: true, video: true});
         $rootScope.currentCall = call;
     };
 

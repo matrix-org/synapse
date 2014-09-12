@@ -22,6 +22,7 @@ angular.module('matrixPhoneService', [])
     };
 
     matrixPhoneService.INCOMING_CALL_EVENT = "INCOMING_CALL_EVENT";
+    matrixPhoneService.REPLACED_CALL_EVENT = "REPLACED_CALL_EVENT";
     matrixPhoneService.allCalls = {};
 
     matrixPhoneService.callPlaced = function(call) {
@@ -38,29 +39,59 @@ angular.module('matrixPhoneService', [])
             call.call_id = msg.call_id;
             call.initWithInvite(msg);
             matrixPhoneService.allCalls[call.call_id] = call;
-            $rootScope.$broadcast(matrixPhoneService.INCOMING_CALL_EVENT, call);
+
+            // Were we trying to call that user (room)?
+            var existingCall;
+            var callIds = Object.keys(matrixPhoneService.allCalls);
+            for (var i = 0; i < callIds.length; ++i) {
+                var thisCallId = callIds[i];
+                var thisCall = matrixPhoneService.allCalls[thisCallId];
+
+                if (call.room_id == thisCall.room_id && thisCall.direction == 'outbound'
+                     && (thisCall.state == 'wait_local_media' || thisCall.state == 'create_offer' || thisCall.state == 'invite_sent')) {
+                    existingCall = thisCall;
+                    break;
+                }
+            }
+
+            if (existingCall) {
+                // If we've only got to wait_local_media or create_offer and we've got an invite,
+                // pick the incoming call because we know we haven't sent our invite yet
+                // otherwise, pick whichever call has the lowest call ID (by string comparison)
+                if (existingCall.state == 'wait_local_media' || existingCall.state == 'create_offer' || existingCall.call_id > call.call_id) {
+                    console.log("Glare detected: answering incoming call "+call.call_id+" and canceling outgoing call "+existingCall.call_id);
+                    existingCall.replacedBy(call);
+                    call.answer();
+                    $rootScope.$broadcast(matrixPhoneService.REPLACED_CALL_EVENT, existingCall, call);
+                } else {
+                    console.log("Glare detected: rejecting incoming call "+call.call_id+" and keeping outgoing call "+existingCall.call_id);
+                    call.hangup();
+                }
+            } else {
+                $rootScope.$broadcast(matrixPhoneService.INCOMING_CALL_EVENT, call);
+            }
         } else if (event.type == 'm.call.answer') {
             var call = matrixPhoneService.allCalls[msg.call_id];
             if (!call) {
-                console.trace("Got answer for unknown call ID "+msg.call_id);
+                console.log("Got answer for unknown call ID "+msg.call_id);
                 return;
             }
             call.receivedAnswer(msg);
         } else if (event.type == 'm.call.candidate') {
             var call = matrixPhoneService.allCalls[msg.call_id];
             if (!call) {
-                console.trace("Got candidate for unknown call ID "+msg.call_id);
+                console.log("Got candidate for unknown call ID "+msg.call_id);
                 return;
             }
             call.gotRemoteIceCandidate(msg.candidate);
         } else if (event.type == 'm.call.hangup') {
             var call = matrixPhoneService.allCalls[msg.call_id];
             if (!call) {
-                console.trace("Got hangup for unknown call ID "+msg.call_id);
+                console.log("Got hangup for unknown call ID "+msg.call_id);
                 return;
             }
             call.onHangupReceived();
-            matrixPhoneService.allCalls[msg.call_id] = undefined;
+            delete(matrixPhoneService.allCalls[msg.call_id]);
         }
     });
     

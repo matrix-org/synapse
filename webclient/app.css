@@ -55,18 +55,18 @@ a:active  { color: #000; }
     margin-left: 4px;
     margin-right: 4px;
     margin-top: 8px;
-    -webkit-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
-    -moz-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
-    -o-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
-    transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
 }
 
-.callIconRotate {
-    -webkit-transform: rotateZ(45deg);
-    -moz-transform: rotateZ(45deg);
-    -ms-transform: rotateZ(45deg);
-    -o-transform: rotateZ(45deg);
+#callEndedIcon {
+    transition:all linear 0.5s;
+}
+
+#callEndedIcon {
     transform: rotateZ(45deg);
+}
+
+#callEndedIcon.ng-hide {
+    transform: rotateZ(0deg);
 }
 
 #callPeerImage {
@@ -220,12 +220,6 @@ a:active  { color: #000; }
     height: 100%;
 }
 
-#roomName {
-    float: right;
-    font-size: 16px;
-    margin-top: 15px;
-}
-
 #roomHeader {
     margin: auto;
     padding-left: 20px;
@@ -263,10 +257,78 @@ a:active  { color: #000; }
 
 #mainInput {
     width: 100%;
+    resize: none;
 }
 
 .blink {
     background-color: #faa;
+}
+
+.roomHighlight {
+    font-weight: bold;
+}
+
+.publicTable {
+    max-width: 480px;
+    width: 100%;
+    border-collapse: collapse;
+}
+.publicTable tr {
+    width: 100%;
+}
+.publicTable td {
+    vertical-align: text-top;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.publicRoomEntry {
+    max-width: 430px;
+}
+
+.publicRoomJoinedUsers {
+    width: 5em;
+    text-align: right;
+    font-size: 12px;
+    color: #888;
+}
+
+.publicRoomTopic {
+    color: #888;
+    font-size: 12px;
+    overflow: hidden;
+    padding-bottom: 5px;
+    border-bottom: 1px #ddd solid;
+}
+
+#roomName {
+    font-size: 16px;
+    text-align: right;
+}
+
+#roomTopic {
+    font-size: 13px;
+    text-align: right;
+}
+
+.roomNameInput, .roomTopicInput {
+    width: 100%;
+}
+
+.roomNameSection, .roomTopicSection {
+    float: right;
+    width: 100%;
+}
+
+.roomNameSetNew, .roomTopicSetNew {
+    float: right;
+}
+
+.roomHeaderInfo {
+    float: right;
+    margin-top: 15px;
+    width: 50%;
 }
 
 /*** Participant list ***/
@@ -465,6 +527,10 @@ a:active  { color: #000; }
     text-align: left ! important;
 }
 
+.bubble .message {
+    /* Break lines when encountering CR+LF */
+    white-space: pre;
+}
 .bubble .messagePending {
     opacity: 0.3
 }
