@@ -529,7 +529,8 @@ a:active  { color: #000; }
 
 .bubble .message {
     /* Break lines when encountering CR+LF */
-    white-space: pre;
+    /* FIXME: this breaks wordwrapping.  We need to s#CRLF#<br/>#g instead */
+/*    white-space: pre; */
 }
 .bubble .messagePending {
     opacity: 0.3
