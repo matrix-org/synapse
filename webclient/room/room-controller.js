@@ -220,7 +220,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     var paginate = function(numItems) {
-        // console.log("paginate " + numItems);
+        //console.log("paginate " + numItems + " and first_pagination is " + $scope.state.first_pagination);
         if ($scope.state.paginating || !$scope.room_id) {
             return;
         }
@@ -260,7 +260,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 }
                 
                 if ($scope.state.first_pagination) {
-                    scrollToBottom();
+                    scrollToBottom(true);
                     $scope.state.first_pagination = false;
                 }
                 else {
