@@ -133,6 +133,7 @@ class RegisterRestServlet(RestServlet):
         logger.debug("Removing session %s", session)
         self.sessions.pop(session["id"])
 
+    @defer.inlineCallbacks
     def _do_recaptcha(self, request, register_json, session):
         if not self.hs.config.enable_registration_captcha:
             raise SynapseError(400, "Captcha not required.")

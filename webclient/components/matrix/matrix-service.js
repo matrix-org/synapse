@@ -154,6 +154,13 @@ angular.module('matrixService', [])
                                 }
                                 if (!useCaptcha && regType == "m.login.recaptcha") {
                                     console.error("Web client setup to not use captcha, but HS demands a captcha.");
+                                    deferred.reject({
+                                        data: {
+                                            errcode: "M_CAPTCHA_NEEDED",
+                                            error: "Home server requires a captcha."
+                                        }
+                                    });
+                                    return;
                                 }
                             }
                         }
@@ -183,7 +190,20 @@ angular.module('matrixService', [])
                             deferred.resolve(response);
                         }
                         else if (response.data.next) {
-                            return doRegisterLogin(path, response.data.next, sessionId, user_name, password, threepidCreds).then(
+                            var nextType = response.data.next;
+                            if (response.data.next instanceof Array) {
+                                for (var i=0; i<response.data.next.length; i++) {
+                                    if (useThreePidFlow && response.data.next[i] == "m.login.email.identity") {
+                                        nextType = response.data.next[i];
+                                        break;
+                                    }
+                                    else if (!useThreePidFlow && response.data.next[i] != "m.login.email.identity") {
+                                        nextType = response.data.next[i];
+                                        break;
+                                    }
+                                }
+                            }
+                            return doRegisterLogin(path, nextType, sessionId, user_name, password, threepidCreds).then(
                                 loginResponseFunc,
                                 function(err) {
                                     deferred.reject(err);
