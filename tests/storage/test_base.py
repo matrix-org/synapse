@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from twisted.trial import unittest
+from tests import unittest
 from twisted.internet import defer
 
 from mock import Mock, call

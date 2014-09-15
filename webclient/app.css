@@ -528,8 +528,8 @@ a:active  { color: #000; }
 }
 
 .bubble .message {
-    /* Break lines when encountering CR+LF */
-    white-space: pre;
+    /* Wrap words and break lines on CR+LF */
+    white-space: pre-wrap;
 }
 .bubble .messagePending {
     opacity: 0.3

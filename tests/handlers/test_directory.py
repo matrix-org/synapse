@@ -14,11 +14,10 @@
 # limitations under the License.
 
 
-from twisted.trial import unittest
+from tests import unittest
 from twisted.internet import defer
 
 from mock import Mock
-import logging
 
 from synapse.server import HomeServer
 from synapse.http.client import HttpClient
@@ -26,9 +25,6 @@ from synapse.handlers.directory import DirectoryHandler
 from synapse.storage.directory import RoomAliasMapping
 
 from tests.utils import SQLiteMemoryDbPool
-
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 
 class DirectoryHandlers(object):

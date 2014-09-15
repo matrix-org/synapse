@@ -14,20 +14,16 @@
 # limitations under the License.
 
 
-from twisted.trial import unittest
+from tests import unittest
 from twisted.internet import defer
 
 from mock import Mock
-import logging
 
 from synapse.api.errors import AuthError
 from synapse.server import HomeServer
 from synapse.handlers.profile import ProfileHandler
 
 from tests.utils import SQLiteMemoryDbPool
-
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 
 class ProfileHandlers(object):

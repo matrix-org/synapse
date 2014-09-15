@@ -77,13 +77,15 @@ angular.module('matrixPhoneService', [])
                 return;
             }
             call.receivedAnswer(msg);
-        } else if (event.type == 'm.call.candidate') {
+        } else if (event.type == 'm.call.candidates') {
             var call = matrixPhoneService.allCalls[msg.call_id];
             if (!call) {
-                console.log("Got candidate for unknown call ID "+msg.call_id);
+                console.log("Got candidates for unknown call ID "+msg.call_id);
                 return;
             }
-            call.gotRemoteIceCandidate(msg.candidate);
+            for (var i = 0; i < msg.candidates.length; ++i) {
+                call.gotRemoteIceCandidate(msg.candidates[i]);
+            }
         } else if (event.type == 'm.call.hangup') {
             var call = matrixPhoneService.allCalls[msg.call_id];
             if (!call) {

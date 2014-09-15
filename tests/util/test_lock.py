@@ -15,7 +15,7 @@
 
 
 from twisted.internet import defer
-from twisted.trial import unittest
+from tests import unittest
 
 from synapse.util.lockutils import LockManager
 

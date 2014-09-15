@@ -14,11 +14,10 @@
 # limitations under the License.
 
 
-from twisted.trial import unittest
+from tests import unittest
 from twisted.internet import defer, reactor
 
 from mock import Mock, call, ANY
-import logging
 import json
 
 from tests.utils import (
@@ -34,9 +33,6 @@ from synapse.handlers.presence import PresenceHandler, UserPresenceCache
 OFFLINE = PresenceState.OFFLINE
 UNAVAILABLE = PresenceState.UNAVAILABLE
 ONLINE = PresenceState.ONLINE
-
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 
 def _expect_edu(destination, edu_type, content, origin="test"):
@@ -85,7 +81,6 @@ class PresenceStateTestCase(unittest.TestCase):
         # Mock the RoomMemberHandler
         room_member_handler = Mock(spec=[])
         hs.handlers.room_member_handler = room_member_handler
-        logging.getLogger().debug("Mocking room_member_handler=%r", room_member_handler)
 
         # Some local users to test with
         self.u_apple = hs.parse_userid("@apple:test")

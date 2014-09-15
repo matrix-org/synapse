@@ -14,7 +14,7 @@
 
 
 from twisted.internet import defer
-from twisted.trial import unittest
+from tests import unittest
 
 from synapse.api.events.room import (
     InviteJoinEvent, MessageEvent, RoomMemberEvent
@@ -26,11 +26,7 @@ from synapse.federation.units import Pdu
 
 from mock import NonCallableMock, ANY
 
-import logging
-
 from ..utils import get_mock_call_args
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 
 class FederationTestCase(unittest.TestCase):
