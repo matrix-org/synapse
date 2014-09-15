@@ -82,6 +82,10 @@ class RegisterRestServlet(RestServlet):
 
         session = (register_json["session"] if "session" in register_json
                   else None)
+        login_type = None
+        if "type" not in register_json:
+            raise SynapseError(400, "Missing 'type' key.")
+
         try:
             login_type = register_json["type"]
             stages = {
@@ -106,7 +110,7 @@ class RegisterRestServlet(RestServlet):
             defer.returnValue((200, response))
         except KeyError as e:
             logger.exception(e)
-            raise SynapseError(400, "Missing JSON keys or bad login type.")
+            raise SynapseError(400, "Missing JSON keys for login type %s." % login_type)
 
     def on_OPTIONS(self, request):
         return (200, {})
