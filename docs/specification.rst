@@ -1379,7 +1379,7 @@ This specification defines the following login types:
  - ``m.login.oauth2``
  - ``m.login.email.code``
  - ``m.login.email.url``
-
+ - ``m.login.email.identity``
 
 Password-based
 --------------
@@ -1525,6 +1525,31 @@ the login process, or a standard error response.
 A common client implementation will be to periodically poll until the link is clicked.
 If the link has not been visited yet, a standard error response with an errcode of 
 ``M_LOGIN_EMAIL_URL_NOT_YET`` should be returned.
+
+
+Email-based (identity server)
+-----------------------------
+:Type:
+  ``m.login.email.identity``
+:Description:
+  Login is supported by authorising an email address with an identity server.
+
+Prior to submitting this, the client should authenticate with an identity server.
+After authenticating, the session information should be submitted to the home server.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.email.identity",
+    "threepidCreds": [
+      {
+        "sid": "<identity server session id>",
+        "clientSecret": "<identity server client secret>",
+        "idServer": "<url of identity server authed with, e.g. 'matrix.org:8090'>"
+      }
+    ]
+  }
+
 
 
 N-Factor Authentication
