@@ -15,7 +15,9 @@
     <script src="js/angular.min.js"></script>
     <script src="js/angular-route.min.js"></script>
     <script src="js/angular-sanitize.min.js"></script>
+    <script src="js/angular-animate.min.js"></script>
     <script type='text/javascript' src='js/ng-infinite-scroll-matrix.js'></script>
+    <script type='text/javascript' src='js/autofill-event.js'></script>
     <script src="app.js"></script>
     <script src="config.js"></script>
     <script src="app-controller.js"></script>
@@ -56,9 +58,11 @@
                     <br />
                     <span id="callState">
                         <span ng-show="currentCall.state == 'invite_sent'">Calling...</span>
+                        <span ng-show="currentCall.state == 'ringing'">Incoming Call</span>
                         <span ng-show="currentCall.state == 'connecting'">Call Connecting...</span>
                         <span ng-show="currentCall.state == 'connected'">Call Connected</span>
-                        <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound'">Call Rejected</span>
+                        <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'remote'">Call Rejected</span>
+                        <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'local'">Call Canceled</span>
                         <span ng-show="currentCall.state == 'ended' && currentCall.didConnect && currentCall.direction == 'outbound'">Call Ended</span>
                         <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'inbound'">Call Canceled</span>
                         <span ng-show="currentCall.state == 'ended' && currentCall.didConnect && currentCall.direction == 'inbound'">Call Ended</span>

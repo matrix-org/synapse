@@ -15,7 +15,7 @@
 
 
 from twisted.internet import defer
-from twisted.trial import unittest
+from tests import unittest
 
 from synapse.api.events.room import (
     InviteJoinEvent, RoomMemberEvent, RoomConfigEvent
@@ -26,10 +26,6 @@ from synapse.handlers.profile import ProfileHandler
 from synapse.server import HomeServer
 
 from mock import Mock, NonCallableMock
-
-import logging
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 
 class RoomMemberHandlerTestCase(unittest.TestCase):

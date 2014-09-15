@@ -15,7 +15,7 @@
 
 from synapse.api.events import SynapseEvent
 
-import unittest
+from tests import unittest
 
 
 class SynapseTemplateCheckTestCase(unittest.TestCase):

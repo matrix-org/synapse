@@ -15,20 +15,16 @@
 
 """Tests REST events for /presence paths."""
 
-from twisted.trial import unittest
+from tests import unittest
 from twisted.internet import defer
 
 from mock import Mock
-import logging
 
 from ..utils import MockHttpResource
 
 from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler
 from synapse.server import HomeServer
-
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 
 OFFLINE = PresenceState.OFFLINE

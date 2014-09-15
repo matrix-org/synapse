@@ -9,12 +9,17 @@
                     {{ room.room_id | mRoomName }}
                 </td>
                 <td class="recentsRoomSummaryTS">
+                    <span ng-show="undefined !== room.numUsersInRoom">
+                        {{ room.numUsersInRoom || '1' }} {{ room.numUsersInRoom == 1 ? 'user' : 'users' }}                     
+                    </span>
+                </td>
+                <td class="recentsRoomSummaryTS">
                     {{ (room.lastMsg.ts) | date:'MMM d HH:mm' }}
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="recentsRoomSummary">
+                <td colspan="3" class="recentsRoomSummary">
 
                     <div ng-show="room.membership === 'invite'">
                         {{ room.lastMsg.inviter | mUserDisplayName: room.room_id }} invited you
@@ -61,7 +66,7 @@
                                 </div>
 
                                 <div ng-switch-when="m.emote">
-                                    <span ng-bind-html="'* ' + (room.lastMsg.user_id) + ' ' + room.lastMsg.content.body | linky:'_blank'">
+                                    <span ng-bind-html="'* ' + (room.lastMsg.user_id | mUserDisplayName: room.room_id) + ' ' + room.lastMsg.content.body | linky:'_blank'">
                                     </span>
                                 </div>
 
@@ -69,6 +74,14 @@
                                     {{ room.lastMsg.content }}
                                 </div>
                             </div>
+                        </div>
+
+                        <div ng-switch-when="m.room.topic">
+                            {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }} changed the topic to: {{ room.lastMsg.content.topic }}
+                        </div>
+
+                        <div ng-switch-when="m.room.name">
+                            {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }} changed the room name to: {{ room.lastMsg.content.name }}
                         </div>
 
                         <div ng-switch-default>

@@ -16,11 +16,10 @@
 """This file contains tests of the "presence-like" data that is shared between
 presence and profiles; namely, the displayname and avatar_url."""
 
-from twisted.trial import unittest
+from tests import unittest
 from twisted.internet import defer
 
 from mock import Mock, call, ANY
-import logging
 
 from ..utils import MockClock
 
@@ -33,9 +32,6 @@ from synapse.handlers.profile import ProfileHandler
 OFFLINE = PresenceState.OFFLINE
 UNAVAILABLE = PresenceState.UNAVAILABLE
 ONLINE = PresenceState.ONLINE
-
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 
 class MockReplication(object):

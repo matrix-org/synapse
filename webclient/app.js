@@ -16,6 +16,7 @@ limitations under the License.
 
 var matrixWebClient = angular.module('matrixWebClient', [
     'ngRoute',
+    'ngAnimate',
     'MatrixWebClientController',
     'LoginController',
     'RegisterController',

@@ -14,11 +14,10 @@
 
 # trial imports
 from twisted.internet import defer
-from twisted.trial import unittest
+from tests import unittest
 
 # python imports
 from mock import Mock
-import logging
 
 from ..utils import MockHttpResource, MockClock
 
@@ -26,9 +25,6 @@ from synapse.server import HomeServer
 from synapse.federation import initialize_http_replication
 from synapse.federation.units import Pdu
 from synapse.storage.pdu import PduTuple, PduEntry
-
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 
 def make_pdu(prev_pdus=[], **kwargs):

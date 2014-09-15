@@ -1,3 +1,26 @@
+Changes in synapse 0.2.3 (2014-09-12)
+=====================================
+
+Homeserver:
+ * Fix bug where we stopped sending events to remote home servers if a
+   user from that home server left, even if there were some still in the
+   room.
+ * Fix bugs in the state conflict resolution where it was incorrectly
+   rejecting events.
+
+Webclient:
+ * Display room names and topics.
+ * Allow setting/editing of room names and topics.
+ * Display information about rooms on the main page.
+ * Handle ban and kick events in real time.
+ * VoIP UI and reliability improvements.
+ * Add glare support for VoIP.
+ * Improvements to initial startup speed.
+ * Don't display duplicate join events.
+ * Local echo of messages.
+ * Differentiate sending and sent of local echo.
+ * Various minor bug fixes.
+
 Changes in synapse 0.2.2 (2014-09-06)
 =====================================
 
