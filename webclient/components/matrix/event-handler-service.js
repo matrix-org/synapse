@@ -63,13 +63,14 @@ angular.module('eventHandlerService', [])
     var initRoom = function(room_id) {
         if (!(room_id in $rootScope.events.rooms)) {
             console.log("Creating new handler entry for " + room_id);
-            $rootScope.events.rooms[room_id] = {};
-            $rootScope.events.rooms[room_id].messages = [];
-            $rootScope.events.rooms[room_id].members = {};
-
-            // Pagination information
-            $rootScope.events.rooms[room_id].pagination = {
-                earliest_token: "END"   // how far back we've paginated
+            $rootScope.events.rooms[room_id] = {
+                room_id: room_id,
+                messages: [],
+                members: {},
+                // Pagination information
+                pagination: {
+                    earliest_token: "END"   // how far back we've paginated
+                }
             };
         }
     };
@@ -257,7 +258,9 @@ angular.module('eventHandlerService', [])
 
             // FIXME: /initialSync on a particular room is not yet available
             // So initRoom on a new room is not called. Make sure the room data is initialised here
-            initRoom(event.room_id);
+            if (event.room_id) {
+                initRoom(event.room_id);
+            }
 
             // Avoid duplicated events
             // Needed for rooms where initialSync has not been done. 
@@ -347,6 +350,30 @@ angular.module('eventHandlerService', [])
 
         resetRoomMessages: function(room_id) {
             resetRoomMessages(room_id);
+        },
+        
+        /**
+         * Compute the room users number, ie the number of members who has joined the room.
+         * @param {String} room_id the room id
+         * @returns {undefined | Number} the room users number if available
+         */
+        getUsersCountInRoom: function(room_id) {
+            var memberCount;
+
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                memberCount = 0;
+
+                for (var i in room.members) {
+                    var member = room.members[i];
+
+                    if ("join" === member.membership) {
+                        memberCount = memberCount + 1;
+                    }
+                }
+            }
+
+            return memberCount;
         }
     };
 }]);
