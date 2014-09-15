@@ -162,7 +162,7 @@ class SynapseCmd(cmd.Cmd):
             "type": "m.login.password"
         }
         if "userid" in args:
-            body["user_id"] = args["userid"]
+            body["user"] = args["userid"]
         if password:
             body["password"] = password
 

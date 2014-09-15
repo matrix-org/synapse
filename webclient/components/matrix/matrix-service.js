@@ -100,7 +100,7 @@ angular.module('matrixService', [])
         }
         else if (loginType === "m.login.password") {
             data = {
-                user_id: userName,
+                user: userName,
                 password: password
             };
         }

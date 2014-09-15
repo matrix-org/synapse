@@ -192,7 +192,7 @@ class RegisterRestServlet(RestServlet):
             raise SynapseError(400, "Captcha is required.")
 
         password = register_json["password"].encode("utf-8")
-        desired_user_id = (register_json["user_id"].encode("utf-8") if "user_id"
+        desired_user_id = (register_json["user"].encode("utf-8") if "user"
                           in register_json else None)
         if desired_user_id and urllib.quote(desired_user_id) != desired_user_id:
             raise SynapseError(

@@ -99,7 +99,7 @@ class RestTestCase(unittest.TestCase):
             "POST",
             "/register",
             json.dumps({
-                "user_id": user_id,
+                "user": user_id,
                 "password": "test",
                 "type": "m.login.password"
             }))
