@@ -57,6 +57,7 @@ class SynapseEvent(JsonEncodedObject):
         "state_key",
         "required_power_level",
         "age_ts",
+        "prev_content",
     ]
 
     internal_keys = [
@@ -171,10 +172,6 @@ class SynapseEvent(JsonEncodedObject):
 
 
 class SynapseStateEvent(SynapseEvent):
-
-    valid_keys = SynapseEvent.valid_keys + [
-        "prev_content",
-    ]
 
     def __init__(self, **kwargs):
         if "state_key" not in kwargs:
