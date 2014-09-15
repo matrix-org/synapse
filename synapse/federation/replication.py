@@ -291,6 +291,12 @@ class ReplicationLayer(object):
     def on_incoming_transaction(self, transaction_data):
         transaction = Transaction(**transaction_data)
 
+        for p in transaction.pdus:
+            if "age" in p:
+                p["age_ts"] = int(self.clock.time_msec()) - int(p["age"])
+
+        pdu_list = [Pdu(**p) for p in transaction.pdus]
+
         logger.debug("[%s] Got transaction", transaction.transaction_id)
 
         response = yield self.transaction_actions.have_responded(transaction)
@@ -302,8 +308,6 @@ class ReplicationLayer(object):
             return
 
         logger.debug("[%s] Transacition is new", transaction.transaction_id)
-
-        pdu_list = [Pdu(**p) for p in transaction.pdus]
 
         dl = []
         for pdu in pdu_list:
@@ -405,9 +409,14 @@ class ReplicationLayer(object):
         """Returns a new Transaction containing the given PDUs suitable for
         transmission.
         """
+        pdus = [p.get_dict() for p in pdu_list]
+        for p in pdus:
+            if "age_ts" in pdus:
+                p["age"] = int(self.clock.time_msec()) - p["age_ts"]
+
         return Transaction(
-            pdus=[p.get_dict() for p in pdu_list],
             origin=self.server_name,
+            pdus=pdus,
             ts=int(self._clock.time_msec()),
             destination=None,
         )
