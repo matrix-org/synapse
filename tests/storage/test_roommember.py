@@ -43,6 +43,9 @@ class RoomMemberStoreTestCase(unittest.TestCase):
         self.u_alice = hs.parse_userid("@alice:test")
         self.u_bob = hs.parse_userid("@bob:test")
 
+        # User elsewhere on another host
+        self.u_charlie = hs.parse_userid("@charlie:elsewhere")
+
         self.room = hs.parse_roomid("!abc123:test")
 
     @defer.inlineCallbacks
@@ -106,4 +109,49 @@ class RoomMemberStoreTestCase(unittest.TestCase):
             (yield self.store.user_rooms_intersect(
                 [self.u_alice.to_string(), self.u_bob.to_string()]
             ))
+        )
+
+    @defer.inlineCallbacks
+    def test_room_hosts(self):
+        yield self.inject_room_member(self.room, self.u_alice, Membership.JOIN)
+
+        self.assertEquals(
+            ["test"],
+            (yield self.store.get_joined_hosts_for_room(self.room.to_string()))
+        )
+
+        # Should still have just one host after second join from it
+        yield self.inject_room_member(self.room, self.u_bob, Membership.JOIN)
+
+        self.assertEquals(
+            ["test"],
+            (yield self.store.get_joined_hosts_for_room(self.room.to_string()))
+        )
+
+        # Should now have two hosts after join from other host
+        yield self.inject_room_member(self.room, self.u_charlie, Membership.JOIN)
+
+        self.assertEquals(
+            {"test", "elsewhere"},
+            set((yield
+                self.store.get_joined_hosts_for_room(self.room.to_string())
+            ))
+        )
+
+        # Should still have both hosts
+        yield self.inject_room_member(self.room, self.u_alice, Membership.LEAVE)
+
+        self.assertEquals(
+            {"test", "elsewhere"},
+            set((yield
+                self.store.get_joined_hosts_for_room(self.room.to_string())
+            ))
+        )
+
+        # Should have only one host after other leaves
+        yield self.inject_room_member(self.room, self.u_charlie, Membership.LEAVE)
+
+        self.assertEquals(
+            ["test"],
+            (yield self.store.get_joined_hosts_for_room(self.room.to_string()))
         )
