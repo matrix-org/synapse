@@ -335,7 +335,7 @@ class RoomMemberHandler(BaseHandler):
 
         member_list = yield self.store.get_room_members(room_id=room_id)
         event_list = [
-            entry.get_dict()
+            self.hs.serialize_event(entry)
             for entry in member_list
         ]
         chunk_data = {

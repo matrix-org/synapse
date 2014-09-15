@@ -17,6 +17,18 @@ from synapse.api.errors import SynapseError, Codes
 from synapse.util.jsonobject import JsonEncodedObject
 
 
+def serialize_event(hs, e):
+    # FIXME(erikj): To handle the case of presence events and the like
+    if not isinstance(e, SynapseEvent):
+        return e
+
+    d = e.get_dict()
+    if "age_ts" in d:
+        d["age"] = int(hs.get_clock().time_msec()) - d["age_ts"]
+
+    return d
+
+
 class SynapseEvent(JsonEncodedObject):
 
     """Base class for Synapse events. These are JSON objects which must abide
@@ -43,6 +55,7 @@ class SynapseEvent(JsonEncodedObject):
         "content",  # HTTP body, JSON
         "state_key",
         "required_power_level",
+        "age_ts",
     ]
 
     internal_keys = [
