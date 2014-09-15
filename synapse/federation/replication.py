@@ -292,8 +292,9 @@ class ReplicationLayer(object):
         transaction = Transaction(**transaction_data)
 
         for p in transaction.pdus:
-            if "age_ts" in p:
-                p["age"] = int(self._clock.time_msec()) - int(p["age_ts"])
+            if "age" in p:
+                p["age_ts"] = int(self._clock.time_msec()) - int(p["age"])
+                del p["age"]
 
         pdu_list = [Pdu(**p) for p in transaction.pdus]
 

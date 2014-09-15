@@ -25,6 +25,7 @@ def serialize_event(hs, e):
     d = e.get_dict()
     if "age_ts" in d:
         d["age"] = int(hs.get_clock().time_msec()) - d["age_ts"]
+        del d["age_ts"]
 
     return d
 
