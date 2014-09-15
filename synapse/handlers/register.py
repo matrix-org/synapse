@@ -40,8 +40,7 @@ class RegistrationHandler(BaseHandler):
         self.distributor.declare("registered_user")
 
     @defer.inlineCallbacks
-    def register(self, localpart=None, password=None, threepidCreds=None, 
-                 captcha_info={}):
+    def register(self, localpart=None, password=None):
         """Registers a new client on the server.
 
         Args:
@@ -54,37 +53,6 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
-        if captcha_info:
-            captcha_response = yield self._validate_captcha(
-                captcha_info["ip"], 
-                captcha_info["private_key"],
-                captcha_info["challenge"],
-                captcha_info["response"]
-            )
-            if not captcha_response["valid"]:
-                logger.info("Invalid captcha entered from %s. Error: %s", 
-                            captcha_info["ip"], captcha_response["error_url"])
-                raise InvalidCaptchaError(
-                    error_url=captcha_response["error_url"]
-                )
-            else:
-                logger.info("Valid captcha entered from %s", captcha_info["ip"])
-
-        if threepidCreds:
-            for c in threepidCreds:
-                logger.info("validating theeepidcred sid %s on id server %s",
-                            c['sid'], c['idServer'])
-                try:
-                    threepid = yield self._threepid_from_creds(c)
-                except:
-                    logger.err()
-                    raise RegistrationError(400, "Couldn't validate 3pid")
-                    
-                if not threepid:
-                    raise RegistrationError(400, "Couldn't validate 3pid")
-                logger.info("got threepid medium %s address %s", 
-                            threepid['medium'], threepid['address'])
-
         password_hash = None
         if password:
             password_hash = bcrypt.hashpw(password, bcrypt.gensalt())
@@ -126,14 +94,53 @@ class RegistrationHandler(BaseHandler):
                         raise RegistrationError(
                             500, "Cannot generate user ID.")
 
-        # Now we have a matrix ID, bind it to the threepids we were given
-        if threepidCreds:
-            for c in threepidCreds:
-                # XXX: This should be a deferred list, shouldn't it?
-                yield self._bind_threepid(c, user_id)
-                
-
         defer.returnValue((user_id, token))
+
+    @defer.inlineCallbacks
+    def check_recaptcha(self, ip, private_key, challenge, response):
+        """Checks a recaptcha is correct."""
+
+        captcha_response = yield self._validate_captcha(
+            ip,
+            private_key,
+            challenge,
+            response
+        )
+        if not captcha_response["valid"]:
+            logger.info("Invalid captcha entered from %s. Error: %s",
+                        ip, captcha_response["error_url"])
+            raise InvalidCaptchaError(
+                error_url=captcha_response["error_url"]
+            )
+        else:
+            logger.info("Valid captcha entered from %s", ip)
+
+    @defer.inlineCallbacks
+    def register_email(self, threepidCreds):
+        """Registers emails with an identity server."""
+
+        for c in threepidCreds:
+            logger.info("validating theeepidcred sid %s on id server %s",
+                        c['sid'], c['idServer'])
+            try:
+                threepid = yield self._threepid_from_creds(c)
+            except:
+                logger.err()
+                raise RegistrationError(400, "Couldn't validate 3pid")
+
+            if not threepid:
+                raise RegistrationError(400, "Couldn't validate 3pid")
+            logger.info("got threepid medium %s address %s",
+                        threepid['medium'], threepid['address'])
+
+    @defer.inlineCallbacks
+    def bind_emails(self, user_id, threepidCreds):
+        """Links emails with a user ID and informs an identity server."""
+
+        # Now we have a matrix ID, bind it to the threepids we were given
+        for c in threepidCreds:
+            # XXX: This should be a deferred list, shouldn't it?
+            yield self._bind_threepid(c, user_id)
 
     def _generate_token(self, user_id):
         # urlsafe variant uses _ and - so use . as the separator and replace
@@ -149,17 +156,17 @@ class RegistrationHandler(BaseHandler):
     def _threepid_from_creds(self, creds):
         httpCli = PlainHttpClient(self.hs)
         # XXX: make this configurable!
-        trustedIdServers = [ 'matrix.org:8090' ]
+        trustedIdServers = ['matrix.org:8090']
         if not creds['idServer'] in trustedIdServers:
-            logger.warn('%s is not a trusted ID server: rejecting 3pid '+
+            logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
                         'credentials', creds['idServer'])
             defer.returnValue(None)
         data = yield httpCli.get_json(
             creds['idServer'],
             "/_matrix/identity/api/v1/3pid/getValidated3pid",
-            { 'sid': creds['sid'], 'clientSecret': creds['clientSecret'] }
+            {'sid': creds['sid'], 'clientSecret': creds['clientSecret']}
         )
-        
+
         if 'medium' in data:
             defer.returnValue(data)
         defer.returnValue(None)
@@ -170,44 +177,45 @@ class RegistrationHandler(BaseHandler):
         data = yield httpCli.post_urlencoded_get_json(
             creds['idServer'],
             "/_matrix/identity/api/v1/3pid/bind",
-            { 'sid': creds['sid'], 'clientSecret': creds['clientSecret'], 
-            'mxid':mxid }
+            {'sid': creds['sid'], 'clientSecret': creds['clientSecret'],
+            'mxid': mxid}
         )
         defer.returnValue(data)
-        
+
     @defer.inlineCallbacks
     def _validate_captcha(self, ip_addr, private_key, challenge, response):
         """Validates the captcha provided.
-        
+
         Returns:
             dict: Containing 'valid'(bool) and 'error_url'(str) if invalid.
-        
+
         """
-        response = yield self._submit_captcha(ip_addr, private_key, challenge, 
+        response = yield self._submit_captcha(ip_addr, private_key, challenge,
                                               response)
         # parse Google's response. Lovely format..
         lines = response.split('\n')
         json = {
             "valid": lines[0] == 'true',
-            "error_url": "http://www.google.com/recaptcha/api/challenge?"+
+            "error_url": "http://www.google.com/recaptcha/api/challenge?" +
                          "error=%s" % lines[1]
         }
         defer.returnValue(json)
-        
+
     @defer.inlineCallbacks
     def _submit_captcha(self, ip_addr, private_key, challenge, response):
         client = PlainHttpClient(self.hs)
         data = yield client.post_urlencoded_get_raw(
             "www.google.com:80",
             "/recaptcha/api/verify",
-            accept_partial=True,  # twisted dislikes google's response, no content length.
-            args={ 
-                'privatekey': private_key, 
+            # twisted dislikes google's response, no content length.
+            accept_partial=True,
+            args={
+                'privatekey': private_key,
                 'remoteip': ip_addr,
                 'challenge': challenge,
                 'response': response
             }
         )
         defer.returnValue(data)
-        
+
 
