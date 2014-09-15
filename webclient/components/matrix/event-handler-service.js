@@ -353,6 +353,30 @@ angular.module('eventHandlerService', [])
         },
         
         /**
+         * Return the last message event of a room
+         * @param {String} room_id the room id
+         * @param {Boolean} filterFake true to not take into account fake messages
+         * @returns {undefined | Event} the last message event if available
+         */
+        getLastMessage: function(room_id, filterEcho) {
+            var lastMessage;
+
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                for (var i = room.messages.length - 1; i >= 0; i--) {
+                    var message = room.messages[i];
+
+                    if (!filterEcho || undefined === message.echo_msg_state) {
+                        lastMessage = message;
+                        break;
+                    }
+                }
+            }
+
+            return lastMessage;
+        },
+        
+        /**
          * Compute the room users number, ie the number of members who has joined the room.
          * @param {String} room_id the room id
          * @returns {undefined | Number} the room users number if available

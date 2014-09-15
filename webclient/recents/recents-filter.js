@@ -35,14 +35,9 @@ angular.module('RecentsController')
         // And time sort them
         // The room with the lastest message at first
         filtered.sort(function (roomA, roomB) {
-            var lastMsgRoomA, lastMsgRoomB;
 
-            if (roomA.messages && 0 < roomA.messages.length) {
-                lastMsgRoomA = roomA.messages[roomA.messages.length - 1];
-            }
-            if (roomB.messages && 0 < roomB.messages.length) {
-                lastMsgRoomB = roomB.messages[roomB.messages.length - 1];
-            }
+            var lastMsgRoomA = eventHandlerService.getLastMessage(roomA.room_id, true);
+            var lastMsgRoomB = eventHandlerService.getLastMessage(roomB.room_id, true);
 
             // Invite message does not have a body message nor ts
             // Puth them at the top of the list
