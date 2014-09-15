@@ -38,6 +38,13 @@ angular.module('eventHandlerService', [])
     var TOPIC_EVENT = "TOPIC_EVENT";
     var RESET_EVENT = "RESET_EVENT";    // eventHandlerService has been resetted
 
+    // used for dedupping events - could be expanded in future...
+    // FIXME: means that we leak memory over time (along with lots of the rest
+    // of the app, given we never try to reap memory yet)
+    var eventMap = {};
+
+    $rootScope.presence = {};
+
     var initialSyncDeferred;
 
     var reset = function() {
@@ -46,16 +53,13 @@ angular.module('eventHandlerService', [])
         $rootScope.events = {
             rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
         };
-    }
+
+        $rootScope.presence = {};
+
+        eventMap = {};
+    };
     reset();
 
-    // used for dedupping events - could be expanded in future...
-    // FIXME: means that we leak memory over time (along with lots of the rest
-    // of the app, given we never try to reap memory yet)
-    var eventMap = {};
-
-    $rootScope.presence = {};
-    
     var initRoom = function(room_id) {
         if (!(room_id in $rootScope.events.rooms)) {
             console.log("Creating new handler entry for " + room_id);
@@ -204,7 +208,7 @@ angular.module('eventHandlerService', [])
 
     var handleCallEvent = function(event, isLiveEvent) {
         $rootScope.$broadcast(CALL_EVENT, event, isLiveEvent);
-        if (event.type == 'm.call.invite') {
+        if (event.type === 'm.call.invite') {
             $rootScope.events.rooms[event.room_id].messages.push(event);
         }
     };
@@ -231,7 +235,7 @@ angular.module('eventHandlerService', [])
             }
         }
         return index;
-    }
+    };
     
     return {
         ROOM_CREATE_EVENT: ROOM_CREATE_EVENT,
