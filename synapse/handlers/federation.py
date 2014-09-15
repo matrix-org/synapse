@@ -93,6 +93,8 @@ class FederationHandler(BaseHandler):
         """
         event = self.pdu_codec.event_from_pdu(pdu)
 
+        logger.debug("Got event: %s", event.event_id)
+
         with (yield self.lock_manager.lock(pdu.context)):
             if event.is_state and not backfilled:
                 is_new_state = yield self.state_handler.handle_new_state(
@@ -106,7 +108,7 @@ class FederationHandler(BaseHandler):
         # respond to PDU.
 
         if hasattr(event, "state_key") and not is_new_state:
-            logger.debug("Ignoring old state.")
+            logger.debug("Ignoring old state: %s", event.event_id)
             return
 
         target_is_mine = False
