@@ -235,7 +235,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         matrixService.paginateBackMessages($scope.room_id, $rootScope.events.rooms[$scope.room_id].pagination.earliest_token, numItems).then(
             function(response) {
 
-                eventHandlerService.handleRoomMessages($scope.room_id, response.data, false);
+                eventHandlerService.handleRoomMessages($scope.room_id, response.data, false, 'b');
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
                     // no more messages to paginate. this currently never gets turned true again, as we never
                     // expire paginated contents in the current implementation.

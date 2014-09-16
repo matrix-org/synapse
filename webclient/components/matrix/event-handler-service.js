@@ -329,13 +329,29 @@ angular.module('eventHandlerService', [])
         },
 
         // Handle messages from /initialSync or /messages
-        handleRoomMessages: function(room_id, messages, isLiveEvents) {
+        handleRoomMessages: function(room_id, messages, isLiveEvents, dir) {
             initRoom(room_id);
-            this.handleEvents(messages.chunk, isLiveEvents);
 
-            // Store how far back we've paginated
-            // This assumes the paginations requests are contiguous and in reverse chronological order
-            $rootScope.events.rooms[room_id].pagination.earliest_token = messages.end;
+            var events = messages.chunk;
+
+            // Handles messages according to their time order
+            if (dir && 'b' === dir) {
+                // paginateBackMessages requests messages to be in reverse chronological order
+                for (var i=0; i<events.length; i++) {
+                    this.handleEvent(events[i], isLiveEvents, isLiveEvents);
+                }
+                
+                // Store how far back we've paginated
+                $rootScope.events.rooms[room_id].pagination.earliest_token = messages.end;
+            }
+            else {
+                // InitialSync returns messages in chronological order
+                for (var i=events.length - 1; i>=0; i--) {
+                    this.handleEvent(events[i], isLiveEvents, isLiveEvents);
+                }
+                // Store where to start pagination
+                $rootScope.events.rooms[room_id].pagination.earliest_token = messages.start;
+            }
         },
 
         handleInitialSyncDone: function(initialSyncData) {
