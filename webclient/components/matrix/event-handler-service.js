@@ -45,6 +45,46 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
     var eventMap = {};
 
     $rootScope.presence = {};
+    
+    // TODO: This is attached to the rootScope so .html can just go containsBingWord
+    // for determining classes so it is easy to highlight bing messages. It seems a
+    // bit strange to put the impl in this service though, but I can't think of a better
+    // file to put it in.
+    $rootScope.containsBingWord = function(content) {
+        if (!content) {
+            return false;
+        }
+        var bingWords = matrixService.config().bingWords;
+        var shouldBing = false;
+        
+        // case-insensitive name check for user_id OR display_name if they exist
+        var myUserId = matrixService.config().user_id;
+        if (myUserId) {
+            myUserId = myUserId.toLocaleLowerCase();
+        }
+        var myDisplayName = matrixService.config().display_name;
+        if (myDisplayName) {
+            myDisplayName = myDisplayName.toLocaleLowerCase();
+        }
+        if ( (myDisplayName && content.toLocaleLowerCase().indexOf(myDisplayName) != -1) ||
+             (myUserId && content.toLocaleLowerCase().indexOf(myUserId) != -1) ) {
+            shouldBing = true;
+        }
+        
+        // bing word list check
+        if (bingWords && !shouldBing) {
+            for (var i=0; i<bingWords.length; i++) {
+                // TODO: Should really be a word check, not a string of characters check.
+                // E.g. bing word is "coffee", "I have coffee" = bing, "I am a coffeepot" = no bing
+                // Currently it will bing for both.
+                if (content.indexOf(bingWords[i]) != -1) {
+                    shouldBing = true;
+                    break;
+                }
+            }
+        }
+        return shouldBing;
+    };
 
     var initialSyncDeferred;
 
@@ -140,36 +180,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             }
             
             if (window.Notification) {
-                var bingWords = matrixService.config().bingWords;
-                var content = event.content.body;
-                var shouldBing = false;
-                
-                // case-insensitive name check for user_id OR display_name if they exist
-                var myUserId = matrixService.config().user_id;
-                if (myUserId) {
-                    myUserId = myUserId.toLocaleLowerCase();
-                }
-                var myDisplayName = matrixService.config().display_name;
-                if (myDisplayName) {
-                    myDisplayName = myDisplayName.toLocaleLowerCase();
-                }
-                if ( (myDisplayName && content.toLocaleLowerCase().indexOf(myDisplayName) != -1) ||
-                     (myUserId && content.toLocaleLowerCase().indexOf(myUserId) != -1) ) {
-                    shouldBing = true;
-                }
-                
-                // bing word list check
-                if (bingWords && !shouldBing) {
-                    for (var i=0; i<bingWords.length; i++) {
-                        // TODO: Should really be a word check, not a string of characters check.
-                        // E.g. bing word is "coffee", "I have coffee" = bing, "I am a coffeepot" = no bing
-                        // Currently it will bing for both.
-                        if (content.indexOf(bingWords[i]) != -1) {
-                            shouldBing = true;
-                            break;
-                        }
-                    }
-                }
+                var shouldBing = $rootScope.containsBingWord(event.content.body);
             
                 // TODO: Binging every message when idle doesn't make much sense. Can we use this more sensibly?
                 var isIdle = (document.hidden || matrixService.presence.unavailable === mPresence.getState());

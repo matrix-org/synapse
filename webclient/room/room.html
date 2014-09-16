@@ -105,7 +105,7 @@
                         
                         <span ng-show='msg.content.msgtype === "m.text"' 
                               class="message"
-                              ng-class="msg.echo_msg_state"
+                              ng-class="containsBingWord(msg.content.body) ? msg.echo_msg_state + ' messageBing' : msg.echo_msg_state"
                               ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
 
                         <span ng-show='msg.type === "m.call.invite" && msg.user_id == state.user_id'>Outgoing Call</span>

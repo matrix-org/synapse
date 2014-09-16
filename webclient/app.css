@@ -538,6 +538,10 @@ a:active  { color: #000; }
     color: #F00;
 }
 
+.messageBing {
+    color: #00F;
+}
+
 #room-fullscreen-image {
     position: absolute;
     top: 0px;
