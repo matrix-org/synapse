@@ -124,7 +124,7 @@ class MessageHandler(BaseHandler):
         )
 
         chunk = {
-            "chunk": [e.get_dict() for e in events],
+            "chunk": [self.hs.serialize_event(e) for e in events],
             "start": pagin_config.from_token.to_string(),
             "end": next_token.to_string(),
         }
@@ -296,7 +296,7 @@ class MessageHandler(BaseHandler):
                 end_token = now_token.copy_and_replace("room_key", token[1])
 
                 d["messages"] = {
-                    "chunk": [m.get_dict() for m in messages],
+                    "chunk": [self.hs.serialize_event(m) for m in messages],
                     "start": start_token.to_string(),
                     "end": end_token.to_string(),
                 }
@@ -304,7 +304,7 @@ class MessageHandler(BaseHandler):
                 current_state = yield self.store.get_current_state(
                     event.room_id
                 )
-                d["state"] = [c.get_dict() for c in current_state]
+                d["state"] = [self.hs.serialize_event(c) for c in current_state]
             except:
                 logger.exception("Failed to get snapshot")
 

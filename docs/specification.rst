@@ -1305,12 +1305,6 @@ display name other than it being a valid unicode string.
 
 Registration and login
 ======================
-.. WARNING::
-  The registration API is likely to change.
-
-.. TODO
-  - TODO Kegan : Make registration like login (just omit the "user" key on the 
-    initial request?)
 
 Clients must register with a home server in order to use Matrix. After 
 registering, the client will be given an access token which must be used in ALL
@@ -1323,9 +1317,11 @@ a token sent to their email address, etc. This specification does not define how
 home servers should authorise their users who want to login to their existing 
 accounts, but instead defines the standard interface which implementations 
 should follow so that ANY client can login to ANY home server. Clients login
-using the |login|_ API.
+using the |login|_ API. Clients register using the |register|_ API. Registration
+follows the same procedure as login, but the path requests are sent to are
+different.
 
-The login process breaks down into the following:
+The registration/login process breaks down into the following:
   1. Determine the requirements for logging in.
   2. Submit the login stage credentials.
   3. Get credentials or be told the next stage in the login process and repeat 
@@ -1383,7 +1379,7 @@ This specification defines the following login types:
  - ``m.login.oauth2``
  - ``m.login.email.code``
  - ``m.login.email.url``
-
+ - ``m.login.email.identity``
 
 Password-based
 --------------
@@ -1529,6 +1525,31 @@ the login process, or a standard error response.
 A common client implementation will be to periodically poll until the link is clicked.
 If the link has not been visited yet, a standard error response with an errcode of 
 ``M_LOGIN_EMAIL_URL_NOT_YET`` should be returned.
+
+
+Email-based (identity server)
+-----------------------------
+:Type:
+  ``m.login.email.identity``
+:Description:
+  Login is supported by authorising an email address with an identity server.
+
+Prior to submitting this, the client should authenticate with an identity server.
+After authenticating, the session information should be submitted to the home server.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.email.identity",
+    "threepidCreds": [
+      {
+        "sid": "<identity server session id>",
+        "clientSecret": "<identity server client secret>",
+        "idServer": "<url of identity server authed with, e.g. 'matrix.org:8090'>"
+      }
+    ]
+  }
+
 
 
 N-Factor Authentication
@@ -2241,6 +2262,9 @@ Transaction:
 
 .. |login| replace:: ``/login``
 .. _login: /docs/api/client-server/#!/-login
+
+.. |register| replace:: ``/register``
+.. _register: /docs/api/client-server/#!/-registration
 
 .. |/rooms/<room_id>/messages| replace:: ``/rooms/<room_id>/messages``
 .. _/rooms/<room_id>/messages: /docs/api/client-server/#!/-rooms/get_messages

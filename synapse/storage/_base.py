@@ -315,6 +315,10 @@ class SQLBaseStore(object):
         d["content"] = json.loads(d["content"])
         del d["unrecognized_keys"]
 
+        if "age_ts" not in d:
+            # For compatibility
+            d["age_ts"] = d["ts"] if "ts" in d else 0
+
         return self.event_factory.create_event(
             etype=d["type"],
             **d

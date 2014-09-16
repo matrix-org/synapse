@@ -17,7 +17,7 @@ from twisted.internet import defer
 from tests import unittest
 
 # python imports
-from mock import Mock
+from mock import Mock, ANY
 
 from ..utils import MockHttpResource, MockClock
 
@@ -181,7 +181,8 @@ class FederationTestCase(unittest.TestCase):
                             "depth": 1,
                         },
                     ]
-                }
+                },
+                on_send_callback=ANY,
         )
 
     @defer.inlineCallbacks
@@ -212,7 +213,9 @@ class FederationTestCase(unittest.TestCase):
                             "content": {"testing": "content here"},
                         }
                     ],
-                })
+                },
+                on_send_callback=ANY,
+        )
 
     @defer.inlineCallbacks
     def test_recv_edu(self):

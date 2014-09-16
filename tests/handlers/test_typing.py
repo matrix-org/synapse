@@ -169,7 +169,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
                         "user_id": self.u_apple.to_string(),
                         "typing": True,
                     }
-                )
+                ),
+                on_send_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -219,7 +220,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
                         "user_id": self.u_apple.to_string(),
                         "typing": False,
                     }
-                )
+                ),
+                on_send_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )

@@ -20,6 +20,7 @@
 
 # Imports required for the default HomeServer() implementation
 from synapse.federation import initialize_http_replication
+from synapse.api.events import serialize_event
 from synapse.api.events.factory import EventFactory
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
@@ -137,6 +138,9 @@ class BaseHomeServer(object):
         """Parse the string given by 's' as a Room ID and return a RoomID
         object."""
         return RoomID.from_string(s, hs=self)
+
+    def serialize_event(self, e):
+        return serialize_event(self, e)
 
 # Build magic accessors for every dependency
 for depname in BaseHomeServer.DEPENDENCIES:
