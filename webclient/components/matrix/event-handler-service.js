@@ -51,7 +51,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
     // bit strange to put the impl in this service though, but I can't think of a better
     // file to put it in.
     $rootScope.containsBingWord = function(content) {
-        if (!content) {
+        if (!content || $.type(content) != "string") {
             return false;
         }
         var bingWords = matrixService.config().bingWords;
