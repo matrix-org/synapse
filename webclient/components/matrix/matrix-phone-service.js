@@ -60,7 +60,7 @@ angular.module('matrixPhoneService', [])
             var MatrixCall = $injector.get('MatrixCall');
             var call = new MatrixCall(event.room_id);
             call.call_id = msg.call_id;
-            call.initWithInvite(msg);
+            call.initWithInvite(event);
             matrixPhoneService.allCalls[call.call_id] = call;
 
             // if we stashed candidate events for that call ID, play them back now
@@ -132,7 +132,7 @@ angular.module('matrixPhoneService', [])
                 var MatrixCall = $injector.get('MatrixCall');
                 var call = new MatrixCall(event.room_id);
                 call.call_id = msg.call_id;
-                call.initWithHangup(msg);
+                call.initWithHangup(event);
                 matrixPhoneService.allCalls[msg.call_id] = call;
             } else {
                 call.onHangupReceived();

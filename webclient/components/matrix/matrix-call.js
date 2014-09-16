@@ -80,19 +80,29 @@ angular.module('MatrixCall', [])
         this.config = config;
     };
 
-    MatrixCall.prototype.initWithInvite = function(msg) {
-        this.msg = msg;
+    MatrixCall.prototype.initWithInvite = function(event) {
+        this.msg = event.content;
         this.peerConn = this.createPeerConnection();
         this.peerConn.setRemoteDescription(new RTCSessionDescription(this.msg.offer), this.onSetRemoteDescriptionSuccess, this.onSetRemoteDescriptionError);
         this.state = 'ringing';
         this.direction = 'inbound';
+        var self = this;
+        $timeout(function() {
+            if (self.state == 'ringing') {
+                self.state = 'ended';
+                self.hangupParty = 'remote'; // effectively
+                self.stopAllMedia();
+                if (self.peerConn.signalingState != 'closed') self.peerConn.close();
+                if (self.onHangup) self.onHangup(self);
+            }
+        }, this.msg.lifetime - event.age);
     };
 
     // perverse as it may seem, sometimes we want to instantiate a call with a hangup message
     // (because when getting the state of the room on load, events come in reverse order and
     // we want to remember that a call has been hung up)
-    MatrixCall.prototype.initWithHangup = function(msg) {
-        this.msg = msg;
+    MatrixCall.prototype.initWithHangup = function(event) {
+        this.msg = event.content;
         this.state = 'ended';
     };
 
@@ -228,8 +238,10 @@ angular.module('MatrixCall', [])
 
         var self = this;
         $timeout(function() {
-            self.hangupReason = 'invite_timeout';
-            self.hangup();
+            if (self.state == 'invite_sent') {
+                self.hangupReason = 'invite_timeout';
+                self.hangup();
+            }
         }, MatrixCall.CALL_TIMEOUT);
 
         $rootScope.$apply(function() {
