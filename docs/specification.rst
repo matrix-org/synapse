@@ -1169,8 +1169,14 @@ This event is sent by the caller when they wish to establish a call.
   Required keys:
     - ``call_id`` : "string" - A unique identifier for the call
     - ``offer`` : "offer object" - The session description
-    - ``version`` : "integer" - The version of the VoIP specification this message
-                                adheres to. This specification is version 0.
+    - ``version`` : "integer" - The version of the VoIP specification this
+                                message adheres to. This specification is
+                                version 0.
+    - ``lifetime`` : "integer" - The time in milliseconds that the invite is
+                                 valid for. Once the invite age exceeds this
+                                 value, clients should discard it. They
+                                 should also no longer show the call as
+                                 awaiting an answer in the UI.
       
   Optional keys:
     None.
