@@ -684,6 +684,10 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 
                 // The room members is available in the data fetched by initialSync
                 if ($rootScope.events.rooms[$scope.room_id]) {
+
+                    // There is no need to do a 1st pagination (initialSync provided enough to fill a page)
+                    $scope.state.first_pagination = false;
+
                     var members = $rootScope.events.rooms[$scope.room_id].members;
 
                     // Update the member list
@@ -743,9 +747,18 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 // Arm list timing update timer
                 updateMemberListPresenceAge();
 
-                // Start pagination
+                // Allow pagination
                 $scope.state.can_paginate = true;
-                paginate(MESSAGES_PER_PAGINATION);
+
+                // Do a first pagination only if it is required
+                // FIXME: Should be no more require when initialSync/{room_id} will be available
+                if ($scope.state.first_pagination) {
+                    paginate(MESSAGES_PER_PAGINATION);
+                }
+                else {
+                    // There are already messages, go to the last message
+                    scrollToBottom(true);
+                }
             },
             function(error) {
                 $scope.feedback = "Failed get member list: " + error.data.error;
