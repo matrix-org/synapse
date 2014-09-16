@@ -55,7 +55,7 @@
                 <div class="section">
                     <h4>Additional words to alert on:</h4>
                     <p>Leave blank to alert on all messages.</p>
-                    <input size=40 name="bingWords" ng-model="settings.bingWords" ng-list placeholder="Enter case-sensitive words separated with ,"
+                    <input size=40 name="bingWords" ng-model="settings.bingWords" ng-list placeholder="Enter words separated with , (supports regex)"
                     ng-blur="saveBingWords()"/>
                     <ul>
                         <li ng-repeat="word in settings.bingWords">{{word}}</li>

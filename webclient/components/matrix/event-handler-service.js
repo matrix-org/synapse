@@ -74,10 +74,8 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
         // bing word list check
         if (bingWords && !shouldBing) {
             for (var i=0; i<bingWords.length; i++) {
-                // TODO: Should really be a word check, not a string of characters check.
-                // E.g. bing word is "coffee", "I have coffee" = bing, "I am a coffeepot" = no bing
-                // Currently it will bing for both.
-                if (content.indexOf(bingWords[i]) != -1) {
+                var re = RegExp(bingWords[i]);
+                if (content.search(re) != -1) {
                     shouldBing = true;
                     break;
                 }
