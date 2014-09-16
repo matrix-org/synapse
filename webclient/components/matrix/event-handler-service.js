@@ -183,6 +183,10 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                 var shouldBing = $rootScope.containsBingWord(event.content.body);
             
                 // TODO: Binging every message when idle doesn't make much sense. Can we use this more sensibly?
+                // Unfortunately document.hidden = false on ubuntu chrome if chrome is minimised / does not have focus;
+                // true when you swap tabs though. However, for the case where the chat screen is OPEN and there is
+                // another window on top, we want to be notifying for those events. This DOES mean that there will be
+                // notifications when currently viewing the chat screen though, but that is preferable to the alternative imo.
                 var isIdle = (document.hidden || matrixService.presence.unavailable === mPresence.getState());
                 
                 if (shouldBing) {
