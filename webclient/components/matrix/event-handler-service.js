@@ -27,7 +27,8 @@ Typically, this service will store events or broadcast them to any listeners
 if typically all the $on method would do is update its own $scope.
 */
 angular.module('eventHandlerService', [])
-.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', function(matrixService, $rootScope, $q) {
+.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 
+function(matrixService, $rootScope, $q, $timeout, mPresence) {
     var ROOM_CREATE_EVENT = "ROOM_CREATE_EVENT";
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
@@ -136,6 +137,23 @@ angular.module('eventHandlerService', [])
             }
             else {
                 $rootScope.events.rooms[event.room_id].messages.push(event);
+            }
+            
+            if (window.Notification) {
+                // Show notification when the window is hidden, or the user is idle
+                if (document.hidden || matrixService.presence.unavailable === mPresence.getState()) {
+                    console.log("Displaying notification for "+JSON.stringify(event));
+                    var notification = new window.Notification(
+                        ($rootScope.events.rooms[event.room_id].members[event.user_id].displayname || event.user_id) +
+                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
+                    {
+                        "body": event.content.body,
+                        "icon": $rootScope.events.rooms[event.room_id].members[event.user_id].avatar_url
+                    });
+                    $timeout(function() {
+                        notification.close();
+                    }, 5 * 1000);
+                }
             }
         }
         else {
