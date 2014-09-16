@@ -140,8 +140,41 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             }
             
             if (window.Notification) {
-                // Show notification when the window is hidden, or the user is idle
-                if (document.hidden || matrixService.presence.unavailable === mPresence.getState()) {
+                var bingWords = matrixService.config().bingWords;
+                var content = event.content.body;
+                var shouldBing = false;
+                
+                // case-insensitive name check for user_id OR display_name if they exist
+                var myUserId = matrixService.config().user_id;
+                if (myUserId) {
+                    myUserId = myUserId.toLocaleLowerCase();
+                }
+                var myDisplayName = matrixService.config().display_name;
+                if (myDisplayName) {
+                    myDisplayName = myDisplayName.toLocaleLowerCase();
+                }
+                if ( (myDisplayName && content.toLocaleLowerCase().indexOf(myDisplayName) != -1) ||
+                     (myUserId && content.toLocaleLowerCase().indexOf(myUserId) != -1) ) {
+                    shouldBing = true;
+                }
+                
+                // bing word list check
+                if (bingWords && !shouldBing) {
+                    for (var i=0; i<bingWords.length; i++) {
+                        // TODO: Should really be a word check, not a string of characters check.
+                        // E.g. bing word is "coffee", "I have coffee" = bing, "I am a coffeepot" = no bing
+                        // Currently it will bing for both.
+                        if (content.indexOf(bingWords[i]) != -1) {
+                            shouldBing = true;
+                            break;
+                        }
+                    }
+                }
+            
+                // TODO: Binging every message when idle doesn't make much sense. Can we use this more sensibly?
+                var isIdle = (document.hidden || matrixService.presence.unavailable === mPresence.getState());
+                
+                if (shouldBing) {
                     console.log("Displaying notification for "+JSON.stringify(event));
                     var notification = new window.Notification(
                         ($rootScope.events.rooms[event.room_id].members[event.user_id].displayname || event.user_id) +

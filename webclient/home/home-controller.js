@@ -117,6 +117,10 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
         matrixService.getDisplayName($scope.config.user_id).then(
             function(response) {
                 $scope.profile.displayName = response.data.displayname;
+                var config = matrixService.config();
+                config.display_name = response.data.displayname;
+                matrixService.setConfig(config);
+                matrixService.saveConfig();
             },
             function(error) {
                 $scope.feedback = "Can't load display name";
