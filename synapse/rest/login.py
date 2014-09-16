@@ -106,4 +106,4 @@ def _parse_json(request):
 
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
-    PasswordResetRestServlet(hs).register(http_server)
+    # TODO PasswordResetRestServlet(hs).register(http_server)
