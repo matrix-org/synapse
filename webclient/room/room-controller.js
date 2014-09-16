@@ -676,6 +676,10 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     var onInit2 = function() {
         console.log("onInit2");
         
+        // Scroll down as soon as possible so that we point to the last message
+        // if it already exists in memory
+        scrollToBottom(true);
+
         // Make sure the initialSync has been before going further
         eventHandlerService.waitForInitialSyncCompletion().then(
             function() {
