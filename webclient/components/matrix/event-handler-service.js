@@ -189,6 +189,12 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                 // notifications when currently viewing the chat screen though, but that is preferable to the alternative imo.
                 var isIdle = (document.hidden || matrixService.presence.unavailable === mPresence.getState());
                 
+                // always bing if there are 0 bing words... apparently.
+                var bingWords = matrixService.config().bingWords;
+                if (bingWords && bingWords.length === 0) {
+                    shouldBing = true;
+                }
+                
                 if (shouldBing) {
                     console.log("Displaying notification for "+JSON.stringify(event));
                     var notification = new window.Notification(
