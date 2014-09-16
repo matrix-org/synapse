@@ -177,7 +177,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                 $rootScope.events.rooms[event.room_id].messages.push(event);
             }
             
-            if (window.Notification) {
+            if (window.Notification && event.user_id != matrixService.config().user_id) {
                 var shouldBing = $rootScope.containsBingWord(event.content.body);
             
                 // TODO: Binging every message when idle doesn't make much sense. Can we use this more sensibly?
@@ -195,12 +195,17 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                 
                 if (shouldBing) {
                     console.log("Displaying notification for "+JSON.stringify(event));
+                    var member = $rootScope.events.rooms[event.room_id].members[event.user_id];
+                    var displayname = undefined;
+                    if (member) {
+                        displayname = member.displayname;
+                    }
                     var notification = new window.Notification(
-                        ($rootScope.events.rooms[event.room_id].members[event.user_id].displayname || event.user_id) +
+                        (displayname || event.user_id) +
                         " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
                     {
                         "body": event.content.body,
-                        "icon": $rootScope.events.rooms[event.room_id].members[event.user_id].avatar_url
+                        "icon": member ? member.avatar_url : undefined
                     });
                     $timeout(function() {
                         notification.close();
