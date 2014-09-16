@@ -194,7 +194,16 @@ angular.module('SettingsController', ['matrixService', 'mFileUpload', 'mFileInpu
     
     /*** Desktop notifications section ***/
     $scope.settings = {
-        notifications: undefined
+        notifications: undefined,
+        bingWords: matrixService.config().bingWords
+    };
+    
+    $scope.saveBingWords = function() {
+        console.log("Saving words: "+JSON.stringify($scope.settings.bingWords));
+        var config = matrixService.config();
+        config.bingWords = $scope.settings.bingWords;
+        matrixService.setConfig(config);
+        matrixService.saveConfig();
     };
 
     // If the browser supports it, check the desktop notification state

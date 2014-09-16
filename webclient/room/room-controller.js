@@ -139,7 +139,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         if (isLive && event.room_id === $scope.room_id) {
             
             scrollToBottom();
-
+            
             if (window.Notification) {
                 // Show notification when the window is hidden, or the user is idle
                 if (document.hidden || matrixService.presence.unavailable === mPresence.getState()) {
