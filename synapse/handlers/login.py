@@ -17,9 +17,11 @@ from twisted.internet import defer
 
 from ._base import BaseHandler
 from synapse.api.errors import LoginError, Codes
+from synapse.http.client import PlainHttpClient
 
 import bcrypt
 import logging
+import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -63,3 +65,28 @@ class LoginHandler(BaseHandler):
         else:
             logger.warn("Failed password login for user %s", user)
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+
+    @defer.inlineCallbacks
+    def reset_password(self, user_id, email):
+        is_valid = yield self._check_valid_association(user_id, email)
+        logger.info("reset_password user=%s email=%s valid=%s", user_id, email,
+                    is_valid)
+
+    @defer.inlineCallbacks
+    def _check_valid_association(self, user_id, email):
+        identity = yield self._query_email(email)
+        if identity and "mxid" in identity:
+            if identity["mxid"] == user_id:
+                defer.returnValue(True)
+                return
+        defer.returnValue(False)
+
+    @defer.inlineCallbacks
+    def _query_email(self, email):
+        httpCli = PlainHttpClient(self.hs)
+        data = yield httpCli.get_json(
+            'matrix.org:8090',  # TODO FIXME This should be configurable.
+            "/_matrix/identity/api/v1/lookup?medium=email&address=" +
+            "%s" % urllib.quote(email)
+        )
+        defer.returnValue(data)
