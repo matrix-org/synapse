@@ -24,21 +24,51 @@ angular.module('matrixPhoneService', [])
     matrixPhoneService.INCOMING_CALL_EVENT = "INCOMING_CALL_EVENT";
     matrixPhoneService.REPLACED_CALL_EVENT = "REPLACED_CALL_EVENT";
     matrixPhoneService.allCalls = {};
+    // a place to save candidates that come in for calls we haven't got invites for yet (when paginating backwards)
+    matrixPhoneService.candidatesByCall = {};
 
     matrixPhoneService.callPlaced = function(call) {
         matrixPhoneService.allCalls[call.call_id] = call;
     };
 
     $rootScope.$on(eventHandlerService.CALL_EVENT, function(ngEvent, event, isLive) {
-        if (!isLive) return; // until matrix supports expiring messages
         if (event.user_id == matrixService.config().user_id) return;
+
         var msg = event.content;
+
         if (event.type == 'm.call.invite') {
+            if (event.age == undefined || msg.lifetime == undefined) {
+                // if the event doesn't have either an age (the HS is too old) or a lifetime
+                // (the sending client was too old when it sent it) then fall back to old behaviour
+                if (!isLive) return; // until matrix supports expiring messages
+            }
+
+            if (event.age > msg.lifetime) {
+                console.log("Ignoring expired call event of type "+event.type);
+                return;
+            }
+
+            var call = undefined;
+            if (!isLive) {
+                // if this event wasn't live then this call may already be over
+                call = matrixPhoneService.allCalls[msg.call_id];
+                if (call && call.state == 'ended') {
+                    return;
+                }
+            }
+
             var MatrixCall = $injector.get('MatrixCall');
             var call = new MatrixCall(event.room_id);
             call.call_id = msg.call_id;
             call.initWithInvite(msg);
             matrixPhoneService.allCalls[call.call_id] = call;
+
+            // if we stashed candidate events for that call ID, play them back now
+            if (!isLive && matrixPhoneService.candidatesByCall[call.call_id] != undefined) {
+                for (var i = 0; i < matrixPhoneService.candidatesByCall[call.call_id].length; ++i) {
+                    call.gotRemoteIceCandidate(matrixPhoneService.candidatesByCall[call.call_id][i]);
+                }
+            }
 
             // Were we trying to call that user (room)?
             var existingCall;
@@ -79,21 +109,35 @@ angular.module('matrixPhoneService', [])
             call.receivedAnswer(msg);
         } else if (event.type == 'm.call.candidates') {
             var call = matrixPhoneService.allCalls[msg.call_id];
-            if (!call) {
+            if (!call && isLive) {
                 console.log("Got candidates for unknown call ID "+msg.call_id);
                 return;
-            }
-            for (var i = 0; i < msg.candidates.length; ++i) {
-                call.gotRemoteIceCandidate(msg.candidates[i]);
+            } else if (!call) {
+                if (matrixPhoneService.candidatesByCall[msg.call_id] == undefined) {
+                    matrixPhoneService.candidatesByCall[msg.call_id] = [];
+                }
+                matrixPhoneService.candidatesByCall[msg.call_id] = matrixPhoneService.candidatesByCall[msg.call_id].concat(msg.candidates);
+            } else {
+                for (var i = 0; i < msg.candidates.length; ++i) {
+                    call.gotRemoteIceCandidate(msg.candidates[i]);
+                }
             }
         } else if (event.type == 'm.call.hangup') {
             var call = matrixPhoneService.allCalls[msg.call_id];
-            if (!call) {
+            if (!call && isLive) {
                 console.log("Got hangup for unknown call ID "+msg.call_id);
-                return;
+            } else if (!call) {
+                // if not live, store the fact that the call has ended because we're probably getting events backwards so
+                // the hangup will come before the invite
+                var MatrixCall = $injector.get('MatrixCall');
+                var call = new MatrixCall(event.room_id);
+                call.call_id = msg.call_id;
+                call.initWithHangup(msg);
+                matrixPhoneService.allCalls[msg.call_id] = call;
+            } else {
+                call.onHangupReceived();
+                delete(matrixPhoneService.allCalls[msg.call_id]);
             }
-            call.onHangupReceived();
-            delete(matrixPhoneService.allCalls[msg.call_id]);
         }
     });
     

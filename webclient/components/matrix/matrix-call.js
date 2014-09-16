@@ -53,6 +53,8 @@ angular.module('MatrixCall', [])
         this.candidateSendTries = 0;
     }
 
+    MatrixCall.CALL_TIMEOUT = 60000;
+
     MatrixCall.prototype.createPeerConnection = function() {
         var stunServer = 'stun:stun.l.google.com:19302';
         var pc;
@@ -84,6 +86,14 @@ angular.module('MatrixCall', [])
         this.peerConn.setRemoteDescription(new RTCSessionDescription(this.msg.offer), this.onSetRemoteDescriptionSuccess, this.onSetRemoteDescriptionError);
         this.state = 'ringing';
         this.direction = 'inbound';
+    };
+
+    // perverse as it may seem, sometimes we want to instantiate a call with a hangup message
+    // (because when getting the state of the room on load, events come in reverse order and
+    // we want to remember that a call has been hung up)
+    MatrixCall.prototype.initWithHangup = function(msg) {
+        this.msg = msg;
+        this.state = 'ended';
     };
 
     MatrixCall.prototype.answer = function() {
@@ -188,14 +198,12 @@ angular.module('MatrixCall', [])
             console.log("Ignoring remote ICE candidate because call has ended");
             return;
         }
-        var candidateObject = new RTCIceCandidate({
-            sdpMLineIndex: cand.label,
-            candidate: cand.candidate
-        });
-        this.peerConn.addIceCandidate(candidateObject, function() {}, function(e) {});
+        this.peerConn.addIceCandidate(new RTCIceCandidate(cand), function() {}, function(e) {});
     };
 
     MatrixCall.prototype.receivedAnswer = function(msg) {
+        if (this.state == 'ended') return;
+
         this.peerConn.setRemoteDescription(new RTCSessionDescription(msg.answer), this.onSetRemoteDescriptionSuccess, this.onSetRemoteDescriptionError);
         this.state = 'connecting';
     };
@@ -213,11 +221,17 @@ angular.module('MatrixCall', [])
         var content = {
             version: 0,
             call_id: this.call_id,
-            offer: description
+            offer: description,
+            lifetime: MatrixCall.CALL_TIMEOUT
         };
         this.sendEventWithRetry('m.call.invite', content);
 
         var self = this;
+        $timeout(function() {
+            self.hangupReason = 'invite_timeout';
+            self.hangup();
+        }, MatrixCall.CALL_TIMEOUT);
+
         $rootScope.$apply(function() {
             self.state = 'invite_sent';
         });

@@ -130,6 +130,10 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
             angular.element('#ringAudio')[0].pause();
             angular.element('#ringbackAudio')[0].pause();
             angular.element('#busyAudio')[0].play();
+        } else if (newVal == 'ended' && oldVal == 'invite_sent' && $rootScope.currentCall.hangupParty == 'local' && $rootScope.currentCall.hangupReason == 'invite_timeout') {
+            angular.element('#ringAudio')[0].pause();
+            angular.element('#ringbackAudio')[0].pause();
+            angular.element('#busyAudio')[0].play();
         } else if (oldVal == 'invite_sent') {
             angular.element('#ringbackAudio')[0].pause();
         } else if (oldVal == 'ringing') {
