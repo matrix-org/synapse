@@ -51,13 +51,11 @@ class RoomStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_room(self):
-        room = yield self.store.get_room(self.room.to_string())
-
         self.assertObjectHasAttributes(
             {"room_id": self.room.to_string(),
              "creator": self.u_creator.to_string(),
              "is_public": True},
-            room
+            (yield self.store.get_room(self.room.to_string()))
         )
 
     @defer.inlineCallbacks
@@ -66,9 +64,10 @@ class RoomStoreTestCase(unittest.TestCase):
             visibility=False
         )
 
-        room = yield self.store.get_room(self.room.to_string())
-
-        self.assertFalse(room.is_public)
+        self.assertObjectHasAttributes(
+            {"is_public": False},
+            (yield self.store.get_room(self.room.to_string()))
+        )
 
     @defer.inlineCallbacks
     def test_get_rooms(self):

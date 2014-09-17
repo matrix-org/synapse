@@ -47,9 +47,10 @@ class DirectoryStoreTestCase(unittest.TestCase):
             servers=["test"],
         )
 
-        aliases = yield self.store.get_aliases_for_room(self.room.to_string())
-
-        self.assertEquals(["#my-room:test"], aliases)
+        self.assertEquals(
+            ["#my-room:test"],
+            (yield self.store.get_aliases_for_room(self.room.to_string()))
+        )
 
     @defer.inlineCallbacks
     def test_alias_to_room(self):
@@ -59,9 +60,9 @@ class DirectoryStoreTestCase(unittest.TestCase):
             servers=["test"],
         )
 
-        mapping = yield self.store.get_association_from_room_alias(
-            self.alias
-        )
 
-        self.assertEquals(self.room.to_string(), mapping.room_id)
-        self.assertEquals(["test"], mapping.servers)
+        self.assertObjectHasAttributes(
+            {"room_id": self.room.to_string(),
+             "servers": ["test"]},
+            (yield self.store.get_association_from_room_alias(self.alias))
+        )

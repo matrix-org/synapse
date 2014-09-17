@@ -48,9 +48,10 @@ class ProfileStoreTestCase(unittest.TestCase):
             self.u_frank.localpart, "Frank"
         )
 
-        name = yield self.store.get_profile_displayname(self.u_frank.localpart)
-
-        self.assertEquals("Frank", name)
+        self.assertEquals(
+            "Frank",
+            (yield self.store.get_profile_displayname(self.u_frank.localpart))
+        )
 
     @defer.inlineCallbacks
     def test_avatar_url(self):
@@ -62,6 +63,7 @@ class ProfileStoreTestCase(unittest.TestCase):
                 self.u_frank.localpart, "http://my.site/here"
         )
 
-        name = yield self.store.get_profile_avatar_url(self.u_frank.localpart)
-
-        self.assertEquals("http://my.site/here", name)
+        self.assertEquals(
+            "http://my.site/here",
+            (yield self.store.get_profile_avatar_url(self.u_frank.localpart))
+        )
