@@ -18,6 +18,9 @@ from tests import unittest
 from twisted.internet import defer
 
 from synapse.server import HomeServer
+from synapse.api.events.room import (
+    RoomNameEvent, RoomTopicEvent
+)
 
 from tests.utils import SQLiteMemoryDbPool
 
@@ -90,3 +93,85 @@ class RoomStoreTestCase(unittest.TestCase):
             "topic": None,
             "aliases": [self.alias.to_string()],
         }, rooms[0])
+
+
+class RoomEventsStoreTestCase(unittest.TestCase):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+
+        hs = HomeServer("test",
+            db_pool=db_pool,
+        )
+
+        # Room events need the full datastore, for persist_event() and
+        # get_room_state()
+        self.store = hs.get_datastore()
+        self.event_factory = hs.get_event_factory();
+
+        self.room = hs.parse_roomid("!abcde:test")
+
+        yield self.store.store_room(self.room.to_string(),
+            room_creator_user_id="@creator:text",
+            is_public=True
+        )
+
+    @defer.inlineCallbacks
+    def inject_room_event(self, **kwargs):
+        yield self.store.persist_event(
+            self.event_factory.create_event(
+                room_id=self.room.to_string(),
+                **kwargs
+            )
+        )
+
+    @defer.inlineCallbacks
+    def test_room_name(self):
+        name = u"A-Room-Name"
+
+        yield self.inject_room_event(
+            etype=RoomNameEvent.TYPE,
+            name=name,
+            content={"name": name},
+            depth=1,
+        )
+
+        state = yield self.store.get_current_state(
+            room_id=self.room.to_string()
+        )
+
+        self.assertEquals(1, len(state))
+        self.assertObjectHasAttributes(
+            {"type": "m.room.name",
+             "room_id": self.room.to_string(),
+             "name": name},
+            state[0]
+        )
+
+    @defer.inlineCallbacks
+    def test_room_name(self):
+        topic = u"A place for things"
+
+        yield self.inject_room_event(
+            etype=RoomTopicEvent.TYPE,
+            topic=topic,
+            content={"topic": topic},
+            depth=1,
+        )
+
+        state = yield self.store.get_current_state(
+            room_id=self.room.to_string()
+        )
+
+        self.assertEquals(1, len(state))
+        self.assertObjectHasAttributes(
+            {"type": "m.room.topic",
+             "room_id": self.room.to_string(),
+             "topic": topic},
+            state[0]
+        )
+
+    # Not testing the various 'level' methods for now because there's lots
+    # of them and need coalescing; see JIRA SPEC-11
