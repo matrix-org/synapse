@@ -173,6 +173,7 @@
                 </span>
                 <button ng-click="leaveRoom()" ng-disabled="state.permission_denied">Leave</button>
                 <button ng-click="startVoiceCall()" ng-show="(currentCall == undefined || currentCall.state == 'ended') && memberCount() == 2" ng-disabled="state.permission_denied">Voice Call</button>
+                <button ng-click="startVideoCall()" ng-show="(currentCall == undefined || currentCall.state == 'ended') && memberCount() == 2" ng-disabled="state.permission_denied">Video Call</button>
             </div>
         
             {{ feedback }}

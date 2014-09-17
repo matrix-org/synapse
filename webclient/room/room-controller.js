@@ -837,7 +837,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         var call = new MatrixCall($scope.room_id);
         call.onError = $rootScope.onCallError;
         call.onHangup = $rootScope.onCallHangup;
-        call.placeCall({audio: true, video: false});
+        // remote video element is used for playing audio in voice calls
+        call.remoteVideoElement = angular.element('#remoteVideo')[0];
+        call.placeVoiceCall();
         $rootScope.currentCall = call;
     };
 
@@ -845,7 +847,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         var call = new MatrixCall($scope.room_id);
         call.onError = $rootScope.onCallError;
         call.onHangup = $rootScope.onCallHangup;
-        call.placeCall({audio: true, video: true});
+        call.localVideoElement = angular.element('#localVideo')[0];
+        call.remoteVideoElement = angular.element('#remoteVideo')[0];
+        call.placeVideoCall();
         $rootScope.currentCall = call;
     };
 

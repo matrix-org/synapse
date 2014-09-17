@@ -89,6 +89,21 @@ a:active  { color: #000; }
     font-size: 80%;
 }
 
+#localVideo {
+    position: absolute;
+    top: 32px;
+    left: 160px;
+    width: 128px;
+    height: 72px;
+}
+#remoteVideo {
+    position: absolute;
+    top: 32px;
+    left: 300px;
+    width: 128px;
+    height: 72px;
+}
+
 #headerContent {
     color: #ccc;
     max-width: 1280px;
@@ -96,6 +111,7 @@ a:active  { color: #000; }
     text-align: right;
     height: 32px;
     line-height: 32px;
+    position: relative;
 }
 
 #headerContent a:link,

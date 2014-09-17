@@ -150,6 +150,8 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         }
         call.onError = $scope.onCallError;
         call.onHangup = $scope.onCallHangup;
+        call.localVideoElement = angular.element('#localVideo')[0];
+        call.remoteVideoElement = angular.element('#remoteVideo')[0];
         $rootScope.currentCall = call;
     });
 
