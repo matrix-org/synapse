@@ -53,6 +53,8 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
 
                     // Add room_alias & room_display_name members
                     angular.extend(room, matrixService.getRoomAliasAndDisplayName(room));
+                    
+                    eventHandlerService.setRoomVisibility(room.room_id, "public");
                 }
             }
         );

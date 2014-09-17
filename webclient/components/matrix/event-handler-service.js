@@ -517,6 +517,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             if (!visible) {
                 return;
             }
+            initRoom(room_id);
             
             var room = $rootScope.events.rooms[room_id];
             if (room) {
