@@ -268,6 +268,9 @@ class MessageHandler(BaseHandler):
             user, pagination_config, None
         )
 
+        public_rooms = yield self.store.get_rooms(is_public=True)
+        public_room_ids = [r["room_id"] for r in public_rooms]
+
         limit = pagin_config.limit
         if not limit:
             limit = 10
@@ -276,6 +279,8 @@ class MessageHandler(BaseHandler):
             d = {
                 "room_id": event.room_id,
                 "membership": event.membership,
+                "visibility": ("public" if event.room_id in
+                              public_room_ids else "private"),
             }
 
             if event.membership == Membership.INVITE:
