@@ -143,7 +143,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     });
     
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
-        if (isLive) {
+        if (isLive && event.room_id === $scope.room_id) {
             if ($scope.state.waiting_for_joined_event) {
                 // The user has successfully joined the room, we can getting data for this room
                 $scope.state.waiting_for_joined_event = false;
@@ -161,19 +161,33 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 else {
                     user = event.user_id;
                 }
-
                  
                 if ("ban" === event.membership) {
                     $scope.state.permission_denied = "You have been banned by " + user;
                 }
                 else {
                     $scope.state.permission_denied = "You have been kicked by " + user;
-                }
-                
+                }  
             }
             else {
                 scrollToBottom();
                 updateMemberList(event); 
+
+                // Notify when a user joins
+                if ((document.hidden  || matrixService.presence.unavailable === mPresence.getState())
+                        && event.state_key !== $scope.state.user_id  && "join" === event.membership) {
+                    debugger;
+                    var notification = new window.Notification(
+                        event.content.displayname +
+                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
+                    {
+                        "body": event.content.displayname + " joined",
+                        "icon": event.content.avatar_url ? event.content.avatar_url : undefined
+                    });
+                    $timeout(function() {
+                        notification.close();
+                    }, 5 * 1000);
+                }
             }
         }
     });
