@@ -738,7 +738,10 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         // Make recents highlight the current room
         $scope.recentsSelectedRoomID = $scope.room_id;
 
-		// Get the up-to-date the current member list
+        // Init the history for this room
+        history.init();
+
+        // Get the up-to-date the current member list
         matrixService.getMemberList($scope.room_id).then(
             function(response) {
                 for (var i = 0; i < response.data.chunk.length; i++) {
@@ -851,6 +854,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     // Manage history of typed messages
+    // History is saved in sessionStoratge so that it survives when the user
+    // navigates through the rooms and when it refreshes the page
     var history = {
         // The list of typed messages. Index 0 is the more recents
         data: [],
@@ -861,9 +866,20 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         // The message the user has started to type before going into the history
         typingMessage: undefined,
 
+        // Init/load data for the current room
+        init: function() {
+            var data = sessionStorage.getItem("history_" + $scope.room_id);
+            if (data) {
+                this.data = JSON.parse(data);
+            }
+        },
+
         // Store a message in the history
         push: function(message) {
             this.data.unshift(message);
+
+            // Update the session storage
+            sessionStorage.setItem("history_" + $scope.room_id, JSON.stringify(this.data));
 
             // Reset history position
             this.position = -1;
