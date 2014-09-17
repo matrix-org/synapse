@@ -62,7 +62,8 @@
                         <span ng-show="currentCall.state == 'connecting'">Call Connecting...</span>
                         <span ng-show="currentCall.state == 'connected'">Call Connected</span>
                         <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'remote'">Call Rejected</span>
-                        <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'local'">Call Canceled</span>
+                        <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'local' && currentCall.hangupReason == undefined">Call Canceled</span>
+                        <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'local' && currentCall.hangupReason == 'invite_timeout'">User Not Responding</span>
                         <span ng-show="currentCall.state == 'ended' && currentCall.didConnect && currentCall.direction == 'outbound'">Call Ended</span>
                         <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'inbound'">Call Canceled</span>
                         <span ng-show="currentCall.state == 'ended' && currentCall.didConnect && currentCall.direction == 'inbound'">Call Ended</span>

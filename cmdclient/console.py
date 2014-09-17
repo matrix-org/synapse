@@ -145,35 +145,50 @@ class SynapseCmd(cmd.Cmd):
         <noupdate> : Do not automatically clobber config values.
         """
         args = self._parse(line, ["userid", "noupdate"])
-        path = "/register"
 
         password = None
         pwd = None
         pwd2 = "_"
         while pwd != pwd2:
-            pwd = getpass.getpass("(Optional) Type a password for this user: ")
-            if len(pwd) == 0:
-                print "Not using a password for this user."
-                break
+            pwd = getpass.getpass("Type a password for this user: ")
             pwd2 = getpass.getpass("Retype the password: ")
-            if pwd != pwd2:
+            if pwd != pwd2 or len(pwd) == 0:
                 print "Password mismatch."
+                pwd = None
             else:
                 password = pwd
 
-        body = {}
+        body = {
+            "type": "m.login.password"
+        }
         if "userid" in args:
-            body["user_id"] = args["userid"]
+            body["user"] = args["userid"]
         if password:
             body["password"] = password
 
-        reactor.callFromThread(self._do_register, "POST", path, body,
+        reactor.callFromThread(self._do_register, body,
                                "noupdate" not in args)
 
     @defer.inlineCallbacks
-    def _do_register(self, method, path, data, update_config):
-        url = self._url() + path
-        json_res = yield self.http_client.do_request(method, url, data=data)
+    def _do_register(self, data, update_config):
+        # check the registration flows
+        url = self._url() + "/register"
+        json_res = yield self.http_client.do_request("GET", url)
+        print json.dumps(json_res, indent=4)
+
+        passwordFlow = None
+        for flow in json_res["flows"]:
+            if flow["type"] == "m.login.recaptcha" or ("stages" in flow and "m.login.recaptcha" in flow["stages"]):
+                print "Unable to register: Home server requires captcha."
+                return
+            if flow["type"] == "m.login.password" and "stages" not in flow:
+                passwordFlow = flow
+                break
+
+        if not passwordFlow:
+            return
+
+        json_res = yield self.http_client.do_request("POST", url, data=data)
         print json.dumps(json_res, indent=4)
         if update_config and "user_id" in json_res:
             self.config["user"] = json_res["user_id"]

@@ -538,6 +538,10 @@ a:active  { color: #000; }
     color: #F00;
 }
 
+.messageBing {
+    color: #00F;
+}
+
 #room-fullscreen-image {
     position: absolute;
     top: 0px;
@@ -599,7 +603,7 @@ a:active  { color: #000; }
     width: auto;
 }
 
-.recentsRoomSummaryTS {
+.recentsRoomSummaryUsersCount, .recentsRoomSummaryTS {
     color: #888;
     font-size: 12px;
     width: 7em;
@@ -610,6 +614,11 @@ a:active  { color: #000; }
     color: #888;
     font-size: 12px;
     padding-bottom: 5px;
+}
+
+/* Do not show users count in the recents fragment displayed on the room page */
+#roomPage .recentsRoomSummaryUsersCount {
+    width: 0em;
 }
 
 /*** Recents in the room page ***/

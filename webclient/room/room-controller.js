@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
-.controller('RoomController', ['$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mPresence', 'matrixPhoneService', 'MatrixCall',
-                               function($filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, mPresence, matrixPhoneService, MatrixCall) {
+.controller('RoomController', ['$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall',
+                               function($filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -139,27 +139,11 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         if (isLive && event.room_id === $scope.room_id) {
             
             scrollToBottom();
-
-            if (window.Notification) {
-                // Show notification when the window is hidden, or the user is idle
-                if (document.hidden || matrixService.presence.unavailable === mPresence.getState()) {
-                    var notification = new window.Notification(
-                        ($scope.members[event.user_id].displayname || event.user_id) +
-                        " (" + ($scope.room_alias || $scope.room_id) + ")", // FIXME: don't leak room_ids here
-                    {
-                        "body": event.content.body,
-                        "icon": $scope.members[event.user_id].avatar_url
-                    });
-                    $timeout(function() {
-                        notification.close();
-                    }, 5 * 1000);
-                }
-            }
         }
     });
     
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
-        if (isLive) {
+        if (isLive && event.room_id === $scope.room_id) {
             if ($scope.state.waiting_for_joined_event) {
                 // The user has successfully joined the room, we can getting data for this room
                 $scope.state.waiting_for_joined_event = false;
@@ -177,19 +161,33 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 else {
                     user = event.user_id;
                 }
-
                  
                 if ("ban" === event.membership) {
                     $scope.state.permission_denied = "You have been banned by " + user;
                 }
                 else {
                     $scope.state.permission_denied = "You have been kicked by " + user;
-                }
-                
+                }  
             }
             else {
                 scrollToBottom();
                 updateMemberList(event); 
+
+                // Notify when a user joins
+                if ((document.hidden  || matrixService.presence.unavailable === mPresence.getState())
+                        && event.state_key !== $scope.state.user_id  && "join" === event.membership) {
+                    debugger;
+                    var notification = new window.Notification(
+                        event.content.displayname +
+                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
+                    {
+                        "body": event.content.displayname + " joined",
+                        "icon": event.content.avatar_url ? event.content.avatar_url : undefined
+                    });
+                    $timeout(function() {
+                        notification.close();
+                    }, 5 * 1000);
+                }
             }
         }
     });
@@ -235,7 +233,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         matrixService.paginateBackMessages($scope.room_id, $rootScope.events.rooms[$scope.room_id].pagination.earliest_token, numItems).then(
             function(response) {
 
-                eventHandlerService.handleRoomMessages($scope.room_id, response.data, false);
+                eventHandlerService.handleRoomMessages($scope.room_id, response.data, false, 'b');
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
                     // no more messages to paginate. this currently never gets turned true again, as we never
                     // expire paginated contents in the current implementation.
@@ -676,6 +674,10 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     var onInit2 = function() {
         console.log("onInit2");
         
+        // Scroll down as soon as possible so that we point to the last message
+        // if it already exists in memory
+        scrollToBottom(true);
+
         // Make sure the initialSync has been before going further
         eventHandlerService.waitForInitialSyncCompletion().then(
             function() {
@@ -684,6 +686,10 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 
                 // The room members is available in the data fetched by initialSync
                 if ($rootScope.events.rooms[$scope.room_id]) {
+
+                    // There is no need to do a 1st pagination (initialSync provided enough to fill a page)
+                    $scope.state.first_pagination = false;
+
                     var members = $rootScope.events.rooms[$scope.room_id].members;
 
                     // Update the member list
@@ -743,9 +749,18 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 // Arm list timing update timer
                 updateMemberListPresenceAge();
 
-                // Start pagination
+                // Allow pagination
                 $scope.state.can_paginate = true;
-                paginate(MESSAGES_PER_PAGINATION);
+
+                // Do a first pagination only if it is required
+                // FIXME: Should be no more require when initialSync/{room_id} will be available
+                if ($scope.state.first_pagination) {
+                    paginate(MESSAGES_PER_PAGINATION);
+                }
+                else {
+                    // There are already messages, go to the last message
+                    scrollToBottom(true);
+                }
             },
             function(error) {
                 $scope.feedback = "Failed get member list: " + error.data.error;

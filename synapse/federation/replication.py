@@ -293,7 +293,8 @@ class ReplicationLayer(object):
 
         for p in transaction.pdus:
             if "age" in p:
-                p["age_ts"] = int(self.clock.time_msec()) - int(p["age"])
+                p["age_ts"] = int(self._clock.time_msec()) - int(p["age"])
+                del p["age"]
 
         pdu_list = [Pdu(**p) for p in transaction.pdus]
 
@@ -602,8 +603,21 @@ class _TransactionQueue(object):
             logger.debug("TX [%s] Sending transaction...", destination)
 
             # Actually send the transaction
+
+            # FIXME (erikj): This is a bit of a hack to make the Pdu age
+            # keys work
+            def cb(transaction):
+                now = int(self._clock.time_msec())
+                if "pdus" in transaction:
+                    for p in transaction["pdus"]:
+                        if "age_ts" in p:
+                            p["age"] = now - int(p["age_ts"])
+
+                return transaction
+
             code, response = yield self.transport_layer.send_transaction(
-                transaction
+                transaction,
+                on_send_callback=cb,
             )
 
             logger.debug("TX [%s] Sent transaction", destination)

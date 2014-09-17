@@ -144,7 +144,7 @@ class TransportLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_transaction(self, transaction):
+    def send_transaction(self, transaction, on_send_callback=None):
         """ Sends the given Transaction to it's destination
 
         Args:
@@ -165,10 +165,23 @@ class TransportLayer(object):
 
         data = transaction.get_dict()
 
+        # FIXME (erikj): This is a bit of a hack to make the Pdu age
+        # keys work
+        def cb(destination, method, path_bytes, producer):
+            if not on_send_callback:
+                return
+
+            transaction = json.loads(producer.body)
+
+            new_transaction = on_send_callback(transaction)
+
+            producer.reset(new_transaction)
+
         code, response = yield self.client.put_json(
             transaction.destination,
             path=PREFIX + "/send/%s/" % transaction.transaction_id,
-            data=data
+            data=data,
+            on_send_callback=cb,
         )
 
         logger.debug(

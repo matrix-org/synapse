@@ -85,7 +85,8 @@ class DataStore(RoomMemberStore, RoomStore,
 
     @defer.inlineCallbacks
     @log_function
-    def persist_event(self, event=None, backfilled=False, pdu=None):
+    def persist_event(self, event=None, backfilled=False, pdu=None,
+                      is_new_state=True):
         stream_ordering = None
         if backfilled:
             if not self.min_token_deferred.called:
@@ -100,6 +101,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 event=event,
                 backfilled=backfilled,
                 stream_ordering=stream_ordering,
+                is_new_state=is_new_state,
             )
         except _RollbackButIsFineException as e:
             pass
@@ -126,12 +128,14 @@ class DataStore(RoomMemberStore, RoomStore,
         defer.returnValue(event)
 
     def _persist_pdu_event_txn(self, txn, pdu=None, event=None,
-                               backfilled=False, stream_ordering=None):
+                               backfilled=False, stream_ordering=None,
+                               is_new_state=True):
         if pdu is not None:
             self._persist_event_pdu_txn(txn, pdu)
         if event is not None:
             return self._persist_event_txn(
-                txn, event, backfilled, stream_ordering
+                txn, event, backfilled, stream_ordering,
+                is_new_state=is_new_state,
             )
 
     def _persist_event_pdu_txn(self, txn, pdu):
@@ -158,7 +162,8 @@ class DataStore(RoomMemberStore, RoomStore,
         self._update_min_depth_for_context_txn(txn, pdu.context, pdu.depth)
 
     @log_function
-    def _persist_event_txn(self, txn, event, backfilled, stream_ordering=None):
+    def _persist_event_txn(self, txn, event, backfilled, stream_ordering=None,
+                           is_new_state=True):
         if event.type == RoomMemberEvent.TYPE:
             self._store_room_member_txn(txn, event)
         elif event.type == FeedbackEvent.TYPE:
@@ -212,7 +217,7 @@ class DataStore(RoomMemberStore, RoomStore,
             )
             raise _RollbackButIsFineException("_persist_event")
 
-        if not backfilled and hasattr(event, "state_key"):
+        if is_new_state and hasattr(event, "state_key"):
             vals = {
                 "event_id": event.event_id,
                 "room_id": event.room_id,

@@ -81,38 +81,155 @@ angular.module('matrixService', [])
 
         return $http(request);
     };
+    
+    var doRegisterLogin = function(path, loginType, sessionId, userName, password, threepidCreds) {
+        var data = {};
+        if (loginType === "m.login.recaptcha") {
+            var challengeToken = Recaptcha.get_challenge();
+            var captchaEntry = Recaptcha.get_response();
+            data = {
+                type: "m.login.recaptcha",
+                challenge: challengeToken,
+                response: captchaEntry
+            };
+        }
+        else if (loginType === "m.login.email.identity") {
+            data = {
+                threepidCreds: threepidCreds
+            };
+        }
+        else if (loginType === "m.login.password") {
+            data = {
+                user: userName,
+                password: password
+            };
+        }
+        
+        if (sessionId) {
+            data.session = sessionId;
+        }
+        data.type = loginType;
+        console.log("doRegisterLogin >>> " + loginType);
+        return doRequest("POST", path, undefined, data);
+    };
 
     return {
         /****** Home server API ******/
         prefix: prefixPath,
 
         // Register an user
-        register: function(user_name, password, threepidCreds, useCaptcha) {         
-            // The REST path spec
+        register: function(user_name, password, threepidCreds, useCaptcha) {
+            // registration is composed of multiple requests, to check you can
+            // register, then to actually register. This deferred will fire when
+            // all the requests are done, along with the final response.
+            var deferred = $q.defer();
             var path = "/register";
             
-            var data = {
-                 user_id: user_name,
-                 password: password,
-                 threepidCreds: threepidCreds
-            };
+            // check we can actually register with this HS.
+            doRequest("GET", path, undefined, undefined).then(
+                function(response) {
+                    console.log("/register [1] : "+JSON.stringify(response));
+                    var flows = response.data.flows;
+                    var knownTypes = [
+                        "m.login.password",
+                        "m.login.recaptcha",
+                        "m.login.email.identity"
+                    ];
+                    // if they entered 3pid creds, we want to use a flow which uses it.
+                    var useThreePidFlow = threepidCreds != undefined;
+                    var flowIndex = 0;
+                    var firstRegType = undefined;
+                    
+                    for (var i=0; i<flows.length; i++) {
+                        var isThreePidFlow = false;
+                        if (flows[i].stages) {
+                            for (var j=0; j<flows[i].stages.length; j++) {
+                                var regType = flows[i].stages[j];
+                                if (knownTypes.indexOf(regType) === -1) {
+                                    deferred.reject("Unknown type: "+regType);
+                                    return;
+                                }
+                                if (regType == "m.login.email.identity") {
+                                    isThreePidFlow = true;
+                                }
+                                if (!useCaptcha && regType == "m.login.recaptcha") {
+                                    console.error("Web client setup to not use captcha, but HS demands a captcha.");
+                                    deferred.reject({
+                                        data: {
+                                            errcode: "M_CAPTCHA_NEEDED",
+                                            error: "Home server requires a captcha."
+                                        }
+                                    });
+                                    return;
+                                }
+                            }
+                        }
+                        
+                        if ( (isThreePidFlow && useThreePidFlow) || (!isThreePidFlow && !useThreePidFlow) ) {
+                            flowIndex = i;
+                        }
+                        
+                        if (knownTypes.indexOf(flows[i].type) == -1) {
+                            deferred.reject("Unknown type: "+flows[i].type);
+                            return;
+                        }
+                    }
+                    
+                    // looks like we can register fine, go ahead and do it.
+                    console.log("Using flow " + JSON.stringify(flows[flowIndex]));
+                    firstRegType = flows[flowIndex].type;
+                    var sessionId = undefined;
+                    
+                    // generic response processor so it can loop as many times as required
+                    var loginResponseFunc = function(response) {
+                        if (response.data.session) {
+                            sessionId = response.data.session;
+                        }
+                        console.log("login response: " + JSON.stringify(response.data));
+                        if (response.data.access_token) {
+                            deferred.resolve(response);
+                        }
+                        else if (response.data.next) {
+                            var nextType = response.data.next;
+                            if (response.data.next instanceof Array) {
+                                for (var i=0; i<response.data.next.length; i++) {
+                                    if (useThreePidFlow && response.data.next[i] == "m.login.email.identity") {
+                                        nextType = response.data.next[i];
+                                        break;
+                                    }
+                                    else if (!useThreePidFlow && response.data.next[i] != "m.login.email.identity") {
+                                        nextType = response.data.next[i];
+                                        break;
+                                    }
+                                }
+                            }
+                            return doRegisterLogin(path, nextType, sessionId, user_name, password, threepidCreds).then(
+                                loginResponseFunc,
+                                function(err) {
+                                    deferred.reject(err);
+                                }
+                            );
+                        }
+                        else {
+                            deferred.reject("Unknown continuation: "+JSON.stringify(response));
+                        }
+                    };
+                    
+                    // set the ball rolling
+                    doRegisterLogin(path, firstRegType, undefined, user_name, password, threepidCreds).then(
+                        loginResponseFunc,
+                        function(err) {
+                            deferred.reject(err);
+                        }
+                    );
+                    
+                },
+                function(err) {
+                    deferred.reject(err);
+                }
+            );
             
-            if (useCaptcha) {
-                // Not all home servers will require captcha on signup, but if this flag is checked,
-                // send captcha information.
-                // TODO: Might be nice to make this a bit more flexible..
-                var challengeToken = Recaptcha.get_challenge();
-                var captchaEntry = Recaptcha.get_response();
-                var captchaType = "m.login.recaptcha";
-                
-                data.captcha = {
-                    type: captchaType,
-                    challenge: challengeToken,
-                    response: captchaEntry
-                };
-            }   
-
-            return doRequest("POST", path, undefined, data);
+            return deferred.promise;
         },
 
         // Create a room

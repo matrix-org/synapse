@@ -104,8 +104,10 @@ angular.module('eventStreamService', [])
         settings.isActive = true;
         var deferred = $q.defer();
 
-        // Initial sync: get all information and the last message of all rooms of the user
-        matrixService.initialSync(1, false).then(
+        // Initial sync: get all information and the last 30 messages of all rooms of the user
+        // 30 messages should be enough to display a full page of messages in a room
+        // without requiring to make an additional request
+        matrixService.initialSync(30, false).then(
             function(response) {
                 var rooms = response.data.rooms;
                 for (var i = 0; i < rooms.length; ++i) {

@@ -1,3 +1,14 @@
+Latest
+======
+
+Registration API:
+ * The registration API has been overhauled to function like the login API. In
+   practice, this means registration requests must now include the following:
+   'type':'m.login.password'. See UPGRADE for more information on this.
+ * The 'user_id' key has been renamed to 'user' to better match the login API.
+ * There is an additional login type: 'm.login.email.identity'.
+ * The command client and web client have been updated to reflect these changes.
+
 Changes in synapse 0.2.3 (2014-09-12)
 =====================================
 

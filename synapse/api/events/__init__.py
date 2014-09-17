@@ -25,6 +25,7 @@ def serialize_event(hs, e):
     d = e.get_dict()
     if "age_ts" in d:
         d["age"] = int(hs.get_clock().time_msec()) - d["age_ts"]
+        del d["age_ts"]
 
     return d
 
@@ -56,6 +57,7 @@ class SynapseEvent(JsonEncodedObject):
         "state_key",
         "required_power_level",
         "age_ts",
+        "prev_content",
     ]
 
     internal_keys = [
@@ -171,10 +173,6 @@ class SynapseEvent(JsonEncodedObject):
 
 
 class SynapseStateEvent(SynapseEvent):
-
-    valid_keys = SynapseEvent.valid_keys + [
-        "prev_content",
-    ]
 
     def __init__(self, **kwargs):
         if "state_key" not in kwargs:

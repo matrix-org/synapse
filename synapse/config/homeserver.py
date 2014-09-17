@@ -20,11 +20,15 @@ from .database import DatabaseConfig
 from .ratelimiting import RatelimitConfig
 from .repository import ContentRepositoryConfig
 from .captcha import CaptchaConfig
+from .email import EmailConfig
+
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
-                       RatelimitConfig, ContentRepositoryConfig, CaptchaConfig):
+                       RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
+                       EmailConfig):
     pass
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     import sys
     HomeServerConfig.load_config("Generate config", sys.argv[1:], "HomeServer")

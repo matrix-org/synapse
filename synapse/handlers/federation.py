@@ -93,21 +93,17 @@ class FederationHandler(BaseHandler):
         """
         event = self.pdu_codec.event_from_pdu(pdu)
 
+        logger.debug("Got event: %s", event.event_id)
+
         with (yield self.lock_manager.lock(pdu.context)):
             if event.is_state and not backfilled:
                 is_new_state = yield self.state_handler.handle_new_state(
                     pdu
                 )
-                if not is_new_state:
-                    return
             else:
                 is_new_state = False
         # TODO: Implement something in federation that allows us to
         # respond to PDU.
-
-        if hasattr(event, "state_key") and not is_new_state:
-            logger.debug("Ignoring old state.")
-            return
 
         target_is_mine = False
         if hasattr(event, "target_host"):
@@ -139,7 +135,11 @@ class FederationHandler(BaseHandler):
 
         else:
             with (yield self.room_lock.lock(event.room_id)):
-                yield self.store.persist_event(event, backfilled)
+                yield self.store.persist_event(
+                    event,
+                    backfilled,
+                    is_new_state=is_new_state
+                )
 
             room = yield self.store.get_room(event.room_id)
 
