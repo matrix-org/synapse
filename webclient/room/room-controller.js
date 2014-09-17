@@ -32,7 +32,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         can_paginate: false, // this is toggled off when we are not ready yet to paginate or when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
         stream_failure: undefined, // the response when the stream fails
-        waiting_for_joined_event: false  // true when the join request is pending. Back to false once the corresponding m.room.member event is received
+        waiting_for_joined_event: false,  // true when the join request is pending. Back to false once the corresponding m.room.member event is received
+        messages_visibility: "hidden" // In order to avoid flickering when scrolling down the message table at the page opening, delay the message table display
     };
     $scope.members = {};
     $scope.autoCompleting = false;
@@ -136,6 +137,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             
             $timeout(function() {
                 objDiv.scrollTop = objDiv.scrollHeight;
+
+                // Show the message table once the first scrolldown is done 
+                if ("visible" !== $scope.state.messages_visibility) {
+                    $timeout(function() {
+                        $scope.state.messages_visibility = "visible";
+                    }, 0);
+                }
             }, 0);
         }
     };

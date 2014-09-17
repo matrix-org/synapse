@@ -56,7 +56,10 @@
         </table>
     </div>
     
-    <div id="messageTableWrapper" ng-hide="state.permission_denied" keep-scroll>
+    <div id="messageTableWrapper" 
+         ng-hide="state.permission_denied" 
+         ng-style="{ 'visibility': state.messages_visibility }"
+         keep-scroll>
         <!-- FIXME: need to have better timestamp semantics than the (msg.content.hsob_ts || msg.ts) hack below -->
         <table id="messageTable" infinite-scroll="paginateMore()">
             <tr ng-repeat="msg in events.rooms[room_id].messages"
