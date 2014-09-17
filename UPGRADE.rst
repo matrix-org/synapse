@@ -20,6 +20,14 @@ to the next stage. There is a new login type: ``m.login.email.identity`` which
 contains the ``threepidCreds`` key which were previously sent in the original
 register request. For more information on this, see the specification.
 
+Web Client
+----------
+
+The VoIP specification has changed between v0.2.0 and v0.3.0. Users should
+refresh any browser tabs to get the latest web client code. Users on
+v0.2.0 of the web client will not be able to call those on v0.3.0 and
+vice versa.
+
 
 Upgrading to v0.2.0
 ===================
