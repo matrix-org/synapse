@@ -15,9 +15,9 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, AuthError
-
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import SynapseError, AuthError, CodeMessageException
+from synapse.api.constants import Membership
+from synapse.api.events.room import RoomMemberEvent
 
 from ._base import BaseHandler
 
@@ -97,6 +97,8 @@ class ProfileHandler(BaseHandler):
             }
         )
 
+        yield self._update_join_states(target_user)
+
     @defer.inlineCallbacks
     def get_avatar_url(self, target_user):
         if target_user.is_mine:
@@ -144,6 +146,8 @@ class ProfileHandler(BaseHandler):
             }
         )
 
+        yield self._update_join_states(target_user)
+
     @defer.inlineCallbacks
     def collect_presencelike_data(self, user, state):
         if not user.is_mine:
@@ -180,3 +184,39 @@ class ProfileHandler(BaseHandler):
             )
 
         defer.returnValue(response)
+
+    @defer.inlineCallbacks
+    def _update_join_states(self, user):
+        if not user.is_mine:
+            return
+
+        joins = yield self.store.get_rooms_for_user_where_membership_is(
+            user.to_string(),
+            [Membership.JOIN],
+        )
+
+        for j in joins:
+            snapshot = yield self.store.snapshot_room(
+                j.room_id, j.state_key, RoomMemberEvent.TYPE,
+                j.state_key
+            )
+
+            content = {
+                "membership": j.content["membership"],
+                "prev": j.content["membership"],
+            }
+
+            yield self.distributor.fire(
+                "collect_presencelike_data", user, content
+            )
+
+            new_event = self.event_factory.create_event(
+                etype=j.type,
+                room_id=j.room_id,
+                state_key=j.state_key,
+                content=content,
+                user_id=j.state_key,
+            )
+
+            yield self.state_handler.handle_new_event(new_event, snapshot)
+            yield self._on_new_room_event(new_event, snapshot)
