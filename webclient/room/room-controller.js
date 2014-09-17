@@ -404,12 +404,15 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     $scope.send = function() {
-        if ($scope.textInput === "") {
+        if (undefined === $scope.textInput || $scope.textInput === "") {
             return;
         }
         
         scrollToBottom(true);
-        
+
+        // Store the command in the history
+        history.push($scope.textInput);
+
         var promise;
         var cmd;
         var args;
@@ -845,6 +848,71 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         call.onHangup = $rootScope.onCallHangup;
         call.placeCall({audio: true, video: true});
         $rootScope.currentCall = call;
+    };
+
+    // Manage history of typed messages
+    var history = {
+        // The list of typed messages. Index 0 is the more recents
+        data: [],
+
+        // The position in the history currently displayed
+        position: -1,
+
+        // The message the user has started to type before going into the history
+        typingMessage: undefined,
+
+        // Store a message in the history
+        push: function(message) {
+            this.data.unshift(message);
+
+            // Reset history position
+            this.position = -1;
+            this.typingMessage = undefined;
+        },
+
+        // Move in the history
+        go: function(offset) {
+
+            if (-1 === this.position) {
+                // User starts to go to into the history, save the current line
+                this.typingMessage = $scope.textInput;
+            }
+            else {
+                // If the user modified this line in history, keep the change
+                this.data[this.position] = $scope.textInput;
+            }
+
+            // Bounds the new position to valid data
+            var newPosition = this.position + offset;
+            newPosition = Math.max(-1, newPosition);
+            newPosition = Math.min(newPosition, this.data.length - 1);
+            this.position = newPosition;
+
+            if (-1 !== this.position) {
+                // Show the message from the history
+                $scope.textInput = this.data[this.position];
+            }
+            else if (undefined !== this.typingMessage) {
+                // Go back to the message the user started to type
+                $scope.textInput = this.typingMessage;
+            }
+        }
+    };
+
+    // Make history singleton methods available from HTML
+    $scope.history = {
+        goUp: function($event) {
+            if ($scope.room_id) {
+                history.go(1);
+            }
+            $event.preventDefault();
+        },
+        goDown: function($event) {
+            if ($scope.room_id) {
+                history.go(-1);
+            }
+            $event.preventDefault();
+        }
     };
 
 }]);

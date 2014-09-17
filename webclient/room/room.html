@@ -156,7 +156,8 @@
                     <td width="*">
                         <textarea id="mainInput" rows="1" ng-model="textInput" ng-enter="send()"
                                   ng-disabled="state.permission_denied"
-                                  ng-focus="true"  autocomplete="off" tab-complete/>
+                                  ng-keydown="(38 === $event.which) ? history.goUp($event) : ((40 === $event.which) ? history.goDown($event) : 0)"
+                                  ng-focus="true" autocomplete="off" tab-complete/>
                     </td>
                     <td id="buttonsCell">
                         <button ng-click="send()" ng-disabled="state.permission_denied">Send</button>
