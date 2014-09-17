@@ -50,9 +50,12 @@ class RoomStoreTestCase(unittest.TestCase):
     def test_get_room(self):
         room = yield self.store.get_room(self.room.to_string())
 
-        self.assertEquals(self.room.to_string(), room.room_id)
-        self.assertEquals(self.u_creator.to_string(), room.creator)
-        self.assertTrue(room.is_public)
+        self.assertObjectHasAttributes(
+            {"room_id": self.room.to_string(),
+             "creator": self.u_creator.to_string(),
+             "is_public": True},
+            room
+        )
 
     @defer.inlineCallbacks
     def test_store_room_config(self):
