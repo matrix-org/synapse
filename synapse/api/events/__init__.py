@@ -154,7 +154,8 @@ class SynapseEvent(JsonEncodedObject):
                     return "Missing %s key" % key
 
                 if type(content[key]) != type(template[key]):
-                    return "Key %s is of the wrong type." % key
+                    return "Key %s is of the wrong type (got %s, want %s)" % (
+                        key, type(content[key]), type(template[key]))
 
                 if type(content[key]) == dict:
                     # we must go deeper
