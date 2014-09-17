@@ -511,6 +511,17 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                 member = room.members[user_id];
             }
             return member;
+        },
+        
+        setRoomVisibility: function(room_id, visible) {
+            if (!visible) {
+                return;
+            }
+            
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                room.visibility = visible;
+            }
         }
     };
 }]);

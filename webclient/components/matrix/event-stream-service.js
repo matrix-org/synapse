@@ -120,6 +120,8 @@ angular.module('eventStreamService', [])
                     if ("state" in room) {
                         eventHandlerService.handleEvents(room.state, false, true);
                     }
+                    
+                    eventHandlerService.setRoomVisibility(room.room_id, room.visibility);
                 }
 
                 var presence = response.data.presence;

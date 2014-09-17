@@ -603,6 +603,10 @@ a:active  { color: #000; }
     width: auto;
 }
 
+.recentsPublicRoom {
+    font-weight: bold;
+}
+
 .recentsRoomSummaryUsersCount, .recentsRoomSummaryTS {
     color: #888;
     font-size: 12px;
