@@ -200,11 +200,17 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                     if (member) {
                         displayname = member.displayname;
                     }
+
+                    var message = event.content.body;
+                    if (event.content.msgtype === "m.emote") {
+                        message = "* " + displayname + " " + message;
+                    }
+
                     var notification = new window.Notification(
                         (displayname || event.user_id) +
                         " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
                     {
-                        "body": event.content.body,
+                        "body": message,
                         "icon": member ? member.avatar_url : undefined
                     });
                     $timeout(function() {
