@@ -53,8 +53,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 return;
             };
 
-            // Use the filter applied in html to set the input value
-            $scope.name.newNameText = $filter('mRoomName')($scope.room_id);
+            var nameEvent = $rootScope.events.rooms[$scope.room_id]['m.room.name'];
+            if (nameEvent) {
+                $scope.name.newNameText = nameEvent.content.name;
+            }
+            else {
+                $scope.name.newNameText = "";
+            }
 
             // Force focus to the input
             $timeout(function() {

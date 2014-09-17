@@ -9,7 +9,7 @@
                     {{ room_id | mRoomName }}
                 </div>
                 <form ng-submit="name.updateName()" ng-show="name.isEditing" class="roomNameForm">
-                    <input ng-model="name.newNameText" ng-blur="name.cancelEdit()" class="roomNameInput" />
+                    <input ng-model="name.newNameText" ng-blur="name.cancelEdit()" class="roomNameInput" placeholder="Room name"/>
                 </form>
             </div>
 
@@ -23,7 +23,7 @@
                         {{ events.rooms[room_id]['m.room.topic'].content.topic | limitTo: 200}}
                     </div>
                     <form ng-submit="topic.updateTopic()" ng-show="topic.isEditing" class="roomTopicForm">
-                        <input ng-model="topic.newTopicText" ng-blur="topic.cancelEdit()" class="roomTopicInput" />
+                        <input ng-model="topic.newTopicText" ng-blur="topic.cancelEdit()" class="roomTopicInput"  placeholder="Topic"/>
                     </form>
                 </div>
             </div>
