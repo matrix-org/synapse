@@ -117,7 +117,6 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             // Report all other metadata of the room object (membership, inviter, visibility, ...)
             for (var field in room) {
                 if (-1 === ["room_id", "messages", "state"].indexOf(field)) {
-                    console.log("#### " + field);
                     $rootScope.events.rooms[room_id][field] = room[field];
                 }
             }
