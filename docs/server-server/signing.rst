@@ -39,18 +39,40 @@ and additional signatures.
 
 ::
 
-  def sign_json(value, signing_key, signing_name):
-      signatures = value.pop("signatures", {})
-      signatures_for_name = signatures.pop(signing_name, {})
-      meta = value.pop("meta", None)
-      signature = signing_key.sign(canonical_json(value))
-      key_identifier = "%s:%s" % (signing_key.algorithm, signing_key.version)
-      signatures_for_name[key_identifier] = encode_base64(signature.signature)
-      signatures[signing_name] = signatures_for_name
-      value["signatures"] = signatures
+  def sign_json(json_object, signing_key, signing_name):
+      signatures = json_object.pop("signatures", {})
+      meta = json_object.pop("meta", None)
+
+      signed = signing_key.sign(encode_canonical_json(json_object))
+      signature_base64 = encode_base64(signed.signature)
+
+      key_id = "%s:%s" % (signing_key.alg, signing_key.version)
+      signatures.setdefault(sigature_name, {})[key_id] = signature_base64
+
+      json_object["signatures"] = signatures
       if meta is not None:
-          value["meta"] = meta
-      return value
+          json_object["meta"] = meta
+
+      return json_object
+
+Checking for a Signature
+------------------------
+
+To check if an entity has signed a JSON object a server does the following
+
+1. Checks if the ``signatures`` object contains an entry with the name of the
+   entity. If the entry is missing then the check fails.
+2. Removes any *signing key identifiers* from the entry with algrothims it
+   doesn't understand. If there are no *signing key identifiers* left then the
+   check fails.
+3. Looks up *verification keys* for the remaining *signing key identifiers*
+   either from a local cache or by consulting a trusted key server. If it
+   cannot find a *verification key* then the check fails.
+4. Decodes the base64 encoded signature bytes. If base64 decoding fails then
+   the check fails.
+5. Checks the signature bytes using the *verification key*. If this fails then
+   the check fails. Otherwise the check succeeds.
+
 
 Canonical JSON
 --------------
