@@ -189,7 +189,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                 
                 // always bing if there are 0 bing words... apparently.
                 var bingWords = matrixService.config().bingWords;
-                if (bingWords && bingWords.length === 0) {
+                if (bingWords === undefined || bingWords.length === 0) {
                     shouldBing = true;
                 }
                 
