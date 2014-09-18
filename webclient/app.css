@@ -124,6 +124,7 @@ a:active  { color: #000; }
 
 #localVideo.ended {
     -webkit-filter: grayscale(1);
+    filter: grayscale(1);
 }
 
 #remoteVideo {
@@ -144,6 +145,7 @@ a:active  { color: #000; }
 
 #remoteVideo.ended {
     -webkit-filter: grayscale(1);
+    filter: grayscale(1);
 }
 
 #headerContent {
