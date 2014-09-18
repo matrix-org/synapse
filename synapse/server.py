@@ -58,6 +58,7 @@ class BaseHomeServer(object):
     DEPENDENCIES = [
         'clock',
         'http_client',
+        'db_name',
         'db_pool',
         'persistence_service',
         'replication_layer',

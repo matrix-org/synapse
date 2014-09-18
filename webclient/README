@@ -1,8 +1,8 @@
 Basic Usage
 -----------
 
-The web client should automatically run when running the home server. Alternatively, you can run
-it stand-alone:
+The web client should automatically run when running the home server. 
+Alternatively, you can run it stand-alone:
 
     $ python -m SimpleHTTPServer
 

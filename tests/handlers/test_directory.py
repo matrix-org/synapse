@@ -24,6 +24,8 @@ from synapse.http.client import HttpClient
 from synapse.handlers.directory import DirectoryHandler
 from synapse.storage.directory import RoomAliasMapping
 
+from tests.utils import SQLiteMemoryDbPool
+
 
 class DirectoryHandlers(object):
     def __init__(self, hs):
@@ -33,6 +35,7 @@ class DirectoryHandlers(object):
 class DirectoryTestCase(unittest.TestCase):
     """ Tests the directory service. """
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.mock_federation = Mock(spec=[
             "make_query",
@@ -43,11 +46,11 @@ class DirectoryTestCase(unittest.TestCase):
             self.query_handlers[query_type] = handler
         self.mock_federation.register_query_handler = register_query_handler
 
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+
         hs = HomeServer("test",
-            datastore=Mock(spec=[
-                "get_association_from_room_alias",
-                "get_joined_hosts_for_room",
-            ]),
+            db_pool=db_pool,
             http_client=None,
             resource_for_federation=Mock(),
             replication_layer=self.mock_federation,
@@ -56,20 +59,16 @@ class DirectoryTestCase(unittest.TestCase):
 
         self.handler = hs.get_handlers().directory_handler
 
-        self.datastore = hs.get_datastore()
-
-        def hosts(room_id):
-            return defer.succeed([])
-        self.datastore.get_joined_hosts_for_room.side_effect = hosts
+        self.store = hs.get_datastore()
 
         self.my_room = hs.parse_roomalias("#my-room:test")
+        self.your_room = hs.parse_roomalias("#your-room:test")
         self.remote_room = hs.parse_roomalias("#another:remote")
 
     @defer.inlineCallbacks
     def test_get_local_association(self):
-        mocked_get = self.datastore.get_association_from_room_alias
-        mocked_get.return_value = defer.succeed(
-            RoomAliasMapping("!8765qwer:test", "#my-room:test", ["test"])
+        yield self.store.create_room_alias_association(
+            self.my_room, "!8765qwer:test", ["test"]
         )
 
         result = yield self.handler.get_association(self.my_room)
@@ -102,9 +101,8 @@ class DirectoryTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_incoming_fed_query(self):
-        mocked_get = self.datastore.get_association_from_room_alias
-        mocked_get.return_value = defer.succeed(
-            RoomAliasMapping("!8765asdf:test", "#your-room:test", ["test"])
+        yield self.store.create_room_alias_association(
+            self.your_room, "!8765asdf:test", ["test"]
         )
 
         response = yield self.query_handlers["directory"](

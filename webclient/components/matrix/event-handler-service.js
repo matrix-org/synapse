@@ -99,7 +99,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
     };
     reset();
 
-    var initRoom = function(room_id) {
+    var initRoom = function(room_id, room) {
         if (!(room_id in $rootScope.events.rooms)) {
             console.log("Creating new handler entry for " + room_id);
             $rootScope.events.rooms[room_id] = {
@@ -111,6 +111,16 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                     earliest_token: "END"   // how far back we've paginated
                 }
             };
+        }
+
+        if (room) {
+            // Report all other metadata of the room object (membership, inviter, visibility, ...)
+            for (var field in room) {
+                if (-1 === ["room_id", "messages", "state"].indexOf(field)) {
+                    $rootScope.events.rooms[room_id][field] = room[field];
+                }
+            }
+            $rootScope.events.rooms[room_id].membership = room.membership;
         }
     };
 
@@ -326,6 +336,10 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
         reset: function() {
             reset();
             $rootScope.$broadcast(RESET_EVENT);
+        },
+        
+        initRoom: function(room) {
+            initRoom(room.room_id, room);
         },
     
         handleEvent: function(event, isLiveEvent, isStateEvent) {

@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
-.controller('RoomController', ['$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall',
-                               function($filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall) {
+.controller('RoomController', ['$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall',
+                               function($filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -189,7 +189,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 // Notify when a user joins
                 if ((document.hidden  || matrixService.presence.unavailable === mPresence.getState())
                         && event.state_key !== $scope.state.user_id  && "join" === event.membership) {
-                    debugger;
                     var notification = new window.Notification(
                         event.content.displayname +
                         " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
@@ -704,7 +703,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 if ($rootScope.events.rooms[$scope.room_id]) {
 
                     // There is no need to do a 1st pagination (initialSync provided enough to fill a page)
-                    $scope.state.first_pagination = false;
+                    if ($rootScope.events.rooms[$scope.room_id].messages.length) {
+                        $scope.state.first_pagination = false;
+                    }
+                    else {
+                        // except if we just joined a room, we won't have this history from initial sync, so we should try to paginate it anyway                        
+                        $scope.state.first_pagination = true;
+                    }
 
                     var members = $rootScope.events.rooms[$scope.room_id].members;
 

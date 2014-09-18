@@ -37,6 +37,10 @@ angular.module('RecentsController')
 
                 filtered.push(room);
             }
+            else if ("invite" === room.membership) {
+                // The only information we have about the room is that the user has been invited
+                filtered.push(room);
+            }
         });
 
         // And time sort them
