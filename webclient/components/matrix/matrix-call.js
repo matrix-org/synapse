@@ -59,7 +59,7 @@ angular.module('MatrixCall', [])
         var stunServer = 'stun:stun.l.google.com:19302';
         var pc;
         if (window.mozRTCPeerConnection) {
-            pc = window.mozRTCPeerConnection({'url': stunServer});
+            pc = new window.mozRTCPeerConnection({'url': stunServer});
         } else {
             pc = new window.RTCPeerConnection({"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]});
         }
