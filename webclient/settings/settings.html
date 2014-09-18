@@ -51,10 +51,10 @@
         <h3>Desktop notifications</h3>
         <div class="section" ng-switch="settings.notifications">
             <div ng-switch-when="granted">
-                Notifications are enabled. You will be alerted when a message contains your user ID or display name.
+                Notifications are enabled.
                 <div class="section">
-                    <h4>Additional words to alert on:</h4>
-                    <p>Leave blank to alert on all messages.</p>
+                    <h4>Specific words to alert on:</h4>
+                    <p>Leave blank to alert on all messages. Your username & display name always alerts.</p>
                     <input size=40 name="bingWords" ng-model="settings.bingWords" ng-list placeholder="Enter words separated with , (supports regex)"
                     ng-blur="saveBingWords()"/>
                     <ul>
