@@ -1,5 +1,32 @@
-Latest
-======
+Changes in synapse 0.3.0 (2014-09-18)
+=====================================
+See UPGRADE for information about changes to the client server API, including
+breaking backwards compatibility with VoIP calls and registration API.
+
+Homeserver:
+ * When a user changes their displayname or avatar the server will now update 
+   all their join states to reflect this.
+ * The server now adds "age" key to events to indicate how old they are. This
+   is clock independent, so at no point does any server or webclient have to
+   assume their clock is in sync with everyone else.
+ * Fix bug where we didn't correctly pull in missing PDUs.
+ * Fix bug where prev_content key wasn't always returned.
+ * Add support for password resets.
+
+Webclient:
+ * Improve page content loading.
+ * Join/parts now trigger desktop notifications.
+ * Always show room aliases in the UI if one is present.
+ * No longer show user-count in the recents side panel.
+ * Add up & down arrow support to the text box for message sending to step
+   through your sent history.
+ * Don't display notifications for our own messages.
+ * Emotes are now formatted correctly in desktop notifications.
+ * The recents list now differentiates between public & private rooms.
+ * Fix bug where when switching between rooms the pagination flickered before
+   the view jumped to the bottom of the screen.
+ * Add support for password resets.
+ * Add bing word support.
 
 Registration API:
  * The registration API has been overhauled to function like the login API. In
