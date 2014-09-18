@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
-.controller('RoomController', ['$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mPresence', 'matrixPhoneService', 'MatrixCall',
-                               function($filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, mPresence, matrixPhoneService, MatrixCall) {
+.controller('RoomController', ['$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall',
+                               function($filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -32,7 +32,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         can_paginate: false, // this is toggled off when we are not ready yet to paginate or when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
         stream_failure: undefined, // the response when the stream fails
-        waiting_for_joined_event: false  // true when the join request is pending. Back to false once the corresponding m.room.member event is received
+        waiting_for_joined_event: false,  // true when the join request is pending. Back to false once the corresponding m.room.member event is received
+        messages_visibility: "hidden" // In order to avoid flickering when scrolling down the message table at the page opening, delay the message table display
     };
     $scope.members = {};
     $scope.autoCompleting = false;
@@ -53,8 +54,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 return;
             };
 
-            // Use the filter applied in html to set the input value
-            $scope.name.newNameText = $filter('mRoomName')($scope.room_id);
+            var nameEvent = $rootScope.events.rooms[$scope.room_id]['m.room.name'];
+            if (nameEvent) {
+                $scope.name.newNameText = nameEvent.content.name;
+            }
+            else {
+                $scope.name.newNameText = "";
+            }
 
             // Force focus to the input
             $timeout(function() {
@@ -131,6 +137,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             
             $timeout(function() {
                 objDiv.scrollTop = objDiv.scrollHeight;
+
+                // Show the message table once the first scrolldown is done 
+                if ("visible" !== $scope.state.messages_visibility) {
+                    $timeout(function() {
+                        $scope.state.messages_visibility = "visible";
+                    }, 0);
+                }
             }, 0);
         }
     };
@@ -139,27 +152,11 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         if (isLive && event.room_id === $scope.room_id) {
             
             scrollToBottom();
-
-            if (window.Notification) {
-                // Show notification when the window is hidden, or the user is idle
-                if (document.hidden || matrixService.presence.unavailable === mPresence.getState()) {
-                    var notification = new window.Notification(
-                        ($scope.members[event.user_id].displayname || event.user_id) +
-                        " (" + ($scope.room_alias || $scope.room_id) + ")", // FIXME: don't leak room_ids here
-                    {
-                        "body": event.content.body,
-                        "icon": $scope.members[event.user_id].avatar_url
-                    });
-                    $timeout(function() {
-                        notification.close();
-                    }, 5 * 1000);
-                }
-            }
         }
     });
     
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
-        if (isLive) {
+        if (isLive && event.room_id === $scope.room_id) {
             if ($scope.state.waiting_for_joined_event) {
                 // The user has successfully joined the room, we can getting data for this room
                 $scope.state.waiting_for_joined_event = false;
@@ -177,19 +174,33 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 else {
                     user = event.user_id;
                 }
-
                  
                 if ("ban" === event.membership) {
                     $scope.state.permission_denied = "You have been banned by " + user;
                 }
                 else {
                     $scope.state.permission_denied = "You have been kicked by " + user;
-                }
-                
+                }  
             }
             else {
                 scrollToBottom();
                 updateMemberList(event); 
+
+                // Notify when a user joins
+                if ((document.hidden  || matrixService.presence.unavailable === mPresence.getState())
+                        && event.state_key !== $scope.state.user_id  && "join" === event.membership) {
+                    debugger;
+                    var notification = new window.Notification(
+                        event.content.displayname +
+                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
+                    {
+                        "body": event.content.displayname + " joined",
+                        "icon": event.content.avatar_url ? event.content.avatar_url : undefined
+                    });
+                    $timeout(function() {
+                        notification.close();
+                    }, 5 * 1000);
+                }
             }
         }
     });
@@ -235,7 +246,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         matrixService.paginateBackMessages($scope.room_id, $rootScope.events.rooms[$scope.room_id].pagination.earliest_token, numItems).then(
             function(response) {
 
-                eventHandlerService.handleRoomMessages($scope.room_id, response.data, false);
+                eventHandlerService.handleRoomMessages($scope.room_id, response.data, false, 'b');
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
                     // no more messages to paginate. this currently never gets turned true again, as we never
                     // expire paginated contents in the current implementation.
@@ -406,12 +417,15 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     $scope.send = function() {
-        if ($scope.textInput === "") {
+        if (undefined === $scope.textInput || $scope.textInput === "") {
             return;
         }
         
         scrollToBottom(true);
-        
+
+        // Store the command in the history
+        history.push($scope.textInput);
+
         var promise;
         var cmd;
         var args;
@@ -676,6 +690,10 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     var onInit2 = function() {
         console.log("onInit2");
         
+        // Scroll down as soon as possible so that we point to the last message
+        // if it already exists in memory
+        scrollToBottom(true);
+
         // Make sure the initialSync has been before going further
         eventHandlerService.waitForInitialSyncCompletion().then(
             function() {
@@ -684,6 +702,10 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 
                 // The room members is available in the data fetched by initialSync
                 if ($rootScope.events.rooms[$scope.room_id]) {
+
+                    // There is no need to do a 1st pagination (initialSync provided enough to fill a page)
+                    $scope.state.first_pagination = false;
+
                     var members = $rootScope.events.rooms[$scope.room_id].members;
 
                     // Update the member list
@@ -729,7 +751,10 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         // Make recents highlight the current room
         $scope.recentsSelectedRoomID = $scope.room_id;
 
-		// Get the up-to-date the current member list
+        // Init the history for this room
+        history.init();
+
+        // Get the up-to-date the current member list
         matrixService.getMemberList($scope.room_id).then(
             function(response) {
                 for (var i = 0; i < response.data.chunk.length; i++) {
@@ -743,9 +768,18 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 // Arm list timing update timer
                 updateMemberListPresenceAge();
 
-                // Start pagination
+                // Allow pagination
                 $scope.state.can_paginate = true;
-                paginate(MESSAGES_PER_PAGINATION);
+
+                // Do a first pagination only if it is required
+                // FIXME: Should be no more require when initialSync/{room_id} will be available
+                if ($scope.state.first_pagination) {
+                    paginate(MESSAGES_PER_PAGINATION);
+                }
+                else {
+                    // There are already messages, go to the last message
+                    scrollToBottom(true);
+                }
             },
             function(error) {
                 $scope.feedback = "Failed get member list: " + error.data.error;
@@ -830,6 +864,84 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         call.onHangup = $rootScope.onCallHangup;
         call.placeCall({audio: true, video: true});
         $rootScope.currentCall = call;
+    };
+
+    // Manage history of typed messages
+    // History is saved in sessionStoratge so that it survives when the user
+    // navigates through the rooms and when it refreshes the page
+    var history = {
+        // The list of typed messages. Index 0 is the more recents
+        data: [],
+
+        // The position in the history currently displayed
+        position: -1,
+
+        // The message the user has started to type before going into the history
+        typingMessage: undefined,
+
+        // Init/load data for the current room
+        init: function() {
+            var data = sessionStorage.getItem("history_" + $scope.room_id);
+            if (data) {
+                this.data = JSON.parse(data);
+            }
+        },
+
+        // Store a message in the history
+        push: function(message) {
+            this.data.unshift(message);
+
+            // Update the session storage
+            sessionStorage.setItem("history_" + $scope.room_id, JSON.stringify(this.data));
+
+            // Reset history position
+            this.position = -1;
+            this.typingMessage = undefined;
+        },
+
+        // Move in the history
+        go: function(offset) {
+
+            if (-1 === this.position) {
+                // User starts to go to into the history, save the current line
+                this.typingMessage = $scope.textInput;
+            }
+            else {
+                // If the user modified this line in history, keep the change
+                this.data[this.position] = $scope.textInput;
+            }
+
+            // Bounds the new position to valid data
+            var newPosition = this.position + offset;
+            newPosition = Math.max(-1, newPosition);
+            newPosition = Math.min(newPosition, this.data.length - 1);
+            this.position = newPosition;
+
+            if (-1 !== this.position) {
+                // Show the message from the history
+                $scope.textInput = this.data[this.position];
+            }
+            else if (undefined !== this.typingMessage) {
+                // Go back to the message the user started to type
+                $scope.textInput = this.typingMessage;
+            }
+        }
+    };
+
+    // Make history singleton methods available from HTML
+    $scope.history = {
+        goUp: function($event) {
+            if ($scope.room_id) {
+                history.go(1);
+            }
+            $event.preventDefault();
+        },
+        goDown: function($event) {
+            if ($scope.room_id) {
+                history.go(-1);
+            }
+            $event.preventDefault();
+        }
     };
 
 }]);

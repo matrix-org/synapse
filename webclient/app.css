@@ -528,15 +528,18 @@ a:active  { color: #000; }
 }
 
 .bubble .message {
-    /* Break lines when encountering CR+LF */
-    /* FIXME: this breaks wordwrapping.  We need to s#CRLF#<br/>#g instead */
-/*    white-space: pre; */
+    /* Wrap words and break lines on CR+LF */
+    white-space: pre-wrap;
 }
 .bubble .messagePending {
     opacity: 0.3
 }
 .messageUnSent {
     color: #F00;
+}
+
+.messageBing {
+    color: #00F;
 }
 
 #room-fullscreen-image {
@@ -600,7 +603,11 @@ a:active  { color: #000; }
     width: auto;
 }
 
-.recentsRoomSummaryTS {
+.recentsPublicRoom {
+    font-weight: bold;
+}
+
+.recentsRoomSummaryUsersCount, .recentsRoomSummaryTS {
     color: #888;
     font-size: 12px;
     width: 7em;
@@ -611,6 +618,11 @@ a:active  { color: #000; }
     color: #888;
     font-size: 12px;
     padding-bottom: 5px;
+}
+
+/* Do not show users count in the recents fragment displayed on the room page */
+#roomPage .recentsRoomSummaryUsersCount {
+    width: 0em;
 }
 
 /*** Recents in the room page ***/

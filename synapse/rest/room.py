@@ -378,7 +378,7 @@ class RoomTriggerBackfill(RestServlet):
         handler = self.handlers.federation_handler
         events = yield handler.backfill(remote_server, room_id, limit)
 
-        res = [event.get_dict() for event in events]
+        res = [self.hs.serialize_event(event) for event in events]
         defer.returnValue((200, res))
 
 

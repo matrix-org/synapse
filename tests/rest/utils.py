@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 # trial imports
-from twisted.trial import unittest
+from tests import unittest
 
 from synapse.api.constants import Membership
 
@@ -95,8 +95,14 @@ class RestTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def register(self, user_id):
-        (code, response) = yield self.mock_resource.trigger("POST", "/register",
-                                '{"user_id":"%s"}' % user_id)
+        (code, response) = yield self.mock_resource.trigger(
+            "POST",
+            "/register",
+            json.dumps({
+                "user": user_id,
+                "password": "test",
+                "type": "m.login.password"
+            }))
         self.assertEquals(200, code)
         defer.returnValue(response)
 

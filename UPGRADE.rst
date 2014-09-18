@@ -1,3 +1,34 @@
+Upgrading to v0.3.0
+===================
+
+This registration API now closely matches the login API. This introduces a bit
+more backwards and forwards between the HS and the client, but this improves
+the overall flexibility of the API. You can now GET on /register to retrieve a list
+of valid registration flows. Upon choosing one, they are submitted in the same
+way as login, e.g::
+
+  {
+    type: m.login.password,
+    user: foo,
+    password: bar
+  }
+
+The default HS supports 2 flows, with and without Identity Server email
+authentication. Enabling captcha on the HS will add in an extra step to all
+flows: ``m.login.recaptcha`` which must be completed before you can transition
+to the next stage. There is a new login type: ``m.login.email.identity`` which
+contains the ``threepidCreds`` key which were previously sent in the original
+register request. For more information on this, see the specification.
+
+Web Client
+----------
+
+The VoIP specification has changed between v0.2.0 and v0.3.0. Users should
+refresh any browser tabs to get the latest web client code. Users on
+v0.2.0 of the web client will not be able to call those on v0.3.0 and
+vice versa.
+
+
 Upgrading to v0.2.0
 ===================
 

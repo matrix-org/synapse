@@ -27,7 +27,8 @@ Typically, this service will store events or broadcast them to any listeners
 if typically all the $on method would do is update its own $scope.
 */
 angular.module('eventHandlerService', [])
-.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', function(matrixService, $rootScope, $q) {
+.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 
+function(matrixService, $rootScope, $q, $timeout, mPresence) {
     var ROOM_CREATE_EVENT = "ROOM_CREATE_EVENT";
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
@@ -38,6 +39,51 @@ angular.module('eventHandlerService', [])
     var TOPIC_EVENT = "TOPIC_EVENT";
     var RESET_EVENT = "RESET_EVENT";    // eventHandlerService has been resetted
 
+    // used for dedupping events - could be expanded in future...
+    // FIXME: means that we leak memory over time (along with lots of the rest
+    // of the app, given we never try to reap memory yet)
+    var eventMap = {};
+
+    $rootScope.presence = {};
+    
+    // TODO: This is attached to the rootScope so .html can just go containsBingWord
+    // for determining classes so it is easy to highlight bing messages. It seems a
+    // bit strange to put the impl in this service though, but I can't think of a better
+    // file to put it in.
+    $rootScope.containsBingWord = function(content) {
+        if (!content || $.type(content) != "string") {
+            return false;
+        }
+        var bingWords = matrixService.config().bingWords;
+        var shouldBing = false;
+        
+        // case-insensitive name check for user_id OR display_name if they exist
+        var myUserId = matrixService.config().user_id;
+        if (myUserId) {
+            myUserId = myUserId.toLocaleLowerCase();
+        }
+        var myDisplayName = matrixService.config().display_name;
+        if (myDisplayName) {
+            myDisplayName = myDisplayName.toLocaleLowerCase();
+        }
+        if ( (myDisplayName && content.toLocaleLowerCase().indexOf(myDisplayName) != -1) ||
+             (myUserId && content.toLocaleLowerCase().indexOf(myUserId) != -1) ) {
+            shouldBing = true;
+        }
+        
+        // bing word list check
+        if (bingWords && !shouldBing) {
+            for (var i=0; i<bingWords.length; i++) {
+                var re = RegExp(bingWords[i]);
+                if (content.search(re) != -1) {
+                    shouldBing = true;
+                    break;
+                }
+            }
+        }
+        return shouldBing;
+    };
+
     var initialSyncDeferred;
 
     var reset = function() {
@@ -46,26 +92,24 @@ angular.module('eventHandlerService', [])
         $rootScope.events = {
             rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
         };
-    }
+
+        $rootScope.presence = {};
+
+        eventMap = {};
+    };
     reset();
 
-    // used for dedupping events - could be expanded in future...
-    // FIXME: means that we leak memory over time (along with lots of the rest
-    // of the app, given we never try to reap memory yet)
-    var eventMap = {};
-
-    $rootScope.presence = {};
-    
     var initRoom = function(room_id) {
         if (!(room_id in $rootScope.events.rooms)) {
             console.log("Creating new handler entry for " + room_id);
-            $rootScope.events.rooms[room_id] = {};
-            $rootScope.events.rooms[room_id].messages = [];
-            $rootScope.events.rooms[room_id].members = {};
-
-            // Pagination information
-            $rootScope.events.rooms[room_id].pagination = {
-                earliest_token: "END"   // how far back we've paginated
+            $rootScope.events.rooms[room_id] = {
+                room_id: room_id,
+                messages: [],
+                members: {},
+                // Pagination information
+                pagination: {
+                    earliest_token: "END"   // how far back we've paginated
+                }
             };
         }
     };
@@ -132,6 +176,48 @@ angular.module('eventHandlerService', [])
             else {
                 $rootScope.events.rooms[event.room_id].messages.push(event);
             }
+            
+            if (window.Notification && event.user_id != matrixService.config().user_id) {
+                var shouldBing = $rootScope.containsBingWord(event.content.body);
+            
+                // TODO: Binging every message when idle doesn't make much sense. Can we use this more sensibly?
+                // Unfortunately document.hidden = false on ubuntu chrome if chrome is minimised / does not have focus;
+                // true when you swap tabs though. However, for the case where the chat screen is OPEN and there is
+                // another window on top, we want to be notifying for those events. This DOES mean that there will be
+                // notifications when currently viewing the chat screen though, but that is preferable to the alternative imo.
+                var isIdle = (document.hidden || matrixService.presence.unavailable === mPresence.getState());
+                
+                // always bing if there are 0 bing words... apparently.
+                var bingWords = matrixService.config().bingWords;
+                if (bingWords && bingWords.length === 0) {
+                    shouldBing = true;
+                }
+                
+                if (shouldBing) {
+                    console.log("Displaying notification for "+JSON.stringify(event));
+                    var member = $rootScope.events.rooms[event.room_id].members[event.user_id];
+                    var displayname = undefined;
+                    if (member) {
+                        displayname = member.displayname;
+                    }
+
+                    var message = event.content.body;
+                    if (event.content.msgtype === "m.emote") {
+                        message = "* " + displayname + " " + message;
+                    }
+
+                    var notification = new window.Notification(
+                        (displayname || event.user_id) +
+                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
+                    {
+                        "body": message,
+                        "icon": member ? member.avatar_url : undefined
+                    });
+                    $timeout(function() {
+                        notification.close();
+                    }, 5 * 1000);
+                }
+            }
         }
         else {
             $rootScope.events.rooms[event.room_id].messages.unshift(event);
@@ -157,8 +243,9 @@ angular.module('eventHandlerService', [])
         // add membership changes as if they were a room message if something interesting changed
         // Exception: Do not do this if the event is a room state event because such events already come
         // as room messages events. Moreover, when they come as room messages events, they are relatively ordered
-        // with other other room messages
-        if (event.content.prev !== event.content.membership && !isStateEvent) {
+        // with other other room messages XXX This is no longer true, you only get a single event, not a room message event.
+        // FIXME: This possibly reintroduces multiple join messages.
+        if (event.content.prev !== event.content.membership) { // && !isStateEvent
             if (isLiveEvent) {
                 $rootScope.events.rooms[event.room_id].messages.push(event);
             }
@@ -204,7 +291,7 @@ angular.module('eventHandlerService', [])
 
     var handleCallEvent = function(event, isLiveEvent) {
         $rootScope.$broadcast(CALL_EVENT, event, isLiveEvent);
-        if (event.type == 'm.call.invite') {
+        if (event.type === 'm.call.invite') {
             $rootScope.events.rooms[event.room_id].messages.push(event);
         }
     };
@@ -231,7 +318,7 @@ angular.module('eventHandlerService', [])
             }
         }
         return index;
-    }
+    };
     
     return {
         ROOM_CREATE_EVENT: ROOM_CREATE_EVENT,
@@ -253,7 +340,9 @@ angular.module('eventHandlerService', [])
 
             // FIXME: /initialSync on a particular room is not yet available
             // So initRoom on a new room is not called. Make sure the room data is initialised here
-            initRoom(event.room_id);
+            if (event.room_id) {
+                initRoom(event.room_id);
+            }
 
             // Avoid duplicated events
             // Needed for rooms where initialSync has not been done. 
@@ -287,6 +376,7 @@ angular.module('eventHandlerService', [])
                         handleMessage(event, isLiveEvent);
                         break;
                     case "m.room.member":
+                        isStateEvent = true;
                         handleRoomMember(event, isLiveEvent, isStateEvent);
                         break;
                     case "m.presence":
@@ -316,19 +406,39 @@ angular.module('eventHandlerService', [])
         // isLiveEvents determines whether notifications should be shown, whether
         // messages get appended to the start/end of lists, etc.
         handleEvents: function(events, isLiveEvents, isStateEvents) {
+            // XXX FIXME TODO: isStateEvents is being left as undefined sometimes. It makes no sense
+            // to have isStateEvents as an arg, since things like m.room.member are ALWAYS state events.
             for (var i=0; i<events.length; i++) {
                 this.handleEvent(events[i], isLiveEvents, isStateEvents);
             }
         },
 
         // Handle messages from /initialSync or /messages
-        handleRoomMessages: function(room_id, messages, isLiveEvents) {
+        handleRoomMessages: function(room_id, messages, isLiveEvents, dir) {
             initRoom(room_id);
-            this.handleEvents(messages.chunk, isLiveEvents);
 
-            // Store how far back we've paginated
-            // This assumes the paginations requests are contiguous and in reverse chronological order
-            $rootScope.events.rooms[room_id].pagination.earliest_token = messages.end;
+            var events = messages.chunk;
+
+            // Handles messages according to their time order
+            if (dir && 'b' === dir) {
+                // paginateBackMessages requests messages to be in reverse chronological order
+                for (var i=0; i<events.length; i++) {
+                    // FIXME: Being live != being state
+                    this.handleEvent(events[i], isLiveEvents, isLiveEvents);
+                }
+                
+                // Store how far back we've paginated
+                $rootScope.events.rooms[room_id].pagination.earliest_token = messages.end;
+            }
+            else {
+                // InitialSync returns messages in chronological order
+                for (var i=events.length - 1; i>=0; i--) {
+                    // FIXME: Being live != being state
+                    this.handleEvent(events[i], isLiveEvents, isLiveEvents);
+                }
+                // Store where to start pagination
+                $rootScope.events.rooms[room_id].pagination.earliest_token = messages.start;
+            }
         },
 
         handleInitialSyncDone: function(initialSyncData) {
@@ -343,6 +453,82 @@ angular.module('eventHandlerService', [])
 
         resetRoomMessages: function(room_id) {
             resetRoomMessages(room_id);
+        },
+        
+        /**
+         * Return the last message event of a room
+         * @param {String} room_id the room id
+         * @param {Boolean} filterFake true to not take into account fake messages
+         * @returns {undefined | Event} the last message event if available
+         */
+        getLastMessage: function(room_id, filterEcho) {
+            var lastMessage;
+
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                for (var i = room.messages.length - 1; i >= 0; i--) {
+                    var message = room.messages[i];
+
+                    if (!filterEcho || undefined === message.echo_msg_state) {
+                        lastMessage = message;
+                        break;
+                    }
+                }
+            }
+
+            return lastMessage;
+        },
+        
+        /**
+         * Compute the room users number, ie the number of members who has joined the room.
+         * @param {String} room_id the room id
+         * @returns {undefined | Number} the room users number if available
+         */
+        getUsersCountInRoom: function(room_id) {
+            var memberCount;
+
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                memberCount = 0;
+
+                for (var i in room.members) {
+                    var member = room.members[i];
+
+                    if ("join" === member.membership) {
+                        memberCount = memberCount + 1;
+                    }
+                }
+            }
+
+            return memberCount;
+        },
+        
+        /**
+         * Get the member object of a room member
+         * @param {String} room_id the room id
+         * @param {String} user_id the id of the user
+         * @returns {undefined | Object} the member object of this user in this room if he is part of the room
+         */
+        getMember: function(room_id, user_id) {
+            var member;
+            
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                member = room.members[user_id];
+            }
+            return member;
+        },
+        
+        setRoomVisibility: function(room_id, visible) {
+            if (!visible) {
+                return;
+            }
+            initRoom(room_id);
+            
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                room.visibility = visible;
+            }
         }
     };
 }]);

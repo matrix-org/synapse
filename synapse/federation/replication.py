@@ -291,6 +291,13 @@ class ReplicationLayer(object):
     def on_incoming_transaction(self, transaction_data):
         transaction = Transaction(**transaction_data)
 
+        for p in transaction.pdus:
+            if "age" in p:
+                p["age_ts"] = int(self._clock.time_msec()) - int(p["age"])
+                del p["age"]
+
+        pdu_list = [Pdu(**p) for p in transaction.pdus]
+
         logger.debug("[%s] Got transaction", transaction.transaction_id)
 
         response = yield self.transaction_actions.have_responded(transaction)
@@ -302,8 +309,6 @@ class ReplicationLayer(object):
             return
 
         logger.debug("[%s] Transacition is new", transaction.transaction_id)
-
-        pdu_list = [Pdu(**p) for p in transaction.pdus]
 
         dl = []
         for pdu in pdu_list:
@@ -405,9 +410,14 @@ class ReplicationLayer(object):
         """Returns a new Transaction containing the given PDUs suitable for
         transmission.
         """
+        pdus = [p.get_dict() for p in pdu_list]
+        for p in pdus:
+            if "age_ts" in pdus:
+                p["age"] = int(self.clock.time_msec()) - p["age_ts"]
+
         return Transaction(
-            pdus=[p.get_dict() for p in pdu_list],
             origin=self.server_name,
+            pdus=pdus,
             ts=int(self._clock.time_msec()),
             destination=None,
         )
@@ -593,8 +603,21 @@ class _TransactionQueue(object):
             logger.debug("TX [%s] Sending transaction...", destination)
 
             # Actually send the transaction
+
+            # FIXME (erikj): This is a bit of a hack to make the Pdu age
+            # keys work
+            def cb(transaction):
+                now = int(self._clock.time_msec())
+                if "pdus" in transaction:
+                    for p in transaction["pdus"]:
+                        if "age_ts" in p:
+                            p["age"] = now - int(p["age_ts"])
+
+                return transaction
+
             code, response = yield self.transport_layer.send_transaction(
-                transaction
+                transaction,
+                on_send_callback=cb,
             )
 
             logger.debug("TX [%s] Sent transaction", destination)

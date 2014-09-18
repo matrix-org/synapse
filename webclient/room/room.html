@@ -9,7 +9,7 @@
                     {{ room_id | mRoomName }}
                 </div>
                 <form ng-submit="name.updateName()" ng-show="name.isEditing" class="roomNameForm">
-                    <input ng-model="name.newNameText" ng-blur="name.cancelEdit()" class="roomNameInput" />
+                    <input ng-model="name.newNameText" ng-blur="name.cancelEdit()" class="roomNameInput" placeholder="Room name"/>
                 </form>
             </div>
 
@@ -23,7 +23,7 @@
                         {{ events.rooms[room_id]['m.room.topic'].content.topic | limitTo: 200}}
                     </div>
                     <form ng-submit="topic.updateTopic()" ng-show="topic.isEditing" class="roomTopicForm">
-                        <input ng-model="topic.newTopicText" ng-blur="topic.cancelEdit()" class="roomTopicInput" />
+                        <input ng-model="topic.newTopicText" ng-blur="topic.cancelEdit()" class="roomTopicInput"  placeholder="Topic"/>
                     </form>
                 </div>
             </div>
@@ -56,7 +56,10 @@
         </table>
     </div>
     
-    <div id="messageTableWrapper" ng-hide="state.permission_denied" keep-scroll>
+    <div id="messageTableWrapper" 
+         ng-hide="state.permission_denied" 
+         ng-style="{ 'visibility': state.messages_visibility }"
+         keep-scroll>
         <!-- FIXME: need to have better timestamp semantics than the (msg.content.hsob_ts || msg.ts) hack below -->
         <table id="messageTable" infinite-scroll="paginateMore()">
             <tr ng-repeat="msg in events.rooms[room_id].messages"
@@ -105,7 +108,7 @@
                         
                         <span ng-show='msg.content.msgtype === "m.text"' 
                               class="message"
-                              ng-class="msg.echo_msg_state"
+                              ng-class="containsBingWord(msg.content.body) && msg.user_id != state.user_id ? msg.echo_msg_state + ' messageBing' : msg.echo_msg_state"
                               ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
 
                         <span ng-show='msg.type === "m.call.invite" && msg.user_id == state.user_id'>Outgoing Call</span>
@@ -156,7 +159,8 @@
                     <td width="*">
                         <textarea id="mainInput" rows="1" ng-model="textInput" ng-enter="send()"
                                   ng-disabled="state.permission_denied"
-                                  ng-focus="true"  autocomplete="off" tab-complete/>
+                                  ng-keydown="(38 === $event.which) ? history.goUp($event) : ((40 === $event.which) ? history.goDown($event) : 0)"
+                                  ng-focus="true" autocomplete="off" tab-complete/>
                     </td>
                     <td id="buttonsCell">
                         <button ng-click="send()" ng-disabled="state.permission_denied">Send</button>

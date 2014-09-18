@@ -47,13 +47,19 @@ angular.module('MatrixCall', [])
         this.call_id = "c" + new Date().getTime();
         this.state = 'fledgling';
         this.didConnect = false;
+
+        // a queue for candidates waiting to go out. We try to amalgamate candidates into a single candidate message where possible
+        this.candidateSendQueue = [];
+        this.candidateSendTries = 0;
     }
+
+    MatrixCall.CALL_TIMEOUT = 60000;
 
     MatrixCall.prototype.createPeerConnection = function() {
         var stunServer = 'stun:stun.l.google.com:19302';
         var pc;
         if (window.mozRTCPeerConnection) {
-            pc = window.mozRTCPeerConnection({'url': stunServer});
+            pc = new window.mozRTCPeerConnection({'url': stunServer});
         } else {
             pc = new window.RTCPeerConnection({"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]});
         }
@@ -74,12 +80,30 @@ angular.module('MatrixCall', [])
         this.config = config;
     };
 
-    MatrixCall.prototype.initWithInvite = function(msg) {
-        this.msg = msg;
+    MatrixCall.prototype.initWithInvite = function(event) {
+        this.msg = event.content;
         this.peerConn = this.createPeerConnection();
         this.peerConn.setRemoteDescription(new RTCSessionDescription(this.msg.offer), this.onSetRemoteDescriptionSuccess, this.onSetRemoteDescriptionError);
         this.state = 'ringing';
         this.direction = 'inbound';
+        var self = this;
+        $timeout(function() {
+            if (self.state == 'ringing') {
+                self.state = 'ended';
+                self.hangupParty = 'remote'; // effectively
+                self.stopAllMedia();
+                if (self.peerConn.signalingState != 'closed') self.peerConn.close();
+                if (self.onHangup) self.onHangup(self);
+            }
+        }, this.msg.lifetime - event.age);
+    };
+
+    // perverse as it may seem, sometimes we want to instantiate a call with a hangup message
+    // (because when getting the state of the room on load, events come in reverse order and
+    // we want to remember that a call has been hung up)
+    MatrixCall.prototype.initWithHangup = function(event) {
+        this.msg = event.content;
+        this.state = 'ended';
     };
 
     MatrixCall.prototype.answer = function() {
@@ -174,12 +198,7 @@ angular.module('MatrixCall', [])
     MatrixCall.prototype.gotLocalIceCandidate = function(event) {
         console.log(event);
         if (event.candidate) {
-            var content = {
-                version: 0,
-                call_id: this.call_id,
-                candidate: event.candidate
-            };
-            this.sendEventWithRetry('m.call.candidate', content);
+            this.sendCandidate(event.candidate);
         }
     }
 
@@ -189,14 +208,12 @@ angular.module('MatrixCall', [])
             console.log("Ignoring remote ICE candidate because call has ended");
             return;
         }
-        var candidateObject = new RTCIceCandidate({
-            sdpMLineIndex: cand.label,
-            candidate: cand.candidate
-        });
-        this.peerConn.addIceCandidate(candidateObject, function() {}, function(e) {});
+        this.peerConn.addIceCandidate(new RTCIceCandidate(cand), function() {}, function(e) {});
     };
 
     MatrixCall.prototype.receivedAnswer = function(msg) {
+        if (this.state == 'ended') return;
+
         this.peerConn.setRemoteDescription(new RTCSessionDescription(msg.answer), this.onSetRemoteDescriptionSuccess, this.onSetRemoteDescriptionError);
         this.state = 'connecting';
     };
@@ -214,11 +231,19 @@ angular.module('MatrixCall', [])
         var content = {
             version: 0,
             call_id: this.call_id,
-            offer: description
+            offer: description,
+            lifetime: MatrixCall.CALL_TIMEOUT
         };
         this.sendEventWithRetry('m.call.invite', content);
 
         var self = this;
+        $timeout(function() {
+            if (self.state == 'invite_sent') {
+                self.hangupReason = 'invite_timeout';
+                self.hangup();
+            }
+        }, MatrixCall.CALL_TIMEOUT);
+
         $rootScope.$apply(function() {
             self.state = 'invite_sent';
         });
@@ -367,6 +392,54 @@ angular.module('MatrixCall', [])
         var self = this;
         $timeout(function() {
             matrixService.sendEvent(self.room_id, ev.type, undefined, ev.content).then(self.eventSent, function(error) { self.eventSendFailed(ev, error); } );
+        }, delayMs);
+    };
+
+    // Sends candidates with are sent in a special way because we try to amalgamate them into one message
+    MatrixCall.prototype.sendCandidate = function(content) {
+        this.candidateSendQueue.push(content);
+        var self = this;
+        if (this.candidateSendTries == 0) $timeout(function() { self.sendCandidateQueue(); }, 100);
+    };
+
+    MatrixCall.prototype.sendCandidateQueue = function(content) {
+        if (this.candidateSendQueue.length == 0) return;
+
+        var cands = this.candidateSendQueue;
+        this.candidateSendQueue = [];
+        ++this.candidateSendTries;
+        var content = {
+            version: 0,
+            call_id: this.call_id,
+            candidates: cands
+        };
+        var self = this;
+        console.log("Attempting to send "+cands.length+" candidates");
+        matrixService.sendEvent(self.room_id, 'm.call.candidates', undefined, content).then(function() { self.candsSent(); }, function(error) { self.candsSendFailed(cands, error); } );
+    };
+
+    MatrixCall.prototype.candsSent = function() {
+        this.candidateSendTries = 0;
+        this.sendCandidateQueue();
+    };
+
+    MatrixCall.prototype.candsSendFailed = function(cands, error) {
+        for (var i = 0; i < cands.length; ++i) {
+            this.candidateSendQueue.push(cands[i]);
+        }
+
+        if (this.candidateSendTries > 5) {
+            console.log("Failed to send candidates on attempt "+ev.tries+". Giving up for now.");
+            this.candidateSendTries = 0;
+            return;
+        }
+
+        var delayMs = 500 * Math.pow(2, this.candidateSendTries);
+        ++this.candidateSendTries;
+        console.log("Failed to send candidates. Retrying in "+delayMs+"ms");
+        var self = this;
+        $timeout(function() {
+            self.sendCandidateQueue();
         }, delayMs);
     };
 

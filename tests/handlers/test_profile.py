@@ -14,18 +14,15 @@
 # limitations under the License.
 
 
-from twisted.trial import unittest
+from tests import unittest
 from twisted.internet import defer
 
 from mock import Mock
-import logging
 
 from synapse.api.errors import AuthError
 from synapse.server import HomeServer
 from synapse.handlers.profile import ProfileHandler
-
-
-logging.getLogger().addHandler(logging.NullHandler())
+from synapse.api.constants import Membership
 
 
 class ProfileHandlers(object):
@@ -54,6 +51,7 @@ class ProfileTestCase(unittest.TestCase):
                     "set_profile_displayname",
                     "get_profile_avatar_url",
                     "set_profile_avatar_url",
+                    "get_rooms_for_user_where_membership_is",
                 ]),
                 handlers=None,
                 resource_for_federation=Mock(),
@@ -68,6 +66,10 @@ class ProfileTestCase(unittest.TestCase):
         self.alice = hs.parse_userid("@alice:remote")
 
         self.handler = hs.get_handlers().profile_handler
+
+        self.mock_get_joined = (
+            self.datastore.get_rooms_for_user_where_membership_is
+        )
 
         # TODO(paul): Icky signal declarings.. booo
         hs.get_distributor().declare("changed_presencelike_data")
@@ -87,7 +89,14 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set = self.datastore.set_profile_displayname
         mocked_set.return_value = defer.succeed(())
 
+        self.mock_get_joined.return_value = defer.succeed([])
+
         yield self.handler.set_displayname(self.frank, self.frank, "Frank Jr.")
+
+        self.mock_get_joined.assert_called_once_with(
+            self.frank.to_string(),
+            [Membership.JOIN]
+        )
 
         mocked_set.assert_called_with("1234ABCD", "Frank Jr.")
 
@@ -139,7 +148,15 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set = self.datastore.set_profile_avatar_url
         mocked_set.return_value = defer.succeed(())
 
+        self.mock_get_joined.return_value = defer.succeed([])
+
         yield self.handler.set_avatar_url(self.frank, self.frank,
                 "http://my.server/pic.gif")
+
+        self.mock_get_joined.assert_called_once_with(
+            self.frank.to_string(),
+            [Membership.JOIN]
+        )
+
 
         mocked_set.assert_called_with("1234ABCD", "http://my.server/pic.gif")

@@ -14,20 +14,16 @@
 # limitations under the License.
 
 
-from twisted.trial import unittest
+from tests import unittest
 from twisted.internet import defer
 
 from mock import Mock, call, ANY
 import json
-import logging
 
 from ..utils import MockHttpResource, MockClock, DeferredMockCallable
 
 from synapse.server import HomeServer
 from synapse.handlers.typing import TypingNotificationHandler
-
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 
 def _expect_edu(destination, edu_type, content, origin="test"):
@@ -173,7 +169,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
                         "user_id": self.u_apple.to_string(),
                         "typing": True,
                     }
-                )
+                ),
+                on_send_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -223,7 +220,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
                         "user_id": self.u_apple.to_string(),
                         "typing": False,
                     }
-                )
+                ),
+                on_send_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )

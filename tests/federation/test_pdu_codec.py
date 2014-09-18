@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.trial import unittest
+from tests import unittest
 
 from synapse.federation.pdu_codec import (
     PduCodec, encode_event_id, decode_event_id

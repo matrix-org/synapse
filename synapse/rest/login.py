@@ -73,6 +73,27 @@ class LoginFallbackRestServlet(RestServlet):
         return (200, {})
 
 
+class PasswordResetRestServlet(RestServlet):
+    PATTERN = client_path_pattern("/login/reset")
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        reset_info = _parse_json(request)
+        try:
+            email = reset_info["email"]
+            user_id = reset_info["user_id"]
+            handler = self.handlers.login_handler
+            yield handler.reset_password(user_id, email)
+            # purposefully give no feedback to avoid people hammering different
+            # combinations.
+            defer.returnValue((200, {}))
+        except KeyError:
+            raise SynapseError(
+                400,
+                "Missing keys. Requires 'email' and 'user_id'."
+            )
+
+
 def _parse_json(request):
     try:
         content = json.loads(request.content.read())
@@ -85,3 +106,4 @@ def _parse_json(request):
 
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
+    # TODO PasswordResetRestServlet(hs).register(http_server)

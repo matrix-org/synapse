@@ -14,7 +14,7 @@
 
 
 from twisted.internet import defer
-from twisted.trial import unittest
+from tests import unittest
 
 from synapse.api.events.room import (
     InviteJoinEvent, MessageEvent, RoomMemberEvent
@@ -26,11 +26,7 @@ from synapse.federation.units import Pdu
 
 from mock import NonCallableMock, ANY
 
-import logging
-
 from ..utils import get_mock_call_args
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 
 class FederationTestCase(unittest.TestCase):
@@ -78,7 +74,9 @@ class FederationTestCase(unittest.TestCase):
 
         yield self.handlers.federation_handler.on_receive_pdu(pdu, False)
 
-        self.datastore.persist_event.assert_called_once_with(ANY, False)
+        self.datastore.persist_event.assert_called_once_with(
+            ANY, False, is_new_state=False
+        )
         self.notifier.on_new_room_event.assert_called_once_with(ANY)
 
     @defer.inlineCallbacks
