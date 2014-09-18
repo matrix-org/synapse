@@ -1,4 +1,4 @@
-Upgrading to Latest
+Upgrading to v0.3.0
 ===================
 
 This registration API now closely matches the login API. This introduces a bit
