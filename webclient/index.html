@@ -45,6 +45,7 @@
 </head>
 
 <body>
+    <div id="videoBackground" ng-class="videoMode" ng-show="videoMode == 'large' || videoMode == 'fullscreen'"></div>
 
     <div id="header">
         <!-- Do not show buttons on the login page -->
@@ -93,8 +94,8 @@
                     <source src="media/busy.mp3" type="audio/mpeg" />
                 </audio>
             </div>
-            <video id="localVideo" ng-show="currentCall && currentCall.type == 'video' && (currentCall.state == 'connected' || currentCall.state == 'connecting' || currentCall.state == 'invite_sent')"></video>
-            <video id="remoteVideo" ng-show="currentCall && currentCall.type == 'video' && currentCall.state == 'connected'"></video>
+            <video id="localVideo" ng-class="videoMode" ng-show="currentCall && currentCall.type == 'video' && (currentCall.state == 'connected' || currentCall.state == 'connecting' || currentCall.state == 'invite_sent')"></video>
+            <video id="remoteVideo" ng-class="[videoMode, currentCall.state]" ng-show="currentCall && currentCall.type == 'video' && currentCall.state == 'connected' || currentCall.state == 'ended'"></video>
 
             <a href id="headerUserId" ng-click='goToUserPage(user_id)'>{{ user_id }}</a>
             &nbsp;

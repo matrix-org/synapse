@@ -167,6 +167,8 @@ angular.module('MatrixCall', [])
     MatrixCall.prototype.hangup = function(suppressEvent) {
         console.log("Ending call "+this.call_id);
 
+        this.remoteVideoElement.pause();
+
         this.stopAllMedia();
         if (this.peerConn) this.peerConn.close();
 

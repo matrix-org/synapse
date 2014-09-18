@@ -126,6 +126,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
             angular.element('#ringAudio')[0].pause();
             angular.element('#ringbackAudio')[0].pause();
             angular.element('#callendAudio')[0].play();
+            $scope.videoMode = undefined;
         } else if (newVal == 'ended' && oldVal == 'invite_sent' && $rootScope.currentCall.hangupParty == 'remote') {
             angular.element('#ringAudio')[0].pause();
             angular.element('#ringbackAudio')[0].pause();
@@ -138,6 +139,8 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
             angular.element('#ringbackAudio')[0].pause();
         } else if (oldVal == 'ringing') {
             angular.element('#ringAudio')[0].pause();
+        } else if (newVal == 'connected') {
+            $scope.videoMode = 'large';
         }
     });
 
@@ -172,7 +175,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
     
     $rootScope.onCallError = function(errStr) {
         $scope.feedback = errStr;
-    }
+    };
 
     $rootScope.onCallHangup = function(call) {
         if (call == $rootScope.currentCall) {
@@ -180,5 +183,5 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
                 if (call == $rootScope.currentCall) $rootScope.currentCall = undefined;
             }, 4070);
         }
-    }
+    };
 }]);
