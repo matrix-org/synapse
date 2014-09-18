@@ -243,8 +243,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
         // add membership changes as if they were a room message if something interesting changed
         // Exception: Do not do this if the event is a room state event because such events already come
         // as room messages events. Moreover, when they come as room messages events, they are relatively ordered
-        // with other other room messages
-        if (event.content.prev !== event.content.membership && !isStateEvent) {
+        // with other other room messages XXX This is no longer true, you only get a single event, not a room message event.
+        // FIXME: This possibly reintroduces multiple join messages.
+        if (event.content.prev !== event.content.membership) { // && !isStateEvent
             if (isLiveEvent) {
                 $rootScope.events.rooms[event.room_id].messages.push(event);
             }
@@ -375,6 +376,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                         handleMessage(event, isLiveEvent);
                         break;
                     case "m.room.member":
+                        isStateEvent = true;
                         handleRoomMember(event, isLiveEvent, isStateEvent);
                         break;
                     case "m.presence":
@@ -404,6 +406,8 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
         // isLiveEvents determines whether notifications should be shown, whether
         // messages get appended to the start/end of lists, etc.
         handleEvents: function(events, isLiveEvents, isStateEvents) {
+            // XXX FIXME TODO: isStateEvents is being left as undefined sometimes. It makes no sense
+            // to have isStateEvents as an arg, since things like m.room.member are ALWAYS state events.
             for (var i=0; i<events.length; i++) {
                 this.handleEvent(events[i], isLiveEvents, isStateEvents);
             }
@@ -419,6 +423,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             if (dir && 'b' === dir) {
                 // paginateBackMessages requests messages to be in reverse chronological order
                 for (var i=0; i<events.length; i++) {
+                    // FIXME: Being live != being state
                     this.handleEvent(events[i], isLiveEvents, isLiveEvents);
                 }
                 
@@ -428,6 +433,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             else {
                 // InitialSync returns messages in chronological order
                 for (var i=events.length - 1; i>=0; i--) {
+                    // FIXME: Being live != being state
                     this.handleEvent(events[i], isLiveEvents, isLiveEvents);
                 }
                 // Store where to start pagination
