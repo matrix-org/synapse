@@ -35,9 +35,8 @@ angular.module('RecentsController')
                 // Count users here
                 // TODO: Compute it directly in eventHandlerService
                 room.numUsersInRoom = eventHandlerService.getUsersCountInRoom(room_id);
-
-                filtered.push(room);
             }
+            filtered.push(room);
         });
 
         // And time sort them
