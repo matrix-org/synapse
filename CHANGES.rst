@@ -1,3 +1,10 @@
+Changes in synapse 0.3.2 (2014-09-18)
+=====================================
+
+Webclient:
+ * Fix bug where an empty "bing words" list in old accounts didn't send
+   notifications when it should have done.
+
 Changes in synapse 0.3.1 (2014-09-18)
 =====================================
 This is a release to hotfix v0.3.0 to fix two regressions.
