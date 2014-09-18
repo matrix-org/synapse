@@ -232,13 +232,6 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
     };
     
     var handleRoomMember = function(event, isLiveEvent, isStateEvent) {
-        // if the server is stupidly re-relaying a no-op join, discard it.
-        if (event.prev_content && 
-            event.content.membership === "join" &&
-            event.content.membership === event.prev_content.membership)
-        {
-            return;
-        }
         
         // add membership changes as if they were a room message if something interesting changed
         // Exception: Do not do this if the event is a room state event because such events already come
