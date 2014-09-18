@@ -703,7 +703,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 if ($rootScope.events.rooms[$scope.room_id]) {
 
                     // There is no need to do a 1st pagination (initialSync provided enough to fill a page)
-                    $scope.state.first_pagination = false;
+                    if ($rootScope.events.rooms[$scope.room_id].messages.length) {
+                        $scope.state.first_pagination = false;
+                    }
+                    else {
+                        // except if we just joined a room, we won't have this history from initial sync, so we should try to paginate it anyway                        
+                        $scope.state.first_pagination = true;
+                    }
 
                     var members = $rootScope.events.rooms[$scope.room_id].members;
 
