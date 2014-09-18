@@ -20,7 +20,9 @@ from twisted.internet import defer, reactor
 from mock import Mock, call, ANY
 import json
 
-from ..utils import MockHttpResource, MockClock, DeferredMockCallable
+from tests.utils import (
+    MockHttpResource, MockClock, DeferredMockCallable, SQLiteMemoryDbPool
+)
 
 from synapse.server import HomeServer
 from synapse.api.constants import PresenceState
@@ -60,30 +62,21 @@ class JustPresenceHandlers(object):
 class PresenceStateTestCase(unittest.TestCase):
     """ Tests presence management. """
 
+    @defer.inlineCallbacks
     def setUp(self):
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+
         hs = HomeServer("test",
-                clock=MockClock(),
-                db_pool=None,
-                datastore=Mock(spec=[
-                    "get_presence_state",
-                    "set_presence_state",
-                    "add_presence_list_pending",
-                    "set_presence_list_accepted",
-                ]),
-                handlers=None,
-                resource_for_federation=Mock(),
-                http_client=None,
-            )
+            clock=MockClock(),
+            db_pool=db_pool,
+            handlers=None,
+            resource_for_federation=Mock(),
+            http_client=None,
+        )
         hs.handlers = JustPresenceHandlers(hs)
 
-        self.datastore = hs.get_datastore()
-
-        def is_presence_visible(observed_localpart, observer_userid):
-            allow = (observed_localpart == "apple" and
-                observer_userid == "@banana:test"
-            )
-            return defer.succeed(allow)
-        self.datastore.is_presence_visible = is_presence_visible
+        self.store = hs.get_datastore()
 
         # Mock the RoomMemberHandler
         room_member_handler = Mock(spec=[])
@@ -93,6 +86,11 @@ class PresenceStateTestCase(unittest.TestCase):
         self.u_apple = hs.parse_userid("@apple:test")
         self.u_banana = hs.parse_userid("@banana:test")
         self.u_clementine = hs.parse_userid("@clementine:test")
+
+        yield self.store.create_presence(self.u_apple.localpart)
+        yield self.store.set_presence_state(
+            self.u_apple.localpart, {"state": ONLINE, "status_msg": "Online"}
+        )
 
         self.handler = hs.get_handlers().presence_handler
 
@@ -117,7 +115,7 @@ class PresenceStateTestCase(unittest.TestCase):
 
             shared = all(map(lambda i: i in room_member_ids, userlist))
             return defer.succeed(shared)
-        self.datastore.user_rooms_intersect = user_rooms_intersect
+        self.store.user_rooms_intersect = user_rooms_intersect
 
         self.mock_start = Mock()
         self.mock_stop = Mock()
@@ -127,11 +125,6 @@ class PresenceStateTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_my_state(self):
-        mocked_get = self.datastore.get_presence_state
-        mocked_get.return_value = defer.succeed(
-            {"state": ONLINE, "status_msg": "Online"}
-        )
-
         state = yield self.handler.get_state(
             target_user=self.u_apple, auth_user=self.u_apple
         )
@@ -140,13 +133,12 @@ class PresenceStateTestCase(unittest.TestCase):
             {"presence": ONLINE, "status_msg": "Online"},
             state
         )
-        mocked_get.assert_called_with("apple")
 
     @defer.inlineCallbacks
     def test_get_allowed_state(self):
-        mocked_get = self.datastore.get_presence_state
-        mocked_get.return_value = defer.succeed(
-            {"state": ONLINE, "status_msg": "Online"}
+        yield self.store.allow_presence_visible(
+            observed_localpart=self.u_apple.localpart,
+            observer_userid=self.u_banana.to_string(),
         )
 
         state = yield self.handler.get_state(
@@ -157,15 +149,9 @@ class PresenceStateTestCase(unittest.TestCase):
             {"presence": ONLINE, "status_msg": "Online"},
             state
         )
-        mocked_get.assert_called_with("apple")
 
     @defer.inlineCallbacks
     def test_get_same_room_state(self):
-        mocked_get = self.datastore.get_presence_state
-        mocked_get.return_value = defer.succeed(
-            {"state": ONLINE, "status_msg": "Online"}
-        )
-
         self.room_members = [self.u_apple, self.u_clementine]
 
         state = yield self.handler.get_state(
@@ -179,11 +165,6 @@ class PresenceStateTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_disallowed_state(self):
-        mocked_get = self.datastore.get_presence_state
-        mocked_get.return_value = defer.succeed(
-            {"state": ONLINE, "status_msg": "Online"}
-        )
-
         self.room_members = []
 
         yield self.assertFailure(
@@ -195,16 +176,17 @@ class PresenceStateTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_state(self):
-        mocked_set = self.datastore.set_presence_state
-        mocked_set.return_value = defer.succeed({"state": OFFLINE})
-
         yield self.handler.set_state(
                 target_user=self.u_apple, auth_user=self.u_apple,
                 state={"presence": UNAVAILABLE, "status_msg": "Away"})
 
-        mocked_set.assert_called_with("apple",
-            {"state": UNAVAILABLE, "status_msg": "Away"}
+        self.assertEquals(
+            {"state": UNAVAILABLE,
+             "status_msg": "Away",
+             "mtime": 1000000},
+            (yield self.store.get_presence_state(self.u_apple.localpart))
         )
+
         self.mock_start.assert_called_with(self.u_apple,
                 state={
                     "presence": UNAVAILABLE,
@@ -222,50 +204,34 @@ class PresenceStateTestCase(unittest.TestCase):
 class PresenceInvitesTestCase(unittest.TestCase):
     """ Tests presence management. """
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.mock_http_client = Mock(spec=[])
         self.mock_http_client.put_json = DeferredMockCallable()
 
         self.mock_federation_resource = MockHttpResource()
 
-        hs = HomeServer("test",
-                clock=MockClock(),
-                db_pool=None,
-                datastore=Mock(spec=[
-                    "has_presence_state",
-                    "allow_presence_visible",
-                    "add_presence_list_pending",
-                    "set_presence_list_accepted",
-                    "get_presence_list",
-                    "del_presence_list",
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
 
-                    # Bits that Federation needs
-                    "prep_send_transaction",
-                    "delivered_txn",
-                    "get_received_txn_response",
-                    "set_received_txn_response",
-                ]),
-                handlers=None,
-                resource_for_client=Mock(),
-                resource_for_federation=self.mock_federation_resource,
-                http_client=self.mock_http_client,
-            )
+        hs = HomeServer("test",
+            clock=MockClock(),
+            db_pool=db_pool,
+            handlers=None,
+            resource_for_client=Mock(),
+            resource_for_federation=self.mock_federation_resource,
+            http_client=self.mock_http_client,
+        )
         hs.handlers = JustPresenceHandlers(hs)
 
-        self.datastore = hs.get_datastore()
-
-        def has_presence_state(user_localpart):
-            return defer.succeed(
-                user_localpart in ("apple", "banana"))
-        self.datastore.has_presence_state = has_presence_state
-
-        def get_received_txn_response(*args):
-            return defer.succeed(None)
-        self.datastore.get_received_txn_response = get_received_txn_response
+        self.store = hs.get_datastore()
 
         # Some local users to test with
         self.u_apple = hs.parse_userid("@apple:test")
         self.u_banana = hs.parse_userid("@banana:test")
+        yield self.store.create_presence(self.u_apple.localpart)
+        yield self.store.create_presence(self.u_banana.localpart)
+
         # ID of a local user that does not exist
         self.u_durian = hs.parse_userid("@durian:test")
 
@@ -288,12 +254,16 @@ class PresenceInvitesTestCase(unittest.TestCase):
         yield self.handler.send_invite(
                 observer_user=self.u_apple, observed_user=self.u_banana)
 
-        self.datastore.add_presence_list_pending.assert_called_with(
-                "apple", "@banana:test")
-        self.datastore.allow_presence_visible.assert_called_with(
-                "banana", "@apple:test")
-        self.datastore.set_presence_list_accepted.assert_called_with(
-                "apple", "@banana:test")
+        self.assertEquals(
+            [{"observed_user_id": "@banana:test", "accepted": 1}],
+            (yield self.store.get_presence_list(self.u_apple.localpart))
+        )
+        self.assertTrue(
+            (yield self.store.is_presence_visible(
+                observed_localpart=self.u_banana.localpart,
+                observer_userid=self.u_apple.to_string(),
+            ))
+        )
 
         self.mock_start.assert_called_with(
                 self.u_apple, target_user=self.u_banana)
@@ -303,10 +273,10 @@ class PresenceInvitesTestCase(unittest.TestCase):
         yield self.handler.send_invite(
                 observer_user=self.u_apple, observed_user=self.u_durian)
 
-        self.datastore.add_presence_list_pending.assert_called_with(
-                "apple", "@durian:test")
-        self.datastore.del_presence_list.assert_called_with(
-                "apple", "@durian:test")
+        self.assertEquals(
+            [],
+            (yield self.store.get_presence_list(self.u_apple.localpart))
+        )
 
     @defer.inlineCallbacks
     def test_invite_remote(self):
@@ -328,8 +298,10 @@ class PresenceInvitesTestCase(unittest.TestCase):
         yield self.handler.send_invite(
                 observer_user=self.u_apple, observed_user=self.u_cabbage)
 
-        self.datastore.add_presence_list_pending.assert_called_with(
-                "apple", "@cabbage:elsewhere")
+        self.assertEquals(
+            [{"observed_user_id": "@cabbage:elsewhere", "accepted": 0}],
+            (yield self.store.get_presence_list(self.u_apple.localpart))
+        )
 
         yield put_json.await_calls()
 
@@ -362,8 +334,12 @@ class PresenceInvitesTestCase(unittest.TestCase):
             )
         )
 
-        self.datastore.allow_presence_visible.assert_called_with(
-                "apple", "@cabbage:elsewhere")
+        self.assertTrue(
+            (yield self.store.is_presence_visible(
+                observed_localpart=self.u_apple.localpart,
+                observer_userid=self.u_cabbage.to_string(),
+            ))
+        )
 
         yield put_json.await_calls()
 
@@ -398,6 +374,11 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_accepted_remote(self):
+        yield self.store.add_presence_list_pending(
+            observer_localpart=self.u_apple.localpart,
+            observed_userid=self.u_cabbage.to_string(),
+        )
+
         yield self.mock_federation_resource.trigger("PUT",
             "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence_accept",
@@ -408,14 +389,21 @@ class PresenceInvitesTestCase(unittest.TestCase):
             )
         )
 
-        self.datastore.set_presence_list_accepted.assert_called_with(
-                "apple", "@cabbage:elsewhere")
+        self.assertEquals(
+            [{"observed_user_id": "@cabbage:elsewhere", "accepted": 1}],
+            (yield self.store.get_presence_list(self.u_apple.localpart))
+        )
 
         self.mock_start.assert_called_with(
                 self.u_apple, target_user=self.u_cabbage)
 
     @defer.inlineCallbacks
     def test_denied_remote(self):
+        yield self.store.add_presence_list_pending(
+            observer_localpart=self.u_apple.localpart,
+            observed_userid="@eggplant:elsewhere",
+        )
+
         yield self.mock_federation_resource.trigger("PUT",
             "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence_deny",
@@ -426,32 +414,65 @@ class PresenceInvitesTestCase(unittest.TestCase):
             )
         )
 
-        self.datastore.del_presence_list.assert_called_with(
-                "apple", "@eggplant:elsewhere")
+        self.assertEquals(
+            [],
+            (yield self.store.get_presence_list(self.u_apple.localpart))
+        )
 
     @defer.inlineCallbacks
     def test_drop_local(self):
-        yield self.handler.drop(
-                observer_user=self.u_apple, observed_user=self.u_banana)
+        yield self.store.add_presence_list_pending(
+            observer_localpart=self.u_apple.localpart,
+            observed_userid=self.u_banana.to_string(),
+        )
+        yield self.store.set_presence_list_accepted(
+            observer_localpart=self.u_apple.localpart,
+            observed_userid=self.u_banana.to_string(),
+        )
 
-        self.datastore.del_presence_list.assert_called_with(
-                "apple", "@banana:test")
+        yield self.handler.drop(
+            observer_user=self.u_apple,
+            observed_user=self.u_banana,
+        )
+
+        self.assertEquals(
+            [],
+            (yield self.store.get_presence_list(self.u_apple.localpart))
+        )
 
         self.mock_stop.assert_called_with(
                 self.u_apple, target_user=self.u_banana)
 
     @defer.inlineCallbacks
     def test_drop_remote(self):
-        yield self.handler.drop(
-                observer_user=self.u_apple, observed_user=self.u_cabbage)
+        yield self.store.add_presence_list_pending(
+            observer_localpart=self.u_apple.localpart,
+            observed_userid=self.u_cabbage.to_string(),
+        )
+        yield self.store.set_presence_list_accepted(
+            observer_localpart=self.u_apple.localpart,
+            observed_userid=self.u_cabbage.to_string(),
+        )
 
-        self.datastore.del_presence_list.assert_called_with(
-                "apple", "@cabbage:elsewhere")
+        yield self.handler.drop(
+            observer_user=self.u_apple,
+            observed_user=self.u_cabbage,
+        )
+
+        self.assertEquals(
+            [],
+            (yield self.store.get_presence_list(self.u_apple.localpart))
+        )
 
     @defer.inlineCallbacks
     def test_get_presence_list(self):
-        self.datastore.get_presence_list.return_value = defer.succeed(
-            [{"observed_user_id": "@banana:test"}]
+        yield self.store.add_presence_list_pending(
+            observer_localpart=self.u_apple.localpart,
+            observed_userid=self.u_banana.to_string(),
+        )
+        yield self.store.set_presence_list_accepted(
+            observer_localpart=self.u_apple.localpart,
+            observed_userid=self.u_banana.to_string(),
         )
 
         presence = yield self.handler.get_presence_list(
@@ -459,28 +480,9 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
         self.assertEquals([
             {"observed_user": self.u_banana,
-             "presence": OFFLINE},
+             "presence": OFFLINE,
+             "accepted": 1},
         ], presence)
-
-        self.datastore.get_presence_list.assert_called_with("apple",
-            accepted=None
-        )
-
-        self.datastore.get_presence_list.return_value = defer.succeed(
-            [{"observed_user_id": "@banana:test"}]
-        )
-
-        presence = yield self.handler.get_presence_list(
-            observer_user=self.u_apple, accepted=True
-        )
-
-        self.assertEquals([
-            {"observed_user": self.u_banana,
-             "presence": OFFLINE},
-        ], presence)
-
-        self.datastore.get_presence_list.assert_called_with("apple",
-                accepted=True)
 
 
 class PresencePushTestCase(unittest.TestCase):

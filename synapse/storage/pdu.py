@@ -43,7 +43,7 @@ class PduStore(SQLBaseStore):
             PduTuple: If the pdu does not exist in the database, returns None
         """
 
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._get_pdu_tuple, pdu_id, origin
         )
 
@@ -95,7 +95,7 @@ class PduStore(SQLBaseStore):
             list: A list of PduTuples
         """
 
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._get_current_state_for_context,
             context
         )
@@ -143,7 +143,7 @@ class PduStore(SQLBaseStore):
             pdu_origin (str)
         """
 
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._mark_as_processed, pdu_id, pdu_origin
         )
 
@@ -152,7 +152,7 @@ class PduStore(SQLBaseStore):
 
     def get_all_pdus_from_context(self, context):
         """Get a list of all PDUs for a given context."""
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._get_all_pdus_from_context, context,
         )
 
@@ -179,7 +179,7 @@ class PduStore(SQLBaseStore):
         Return:
             list: A list of PduTuples
         """
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._get_backfill, context, pdu_list, limit
         )
 
@@ -240,7 +240,7 @@ class PduStore(SQLBaseStore):
             txn
             context (str)
         """
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._get_min_depth_for_context, context
         )
 
@@ -346,7 +346,7 @@ class PduStore(SQLBaseStore):
             bool
         """
 
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._is_pdu_new,
             pdu_id=pdu_id,
             origin=origin,
@@ -499,7 +499,7 @@ class StatePduStore(SQLBaseStore):
         )
 
     def get_unresolved_state_tree(self, new_state_pdu):
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._get_unresolved_state_tree, new_state_pdu
         )
 
@@ -538,7 +538,7 @@ class StatePduStore(SQLBaseStore):
 
     def update_current_state(self, pdu_id, origin, context, pdu_type,
                              state_key):
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._update_current_state,
             pdu_id, origin, context, pdu_type, state_key
         )
@@ -577,7 +577,7 @@ class StatePduStore(SQLBaseStore):
             PduEntry
         """
 
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._get_current_state_pdu, context, pdu_type, state_key
         )
 
@@ -636,7 +636,7 @@ class StatePduStore(SQLBaseStore):
         Returns:
             bool: True if the new_pdu clobbered the current state, False if not
         """
-        return self._db_pool.runInteraction(
+        return self.runInteraction(
             self._handle_new_state, new_pdu
         )
 

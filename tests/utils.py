@@ -16,12 +16,14 @@
 from synapse.http.server import HttpServer
 from synapse.api.errors import cs_error, CodeMessageException, StoreError
 from synapse.api.constants import Membership
+from synapse.storage import prepare_database
 
 from synapse.api.events.room import (
     RoomMemberEvent, MessageEvent
 )
 
 from twisted.internet import defer, reactor
+from twisted.enterprise.adbapi import ConnectionPool
 
 from collections import namedtuple
 from mock import patch, Mock
@@ -118,6 +120,18 @@ class MockClock(object):
     # For unit testing
     def advance_time(self, secs):
         self.now += secs
+
+
+class SQLiteMemoryDbPool(ConnectionPool, object):
+    def __init__(self):
+        super(SQLiteMemoryDbPool, self).__init__(
+            "sqlite3", ":memory:",
+            cp_min=1,
+            cp_max=1,
+        )
+
+    def prepare(self):
+        return self.runWithConnection(prepare_database)
 
 
 class MemoryDataStore(object):

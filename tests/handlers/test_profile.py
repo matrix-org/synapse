@@ -24,6 +24,8 @@ from synapse.server import HomeServer
 from synapse.handlers.profile import ProfileHandler
 from synapse.api.constants import Membership
 
+from tests.utils import SQLiteMemoryDbPool
+
 
 class ProfileHandlers(object):
     def __init__(self, hs):
@@ -33,6 +35,7 @@ class ProfileHandlers(object):
 class ProfileTestCase(unittest.TestCase):
     """ Tests profile management. """
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.mock_federation = Mock(spec=[
             "make_query",
@@ -43,62 +46,49 @@ class ProfileTestCase(unittest.TestCase):
             self.query_handlers[query_type] = handler
         self.mock_federation.register_query_handler = register_query_handler
 
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+
         hs = HomeServer("test",
-                db_pool=None,
+                db_pool=db_pool,
                 http_client=None,
-                datastore=Mock(spec=[
-                    "get_profile_displayname",
-                    "set_profile_displayname",
-                    "get_profile_avatar_url",
-                    "set_profile_avatar_url",
-                    "get_rooms_for_user_where_membership_is",
-                ]),
                 handlers=None,
                 resource_for_federation=Mock(),
                 replication_layer=self.mock_federation,
             )
         hs.handlers = ProfileHandlers(hs)
 
-        self.datastore = hs.get_datastore()
+        self.store = hs.get_datastore()
 
         self.frank = hs.parse_userid("@1234ABCD:test")
         self.bob   = hs.parse_userid("@4567:test")
         self.alice = hs.parse_userid("@alice:remote")
 
-        self.handler = hs.get_handlers().profile_handler
+        yield self.store.create_profile(self.frank.localpart)
 
-        self.mock_get_joined = (
-            self.datastore.get_rooms_for_user_where_membership_is
-        )
+        self.handler = hs.get_handlers().profile_handler
 
         # TODO(paul): Icky signal declarings.. booo
         hs.get_distributor().declare("changed_presencelike_data")
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
-        mocked_get = self.datastore.get_profile_displayname
-        mocked_get.return_value = defer.succeed("Frank")
+        yield self.store.set_profile_displayname(
+            self.frank.localpart, "Frank"
+        )
 
         displayname = yield self.handler.get_displayname(self.frank)
 
         self.assertEquals("Frank", displayname)
-        mocked_get.assert_called_with("1234ABCD")
 
     @defer.inlineCallbacks
     def test_set_my_name(self):
-        mocked_set = self.datastore.set_profile_displayname
-        mocked_set.return_value = defer.succeed(())
-
-        self.mock_get_joined.return_value = defer.succeed([])
-
         yield self.handler.set_displayname(self.frank, self.frank, "Frank Jr.")
 
-        self.mock_get_joined.assert_called_once_with(
-            self.frank.to_string(),
-            [Membership.JOIN]
+        self.assertEquals(
+            (yield self.store.get_profile_displayname(self.frank.localpart)),
+            "Frank Jr."
         )
-
-        mocked_set.assert_called_with("1234ABCD", "Frank Jr.")
 
     @defer.inlineCallbacks
     def test_set_my_name_noauth(self):
@@ -123,40 +113,31 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_incoming_fed_query(self):
-        mocked_get = self.datastore.get_profile_displayname
-        mocked_get.return_value = defer.succeed("Caroline")
+        yield self.store.create_profile("caroline")
+        yield self.store.set_profile_displayname("caroline", "Caroline")
 
         response = yield self.query_handlers["profile"](
             {"user_id": "@caroline:test", "field": "displayname"}
         )
 
         self.assertEquals({"displayname": "Caroline"}, response)
-        mocked_get.assert_called_with("caroline")
 
     @defer.inlineCallbacks
     def test_get_my_avatar(self):
-        mocked_get = self.datastore.get_profile_avatar_url
-        mocked_get.return_value = defer.succeed("http://my.server/me.png")
+        yield self.store.set_profile_avatar_url(
+            self.frank.localpart, "http://my.server/me.png"
+        )
 
         avatar_url = yield self.handler.get_avatar_url(self.frank)
 
         self.assertEquals("http://my.server/me.png", avatar_url)
-        mocked_get.assert_called_with("1234ABCD")
 
     @defer.inlineCallbacks
     def test_set_my_avatar(self):
-        mocked_set = self.datastore.set_profile_avatar_url
-        mocked_set.return_value = defer.succeed(())
-
-        self.mock_get_joined.return_value = defer.succeed([])
-
         yield self.handler.set_avatar_url(self.frank, self.frank,
                 "http://my.server/pic.gif")
 
-        self.mock_get_joined.assert_called_once_with(
-            self.frank.to_string(),
-            [Membership.JOIN]
+        self.assertEquals(
+            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
+            "http://my.server/pic.gif"
         )
-
-
-        mocked_set.assert_called_with("1234ABCD", "http://my.server/pic.gif")
