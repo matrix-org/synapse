@@ -1,3 +1,12 @@
+Changes in synapse 0.3.1 (2014-09-18)
+=====================================
+This is a release to hotfix v0.3.0 to fix two regressions.
+
+Webclient:
+ * Fix a regression where we sometimes displayed duplicate events.
+ * Fix a regression where we didn't immediately remove rooms you were
+   banned in from the recents list.
+
 Changes in synapse 0.3.0 (2014-09-18)
 =====================================
 See UPGRADE for information about changes to the client server API, including

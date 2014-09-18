@@ -19,14 +19,13 @@
 angular.module('RecentsController')
 .filter('orderRecents', ["matrixService", "eventHandlerService", function(matrixService, eventHandlerService) {
     return function(rooms) {
-
         var user_id = matrixService.config().user_id;
 
         // Transform the dict into an array
         // The key, room_id, is already in value objects
         var filtered = [];
         angular.forEach(rooms, function(room, room_id) {
-
+            
             // Show the room only if the user has joined it or has been invited
             // (ie, do not show it if he has been banned)
             var member = eventHandlerService.getMember(room_id, user_id);
@@ -35,8 +34,9 @@ angular.module('RecentsController')
                 // Count users here
                 // TODO: Compute it directly in eventHandlerService
                 room.numUsersInRoom = eventHandlerService.getUsersCountInRoom(room_id);
+
+                filtered.push(room);
             }
-            filtered.push(room);
         });
 
         // And time sort them
