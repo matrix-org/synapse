@@ -93,7 +93,13 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
     };
 
     $rootScope.$watch('currentCall', function(newVal, oldVal) {
-        if (!$rootScope.currentCall) return;
+        if (!$rootScope.currentCall) {
+            // This causes the still frame to be flushed out of the video elements,
+            // avoiding a flash of the last frame of the previous call when starting the next
+            angular.element('#localVideo')[0].load();
+            angular.element('#remoteVideo')[0].load();
+            return;
+        }
 
         var roomMembers = angular.copy($rootScope.events.rooms[$rootScope.currentCall.room_id].members);
         delete roomMembers[matrixService.config().user_id];
@@ -140,7 +146,19 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         } else if (oldVal == 'ringing') {
             angular.element('#ringAudio')[0].pause();
         } else if (newVal == 'connected') {
-            $scope.videoMode = 'large';
+            $timeout(function() {
+                //if ($scope.currentCall.type == 'video') $scope.videoMode = 'large';
+            }, 5000);
+        }
+
+        if ($rootScope.currentCall && $rootScope.currentCall.type == 'video' && $rootScope.currentCall.state != 'connected') {
+            $scope.videoMode = 'mini';
+        }
+    });
+    $rootScope.$watch('currentCall.type', function(newVal, oldVal) {
+        // need to listen for this too as the type of the call won't be know when it's created
+        if ($rootScope.currentCall && $rootScope.currentCall.type == 'video' && $rootScope.currentCall.state != 'connected') {
+            $scope.videoMode = 'mini';
         }
     });
 

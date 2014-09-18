@@ -65,7 +65,7 @@ angular.module('MatrixCall', [])
         var stunServer = 'stun:stun.l.google.com:19302';
         var pc;
         if (window.mozRTCPeerConnection) {
-            pc = window.mozRTCPeerConnection({'url': stunServer});
+            pc = new window.mozRTCPeerConnection({'url': stunServer});
         } else {
             pc = new window.RTCPeerConnection({"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]});
         }
@@ -118,6 +118,17 @@ angular.module('MatrixCall', [])
         this.peerConn.setRemoteDescription(new RTCSessionDescription(this.msg.offer), this.onSetRemoteDescriptionSuccess, this.onSetRemoteDescriptionError);
         this.state = 'ringing';
         this.direction = 'inbound';
+
+        if (window.mozRTCPeerConnection) {
+            // firefox's RTCPeerConnection doesn't add streams until it starts getting media on them
+            // so we need to figure out whether a video channel has been offered by ourselves.
+            if (this.msg.offer.sdp.indexOf('m=video') > -1) {
+                this.type = 'video';
+            } else {
+                this.type = 'voice';
+            }
+        }
+
         var self = this;
         $timeout(function() {
             if (self.state == 'ringing') {
@@ -167,7 +178,10 @@ angular.module('MatrixCall', [])
     MatrixCall.prototype.hangup = function(suppressEvent) {
         console.log("Ending call "+this.call_id);
 
-        this.remoteVideoElement.pause();
+        // pausing now keeps the last frame (ish) of the video call in the video element
+        // rather than it just turning black straight away
+        if (this.remoteVideoElement) this.remoteVideoElement.pause();
+        if (this.localVideoElement) this.localVideoElement.pause();
 
         this.stopAllMedia();
         if (this.peerConn) this.peerConn.close();
@@ -318,7 +332,7 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.getUserMediaFailed = function() {
-        this.onError("Couldn't start capturing audio! Is your microphone set up?");
+        this.onError("Couldn't start capturing! Is your microphone set up?");
         this.hangup();
     };
 
@@ -411,6 +425,8 @@ angular.module('MatrixCall', [])
 
     MatrixCall.prototype.onHangupReceived = function() {
         console.log("Hangup received");
+        if (this.remoteVideoElement) this.remoteVideoElement.pause();
+        if (this.localVideoElement) this.localVideoElement.pause();
         this.state = 'ended';
         this.hangupParty = 'remote';
         this.stopAllMedia();

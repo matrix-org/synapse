@@ -97,30 +97,44 @@ a:active  { color: #000; }
     left: 0px;
     z-index: 1;
     background-color: rgba(0,0,0,0.0);
+    pointer-events: none;
     transition: background-color linear 300ms;
 }
 
 #videoBackground.large {
     background-color: rgba(0,0,0,0.85);
+    pointer-events: auto;
 }
 
-#localVideo {
-    position: absolute;
+#videoContainer {
+    max-width: 1280px;
+    margin: auto;
     top: 32px;
-    left: 160px;
+}
+
+#videoContainer.large {
+}
+
+#localVideo.mini {
+    position: relative;
+    left: 120px;
     width: 128px;
     height: 72px;
-    z-index: 2;
+}
+
+#localVideo.ended {
+    -webkit-filter: grayscale(1);
 }
 
 #remoteVideo {
-    position: absolute;
-    top: 32px;
-    left: 300px;
+    transition: all linear 300ms;
+}
+
+#remoteVideo.mini {
+    position: relative;
+    left: 120px;
     width: 128px;
     height: 72px;
-    z-index: 2;
-    transition: all linear 300ms;
 }
 
 #remoteVideo.large {

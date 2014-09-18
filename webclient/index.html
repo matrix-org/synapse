@@ -45,7 +45,12 @@
 </head>
 
 <body>
-    <div id="videoBackground" ng-class="videoMode" ng-show="videoMode == 'large' || videoMode == 'fullscreen'"></div>
+    <div id="videoBackground" ng-class="videoMode">
+        <div id="videoContainer" ng-class="videoMode">
+            <video id="localVideo" ng-class="[videoMode, currentCall.state]" ng-show="currentCall && currentCall.type == 'video' && (currentCall.state == 'connected' || currentCall.state == 'connecting' || currentCall.state == 'invite_sent' || currentCall.state == 'ended')"></video>
+            <video id="remoteVideo" ng-class="[videoMode, currentCall.state]" ng-show="currentCall && currentCall.type == 'video' && (currentCall.state == 'connected' || currentCall.state == 'ended')"></video>
+        </div>
+    </div>
 
     <div id="header">
         <!-- Do not show buttons on the login page -->
@@ -59,8 +64,8 @@
                     <br />
                     <span id="callState">
                         <span ng-show="currentCall.state == 'invite_sent'">Calling...</span>
-                        <span ng-show="currentCall.state == 'ringing' && currentCall.type == 'video'">Incoming Video Call</span>
-                        <span ng-show="currentCall.state == 'ringing' && currentCall.type == 'voice'">Incoming Voice Call</span>
+                        <span ng-show="currentCall.state == 'ringing' && currentCall && currentCall.type == 'video'">Incoming Video Call</span>
+                        <span ng-show="currentCall.state == 'ringing' && currentCall && currentCall.type == 'voice'">Incoming Voice Call</span>
                         <span ng-show="currentCall.state == 'connecting'">Call Connecting...</span>
                         <span ng-show="currentCall.state == 'connected'">Call Connected</span>
                         <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'remote'">Call Rejected</span>
@@ -94,8 +99,6 @@
                     <source src="media/busy.mp3" type="audio/mpeg" />
                 </audio>
             </div>
-            <video id="localVideo" ng-class="videoMode" ng-show="currentCall && currentCall.type == 'video' && (currentCall.state == 'connected' || currentCall.state == 'connecting' || currentCall.state == 'invite_sent')"></video>
-            <video id="remoteVideo" ng-class="[videoMode, currentCall.state]" ng-show="currentCall && currentCall.type == 'video' && currentCall.state == 'connected' || currentCall.state == 'ended'"></video>
 
             <a href id="headerUserId" ng-click='goToUserPage(user_id)'>{{ user_id }}</a>
             &nbsp;
