@@ -26,6 +26,12 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
          
     // Check current URL to avoid to display the logout button on the login page
     $scope.location = $location.path();
+
+    // disable nganimate for the local and remote video elements because ngAnimate appears
+    // to be buggy and leaves animation classes on the video elements causing them to show
+    // when they should not (their animations are pure CSS3)
+    $animate.enabled(false, angular.element('#localVideo'));
+    $animate.enabled(false, angular.element('#remoteVideo'));
     
     // Update the location state when the ng location changed
     $rootScope.$on('$routeChangeSuccess', function (event, current, previous) {
@@ -147,8 +153,8 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
             angular.element('#ringAudio')[0].pause();
         } else if (newVal == 'connected') {
             $timeout(function() {
-                //if ($scope.currentCall.type == 'video') $scope.videoMode = 'large';
-            }, 5000);
+                if ($scope.currentCall.type == 'video') $scope.videoMode = 'large';
+            }, 500);
         }
 
         if ($rootScope.currentCall && $rootScope.currentCall.type == 'video' && $rootScope.currentCall.state != 'connected') {

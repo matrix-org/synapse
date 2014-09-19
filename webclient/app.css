@@ -98,7 +98,7 @@ a:active  { color: #000; }
     z-index: 1;
     background-color: rgba(0,0,0,0.0);
     pointer-events: none;
-    transition: background-color linear 300ms;
+    transition: background-color linear 500ms;
 }
 
 #videoBackground.large {
@@ -107,19 +107,31 @@ a:active  { color: #000; }
 }
 
 #videoContainer {
+    position: relative;
     max-width: 1280px;
     margin: auto;
-    top: 32px;
 }
 
-#videoContainer.large {
+#videoContainerPadding {
+    width: 1280px;
+}
+
+#localVideo {
+    position: absolute;
+    width: 128px;
+    height: 72px;
+    z-index: 1;
+    transition: left linear 500ms, top linear 500ms, width linear 500ms, height linear 500ms;
 }
 
 #localVideo.mini {
-    position: relative;
-    left: 120px;
-    width: 128px;
-    height: 72px;
+    top: 0px;
+    left: 130px;
+}
+
+#localVideo.large {
+    top: 70px;
+    left: 20px;
 }
 
 #localVideo.ended {
@@ -128,19 +140,21 @@ a:active  { color: #000; }
 }
 
 #remoteVideo {
-    transition: all linear 300ms;
+    position: relative;
+    height: auto;
+    transition: left linear 500ms, top linear 500ms, width linear 500ms, height linear 500ms;
 }
 
 #remoteVideo.mini {
-    position: relative;
-    left: 120px;
+    left: 260px;
+    top: 0px;
     width: 128px;
-    height: 72px;
 }
 
 #remoteVideo.large {
+    left: 0px;
+    top: 50px;
     width: 100%;
-    height: auto;
 }
 
 #remoteVideo.ended {

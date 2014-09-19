@@ -47,8 +47,9 @@
 <body>
     <div id="videoBackground" ng-class="videoMode">
         <div id="videoContainer" ng-class="videoMode">
+            <div id="videoContainerPadding"></div>
             <video id="localVideo" ng-class="[videoMode, currentCall.state]" ng-show="currentCall && currentCall.type == 'video' && (currentCall.state == 'connected' || currentCall.state == 'connecting' || currentCall.state == 'invite_sent' || currentCall.state == 'ended')"></video>
-            <video id="remoteVideo" ng-class="[videoMode, currentCall.state]" ng-show="currentCall && currentCall.type == 'video' && (currentCall.state == 'connected' || currentCall.state == 'ended')"></video>
+            <video id="remoteVideo" ng-class="[videoMode, currentCall.state]" ng-show="currentCall && currentCall.type == 'video' && (currentCall.state == 'connected' || (currentCall.state == 'ended' && currentCall.didConnect))"></video>
         </div>
     </div>
 
