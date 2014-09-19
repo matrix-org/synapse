@@ -111,8 +111,8 @@
                               ng-class="containsBingWord(msg.content.body) && msg.user_id != state.user_id ? msg.echo_msg_state + ' messageBing' : msg.echo_msg_state"
                               ng-bind-html="((msg.content.msgtype === 'm.text') ? msg.content.body : '') | linky:'_blank'"/>
 
-                        <span ng-show='msg.type === "m.call.invite" && msg.user_id == state.user_id'>Outgoing Call</span>
-                        <span ng-show='msg.type === "m.call.invite" && msg.user_id != state.user_id'>Incoming Call</span>
+                        <span ng-show='msg.type === "m.call.invite" && msg.user_id == state.user_id'>Outgoing Call{{ isWebRTCSupported ? '' : ' (But your browser does not support VoIP)' }}</span>
+                        <span ng-show='msg.type === "m.call.invite" && msg.user_id != state.user_id'>Incoming Call{{ isWebRTCSupported ? '' : ' (But your browser does not support VoIP)' }}</span>
 
                         <div ng-show='msg.content.msgtype === "m.image"'>
                             <div ng-hide='msg.content.thumbnail_url' ng-style="msg.content.body.h && { 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
@@ -178,15 +178,15 @@
                 <button ng-click="leaveRoom()" ng-disabled="state.permission_denied">Leave</button>
                 <button ng-click="startVoiceCall()"
                         ng-show="(currentCall == undefined || currentCall.state == 'ended')"
-                        ng-disabled="state.permission_denied || !state.webRTCSupported || memberCount() != 2"
-                        title ="{{ !state.webRTCSupported ? 'VoIP requires webRTC but your browser does not support it' : (memberCount() == 2 ? '' : 'VoIP calls can only be made in rooms with two participants') }}"
+                        ng-disabled="state.permission_denied || !isWebRTCSupported || memberCount() != 2"
+                        title ="{{ !isWebRTCSupported ? 'VoIP requires webRTC but your browser does not support it' : (memberCount() == 2 ? '' : 'VoIP calls can only be made in rooms with two participants') }}"
                         >
                     Voice Call
                 </button>
                 <button ng-click="startVideoCall()"
                         ng-show="(currentCall == undefined || currentCall.state == 'ended')"
-                        ng-disabled="state.permission_denied || !state.webRTCSupported || memberCount() != 2"
-                        title ="{{ !state.webRTCSupported ? 'VoIP requires webRTC but your browser does not support it' : (memberCount() == 2 ? '' : 'VoIP calls can only be made in rooms with two participants') }}"
+                        ng-disabled="state.permission_denied || !isWebRTCSupported || memberCount() != 2"
+                        title ="{{ !isWebRTCSupported ? 'VoIP requires webRTC but your browser does not support it' : (memberCount() == 2 ? '' : 'VoIP calls can only be made in rooms with two participants') }}"
                         >
                     Video Call
                 </button>

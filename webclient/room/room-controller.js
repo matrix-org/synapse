@@ -34,7 +34,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         stream_failure: undefined, // the response when the stream fails
         waiting_for_joined_event: false,  // true when the join request is pending. Back to false once the corresponding m.room.member event is received
         messages_visibility: "hidden", // In order to avoid flickering when scrolling down the message table at the page opening, delay the message table display
-        webRTCSupported: isWebRTCSupported() // true if the browser does not support WebRTC
     };
     $scope.members = {};
     $scope.autoCompleting = false;
