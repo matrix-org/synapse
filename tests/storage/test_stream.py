@@ -48,22 +48,28 @@ class StreamStoreTestCase(unittest.TestCase):
         self.depth = 1
 
     @defer.inlineCallbacks
-    def inject_room_member(self, room, user, membership):
+    def inject_room_member(self, room, user, membership, prev_state=None):
         self.depth += 1
+
+        event = self.event_factory.create_event(
+            etype=RoomMemberEvent.TYPE,
+            user_id=user.to_string(),
+            state_key=user.to_string(),
+            room_id=room.to_string(),
+            membership=membership,
+            content={"membership": membership},
+            depth=self.depth,
+        )
+
+        if prev_state:
+            event.prev_state = prev_state
 
         # Have to create a join event using the eventfactory
         yield self.store.persist_event(
-            self.event_factory.create_event(
-                etype=RoomMemberEvent.TYPE,
-                user_id=user.to_string(),
-                state_key=user.to_string(),
-                room_id=room.to_string(),
-                membership=membership,
-                content={"membership": membership},
-                depth=self.depth,
-            )
+            event
         )
 
+        defer.returnValue(event)
 
     @defer.inlineCallbacks
     def inject_message(self, room, user, body):
@@ -83,8 +89,12 @@ class StreamStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_event_stream_get_other(self):
         # Both bob and alice joins the room
-        yield self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
-        yield self.inject_room_member(self.room1, self.u_bob, Membership.JOIN)
+        yield self.inject_room_member(
+            self.room1, self.u_alice, Membership.JOIN
+        )
+        yield self.inject_room_member(
+            self.room1, self.u_bob, Membership.JOIN
+        )
 
         # Initial stream key:
         start = yield self.store.get_room_events_max_id()
@@ -116,8 +126,12 @@ class StreamStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_event_stream_get_own(self):
         # Both bob and alice joins the room
-        yield self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
-        yield self.inject_room_member(self.room1, self.u_bob, Membership.JOIN)
+        yield self.inject_room_member(
+            self.room1, self.u_alice, Membership.JOIN
+        )
+        yield self.inject_room_member(
+            self.room1, self.u_bob, Membership.JOIN
+        )
 
         # Initial stream key:
         start = yield self.store.get_room_events_max_id()
@@ -149,11 +163,17 @@ class StreamStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_event_stream_join_leave(self):
         # Both bob and alice joins the room
-        yield self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
-        yield self.inject_room_member(self.room1, self.u_bob, Membership.JOIN)
+        yield self.inject_room_member(
+            self.room1, self.u_alice, Membership.JOIN
+        )
+        yield self.inject_room_member(
+            self.room1, self.u_bob, Membership.JOIN
+        )
 
         # Then bob leaves again.
-        yield self.inject_room_member(self.room1, self.u_bob, Membership.LEAVE)
+        yield self.inject_room_member(
+            self.room1, self.u_bob, Membership.LEAVE
+        )
 
         # Initial stream key:
         start = yield self.store.get_room_events_max_id()
@@ -171,3 +191,36 @@ class StreamStoreTestCase(unittest.TestCase):
 
         # We should not get the message, as it happened *after* bob left.
         self.assertEqual(0, len(results))
+
+    @defer.inlineCallbacks
+    def test_event_stream_prev_content(self):
+        yield self.inject_room_member(
+            self.room1, self.u_bob, Membership.JOIN
+        )
+
+        event1 = yield self.inject_room_member(
+            self.room1, self.u_alice, Membership.JOIN
+        )
+
+        start = yield self.store.get_room_events_max_id()
+
+        event2 = yield self.inject_room_member(
+            self.room1, self.u_alice, Membership.JOIN,
+            prev_state=event1.event_id,
+        )
+
+        end = yield self.store.get_room_events_max_id()
+
+        results, _ = yield self.store.get_room_events_stream(
+            self.u_bob.to_string(),
+            start,
+            end,
+            None,  # Is currently ignored
+        )
+
+        # We should not get the message, as it happened *after* bob left.
+        self.assertEqual(1, len(results))
+
+        event = results[0]
+
+        self.assertTrue(hasattr(event, "prev_content"), msg="No prev_content key")
