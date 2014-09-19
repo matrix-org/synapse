@@ -47,6 +47,7 @@ textarea, input {
 #header
 {
     position: absolute;
+    z-index: 2;
     top: 0px;
     width: 100%;
     background-color: #333;
@@ -103,7 +104,7 @@ textarea, input {
     position: absolute;
     height: 100%;
     width: 100%;
-    top: 32px;
+    top: 0px;
     left: 0px;
     z-index: 1;
     background-color: rgba(0,0,0,0.0);
@@ -118,6 +119,7 @@ textarea, input {
 
 #videoContainer {
     position: relative;
+    top: 32px;
     max-width: 1280px;
     margin: auto;
 }
