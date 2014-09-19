@@ -176,7 +176,13 @@
                         <button ng-click="inviteUser()" ng-disabled="state.permission_denied">Invite</button>
                 </span>
                 <button ng-click="leaveRoom()" ng-disabled="state.permission_denied">Leave</button>
-                <button ng-click="startVoiceCall()" ng-show="(currentCall == undefined || currentCall.state == 'ended') && memberCount() == 2" ng-disabled="state.permission_denied">Voice Call</button>
+                <button ng-click="startVoiceCall()"
+                        ng-show="(currentCall == undefined || currentCall.state == 'ended') && memberCount() == 2"
+                        ng-disabled="state.permission_denied || !state.webRTCSupported"
+                        title ="{{ state.webRTCNotSupported ? '' : 'VoIP requires webRTC but your browser does not support it.'}}"
+                        >
+                    Voice Call
+                </button>
             </div>
         
             {{ feedback }}
