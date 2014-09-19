@@ -156,7 +156,22 @@ angular.module('MatrixCall', [])
 
     MatrixCall.prototype.answer = function() {
         console.log("Answering call "+this.call_id);
+
         var self = this;
+
+        var roomMembers = $rootScope.events.rooms[this.room_id].members;
+        if (roomMembers[matrixService.config().user_id].membership != 'join') {
+            console.log("We need to join the room before we can accept this call");
+            matrixService.join(this.room_id).then(function() {
+                self.answer();
+            }, function() {
+                console.log("Failed to join room: can't answer call!");
+                self.onError("Unable to join room to answer call!");
+                self.hangup();
+            });
+            return;
+        }
+
         if (!this.localAVStream && !this.waitForLocalAVStream) {
             navigator.getUserMedia(this.getUserMediaVideoContraints(this.type), function(s) { self.gotUserMediaForAnswer(s); }, function(e) { self.getUserMediaFailed(e); });
             this.state = 'wait_local_media';
