@@ -157,7 +157,7 @@
                         {{ state.user_id }} 
                     </td>
                     <td width="*">
-                        <textarea id="mainInput" rows="1" ng-model="textInput" ng-enter="send()"
+                        <textarea id="mainInput" rows="1" ng-enter="send()"
                                   ng-disabled="state.permission_denied"
                                   ng-keydown="(38 === $event.which) ? history.goUp($event) : ((40 === $event.which) ? history.goDown($event) : 0)"
                                   ng-focus="true" autocomplete="off" tab-complete/>

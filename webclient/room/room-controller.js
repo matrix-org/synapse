@@ -416,14 +416,16 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     $scope.send = function() {
-        if (undefined === $scope.textInput || $scope.textInput === "") {
+        var input = $('#mainInput').val();
+        
+        if (undefined === input || input === "") {
             return;
         }
         
         scrollToBottom(true);
 
         // Store the command in the history
-        history.push($scope.textInput);
+        history.push(input);
 
         var promise;
         var cmd;
@@ -431,13 +433,11 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         var echo = false;
         
         // Check for IRC style commands first
-        var line = $scope.textInput;
-        
         // trim any trailing whitespace, as it can confuse the parser for IRC-style commands
-        line = line.replace(/\s+$/, "");
+        input = input.replace(/\s+$/, "");
         
-        if (line[0] === "/" && line[1] !== "/") {
-            var bits = line.match(/^(\S+?)( +(.*))?$/);
+        if (input[0] === "/" && input[1] !== "/") {
+            var bits = input.match(/^(\S+?)( +(.*))?$/);
             cmd = bits[1];
             args = bits[3];
             
@@ -580,7 +580,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         // By default send this as a message unless it's an IRC-style command
         if (!promise && !cmd) {
             // Make the request
-            promise = matrixService.sendTextMessage($scope.room_id, line);
+            promise = matrixService.sendTextMessage($scope.room_id, input);
             echo = true;
         }
         
@@ -589,7 +589,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             // To do so, create a minimalist fake text message event and add it to the in-memory list of room messages
             var echoMessage = {
                 content: {
-                    body: (cmd === "/me" ? args : line),
+                    body: (cmd === "/me" ? args : input),
                     hsob_ts: new Date().getTime(), // fake a timestamp
                     msgtype: (cmd === "/me" ? "m.emote" : "m.text"),
                 },
@@ -599,7 +599,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 echo_msg_state: "messagePending"     // Add custom field to indicate the state of this fake message to HTML
             };
 
-            $scope.textInput = "";
+            $('#mainInput').val('');
             $rootScope.events.rooms[$scope.room_id].messages.push(echoMessage);
             scrollToBottom();
         }
@@ -619,7 +619,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                         echoMessage.event_id = response.data.event_id;
                     }
                     else {
-                        $scope.textInput = "";
+                        $('#mainInput').val('');
                     }         
                 },
                 function(error) {
@@ -913,11 +913,11 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
             if (-1 === this.position) {
                 // User starts to go to into the history, save the current line
-                this.typingMessage = $scope.textInput;
+                this.typingMessage = $('#mainInput').val();
             }
             else {
                 // If the user modified this line in history, keep the change
-                this.data[this.position] = $scope.textInput;
+                this.data[this.position] = $('#mainInput').val();
             }
 
             // Bounds the new position to valid data
@@ -928,11 +928,11 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
             if (-1 !== this.position) {
                 // Show the message from the history
-                $scope.textInput = this.data[this.position];
+                $('#mainInput').val(this.data[this.position]);
             }
             else if (undefined !== this.typingMessage) {
                 // Go back to the message the user started to type
-                $scope.textInput = this.typingMessage;
+                $('#mainInput').val(this.typingMessage);
             }
         }
     };
