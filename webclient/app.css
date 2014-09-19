@@ -20,7 +20,7 @@ a:visited { color: #666; }
 a:hover   { color: #000; }
 a:active  { color: #000; }
 
-#page {
+.page {
     min-height: 100%;
     margin-bottom: -32px; /* to make room for the footer */
 }
@@ -32,6 +32,11 @@ a:active  { color: #000; }
     padding-bottom: 40px;
     padding-left: 20px;
     padding-right: 20px;
+}
+
+#unsupportedBrowser {
+    padding-top: 240px;
+    text-align: center;
 }
 
 #header

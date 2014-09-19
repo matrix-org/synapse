@@ -100,9 +100,20 @@
         </div>
     </div>
 
-    <div id="page" ng-view></div>
+    <div class="page" ng-hide="unsupportedBrowser" ng-view></div>
 
-    <div id="footer" ng-hide="location.indexOf('/room') == 0">
+    <div class="page" ng-show="unsupportedBrowser">
+        <div id="unsupportedBrowser" ng-show="unsupportedBrowser">
+            Sorry, your browser is not supported. <br/>
+                Reason: {{ unsupportedBrowser.reason }}
+
+            <br/><br/>
+            Your browser: <br/>
+            {{ unsupportedBrowser.browser }}
+        </div>
+    </div>
+
+    <div id="footer" ng-hide="location.indexOf('/room') === 0">
         <div id="footerContent">
             &copy; 2014 Matrix.org
         </div>
