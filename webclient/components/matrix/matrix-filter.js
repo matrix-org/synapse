@@ -113,6 +113,10 @@ angular.module('matrixFilter', [])
         if (undefined === roomName) {
             // By default, use the room ID
             roomName = room_id;
+
+            // Log some information that lead to this leak
+            console.log("Room ID leak for " + room_id);
+            console.log("room object: " + JSON.stringify(room, undefined, 4));   
         }
 
         return roomName;
