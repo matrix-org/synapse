@@ -429,7 +429,7 @@ angular.module('MatrixCall', [])
         }
 
         if (this.candidateSendTries > 5) {
-            console.log("Failed to send candidates on attempt "+ev.tries+". Giving up for now.");
+            console.log("Failed to send candidates on attempt "+this.candidateSendTries+". Giving up for now.");
             this.candidateSendTries = 0;
             return;
         }
