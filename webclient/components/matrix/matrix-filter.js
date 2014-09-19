@@ -38,13 +38,15 @@ angular.module('matrixFilter', [])
                 roomName = alias;
             }
             else if (room.members) {
+
+                var user_id = matrixService.config().user_id;
+
                 // Else, build the name from its users
-                // FIXME: Is it still required?
                 // Limit the room renaming to 1:1 room
                 if (2 === Object.keys(room.members).length) {
                     for (var i in room.members) {
                         var member = room.members[i];
-                        if (member.state_key !== matrixService.config().user_id) {
+                        if (member.state_key !== user_id) {
 
                             if (member.state_key in $rootScope.presence) {
                                 // If the user is available in presence, use the displayname there
@@ -61,29 +63,43 @@ angular.module('matrixFilter', [])
                     }
                 }
                 else if (1 === Object.keys(room.members).length) {
-                    // The other member may be in the invite list, get all invited users
-                    var invitedUserIDs = [];
-                    for (var i in room.messages) {
-                        var message = room.messages[i];
-                        if ("m.room.member" === message.type && "invite" === message.membership) {
-                            // Make sure there is no duplicate user
-                            if (-1 === invitedUserIDs.indexOf(message.state_key)) {
-                                invitedUserIDs.push(message.state_key);
-                            }
-                        } 
+                    var otherUserId;
+
+                    if (Object.keys(room.members)[0] !== user_id) {
+                        otherUserId = Object.keys(room.members)[0];
+                    }
+                    else {
+                        // The other member may be in the invite list, get all invited users
+                        var invitedUserIDs = [];
+                        for (var i in room.messages) {
+                            var message = room.messages[i];
+                            if ("m.room.member" === message.type && "invite" === message.membership) {
+                                // Filter out the current user
+                                var member_id = message.state_key;
+                                if (member_id === user_id) {
+                                    member_id = message.user_id;
+                                }
+                                if (member_id !== user_id) {
+                                    // Make sure there is no duplicate user
+                                    if (-1 === invitedUserIDs.indexOf(message.state_key)) {
+                                        invitedUserIDs.push(message.state_key);
+                                    }
+                                }
+                            } 
+                        }
+
+                        // For now, only 1:1 room needs to be renamed. It means only 1 invited user
+                        if (1 === invitedUserIDs.length) {
+                            otherUserId = invitedUserIDs[0];
+                        }
                     }
 
-                    // For now, only 1:1 room needs to be renamed. It means only 1 invited user
-                    if (1 === invitedUserIDs.length) {
-                        var userID = invitedUserIDs[0];
-
-                        // Try to resolve his displayname in presence global data
-                        if (userID in $rootScope.presence) {
-                            roomName = $rootScope.presence[userID].content.displayname;
-                        }
-                        else {
-                            roomName = userID;
-                        }
+                    // Try to resolve his displayname in presence global data
+                    if (otherUserId in $rootScope.presence) {
+                        roomName = $rootScope.presence[otherUserId].content.displayname;
+                    }
+                    else {
+                        roomName = otherUserId;
                     }
                 }
             }
