@@ -20,6 +20,11 @@ a:visited { color: #666; }
 a:hover   { color: #000; }
 a:active  { color: #000; }
 
+textarea, input {
+   font-family: inherit;
+   font-size: inherit;
+}
+
 .page {
     min-height: 100%;
     margin-bottom: -32px; /* to make room for the footer */
