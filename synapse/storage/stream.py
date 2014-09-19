@@ -146,7 +146,7 @@ class StreamStore(SQLBaseStore):
         current_room_membership_sql = (
             "SELECT m.room_id FROM room_memberships as m "
             "INNER JOIN current_state_events as c ON m.event_id = c.event_id "
-            "WHERE m.user_id = ?"
+            "WHERE m.user_id = ? AND m.membership = 'join'"
         )
 
         # We also want to get any membership events about that user, e.g.
