@@ -94,6 +94,79 @@ a:active  { color: #000; }
     font-size: 80%;
 }
 
+#videoBackground {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    top: 32px;
+    left: 0px;
+    z-index: 1;
+    background-color: rgba(0,0,0,0.0);
+    pointer-events: none;
+    transition: background-color linear 500ms;
+}
+
+#videoBackground.large {
+    background-color: rgba(0,0,0,0.85);
+    pointer-events: auto;
+}
+
+#videoContainer {
+    position: relative;
+    max-width: 1280px;
+    margin: auto;
+}
+
+#videoContainerPadding {
+    width: 1280px;
+}
+
+#localVideo {
+    position: absolute;
+    width: 128px;
+    height: 72px;
+    z-index: 1;
+    transition: left linear 500ms, top linear 500ms, width linear 500ms, height linear 500ms;
+}
+
+#localVideo.mini {
+    top: 0px;
+    left: 130px;
+}
+
+#localVideo.large {
+    top: 70px;
+    left: 20px;
+}
+
+#localVideo.ended {
+    -webkit-filter: grayscale(1);
+    filter: grayscale(1);
+}
+
+#remoteVideo {
+    position: relative;
+    height: auto;
+    transition: left linear 500ms, top linear 500ms, width linear 500ms, height linear 500ms;
+}
+
+#remoteVideo.mini {
+    left: 260px;
+    top: 0px;
+    width: 128px;
+}
+
+#remoteVideo.large {
+    left: 0px;
+    top: 50px;
+    width: 100%;
+}
+
+#remoteVideo.ended {
+    -webkit-filter: grayscale(1);
+    filter: grayscale(1);
+}
+
 #headerContent {
     color: #ccc;
     max-width: 1280px;
@@ -101,6 +174,7 @@ a:active  { color: #000; }
     text-align: right;
     height: 32px;
     line-height: 32px;
+    position: relative;
 }
 
 #headerContent a:link,

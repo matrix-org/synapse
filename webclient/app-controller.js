@@ -26,6 +26,12 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
          
     // Check current URL to avoid to display the logout button on the login page
     $scope.location = $location.path();
+
+    // disable nganimate for the local and remote video elements because ngAnimate appears
+    // to be buggy and leaves animation classes on the video elements causing them to show
+    // when they should not (their animations are pure CSS3)
+    $animate.enabled(false, angular.element('#localVideo'));
+    $animate.enabled(false, angular.element('#remoteVideo'));
     
     // Update the location state when the ng location changed
     $rootScope.$on('$routeChangeSuccess', function (event, current, previous) {
@@ -93,7 +99,13 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
     };
 
     $rootScope.$watch('currentCall', function(newVal, oldVal) {
-        if (!$rootScope.currentCall) return;
+        if (!$rootScope.currentCall) {
+            // This causes the still frame to be flushed out of the video elements,
+            // avoiding a flash of the last frame of the previous call when starting the next
+            angular.element('#localVideo')[0].load();
+            angular.element('#remoteVideo')[0].load();
+            return;
+        }
 
         var roomMembers = angular.copy($rootScope.events.rooms[$rootScope.currentCall.room_id].members);
         delete roomMembers[matrixService.config().user_id];
@@ -126,6 +138,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
             angular.element('#ringAudio')[0].pause();
             angular.element('#ringbackAudio')[0].pause();
             angular.element('#callendAudio')[0].play();
+            $scope.videoMode = undefined;
         } else if (newVal == 'ended' && oldVal == 'invite_sent' && $rootScope.currentCall.hangupParty == 'remote') {
             angular.element('#ringAudio')[0].pause();
             angular.element('#ringbackAudio')[0].pause();
@@ -138,6 +151,20 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
             angular.element('#ringbackAudio')[0].pause();
         } else if (oldVal == 'ringing') {
             angular.element('#ringAudio')[0].pause();
+        } else if (newVal == 'connected') {
+            $timeout(function() {
+                if ($scope.currentCall.type == 'video') $scope.videoMode = 'large';
+            }, 500);
+        }
+
+        if ($rootScope.currentCall && $rootScope.currentCall.type == 'video' && $rootScope.currentCall.state != 'connected') {
+            $scope.videoMode = 'mini';
+        }
+    });
+    $rootScope.$watch('currentCall.type', function(newVal, oldVal) {
+        // need to listen for this too as the type of the call won't be know when it's created
+        if ($rootScope.currentCall && $rootScope.currentCall.type == 'video' && $rootScope.currentCall.state != 'connected') {
+            $scope.videoMode = 'mini';
         }
     });
 
@@ -150,6 +177,8 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         }
         call.onError = $scope.onCallError;
         call.onHangup = $scope.onCallHangup;
+        call.localVideoElement = angular.element('#localVideo')[0];
+        call.remoteVideoElement = angular.element('#remoteVideo')[0];
         $rootScope.currentCall = call;
     });
 
@@ -170,7 +199,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
     
     $rootScope.onCallError = function(errStr) {
         $scope.feedback = errStr;
-    }
+    };
 
     $rootScope.onCallHangup = function(call) {
         if (call == $rootScope.currentCall) {
@@ -178,5 +207,5 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
                 if (call == $rootScope.currentCall) $rootScope.currentCall = undefined;
             }, 4070);
         }
-    }
+    };
 }]);

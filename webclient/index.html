@@ -45,6 +45,13 @@
 </head>
 
 <body>
+    <div id="videoBackground" ng-class="videoMode">
+        <div id="videoContainer" ng-class="videoMode">
+            <div id="videoContainerPadding"></div>
+            <video id="localVideo" ng-class="[videoMode, currentCall.state]" ng-show="currentCall && currentCall.type == 'video' && (currentCall.state == 'connected' || currentCall.state == 'connecting' || currentCall.state == 'invite_sent' || currentCall.state == 'ended')"></video>
+            <video id="remoteVideo" ng-class="[videoMode, currentCall.state]" ng-show="currentCall && currentCall.type == 'video' && (currentCall.state == 'connected' || (currentCall.state == 'ended' && currentCall.didConnect))"></video>
+        </div>
+    </div>
 
     <div id="header">
         <!-- Do not show buttons on the login page -->
@@ -58,7 +65,8 @@
                     <br />
                     <span id="callState">
                         <span ng-show="currentCall.state == 'invite_sent'">Calling...</span>
-                        <span ng-show="currentCall.state == 'ringing'">Incoming Call</span>
+                        <span ng-show="currentCall.state == 'ringing' && currentCall && currentCall.type == 'video'">Incoming Video Call</span>
+                        <span ng-show="currentCall.state == 'ringing' && currentCall && currentCall.type == 'voice'">Incoming Voice Call</span>
                         <span ng-show="currentCall.state == 'connecting'">Call Connecting...</span>
                         <span ng-show="currentCall.state == 'connected'">Call Connected</span>
                         <span ng-show="currentCall.state == 'ended' && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'remote'">Call Rejected</span>
@@ -71,7 +79,7 @@
                     </span>
                 </div>
                 <span ng-show="currentCall.state == 'ringing'">
-                    <button ng-click="answerCall()">Answer</button>
+                    <button ng-click="answerCall()">Answer {{ currentCall.type }} call</button>
                     <button ng-click="hangupCall()">Reject</button>
                 </span>
                 <button ng-click="hangupCall()" ng-show="currentCall && currentCall.state != 'ringing' && currentCall.state != 'ended' && currentCall.state != 'fledgling'">Hang up</button>
@@ -92,6 +100,7 @@
                     <source src="media/busy.mp3" type="audio/mpeg" />
                 </audio>
             </div>
+
             <a href id="headerUserId" ng-click='goToUserPage(user_id)'>{{ user_id }}</a>
             &nbsp;
             <button ng-click='goToPage("/")'>Home</button>

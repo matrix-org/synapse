@@ -56,6 +56,12 @@ angular.module('MatrixCall', [])
         // a queue for candidates waiting to go out. We try to amalgamate candidates into a single candidate message where possible
         this.candidateSendQueue = [];
         this.candidateSendTries = 0;
+
+        var self = this;
+        $rootScope.$watch(this.remoteVideoElement, function (oldValue, newValue) {
+            self.tryPlayRemoteStream();
+        });
+
     }
 
     MatrixCall.CALL_TIMEOUT = 60000;
@@ -76,13 +82,39 @@ angular.module('MatrixCall', [])
         return pc;
     }
 
-    MatrixCall.prototype.placeCall = function(config) {
+    MatrixCall.prototype.getUserMediaVideoContraints = function(callType) {
+        switch (callType) {
+            case 'voice':
+                return ({audio: true, video: false});
+            case 'video':
+                return ({audio: true, video: {
+                    mandatory: {
+                        minWidth: 640,
+                        maxWidth: 640,
+                        minHeight: 360,
+                        maxHeight: 360,
+                    }
+                }});
+        }
+    };
+
+    MatrixCall.prototype.placeVoiceCall = function() {
+        this.placeCallWithConstraints(this.getUserMediaVideoContraints('voice'));
+        this.type = 'voice';
+    };
+
+    MatrixCall.prototype.placeVideoCall = function(config) {
+        this.placeCallWithConstraints(this.getUserMediaVideoContraints('video'));
+        this.type = 'video';
+    };
+
+    MatrixCall.prototype.placeCallWithConstraints = function(constraints) {
         var self = this;
         matrixPhoneService.callPlaced(this);
-        navigator.getUserMedia({audio: config.audio, video: config.video}, function(s) { self.gotUserMediaForInvite(s); }, function(e) { self.getUserMediaFailed(e); });
+        navigator.getUserMedia(constraints, function(s) { self.gotUserMediaForInvite(s); }, function(e) { self.getUserMediaFailed(e); });
         this.state = 'wait_local_media';
         this.direction = 'outbound';
-        this.config = config;
+        this.config = constraints;
     };
 
     MatrixCall.prototype.initWithInvite = function(event) {
@@ -91,6 +123,17 @@ angular.module('MatrixCall', [])
         this.peerConn.setRemoteDescription(new RTCSessionDescription(this.msg.offer), this.onSetRemoteDescriptionSuccess, this.onSetRemoteDescriptionError);
         this.state = 'ringing';
         this.direction = 'inbound';
+
+        if (window.mozRTCPeerConnection) {
+            // firefox's RTCPeerConnection doesn't add streams until it starts getting media on them
+            // so we need to figure out whether a video channel has been offered by ourselves.
+            if (this.msg.offer.sdp.indexOf('m=video') > -1) {
+                this.type = 'video';
+            } else {
+                this.type = 'voice';
+            }
+        }
+
         var self = this;
         $timeout(function() {
             if (self.state == 'ringing') {
@@ -115,7 +158,7 @@ angular.module('MatrixCall', [])
         console.log("Answering call "+this.call_id);
         var self = this;
         if (!this.localAVStream && !this.waitForLocalAVStream) {
-            navigator.getUserMedia({audio: true, video: false}, function(s) { self.gotUserMediaForAnswer(s); }, function(e) { self.getUserMediaFailed(e); });
+            navigator.getUserMedia(this.getUserMediaVideoContraints(this.type), function(s) { self.gotUserMediaForAnswer(s); }, function(e) { self.getUserMediaFailed(e); });
             this.state = 'wait_local_media';
         } else if (this.localAVStream) {
             this.gotUserMediaForAnswer(this.localAVStream);
@@ -140,6 +183,11 @@ angular.module('MatrixCall', [])
     MatrixCall.prototype.hangup = function(suppressEvent) {
         console.log("Ending call "+this.call_id);
 
+        // pausing now keeps the last frame (ish) of the video call in the video element
+        // rather than it just turning black straight away
+        if (this.remoteVideoElement) this.remoteVideoElement.pause();
+        if (this.localVideoElement) this.localVideoElement.pause();
+
         this.stopAllMedia();
         if (this.peerConn) this.peerConn.close();
 
@@ -160,6 +208,13 @@ angular.module('MatrixCall', [])
             return;
         }
         if (this.state == 'ended') return;
+
+        if (this.localVideoElement && this.type == 'video') {
+            var vidTrack = stream.getVideoTracks()[0];
+            this.localVideoElement.src = URL.createObjectURL(stream);
+            this.localVideoElement.muted = true;
+            this.localVideoElement.play();
+        }
 
         this.localAVStream = stream;
         var audioTracks = stream.getAudioTracks();
@@ -182,6 +237,13 @@ angular.module('MatrixCall', [])
     MatrixCall.prototype.gotUserMediaForAnswer = function(stream) {
         if (this.state == 'ended') return;
 
+        if (this.localVideoElement && this.type == 'video') {
+            var vidTrack = stream.getVideoTracks()[0];
+            this.localVideoElement.src = URL.createObjectURL(stream);
+            this.localVideoElement.muted = true;
+            this.localVideoElement.play();
+        }
+
         this.localAVStream = stream;
         var audioTracks = stream.getAudioTracks();
         for (var i = 0; i < audioTracks.length; i++) {
@@ -192,7 +254,7 @@ angular.module('MatrixCall', [])
         var constraints = {
             'mandatory': {
                 'OfferToReceiveAudio': true,
-                'OfferToReceiveVideo': false
+                'OfferToReceiveVideo': this.type == 'video'
             },
         };
         this.peerConn.createAnswer(function(d) { self.createdAnswer(d); }, function(e) {}, constraints);
@@ -222,6 +284,7 @@ angular.module('MatrixCall', [])
         this.peerConn.setRemoteDescription(new RTCSessionDescription(msg.answer), this.onSetRemoteDescriptionSuccess, this.onSetRemoteDescriptionError);
         this.state = 'connecting';
     };
+
 
     MatrixCall.prototype.gotLocalOffer = function(description) {
         console.log("Created offer: "+description);
@@ -274,7 +337,7 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.getUserMediaFailed = function() {
-        this.onError("Couldn't start capturing audio! Is your microphone set up?");
+        this.onError("Couldn't start capturing! Is your microphone set up?");
         this.hangup();
     };
 
@@ -310,6 +373,14 @@ angular.module('MatrixCall', [])
 
         this.remoteAVStream = s;
 
+        if (this.direction == 'inbound') {
+            if (s.getVideoTracks().length > 0) {
+                this.type = 'video';
+            } else {
+                this.type = 'voice';
+            }
+        }
+
         var self = this;
         forAllTracksOnStream(s, function(t) {
             // not currently implemented in chrome
@@ -319,9 +390,16 @@ angular.module('MatrixCall', [])
         event.stream.onended = function(e) { self.onRemoteStreamEnded(e); }; 
         // not currently implemented in chrome
         event.stream.onstarted = function(e) { self.onRemoteStreamStarted(e); };
-        var player = new Audio();
-        player.src = URL.createObjectURL(s);
-        player.play();
+
+        this.tryPlayRemoteStream();
+    };
+
+    MatrixCall.prototype.tryPlayRemoteStream = function(event) {
+        if (this.remoteVideoElement && this.remoteAVStream) {
+            var player = this.remoteVideoElement;
+            player.src = URL.createObjectURL(this.remoteAVStream);
+            player.play();
+        }
     };
 
     MatrixCall.prototype.onRemoteStreamStarted = function(event) {
@@ -352,10 +430,12 @@ angular.module('MatrixCall', [])
 
     MatrixCall.prototype.onHangupReceived = function() {
         console.log("Hangup received");
+        if (this.remoteVideoElement) this.remoteVideoElement.pause();
+        if (this.localVideoElement) this.localVideoElement.pause();
         this.state = 'ended';
         this.hangupParty = 'remote';
         this.stopAllMedia();
-        if (this.peerConn.signalingState != 'closed') this.peerConn.close();
+        if (this.peerConn && this.peerConn.signalingState != 'closed') this.peerConn.close();
         if (this.onHangup) this.onHangup(this);
     };
 
@@ -366,13 +446,15 @@ angular.module('MatrixCall', [])
             newCall.waitForLocalAVStream = true;
         } else if (this.state == 'create_offer') {
             console.log("Handing local stream to new call");
-            newCall.localAVStream = this.localAVStream;
+            newCall.gotUserMediaForAnswer(this.localAVStream);
             delete(this.localAVStream);
         } else if (this.state == 'invite_sent') {
             console.log("Handing local stream to new call");
-            newCall.localAVStream = this.localAVStream;
+            newCall.gotUserMediaForAnswer(this.localAVStream);
             delete(this.localAVStream);
         }
+        newCall.localVideoElement = this.localVideoElement;
+        newCall.remoteVideoElement = this.remoteVideoElement;
         this.successor = newCall;
         this.hangup(true);
     };

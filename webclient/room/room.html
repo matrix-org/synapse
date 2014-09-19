@@ -183,6 +183,13 @@
                         >
                     Voice Call
                 </button>
+                <button ng-click="startVideoCall()"
+                        ng-show="(currentCall == undefined || currentCall.state == 'ended') && memberCount() == 2"
+                        ng-disabled="state.permission_denied || !state.webRTCSupported"
+                        title ="{{ state.webRTCNotSupported ? '' : 'VoIP requires webRTC but your browser does not support it.'}}"
+                        >
+                    Video Call
+                </button>
             </div>
         
             {{ feedback }}
