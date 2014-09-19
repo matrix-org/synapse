@@ -102,7 +102,7 @@ service provider in Matrix, unlike WhatsApp, Facebook, Hangouts, etc.
 
 Synapse ships with two basic demo Matrix clients: webclient (a basic group chat
 web client demo implemented in AngularJS) and cmdclient (a basic Python
-commandline utility which lets you easily see what the JSON APIs are up to).
+command line utility which lets you easily see what the JSON APIs are up to).
 
 We'd like to invite you to take a look at the Matrix spec, try to run a
 homeserver, and join the existing Matrix chatrooms already out there, experiment
@@ -122,7 +122,7 @@ Homeserver Installation
 First, the dependencies need to be installed.  Start by installing 
 'python2.7-dev' and the various tools of the compiler toolchain.
 
-  Installing prerequisites on ubuntu::
+  Installing prerequisites on Ubuntu::
 
     $ sudo apt-get install build-essential python2.7-dev libffi-dev
 
@@ -151,8 +151,8 @@ you can check PyNaCl out of git directly (https://github.com/pyca/pynacl) and
 installing it. Installing PyNaCl using pip may also work (remember to remove any
 other versions installed by setuputils in, for example, ~/.local/lib).
 
-On OSX, if you encounter ``clang: error: unknown argument: '-mno-fused-madd'`` you will
-need to ``export CFLAGS=-Qunused-arguments``.
+On OSX, if you encounter ``clang: error: unknown argument: '-mno-fused-madd'`` 
+you will need to ``export CFLAGS=-Qunused-arguments``.
 
 This will run a process of downloading and installing into your
 user's .local/lib directory all of the required dependencies that are
@@ -203,9 +203,10 @@ For the first form, simply pass the required hostname (of the machine) as the
         --generate-config
     $ python synapse/app/homeserver.py --config-path homeserver.config
     
-Alternatively, you can run synapse via synctl - running ``synctl start`` to generate a
-homeserver.yaml config file, where you can then edit server-name to specify
-machine.my.domain.name, and then set the actual server running again with synctl start.
+Alternatively, you can run synapse via synctl - running ``synctl start`` to 
+generate a homeserver.yaml config file, where you can then edit server-name to 
+specify machine.my.domain.name, and then set the actual server running again 
+with synctl start.
 
 For the second form, first create your SRV record and publish it in DNS. This
 needs to be named _matrix._tcp.YOURDOMAIN, and point at at least one hostname
@@ -293,7 +294,8 @@ track 3PID logins and publish end-user public keys.
 
 It's currently early days for identity servers as Matrix is not yet using 3PIDs
 as the primary means of identity and E2E encryption is not complete. As such,
-we are running a single identity server (http://matrix.org:8090) at the current time.
+we are running a single identity server (http://matrix.org:8090) at the current 
+time.
 
 
 Where's the spec?!
