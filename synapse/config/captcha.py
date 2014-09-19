@@ -14,13 +14,16 @@
 
 from ._base import Config
 
+
 class CaptchaConfig(Config):
 
     def __init__(self, args):
         super(CaptchaConfig, self).__init__(args)
         self.recaptcha_private_key = args.recaptcha_private_key
         self.enable_registration_captcha = args.enable_registration_captcha
-        self.captcha_ip_origin_is_x_forwarded = args.captcha_ip_origin_is_x_forwarded
+        self.captcha_ip_origin_is_x_forwarded = (
+            args.captcha_ip_origin_is_x_forwarded
+        )
 
     @classmethod
     def add_arguments(cls, parser):
@@ -32,11 +35,12 @@ class CaptchaConfig(Config):
         )
         group.add_argument(
             "--enable-registration-captcha", type=bool, default=False,
-            help="Enables ReCaptcha checks when registering, preventing signup "+
-            "unless a captcha is answered. Requires a valid ReCaptcha public/private key."
+            help="Enables ReCaptcha checks when registering, preventing signup"
+            + " unless a captcha is answered. Requires a valid ReCaptcha "
+            + "public/private key."
         )
         group.add_argument(
             "--captcha_ip_origin_is_x_forwarded", type=bool, default=False,
-            help="When checking captchas, use the X-Forwarded-For (XFF) header as the client IP "+
-            "and not the actual client IP."
+            help="When checking captchas, use the X-Forwarded-For (XFF) header"
+            + " as the client IP and not the actual client IP."
         )
