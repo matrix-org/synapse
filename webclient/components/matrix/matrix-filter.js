@@ -81,8 +81,8 @@ angular.module('matrixFilter', [])
                                 }
                                 if (member_id !== user_id) {
                                     // Make sure there is no duplicate user
-                                    if (-1 === invitedUserIDs.indexOf(message.state_key)) {
-                                        invitedUserIDs.push(message.state_key);
+                                    if (-1 === invitedUserIDs.indexOf(member_id)) {
+                                        invitedUserIDs.push(member_id);
                                     }
                                 }
                             } 
