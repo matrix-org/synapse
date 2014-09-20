@@ -114,9 +114,13 @@ angular.module('matrixFilter', [])
             // By default, use the room ID
             roomName = room_id;
 
+            // XXX: this is *INCREDIBLY* heavy logging for a function that calls every single
+            // time any kind of digest runs which refreshes a room name...
+            // commenting it out for now.
+
             // Log some information that lead to this leak
-            console.log("Room ID leak for " + room_id);
-            console.log("room object: " + JSON.stringify(room, undefined, 4));   
+            // console.log("Room ID leak for " + room_id);
+            // console.log("room object: " + JSON.stringify(room, undefined, 4));   
         }
 
         return roomName;
