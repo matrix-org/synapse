@@ -189,21 +189,27 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             
             if (window.Notification && event.user_id != matrixService.config().user_id) {
                 var shouldBing = $rootScope.containsBingWord(event.content.body);
-            
-                // TODO: Binging every message when idle doesn't make much sense. Can we use this more sensibly?
-                // Unfortunately document.hidden = false on ubuntu chrome if chrome is minimised / does not have focus;
-                // true when you swap tabs though. However, for the case where the chat screen is OPEN and there is
-                // another window on top, we want to be notifying for those events. This DOES mean that there will be
-                // notifications when currently viewing the chat screen though, but that is preferable to the alternative imo.
+
+                // Ideally we would notify only when the window is hidden (i.e. document.hidden = true).
+                //
+                // However, Chrome on Linux and OSX currently returns document.hidden = false unless the window is
+                // explicitly showing a different tab.  So we need another metric to determine hiddenness - we
+                // simply use idle time.  If the user has been idle enough that their presence goes to idle, then
+                // we also display notifs when things happen.
+                //
+                // This is far far better than notifying whenever anything happens anyway, otherwise you get spammed
+                // to death with notifications when the window is in the foreground, which is horrible UX (especially
+                // if you have not defined any bingers and so get notified for everything).
                 var isIdle = (document.hidden || matrixService.presence.unavailable === mPresence.getState());
                 
-                // always bing if there are 0 bing words... apparently.
+                // We need a way to let people get notifications for everything, if they so desire.  The way to do this
+                // is to specify zero bingwords.
                 var bingWords = matrixService.config().bingWords;
                 if (bingWords === undefined || bingWords.length === 0) {
                     shouldBing = true;
                 }
                 
-                if (shouldBing) {
+                if (shouldBing && isIdle) {
                     console.log("Displaying notification for "+JSON.stringify(event));
                     var member = $rootScope.events.rooms[event.room_id].members[event.user_id];
                     var displayname = undefined;
