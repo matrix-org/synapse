@@ -16,8 +16,12 @@ on. If you do, edit the config to point to that url):
   webdriver-manager start
 
   Create a file "environment-protractor.js" in this directory and type:
-    var seleniumAddress = 'http://localhost:4444/wd/hub';
-
+    module.exports = {
+        seleniumAddress: 'http://localhost:4444/wd/hub',
+        loginUrl: "http://localhost:8008/_matrix/client/#/login",
+        username: "YOUR_TEST_USERNAME",
+        password: "YOUR_TEST_PASSWORD"
+    }
 
 Running e2e tests:
   protractor protractor.conf.js

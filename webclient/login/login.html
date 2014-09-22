@@ -23,7 +23,7 @@
                     <br/>
                     <input id="password" size="32" type="password" ng-model="account.password" placeholder="Password"/>
                     <br/><br/>
-                    <button ng-click="login()" ng-disabled="!account.user_id || !account.password || !account.homeserver">Login</button>
+                    <button id="login" ng-click="login()" ng-disabled="!account.user_id || !account.password || !account.homeserver">Login</button>
                     <br/><br/>
                 </div>
 
