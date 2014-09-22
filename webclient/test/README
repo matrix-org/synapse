@@ -18,7 +18,7 @@ on. If you do, edit the config to point to that url):
   Create a file "environment-protractor.js" in this directory and type:
     module.exports = {
         seleniumAddress: 'http://localhost:4444/wd/hub',
-        loginUrl: "http://localhost:8008/_matrix/client/#/login",
+        baseUrl: "http://localhost:8008",
         username: "YOUR_TEST_USERNAME",
         password: "YOUR_TEST_PASSWORD"
     }
@@ -26,6 +26,7 @@ on. If you do, edit the config to point to that url):
 Running e2e tests:
   protractor protractor.conf.js
 
+NOTE: This will create a public room on the target home server.
 
 
 
