@@ -130,13 +130,13 @@ Signing events is a more complicated process since servers can choose to redact
 non-essential event contents. Before signing the event it is encoded as
 Canonical JSON and hashed using SHA-256. The resulting hash is then stored
 in the event JSON in a ``hash`` object under a ``sha256`` key. Then all
-non-essential keys are striped from the event object and the resulting object
+non-essential keys are stripped from the event object, and the resulting object
 which included the ``hash`` key is signed using the JSON signing algorithm.
 
 Servers can then transmit the entire event or the event with the non-essential
-keys removed. Recieving servers can then check the entire event if it is
-present by computing the SHA-256 of the event excluding the ``hash`` object or
-by using the ``hash`` object including in the event if keys have been redacted.
+keys removed. Receiving servers can then check the entire event if it is
+present by computing the SHA-256 of the event excluding the ``hash`` object, or
+by using the ``hash`` object included in the event if keys have been redacted.
 
 New hash functions can be introduced by adding additional keys to the ``hash``
 object. Since the ``hash`` object cannot be redacted a server shouldn't allow
