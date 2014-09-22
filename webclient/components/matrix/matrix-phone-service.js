@@ -145,7 +145,7 @@ angular.module('matrixPhoneService', [])
                 call.initWithHangup(event);
                 matrixPhoneService.allCalls[msg.call_id] = call;
             } else {
-                call.onHangupReceived();
+                call.onHangupReceived(msg);
                 delete(matrixPhoneService.allCalls[msg.call_id]);
             }
         }

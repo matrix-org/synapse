@@ -197,7 +197,7 @@ angular.module('MatrixCall', [])
         }
     };
 
-    MatrixCall.prototype.hangup = function(suppressEvent) {
+    MatrixCall.prototype.hangup = function(reason, suppressEvent) {
         console.log("Ending call "+this.call_id);
 
         // pausing now keeps the last frame (ish) of the video call in the video element
@@ -209,10 +209,12 @@ angular.module('MatrixCall', [])
         if (this.peerConn) this.peerConn.close();
 
         this.hangupParty = 'local';
+        this.hangupReason = reason;
 
         var content = {
             version: 0,
             call_id: this.call_id,
+            reason: reason
         };
         this.sendEventWithRetry('m.call.hangup', content);
         this.state = 'ended';
@@ -324,8 +326,7 @@ angular.module('MatrixCall', [])
         var self = this;
         $timeout(function() {
             if (self.state == 'invite_sent') {
-                self.hangupReason = 'invite_timeout';
-                self.hangup();
+                self.hangup('invite_timeout');
             }
         }, MatrixCall.CALL_TIMEOUT);
 
@@ -369,8 +370,7 @@ angular.module('MatrixCall', [])
                 self.didConnect = true;
             });
         } else if (this.peerConn.iceConnectionState == 'failed') {
-            this.hangupReason = 'ice_failed';
-            this.hangup();
+            this.hangup('ice_failed');
         }
     };
 
@@ -448,12 +448,13 @@ angular.module('MatrixCall', [])
         });
     };
 
-    MatrixCall.prototype.onHangupReceived = function() {
+    MatrixCall.prototype.onHangupReceived = function(msg) {
         console.log("Hangup received");
         if (this.remoteVideoElement) this.remoteVideoElement.pause();
         if (this.localVideoElement) this.localVideoElement.pause();
         this.state = 'ended';
         this.hangupParty = 'remote';
+        this.hangupReason = msg.reason;
         this.stopAllMedia();
         if (this.peerConn && this.peerConn.signalingState != 'closed') this.peerConn.close();
         if (this.onHangup) this.onHangup(this);
