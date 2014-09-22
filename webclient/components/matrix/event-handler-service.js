@@ -253,12 +253,30 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
         // Exception: Do not do this if the event is a room state event because such events already come
         // as room messages events. Moreover, when they come as room messages events, they are relatively ordered
         // with other other room messages
-        if (event.content.prev !== event.content.membership && !isStateEvent) {
-            if (isLiveEvent) {
-                $rootScope.events.rooms[event.room_id].messages.push(event);
+        if (!isStateEvent) {
+            // could be a membership change, display name change, etc.
+            // Find out which one.
+            var memberChanges = undefined;
+            if (event.content.prev !== event.content.membership) {
+                memberChanges = "membership";
             }
-            else {
-                $rootScope.events.rooms[event.room_id].messages.unshift(event);
+            else if (event.prev_content.displayname !== 
+                     event.content.displayname) {
+                memberChanges = "displayname";
+            }
+
+            // mark the key which changed
+            event.changedKey = memberChanges;
+
+            // If there was a change we want to display, dump it in the message
+            // list.
+            if (memberChanges) {
+                if (isLiveEvent) {
+                    $rootScope.events.rooms[event.room_id].messages.push(event);
+                }
+                else {
+                    $rootScope.events.rooms[event.room_id].messages.unshift(event);
+                }
             }
         }
         

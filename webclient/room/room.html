@@ -77,10 +77,10 @@
                 </td>
                 <td ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble">
-                        <span ng-if="'join' === msg.content.membership">
+                        <span ng-if="'join' === msg.content.membership && msg.changedKey === 'membership'">
                             {{ members[msg.state_key].displayname || msg.state_key }} joined
                         </span>
-                        <span ng-if="'leave' === msg.content.membership">
+                        <span ng-if="'leave' === msg.content.membership && msg.changedKey === 'membership'">
                             <span ng-if="msg.user_id === msg.state_key">
                                 {{ members[msg.state_key].displayname || msg.state_key }} left
                             </span>
@@ -93,7 +93,8 @@
                                 </span>
                             </span>
                         </span>
-                        <span ng-if="'invite' === msg.content.membership || 'ban' === msg.content.membership">
+                        <span ng-if="'invite' === msg.content.membership && msg.changedKey === 'membership' || 
+                                     'ban' === msg.content.membership && msg.changedKey === 'membership'">
                             {{ members[msg.user_id].displayname || msg.user_id }}
                             {{ {"invite": "invited", "ban": "banned"}[msg.content.membership] }}
                             {{ members[msg.state_key].displayname || msg.state_key }}
@@ -101,6 +102,9 @@
                                 : {{ msg.content.reason }}
                             </span>
                         </span>                        
+                        <span ng-if="msg.changedKey === 'displayname'">
+                            {{ msg.user_id }} changed their display name from {{ msg.prev_content.displayname }} to {{ msg.content.displayname }}
+                        </span>
                         
                         <span ng-show='msg.content.msgtype === "m.emote"'
                               ng-class="msg.echo_msg_state"
