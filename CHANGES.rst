@@ -41,7 +41,6 @@ Webclient:
  * The recents list now differentiates between public & private rooms.
  * Fix bug where when switching between rooms the pagination flickered before
    the view jumped to the bottom of the screen.
- * Add support for password resets.
  * Add bing word support.
 
 Registration API:
