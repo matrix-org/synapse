@@ -25,5 +25,6 @@ graph/*.png
 graph/*.dot
 
 webclient/config.js
+webclient/test/environment-protractor.js
 
 uploads

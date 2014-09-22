@@ -21,13 +21,12 @@ describe("UserCtrl", function() {
 
                 getDisplayName: function(uid) {
                     var d = $q.defer();
-                    // FIXME: everything goes into fire here
                     d.resolve({
                         data: {
                             displayname: displayName
                         }
                     });
-                    return d;
+                    return d.promise;
                 },
 
                 getProfilePictureUrl: function(uid) {
@@ -37,7 +36,7 @@ describe("UserCtrl", function() {
                             avatar_url: avatarUrl
                         }
                     });
-                    return d;
+                    return d.promise;
                 }
             };
             scope = $rootScope.$new();
@@ -49,7 +48,6 @@ describe("UserCtrl", function() {
                 '$routeParams': routeParams, 
                 'matrixService': matrixService
             });
-            console.log("end inject");
         });
     });
 

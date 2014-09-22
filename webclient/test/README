@@ -1,9 +1,22 @@
 Requires:
- - npm
+ - nodejs/npm
  - npm install karma
  - npm install jasmine
+ - npm install protractor (e2e testing)
 
-Setting up continuous integration / run the tests:
+Setting up continuous integration / run the unit tests (make sure you're in
+this directory so it can find the config file):
   karma start
+
+Setting up e2e tests (only if you don't have a selenium server to run the tests
+on. If you do, edit the config to point to that url):
+  webdriver-manager update
+  webdriver-manager start
+
+Running e2e tests:
+  protractor protractor.conf.js
+
+
+
 
 
