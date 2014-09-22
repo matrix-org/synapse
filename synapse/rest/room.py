@@ -154,14 +154,14 @@ class RoomStateEventRestServlet(RestServlet):
             # membership events are special
             handler = self.handlers.room_member_handler
             yield handler.change_membership(event)
-            defer.returnValue((200, ""))
+            defer.returnValue((200, {}))
         else:
             # store random bits of state
             msg_handler = self.handlers.message_handler
             yield msg_handler.store_room_data(
                 event=event
             )
-            defer.returnValue((200, ""))
+            defer.returnValue((200, {}))
 
 
 # TODO: Needs unit testing for generic events + feedback
@@ -249,7 +249,7 @@ class JoinRoomAliasServlet(RestServlet):
             )
             handler = self.handlers.room_member_handler
             yield handler.change_membership(event)
-            defer.returnValue((200, ""))
+            defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_identifier, txn_id):
@@ -378,7 +378,7 @@ class RoomTriggerBackfill(RestServlet):
         handler = self.handlers.federation_handler
         events = yield handler.backfill(remote_server, room_id, limit)
 
-        res = [event.get_dict() for event in events]
+        res = [self.hs.serialize_event(event) for event in events]
         defer.returnValue((200, res))
 
 
@@ -416,7 +416,7 @@ class RoomMembershipRestServlet(RestServlet):
         )
         handler = self.handlers.room_member_handler
         yield handler.change_membership(event)
-        defer.returnValue((200, ""))
+        defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):

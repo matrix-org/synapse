@@ -59,7 +59,7 @@ class EventRestServlet(RestServlet):
         event = yield handler.get_event(auth_user, event_id)
 
         if event:
-            defer.returnValue((200, event.get_dict()))
+            defer.returnValue((200, self.hs.serialize_event(event)))
         else:
             defer.returnValue((404, "Event not found."))
 

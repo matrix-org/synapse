@@ -1,3 +1,119 @@
+Changes in synapse 0.3.3 (2014-09-22)
+=====================================
+
+Homeserver:
+ * Fix bug where you continued to get events for rooms you had left.
+
+Webclient:
+ * Add support for video calls with basic UI.
+ * Fix bug where one to one chats were named after your display name rather
+   than the other person's.
+ * Fix bug which caused lag when typing in the textarea.
+ * Refuse to run on browsers we know won't work.
+ * Trigger pagination when joining new rooms.
+ * Fix bug where we sometimes didn't display invitations in recents.
+ * Automatically join room when accepting a VoIP call.
+ * Disable outgoing and reject incoming calls on browsers we don't support
+   VoIP in.
+ * Don't display desktop notifications for messages in the room you are
+   non-idle and speaking in.
+
+Changes in synapse 0.3.2 (2014-09-18)
+=====================================
+
+Webclient:
+ * Fix bug where an empty "bing words" list in old accounts didn't send
+   notifications when it should have done.
+
+Changes in synapse 0.3.1 (2014-09-18)
+=====================================
+This is a release to hotfix v0.3.0 to fix two regressions.
+
+Webclient:
+ * Fix a regression where we sometimes displayed duplicate events.
+ * Fix a regression where we didn't immediately remove rooms you were
+   banned in from the recents list.
+
+Changes in synapse 0.3.0 (2014-09-18)
+=====================================
+See UPGRADE for information about changes to the client server API, including
+breaking backwards compatibility with VoIP calls and registration API.
+
+Homeserver:
+ * When a user changes their displayname or avatar the server will now update 
+   all their join states to reflect this.
+ * The server now adds "age" key to events to indicate how old they are. This
+   is clock independent, so at no point does any server or webclient have to
+   assume their clock is in sync with everyone else.
+ * Fix bug where we didn't correctly pull in missing PDUs.
+ * Fix bug where prev_content key wasn't always returned.
+ * Add support for password resets.
+
+Webclient:
+ * Improve page content loading.
+ * Join/parts now trigger desktop notifications.
+ * Always show room aliases in the UI if one is present.
+ * No longer show user-count in the recents side panel.
+ * Add up & down arrow support to the text box for message sending to step
+   through your sent history.
+ * Don't display notifications for our own messages.
+ * Emotes are now formatted correctly in desktop notifications.
+ * The recents list now differentiates between public & private rooms.
+ * Fix bug where when switching between rooms the pagination flickered before
+   the view jumped to the bottom of the screen.
+ * Add bing word support.
+
+Registration API:
+ * The registration API has been overhauled to function like the login API. In
+   practice, this means registration requests must now include the following:
+   'type':'m.login.password'. See UPGRADE for more information on this.
+ * The 'user_id' key has been renamed to 'user' to better match the login API.
+ * There is an additional login type: 'm.login.email.identity'.
+ * The command client and web client have been updated to reflect these changes.
+
+Changes in synapse 0.2.3 (2014-09-12)
+=====================================
+
+Homeserver:
+ * Fix bug where we stopped sending events to remote home servers if a
+   user from that home server left, even if there were some still in the
+   room.
+ * Fix bugs in the state conflict resolution where it was incorrectly
+   rejecting events.
+
+Webclient:
+ * Display room names and topics.
+ * Allow setting/editing of room names and topics.
+ * Display information about rooms on the main page.
+ * Handle ban and kick events in real time.
+ * VoIP UI and reliability improvements.
+ * Add glare support for VoIP.
+ * Improvements to initial startup speed.
+ * Don't display duplicate join events.
+ * Local echo of messages.
+ * Differentiate sending and sent of local echo.
+ * Various minor bug fixes.
+
+Changes in synapse 0.2.2 (2014-09-06)
+=====================================
+
+Homeserver:
+ * When the server returns state events it now also includes the previous 
+   content.
+ * Add support for inviting people when creating a new room.
+ * Make the homeserver inform the room via `m.room.aliases` when a new alias
+   is added for a room.
+ * Validate `m.room.power_level` events.
+
+Webclient:
+ * Add support for captchas on registration.
+ * Handle `m.room.aliases` events.
+ * Asynchronously send messages and show a local echo.
+ * Inform the UI when a message failed to send.
+ * Only autoscroll on receiving a new message if the user was already at the 
+   bottom of the screen.
+ * Add support for ban/kick reasons.
+
 Changes in synapse 0.2.1 (2014-09-03)
 =====================================
 

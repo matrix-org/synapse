@@ -18,8 +18,8 @@
 from twisted.internet import defer
 
 from synapse.api.constants import Membership, JoinRules
-from synapse.api.errors import AuthError, StoreError, Codes
-from synapse.api.events.room import RoomMemberEvent
+from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
+from synapse.api.events.room import RoomMemberEvent, RoomPowerLevelsEvent
 from synapse.util.logutils import log_function
 
 import logging
@@ -66,6 +66,9 @@ class Auth(object):
                     yield self._can_replace_state(event)
                 else:
                     yield self._can_send_event(event)
+
+                if event.type == RoomPowerLevelsEvent.TYPE:
+                    yield self._check_power_levels(event)
 
                 defer.returnValue(True)
             else:
@@ -172,7 +175,7 @@ class Auth(object):
                 if kick_level:
                     kick_level = int(kick_level)
                 else:
-                    kick_level = 5
+                    kick_level = 50
 
                 if user_level < kick_level:
                     raise AuthError(
@@ -189,7 +192,7 @@ class Auth(object):
             if ban_level:
                 ban_level = int(ban_level)
             else:
-                ban_level = 5  # FIXME (erikj): What should we do here?
+                ban_level = 50  # FIXME (erikj): What should we do here?
 
             if user_level < ban_level:
                 raise AuthError(403, "You don't have permission to ban")
@@ -305,7 +308,9 @@ class Auth(object):
         else:
             user_level = 0
 
-        logger.debug("Checking power level for %s, %s", event.user_id, user_level)
+        logger.debug(
+            "Checking power level for %s, %s", event.user_id, user_level
+        )
         if current_state and hasattr(current_state, "required_power_level"):
             req = current_state.required_power_level
 
@@ -315,3 +320,101 @@ class Auth(object):
                     403,
                     "You don't have permission to change that state"
                 )
+
+    @defer.inlineCallbacks
+    def _check_power_levels(self, event):
+        for k, v in event.content.items():
+            if k == "default":
+                continue
+
+            # FIXME (erikj): We don't want hsob_Ts in content.
+            if k == "hsob_ts":
+                continue
+
+            try:
+                self.hs.parse_userid(k)
+            except:
+                raise SynapseError(400, "Not a valid user_id: %s" % (k,))
+
+            try:
+                int(v)
+            except:
+                raise SynapseError(400, "Not a valid power level: %s" % (v,))
+
+        current_state = yield self.store.get_current_state(
+            event.room_id,
+            event.type,
+            event.state_key,
+        )
+
+        if not current_state:
+            return
+        else:
+            current_state = current_state[0]
+
+        user_level = yield self.store.get_power_level(
+            event.room_id,
+            event.user_id,
+        )
+
+        if user_level:
+            user_level = int(user_level)
+        else:
+            user_level = 0
+
+        old_list = current_state.content
+
+        # FIXME (erikj)
+        old_people = {k: v for k, v in old_list.items() if k.startswith("@")}
+        new_people = {
+            k: v for k, v in event.content.items()
+            if k.startswith("@")
+        }
+
+        removed = set(old_people.keys()) - set(new_people.keys())
+        added = set(old_people.keys()) - set(new_people.keys())
+        same = set(old_people.keys()) & set(new_people.keys())
+
+        for r in removed:
+            if int(old_list.content[r]) > user_level:
+                raise AuthError(
+                    403,
+                    "You don't have permission to remove user: %s" % (r, )
+                )
+
+        for n in added:
+            if int(event.content[n]) > user_level:
+                raise AuthError(
+                    403,
+                    "You don't have permission to add ops level greater "
+                    "than your own"
+                )
+
+        for s in same:
+            if int(event.content[s]) != int(old_list[s]):
+                if int(event.content[s]) > user_level:
+                    raise AuthError(
+                        403,
+                        "You don't have permission to add ops level greater "
+                        "than your own"
+                    )
+
+        if "default" in old_list:
+            old_default = int(old_list["default"])
+
+            if old_default > user_level:
+                raise AuthError(
+                    403,
+                    "You don't have permission to add ops level greater than "
+                    "your own"
+                )
+
+            if "default" in event.content:
+                new_default = int(event.content["default"])
+
+                if new_default > user_level:
+                    raise AuthError(
+                        403,
+                        "You don't have permission to add ops level greater "
+                        "than your own"
+                    )

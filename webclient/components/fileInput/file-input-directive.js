@@ -31,13 +31,23 @@ angular.module('mFileInput', [])
         },
 
         link: function(scope, element, attrs, ctrl) {
-            element.bind("click", function() {
-                element.find("input")[0].click();
-                element.find("input").bind("change", function(e) {
-                    scope.selectedFile = this.files[0];
-                    scope.$apply();
+            
+            // Check if HTML5 file selection is supported
+            if (window.FileList) {
+                element.bind("click", function() {
+                    element.find("input")[0].click();
+                    element.find("input").bind("change", function(e) {
+                        scope.selectedFile = this.files[0];
+                        scope.$apply();
+                    });
                 });
-            });
+            }
+            else {
+                setTimeout(function() {
+                    element.attr("disabled", true);
+                    element.attr("title", "The app uses the HTML5 File API to send files. Your browser does not support it.");
+                }, 1);
+            }
 
             // Change the mouse icon on mouseover on this element
             element.css("cursor", "pointer");

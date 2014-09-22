@@ -1,72 +1,95 @@
-<div ng-controller="RecentsController" data-ng-init="onInit()">
+<div ng-controller="RecentsController">
     <table class="recentsTable">
-        <tbody ng-repeat="(rm_id, room) in rooms | orderRecents" 
+        <tbody ng-repeat="(index, room) in events.rooms | orderRecents" 
                ng-click="goToPage('room/' + (room.room_alias ? room.room_alias : room.room_id) )" 
                class ="recentsRoom" 
-               ng-class="{'recentsRoomSelected': (room.room_id === recentsSelectedRoomID)}">
+               ng-class="{'recentsRoomSelected': (room.room_id === recentsSelectedRoomID)}">                                           
             <tr>
-                <td class="recentsRoomName">
+                <td ng-class="room['m.room.join_rules'].content.join_rule == 'public' ? 'recentsRoomName recentsPublicRoom' : 'recentsRoomName'">
                     {{ room.room_id | mRoomName }}
                 </td>
+                <td class="recentsRoomSummaryUsersCount">
+                    <span ng-show="undefined !== room.numUsersInRoom">
+                        {{ room.numUsersInRoom || '1' }} {{ room.numUsersInRoom == 1 ? 'user' : 'users' }}                     
+                    </span>
+                </td>
                 <td class="recentsRoomSummaryTS">
-                    {{ (room.lastMsg.ts) | date:'MMM d HH:mm' }}
+                    <!-- Use a temp var as alias to the last room message.
+                         Declaring it in this way ensures the data-binding -->
+                    {{ lastMsg = eventHandlerService.getLastMessage(room.room_id, true);"" }}
+
+                    {{ (lastMsg.ts) | date:'MMM d HH:mm' }}
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="recentsRoomSummary">
+                <td colspan="3" class="recentsRoomSummary">
 
                     <div ng-show="room.membership === 'invite'">
-                        {{ room.lastMsg.inviter | mUserDisplayName: room.room_id }} invited you
+                        {{ room.inviter | mUserDisplayName: room.room_id }} invited you
                     </div>
                     
-                    <div ng-hide="room.membership === 'invite'" ng-switch="room.lastMsg.type">
+                    <div ng-hide="room.membership === 'invite'" ng-switch="lastMsg.type">
                         <div ng-switch-when="m.room.member">
-                            <span ng-if="'join' === room.lastMsg.content.membership">
-                                {{ room.lastMsg.state_key | mUserDisplayName: room.room_id}} joined
+                            <span ng-if="'join' === lastMsg.content.membership">
+                                {{ lastMsg.state_key | mUserDisplayName: room.room_id}} joined
                             </span>
-                            <span ng-if="'leave' === room.lastMsg.content.membership">
-                                <span ng-if="room.lastMsg.user_id === room.lastMsg.state_key">
-                                    {{room.lastMsg.state_key | mUserDisplayName: room.room_id }} left
+                            <span ng-if="'leave' === lastMsg.content.membership">
+                                <span ng-if="lastMsg.user_id === lastMsg.state_key">
+                                    {{lastMsg.state_key | mUserDisplayName: room.room_id }} left
                                 </span>
-                                <span ng-if="room.lastMsg.user_id !== room.lastMsg.state_key">
-                                    {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }}
-                                    {{ {"join": "kicked", "ban": "unbanned"}[room.lastMsg.content.prev] }}
-                                    {{ room.lastMsg.state_key | mUserDisplayName: room.room_id }}
+                                <span ng-if="lastMsg.user_id !== lastMsg.state_key">
+                                    {{ lastMsg.user_id | mUserDisplayName: room.room_id }}
+                                    {{ {"join": "kicked", "ban": "unbanned"}[lastMsg.content.prev] }}
+                                    {{ lastMsg.state_key | mUserDisplayName: room.room_id }}
+                                </span>
+                                <span ng-if="'join' === lastMsg.content.prev && lastMsg.content.reason">
+                                    : {{ lastMsg.content.reason }}
                                 </span>
                             </span>
-                            <span ng-if="'invite' === room.lastMsg.content.membership || 'ban' === room.lastMsg.content.membership">
-                                {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }}
-                                {{ {"invite": "invited", "ban": "banned"}[room.lastMsg.content.membership] }}
-                                {{ room.lastMsg.state_key | mUserDisplayName: room.room_id }}
+                            <span ng-if="'invite' === lastMsg.content.membership || 'ban' === lastMsg.content.membership">
+                                {{ lastMsg.user_id | mUserDisplayName: room.room_id }}
+                                {{ {"invite": "invited", "ban": "banned"}[lastMsg.content.membership] }}
+                                {{ lastMsg.state_key | mUserDisplayName: room.room_id }}
+                                <span ng-if="'ban' === lastMsg.content.prev && lastMsg.content.reason">
+                                    : {{ lastMsg.content.reason }}
+                                </span>
                             </span>
                         </div>
 
                         <div ng-switch-when="m.room.message">
-                            <div ng-switch="room.lastMsg.content.msgtype">
+                            <div ng-switch="lastMsg.content.msgtype">
                                 <div ng-switch-when="m.text">
-                                    {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }} :
-                                    <span ng-bind-html="(room.lastMsg.content.body) | linky:'_blank'">
+                                    {{ lastMsg.user_id | mUserDisplayName: room.room_id }} :
+                                    <span ng-bind-html="(lastMsg.content.body) | linky:'_blank'">
                                     </span>
                                 </div>
 
                                 <div ng-switch-when="m.image">
-                                    {{ room.lastMsg.user_id | mUserDisplayName: room.room_id }} sent an image
+                                    {{ lastMsg.user_id | mUserDisplayName: room.room_id }} sent an image
                                 </div>
 
                                 <div ng-switch-when="m.emote">
-                                    <span ng-bind-html="'* ' + (room.lastMsg.user_id) + ' ' + room.lastMsg.content.body | linky:'_blank'">
+                                    <span ng-bind-html="'* ' + (lastMsg.user_id | mUserDisplayName: room.room_id) + ' ' + lastMsg.content.body | linky:'_blank'">
                                     </span>
                                 </div>
 
                                 <div ng-switch-default>
-                                    {{ room.lastMsg.content }}
+                                    {{ lastMsg.content }}
                                 </div>
                             </div>
                         </div>
 
+                        <div ng-switch-when="m.room.topic">
+                            {{ lastMsg.user_id | mUserDisplayName: room.room_id }} changed the topic to: {{ lastMsg.content.topic }}
+                        </div>
+
+                        <div ng-switch-when="m.room.name">
+                            {{ lastMsg.user_id | mUserDisplayName: room.room_id }} changed the room name to: {{ lastMsg.content.name }}
+                        </div>
+
                         <div ng-switch-default>
-                            <div ng-if="room.lastMsg.type.indexOf('m.call.') === 0">
+                            <div ng-if="lastMsg.type.indexOf('m.call.') === 0">
                                 Call
                             </div>
                         </div>

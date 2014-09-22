@@ -17,31 +17,51 @@
 'use strict';
 
 angular.module('RecentsController')
-.filter('orderRecents', function() {
+.filter('orderRecents', ["matrixService", "eventHandlerService", function(matrixService, eventHandlerService) {
     return function(rooms) {
+        var user_id = matrixService.config().user_id;
 
         // Transform the dict into an array
         // The key, room_id, is already in value objects
         var filtered = [];
-        angular.forEach(rooms, function(value, key) {
-            filtered.push( value );
+        angular.forEach(rooms, function(room, room_id) {
+            
+            // Show the room only if the user has joined it or has been invited
+            // (ie, do not show it if he has been banned)
+            var member = eventHandlerService.getMember(room_id, user_id);
+            if (member && ("invite" === member.membership || "join" === member.membership)) {
+            
+                // Count users here
+                // TODO: Compute it directly in eventHandlerService
+                room.numUsersInRoom = eventHandlerService.getUsersCountInRoom(room_id);
+
+                filtered.push(room);
+            }
+            else if ("invite" === room.membership) {
+                // The only information we have about the room is that the user has been invited
+                filtered.push(room);
+            }
         });
 
         // And time sort them
         // The room with the lastest message at first
-        filtered.sort(function (a, b) {
+        filtered.sort(function (roomA, roomB) {
+
+            var lastMsgRoomA = eventHandlerService.getLastMessage(roomA.room_id, true);
+            var lastMsgRoomB = eventHandlerService.getLastMessage(roomB.room_id, true);
+
             // Invite message does not have a body message nor ts
             // Puth them at the top of the list
-            if (undefined === a.lastMsg) {
+            if (undefined === lastMsgRoomA) {
                 return -1;
             }
-            else if (undefined === b.lastMsg) {
+            else if (undefined === lastMsgRoomB) {
                 return 1;
             }
             else {
-                return b.lastMsg.ts - a.lastMsg.ts;
+                return lastMsgRoomB.ts - lastMsgRoomA.ts;
             }
         });
         return filtered;
     };
-});
+}]);

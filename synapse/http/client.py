@@ -16,7 +16,7 @@
 
 from twisted.internet import defer, reactor
 from twisted.internet.error import DNSLookupError
-from twisted.web.client import _AgentBase, _URI, readBody, FileBodyProducer
+from twisted.web.client import _AgentBase, _URI, readBody, FileBodyProducer, PartialDownloadError
 from twisted.web.http_headers import Headers
 
 from synapse.http.endpoint import matrix_endpoint
@@ -122,7 +122,7 @@ class TwistedHttpClient(HttpClient):
         self.hs = hs
 
     @defer.inlineCallbacks
-    def put_json(self, destination, path, data):
+    def put_json(self, destination, path, data, on_send_callback=None):
         if destination in _destination_mappings:
             destination = _destination_mappings[destination]
 
@@ -131,7 +131,8 @@ class TwistedHttpClient(HttpClient):
             "PUT",
             path.encode("ascii"),
             producer=_JsonProducer(data),
-            headers_dict={"Content-Type": ["application/json"]}
+            headers_dict={"Content-Type": ["application/json"]},
+            on_send_callback=on_send_callback,
         )
 
         logger.debug("Getting resp body")
@@ -188,11 +189,37 @@ class TwistedHttpClient(HttpClient):
         body = yield readBody(response)
 
         defer.returnValue(json.loads(body))
+        
+    # XXX FIXME : I'm so sorry.
+    @defer.inlineCallbacks
+    def post_urlencoded_get_raw(self, destination, path, accept_partial=False, args={}):
+        if destination in _destination_mappings:
+            destination = _destination_mappings[destination]
+
+        query_bytes = urllib.urlencode(args, True)
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "POST",
+            path.encode("ascii"),
+            producer=FileBodyProducer(StringIO(urllib.urlencode(args))),
+            headers_dict={"Content-Type": ["application/x-www-form-urlencoded"]}
+        )
+
+        try:
+            body = yield readBody(response)
+            defer.returnValue(body)
+        except PartialDownloadError as e:
+            if accept_partial:
+                defer.returnValue(e.response)
+            else:
+                raise e
+        
 
     @defer.inlineCallbacks
     def _create_request(self, destination, method, path_bytes, param_bytes=b"",
                         query_bytes=b"", producer=None, headers_dict={},
-                        retry_on_dns_fail=True):
+                        retry_on_dns_fail=True, on_send_callback=None):
         """ Creates and sends a request to the given url
         """
         headers_dict[b"User-Agent"] = [b"Synapse"]
@@ -216,6 +243,9 @@ class TwistedHttpClient(HttpClient):
         endpoint = self._getEndpoint(reactor, destination);
 
         while True:
+            if on_send_callback:
+                on_send_callback(destination, method, path_bytes, producer)
+
             try:
                 response = yield self.agent.request(
                     destination,
@@ -284,6 +314,9 @@ class _JsonProducer(object):
     """ Used by the twisted http client to create the HTTP body from json
     """
     def __init__(self, jsn):
+        self.reset(jsn)
+
+    def reset(self, jsn):
         self.body = encode_canonical_json(jsn)
         self.length = len(self.body)
 

@@ -19,7 +19,7 @@ from synapse.api.constants import Membership
 from synapse.api.events.room import RoomTopicEvent
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
-from ._base import BaseRoomHandler
+from ._base import BaseHandler
 
 import logging
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 
-class MessageHandler(BaseRoomHandler):
+class MessageHandler(BaseHandler):
 
     def __init__(self, hs):
         super(MessageHandler, self).__init__(hs)
@@ -124,7 +124,7 @@ class MessageHandler(BaseRoomHandler):
         )
 
         chunk = {
-            "chunk": [e.get_dict() for e in events],
+            "chunk": [self.hs.serialize_event(e) for e in events],
             "start": pagin_config.from_token.to_string(),
             "end": next_token.to_string(),
         }
@@ -268,6 +268,9 @@ class MessageHandler(BaseRoomHandler):
             user, pagination_config, None
         )
 
+        public_rooms = yield self.store.get_rooms(is_public=True)
+        public_room_ids = [r["room_id"] for r in public_rooms]
+
         limit = pagin_config.limit
         if not limit:
             limit = 10
@@ -276,6 +279,8 @@ class MessageHandler(BaseRoomHandler):
             d = {
                 "room_id": event.room_id,
                 "membership": event.membership,
+                "visibility": ("public" if event.room_id in
+                              public_room_ids else "private"),
             }
 
             if event.membership == Membership.INVITE:
@@ -296,7 +301,7 @@ class MessageHandler(BaseRoomHandler):
                 end_token = now_token.copy_and_replace("room_key", token[1])
 
                 d["messages"] = {
-                    "chunk": [m.get_dict() for m in messages],
+                    "chunk": [self.hs.serialize_event(m) for m in messages],
                     "start": start_token.to_string(),
                     "end": end_token.to_string(),
                 }
@@ -304,7 +309,7 @@ class MessageHandler(BaseRoomHandler):
                 current_state = yield self.store.get_current_state(
                     event.room_id
                 )
-                d["state"] = [c.get_dict() for c in current_state]
+                d["state"] = [self.hs.serialize_event(c) for c in current_state]
             except:
                 logger.exception("Failed to get snapshot")
 

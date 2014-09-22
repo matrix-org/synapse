@@ -20,7 +20,12 @@ a:visited { color: #666; }
 a:hover   { color: #000; }
 a:active  { color: #000; }
 
-#page {
+textarea, input {
+   font-family: inherit;
+   font-size: inherit;
+}
+
+.page {
     min-height: 100%;
     margin-bottom: -32px; /* to make room for the footer */
 }
@@ -34,9 +39,15 @@ a:active  { color: #000; }
     padding-right: 20px;
 }
 
+#unsupportedBrowser {
+    padding-top: 240px;
+    text-align: center;
+}
+
 #header
 {
     position: absolute;
+    z-index: 2;
     top: 0px;
     width: 100%;
     background-color: #333;
@@ -44,7 +55,123 @@ a:active  { color: #000; }
 }
 
 #callBar {
-   float: left;
+    float: left;
+    height: 32px;
+    margin: auto;
+    text-align: right;
+    line-height: 16px;
+}
+
+.callIcon {
+    margin-left: 4px;
+    margin-right: 4px;
+    margin-top: 8px;
+}
+
+#callEndedIcon {
+    transition:all linear 0.5s;
+}
+
+#callEndedIcon {
+    transform: rotateZ(45deg);
+}
+
+#callEndedIcon.ng-hide {
+    transform: rotateZ(0deg);
+}
+
+#callPeerImage {
+    width: 32px;
+    height: 32px;
+    border: none;
+    float: left;
+}
+
+#callPeerNameAndState {
+    float: left;
+    margin-left: 4px;
+}
+
+#callState {
+    font-size: 60%;
+}
+
+#callPeerName {
+    font-size: 80%;
+}
+
+#videoBackground {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    top: 0px;
+    left: 0px;
+    z-index: 1;
+    background-color: rgba(0,0,0,0.0);
+    pointer-events: none;
+    transition: background-color linear 500ms;
+}
+
+#videoBackground.large {
+    background-color: rgba(0,0,0,0.85);
+    pointer-events: auto;
+}
+
+#videoContainer {
+    position: relative;
+    top: 32px;
+    max-width: 1280px;
+    margin: auto;
+}
+
+#videoContainerPadding {
+    width: 1280px;
+}
+
+#localVideo {
+    position: absolute;
+    width: 128px;
+    height: 72px;
+    z-index: 1;
+    transition: left linear 500ms, top linear 500ms, width linear 500ms, height linear 500ms;
+}
+
+#localVideo.mini {
+    top: 0px;
+    left: 130px;
+}
+
+#localVideo.large {
+    top: 70px;
+    left: 20px;
+}
+
+#localVideo.ended {
+    -webkit-filter: grayscale(1);
+    filter: grayscale(1);
+}
+
+#remoteVideo {
+    position: relative;
+    height: auto;
+    transition: left linear 500ms, top linear 500ms, width linear 500ms, height linear 500ms;
+}
+
+#remoteVideo.mini {
+    left: 260px;
+    top: 0px;
+    width: 128px;
+}
+
+#remoteVideo.large {
+    left: 0px;
+    top: 50px;
+    width: 100%;
+}
+
+#remoteVideo.ended {
+    -webkit-filter: grayscale(1);
+    filter: grayscale(1);
 }
 
 #headerContent {
@@ -54,6 +181,7 @@ a:active  { color: #000; }
     text-align: right;
     height: 32px;
     line-height: 32px;
+    position: relative;
 }
 
 #headerContent a:link,
@@ -103,6 +231,10 @@ a:active  { color: #000; }
 
 .loginWrapper {
     text-align: center;
+}
+
+#recaptcha_area { 
+    margin: auto
 }
 
 #loginForm {
@@ -174,12 +306,6 @@ a:active  { color: #000; }
     height: 100%;
 }
 
-#roomName {
-    float: right;
-    font-size: 16px;
-    margin-top: 15px;
-}
-
 #roomHeader {
     margin: auto;
     padding-left: 20px;
@@ -217,10 +343,78 @@ a:active  { color: #000; }
 
 #mainInput {
     width: 100%;
+    resize: none;
 }
 
 .blink {
     background-color: #faa;
+}
+
+.roomHighlight {
+    font-weight: bold;
+}
+
+.publicTable {
+    max-width: 480px;
+    width: 100%;
+    border-collapse: collapse;
+}
+.publicTable tr {
+    width: 100%;
+}
+.publicTable td {
+    vertical-align: text-top;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.publicRoomEntry {
+    max-width: 430px;
+}
+
+.publicRoomJoinedUsers {
+    width: 5em;
+    text-align: right;
+    font-size: 12px;
+    color: #888;
+}
+
+.publicRoomTopic {
+    color: #888;
+    font-size: 12px;
+    overflow: hidden;
+    padding-bottom: 5px;
+    border-bottom: 1px #ddd solid;
+}
+
+#roomName {
+    font-size: 16px;
+    text-align: right;
+}
+
+#roomTopic {
+    font-size: 13px;
+    text-align: right;
+}
+
+.roomNameInput, .roomTopicInput {
+    width: 100%;
+}
+
+.roomNameSection, .roomTopicSection {
+    float: right;
+    width: 100%;
+}
+
+.roomNameSetNew, .roomTopicSetNew {
+    float: right;
+}
+
+.roomHeaderInfo {
+    float: right;
+    margin-top: 15px;
+    width: 50%;
 }
 
 /*** Participant list ***/
@@ -419,11 +613,19 @@ a:active  { color: #000; }
     text-align: left ! important;
 }
 
+.bubble .message {
+    /* Wrap words and break lines on CR+LF */
+    white-space: pre-wrap;
+}
 .bubble .messagePending {
     opacity: 0.3
 }
 .messageUnSent {
     color: #F00;
+}
+
+.messageBing {
+    color: #00F;
 }
 
 #room-fullscreen-image {
@@ -487,7 +689,11 @@ a:active  { color: #000; }
     width: auto;
 }
 
-.recentsRoomSummaryTS {
+.recentsPublicRoom {
+    font-weight: bold;
+}
+
+.recentsRoomSummaryUsersCount, .recentsRoomSummaryTS {
     color: #888;
     font-size: 12px;
     width: 7em;
@@ -498,6 +704,11 @@ a:active  { color: #000; }
     color: #888;
     font-size: 12px;
     padding-bottom: 5px;
+}
+
+/* Do not show users count in the recents fragment displayed on the room page */
+#roomPage .recentsRoomSummaryUsersCount {
+    width: 0em;
 }
 
 /*** Recents in the room page ***/

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """ Tests REST events for /events paths."""
-from twisted.trial import unittest
+from tests import unittest
 
 # twisted imports
 from twisted.internet import defer
@@ -27,14 +27,12 @@ from synapse.server import HomeServer
 
 # python imports
 import json
-import logging
 
 from ..utils import MockHttpResource, MemoryDataStore
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
 
-logging.getLogger().addHandler(logging.NullHandler())
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 
@@ -145,6 +143,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
+        hs.config.enable_registration_captcha = False
 
         hs.get_handlers().federation_handler = Mock()
 

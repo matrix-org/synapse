@@ -15,7 +15,6 @@
 
 from twisted.internet import defer
 
-from synapse.api.events import SynapseEvent
 from synapse.util.logutils import log_function
 
 from ._base import BaseHandler
@@ -71,10 +70,7 @@ class EventStreamHandler(BaseHandler):
                 auth_user, room_ids, pagin_config, timeout
             )
 
-            chunks = [
-                e.get_dict() if isinstance(e, SynapseEvent) else e
-                for e in events
-            ]
+            chunks = [self.hs.serialize_event(e) for e in events]
 
             chunk = {
                 "chunk": chunks,
@@ -92,7 +88,9 @@ class EventStreamHandler(BaseHandler):
                 # 10 seconds of grace to allow the client to reconnect again
                 #   before we think they're gone
                 def _later():
-                    logger.debug("_later stopped_user_eventstream %s", auth_user)
+                    logger.debug(
+                        "_later stopped_user_eventstream %s", auth_user
+                    )
                     self.distributor.fire(
                         "stopped_user_eventstream", auth_user
                     )

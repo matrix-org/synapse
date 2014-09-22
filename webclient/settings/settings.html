@@ -52,6 +52,15 @@
         <div class="section" ng-switch="settings.notifications">
             <div ng-switch-when="granted">
                 Notifications are enabled.
+                <div class="section">
+                    <h4>Specific words to alert on:</h4>
+                    <p>Leave blank to alert on all messages. Your username & display name always alerts.</p>
+                    <input size=40 name="bingWords" ng-model="settings.bingWords" ng-list placeholder="Enter words separated with , (supports regex)"
+                    ng-blur="saveBingWords()"/>
+                    <ul>
+                        <li ng-repeat="word in settings.bingWords">{{word}}</li>
+                    </ul>
+                </div>
             </div>
             <div ng-switch-when="denied">
                 You have denied permission for notifications.<br/>
@@ -81,7 +90,8 @@
             <ul>
                 <li>/nick &lt;display_name&gt;: change your display name</li>
                 <li>/me &lt;action&gt;: send the action you are doing. /me will be replaced by your display name</li>
-                <li>/kick &lt;user_id&gt;: kick the user</li>
+                <li>/join &lt;room_alias&gt;: join a room</li>
+                <li>/kick &lt;user_id&gt; [&lt;reason&gt;]: kick the user</li>
                 <li>/ban &lt;user_id&gt; [&lt;reason&gt;]: ban the user</li>
                 <li>/unban &lt;user_id&gt;: unban the user</li>
                 <li>/op &lt;user_id&gt; &lt;power_level&gt;: set user power level</li>

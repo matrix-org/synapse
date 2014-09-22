@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage import read_schema
+from synapse.storage import prepare_database
 
 from synapse.server import HomeServer
 
@@ -36,28 +36,12 @@ from daemonize import Daemonize
 import twisted.manhole.telnet
 
 import logging
-import sqlite3
 import os
 import re
 import sys
+import sqlite3
 
 logger = logging.getLogger(__name__)
-
-
-SCHEMAS = [
-    "transactions",
-    "pdu",
-    "users",
-    "profiles",
-    "presence",
-    "im",
-    "room_aliases",
-]
-
-
-# Remember to update this number every time an incompatible change is made to
-# database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 2
 
 
 class SynapseHomeServer(HomeServer):
@@ -80,52 +64,12 @@ class SynapseHomeServer(HomeServer):
         )
 
     def build_db_pool(self):
-        """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
-        don't have to worry about overwriting existing content.
-        """
-        logging.info("Preparing database: %s...", self.db_name)
-
-        with sqlite3.connect(self.db_name) as db_conn:
-            c = db_conn.cursor()
-            c.execute("PRAGMA user_version")
-            row = c.fetchone()
-
-            if row and row[0]:
-                user_version = row[0]
-
-                if user_version > SCHEMA_VERSION:
-                    raise ValueError("Cannot use this database as it is too " +
-                        "new for the server to understand"
-                    )
-                elif user_version < SCHEMA_VERSION:
-                    logging.info("Upgrading database from version %d",
-                        user_version
-                    )
-
-                    # Run every version since after the current version.
-                    for v in range(user_version + 1, SCHEMA_VERSION + 1):
-                        sql_script = read_schema("delta/v%d" % (v))
-                        c.executescript(sql_script)
-
-                    db_conn.commit()
-
-            else:
-                for sql_loc in SCHEMAS:
-                    sql_script = read_schema(sql_loc)
-
-                    c.executescript(sql_script)
-                db_conn.commit()
-                c.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
-
-            c.close()
-
-        logging.info("Database prepared in %s.", self.db_name)
-
-        pool = adbapi.ConnectionPool(
-            'sqlite3', self.db_name, check_same_thread=False,
-            cp_min=1, cp_max=1)
-
-        return pool
+        return adbapi.ConnectionPool(
+            "sqlite3", self.get_db_name(),
+            check_same_thread=False,
+            cp_min=1,
+            cp_max=1
+        )
 
     def create_resource_tree(self, web_client, redirect_root_to_web_client):
         """Create the resource tree for this Home Server.
@@ -230,10 +174,6 @@ class SynapseHomeServer(HomeServer):
             logger.info("Synapse now listening on port %d", unsecure_port)
 
 
-def run():
-    reactor.run()
-
-
 def setup():
     config = HomeServerConfig.load_config(
         "Synapse Homeserver",
@@ -268,7 +208,15 @@ def setup():
         web_client=config.webclient,
         redirect_root_to_web_client=True,
     )
-    hs.start_listening(config.bind_port, config.unsecure_port)
+
+    db_name = hs.get_db_name()
+
+    logging.info("Preparing database: %s...", db_name)
+
+    with sqlite3.connect(db_name) as db_conn:
+        prepare_database(db_conn)
+
+    logging.info("Database prepared in %s.", db_name)
 
     hs.get_db_pool()
 
@@ -279,12 +227,14 @@ def setup():
         f.namespace['hs'] = hs
         reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
 
+    hs.start_listening(config.bind_port, config.unsecure_port)
+
     if config.daemonize:
         print config.pid_file
         daemon = Daemonize(
             app="synapse-homeserver",
             pid=config.pid_file,
-            action=run,
+            action=reactor.run,
             auto_close_fds=False,
             verbose=True,
             logger=logger,
@@ -292,7 +242,7 @@ def setup():
 
         daemon.start()
     else:
-        run()
+        reactor.run()
 
 
 if __name__ == '__main__':

@@ -18,6 +18,7 @@ from twisted.internet import defer
 from ._base import SQLBaseStore
 
 from synapse.api.constants import Membership
+from synapse.util.logutils import log_function
 
 import logging
 
@@ -29,8 +30,18 @@ class RoomMemberStore(SQLBaseStore):
     def _store_room_member_txn(self, txn, event):
         """Store a room member in the database.
         """
-        target_user_id = event.state_key
-        domain = self.hs.parse_userid(target_user_id).domain
+        try:
+            target_user_id = event.state_key
+            domain = self.hs.parse_userid(target_user_id).domain
+        except:
+            logger.exception("Failed to parse target_user_id=%s", target_user_id)
+            raise
+
+        logger.debug(
+            "_store_room_member_txn: target_user_id=%s, membership=%s",
+            target_user_id,
+            event.membership,
+        )
 
         self._simple_insert_txn(
             txn,
@@ -51,12 +62,30 @@ class RoomMemberStore(SQLBaseStore):
                 "VALUES (?, ?)"
             )
             txn.execute(sql, (event.room_id, domain))
-        else:
-            sql = (
-                "DELETE FROM room_hosts WHERE room_id = ? AND host = ?"
+        elif event.membership != Membership.INVITE:
+            # Check if this was the last person to have left.
+            member_events = self._get_members_query_txn(
+                txn,
+                where_clause="c.room_id = ? AND m.membership = ? AND m.user_id != ?",
+                where_values=(event.room_id, Membership.JOIN, target_user_id,)
             )
 
-            txn.execute(sql, (event.room_id, domain))
+            joined_domains = set()
+            for e in member_events:
+                try:
+                    joined_domains.add(
+                        self.hs.parse_userid(e.state_key).domain
+                    )
+                except:
+                    # FIXME: How do we deal with invalid user ids in the db?
+                    logger.exception("Invalid user_id: %s", event.state_key)
+
+            if domain not in joined_domains:
+                sql = (
+                    "DELETE FROM room_hosts WHERE room_id = ? AND host = ?"
+                )
+
+                txn.execute(sql, (event.room_id, domain))
 
     @defer.inlineCallbacks
     def get_room_member(self, user_id, room_id):
@@ -88,7 +117,7 @@ class RoomMemberStore(SQLBaseStore):
         txn.execute(sql, (user_id, room_id))
         rows = self.cursor_to_dict(txn)
         if rows:
-            return self._parse_event_from_row(rows[0])
+            return self._parse_events_txn(txn, rows)[0]
         else:
             return None
 
@@ -120,7 +149,7 @@ class RoomMemberStore(SQLBaseStore):
             membership_list (list): A list of synapse.api.constants.Membership
             values which the user must be in.
         Returns:
-            A list of dicts with "room_id" and "membership" keys.
+            A list of RoomMemberEvent objects
         """
         if not membership_list:
             return defer.succeed(None)
@@ -146,8 +175,13 @@ class RoomMemberStore(SQLBaseStore):
         vals = where_dict.values()
         return self._get_members_query(clause, vals)
 
-    @defer.inlineCallbacks
     def _get_members_query(self, where_clause, where_values):
+        return self._db_pool.runInteraction(
+            self._get_members_query_txn,
+            where_clause, where_values
+        )
+
+    def _get_members_query_txn(self, txn, where_clause, where_values):
         sql = (
             "SELECT e.* FROM events as e "
             "INNER JOIN room_memberships as m "
@@ -157,18 +191,18 @@ class RoomMemberStore(SQLBaseStore):
             "WHERE %s "
         ) % (where_clause,)
 
-        rows = yield self._execute_and_decode(sql, *where_values)
+        txn.execute(sql, where_values)
+        rows = self.cursor_to_dict(txn)
 
-        # logger.debug("_get_members_query Got rows %s", rows)
-
-        results = [self._parse_event_from_row(r) for r in rows]
-        defer.returnValue(results)
+        results = self._parse_events_txn(txn, rows)
+        return results
 
     @defer.inlineCallbacks
-    def user_rooms_intersect(self, user_list):
-        """ Checks whether a list of users share a room.
+    def user_rooms_intersect(self, user_id_list):
+        """ Checks whether all the users whose IDs are given in a list share a
+        room.
         """
-        user_list_clause = " OR ".join(["m.user_id = ?"] * len(user_list))
+        user_list_clause = " OR ".join(["m.user_id = ?"] * len(user_id_list))
         sql = (
             "SELECT m.room_id FROM room_memberships as m "
             "INNER JOIN current_state_events as c "
@@ -178,8 +212,8 @@ class RoomMemberStore(SQLBaseStore):
             "GROUP BY m.room_id HAVING COUNT(m.room_id) = ?"
         ) % {"clause": user_list_clause}
 
-        args = user_list
-        args.append(len(user_list))
+        args = list(user_id_list)
+        args.append(len(user_id_list))
 
         rows = yield self._execute(None, sql, *args)
 

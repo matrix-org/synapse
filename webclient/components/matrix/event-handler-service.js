@@ -27,7 +27,8 @@ Typically, this service will store events or broadcast them to any listeners
 if typically all the $on method would do is update its own $scope.
 */
 angular.module('eventHandlerService', [])
-.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', function(matrixService, $rootScope, $q) {
+.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 
+function(matrixService, $rootScope, $q, $timeout, mPresence) {
     var ROOM_CREATE_EVENT = "ROOM_CREATE_EVENT";
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
@@ -35,21 +36,91 @@ angular.module('eventHandlerService', [])
     var POWERLEVEL_EVENT = "POWERLEVEL_EVENT";
     var CALL_EVENT = "CALL_EVENT";
     var NAME_EVENT = "NAME_EVENT";
+    var TOPIC_EVENT = "TOPIC_EVENT";
+    var RESET_EVENT = "RESET_EVENT";    // eventHandlerService has been resetted
 
-    var InitialSyncDeferred = $q.defer();
-    
-    $rootScope.events = {
-        rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
-    };
+    // used for dedupping events - could be expanded in future...
+    // FIXME: means that we leak memory over time (along with lots of the rest
+    // of the app, given we never try to reap memory yet)
+    var eventMap = {};
 
     $rootScope.presence = {};
     
-    var initRoom = function(room_id) {
+    // TODO: This is attached to the rootScope so .html can just go containsBingWord
+    // for determining classes so it is easy to highlight bing messages. It seems a
+    // bit strange to put the impl in this service though, but I can't think of a better
+    // file to put it in.
+    $rootScope.containsBingWord = function(content) {
+        if (!content || $.type(content) != "string") {
+            return false;
+        }
+        var bingWords = matrixService.config().bingWords;
+        var shouldBing = false;
+        
+        // case-insensitive name check for user_id OR display_name if they exist
+        var myUserId = matrixService.config().user_id;
+        if (myUserId) {
+            myUserId = myUserId.toLocaleLowerCase();
+        }
+        var myDisplayName = matrixService.config().display_name;
+        if (myDisplayName) {
+            myDisplayName = myDisplayName.toLocaleLowerCase();
+        }
+        if ( (myDisplayName && content.toLocaleLowerCase().indexOf(myDisplayName) != -1) ||
+             (myUserId && content.toLocaleLowerCase().indexOf(myUserId) != -1) ) {
+            shouldBing = true;
+        }
+        
+        // bing word list check
+        if (bingWords && !shouldBing) {
+            for (var i=0; i<bingWords.length; i++) {
+                var re = RegExp(bingWords[i]);
+                if (content.search(re) != -1) {
+                    shouldBing = true;
+                    break;
+                }
+            }
+        }
+        return shouldBing;
+    };
+
+    var initialSyncDeferred;
+
+    var reset = function() {
+        initialSyncDeferred = $q.defer();
+
+        $rootScope.events = {
+            rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
+        };
+
+        $rootScope.presence = {};
+
+        eventMap = {};
+    };
+    reset();
+
+    var initRoom = function(room_id, room) {
         if (!(room_id in $rootScope.events.rooms)) {
             console.log("Creating new handler entry for " + room_id);
-            $rootScope.events.rooms[room_id] = {};
-            $rootScope.events.rooms[room_id].messages = [];
-            $rootScope.events.rooms[room_id].members = {};
+            $rootScope.events.rooms[room_id] = {
+                room_id: room_id,
+                messages: [],
+                members: {},
+                // Pagination information
+                pagination: {
+                    earliest_token: "END"   // how far back we've paginated
+                }
+            };
+        }
+
+        if (room) {
+            // Report all other metadata of the room object (membership, inviter, visibility, ...)
+            for (var field in room) {
+                if (-1 === ["room_id", "messages", "state"].indexOf(field)) {
+                    $rootScope.events.rooms[room_id][field] = room[field];
+                }
+            }
+            $rootScope.events.rooms[room_id].membership = room.membership;
         }
     };
 
@@ -59,18 +130,110 @@ angular.module('eventHandlerService', [])
         }
     };
     
-    var handleRoomCreate = function(event, isLiveEvent) {
-        initRoom(event.room_id);
+    // Generic method to handle events data
+    var handleRoomDateEvent = function(event, isLiveEvent, addToRoomMessages) {
+        // Add topic changes as if they were a room message
+        if (addToRoomMessages) {
+            if (isLiveEvent) {
+                $rootScope.events.rooms[event.room_id].messages.push(event);
+            }
+            else {
+                $rootScope.events.rooms[event.room_id].messages.unshift(event);
+            }
+        }
 
+        // live events always update, but non-live events only update if the
+        // ts is later.
+        var latestData = true;
+        if (!isLiveEvent) {
+            var eventTs = event.ts;
+            var storedEvent = $rootScope.events.rooms[event.room_id][event.type];
+            if (storedEvent) {
+                if (storedEvent.ts > eventTs) {
+                    // ignore it, we have a newer one already.
+                    latestData = false;
+                }
+            }
+        }
+        if (latestData) {
+            $rootScope.events.rooms[event.room_id][event.type] = event;         
+        }
+    };
+    
+    var handleRoomCreate = function(event, isLiveEvent) {
         // For now, we do not use the event data. Simply signal it to the app controllers
         $rootScope.$broadcast(ROOM_CREATE_EVENT, event, isLiveEvent);
     };
 
+    var handleRoomAliases = function(event, isLiveEvent) {
+        matrixService.createRoomIdToAliasMapping(event.room_id, event.content.aliases[0]);
+    };
+
     var handleMessage = function(event, isLiveEvent) {
-        initRoom(event.room_id);
-        
         if (isLiveEvent) {
-            $rootScope.events.rooms[event.room_id].messages.push(event);
+            if (event.user_id === matrixService.config().user_id &&
+                (event.content.msgtype === "m.text" || event.content.msgtype === "m.emote") ) {
+                // Assume we've already echoed it. So, there is a fake event in the messages list of the room
+                // Replace this fake event by the true one
+                var index = getRoomEventIndex(event.room_id, event.event_id);
+                if (index) {
+                    $rootScope.events.rooms[event.room_id].messages[index] = event;
+                }
+                else {
+                    $rootScope.events.rooms[event.room_id].messages.push(event);
+                }
+            }
+            else {
+                $rootScope.events.rooms[event.room_id].messages.push(event);
+            }
+            
+            if (window.Notification && event.user_id != matrixService.config().user_id) {
+                var shouldBing = $rootScope.containsBingWord(event.content.body);
+
+                // Ideally we would notify only when the window is hidden (i.e. document.hidden = true).
+                //
+                // However, Chrome on Linux and OSX currently returns document.hidden = false unless the window is
+                // explicitly showing a different tab.  So we need another metric to determine hiddenness - we
+                // simply use idle time.  If the user has been idle enough that their presence goes to idle, then
+                // we also display notifs when things happen.
+                //
+                // This is far far better than notifying whenever anything happens anyway, otherwise you get spammed
+                // to death with notifications when the window is in the foreground, which is horrible UX (especially
+                // if you have not defined any bingers and so get notified for everything).
+                var isIdle = (document.hidden || matrixService.presence.unavailable === mPresence.getState());
+                
+                // We need a way to let people get notifications for everything, if they so desire.  The way to do this
+                // is to specify zero bingwords.
+                var bingWords = matrixService.config().bingWords;
+                if (bingWords === undefined || bingWords.length === 0) {
+                    shouldBing = true;
+                }
+                
+                if (shouldBing && isIdle) {
+                    console.log("Displaying notification for "+JSON.stringify(event));
+                    var member = $rootScope.events.rooms[event.room_id].members[event.user_id];
+                    var displayname = undefined;
+                    if (member) {
+                        displayname = member.displayname;
+                    }
+
+                    var message = event.content.body;
+                    if (event.content.msgtype === "m.emote") {
+                        message = "* " + displayname + " " + message;
+                    }
+
+                    var notification = new window.Notification(
+                        (displayname || event.user_id) +
+                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
+                    {
+                        "body": message,
+                        "icon": member ? member.avatar_url : undefined
+                    });
+                    $timeout(function() {
+                        notification.close();
+                    }, 5 * 1000);
+                }
+            }
         }
         else {
             $rootScope.events.rooms[event.room_id].messages.unshift(event);
@@ -84,21 +247,46 @@ angular.module('eventHandlerService', [])
         $rootScope.$broadcast(MSG_EVENT, event, isLiveEvent);
     };
     
-    var handleRoomMember = function(event, isLiveEvent) {
-        initRoom(event.room_id);
+    var handleRoomMember = function(event, isLiveEvent, isStateEvent) {
         
         // add membership changes as if they were a room message if something interesting changed
-        if (event.content.prev !== event.content.membership) {
-            if (isLiveEvent) {
-                $rootScope.events.rooms[event.room_id].messages.push(event);
+        // Exception: Do not do this if the event is a room state event because such events already come
+        // as room messages events. Moreover, when they come as room messages events, they are relatively ordered
+        // with other other room messages
+        if (!isStateEvent) {
+            // could be a membership change, display name change, etc.
+            // Find out which one.
+            var memberChanges = undefined;
+            if (event.content.prev !== event.content.membership) {
+                memberChanges = "membership";
             }
-            else {
-                $rootScope.events.rooms[event.room_id].messages.unshift(event);
+            else if (event.prev_content.displayname !== 
+                     event.content.displayname) {
+                memberChanges = "displayname";
+            }
+
+            // mark the key which changed
+            event.changedKey = memberChanges;
+
+            // If there was a change we want to display, dump it in the message
+            // list.
+            if (memberChanges) {
+                if (isLiveEvent) {
+                    $rootScope.events.rooms[event.room_id].messages.push(event);
+                }
+                else {
+                    $rootScope.events.rooms[event.room_id].messages.unshift(event);
+                }
             }
         }
         
-        $rootScope.events.rooms[event.room_id].members[event.state_key] = event;
-        $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent);
+        // Use data from state event or the latest data from the stream.
+        // Do not care of events that come when paginating back
+        if (isStateEvent || isLiveEvent) {
+            $rootScope.events.rooms[event.room_id].members[event.state_key] = event;
+        }
+        
+        $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent, isStateEvent);
     };
     
     var handlePresence = function(event, isLiveEvent) {
@@ -107,8 +295,6 @@ angular.module('eventHandlerService', [])
     };
     
     var handlePowerLevels = function(event, isLiveEvent) {
-        initRoom(event.room_id);
-
         // Keep the latest data. Do not care of events that come when paginating back
         if (!$rootScope.events.rooms[event.room_id][event.type] || isLiveEvent) {
             $rootScope.events.rooms[event.room_id][event.type] = event;
@@ -116,17 +302,48 @@ angular.module('eventHandlerService', [])
         }
     };
 
-    var handleRoomName = function(event, isLiveEvent) {
-        console.log("handleRoomName " + isLiveEvent);
-
-        initRoom(event.room_id);
-
-        $rootScope.events.rooms[event.room_id][event.type] = event;
+    var handleRoomName = function(event, isLiveEvent, isStateEvent) {
+        console.log("handleRoomName room_id: " + event.room_id + " - isLiveEvent: " + isLiveEvent + " - name: " + event.content.name);
+        handleRoomDateEvent(event, isLiveEvent, !isStateEvent);
         $rootScope.$broadcast(NAME_EVENT, event, isLiveEvent);
+    };
+    
+
+    var handleRoomTopic = function(event, isLiveEvent, isStateEvent) {
+        console.log("handleRoomTopic room_id: " + event.room_id + " - isLiveEvent: " + isLiveEvent + " - topic: " + event.content.topic);
+        handleRoomDateEvent(event, isLiveEvent, !isStateEvent);
+        $rootScope.$broadcast(TOPIC_EVENT, event, isLiveEvent);
     };
 
     var handleCallEvent = function(event, isLiveEvent) {
         $rootScope.$broadcast(CALL_EVENT, event, isLiveEvent);
+        if (event.type === 'm.call.invite') {
+            $rootScope.events.rooms[event.room_id].messages.push(event);
+        }
+    };
+    
+    /**
+     * Get the index of the event in $rootScope.events.rooms[room_id].messages
+     * @param {type} room_id the room id
+     * @param {type} event_id the event id to look for
+     * @returns {Number | undefined} the index. undefined if not found.
+     */
+    var getRoomEventIndex = function(room_id, event_id) {
+        var index;
+
+        var room = $rootScope.events.rooms[room_id];
+        if (room) {
+            // Start looking from the tail since the first goal of this function 
+            // is to find a messaged among the latest ones
+            for (var i = room.messages.length - 1; i > 0; i--) {
+                var message = room.messages[i];
+                if (event_id === message.event_id) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        return index;
     };
     
     return {
@@ -137,62 +354,206 @@ angular.module('eventHandlerService', [])
         POWERLEVEL_EVENT: POWERLEVEL_EVENT,
         CALL_EVENT: CALL_EVENT,
         NAME_EVENT: NAME_EVENT,
+        TOPIC_EVENT: TOPIC_EVENT,
+        RESET_EVENT: RESET_EVENT,
         
+        reset: function() {
+            reset();
+            $rootScope.$broadcast(RESET_EVENT);
+        },
+        
+        initRoom: function(room) {
+            initRoom(room.room_id, room);
+        },
     
-        handleEvent: function(event, isLiveEvent) {
-            switch(event.type) {
-                case "m.room.create":
-                    handleRoomCreate(event, isLiveEvent);
-                    break;
-                case "m.room.message":
-                    handleMessage(event, isLiveEvent);
-                    break;
-                case "m.room.member":
-                    handleRoomMember(event, isLiveEvent);
-                    break;
-                case "m.presence":
-                    handlePresence(event, isLiveEvent);
-                    break;
-                case 'm.room.ops_levels':
-                case 'm.room.send_event_level':
-                case 'm.room.add_state_level':
-                case 'm.room.join_rules':
-                case 'm.room.power_levels':
-                    handlePowerLevels(event, isLiveEvent);
-                    break;
-                case 'm.room.name':
-                    handleRoomName(event, isLiveEvent);
-                    break;
-                default:
-                    console.log("Unable to handle event type " + event.type);
-                    console.log(JSON.stringify(event, undefined, 4));
-                    break;
+        handleEvent: function(event, isLiveEvent, isStateEvent) {
+
+            // FIXME: /initialSync on a particular room is not yet available
+            // So initRoom on a new room is not called. Make sure the room data is initialised here
+            if (event.room_id) {
+                initRoom(event.room_id);
             }
+
+            // Avoid duplicated events
+            // Needed for rooms where initialSync has not been done. 
+            // In this case, we do not know where to start pagination. So, it starts from the END
+            // and we can have the same event (ex: joined, invitation) coming from the pagination
+            // AND from the event stream.
+            // FIXME: This workaround should be no more required when /initialSync on a particular room
+            // will be available (as opposite to the global /initialSync done at startup)
+            if (!isStateEvent) {    // Do not consider state events
+                if (event.event_id && eventMap[event.event_id]) {
+                    console.log("discarding duplicate event: " + JSON.stringify(event, undefined, 4));
+                    return;
+                }
+                else {
+                    eventMap[event.event_id] = 1;
+                }
+            }
+
             if (event.type.indexOf('m.call.') === 0) {
                 handleCallEvent(event, isLiveEvent);
+            }
+            else {            
+                switch(event.type) {
+                    case "m.room.create":
+                        handleRoomCreate(event, isLiveEvent);
+                        break;
+                    case "m.room.aliases":
+                        handleRoomAliases(event, isLiveEvent);
+                        break;
+                    case "m.room.message":
+                        handleMessage(event, isLiveEvent);
+                        break;
+                    case "m.room.member":
+                        handleRoomMember(event, isLiveEvent, isStateEvent);
+                        break;
+                    case "m.presence":
+                        handlePresence(event, isLiveEvent);
+                        break;
+                    case 'm.room.ops_levels':
+                    case 'm.room.send_event_level':
+                    case 'm.room.add_state_level':
+                    case 'm.room.join_rules':
+                    case 'm.room.power_levels':
+                        handlePowerLevels(event, isLiveEvent);
+                        break;
+                    case 'm.room.name':
+                        handleRoomName(event, isLiveEvent, isStateEvent);
+                        break;
+                    case 'm.room.topic':
+                        handleRoomTopic(event, isLiveEvent, isStateEvent);
+                        break;
+                    default:
+                        console.log("Unable to handle event type " + event.type);
+                        console.log(JSON.stringify(event, undefined, 4));
+                        break;
+                }
             }
         },
         
         // isLiveEvents determines whether notifications should be shown, whether
         // messages get appended to the start/end of lists, etc.
-        handleEvents: function(events, isLiveEvents) {
+        handleEvents: function(events, isLiveEvents, isStateEvents) {
             for (var i=0; i<events.length; i++) {
-                this.handleEvent(events[i], isLiveEvents);
+                this.handleEvent(events[i], isLiveEvents, isStateEvents);
             }
         },
 
-        handleInitialSyncDone: function() {
+        // Handle messages from /initialSync or /messages
+        handleRoomMessages: function(room_id, messages, isLiveEvents, dir) {
+            initRoom(room_id);
+
+            var events = messages.chunk;
+
+            // Handles messages according to their time order
+            if (dir && 'b' === dir) {
+                // paginateBackMessages requests messages to be in reverse chronological order
+                for (var i=0; i<events.length; i++) {
+                    this.handleEvent(events[i], isLiveEvents, isLiveEvents);
+                }
+                
+                // Store how far back we've paginated
+                $rootScope.events.rooms[room_id].pagination.earliest_token = messages.end;
+            }
+            else {
+                // InitialSync returns messages in chronological order
+                for (var i=events.length - 1; i>=0; i--) {
+                    this.handleEvent(events[i], isLiveEvents, isLiveEvents);
+                }
+                // Store where to start pagination
+                $rootScope.events.rooms[room_id].pagination.earliest_token = messages.start;
+            }
+        },
+
+        handleInitialSyncDone: function(initialSyncData) {
             console.log("# handleInitialSyncDone");
-            InitialSyncDeferred.resolve($rootScope.events, $rootScope.presence);
+            initialSyncDeferred.resolve(initialSyncData);
         },
 
         // Returns a promise that resolves when the initialSync request has been processed
         waitForInitialSyncCompletion: function() {
-            return InitialSyncDeferred.promise;
+            return initialSyncDeferred.promise;
         },
 
         resetRoomMessages: function(room_id) {
             resetRoomMessages(room_id);
+        },
+        
+        /**
+         * Return the last message event of a room
+         * @param {String} room_id the room id
+         * @param {Boolean} filterFake true to not take into account fake messages
+         * @returns {undefined | Event} the last message event if available
+         */
+        getLastMessage: function(room_id, filterEcho) {
+            var lastMessage;
+
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                for (var i = room.messages.length - 1; i >= 0; i--) {
+                    var message = room.messages[i];
+
+                    if (!filterEcho || undefined === message.echo_msg_state) {
+                        lastMessage = message;
+                        break;
+                    }
+                }
+            }
+
+            return lastMessage;
+        },
+        
+        /**
+         * Compute the room users number, ie the number of members who has joined the room.
+         * @param {String} room_id the room id
+         * @returns {undefined | Number} the room users number if available
+         */
+        getUsersCountInRoom: function(room_id) {
+            var memberCount;
+
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                memberCount = 0;
+
+                for (var i in room.members) {
+                    var member = room.members[i];
+
+                    if ("join" === member.membership) {
+                        memberCount = memberCount + 1;
+                    }
+                }
+            }
+
+            return memberCount;
+        },
+        
+        /**
+         * Get the member object of a room member
+         * @param {String} room_id the room id
+         * @param {String} user_id the id of the user
+         * @returns {undefined | Object} the member object of this user in this room if he is part of the room
+         */
+        getMember: function(room_id, user_id) {
+            var member;
+            
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                member = room.members[user_id];
+            }
+            return member;
+        },
+        
+        setRoomVisibility: function(room_id, visible) {
+            if (!visible) {
+                return;
+            }
+            initRoom(room_id);
+            
+            var room = $rootScope.events.rooms[room_id];
+            if (room) {
+                room.visibility = visible;
+            }
         }
     };
 }]);

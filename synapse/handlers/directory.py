@@ -19,8 +19,10 @@ from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError
 from synapse.http.client import HttpClient
+from synapse.api.events.room import RoomAliasesEvent
 
 import logging
+import sqlite3
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +39,8 @@ class DirectoryHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def create_association(self, room_alias, room_id, servers=None):
+    def create_association(self, user_id, room_alias, room_id, servers=None):
+
         # TODO(erikj): Do auth.
 
         if not room_alias.is_mine:
@@ -54,11 +57,36 @@ class DirectoryHandler(BaseHandler):
         if not servers:
             raise SynapseError(400, "Failed to get server list")
 
-        yield self.store.create_room_alias_association(
-            room_alias,
-            room_id,
-            servers
+
+        try:
+            yield self.store.create_room_alias_association(
+                room_alias,
+                room_id,
+                servers
+            )
+        except sqlite3.IntegrityError:
+            defer.returnValue("Already exists")
+
+        # TODO: Send the room event.
+
+        aliases = yield self.store.get_aliases_for_room(room_id)
+
+        event = self.event_factory.create_event(
+            etype=RoomAliasesEvent.TYPE,
+            state_key=self.hs.hostname,
+            room_id=room_id,
+            user_id=user_id,
+            content={"aliases": aliases},
         )
+
+        snapshot = yield self.store.snapshot_room(
+            room_id=room_id,
+            user_id=user_id,
+        )
+
+        yield self.state_handler.handle_new_event(event, snapshot)
+        yield self._on_new_room_event(event, snapshot, extra_users=[user_id])
+
 
     @defer.inlineCallbacks
     def get_association(self, room_alias):

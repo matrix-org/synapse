@@ -29,6 +29,8 @@ class Codes(object):
     NOT_FOUND = "M_NOT_FOUND"
     UNKNOWN_TOKEN = "M_UNKNOWN_TOKEN"
     LIMIT_EXCEEDED = "M_LIMIT_EXCEEDED"
+    CAPTCHA_NEEDED = "M_CAPTCHA_NEEDED"
+    CAPTCHA_INVALID = "M_CAPTCHA_INVALID"
 
 
 class CodeMessageException(Exception):
@@ -100,6 +102,19 @@ class StoreError(SynapseError):
     """An error raised when there was a problem storing some data."""
     pass
 
+
+class InvalidCaptchaError(SynapseError):
+    def __init__(self, code=400, msg="Invalid captcha.", error_url=None,
+                 errcode=Codes.CAPTCHA_INVALID):
+        super(InvalidCaptchaError, self).__init__(code, msg, errcode)
+        self.error_url = error_url
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            error_url=self.error_url,
+        )
 
 class LimitExceededError(SynapseError):
     """A client has sent too many requests and is being throttled.

@@ -418,6 +418,16 @@ which can be set when creating a room:
     If this is included, an ``m.room.topic`` event will be sent into the room to indicate the
     topic for the room. See `Room Events`_ for more information on ``m.room.topic``.
 
+``invite``
+  Type:
+    List
+  Optional:
+    Yes
+  Value:
+    A list of user ids to invite.
+  Description:
+    This will tell the server to invite everyone in the list to the newly created room.
+
 Example::
 
   {
@@ -745,15 +755,17 @@ There are several APIs provided to ``GET`` events for a room:
   Description:
     Get all ``m.room.member`` state events.
   Response format:
-    ``{ "start": "token", "end": "token", "chunk": [ { m.room.member event }, ... ] }``
+    ``{ "start": "<token>", "end": "<token>", "chunk": [ { m.room.member event }, ... ] }``
   Example:
     TODO
 
 |/rooms/<room_id>/messages|_
   Description:
-    Get all ``m.room.message`` events.
+    Get all ``m.room.message`` and ``m.room.member`` events. This API supports pagination
+	using ``from`` and ``to`` query parameters, coupled with the ``start`` and ``end``
+	tokens from an |initialSync|_ API.
   Response format:
-    ``{ TODO }``
+    ``{ "start": "<token>", "end": "<token>" }``
   Example:
     TODO
     
@@ -908,6 +920,22 @@ prefixed with ``m.``
     This defines who can ban and/or kick people in the room. Most of the time
     ``ban_level`` will be greater than or equal to ``kick_level`` since 
     banning is more severe than kicking.
+
+``m.room.aliases``
+  Summary:
+    These state events are used to inform the room about what room aliases it has.
+  Type:
+    State event
+  JSON format:
+    ``{ "aliases": ["string", ...] }``
+  Example:
+    ``{ "aliases": ["#foo:example.com"] }``
+  Description:
+    A server `may` inform the room that it has added or removed an alias for 
+    the room. This is purely for informational purposes and may become stale.
+    Clients `should` check that the room alias is still valid before using it.
+    The ``state_key`` of the event is the homeserver which owns the room 
+    alias.
 
 ``m.room.message``
   Summary:
@@ -1141,8 +1169,14 @@ This event is sent by the caller when they wish to establish a call.
   Required keys:
     - ``call_id`` : "string" - A unique identifier for the call
     - ``offer`` : "offer object" - The session description
-    - ``version`` : "integer" - The version of the VoIP specification this message
-                                adheres to. This specification is version 0.
+    - ``version`` : "integer" - The version of the VoIP specification this
+                                message adheres to. This specification is
+                                version 0.
+    - ``lifetime`` : "integer" - The time in milliseconds that the invite is
+                                 valid for. Once the invite age exceeds this
+                                 value, clients should discard it. They
+                                 should also no longer show the call as
+                                 awaiting an answer in the UI.
       
   Optional keys:
     None.
@@ -1154,16 +1188,16 @@ This event is sent by the caller when they wish to establish a call.
     - ``type`` : "string" - The type of session description, in this case 'offer'
     - ``sdp`` : "string" - The SDP text of the session description
 
-``m.call.candidate``
+``m.call.candidates``
 This event is sent by callers after sending an invite and by the callee after answering.
-Its purpose is to give the other party an additional ICE candidate to try using to
+Its purpose is to give the other party additional ICE candidates to try using to
 communicate.
 
   Required keys:
     - ``call_id`` : "string" - The ID of the call this event relates to
     - ``version`` : "integer" - The version of the VoIP specification this messages
                                 adheres to. his specification is version 0.
-    - ``candidate`` : "candidate object" - Object describing the candidate.
+    - ``candidates`` : "array of candidate objects" - Array of object describing the candidates.
 
 ``Candidate Object``
 
@@ -1221,7 +1255,33 @@ Or a rejected call:
                  <------- m.call.hangup
 
 Calls are negotiated according to the WebRTC specification.
- 
+
+
+Glare
+-----
+This specification aims to address the problem of two users calling each other
+at roughly the same time and their invites crossing on the wire. It is a far
+better experience for the users if their calls are connected if it is clear
+that their intention is to set up a call with one another.
+
+In Matrix, calls are to rooms rather than users (even if those rooms may only
+contain one other user) so we consider calls which are to the same room.
+
+The rules for dealing with such a situation are as follows:
+
+ - If an invite to a room is received whilst the client is preparing to send an
+   invite to the same room, the client should cancel its outgoing call and
+   instead automatically accept the incoming call on behalf of the user.
+ - If an invite to a room is received after the client has sent an invite to the
+   same room and is waiting for a response, the client should perform a
+   lexicographical comparison of the call IDs of the two calls and use the
+   lesser of the two calls, aborting the greater. If the incoming call is the
+   lesser, the client should accept this call on behalf of the user.
+
+The call setup should appear seamless to the user as if they had simply placed
+a call and the other party had accepted. Thusly, any media stream that had been
+setup for use on a call should be transferred and used for the call that
+replaces it.
  
 Profiles
 ========
@@ -1251,12 +1311,6 @@ display name other than it being a valid unicode string.
 
 Registration and login
 ======================
-.. WARNING::
-  The registration API is likely to change.
-
-.. TODO
-  - TODO Kegan : Make registration like login (just omit the "user" key on the 
-    initial request?)
 
 Clients must register with a home server in order to use Matrix. After 
 registering, the client will be given an access token which must be used in ALL
@@ -1269,9 +1323,11 @@ a token sent to their email address, etc. This specification does not define how
 home servers should authorise their users who want to login to their existing 
 accounts, but instead defines the standard interface which implementations 
 should follow so that ANY client can login to ANY home server. Clients login
-using the |login|_ API.
+using the |login|_ API. Clients register using the |register|_ API. Registration
+follows the same procedure as login, but the path requests are sent to are
+different.
 
-The login process breaks down into the following:
+The registration/login process breaks down into the following:
   1. Determine the requirements for logging in.
   2. Submit the login stage credentials.
   3. Get credentials or be told the next stage in the login process and repeat 
@@ -1329,7 +1385,7 @@ This specification defines the following login types:
  - ``m.login.oauth2``
  - ``m.login.email.code``
  - ``m.login.email.url``
-
+ - ``m.login.email.identity``
 
 Password-based
 --------------
@@ -1475,6 +1531,31 @@ the login process, or a standard error response.
 A common client implementation will be to periodically poll until the link is clicked.
 If the link has not been visited yet, a standard error response with an errcode of 
 ``M_LOGIN_EMAIL_URL_NOT_YET`` should be returned.
+
+
+Email-based (identity server)
+-----------------------------
+:Type:
+  ``m.login.email.identity``
+:Description:
+  Login is supported by authorising an email address with an identity server.
+
+Prior to submitting this, the client should authenticate with an identity server.
+After authenticating, the session information should be submitted to the home server.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.email.identity",
+    "threepidCreds": [
+      {
+        "sid": "<identity server session id>",
+        "clientSecret": "<identity server client secret>",
+        "idServer": "<url of identity server authed with, e.g. 'matrix.org:8090'>"
+      }
+    ]
+  }
+
 
 
 N-Factor Authentication
@@ -1946,6 +2027,10 @@ victim would then include in their view of the chatroom history. Other servers
 in the chatroom would reject the invalid messages and potentially reject the
 victims messages as well since they depended on the invalid messages.
 
+.. TODO
+  Track trustworthiness of HS or users based on if they try to pretend they
+  haven't seen recent events, and fake a splitbrain... --M
+
 Threat: Block Network Traffic
 +++++++++++++++++++++++++++++
 
@@ -2183,6 +2268,9 @@ Transaction:
 
 .. |login| replace:: ``/login``
 .. _login: /docs/api/client-server/#!/-login
+
+.. |register| replace:: ``/register``
+.. _register: /docs/api/client-server/#!/-registration
 
 .. |/rooms/<room_id>/messages| replace:: ``/rooms/<room_id>/messages``
 .. _/rooms/<room_id>/messages: /docs/api/client-server/#!/-rooms/get_messages

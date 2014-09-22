@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
-.controller('RoomController', ['$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'eventHandlerService', 'mFileUpload', 'mPresence', 'matrixPhoneService', 'MatrixCall',
-                               function($scope, $timeout, $routeParams, $location, $rootScope, matrixService, eventHandlerService, mFileUpload, mPresence, matrixPhoneService, MatrixCall) {
+.controller('RoomController', ['$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall',
+                               function($filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -27,12 +27,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
     $scope.state = {
         user_id: matrixService.config().user_id,
-        events_from: "END", // when to start the event stream from.
-        earliest_token: "END", // stores how far back we've paginated.
+        permission_denied: undefined, // If defined, this string contains the reason why the user cannot join the room
         first_pagination: true, // this is toggled off when the first pagination is done
-        can_paginate: true, // this is toggled off when we run out of items
+        can_paginate: false, // this is toggled off when we are not ready yet to paginate or when we run out of items
         paginating: false, // used to avoid concurrent pagination requests pulling in dup contents
-        stream_failure: undefined // the response when the stream fails
+        stream_failure: undefined, // the response when the stream fails
+        waiting_for_joined_event: false,  // true when the join request is pending. Back to false once the corresponding m.room.member event is received
+        messages_visibility: "hidden", // In order to avoid flickering when scrolling down the message table at the page opening, delay the message table display
     };
     $scope.members = {};
     $scope.autoCompleting = false;
@@ -42,45 +43,164 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     $scope.imageURLToSend = "";
     $scope.userIDToInvite = "";
     
-    var scrollToBottom = function() {
+
+    // vars and functions for updating the name
+    $scope.name = {
+        isEditing: false,
+        newNameText: "",
+        editName: function() {
+            if ($scope.name.isEditing) {
+                console.log("Warning: Already editing name.");
+                return;
+            };
+
+            var nameEvent = $rootScope.events.rooms[$scope.room_id]['m.room.name'];
+            if (nameEvent) {
+                $scope.name.newNameText = nameEvent.content.name;
+            }
+            else {
+                $scope.name.newNameText = "";
+            }
+
+            // Force focus to the input
+            $timeout(function() {
+                angular.element('.roomNameInput').focus(); 
+            }, 0);
+
+            $scope.name.isEditing = true;
+        },
+        updateName: function() {
+            console.log("Updating name to "+$scope.name.newNameText);
+            matrixService.setName($scope.room_id, $scope.name.newNameText).then(
+                function() {
+                },
+                function(error) {
+                    $scope.feedback = "Request failed: " + error.data.error;
+                }
+            );
+
+            $scope.name.isEditing = false;
+        },
+        cancelEdit: function() {
+            $scope.name.isEditing = false;
+        }
+    };
+
+    // vars and functions for updating the topic
+    $scope.topic = {
+        isEditing: false,
+        newTopicText: "",
+        editTopic: function() {
+            if ($scope.topic.isEditing) {
+                console.log("Warning: Already editing topic.");
+                return;
+            }
+            var topicEvent = $rootScope.events.rooms[$scope.room_id]['m.room.topic'];
+            if (topicEvent) {
+                $scope.topic.newTopicText = topicEvent.content.topic;
+            }
+            else {
+                $scope.topic.newTopicText = "";
+            }
+            
+            // Force focus to the input
+            $timeout(function() {
+                angular.element('.roomTopicInput').focus(); 
+            }, 0);
+            
+            $scope.topic.isEditing = true;
+        },
+        updateTopic: function() {
+            console.log("Updating topic to "+$scope.topic.newTopicText);
+            matrixService.setTopic($scope.room_id, $scope.topic.newTopicText).then(
+                function() {
+                },
+                function(error) {
+                    $scope.feedback = "Request failed: " + error.data.error;
+                }
+            );
+
+            $scope.topic.isEditing = false;
+        },
+        cancelEdit: function() {
+            $scope.topic.isEditing = false;
+        }
+    };  
+    
+    var scrollToBottom = function(force) {
         console.log("Scrolling to bottom");
-        $timeout(function() {
-            var objDiv = document.getElementById("messageTableWrapper");
-            objDiv.scrollTop = objDiv.scrollHeight;
-        }, 0);
+        
+        // Do not autoscroll to the bottom to display the new event if the user is not at the bottom.
+        // Exception: in case where the event is from the user, we want to force scroll to the bottom
+        var objDiv = document.getElementById("messageTableWrapper");
+        if ((objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || force) {
+            
+            $timeout(function() {
+                objDiv.scrollTop = objDiv.scrollHeight;
+
+                // Show the message table once the first scrolldown is done 
+                if ("visible" !== $scope.state.messages_visibility) {
+                    $timeout(function() {
+                        $scope.state.messages_visibility = "visible";
+                    }, 0);
+                }
+            }, 0);
+        }
     };
 
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
         if (isLive && event.room_id === $scope.room_id) {
-
-            // Do not autoscroll to the bottom to display this new event if the user is not at the bottom.
-            // Exception: if the event is from the user, scroll to the bottom
-            var objDiv = document.getElementById("messageTableWrapper");
-            if ( (objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || event.user_id === $scope.state.user_id) {
-                scrollToBottom();
+            
+            scrollToBottom();
+        }
+    });
+    
+    $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
+        if (isLive && event.room_id === $scope.room_id) {
+            if ($scope.state.waiting_for_joined_event) {
+                // The user has successfully joined the room, we can getting data for this room
+                $scope.state.waiting_for_joined_event = false;
+                onInit3();
             }
+            else if (event.state_key === $scope.state.user_id && "invite" !== event.membership && "join" !== event.membership) {
+                var user;
+                        
+                if ($scope.members[event.user_id]) {
+                    user = $scope.members[event.user_id].displayname;
+                }
+                if (user) {
+                    user = user + " (" + event.user_id + ")";
+                }
+                else {
+                    user = event.user_id;
+                }
+                 
+                if ("ban" === event.membership) {
+                    $scope.state.permission_denied = "You have been banned by " + user;
+                }
+                else {
+                    $scope.state.permission_denied = "You have been kicked by " + user;
+                }  
+            }
+            else {
+                scrollToBottom();
+                updateMemberList(event); 
 
-            if (window.Notification) {
-                // Show notification when the user is idle
-                if (matrixService.presence.offline === mPresence.getState()) {
+                // Notify when a user joins
+                if ((document.hidden  || matrixService.presence.unavailable === mPresence.getState())
+                        && event.state_key !== $scope.state.user_id  && "join" === event.membership) {
                     var notification = new window.Notification(
-                        ($scope.members[event.user_id].displayname || event.user_id) +
-                        " (" + ($scope.room_alias || $scope.room_id) + ")", // FIXME: don't leak room_ids here
+                        event.content.displayname +
+                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
                     {
-                        "body": event.content.body,
-                        "icon": $scope.members[event.user_id].avatar_url
+                        "body": event.content.displayname + " joined",
+                        "icon": event.content.avatar_url ? event.content.avatar_url : undefined
                     });
                     $timeout(function() {
                         notification.close();
                     }, 5 * 1000);
                 }
             }
-        }
-    });
-    
-    $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
-        if (isLive) {
-            updateMemberList(event);
         }
     });
     
@@ -110,19 +230,22 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     var paginate = function(numItems) {
-        // console.log("paginate " + numItems);
+        //console.log("paginate " + numItems + " and first_pagination is " + $scope.state.first_pagination);
         if ($scope.state.paginating || !$scope.room_id) {
             return;
         }
         else {
             $scope.state.paginating = true;
         }
-        // console.log("paginateBackMessages from " + $scope.state.earliest_token + " for " + numItems);
+        
+        console.log("paginateBackMessages from " + $rootScope.events.rooms[$scope.room_id].pagination.earliest_token + " for " + numItems);
         var originalTopRow = $("#messageTable>tbody>tr:first")[0];
-        matrixService.paginateBackMessages($scope.room_id, $scope.state.earliest_token, numItems).then(
+        
+        // Paginate events from the point in cache
+        matrixService.paginateBackMessages($scope.room_id, $rootScope.events.rooms[$scope.room_id].pagination.earliest_token, numItems).then(
             function(response) {
-                eventHandlerService.handleEvents(response.data.chunk, false);
-                $scope.state.earliest_token = response.data.end;
+
+                eventHandlerService.handleRoomMessages($scope.room_id, response.data, false, 'b');
                 if (response.data.chunk.length < MESSAGES_PER_PAGINATION) {
                     // no more messages to paginate. this currently never gets turned true again, as we never
                     // expire paginated contents in the current implementation.
@@ -147,7 +270,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 }
                 
                 if ($scope.state.first_pagination) {
-                    scrollToBottom();
+                    scrollToBottom(true);
                     $scope.state.first_pagination = false;
                 }
                 else {
@@ -173,16 +296,18 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     var updateMemberList = function(chunk) {
         if (chunk.room_id != $scope.room_id) return;
 
-        // Ignore banned and kicked (leave) people
-        if ("ban" === chunk.membership || "leave" === chunk.membership) {
-            return;
-        }
 
         // set target_user_id to keep things clear
         var target_user_id = chunk.state_key;
 
         var isNewMember = !(target_user_id in $scope.members);
         if (isNewMember) {
+            
+            // Ignore banned and kicked (leave) people
+            if ("ban" === chunk.membership || "leave" === chunk.membership) {
+                return;
+            }
+        
             // FIXME: why are we copying these fields around inside chunk?
             if ("presence" in chunk.content) {
                 chunk.presence = chunk.content.presence;
@@ -206,6 +331,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         }
         else {
             // selectively update membership and presence else it will nuke the picture and displayname too :/
+            
+            // Remove banned and kicked (leave) people
+            if ("ban" === chunk.membership || "leave" === chunk.membership) {
+                delete $scope.members[target_user_id];
+                return;
+            }
+            
             var member = $scope.members[target_user_id];
             member.membership = chunk.content.membership;
             if ("presence" in chunk.content) {
@@ -284,93 +416,142 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     $scope.send = function() {
-        if ($scope.textInput === "") {
+        var input = $('#mainInput').val();
+        
+        if (undefined === input || input === "") {
             return;
         }
         
+        scrollToBottom(true);
+
+        // Store the command in the history
+        history.push(input);
+
         var promise;
-        var isCmd = false;
+        var cmd;
+        var args;
+        var echo = false;
         
         // Check for IRC style commands first
-        var line = $scope.textInput;
-        
         // trim any trailing whitespace, as it can confuse the parser for IRC-style commands
-        line = line.replace(/\s+$/, "");
+        input = input.replace(/\s+$/, "");
         
-        if (line[0] === "/" && line[1] !== "/") {
-            isCmd = true;
-            
-            var bits = line.match(/^(\S+?)( +(.*))?$/);
-            var cmd = bits[1];
-            var args = bits[3];
+        if (input[0] === "/" && input[1] !== "/") {
+            var bits = input.match(/^(\S+?)( +(.*))?$/);
+            cmd = bits[1];
+            args = bits[3];
             
             console.log("cmd: " + cmd + ", args: " + args);
             
             switch (cmd) {
                 case "/me":
                     promise = matrixService.sendEmoteMessage($scope.room_id, args);
+                    echo = true;
                     break;
                     
                 case "/nick":
                     // Change user display name
-                    promise = matrixService.setDisplayName(args);
+                    if (args) {
+                        promise = matrixService.setDisplayName(args);                     
+                    }
+                    else {
+                        $scope.feedback = "Usage: /nick <display_name>";
+                    }
+                    break;
+
+                case "/join":
+                    // Join a room
+                    if (args) {
+                        var matches = args.match(/^(\S+)$/);
+                        if (matches) {
+                            var room_alias = matches[1];
+                            if (room_alias.indexOf(':') == -1) {
+                                // FIXME: actually track the :domain style name of our homeserver
+                                // with or without port as is appropriate and append it at this point
+                            }
+                            
+                            var room_id = matrixService.getAliasToRoomIdMapping(room_alias);
+                            console.log("joining " + room_alias + " id=" + room_id);
+                            if ($rootScope.events.rooms[room_id]) {
+                                // don't send a join event for a room you're already in.
+                                $location.url("room/" + room_alias);
+                            }
+                            else {
+                                promise = matrixService.joinAlias(room_alias).then(
+                                    function(response) {
+                                        $location.url("room/" + room_alias);
+                                    },
+                                    function(error) {
+                                        $scope.feedback = "Can't join room: " + JSON.stringify(error.data);
+                                    }
+                                );
+                            }
+                        }
+                    }
+                    else {
+                        $scope.feedback = "Usage: /join <room_alias>";
+                    }
                     break;
                     
                 case "/kick":
-                    var matches = args.match(/^(\S+?)( +(.*))?$/);
-                    if (matches.length === 2) {
-                        promise = matrixService.setMembership($scope.room_id, matches[1], "leave");                        
+                    // Kick a user from the room with an optional reason
+                    if (args) {
+                        var matches = args.match(/^(\S+?)( +(.*))?$/);
+                        if (matches) {
+                            promise = matrixService.kick($scope.room_id, matches[1], matches[3]);
+                        }
                     }
-                    else if (matches.length === 4) {
-                        promise = matrixService.setMembershipObject($scope.room_id, matches[1], {
-                            membership: "leave",
-                            reason: matches[3] // TODO: we need to specify resaon in the spec
-                        });
-                    }
-                    else {
+
+                    if (!promise) {
                         $scope.feedback = "Usage: /kick <userId> [<reason>]";
                     }
                     break;
 
                 case "/ban":
-                    // Ban a user from the room with optional reason
-                    var matches = args.match(/^(\S+?)( +(.*))?$/);
-                    if (matches) {
-                        promise = matrixService.ban($scope.room_id, matches[1], matches[3]);
+                    // Ban a user from the room with an optional reason
+                    if (args) {
+                        var matches = args.match(/^(\S+?)( +(.*))?$/);
+                        if (matches) {
+                            promise = matrixService.ban($scope.room_id, matches[1], matches[3]);
+                        }
                     }
-                    else {
+                    
+                    if (!promise) {
                         $scope.feedback = "Usage: /ban <userId> [<reason>]";
                     }
                     break;
 
                 case "/unban":
                     // Unban a user from the room
-                    // FIXME: this feels horribly asymmetrical - why are we banning via RPC
-                    // and unbanning by editing the membership list?
-                    // Why can't we specify a reason?
-                    var matches = args.match(/^(\S+)$/);
-                    if (matches) {
-                        // Reset the user membership to "leave" to unban him
-                        promise = matrixService.setMembership($scope.room_id, args, "leave");
+                    if (args) {
+                        var matches = args.match(/^(\S+)$/);
+                        if (matches) {
+                            // Reset the user membership to "leave" to unban him
+                            promise = matrixService.unban($scope.room_id, matches[1]);
+                        }
                     }
-                    else {
+                    
+                    if (!promise) {
                         $scope.feedback = "Usage: /unban <userId>";
                     }
                     break;
                     
                 case "/op":
                     // Define the power level of a user
-                    var matches = args.match(/^(\S+?)( +(\d+))?$/);
-                    var powerLevel = 50; // default power level for op
-                    if (matches) {
-                        var user_id = matches[1];
-                        if (matches.length === 4) {
-                            powerLevel = parseInt(matches[3]);
-                        }
-                        if (powerLevel !== NaN) {
-                            promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
+                    if (args) {
+                        var matches = args.match(/^(\S+?)( +(\d+))?$/);
+                        var powerLevel = 50; // default power level for op
+                        if (matches) {
+                            var user_id = matches[1];
+                            if (matches.length === 4 && undefined !== matches[3]) {
+                                powerLevel = parseInt(matches[3]);
+                            }
+                            if (powerLevel !== NaN) {
+                                promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
+                            }
                         }
                     }
+                    
                     if (!promise) {
                         $scope.feedback = "Usage: /op <userId> [<power level>]";
                     }
@@ -378,11 +559,14 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     
                 case "/deop":
                     // Reset the power level of a user
-                    var matches = args.match(/^(\S+)$/);
-                    if (matches) {
-                        promise = matrixService.setUserPowerLevel($scope.room_id, args, undefined);
+                    if (args) {
+                        var matches = args.match(/^(\S+)$/);
+                        if (matches) {
+                            promise = matrixService.setUserPowerLevel($scope.room_id, args, undefined);
+                        }
                     }
-                    else {
+                    
+                    if (!promise) {
                         $scope.feedback = "Usage: /deop <userId>";
                     }
                     break;
@@ -394,17 +578,20 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         }
         
         // By default send this as a message unless it's an IRC-style command
-        if (!promise && !isCmd) {
-            var message = $scope.textInput;
-            $scope.textInput = "";
-
+        if (!promise && !cmd) {
+            // Make the request
+            promise = matrixService.sendTextMessage($scope.room_id, input);
+            echo = true;
+        }
+        
+        if (echo) {
             // Echo the message to the room
             // To do so, create a minimalist fake text message event and add it to the in-memory list of room messages
             var echoMessage = {
                 content: {
-                    body: message,
-                    hsob_ts: "Sending...",      // Hack timestamp to display this text in place of the message time
-                    msgtype: "m.text"
+                    body: (cmd === "/me" ? args : input),
+                    hsob_ts: new Date().getTime(), // fake a timestamp
+                    msgtype: (cmd === "/me" ? "m.emote" : "m.text"),
                 },
                 room_id: $scope.room_id,
                 type: "m.room.message",
@@ -412,29 +599,28 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 echo_msg_state: "messagePending"     // Add custom field to indicate the state of this fake message to HTML
             };
 
+            $('#mainInput').val('');
             $rootScope.events.rooms[$scope.room_id].messages.push(echoMessage);
             scrollToBottom();
-
-            // Make the request
-            promise = matrixService.sendTextMessage($scope.room_id, message);
         }
 
         if (promise) {
+            // Reset previous feedback
+            $scope.feedback = "";
+
             promise.then(
-                function() {
+                function(response) {
                     console.log("Request successfully sent");
 
-                    if (echoMessage) {
-                        // Remove the fake echo message from the room messages
-                        // It will be replaced by the one acknowledged by the server
-                        var index = $rootScope.events.rooms[$scope.room_id].messages.indexOf(echoMessage);
-                        if (index > -1) {
-                            $rootScope.events.rooms[$scope.room_id].messages.splice(index, 1);
-                        }
+                    if (echo) {
+                        // Mark this fake message event with its allocated event_id
+                        // When the true message event will come from the events stream (in handleMessage),
+                        // we will be able to replace the fake one by the true one
+                        echoMessage.event_id = response.data.event_id;
                     }
                     else {
-                        $scope.textInput = "";
-                    }
+                        $('#mainInput').val('');
+                    }         
                 },
                 function(error) {
                     $scope.feedback = "Request failed: " + error.data.error;
@@ -503,6 +689,10 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     var onInit2 = function() {
         console.log("onInit2");
         
+        // Scroll down as soon as possible so that we point to the last message
+        // if it already exists in memory
+        scrollToBottom(true);
+
         // Make sure the initialSync has been before going further
         eventHandlerService.waitForInitialSyncCompletion().then(
             function() {
@@ -511,6 +701,16 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 
                 // The room members is available in the data fetched by initialSync
                 if ($rootScope.events.rooms[$scope.room_id]) {
+
+                    // There is no need to do a 1st pagination (initialSync provided enough to fill a page)
+                    if ($rootScope.events.rooms[$scope.room_id].messages.length) {
+                        $scope.state.first_pagination = false;
+                    }
+                    else {
+                        // except if we just joined a room, we won't have this history from initial sync, so we should try to paginate it anyway                        
+                        $scope.state.first_pagination = true;
+                    }
+
                     var members = $rootScope.events.rooms[$scope.room_id].members;
 
                     // Update the member list
@@ -529,14 +729,18 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 
                 // Do we to join the room before starting?
                 if (needsToJoin) {
+                    $scope.state.waiting_for_joined_event = true;
                     matrixService.join($scope.room_id).then(
                         function() {
+                            // onInit3 will be called once the joined m.room.member event is received from the events stream
+                            // This avoids to get the joined information twice in parallel:
+                            //    - one from the events stream
+                            //    - one from the pagination because the pagination window covers this event ts
                             console.log("Joined room "+$scope.room_id);
-                            onInit3();
                         },
                         function(reason) {
                             console.log("Can't join room: " + JSON.stringify(reason));
-                            $scope.feedback = "You do not have permission to join this room";
+                            $scope.state.permission_denied = "You do not have permission to join this room";
                         });
                 }
                 else {
@@ -548,14 +752,14 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
     var onInit3 = function() {
         console.log("onInit3");
-        
-        // TODO: We should be able to keep them
-        eventHandlerService.resetRoomMessages($scope.room_id); 
 
         // Make recents highlight the current room
         $scope.recentsSelectedRoomID = $scope.room_id;
 
-		// Get the up-to-date the current member list
+        // Init the history for this room
+        history.init();
+
+        // Get the up-to-date the current member list
         matrixService.getMemberList($scope.room_id).then(
             function(response) {
                 for (var i = 0; i < response.data.chunk.length; i++) {
@@ -568,21 +772,33 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
                 // Arm list timing update timer
                 updateMemberListPresenceAge();
+
+                // Allow pagination
+                $scope.state.can_paginate = true;
+
+                // Do a first pagination only if it is required
+                // FIXME: Should be no more require when initialSync/{room_id} will be available
+                if ($scope.state.first_pagination) {
+                    paginate(MESSAGES_PER_PAGINATION);
+                }
+                else {
+                    // There are already messages, go to the last message
+                    scrollToBottom(true);
+                }
             },
             function(error) {
                 $scope.feedback = "Failed get member list: " + error.data.error;
             }
         );
-
-        paginate(MESSAGES_PER_PAGINATION);
     }; 
     
-    $scope.inviteUser = function(user_id) {
+    $scope.inviteUser = function() {
         
-        matrixService.invite($scope.room_id, user_id).then(
+        matrixService.invite($scope.room_id, $scope.userIDToInvite).then(
             function() {
                 console.log("Invited.");
-                $scope.feedback = "Invite sent successfully";
+                $scope.feedback = "Invite successfully sent to " + $scope.userIDToInvite;
+                $scope.userIDToInvite = "";
             },
             function(reason) {
                 $scope.feedback = "Failure: " + reason;
@@ -602,7 +818,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     $scope.sendImage = function(url, body) {
-
+        scrollToBottom(true);
+        
         matrixService.sendImageMessage($scope.room_id, url, body).then(
             function() {
                 console.log("Image sent");
@@ -642,8 +859,98 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         var call = new MatrixCall($scope.room_id);
         call.onError = $rootScope.onCallError;
         call.onHangup = $rootScope.onCallHangup;
-        call.placeCall();
+        // remote video element is used for playing audio in voice calls
+        call.remoteVideoElement = angular.element('#remoteVideo')[0];
+        call.placeVoiceCall();
         $rootScope.currentCall = call;
+    };
+
+    $scope.startVideoCall = function() {
+        var call = new MatrixCall($scope.room_id);
+        call.onError = $rootScope.onCallError;
+        call.onHangup = $rootScope.onCallHangup;
+        call.localVideoElement = angular.element('#localVideo')[0];
+        call.remoteVideoElement = angular.element('#remoteVideo')[0];
+        call.placeVideoCall();
+        $rootScope.currentCall = call;
+    };
+
+    // Manage history of typed messages
+    // History is saved in sessionStoratge so that it survives when the user
+    // navigates through the rooms and when it refreshes the page
+    var history = {
+        // The list of typed messages. Index 0 is the more recents
+        data: [],
+
+        // The position in the history currently displayed
+        position: -1,
+
+        // The message the user has started to type before going into the history
+        typingMessage: undefined,
+
+        // Init/load data for the current room
+        init: function() {
+            var data = sessionStorage.getItem("history_" + $scope.room_id);
+            if (data) {
+                this.data = JSON.parse(data);
+            }
+        },
+
+        // Store a message in the history
+        push: function(message) {
+            this.data.unshift(message);
+
+            // Update the session storage
+            sessionStorage.setItem("history_" + $scope.room_id, JSON.stringify(this.data));
+
+            // Reset history position
+            this.position = -1;
+            this.typingMessage = undefined;
+        },
+
+        // Move in the history
+        go: function(offset) {
+
+            if (-1 === this.position) {
+                // User starts to go to into the history, save the current line
+                this.typingMessage = $('#mainInput').val();
+            }
+            else {
+                // If the user modified this line in history, keep the change
+                this.data[this.position] = $('#mainInput').val();
+            }
+
+            // Bounds the new position to valid data
+            var newPosition = this.position + offset;
+            newPosition = Math.max(-1, newPosition);
+            newPosition = Math.min(newPosition, this.data.length - 1);
+            this.position = newPosition;
+
+            if (-1 !== this.position) {
+                // Show the message from the history
+                $('#mainInput').val(this.data[this.position]);
+            }
+            else if (undefined !== this.typingMessage) {
+                // Go back to the message the user started to type
+                $('#mainInput').val(this.typingMessage);
+            }
+        }
+    };
+
+    // Make history singleton methods available from HTML
+    $scope.history = {
+        goUp: function($event) {
+            if ($scope.room_id) {
+                history.go(1);
+            }
+            $event.preventDefault();
+        },
+        goDown: function($event) {
+            if ($scope.room_id) {
+                history.go(-1);
+            }
+            $event.preventDefault();
+        }
     };
 
 }]);

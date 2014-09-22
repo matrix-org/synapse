@@ -16,11 +16,10 @@
 """This file contains tests of the "presence-like" data that is shared between
 presence and profiles; namely, the displayname and avatar_url."""
 
-from twisted.trial import unittest
+from tests import unittest
 from twisted.internet import defer
 
 from mock import Mock, call, ANY
-import logging
 
 from ..utils import MockClock
 
@@ -33,9 +32,6 @@ from synapse.handlers.profile import ProfileHandler
 OFFLINE = PresenceState.OFFLINE
 UNAVAILABLE = PresenceState.UNAVAILABLE
 ONLINE = PresenceState.ONLINE
-
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 
 class MockReplication(object):
@@ -69,6 +65,8 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                     "is_presence_visible",
 
                     "set_profile_displayname",
+
+                    "get_rooms_for_user_where_membership_is",
                 ]),
                 handlers=None,
                 resource_for_federation=Mock(),
@@ -136,6 +134,10 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         # Remote user
         self.u_potato = hs.parse_userid("@potato:remote")
 
+        self.mock_get_joined = (
+            self.datastore.get_rooms_for_user_where_membership_is
+        )
+
     @defer.inlineCallbacks
     def test_set_my_state(self):
         self.presence_list = [
@@ -156,6 +158,11 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_push_local(self):
+        def get_joined(*args):
+            return defer.succeed([])
+
+        self.mock_get_joined.side_effect = get_joined
+
         self.presence_list = [
             {"observed_user_id": "@banana:test"},
             {"observed_user_id": "@clementine:test"},

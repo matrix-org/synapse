@@ -16,6 +16,7 @@ limitations under the License.
 
 var matrixWebClient = angular.module('matrixWebClient', [
     'ngRoute',
+    'ngAnimate',
     'MatrixWebClientController',
     'LoginController',
     'RegisterController',
@@ -79,7 +80,24 @@ matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',
         $httpProvider.interceptors.push('AccessTokenInterceptor');
     }]);
 
-matrixWebClient.run(['$location', 'matrixService', function($location, matrixService) {
+matrixWebClient.run(['$location', '$rootScope', 'matrixService', function($location, $rootScope, matrixService) {
+
+    // Check browser support
+    // Support IE from 9.0. AngularJS needs some tricks to run on IE8 and below
+    var version = parseFloat($.browser.version);
+    if ($.browser.msie && version < 9.0) {
+        $rootScope.unsupportedBrowser = {
+            browser: navigator.userAgent,
+            reason: "Internet Explorer is supported from version 9"
+        };
+    }
+    // The app requires localStorage
+    if(typeof(Storage) === "undefined") {
+        $rootScope.unsupportedBrowser = {
+            browser: navigator.userAgent,
+            reason: "It does not support HTML local storage"
+        };
+    }
 
     // If user auth details are not in cache, go to the login page
     if (!matrixService.isUserLoggedIn() &&

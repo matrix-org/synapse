@@ -25,14 +25,14 @@ from synapse.api.events.room import (
     RoomSendEventLevelEvent, RoomOpsPowerLevelsEvent, RoomNameEvent,
 )
 from synapse.util import stringutils
-from ._base import BaseRoomHandler
+from ._base import BaseHandler
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class RoomCreationHandler(BaseRoomHandler):
+class RoomCreationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def create_room(self, user_id, room_id, config):
@@ -64,6 +64,13 @@ class RoomCreationHandler(BaseRoomHandler):
                 raise SynapseError(400, "Room alias already taken")
         else:
             room_alias = None
+
+        invite_list = config.get("invite", [])
+        for i in invite_list:
+            try:
+                self.hs.parse_userid(i)
+            except:
+                raise SynapseError(400, "Invalid user_id: %s" % (i,))
 
         is_public = config.get("visibility", None) == "public"
 
@@ -105,7 +112,9 @@ class RoomCreationHandler(BaseRoomHandler):
         )
 
         if room_alias:
-            yield self.store.create_room_alias_association(
+            directory_handler = self.hs.get_handlers().directory_handler
+            yield directory_handler.create_association(
+                user_id=user_id,
                 room_id=room_id,
                 room_alias=room_alias,
                 servers=[self.hs.hostname],
@@ -132,7 +141,7 @@ class RoomCreationHandler(BaseRoomHandler):
                 etype=RoomNameEvent.TYPE,
                 room_id=room_id,
                 user_id=user_id,
-                required_power_level=5,
+                required_power_level=50,
                 content={"name": name},
             )
 
@@ -143,7 +152,7 @@ class RoomCreationHandler(BaseRoomHandler):
                 etype=RoomNameEvent.TYPE,
                 room_id=room_id,
                 user_id=user_id,
-                required_power_level=5,
+                required_power_level=50,
                 content={"name": name},
             )
 
@@ -155,7 +164,7 @@ class RoomCreationHandler(BaseRoomHandler):
                 etype=RoomTopicEvent.TYPE,
                 room_id=room_id,
                 user_id=user_id,
-                required_power_level=5,
+                required_power_level=50,
                 content={"topic": topic},
             )
 
@@ -176,6 +185,25 @@ class RoomCreationHandler(BaseRoomHandler):
             do_auth=False
         )
 
+        content = {"membership": Membership.INVITE}
+        for invitee in invite_list:
+            invite_event = self.event_factory.create_event(
+                etype=RoomMemberEvent.TYPE,
+                state_key=invitee,
+                room_id=room_id,
+                user_id=user_id,
+                content=content
+            )
+
+            yield self.hs.get_handlers().room_member_handler.change_membership(
+                invite_event,
+                do_auth=False
+            )
+
+        yield self.hs.get_handlers().room_member_handler.change_membership(
+            join_event,
+            do_auth=False
+        )
         result = {"room_id": room_id}
         if room_alias:
             result["room_alias"] = room_alias.to_string()
@@ -186,7 +214,7 @@ class RoomCreationHandler(BaseRoomHandler):
         event_keys = {
             "room_id": room_id,
             "user_id": creator.to_string(),
-            "required_power_level": 10,
+            "required_power_level": 100,
         }
 
         def create(etype, **content):
@@ -203,7 +231,7 @@ class RoomCreationHandler(BaseRoomHandler):
 
         power_levels_event = self.event_factory.create_event(
             etype=RoomPowerLevelsEvent.TYPE,
-            content={creator.to_string(): 10, "default": 0},
+            content={creator.to_string(): 100, "default": 0},
             **event_keys
         )
 
@@ -215,7 +243,7 @@ class RoomCreationHandler(BaseRoomHandler):
 
         add_state_event = create(
             etype=RoomAddStateLevelEvent.TYPE,
-            level=10,
+            level=100,
         )
 
         send_event = create(
@@ -225,8 +253,8 @@ class RoomCreationHandler(BaseRoomHandler):
 
         ops = create(
             etype=RoomOpsPowerLevelsEvent.TYPE,
-            ban_level=5,
-            kick_level=5,
+            ban_level=50,
+            kick_level=50,
         )
 
         return [
@@ -239,7 +267,7 @@ class RoomCreationHandler(BaseRoomHandler):
         ]
 
 
-class RoomMemberHandler(BaseRoomHandler):
+class RoomMemberHandler(BaseHandler):
     # TODO(paul): This handler currently contains a messy conflation of
     #   low-level API that works on UserID objects and so on, and REST-level
     #   API that takes ID strings and returns pagination chunks. These concerns
@@ -307,7 +335,7 @@ class RoomMemberHandler(BaseRoomHandler):
 
         member_list = yield self.store.get_room_members(room_id=room_id)
         event_list = [
-            entry.get_dict()
+            self.hs.serialize_event(entry)
             for entry in member_list
         ]
         chunk_data = {
@@ -560,11 +588,17 @@ class RoomMemberHandler(BaseRoomHandler):
             extra_users=[target_user]
         )
 
-class RoomListHandler(BaseRoomHandler):
+class RoomListHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_public_room_list(self):
         chunk = yield self.store.get_rooms(is_public=True)
+        for room in chunk:
+            joined_members = yield self.store.get_room_members(
+                room_id=room["room_id"],
+                membership=Membership.JOIN
+            )
+            room["num_joined_members"] = len(joined_members)
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
 

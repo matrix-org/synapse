@@ -53,6 +53,8 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
 
                     // Add room_alias & room_display_name members
                     angular.extend(room, matrixService.getRoomAliasAndDisplayName(room));
+                    
+                    eventHandlerService.setRoomVisibility(room.room_id, "public");
                 }
             }
         );
@@ -117,6 +119,10 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
         matrixService.getDisplayName($scope.config.user_id).then(
             function(response) {
                 $scope.profile.displayName = response.data.displayname;
+                var config = matrixService.config();
+                config.display_name = response.data.displayname;
+                matrixService.setConfig(config);
+                matrixService.saveConfig();
             },
             function(error) {
                 $scope.feedback = "Can't load display name";
@@ -142,4 +148,9 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
 
         refresh();
     };
+
+    // Clean data when user logs out
+    $scope.$on(eventHandlerService.RESET_EVENT, function() {
+        $scope.public_rooms = [];
+    });
 }]);

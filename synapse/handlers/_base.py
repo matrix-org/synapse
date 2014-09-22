@@ -42,9 +42,6 @@ class BaseHandler(object):
                 retry_after_ms=int(1000*(time_allowed - time_now)),
             )
 
-
-class BaseRoomHandler(BaseHandler):
-
     @defer.inlineCallbacks
     def _on_new_room_event(self, event, snapshot, extra_destinations=[],
                            extra_users=[]):
