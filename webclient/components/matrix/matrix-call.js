@@ -280,14 +280,14 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.gotLocalIceCandidate = function(event) {
-        console.log(event);
         if (event.candidate) {
+            console.log("Got local ICE "+event.candidate.sdpMid+" candidate: "+event.candidate.candidate);
             this.sendCandidate(event.candidate);
         }
     }
 
     MatrixCall.prototype.gotRemoteIceCandidate = function(cand) {
-        console.log("Got ICE candidate from remote: "+cand);
+        console.log("Got remote ICE "+cand.sdpMid+" candidate: "+cand.candidate);
         if (this.state == 'ended') {
             console.log("Ignoring remote ICE candidate because call has ended");
             return;
@@ -368,6 +368,9 @@ angular.module('MatrixCall', [])
                 self.state = 'connected';
                 self.didConnect = true;
             });
+        } else if (this.peerConn.iceConnectionState == 'failed') {
+            this.hangupReason = 'ice_failed';
+            this.hangup();
         }
     };
 
