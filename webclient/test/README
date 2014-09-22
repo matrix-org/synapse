@@ -1,0 +1,9 @@
+Requires:
+ - npm
+ - npm install karma
+ - npm install jasmine
+
+Setting up continuous integration / run the tests:
+  karma start
+
+
