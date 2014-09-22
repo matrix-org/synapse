@@ -1,3 +1,23 @@
+Changes in synapse 0.3.3 (2014-09-22)
+=====================================
+
+Homeserver:
+ * Fix bug where you continued to get events for rooms you had left.
+
+Webclient:
+ * Add support for video calls with basic UI.
+ * Fix bug where one to one chats were named after your display name rather
+   than the other person's.
+ * Fix bug which caused lag when typing in the textarea.
+ * Refuse to run on browsers we know won't work.
+ * Trigger pagination when joining new rooms.
+ * Fix bug where we sometimes didn't display invitations in recents.
+ * Automatically join room when accepting a VoIP call.
+ * Disable outgoing and reject incoming calls on browsers we don't support
+   VoIP in.
+ * Don't display desktop notifications for messages in the room you are
+   non-idle and speaking in.
+
 Changes in synapse 0.3.2 (2014-09-18)
 =====================================
 
