@@ -30,9 +30,9 @@ class VoipRestServlet(RestServlet):
     def on_GET(self, request):
         auth_user = yield self.auth.get_user_by_req(request)
 
-        turnUri = self.hs.config.voip.turn_uri
-        turnSecret = self.hs.config.voip.turn_shared_secret
-        userLifetime = self.hs.config.voip.turn_user_lifetime
+        turnUri = self.hs.config.turn_uri
+        turnSecret = self.hs.config.turn_shared_secret
+        userLifetime = self.hs.config.turn_user_lifetime
         if not turnUri or not turnSecret or not userLifetime:
             defer.returnValue( (200, {"uris": []}) )
 
