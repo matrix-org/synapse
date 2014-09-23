@@ -101,7 +101,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
 
     var initRoom = function(room_id, room) {
         if (!(room_id in $rootScope.events.rooms)) {
-            console.log("Creating new handler entry for " + room_id);
+            console.log("Creating new rooms entry for " + room_id);
             $rootScope.events.rooms[room_id] = {
                 room_id: room_id,
                 messages: [],
@@ -113,10 +113,11 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             };
         }
 
-        if (room) {
+        if (room) { // we got an existing room object from initialsync, seemingly.
             // Report all other metadata of the room object (membership, inviter, visibility, ...)
+            // XXX: do we *REALLY* want to iterate over *EVERY* field in the object, including all its methods etc? -- Matthew
             for (var field in room) {
-                if (-1 === ["room_id", "messages", "state"].indexOf(field)) {
+                if (-1 === ["room_id", "messages", "state"].indexOf(field)) { // why indexOf - why not ===? --Matthew
                     $rootScope.events.rooms[room_id][field] = room[field];
                 }
             }
