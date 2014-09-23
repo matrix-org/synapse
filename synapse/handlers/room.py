@@ -255,6 +255,7 @@ class RoomCreationHandler(BaseHandler):
             etype=RoomOpsPowerLevelsEvent.TYPE,
             ban_level=50,
             kick_level=50,
+            delete_level=50,
         )
 
         return [

@@ -19,7 +19,9 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
-from synapse.api.events.room import RoomMemberEvent, RoomPowerLevelsEvent
+from synapse.api.events.room import (
+    RoomMemberEvent, RoomPowerLevelsEvent, RoomDeletionEvent,
+)
 from synapse.util.logutils import log_function
 
 import logging
@@ -69,6 +71,9 @@ class Auth(object):
 
                 if event.type == RoomPowerLevelsEvent.TYPE:
                     yield self._check_power_levels(event)
+
+                if event.type == RoomDeletionEvent.TYPE:
+                    yield self._check_deletion(event)
 
                 defer.returnValue(True)
             else:
@@ -170,7 +175,7 @@ class Auth(object):
                     event.room_id,
                     event.user_id,
                 )
-                _, kick_level = yield self.store.get_ops_levels(event.room_id)
+                _, kick_level, _ = yield self.store.get_ops_levels(event.room_id)
 
                 if kick_level:
                     kick_level = int(kick_level)
@@ -187,7 +192,7 @@ class Auth(object):
                 event.user_id,
             )
 
-            ban_level, _ = yield self.store.get_ops_levels(event.room_id)
+            ban_level, _, _  = yield self.store.get_ops_levels(event.room_id)
 
             if ban_level:
                 ban_level = int(ban_level)
@@ -320,6 +325,29 @@ class Auth(object):
                     403,
                     "You don't have permission to change that state"
                 )
+
+    @defer.inlineCallbacks
+    def _check_deletion(self, event):
+        user_level = yield self.store.get_power_level(
+            event.room_id,
+            event.user_id,
+        )
+
+        if user_level:
+            user_level = int(user_level)
+        else:
+            user_level = 0
+
+        _, _, delete_level  = yield self.store.get_ops_levels(event.room_id)
+
+        if not delete_level:
+            delete_level = 50
+
+        if user_level < delete_level:
+            raise AuthError(
+                403,
+                "You don't have permission to delete events"
+            )
 
     @defer.inlineCallbacks
     def _check_power_levels(self, event):
