@@ -153,8 +153,9 @@ class RegisterRestServlet(RestServlet):
     @defer.inlineCallbacks
     def _check_recaptcha(self, request, register_json):
         if "captcha_bypass_secret" in register_json:
-            if (register_json["captcha_bypass_secret"] ==
-                    self.hs.config.captcha_bypass_secret):
+            if (self.hs.config.captcha_bypass_secret is not None and
+                    register_json["captcha_bypass_secret"] ==
+                        self.hs.config.captcha_bypass_secret):
                 defer.returnValue(None)
             else:
                 raise SynapseError(400, "Captcha bypass secret incorrect",
