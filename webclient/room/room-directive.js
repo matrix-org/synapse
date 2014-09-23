@@ -135,6 +135,21 @@ angular.module('RoomController')
         });
     };
 }])
+.directive('commandHistory', [ function() {
+    return function (scope, element, attrs) {
+        element.bind("keydown keypress", function (event) {
+            var keycodePressed = event.which;
+            var UP_ARROW = 38;
+            var DOWN_ARROW = 40;
+            if (keycodePressed === UP_ARROW) {
+                scope.history.goUp(event);
+            }
+            else if (keycodePressed === DOWN_ARROW) {
+                scope.history.goDown(event);
+            } 
+        });
+    }
+}])
 
 // A directive to anchor the scroller position at the bottom when the browser is resizing.
 // When the screen resizes, the bottom of the element remains the same, not the top.
