@@ -142,6 +142,24 @@ class RegisterRestServlet(RestServlet):
         if not self.hs.config.enable_registration_captcha:
             raise SynapseError(400, "Captcha not required.")
 
+        yield self._check_recaptcha(request, register_json)
+
+        session[LoginType.RECAPTCHA] = True  # mark captcha as done
+        self._save_session(session)
+        defer.returnValue({
+            "next": [LoginType.PASSWORD, LoginType.EMAIL_IDENTITY]
+        })
+
+    @defer.inlineCallbacks
+    def _check_recaptcha(self, request, register_json):
+        if "captcha_bypass_secret" in register_json:
+            if (register_json["captcha_bypass_secret"] ==
+                    self.hs.config.captcha_bypass_secret):
+                defer.returnValue(None)
+            else:
+                raise SynapseError(400, "Captcha bypass secret incorrect",
+                    errcode=Codes.CAPTCHA_NEEDED)
+
         challenge = None
         user_response = None
         try:
@@ -166,11 +184,6 @@ class RegisterRestServlet(RestServlet):
             challenge,
             user_response
         )
-        session[LoginType.RECAPTCHA] = True  # mark captcha as done
-        self._save_session(session)
-        defer.returnValue({
-            "next": [LoginType.PASSWORD, LoginType.EMAIL_IDENTITY]
-        })
 
     @defer.inlineCallbacks
     def _do_email_identity(self, request, register_json, session):

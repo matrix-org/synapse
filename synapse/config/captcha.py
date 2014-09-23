@@ -24,6 +24,7 @@ class CaptchaConfig(Config):
         self.captcha_ip_origin_is_x_forwarded = (
             args.captcha_ip_origin_is_x_forwarded
         )
+        self.captcha_bypass_secret = args.captcha_bypass_secret
 
     @classmethod
     def add_arguments(cls, parser):
@@ -43,4 +44,8 @@ class CaptchaConfig(Config):
             "--captcha_ip_origin_is_x_forwarded", type=bool, default=False,
             help="When checking captchas, use the X-Forwarded-For (XFF) header"
             + " as the client IP and not the actual client IP."
+        )
+        group.add_argument(
+            "--captcha_bypass_secret", type=str,
+            help="A secret key used to bypass the captcha test entirely."
         )
