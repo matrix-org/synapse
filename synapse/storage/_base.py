@@ -17,6 +17,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.api.events.utils import prune_event
 from synapse.util.logutils import log_function
 
 import collections
@@ -345,7 +346,7 @@ class SQLBaseStore(object):
         return self.runInteraction(func)
 
     def _parse_event_from_row(self, row_dict):
-        d = copy.deepcopy({k: v for k, v in row_dict.items() if v})
+        d = copy.deepcopy({k: v for k, v in row_dict.items()})
 
         d.pop("stream_ordering", None)
         d.pop("topological_ordering", None)
@@ -373,8 +374,8 @@ class SQLBaseStore(object):
         sql = "SELECT * FROM events WHERE event_id = ?"
 
         for ev in events:
-           if hasattr(ev, "prev_state"):
-                # Load previous state_content. 
+            if hasattr(ev, "prev_state"):
+                # Load previous state_content.
                 # TODO: Should we be pulling this out above?
                 cursor = txn.execute(sql, (ev.prev_state,))
                 prevs = self.cursor_to_dict(cursor)
@@ -382,7 +383,30 @@ class SQLBaseStore(object):
                     prev = self._parse_event_from_row(prevs[0])
                     ev.prev_content = prev.content
 
+            if not hasattr(ev, "deleted"):
+                logger.debug("Doesn't have deleted key: %s", ev)
+                ev.deleted = self._has_been_deleted_txn(txn, ev)
+
+            if ev.deleted:
+                # Get the deletion event.
+                sql = "SELECT * FROM events WHERE event_id = ?"
+                txn.execute(sql, (ev.deleted,))
+
+                del_evs = self._parse_events_txn(
+                    txn, self.cursor_to_dict(txn)
+                )
+
+                if del_evs:
+                    prune_event(ev)
+                    ev.pruned = del_evs[0]
+
         return events
+
+    def _has_been_deleted_txn(self, txn, event):
+        sql = "SELECT * FROM deletions WHERE deletes = ?"
+        txn.execute(sql, (event.event_id,))
+        return len(txn.fetchall()) > 0
+
 
 class Table(object):
     """ A base class used to store information about a particular table.

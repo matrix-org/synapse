@@ -24,6 +24,7 @@ from synapse.api.events.room import (
     RoomAddStateLevelEvent,
     RoomSendEventLevelEvent,
     RoomOpsPowerLevelsEvent,
+    RoomDeletionEvent,
 )
 
 from synapse.util.logutils import log_function
@@ -61,7 +62,7 @@ SCHEMAS = [
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 class _RollbackButIsFineException(Exception):
@@ -182,6 +183,8 @@ class DataStore(RoomMemberStore, RoomStore,
             self._store_send_event_level(txn, event)
         elif event.type == RoomOpsPowerLevelsEvent.TYPE:
             self._store_ops_level(txn, event)
+        elif event.type == RoomDeletionEvent.TYPE:
+            self._store_deletion(txn, event)
 
         vals = {
             "topological_ordering": event.depth,
@@ -203,7 +206,7 @@ class DataStore(RoomMemberStore, RoomStore,
         unrec = {
             k: v
             for k, v in event.get_full_dict().items()
-            if k not in vals.keys()
+            if k not in vals.keys() and k is not "deleted"
         }
         vals["unrecognized_keys"] = json.dumps(unrec)
 
@@ -241,14 +244,32 @@ class DataStore(RoomMemberStore, RoomStore,
                 }
             )
 
+    def _store_deletion(self, txn, event):
+        event_id = event.event_id
+        deletes = event.deletes
+
+        # We check if this new delete deletes an old delete or has been
+        # deleted by a previous delete that we received out of order.
+        sql = "SELECT * FROM deletions WHERE event_id = ? OR deletes = ?"
+        txn.execute(sql, (deletes, event_id))
+
+        if txn.fetchall():
+            sql = "DELETE FROM deletions WHERE event_id = ? OR deletes = ?"
+            txn.execute(sql, (deletes, event_id, ))
+        else:
+            sql = "INSERT INTO deletions (event_id, deletes) VALUES (?,?)"
+            txn.execute(sql, (event_id, deletes))
+
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
         sql = (
-            "SELECT e.* FROM events as e "
+            "SELECT e.*, (%(deleted)s) AS deleted FROM events as e "
             "INNER JOIN current_state_events as c ON e.event_id = c.event_id "
             "INNER JOIN state_events as s ON e.event_id = s.event_id "
             "WHERE c.room_id = ? "
-        )
+        ) % {
+            "deleted": "e.event_id IN (SELECT deletes FROM deletions)",
+        }
 
         if event_type:
             sql += " AND s.type = ? AND s.state_key = ? "

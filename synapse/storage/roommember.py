@@ -182,14 +182,21 @@ class RoomMemberStore(SQLBaseStore):
         )
 
     def _get_members_query_txn(self, txn, where_clause, where_values):
+        del_sql = (
+            "SELECT event_id FROM deletions WHERE deletes = e.event_id"
+        )
+
         sql = (
-            "SELECT e.* FROM events as e "
+            "SELECT e.*, (%(deleted)s) AS deleted FROM events as e "
             "INNER JOIN room_memberships as m "
             "ON e.event_id = m.event_id "
             "INNER JOIN current_state_events as c "
             "ON m.event_id = c.event_id "
-            "WHERE %s "
-        ) % (where_clause,)
+            "WHERE %(where)s "
+        ) % {
+            "deleted": del_sql,
+            "where": where_clause,
+        }
 
         txn.execute(sql, where_values)
         rows = self.cursor_to_dict(txn)

@@ -157,6 +157,10 @@ class StreamStore(SQLBaseStore):
             "WHERE m.user_id = ? "
         )
 
+        del_sql = (
+            "SELECT event_id FROM deletions WHERE deletes = e.event_id"
+        )
+
         if limit:
             limit = max(limit, MAX_STREAM_SIZE)
         else:
@@ -171,13 +175,14 @@ class StreamStore(SQLBaseStore):
             return
 
         sql = (
-            "SELECT * FROM events as e WHERE "
+            "SELECT *, (%(deleted)s) AS deleted FROM events AS e WHERE "
             "((room_id IN (%(current)s)) OR "
             "(event_id IN (%(invites)s))) "
             "AND e.stream_ordering > ? AND e.stream_ordering <= ? "
             "AND e.outlier = 0 "
             "ORDER BY stream_ordering ASC LIMIT %(limit)d "
         ) % {
+            "deleted": del_sql,
             "current": current_room_membership_sql,
             "invites": membership_sql,
             "limit": limit
@@ -224,11 +229,20 @@ class StreamStore(SQLBaseStore):
         else:
             limit_str = ""
 
+        del_sql = (
+            "SELECT event_id FROM deletions WHERE deletes = events.event_id"
+        )
+
         sql = (
-            "SELECT * FROM events "
+            "SELECT *, (%(deleted)s) AS deleted FROM events "
             "WHERE outlier = 0 AND room_id = ? AND %(bounds)s "
             "ORDER BY topological_ordering %(order)s, stream_ordering %(order)s %(limit)s "
-        ) % {"bounds": bounds, "order": order, "limit": limit_str}
+        ) % {
+            "deleted": del_sql,
+            "bounds": bounds,
+            "order": order,
+            "limit": limit_str
+        }
 
         rows = yield self._execute_and_decode(
             sql,
@@ -257,11 +271,17 @@ class StreamStore(SQLBaseStore):
                                    with_feedback=False):
         # TODO (erikj): Handle compressed feedback
 
+        del_sql = (
+            "SELECT event_id FROM deletions WHERE deletes = events.event_id"
+        )
+
         sql = (
-            "SELECT * FROM events "
+            "SELECT *, (%(deleted)s) AS deleted FROM events "
             "WHERE room_id = ? AND stream_ordering <= ? "
             "ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ? "
-        )
+        ) % {
+            "deleted": del_sql,
+        }
 
         rows = yield self._execute_and_decode(
             sql,

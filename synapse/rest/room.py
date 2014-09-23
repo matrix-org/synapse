@@ -19,7 +19,7 @@ from twisted.internet import defer
 from base import RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
 from synapse.streams.config import PaginationConfig
-from synapse.api.events.room import RoomMemberEvent
+from synapse.api.events.room import RoomMemberEvent, RoomDeletionEvent
 from synapse.api.constants import Membership
 
 import json
@@ -430,6 +430,41 @@ class RoomMembershipRestServlet(RestServlet):
         self.txns.store_client_transaction(request, txn_id, response)
         defer.returnValue(response)
 
+class RoomDeleteEventRestServlet(RestServlet):
+    def register(self, http_server):
+        PATTERN = ("/rooms/(?P<room_id>[^/]*)/delete/(?P<event_id>[^/]*)")
+        register_txn_path(self, PATTERN, http_server)
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, room_id, event_id):
+        user = yield self.auth.get_user_by_req(request)
+        content = _parse_json(request)
+
+        event = self.event_factory.create_event(
+            etype=RoomDeletionEvent.TYPE,
+            room_id=urllib.unquote(room_id),
+            user_id=user.to_string(),
+            content=content,
+            deletes=event_id,
+        )
+
+        msg_handler = self.handlers.message_handler
+        yield msg_handler.send_message(event)
+
+        defer.returnValue((200, {"event_id": event.event_id}))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_id, event_id, txn_id):
+        try:
+            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+        except KeyError:
+            pass
+
+        response = yield self.on_POST(request, room_id, event_id)
+
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
+
 
 def _parse_json(request):
     try:
@@ -485,3 +520,4 @@ def register_servlets(hs, http_server):
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomInitialSyncRestServlet(hs).register(http_server)
+    RoomDeleteEventRestServlet(hs).register(http_server)
