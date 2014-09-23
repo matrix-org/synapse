@@ -75,6 +75,7 @@ class BaseHomeServer(object):
         'resource_for_federation',
         'resource_for_web_client',
         'resource_for_content_repo',
+        'resource_for_server_key',
         'event_sources',
         'ratelimiter',
     ]
