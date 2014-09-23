@@ -697,11 +697,10 @@ angular.module('matrixService', [])
         createRoomIdToAliasMapping: function(roomId, alias) {
             roomIdToAlias[roomId] = alias;
             aliasToRoomId[alias] = roomId;
-            // localStorage.setItem(MAPPING_PREFIX+roomId, alias);
         },
         
         getRoomIdToAliasMapping: function(roomId) {
-            var alias = roomIdToAlias[roomId]; // was localStorage.getItem(MAPPING_PREFIX+roomId)
+            var alias = roomIdToAlias[roomId];
             //console.log("looking for alias for " + roomId + "; found: " + alias);
             return alias;
         },
