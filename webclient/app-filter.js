@@ -70,7 +70,23 @@ angular.module('matrixWebClient')
         });
 
         filtered.sort(function (a, b) {
-            return ((a["last_active_ago"] || 10e10) > (b["last_active_ago"] || 10e10) ? 1 : -1);
+            // Sort members on their last_active_ago value
+            if (undefined !== a.last_active_ago || undefined !== b.last_active_ago) {
+                return ((a.last_active_ago || 10e10) > (b.last_active_ago || 10e10) ? 1 : -1);
+            }
+            else {
+                // If they do not have last_active_ago, sort them according to their presence state
+                // Online users go first amongs members who do not have last_active_ago
+                var presenceLevels = {
+                    offline: 1,
+                    unavailable: 2,
+                    online: 4,
+                    free_for_chat: 3
+                };
+                var aPresence = (a.presence in presenceLevels) ? presenceLevels[a.presence] : 0;
+                var bPresence = (b.presence in presenceLevels) ? presenceLevels[b.presence] : 0;
+                return bPresence - aPresence;
+            }
         });
         return filtered;
     };
