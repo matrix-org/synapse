@@ -21,6 +21,8 @@ from synapse.api.constants import LoginType
 from base import RestServlet, client_path_pattern
 import synapse.util.stringutils as stringutils
 
+from hashlib import sha1
+import hmac
 import json
 import logging
 import urllib
@@ -142,7 +144,7 @@ class RegisterRestServlet(RestServlet):
         if not self.hs.config.enable_registration_captcha:
             raise SynapseError(400, "Captcha not required.")
 
-        yield self._check_recaptcha(request, register_json)
+        yield self._check_recaptcha(request, register_json, session)
 
         session[LoginType.RECAPTCHA] = True  # mark captcha as done
         self._save_session(session)
@@ -151,14 +153,27 @@ class RegisterRestServlet(RestServlet):
         })
 
     @defer.inlineCallbacks
-    def _check_recaptcha(self, request, register_json):
-        if "captcha_bypass_secret" in register_json:
-            if (self.hs.config.captcha_bypass_secret and
-                    register_json["captcha_bypass_secret"] ==
-                        self.hs.config.captcha_bypass_secret):
+    def _check_recaptcha(self, request, register_json, session):
+        if ("captcha_bypass_hmac" in register_json and
+                self.hs.config.captcha_bypass_secret):
+            if "user" not in register_json:
+                raise SynapseError(400, "Captcha bypass needs 'user'")
+
+            want = hmac.new(
+                key=self.hs.config.captcha_bypass_secret,
+                msg=register_json["user"],
+                digestmod=sha1,
+            ).hexdigest()
+
+            # str() because otherwise hmac complains that 'unicode' does not
+            # have the buffer interface
+            got = str(register_json["captcha_bypass_hmac"])
+
+            if hmac.compare_digest(want, got):
+                session["user"] = register_json["user"]
                 defer.returnValue(None)
             else:
-                raise SynapseError(400, "Captcha bypass secret incorrect",
+                raise SynapseError(400, "Captcha bypass HMAC incorrect",
                     errcode=Codes.CAPTCHA_NEEDED)
 
         challenge = None
@@ -208,6 +223,10 @@ class RegisterRestServlet(RestServlet):
                 not session[LoginType.RECAPTCHA]):
             # captcha should've been done by this stage!
             raise SynapseError(400, "Captcha is required.")
+
+        if ("user" in session and "user" in register_json and
+                session["user"] != register_json["user"]):
+            raise SynapseError(400, "Cannot change user ID during registration")
 
         password = register_json["password"].encode("utf-8")
         desired_user_id = (register_json["user"].encode("utf-8") if "user"
