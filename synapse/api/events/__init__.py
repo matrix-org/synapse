@@ -59,7 +59,7 @@ class SynapseEvent(JsonEncodedObject):
         "age_ts",
         "prev_content",
         "prev_state",
-        "pruned",
+        "pruned_because",
     ]
 
     internal_keys = [

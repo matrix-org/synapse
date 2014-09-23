@@ -398,7 +398,7 @@ class SQLBaseStore(object):
 
                 if del_evs:
                     prune_event(ev)
-                    ev.pruned = del_evs[0]
+                    ev.pruned_because = del_evs[0]
 
         return events
 
