@@ -146,7 +146,7 @@ angular.module('RoomController')
 }])
 .directive('commandHistory', [ function() {
     return function (scope, element, attrs) {
-        element.bind("keydown keypress", function (event) {
+        element.bind("keydown", function (event) {
             var keycodePressed = event.which;
             var UP_ARROW = 38;
             var DOWN_ARROW = 40;
