@@ -30,6 +30,16 @@ import urllib
 logger = logging.getLogger(__name__)
 
 
+# We ought to be using hmac.compare_digest() but on older pythons it doesn't
+# exist. It's a _really minor_ security flaw to use plain string comparison
+# because the timing attack is so obscured by all the other code here it's
+# unlikely to make much difference
+if hasattr(hmac, "compare_digest"):
+    compare_digest = hmac.compare_digest
+else:
+    compare_digest = lambda a, b: a == b
+
+
 class RegisterRestServlet(RestServlet):
     """Handles registration with the home server.
 
@@ -169,7 +179,7 @@ class RegisterRestServlet(RestServlet):
             # have the buffer interface
             got = str(register_json["captcha_bypass_hmac"])
 
-            if hmac.compare_digest(want, got):
+            if compare_digest(want, got):
                 session["user"] = register_json["user"]
                 defer.returnValue(None)
             else:
