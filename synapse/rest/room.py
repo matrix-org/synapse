@@ -329,12 +329,13 @@ class RoomStateRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         user = yield self.auth.get_user_by_req(request)
-        # TODO: Get all the current state for this room and return in the same
-        # format as initial sync, that is:
-        # [
-        #   { state event }, { state event }
-        # ]
-        defer.returnValue((200, []))
+        handler = self.handlers.message_handler
+        # Get all the current state for this room
+        events = yield handler.get_state_events(
+            room_id=urllib.unquote(room_id),
+            user_id=user.to_string(),
+        )
+        defer.returnValue((200, events))
 
 
 # TODO: Needs unit testing
