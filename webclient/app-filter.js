@@ -70,9 +70,16 @@ angular.module('matrixWebClient')
         });
 
         filtered.sort(function (a, b) {
-            // Sort members on their last_active_ago value
-            if (undefined !== a.last_active_ago || undefined !== b.last_active_ago) {
-                return ((a.last_active_ago || 10e10) > (b.last_active_ago || 10e10) ? 1 : -1);
+            // Sort members on their last_active absolute time
+            var aLastActiveTS = 0, bLastActiveTS = 0;
+            if (undefined !== a.last_active_ago) {
+                aLastActiveTS = a.last_updated - a.last_active_ago;
+            }
+            if (undefined !== b.last_active_ago) {
+                bLastActiveTS = b.last_updated - b.last_active_ago;
+            }
+            if (aLastActiveTS || bLastActiveTS) {
+                return bLastActiveTS - aLastActiveTS;
             }
             else {
                 // If they do not have last_active_ago, sort them according to their presence state
