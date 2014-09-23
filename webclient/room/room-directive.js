@@ -52,12 +52,21 @@ angular.module('RoomController')
                 // console.log("targetIndex: " + targetIndex + ", 
                 // text=" + text);
                                     
-                // FIXME: use the correct regexp to recognise userIDs
+                // FIXME: use the correct regexp to recognise userIDs --M
+                //
                 // XXX: I don't really know what the point of this is. You
                 // WANT to match freeform text given you want to match display
                 // names AND user IDs. Surely you just want to get the last
                 // word out of the input text and that's that?
                 // Am I missing something here? -- Kegan
+                //
+                // You're not missing anything - my point was that we should
+                // explicitly define the syntax for user IDs /somewhere/.
+                // Meanwhile as long as the delimeters are well defined, we
+                // could just pick "the last word".  But to know what the
+                // correct delimeters are, we probably do need a formal
+                // syntax for user IDs to refer to... --Matthew
+                
                 var search = /@?([a-zA-Z0-9_\-:\.]+)$/.exec(text);
 
                 if (targetIndex === 0) { // 0 is always the original text
