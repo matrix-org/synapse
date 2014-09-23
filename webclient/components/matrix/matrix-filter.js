@@ -73,7 +73,7 @@ angular.module('matrixFilter', [])
                         // find invite - surely the other user should be in room.members with state invited? :/ --Matthew
                         for (var i in room.messages) {
                             var message = room.messages[i];
-                            if ("m.room.member" === message.type && "invite" === message.membership) {
+                            if ("m.room.member" === message.type && "invite" === message.content.membership) {
                                 // Filter out the current user
                                 var member_id = message.state_key;
                                 if (member_id === user_id) {
