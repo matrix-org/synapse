@@ -49,15 +49,12 @@ angular.module('matrixFilter', [])
                         if (member.state_key !== user_id) {
 
                             if (member.state_key in $rootScope.presence) {
-                                // If the user is available in presence, use the displayname there
+                                // If the user is listed in presence, use the displayname there
                                 // as it is the most uptodate
-                                roomName = $rootScope.presence[member.state_key].content.displayname;
+                                roomName = $rootScope.presence[member.state_key].content.displayname || member.state_key;
                             }
-                            else if (member.content.displayname) {
-                                roomName = member.content.displayname;
-                            }
-                            else {
-                                roomName = member.state_key;
+                            else { 
+                                roomName = member.content.displayname || member.state_key;
                             }
                         }
                     }
