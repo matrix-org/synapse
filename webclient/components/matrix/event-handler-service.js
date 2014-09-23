@@ -260,8 +260,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             if (event.content.prev !== event.content.membership) {
                 memberChanges = "membership";
             }
-            else if (event.prev_content.displayname !== 
-                     event.content.displayname) {
+            else if (event.prev_content && (event.prev_content.displayname !== event.content.displayname)) {
                 memberChanges = "displayname";
             }
 
