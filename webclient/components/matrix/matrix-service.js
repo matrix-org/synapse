@@ -264,7 +264,13 @@ angular.module('matrixService', [])
 
             return doRequest("GET", path, params);
         },
-
+        
+        // get room state for a specific room
+        roomState: function(room_id) {
+            var path = "/rooms/" + room_id + "/state";
+            return doRequest("GET", path);
+        },
+        
         // Joins a room
         join: function(room_id) {
             return this.membershipChange(room_id, undefined, "join");

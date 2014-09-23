@@ -479,6 +479,15 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                             else {
                                 promise = matrixService.joinAlias(room_alias).then(
                                     function(response) {
+                                        // TODO: factor out the common housekeeping whenever we try to join a room or alias
+                                        matrixService.roomState(response.room_id).then(
+                                            function(response) {
+                                                eventHandlerService.handleEvents(response, false, true);
+                                            },
+                                            function(error) {
+                                                $scope.feedback = "Failed to get room state for: " + response.room_id;
+                                            }
+                                        );                                        
                                         $location.url("room/" + room_alias);
                                     },
                                     function(error) {
@@ -732,6 +741,16 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     $scope.state.waiting_for_joined_event = true;
                     matrixService.join($scope.room_id).then(
                         function() {
+                            // TODO: factor out the common housekeeping whenever we try to join a room or alias
+                            matrixService.roomState($scope.room_id).then(
+                                function(response) {
+                                    eventHandlerService.handleEvents(response, false, true);
+                                },
+                                function(error) {
+                                    console.error("Failed to get room state for: " + $scope.room_id);
+                                }
+                            );                                        
+                            
                             // onInit3 will be called once the joined m.room.member event is received from the events stream
                             // This avoids to get the joined information twice in parallel:
                             //    - one from the events stream
@@ -740,6 +759,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                         },
                         function(reason) {
                             console.log("Can't join room: " + JSON.stringify(reason));
+                            // FIXME: what if it wasn't a perms problem?
                             $scope.state.permission_denied = "You do not have permission to join this room";
                         });
                 }
