@@ -51,6 +51,7 @@ angular.module('matrixFilter', [])
                             if (member.state_key in $rootScope.presence) {
                                 // If the user is listed in presence, use the displayname there
                                 // as it is the most uptodate
+                                // XXX: is this true nowadays?
                                 roomName = $rootScope.presence[member.state_key].content.displayname || member.state_key;
                             }
                             else { 
@@ -59,13 +60,19 @@ angular.module('matrixFilter', [])
                         }
                     }
                 }
-                else if (1 === Object.keys(room.members).length) {
+                else if (Object.keys(room.members).length <= 1) {
+                    
                     var otherUserId;
 
-                    if (Object.keys(room.members)[0] !== user_id) {
+                    if (Object.keys(room.members)[0] && Object.keys(room.members)[0] !== user_id) {
                         otherUserId = Object.keys(room.members)[0];
                     }
                     else {
+                        // it's got to be an invite, or failing that a self-chat;
+                        otherUserId = room.inviter || user_id;
+/*                        
+                        // XXX: This should all be unnecessary now thanks to using the /rooms/<room>/roomid API
+
                         // The other member may be in the invite list, get all invited users
                         var invitedUserIDs = [];
                         
@@ -92,13 +99,13 @@ angular.module('matrixFilter', [])
                         if (1 === invitedUserIDs.length) {
                             otherUserId = invitedUserIDs[0];
                         }
+*/                        
                     }
                     
-                    if (!otherUserId) otherUserId = user_id; // name the room after ourselves as we're the only person there!
-
                     // Try to resolve his displayname in presence global data
+                    // XXX: should we be looking in the room state instead, given it should be accurate nowadays?
                     if (otherUserId in $rootScope.presence) {
-                        roomName = $rootScope.presence[otherUserId].content.displayname;
+                        roomName = $rootScope.presence[otherUserId].content.displayname || otherUserId;
                     }
                     else {
                         roomName = otherUserId;
