@@ -96,7 +96,7 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
                 // TODO: factor out the common housekeeping whenever we try to join a room or alias
                 matrixService.roomState(final_room_id).then(
                     function(response) {
-                        eventHandlerService.handleEvents(response, false, true);
+                        eventHandlerService.handleEvents(response.data, false, true);
                     },
                     function(error) {
                         $scope.feedback = "Failed to get room state for: " + final_room_id;
@@ -117,7 +117,7 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
                 // TODO: factor out the common housekeeping whenever we try to join a room or alias
                 matrixService.roomState(response.room_id).then(
                     function(response) {
-                        eventHandlerService.handleEvents(response, false, true);
+                        eventHandlerService.handleEvents(response.data, false, true);
                     },
                     function(error) {
                         $scope.feedback = "Failed to get room state for: " + response.room_id;

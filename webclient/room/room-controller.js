@@ -482,7 +482,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                                         // TODO: factor out the common housekeeping whenever we try to join a room or alias
                                         matrixService.roomState(response.room_id).then(
                                             function(response) {
-                                                eventHandlerService.handleEvents(response, false, true);
+                                                eventHandlerService.handleEvents(response.data, false, true);
                                             },
                                             function(error) {
                                                 $scope.feedback = "Failed to get room state for: " + response.room_id;
@@ -744,7 +744,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                             // TODO: factor out the common housekeeping whenever we try to join a room or alias
                             matrixService.roomState($scope.room_id).then(
                                 function(response) {
-                                    eventHandlerService.handleEvents(response, false, true);
+                                    eventHandlerService.handleEvents(response.data, false, true);
                                 },
                                 function(error) {
                                     console.error("Failed to get room state for: " + $scope.room_id);
