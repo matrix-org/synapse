@@ -206,7 +206,7 @@ class DataStore(RoomMemberStore, RoomStore,
         unrec = {
             k: v
             for k, v in event.get_full_dict().items()
-            if k not in vals.keys() and k is not "deleted"
+            if k not in vals.keys() and k not in ["deleted", "pruned"]
         }
         vals["unrecognized_keys"] = json.dumps(unrec)
 
