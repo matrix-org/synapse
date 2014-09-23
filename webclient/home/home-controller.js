@@ -42,6 +42,10 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
         displayName: "",
         avatarUrl: ""
     };
+    
+    $scope.newChat = {
+        user: ""
+    };
 
     var refresh = function() {
         
@@ -112,6 +116,32 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
             }
         );
     };
+    
+    // FIXME: factor this out between user-controller and home-controller etc.
+    $scope.messageUser = function() {    
+        
+        // FIXME: create a new room every time, for now
+        
+        matrixService.create(null, 'private').then(
+            function(response) { 
+                // This room has been created. Refresh the rooms list
+                var room_id = response.data.room_id;
+                console.log("Created room with id: "+ room_id);
+                
+                matrixService.invite(room_id, $scope.newChat.user).then(
+                    function() {
+                        $scope.feedback = "Invite sent successfully";
+                        $scope.$parent.goToPage("/room/" + room_id);
+                    },
+                    function(reason) {
+                        $scope.feedback = "Failure: " + JSON.stringify(reason);
+                    });
+            },
+            function(error) {
+                $scope.feedback = "Failure: " + JSON.stringify(error.data);
+            });                
+    };
+    
  
     $scope.onInit = function() {
         // Load profile data
