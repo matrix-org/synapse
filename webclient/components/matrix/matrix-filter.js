@@ -68,6 +68,9 @@ angular.module('matrixFilter', [])
                     else {
                         // The other member may be in the invite list, get all invited users
                         var invitedUserIDs = [];
+                        
+                        // XXX: *SURELY* we shouldn't have to trawl through the whole messages list to
+                        // find invite - surely the other user should be in room.members with state invited? :/ --Matthew
                         for (var i in room.messages) {
                             var message = room.messages[i];
                             if ("m.room.member" === message.type && "invite" === message.membership) {
@@ -90,6 +93,8 @@ angular.module('matrixFilter', [])
                             otherUserId = invitedUserIDs[0];
                         }
                     }
+                    
+                    if (!otherUserId) otherUserId = user_id; // name the room after ourselves as we're the only person there!
 
                     // Try to resolve his displayname in presence global data
                     if (otherUserId in $rootScope.presence) {
