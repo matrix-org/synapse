@@ -544,6 +544,34 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             return member;
         },
         
+        /**
+         * Return the display name of an user acccording to data already downloaded
+         * @param {String} room_id the room id
+         * @param {String} user_id the id of the user
+         * @returns {String} the user displayname or user_id if not available
+         */
+        getUserDisplayName: function(room_id, user_id) {
+            var displayName;
+
+            // Get the user display name from the member list of the room
+            var member = this.getMember(room_id, user_id);
+            if (member) {
+                displayName = member.content.displayname;
+            }
+
+            // The user may not have joined the room yet. So try to resolve display name from presence data
+            // Note: This data may not be available
+            if (undefined === displayName && user_id in $rootScope.presence) {
+                displayName = $rootScope.presence[user_id].content.displayname;
+            }
+
+            if (undefined === displayName) {
+                // By default, use the user ID
+                displayName = user_id;
+            }
+            return displayName;
+        },
+
         setRoomVisibility: function(room_id, visible) {
             if (!visible) {
                 return;

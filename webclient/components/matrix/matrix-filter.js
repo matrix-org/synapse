@@ -19,7 +19,7 @@
 angular.module('matrixFilter', [])
 
 // Compute the room name according to information we have
-.filter('mRoomName', ['$rootScope', 'matrixService', function($rootScope, matrixService) {
+.filter('mRoomName', ['$rootScope', 'matrixService', 'eventHandlerService', function($rootScope, matrixService, eventHandlerService) {
     return function(room_id) {
         var roomName;
 
@@ -47,16 +47,8 @@ angular.module('matrixFilter', [])
                     for (var i in room.members) {
                         var member = room.members[i];
                         if (member.state_key !== user_id) {
-
-                            if (member.state_key in $rootScope.presence) {
-                                // If the user is listed in presence, use the displayname there
-                                // as it is the most uptodate
-                                // XXX: is this true nowadays?
-                                roomName = $rootScope.presence[member.state_key].content.displayname || member.state_key;
-                            }
-                            else { 
-                                roomName = member.content.displayname || member.state_key;
-                            }
+                            roomName = eventHandlerService.getUserDisplayName(room_id, member.state_key);
+                            break;
                         }
                     }
                 }
@@ -102,14 +94,8 @@ angular.module('matrixFilter', [])
 */                        
                     }
                     
-                    // Try to resolve his displayname in presence global data
-                    // XXX: should we be looking in the room state instead, given it should be accurate nowadays?
-                    if (otherUserId in $rootScope.presence) {
-                        roomName = $rootScope.presence[otherUserId].content.displayname || otherUserId;
-                    }
-                    else {
-                        roomName = otherUserId;
-                    }
+                    // Get the user display name
+                    roomName = eventHandlerService.getUserDisplayName(room_id, otherUserId);
                 }
             }
         }
@@ -136,37 +122,9 @@ angular.module('matrixFilter', [])
     };
 }])
 
-// Compute the user display name in a room according to the data already downloaded
-.filter('mUserDisplayName', ['$rootScope', function($rootScope) {
+// Return the user display name
+.filter('mUserDisplayName', ['eventHandlerService', function(eventHandlerService) {
     return function(user_id, room_id) {
-        var displayName;
-    
-        // Try to find the user name among presence data
-        // Warning: that means we have received before a presence event for this
-        // user which cannot be guaranted.
-        // However, if we get the info by this way, we are sure this is the latest user display name
-        // See FIXME comment below
-        if (user_id in $rootScope.presence) {
-            displayName = $rootScope.presence[user_id].content.displayname;
-        }
-            
-        // FIXME: Would like to use the display name as defined in room members of the room.
-        // But this information is the display name of the user when he has joined the room.
-        // It does not take into account user display name update
-        if (room_id) {
-            var room = $rootScope.events.rooms[room_id];
-            if (room && (user_id in room.members)) {
-                var member = room.members[user_id];
-                if (member.content.displayname) {
-                    displayName = member.content.displayname;
-                }
-            }
-        }
-        
-        if (undefined === displayName) {
-            // By default, use the user ID
-            displayName = user_id;
-        }
-        return displayName;
+        return eventHandlerService.getUserDisplayName(room_id, user_id);
     };
 }]);
