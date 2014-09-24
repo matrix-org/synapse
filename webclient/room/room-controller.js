@@ -829,7 +829,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         
         matrixService.leave($scope.room_id).then(
             function(response) {
-                console.log("Left room ");
+                console.log("Left room " + $scope.room_id);
                 $location.url("home");
             },
             function(error) {
