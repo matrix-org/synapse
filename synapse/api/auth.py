@@ -376,7 +376,7 @@ class Auth(object):
         same = set(old_people.keys()) & set(new_people.keys())
 
         for r in removed:
-            if int(old_list.content[r]) > user_level:
+            if int(old_list[r]) > user_level:
                 raise AuthError(
                     403,
                     "You don't have permission to remove user: %s" % (r, )
