@@ -213,11 +213,8 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                 
                 if (shouldBing && isIdle) {
                     console.log("Displaying notification for "+JSON.stringify(event));
-                    var member = $rootScope.events.rooms[event.room_id].members[event.user_id];
-                    var displayname = undefined;
-                    if (member) {
-                        displayname = member.displayname;
-                    }
+                    var member = getMember(event.room_id, event.user_id);
+                    var displayname = getUserDisplayName(event.room_id, event.user_id);
 
                     var message = event.content.body;
                     if (event.content.msgtype === "m.emote") {
@@ -225,7 +222,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                     }
 
                     var notification = new window.Notification(
-                        (displayname || event.user_id) +
+                        displayname +
                         " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
                     {
                         "body": message,
@@ -347,6 +344,50 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
         return index;
     };
     
+    /**
+     * Get the member object of a room member
+     * @param {String} room_id the room id
+     * @param {String} user_id the id of the user
+     * @returns {undefined | Object} the member object of this user in this room if he is part of the room
+     */
+    var getMember = function(room_id, user_id) {
+        var member;
+
+        var room = $rootScope.events.rooms[room_id];
+        if (room) {
+            member = room.members[user_id];
+        }
+        return member;
+    };
+
+    /**
+     * Return the display name of an user acccording to data already downloaded
+     * @param {String} room_id the room id
+     * @param {String} user_id the id of the user
+     * @returns {String} the user displayname or user_id if not available
+     */
+    var getUserDisplayName = function(room_id, user_id) {
+        var displayName;
+
+        // Get the user display name from the member list of the room
+        var member = getMember(room_id, user_id);
+        if (member) {
+            displayName = member.content.displayname;
+        }
+
+        // The user may not have joined the room yet. So try to resolve display name from presence data
+        // Note: This data may not be available
+        if (undefined === displayName && user_id in $rootScope.presence) {
+            displayName = $rootScope.presence[user_id].content.displayname;
+        }
+
+        if (undefined === displayName) {
+            // By default, use the user ID
+            displayName = user_id;
+        }
+        return displayName;
+    };
+
     return {
         ROOM_CREATE_EVENT: ROOM_CREATE_EVENT,
         MSG_EVENT: MSG_EVENT,
@@ -538,13 +579,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
          * @returns {undefined | Object} the member object of this user in this room if he is part of the room
          */
         getMember: function(room_id, user_id) {
-            var member;
-            
-            var room = $rootScope.events.rooms[room_id];
-            if (room) {
-                member = room.members[user_id];
-            }
-            return member;
+            return getMember(room_id, user_id);
         },
         
         /**
@@ -554,25 +589,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
          * @returns {String} the user displayname or user_id if not available
          */
         getUserDisplayName: function(room_id, user_id) {
-            var displayName;
-
-            // Get the user display name from the member list of the room
-            var member = this.getMember(room_id, user_id);
-            if (member) {
-                displayName = member.content.displayname;
-            }
-
-            // The user may not have joined the room yet. So try to resolve display name from presence data
-            // Note: This data may not be available
-            if (undefined === displayName && user_id in $rootScope.presence) {
-                displayName = $rootScope.presence[user_id].content.displayname;
-            }
-
-            if (undefined === displayName) {
-                // By default, use the user ID
-                displayName = user_id;
-            }
-            return displayName;
+            return getUserDisplayName(room_id, user_id);
         },
 
         setRoomVisibility: function(room_id, visible) {
