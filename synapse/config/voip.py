@@ -19,7 +19,7 @@ class VoipConfig(Config):
 
     def __init__(self, args):
         super(VoipConfig, self).__init__(args)
-        self.turn_uri = args.turn_uri
+        self.turn_uris = args.turn_uris.split(",")
         self.turn_shared_secret = args.turn_shared_secret
         self.turn_user_lifetime = args.turn_user_lifetime
 
@@ -28,8 +28,8 @@ class VoipConfig(Config):
         super(VoipConfig, cls).add_arguments(parser)
         group = parser.add_argument_group("voip")
         group.add_argument(
-            "--turn-uri", type=str, default=None,
-            help="The public URI of the TURN server to give to clients"
+            "--turn-uris", type=str, default=None,
+            help="The public URIs of the TURN server to give to clients"
         )
         group.add_argument(
             "--turn-shared-secret", type=str, default=None,

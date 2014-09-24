@@ -24,13 +24,13 @@ import base64
 
 
 class VoipRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/voip/turnuris$")
+    PATTERN = client_path_pattern("/voip/turnServers$")
 
     @defer.inlineCallbacks
     def on_GET(self, request):
         auth_user = yield self.auth.get_user_by_req(request)
 
-        turnUri = self.hs.config.turn_uri
+        turnUris = self.hs.config.turn_uris
         turnSecret = self.hs.config.turn_shared_secret
         userLifetime = self.hs.config.turn_user_lifetime
         if not turnUri or not turnSecret or not userLifetime:
@@ -49,9 +49,7 @@ class VoipRestServlet(RestServlet):
             'username': username,
             'password': password,
             'ttl': userLifetime / 1000,
-            'uris': [
-                turnUri,
-            ]
+            'uris': turnUris,
         }) )
 
     def on_OPTIONS(self, request):
