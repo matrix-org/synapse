@@ -150,7 +150,8 @@ CREATE TABLE IF NOT EXISTS room_ops_levels(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     ban_level INTEGER,
-    kick_level INTEGER
+    kick_level INTEGER,
+    delete_level INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS room_ops_levels_event_id ON room_ops_levels(event_id);
