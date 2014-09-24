@@ -108,6 +108,21 @@ class MockHttpResource(HttpServer):
         self.callbacks.append((method, path_pattern, callback))
 
 
+class MockKey(object):
+    alg = "mock_alg"
+    version = "mock_version"
+
+    @property
+    def verify_key(self):
+        return self
+
+    def sign(self, message):
+        return b"\x9a\x87$"
+
+    def verify(self, message, sig):
+        assert sig == b"\x9a\x87$"
+
+
 class MockClock(object):
     now = 1000
 

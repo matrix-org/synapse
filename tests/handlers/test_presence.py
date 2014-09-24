@@ -17,11 +17,12 @@
 from tests import unittest
 from twisted.internet import defer, reactor
 
-from mock import Mock, call, ANY
+from mock import Mock, call, ANY, NonCallableMock
 import json
 
 from tests.utils import (
-    MockHttpResource, MockClock, DeferredMockCallable, SQLiteMemoryDbPool
+    MockHttpResource, MockClock, DeferredMockCallable, SQLiteMemoryDbPool,
+    MockKey
 )
 
 from synapse.server import HomeServer
@@ -67,12 +68,16 @@ class PresenceStateTestCase(unittest.TestCase):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
             clock=MockClock(),
             db_pool=db_pool,
             handlers=None,
             resource_for_federation=Mock(),
             http_client=None,
+            config=self.mock_config,
         )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -214,6 +219,9 @@ class PresenceInvitesTestCase(unittest.TestCase):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
             clock=MockClock(),
             db_pool=db_pool,
@@ -221,6 +229,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
             resource_for_client=Mock(),
             resource_for_federation=self.mock_federation_resource,
             http_client=self.mock_http_client,
+            config=self.mock_config,
         )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -503,6 +512,9 @@ class PresencePushTestCase(unittest.TestCase):
 
         self.mock_federation_resource = MockHttpResource()
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
                 clock=self.clock,
                 db_pool=None,
@@ -520,6 +532,7 @@ class PresencePushTestCase(unittest.TestCase):
                 resource_for_client=Mock(),
                 resource_for_federation=self.mock_federation_resource,
                 http_client=self.mock_http_client,
+                config=self.mock_config,
             )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -995,6 +1008,9 @@ class PresencePollingTestCase(unittest.TestCase):
 
         self.mock_federation_resource = MockHttpResource()
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
                 clock=MockClock(),
                 db_pool=None,
@@ -1009,6 +1025,7 @@ class PresencePollingTestCase(unittest.TestCase):
                 resource_for_client=Mock(),
                 resource_for_federation=self.mock_federation_resource,
                 http_client=self.mock_http_client,
+                config = self.mock_config,
             )
         hs.handlers = JustPresenceHandlers(hs)
 

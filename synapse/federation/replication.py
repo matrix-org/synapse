@@ -25,6 +25,8 @@ from .persistence import PduActions, TransactionActions
 
 from synapse.util.logutils import log_function
 
+from syutil.crypto.jsonsign import sign_json
+
 import logging
 
 
@@ -489,7 +491,7 @@ class _TransactionQueue(object):
     """
 
     def __init__(self, hs, transaction_actions, transport_layer):
-
+        self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
         self.transaction_actions = transaction_actions
         self.transport_layer = transport_layer
@@ -604,6 +606,9 @@ class _TransactionQueue(object):
 
             # Actually send the transaction
 
+            server_name = self.server_name
+            signing_key = self.signing_key
+
             # FIXME (erikj): This is a bit of a hack to make the Pdu age
             # keys work
             def cb(transaction):
@@ -612,6 +617,8 @@ class _TransactionQueue(object):
                     for p in transaction["pdus"]:
                         if "age_ts" in p:
                             p["age"] = now - int(p["age_ts"])
+
+                transaction = sign_json(transaction, server_name, signing_key)
 
                 return transaction
 

@@ -24,6 +24,7 @@ from synapse.api.constants import Membership
 from synapse.handlers.room import RoomMemberHandler, RoomCreationHandler
 from synapse.handlers.profile import ProfileHandler
 from synapse.server import HomeServer
+from ..utils import MockKey
 
 from mock import Mock, NonCallableMock
 
@@ -31,6 +32,8 @@ from mock import Mock, NonCallableMock
 class RoomMemberHandlerTestCase(unittest.TestCase):
 
     def setUp(self):
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
         self.hostname = "red"
         hs = HomeServer(
             self.hostname,
@@ -38,7 +41,6 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
             datastore=NonCallableMock(spec_set=[
                 "persist_event",
                 "get_joined_hosts_for_room",
@@ -57,6 +59,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             ]),
             auth=NonCallableMock(spec_set=["check"]),
             state_handler=NonCallableMock(spec_set=["handle_new_event"]),
+            config=self.mock_config,
         )
 
         self.federation = NonCallableMock(spec_set=[

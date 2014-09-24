@@ -19,7 +19,7 @@ from tests import unittest
 # python imports
 from mock import Mock, ANY
 
-from ..utils import MockHttpResource, MockClock
+from ..utils import MockHttpResource, MockClock, MockKey
 
 from synapse.server import HomeServer
 from synapse.federation import initialize_http_replication
@@ -64,6 +64,8 @@ class FederationTestCase(unittest.TestCase):
         self.mock_persistence.get_received_txn_response.return_value = (
                 defer.succeed(None)
         )
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
         self.clock = MockClock()
         hs = HomeServer("test",
                 resource_for_federation=self.mock_resource,
@@ -71,6 +73,7 @@ class FederationTestCase(unittest.TestCase):
                 db_pool=None,
                 datastore=self.mock_persistence,
                 clock=self.clock,
+                config=self.mock_config,
         )
         self.federation = initialize_http_replication(hs)
         self.distributor = hs.get_distributor()

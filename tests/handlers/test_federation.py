@@ -26,12 +26,16 @@ from synapse.federation.units import Pdu
 
 from mock import NonCallableMock, ANY
 
-from ..utils import get_mock_call_args
+from ..utils import get_mock_call_args, MockKey
 
 
 class FederationTestCase(unittest.TestCase):
 
     def setUp(self):
+
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         self.hostname = "test"
         hs = HomeServer(
             self.hostname,
@@ -48,6 +52,7 @@ class FederationTestCase(unittest.TestCase):
                 "room_member_handler",
                 "federation_handler",
             ]),
+            config=self.mock_config,
         )
 
         self.datastore = hs.get_datastore()
