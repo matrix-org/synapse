@@ -372,7 +372,7 @@ class Auth(object):
         }
 
         removed = set(old_people.keys()) - set(new_people.keys())
-        added = set(old_people.keys()) - set(new_people.keys())
+        added = set(new_people.keys()) - set(old_people.keys())
         same = set(old_people.keys()) & set(new_people.keys())
 
         for r in removed:
