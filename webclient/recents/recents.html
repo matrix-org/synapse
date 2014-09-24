@@ -33,28 +33,35 @@
                     
                     <div ng-hide="room.membership === 'invite'" ng-switch="lastMsg.type">
                         <div ng-switch-when="m.room.member">
-                            <span ng-if="'join' === lastMsg.content.membership">
-                                {{ lastMsg.state_key | mUserDisplayName: room.room_id}} joined
-                            </span>
-                            <span ng-if="'leave' === lastMsg.content.membership">
-                                <span ng-if="lastMsg.user_id === lastMsg.state_key">
-                                    {{lastMsg.state_key | mUserDisplayName: room.room_id }} left
+                            <span ng-switch="lastMsg.changedKey">
+                                <span ng-switch-when="membership">
+                                    <span ng-if="'join' === lastMsg.content.membership">
+                                        {{ lastMsg.state_key | mUserDisplayName: room.room_id }} joined
+                                    </span>
+                                    <span ng-if="'leave' === lastMsg.content.membership">
+                                        <span ng-if="lastMsg.user_id === lastMsg.state_key">
+                                            {{lastMsg.state_key | mUserDisplayName: room.room_id }} left
+                                        </span>
+                                        <span ng-if="lastMsg.user_id !== lastMsg.state_key">
+                                            {{ lastMsg.user_id | mUserDisplayName: room.room_id }}
+                                            {{ {"join": "kicked", "ban": "unbanned"}[lastMsg.content.prev] }}
+                                            {{ lastMsg.state_key | mUserDisplayName: room.room_id }}
+                                        </span>
+                                        <span ng-if="'join' === lastMsg.content.prev && lastMsg.content.reason">
+                                            : {{ lastMsg.content.reason }}
+                                        </span>
+                                    </span>
+                                    <span ng-if="'invite' === lastMsg.content.membership || 'ban' === lastMsg.content.membership">
+                                        {{ lastMsg.user_id | mUserDisplayName: room.room_id }}
+                                        {{ {"invite": "invited", "ban": "banned"}[lastMsg.content.membership] }}
+                                        {{ lastMsg.state_key | mUserDisplayName: room.room_id }}
+                                        <span ng-if="'ban' === lastMsg.content.prev && lastMsg.content.reason">
+                                            : {{ lastMsg.content.reason }}
+                                        </span>
+                                    </span>         
                                 </span>
-                                <span ng-if="lastMsg.user_id !== lastMsg.state_key">
-                                    {{ lastMsg.user_id | mUserDisplayName: room.room_id }}
-                                    {{ {"join": "kicked", "ban": "unbanned"}[lastMsg.content.prev] }}
-                                    {{ lastMsg.state_key | mUserDisplayName: room.room_id }}
-                                </span>
-                                <span ng-if="'join' === lastMsg.content.prev && lastMsg.content.reason">
-                                    : {{ lastMsg.content.reason }}
-                                </span>
-                            </span>
-                            <span ng-if="'invite' === lastMsg.content.membership || 'ban' === lastMsg.content.membership">
-                                {{ lastMsg.user_id | mUserDisplayName: room.room_id }}
-                                {{ {"invite": "invited", "ban": "banned"}[lastMsg.content.membership] }}
-                                {{ lastMsg.state_key | mUserDisplayName: room.room_id }}
-                                <span ng-if="'ban' === lastMsg.content.prev && lastMsg.content.reason">
-                                    : {{ lastMsg.content.reason }}
+                                <span ng-switch-when="displayname">
+                                    {{ lastMsg.user_id }} changed their display name from {{ lastMsg.prev_content.displayname }} to {{ lastMsg.content.displayname }}
                                 </span>
                             </span>
                         </div>
