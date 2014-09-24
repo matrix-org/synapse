@@ -400,6 +400,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         // Find the max power level
         var maxPowerLevel = 0;
         for (var i in $scope.members) {
+            if (!$scope.members.hasOwnProperty(i)) continue;
+
             var member = $scope.members[i];
             if (member.powerLevel) {
                 maxPowerLevel = Math.max(maxPowerLevel, member.powerLevel);
@@ -409,6 +411,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         // Normalized them on a 0..100% scale to be use in css width
         if (maxPowerLevel) {
             for (var i in $scope.members) {
+                if (!$scope.members.hasOwnProperty(i)) continue;
+
                 var member = $scope.members[i];
                 member.powerLevelNorm = (member.powerLevel * 100) / maxPowerLevel;
             }
@@ -724,6 +728,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
                     // Update the member list
                     for (var i in members) {
+                        if (!members.hasOwnProperty(i)) continue;
+
                         var member = members[i];
                         updateMemberList(member);
                     }

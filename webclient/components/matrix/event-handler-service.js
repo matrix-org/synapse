@@ -115,8 +115,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
 
         if (room) { // we got an existing room object from initialsync, seemingly.
             // Report all other metadata of the room object (membership, inviter, visibility, ...)
-            // XXX: do we *REALLY* want to iterate over *EVERY* field in the object, including all its methods etc? -- Matthew
             for (var field in room) {
+                if (!room.hasOwnProperty(field)) continue;
+
                 if (-1 === ["room_id", "messages", "state"].indexOf(field)) { // why indexOf - why not ===? --Matthew
                     $rootScope.events.rooms[room_id][field] = room[field];
                 }
@@ -517,6 +518,8 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                 memberCount = 0;
 
                 for (var i in room.members) {
+                    if (!room.members.hasOwnProperty(i)) continue;
+
                     var member = room.members[i];
 
                     if ("join" === member.membership) {

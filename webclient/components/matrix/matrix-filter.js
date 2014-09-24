@@ -45,6 +45,8 @@ angular.module('matrixFilter', [])
                 // Limit the room renaming to 1:1 room
                 if (2 === Object.keys(room.members).length) {
                     for (var i in room.members) {
+                        if (!room.members.hasOwnProperty(i)) continue;
+
                         var member = room.members[i];
                         if (member.state_key !== user_id) {
                             roomName = eventHandlerService.getUserDisplayName(room_id, member.state_key);
