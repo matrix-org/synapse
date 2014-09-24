@@ -762,6 +762,10 @@ angular.module('matrixService', [])
             var deferred = $q.defer();
             deferred.reject({data:{error: "Invalid room: " + room_id}});
             return deferred.promise;
+        },
+
+        getTurnServer: function() {
+            return doRequest("GET", "/voip/turnServers");
         }
 
     };

@@ -49,6 +49,15 @@ angular.module('MatrixCall', [])
 .factory('MatrixCall', ['matrixService', 'matrixPhoneService', '$rootScope', '$timeout', function MatrixCallFactory(matrixService, matrixPhoneService, $rootScope, $timeout) {
     $rootScope.isWebRTCSupported = isWebRTCSupported();
 
+    // FIXME: we should prevent any class from being placed or accepted before this has finished
+    matrixService.getTurnServer().then(function(response) {
+        console.log("Got TURN URIs: "+response.data.uris);
+        MatrixCall.turnServer = response.data;
+    }, function(error) {
+        console.log("Failed to get TURN URIs");
+        MatrixCall.turnServer = {};
+    });
+
     var MatrixCall = function(room_id) {
         this.room_id = room_id;
         this.call_id = "c" + new Date().getTime();
@@ -69,12 +78,30 @@ angular.module('MatrixCall', [])
     MatrixCall.CALL_TIMEOUT = 60000;
 
     MatrixCall.prototype.createPeerConnection = function() {
-        var stunServer = 'stun:stun.l.google.com:19302';
         var pc;
         if (window.mozRTCPeerConnection) {
-            pc = new window.mozRTCPeerConnection({'url': stunServer});
+            var iceServers = [];
+            if (MatrixCall.turnServer) {
+                iceServers.push({
+                    'urls': MatrixCall.turnServer.uris,
+                    'username': MatrixCall.turnServer.username,
+                    'credential': MatrixCall.turnServer.password,
+                });
+            }
+          
+            pc = new window.mozRTCPeerConnection({"iceServers":iceServers});
+            //pc = new window.mozRTCPeerConnection({'url': stunServer});
         } else {
-            pc = new window.RTCPeerConnection({"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]});
+            var iceServers = [];
+            if (MatrixCall.turnServer) {
+                iceServers.push({
+                    'urls': MatrixCall.turnServer.uris,
+                    'username': MatrixCall.turnServer.username,
+                    'credential': MatrixCall.turnServer.password,
+                });
+            }
+          
+            pc = new window.RTCPeerConnection({"iceServers":iceServers});
         }
         var self = this;
         pc.oniceconnectionstatechange = function() { self.onIceConnectionStateChanged(); };
