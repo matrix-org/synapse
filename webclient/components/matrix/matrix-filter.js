@@ -31,14 +31,21 @@ angular.module('matrixFilter', [])
         if (room) {
             // Get name from room state date
             var room_name_event = room["m.room.name"];
+
+            // Determine if it is a public room
+            var isPublicRoom = false;
+            if (room["m.room.join_rules"] && room["m.room.join_rules"].content) {
+                isPublicRoom = ("public" === room["m.room.join_rules"].content.join_rule);
+            }
+
             if (room_name_event) {
                 roomName = room_name_event.content.name;
             }
             else if (alias) {
                 roomName = alias;
             }
-            else if (room.members) {
-
+            else if (room.members && !isPublicRoom) {    // Do not rename public room
+            
                 var user_id = matrixService.config().user_id;
 
                 // Else, build the name from its users
