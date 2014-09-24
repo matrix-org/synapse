@@ -49,15 +49,6 @@ angular.module('MatrixCall', [])
 .factory('MatrixCall', ['matrixService', 'matrixPhoneService', '$rootScope', '$timeout', function MatrixCallFactory(matrixService, matrixPhoneService, $rootScope, $timeout) {
     $rootScope.isWebRTCSupported = isWebRTCSupported();
 
-    // FIXME: we should prevent any class from being placed or accepted before this has finished
-    matrixService.getTurnServer().then(function(response) {
-        console.log("Got TURN URIs: "+response.data.uris);
-        MatrixCall.turnServer = response.data;
-    }, function(error) {
-        console.log("Failed to get TURN URIs");
-        MatrixCall.turnServer = {};
-    });
-
     var MatrixCall = function(room_id) {
         this.room_id = room_id;
         this.call_id = "c" + new Date().getTime();
@@ -75,6 +66,22 @@ angular.module('MatrixCall', [])
 
     }
 
+    MatrixCall.getTurnServer = function() {
+        matrixService.getTurnServer().then(function(response) {
+            console.log("Got TURN URIs: "+response.data.uris);
+            MatrixCall.turnServer = response.data;
+            // re-fetch when we're about to reach the TTL
+            $timeout(MatrixCall.getTurnServer, MatrixCall.turnServer.ttl * 1000 * 0.9);
+        }, function(error) {
+            console.log("Failed to get TURN URIs");
+            MatrixCall.turnServer = {};
+            $timeout(MatrixCall.getTurnServer, 60000);
+        });
+    }
+
+    // FIXME: we should prevent any class from being placed or accepted before this has finished
+    MatrixCall.getTurnServer();
+
     MatrixCall.CALL_TIMEOUT = 60000;
 
     MatrixCall.prototype.createPeerConnection = function() {
@@ -82,11 +89,13 @@ angular.module('MatrixCall', [])
         if (window.mozRTCPeerConnection) {
             var iceServers = [];
             if (MatrixCall.turnServer) {
-                iceServers.push({
-                    'urls': MatrixCall.turnServer.uris,
-                    'username': MatrixCall.turnServer.username,
-                    'credential': MatrixCall.turnServer.password,
-                });
+                for (var i = 0; i < MatrixCall.turnServer.uris.length; i++) {
+                    iceServers.push({
+                        'url': MatrixCall.turnServer.uris[i],
+                        'username': MatrixCall.turnServer.username,
+                        'credential': MatrixCall.turnServer.password,
+                    });
+               }
             }
           
             pc = new window.mozRTCPeerConnection({"iceServers":iceServers});
