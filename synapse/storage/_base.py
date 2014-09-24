@@ -403,9 +403,10 @@ class SQLBaseStore(object):
         return events
 
     def _has_been_deleted_txn(self, txn, event):
-        sql = "SELECT * FROM deletions WHERE deletes = ?"
+        sql = "SELECT event_id FROM deletions WHERE deletes = ?"
         txn.execute(sql, (event.event_id,))
-        return len(txn.fetchall()) > 0
+        result = txn.fetchone()
+        return result[0] if result else None
 
 
 class Table(object):

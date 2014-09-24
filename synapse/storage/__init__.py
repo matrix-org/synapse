@@ -263,13 +263,17 @@ class DataStore(RoomMemberStore, RoomStore,
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
+        del_sql = (
+            "SELECT event_id FROM deletions WHERE deletes = e.event_id"
+        )
+
         sql = (
             "SELECT e.*, (%(deleted)s) AS deleted FROM events as e "
             "INNER JOIN current_state_events as c ON e.event_id = c.event_id "
             "INNER JOIN state_events as s ON e.event_id = s.event_id "
             "WHERE c.room_id = ? "
         ) % {
-            "deleted": "e.event_id IN (SELECT deletes FROM deletions)",
+            "deleted": del_sql,
         }
 
         if event_type:
