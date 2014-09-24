@@ -371,7 +371,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
 
         // Get the user display name from the member list of the room
         var member = getMember(room_id, user_id);
-        if (member) {
+        if (member && member.content.displayname) { // Do not consider null displayname
             displayName = member.content.displayname;
         }
 
