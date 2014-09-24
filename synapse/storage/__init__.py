@@ -246,20 +246,10 @@ class DataStore(RoomMemberStore, RoomStore,
             )
 
     def _store_deletion(self, txn, event):
-        event_id = event.event_id
-        deletes = event.deletes
-
-        # We check if this new delete deletes an old delete or has been
-        # deleted by a previous delete that we received out of order.
-        sql = "SELECT * FROM deletions WHERE event_id = ? OR deletes = ?"
-        txn.execute(sql, (deletes, event_id))
-
-        if txn.fetchall():
-            sql = "DELETE FROM deletions WHERE event_id = ? OR deletes = ?"
-            txn.execute(sql, (deletes, event_id, ))
-        else:
-            sql = "INSERT INTO deletions (event_id, deletes) VALUES (?,?)"
-            txn.execute(sql, (event_id, deletes))
+        txn.execute(
+            "INSERT INTO deletions (event_id, deletes) VALUES (?,?) OR IGNORE",
+            (event.event_id, event.deletes)
+        )
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
