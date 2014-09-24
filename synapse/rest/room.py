@@ -19,7 +19,7 @@ from twisted.internet import defer
 from base import RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
 from synapse.streams.config import PaginationConfig
-from synapse.api.events.room import RoomMemberEvent, RoomDeletionEvent
+from synapse.api.events.room import RoomMemberEvent, RoomRedactionEvent
 from synapse.api.constants import Membership
 
 import json
@@ -430,9 +430,9 @@ class RoomMembershipRestServlet(RestServlet):
         self.txns.store_client_transaction(request, txn_id, response)
         defer.returnValue(response)
 
-class RoomDeleteEventRestServlet(RestServlet):
+class RoomRedactEventRestServlet(RestServlet):
     def register(self, http_server):
-        PATTERN = ("/rooms/(?P<room_id>[^/]*)/delete/(?P<event_id>[^/]*)")
+        PATTERN = ("/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)")
         register_txn_path(self, PATTERN, http_server)
 
     @defer.inlineCallbacks
@@ -441,11 +441,11 @@ class RoomDeleteEventRestServlet(RestServlet):
         content = _parse_json(request)
 
         event = self.event_factory.create_event(
-            etype=RoomDeletionEvent.TYPE,
+            etype=RoomRedactionEvent.TYPE,
             room_id=urllib.unquote(room_id),
             user_id=user.to_string(),
             content=content,
-            deletes=event_id,
+            redacts=event_id,
         )
 
         msg_handler = self.handlers.message_handler
@@ -520,4 +520,4 @@ def register_servlets(hs, http_server):
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomInitialSyncRestServlet(hs).register(http_server)
-    RoomDeleteEventRestServlet(hs).register(http_server)
+    RoomRedactEventRestServlet(hs).register(http_server)

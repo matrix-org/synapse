@@ -24,7 +24,7 @@ from synapse.api.events.room import (
     RoomAddStateLevelEvent,
     RoomSendEventLevelEvent,
     RoomOpsPowerLevelsEvent,
-    RoomDeletionEvent,
+    RoomRedactionEvent,
 )
 
 from synapse.util.logutils import log_function
@@ -57,7 +57,7 @@ SCHEMAS = [
     "presence",
     "im",
     "room_aliases",
-    "deletions",
+    "redactions",
 ]
 
 
@@ -184,8 +184,8 @@ class DataStore(RoomMemberStore, RoomStore,
             self._store_send_event_level(txn, event)
         elif event.type == RoomOpsPowerLevelsEvent.TYPE:
             self._store_ops_level(txn, event)
-        elif event.type == RoomDeletionEvent.TYPE:
-            self._store_deletion(txn, event)
+        elif event.type == RoomRedactionEvent.TYPE:
+            self._store_redaction(txn, event)
 
         vals = {
             "topological_ordering": event.depth,
@@ -207,7 +207,7 @@ class DataStore(RoomMemberStore, RoomStore,
         unrec = {
             k: v
             for k, v in event.get_full_dict().items()
-            if k not in vals.keys() and k not in ["deleted", "pruned_because"]
+            if k not in vals.keys() and k not in ["redacted", "redacted_because"]
         }
         vals["unrecognized_keys"] = json.dumps(unrec)
 
@@ -245,25 +245,26 @@ class DataStore(RoomMemberStore, RoomStore,
                 }
             )
 
-    def _store_deletion(self, txn, event):
+    def _store_redaction(self, txn, event):
         txn.execute(
-            "INSERT INTO deletions (event_id, deletes) VALUES (?,?) OR IGNORE",
-            (event.event_id, event.deletes)
+            "INSERT OR IGNORE INTO redactions "
+            "(event_id, redacts) VALUES (?,?)",
+            (event.event_id, event.redacts)
         )
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
         del_sql = (
-            "SELECT event_id FROM deletions WHERE deletes = e.event_id"
+            "SELECT event_id FROM redactions WHERE redacts = e.event_id"
         )
 
         sql = (
-            "SELECT e.*, (%(deleted)s) AS deleted FROM events as e "
+            "SELECT e.*, (%(redacted)s) AS redacted FROM events as e "
             "INNER JOIN current_state_events as c ON e.event_id = c.event_id "
             "INNER JOIN state_events as s ON e.event_id = s.event_id "
             "WHERE c.room_id = ? "
         ) % {
-            "deleted": del_sql,
+            "redacted": del_sql,
         }
 
         if event_type:

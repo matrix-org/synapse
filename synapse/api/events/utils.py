@@ -23,7 +23,7 @@ def prune_event(event):
     """ Prunes the given event of all keys we don't know about or think could
     potentially be dodgy.
 
-    This is used when we "delete" an event. We want to remove all fields that
+    This is used when we "redact" an event. We want to remove all fields that
     the user has specified, but we do want to keep necessary information like
     type, state_key etc.
     """
@@ -55,7 +55,7 @@ def prune_event(event):
     elif event.type == RoomSendEventLevelEvent.TYPE:
         add_fields("level")
     elif event.type == RoomOpsPowerLevelsEvent.TYPE:
-        add_fields("kick_level", "ban_level", "delete_level")
+        add_fields("kick_level", "ban_level", "redact_level")
     elif event.type == RoomAliasesEvent.TYPE:
         add_fields("aliases")
 

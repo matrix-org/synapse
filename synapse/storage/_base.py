@@ -383,14 +383,14 @@ class SQLBaseStore(object):
                     prev = self._parse_event_from_row(prevs[0])
                     ev.prev_content = prev.content
 
-            if not hasattr(ev, "deleted"):
-                logger.debug("Doesn't have deleted key: %s", ev)
-                ev.deleted = self._has_been_deleted_txn(txn, ev)
+            if not hasattr(ev, "redacted"):
+                logger.debug("Doesn't have redacted key: %s", ev)
+                ev.redacted = self._has_been_redacted_txn(txn, ev)
 
-            if ev.deleted:
-                # Get the deletion event.
+            if ev.redacted:
+                # Get the redaction event.
                 sql = "SELECT * FROM events WHERE event_id = ?"
-                txn.execute(sql, (ev.deleted,))
+                txn.execute(sql, (ev.redacted,))
 
                 del_evs = self._parse_events_txn(
                     txn, self.cursor_to_dict(txn)
@@ -398,12 +398,12 @@ class SQLBaseStore(object):
 
                 if del_evs:
                     prune_event(ev)
-                    ev.pruned_because = del_evs[0]
+                    ev.redacted_because = del_evs[0]
 
         return events
 
-    def _has_been_deleted_txn(self, txn, event):
-        sql = "SELECT event_id FROM deletions WHERE deletes = ?"
+    def _has_been_redacted_txn(self, txn, event):
+        sql = "SELECT event_id FROM redactions WHERE redacts = ?"
         txn.execute(sql, (event.event_id,))
         result = txn.fetchone()
         return result[0] if result else None

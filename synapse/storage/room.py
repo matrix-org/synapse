@@ -27,7 +27,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-OpsLevel = collections.namedtuple("OpsLevel", ("ban_level", "kick_level", "delete_level"))
+OpsLevel = collections.namedtuple("OpsLevel", ("ban_level", "kick_level", "redact_level"))
 
 
 class RoomStore(SQLBaseStore):
@@ -189,7 +189,7 @@ class RoomStore(SQLBaseStore):
 
     def _get_ops_levels(self, txn, room_id):
         sql = (
-            "SELECT ban_level, kick_level, delete_level "
+            "SELECT ban_level, kick_level, redact_level "
             "FROM room_ops_levels as r "
             "INNER JOIN current_state_events as c "
             "ON r.event_id = c.event_id "
@@ -327,8 +327,8 @@ class RoomStore(SQLBaseStore):
         if "ban_level" in event.content:
             content["ban_level"] = event.content["ban_level"]
 
-        if "delete_level" in event.content:
-            content["delete_level"] = event.content["delete_level"]
+        if "redact_level" in event.content:
+            content["redact_level"] = event.content["redact_level"]
 
         self._simple_insert_txn(
             txn,

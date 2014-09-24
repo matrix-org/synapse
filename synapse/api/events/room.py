@@ -182,10 +182,10 @@ class RoomAliasesEvent(SynapseStateEvent):
         return {}
 
 
-class RoomDeletionEvent(SynapseEvent):
-    TYPE = "m.room.deletion"
+class RoomRedactionEvent(SynapseEvent):
+    TYPE = "m.room.redaction"
 
-    valid_keys = SynapseEvent.valid_keys + ["deletes"]
+    valid_keys = SynapseEvent.valid_keys + ["redacts"]
 
     def get_content_template(self):
         return {}

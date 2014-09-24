@@ -18,7 +18,7 @@ from synapse.api.events.room import (
     InviteJoinEvent, RoomConfigEvent, RoomNameEvent, GenericEvent,
     RoomPowerLevelsEvent, RoomJoinRulesEvent, RoomOpsPowerLevelsEvent,
     RoomCreateEvent, RoomAddStateLevelEvent, RoomSendEventLevelEvent,
-    RoomDeletionEvent,
+    RoomRedactionEvent,
 )
 
 from synapse.util.stringutils import random_string
@@ -40,7 +40,7 @@ class EventFactory(object):
         RoomAddStateLevelEvent,
         RoomSendEventLevelEvent,
         RoomOpsPowerLevelsEvent,
-        RoomDeletionEvent,
+        RoomRedactionEvent,
     ]
 
     def __init__(self, hs):

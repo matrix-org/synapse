@@ -20,7 +20,7 @@ from twisted.internet import defer
 from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.api.events.room import (
-    RoomMemberEvent, RoomPowerLevelsEvent, RoomDeletionEvent,
+    RoomMemberEvent, RoomPowerLevelsEvent, RoomRedactionEvent,
 )
 from synapse.util.logutils import log_function
 
@@ -72,8 +72,8 @@ class Auth(object):
                 if event.type == RoomPowerLevelsEvent.TYPE:
                     yield self._check_power_levels(event)
 
-                if event.type == RoomDeletionEvent.TYPE:
-                    yield self._check_deletion(event)
+                if event.type == RoomRedactionEvent.TYPE:
+                    yield self._check_redaction(event)
 
                 defer.returnValue(True)
             else:
@@ -327,7 +327,7 @@ class Auth(object):
                 )
 
     @defer.inlineCallbacks
-    def _check_deletion(self, event):
+    def _check_redaction(self, event):
         user_level = yield self.store.get_power_level(
             event.room_id,
             event.user_id,
@@ -338,15 +338,15 @@ class Auth(object):
         else:
             user_level = 0
 
-        _, _, delete_level  = yield self.store.get_ops_levels(event.room_id)
+        _, _, redact_level  = yield self.store.get_ops_levels(event.room_id)
 
-        if not delete_level:
-            delete_level = 50
+        if not redact_level:
+            redact_level = 50
 
-        if user_level < delete_level:
+        if user_level < redact_level:
             raise AuthError(
                 403,
-                "You don't have permission to delete events"
+                "You don't have permission to redact events"
             )
 
     @defer.inlineCallbacks
