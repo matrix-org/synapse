@@ -17,10 +17,10 @@ from twisted.internet import defer
 
 from base import RestServlet, client_path_pattern
 
-from syutil.base64util import encode_base64
 
 import hmac
 import hashlib
+import base64
 
 
 class VoipRestServlet(RestServlet):
@@ -40,7 +40,10 @@ class VoipRestServlet(RestServlet):
         username = "%d:%s" % (expiry, auth_user.to_string())
          
         mac = hmac.new(turnSecret, msg=username, digestmod=hashlib.sha1)
-        password = encode_base64(mac.digest())
+        # We need to use standard base64 encoding here, *not* syutil's encode_base64
+        # because we need to add the standard padding to get the same result as the
+        # TURN server.
+        password = base64.b64encode(mac.digest())
 
         defer.returnValue( (200, {
             'username': username,
