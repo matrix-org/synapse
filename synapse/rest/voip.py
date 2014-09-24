@@ -24,7 +24,7 @@ import base64
 
 
 class VoipRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/voip/turnServers$")
+    PATTERN = client_path_pattern("/voip/turnServer$")
 
     @defer.inlineCallbacks
     def on_GET(self, request):

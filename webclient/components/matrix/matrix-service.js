@@ -765,7 +765,7 @@ angular.module('matrixService', [])
         },
 
         getTurnServer: function() {
-            return doRequest("GET", "/voip/turnServers");
+            return doRequest("GET", "/voip/turnServer");
         }
 
     };
