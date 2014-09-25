@@ -19,7 +19,7 @@ class VoipConfig(Config):
 
     def __init__(self, args):
         super(VoipConfig, self).__init__(args)
-        self.turn_uris = args.turn_uris.split(",") if args.turn_uris else None
+        self.turn_uris = args.turn_uris
         self.turn_shared_secret = args.turn_shared_secret
         self.turn_user_lifetime = args.turn_user_lifetime
 

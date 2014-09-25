@@ -1,3 +1,28 @@
+Changes in synapse 0.3.4 (2014-09-25)
+=====================================
+This version adds support for using a TURN server. See docs/turn-howto.rst on
+how to set one up.
+
+Homeserver:
+ * Add support for redaction of messages.
+ * Fix bug where inviting a user on a remote home server could take up to
+   20-30s.
+ * Implement a get current room state API.
+ * Add support specifying and retrieving turn server configuration.
+
+Webclient:
+ * Add button to send messages to users from the home page.
+ * Add support for using TURN for VoIP calls.
+ * Show display name change messages.
+ * Fix bug where the client didn't get the state of a newly joined room
+   until after it has been refreshed.
+ * Fix bugs with tab complete.
+ * Fix bug where holding down the down arrow caused chrome to chew 100% CPU.
+ * Fix bug where desktop notifications occasionally used "Undefined" as the
+   display name.
+ * Fix more places where we sometimes saw room IDs incorrectly.
+ * Fix bug which caused lag when entering text in the text box.
+
 Changes in synapse 0.3.3 (2014-09-22)
 =====================================
 
