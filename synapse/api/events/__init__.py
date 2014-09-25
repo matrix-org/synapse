@@ -22,7 +22,8 @@ def serialize_event(hs, e):
     if not isinstance(e, SynapseEvent):
         return e
 
-    d = {k: v for k, v in e.get_dict().items() if v is not None}
+    # Should this strip out None's?
+    d = {k: v for k, v in e.get_dict().items()}
     if "age_ts" in d:
         d["age"] = int(hs.get_clock().time_msec()) - d["age_ts"]
         del d["age_ts"]
