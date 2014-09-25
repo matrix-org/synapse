@@ -34,7 +34,7 @@ class VoipRestServlet(RestServlet):
         turnSecret = self.hs.config.turn_shared_secret
         userLifetime = self.hs.config.turn_user_lifetime
         if not turnUris or not turnSecret or not userLifetime:
-            defer.returnValue( (200, {"uris": []}) )
+            defer.returnValue( (200, {}) )
 
         expiry = self.hs.get_clock().time_msec() + userLifetime
         username = "%d:%s" % (expiry, auth_user.to_string())
