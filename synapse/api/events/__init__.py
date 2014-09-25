@@ -22,7 +22,8 @@ def serialize_event(hs, e):
     if not isinstance(e, SynapseEvent):
         return e
 
-    d = e.get_dict()
+    # Should this strip out None's?
+    d = {k: v for k, v in e.get_dict().items()}
     if "age_ts" in d:
         d["age"] = int(hs.get_clock().time_msec()) - d["age_ts"]
         del d["age_ts"]
@@ -58,17 +59,19 @@ class SynapseEvent(JsonEncodedObject):
         "required_power_level",
         "age_ts",
         "prev_content",
+        "prev_state",
+        "redacted_because",
     ]
 
     internal_keys = [
         "is_state",
         "prev_events",
-        "prev_state",
         "depth",
         "destinations",
         "origin",
         "outlier",
         "power_level",
+        "redacted",
     ]
 
     required_keys = [
