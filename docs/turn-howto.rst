@@ -62,8 +62,8 @@ synapse Setup
 
 Your home server configuration file needs the following extra keys:
 
- 1. "turn_uris": This needs to be a comma-separated
-    list of public-facing URIs for your TURN server to be given out 
+ 1. "turn_uris": This needs to be a yaml list
+    of public-facing URIs for your TURN server to be given out 
     to your clients. Add separate entries for each transport your
     TURN server supports.
 
