@@ -21,11 +21,12 @@ from .ratelimiting import RatelimitConfig
 from .repository import ContentRepositoryConfig
 from .captcha import CaptchaConfig
 from .email import EmailConfig
+from .voip import VoipConfig
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
-                       EmailConfig):
+                       EmailConfig, VoipConfig):
     pass
 
 

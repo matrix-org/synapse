@@ -66,15 +66,67 @@ angular.module('MatrixCall', [])
 
     }
 
+    MatrixCall.getTurnServer = function() {
+        matrixService.getTurnServer().then(function(response) {
+            if (response.data.uris) {
+                console.log("Got TURN URIs: "+response.data.uris);
+                MatrixCall.turnServer = response.data;
+                $rootScope.haveTurn = true;
+                // re-fetch when we're about to reach the TTL
+                $timeout(MatrixCall.getTurnServer, MatrixCall.turnServer.ttl * 1000 * 0.9);
+            } else {
+                console.log("Got no TURN URIs from HS");
+                $rootScope.haveTurn = false;
+            }
+        }, function(error) {
+            console.log("Failed to get TURN URIs");
+            MatrixCall.turnServer = {};
+            $timeout(MatrixCall.getTurnServer, 60000);
+        });
+    }
+
+    // FIXME: we should prevent any class from being placed or accepted before this has finished
+    MatrixCall.getTurnServer();
+
     MatrixCall.CALL_TIMEOUT = 60000;
+    MatrixCall.FALLBACK_STUN_SERVER = 'stun:stun.l.google.com:19302';
 
     MatrixCall.prototype.createPeerConnection = function() {
-        var stunServer = 'stun:stun.l.google.com:19302';
         var pc;
         if (window.mozRTCPeerConnection) {
-            pc = new window.mozRTCPeerConnection({'url': stunServer});
+            var iceServers = [];
+            if (MatrixCall.turnServer) {
+                if (MatrixCall.turnServer.uris) {
+                    for (var i = 0; i < MatrixCall.turnServer.uris.length; i++) {
+                        iceServers.push({
+                            'url': MatrixCall.turnServer.uris[i],
+                            'username': MatrixCall.turnServer.username,
+                            'credential': MatrixCall.turnServer.password,
+                        });
+                    }
+                } else {
+                    console.log("No TURN server: using fallback STUN server");
+                    iceServers.push({ 'url' : MatrixCall.FALLBACK_STUN_SERVER });
+                }
+            }
+          
+            pc = new window.mozRTCPeerConnection({"iceServers":iceServers});
         } else {
-            pc = new window.RTCPeerConnection({"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]});
+            var iceServers = [];
+            if (MatrixCall.turnServer) {
+                if (MatrixCall.turnServer.uris) {
+                    iceServers.push({
+                        'urls': MatrixCall.turnServer.uris,
+                        'username': MatrixCall.turnServer.username,
+                        'credential': MatrixCall.turnServer.password,
+                    });
+                } else {
+                    console.log("No TURN server: using fallback STUN server");
+                    iceServers.push({ 'urls' : MatrixCall.FALLBACK_STUN_SERVER });
+                }
+            }
+          
+            pc = new window.RTCPeerConnection({"iceServers":iceServers});
         }
         var self = this;
         pc.oniceconnectionstatechange = function() { self.onIceConnectionStateChanged(); };
