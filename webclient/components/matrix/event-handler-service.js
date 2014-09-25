@@ -373,6 +373,21 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
         var member = getMember(room_id, user_id);
         if (member && member.content.displayname) { // Do not consider null displayname
             displayName = member.content.displayname;
+
+            // Disambiguate users who have the same displayname in the room
+            if (user_id !== matrixService.config().user_id) {
+                var room = $rootScope.events.rooms[room_id];
+
+                for (var member_id in room.members) {
+                    if (room.members.hasOwnProperty(member_id) && member_id !== user_id) {
+                        var member2 = room.members[member_id];
+                        if (member2.content.displayname && member2.content.displayname === displayName) {
+                            displayName = displayName + " (" + user_id + ")";
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         // The user may not have joined the room yet. So try to resolve display name from presence data
