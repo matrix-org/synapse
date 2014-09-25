@@ -26,7 +26,7 @@ from synapse.api.events.room import (
 from tests.utils import SQLiteMemoryDbPool
 
 
-class StreamStoreTestCase(unittest.TestCase):
+class RedactionTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
