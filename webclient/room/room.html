@@ -48,7 +48,15 @@
                          width="80" height="80"/>
                     <img class="userAvatarGradient" src="img/gradient.png" title="{{ member.id }}" width="80" height="24"/>
                     <div class="userPowerLevel" ng-style="{'width': member.powerLevelNorm +'%'}"></div>
-                    <div class="userName">{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}<br/>{{ member.displayname ? "" : member.id.substr(member.id.indexOf(':')) }}</div>
+                    <div class="userName">
+                        <div ng-show="member.displayname">
+                            {{ member.id | mUserDisplayName: room_id }}
+                        </div>
+                        <div ng-hide="member.displayname">
+                            {{ member.id.substr(0, member.id.indexOf(':')) }}<br/>
+                            {{ member.id.substr(member.id.indexOf(':')) }}
+                        </div>
+                    </div>
                 </td>
                 <td class="userPresence" ng-class="(member.presence === 'online' ? 'online' : (member.presence === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">
                     <span ng-show="member.last_active_ago">{{ member.last_active_ago + (now - member.last_updated) | duration }}<br/>ago</span>
@@ -65,7 +73,7 @@
             <tr ng-repeat="msg in events.rooms[room_id].messages"
                 ng-class="(events.rooms[room_id].messages[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
                 <td class="leftBlock">
-                    <div class="sender" ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id">{{ members[msg.user_id].displayname || msg.user_id }}</div>
+                    <div class="sender" ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id"> {{ msg.user_id | mUserDisplayName: room_id }}</div>
                     <div class="timestamp"
                          ng-class="msg.echo_msg_state">
                         {{ (msg.content.hsob_ts || msg.ts) | date:'MMM d HH:mm' }}
