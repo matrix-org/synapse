@@ -42,13 +42,15 @@ class StreamStoreTestCase(unittest.TestCase):
         self.event_factory = hs.get_event_factory()
 
         self.u_alice = hs.parse_userid("@alice:test")
+        self.u_bob = hs.parse_userid("@bob:test")
 
         self.room1 = hs.parse_roomid("!abc123:test")
 
         self.depth = 1
 
     @defer.inlineCallbacks
-    def inject_room_member(self, room, user, membership, prev_state=None):
+    def inject_room_member(self, room, user, membership, prev_state=None,
+                           extra_content={}):
         self.depth += 1
 
         event = self.event_factory.create_event(
@@ -60,6 +62,8 @@ class StreamStoreTestCase(unittest.TestCase):
             content={"membership": membership},
             depth=self.depth,
         )
+
+        event.content.update(extra_content)
 
         if prev_state:
             event.prev_state = prev_state
@@ -165,6 +169,83 @@ class StreamStoreTestCase(unittest.TestCase):
                 "type": MessageEvent.TYPE,
                 "user_id": self.u_alice.to_string(),
                 "content": {},
+            },
+            event,
+        )
+
+        self.assertTrue(hasattr(event, "redacted_because"))
+
+        self.assertObjectHasAttributes(
+            {
+                "type": RoomRedactionEvent.TYPE,
+                "user_id": self.u_alice.to_string(),
+                "content": {"reason": reason},
+            },
+            event.redacted_because,
+        )
+
+    @defer.inlineCallbacks
+    def test_redact_join(self):
+        yield self.inject_room_member(
+            self.room1, self.u_alice, Membership.JOIN
+        )
+
+        start = yield self.store.get_room_events_max_id()
+
+        msg_event = yield self.inject_room_member(
+            self.room1, self.u_bob, Membership.JOIN,
+            extra_content={"blue": "red"},
+        )
+
+        end = yield self.store.get_room_events_max_id()
+
+        results, _ = yield self.store.get_room_events_stream(
+            self.u_alice.to_string(),
+            start,
+            end,
+            None,  # Is currently ignored
+        )
+
+        self.assertEqual(1, len(results))
+
+        # Check event has not been redacted:
+        event = results[0]
+
+        self.assertObjectHasAttributes(
+            {
+                "type": RoomMemberEvent.TYPE,
+                "user_id": self.u_bob.to_string(),
+                "content": {"membership": Membership.JOIN, "blue": "red"},
+            },
+            event,
+        )
+
+        self.assertFalse(hasattr(event, "redacted_because"))
+
+        # Redact event
+        reason = "Because I said so"
+        yield self.inject_redaction(
+            self.room1, msg_event.event_id, self.u_alice, reason
+        )
+
+        results, _ = yield self.store.get_room_events_stream(
+            self.u_alice.to_string(),
+            start,
+            end,
+            None,  # Is currently ignored
+        )
+
+        self.assertEqual(1, len(results))
+
+        # Check redaction
+
+        event = results[0]
+
+        self.assertObjectHasAttributes(
+            {
+                "type": RoomMemberEvent.TYPE,
+                "user_id": self.u_bob.to_string(),
+                "content": {"membership": Membership.JOIN},
             },
             event,
         )
