@@ -255,7 +255,8 @@ class DataStore(RoomMemberStore, RoomStore,
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
         del_sql = (
-            "SELECT event_id FROM redactions WHERE redacts = e.event_id"
+            "SELECT event_id FROM redactions WHERE redacts = e.event_id "
+            "LIMIT 1"
         )
 
         sql = (

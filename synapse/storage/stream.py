@@ -158,7 +158,8 @@ class StreamStore(SQLBaseStore):
         )
 
         del_sql = (
-            "SELECT event_id FROM redactions WHERE redacts = e.event_id"
+            "SELECT event_id FROM redactions WHERE redacts = e.event_id "
+            "LIMIT 1"
         )
 
         if limit:
@@ -230,7 +231,8 @@ class StreamStore(SQLBaseStore):
             limit_str = ""
 
         del_sql = (
-            "SELECT event_id FROM redactions WHERE redacts = events.event_id"
+            "SELECT event_id FROM redactions WHERE redacts = events.event_id "
+            "LIMIT 1"
         )
 
         sql = (
@@ -272,7 +274,8 @@ class StreamStore(SQLBaseStore):
         # TODO (erikj): Handle compressed feedback
 
         del_sql = (
-            "SELECT event_id FROM redactions WHERE redacts = events.event_id"
+            "SELECT event_id FROM redactions WHERE redacts = events.event_id "
+            "LIMIT 1"
         )
 
         sql = (
