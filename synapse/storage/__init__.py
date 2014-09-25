@@ -217,7 +217,8 @@ class DataStore(RoomMemberStore, RoomStore,
             )
             raise _RollbackButIsFineException("_persist_event")
 
-        if is_new_state and hasattr(event, "state_key"):
+        is_state = hasattr(event, "state_key") and event.state_key is not None
+        if is_new_state and is_state:
             vals = {
                 "event_id": event.event_id,
                 "room_id": event.room_id,
