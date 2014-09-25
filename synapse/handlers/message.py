@@ -233,6 +233,22 @@ class MessageHandler(BaseHandler):
         yield self._on_new_room_event(event, snapshot)
 
     @defer.inlineCallbacks
+    def get_state_events(self, user_id, room_id):
+        """Retrieve all state events for a given room.
+
+        Args:
+            user_id(str): The user requesting state events.
+            room_id(str): The room ID to get all state events from.
+        Returns:
+            A list of dicts representing state events. [{}, {}, {}]
+        """
+        yield self.auth.check_joined_room(room_id, user_id)
+
+        # TODO: This is duplicating logic from snapshot_all_rooms
+        current_state = yield self.store.get_current_state(room_id)
+        defer.returnValue([self.hs.serialize_event(c) for c in current_state])
+
+    @defer.inlineCallbacks
     def snapshot_all_rooms(self, user_id=None, pagin_config=None,
                            feedback=False):
         """Retrieve a snapshot of all rooms the user is invited or has joined.

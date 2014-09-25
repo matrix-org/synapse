@@ -19,7 +19,7 @@
 angular.module('matrixFilter', [])
 
 // Compute the room name according to information we have
-.filter('mRoomName', ['$rootScope', 'matrixService', function($rootScope, matrixService) {
+.filter('mRoomName', ['$rootScope', 'matrixService', 'eventHandlerService', function($rootScope, matrixService, eventHandlerService) {
     return function(room_id) {
         var roomName;
 
@@ -31,49 +31,57 @@ angular.module('matrixFilter', [])
         if (room) {
             // Get name from room state date
             var room_name_event = room["m.room.name"];
+
+            // Determine if it is a public room
+            var isPublicRoom = false;
+            if (room["m.room.join_rules"] && room["m.room.join_rules"].content) {
+                isPublicRoom = ("public" === room["m.room.join_rules"].content.join_rule);
+            }
+
             if (room_name_event) {
                 roomName = room_name_event.content.name;
             }
             else if (alias) {
                 roomName = alias;
             }
-            else if (room.members) {
-
+            else if (room.members && !isPublicRoom) {    // Do not rename public room
+            
                 var user_id = matrixService.config().user_id;
 
                 // Else, build the name from its users
                 // Limit the room renaming to 1:1 room
                 if (2 === Object.keys(room.members).length) {
                     for (var i in room.members) {
+                        if (!room.members.hasOwnProperty(i)) continue;
+
                         var member = room.members[i];
                         if (member.state_key !== user_id) {
-
-                            if (member.state_key in $rootScope.presence) {
-                                // If the user is available in presence, use the displayname there
-                                // as it is the most uptodate
-                                roomName = $rootScope.presence[member.state_key].content.displayname;
-                            }
-                            else if (member.content.displayname) {
-                                roomName = member.content.displayname;
-                            }
-                            else {
-                                roomName = member.state_key;
-                            }
+                            roomName = eventHandlerService.getUserDisplayName(room_id, member.state_key);
+                            break;
                         }
                     }
                 }
-                else if (1 === Object.keys(room.members).length) {
+                else if (Object.keys(room.members).length <= 1) {
+                    
                     var otherUserId;
 
-                    if (Object.keys(room.members)[0] !== user_id) {
+                    if (Object.keys(room.members)[0] && Object.keys(room.members)[0] !== user_id) {
                         otherUserId = Object.keys(room.members)[0];
                     }
                     else {
+                        // it's got to be an invite, or failing that a self-chat;
+                        otherUserId = room.inviter || user_id;
+/*                        
+                        // XXX: This should all be unnecessary now thanks to using the /rooms/<room>/roomid API
+
                         // The other member may be in the invite list, get all invited users
                         var invitedUserIDs = [];
+                        
+                        // XXX: *SURELY* we shouldn't have to trawl through the whole messages list to
+                        // find invite - surely the other user should be in room.members with state invited? :/ --Matthew
                         for (var i in room.messages) {
                             var message = room.messages[i];
-                            if ("m.room.member" === message.type && "invite" === message.membership) {
+                            if ("m.room.member" === message.type && "invite" === message.content.membership) {
                                 // Filter out the current user
                                 var member_id = message.state_key;
                                 if (member_id === user_id) {
@@ -92,15 +100,11 @@ angular.module('matrixFilter', [])
                         if (1 === invitedUserIDs.length) {
                             otherUserId = invitedUserIDs[0];
                         }
+*/                        
                     }
-
-                    // Try to resolve his displayname in presence global data
-                    if (otherUserId in $rootScope.presence) {
-                        roomName = $rootScope.presence[otherUserId].content.displayname;
-                    }
-                    else {
-                        roomName = otherUserId;
-                    }
+                    
+                    // Get the user display name
+                    roomName = eventHandlerService.getUserDisplayName(room_id, otherUserId);
                 }
             }
         }
@@ -127,37 +131,9 @@ angular.module('matrixFilter', [])
     };
 }])
 
-// Compute the user display name in a room according to the data already downloaded
-.filter('mUserDisplayName', ['$rootScope', function($rootScope) {
+// Return the user display name
+.filter('mUserDisplayName', ['eventHandlerService', function(eventHandlerService) {
     return function(user_id, room_id) {
-        var displayName;
-    
-        // Try to find the user name among presence data
-        // Warning: that means we have received before a presence event for this
-        // user which cannot be guaranted.
-        // However, if we get the info by this way, we are sure this is the latest user display name
-        // See FIXME comment below
-        if (user_id in $rootScope.presence) {
-            displayName = $rootScope.presence[user_id].content.displayname;
-        }
-            
-        // FIXME: Would like to use the display name as defined in room members of the room.
-        // But this information is the display name of the user when he has joined the room.
-        // It does not take into account user display name update
-        if (room_id) {
-            var room = $rootScope.events.rooms[room_id];
-            if (room && (user_id in room.members)) {
-                var member = room.members[user_id];
-                if (member.content.displayname) {
-                    displayName = member.content.displayname;
-                }
-            }
-        }
-        
-        if (undefined === displayName) {
-            // By default, use the user ID
-            displayName = user_id;
-        }
-        return displayName;
+        return eventHandlerService.getUserDisplayName(room_id, user_id);
     };
 }]);

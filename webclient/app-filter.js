@@ -45,32 +45,33 @@ angular.module('matrixWebClient')
         angular.forEach(members, function(value, key) {
             value["id"] = key;
             filtered.push( value );
-            if (value["displayname"]) {
-                if (!displayNames[value["displayname"]]) {
-                    displayNames[value["displayname"]] = [];
-                }
-                displayNames[value["displayname"]].push(key);
-            }
-        });
-
-        // FIXME: we shouldn't disambiguate displayNames on every orderMembersList
-        // invocation but keep track of duplicates incrementally somewhere
-        angular.forEach(displayNames, function(value, key) {
-            if (value.length > 1) {
-                // console.log(key + ": " + value);
-                for (var i=0; i < value.length; i++) {
-                    var v = value[i];
-                    // FIXME: this permenantly rewrites the displayname for a given
-                    // room member. which means we can't reset their name if it is
-                    // no longer ambiguous!
-                    members[v].displayname += " (" + v + ")";
-                    // console.log(v + " " + members[v]);
-                };
-            }
         });
 
         filtered.sort(function (a, b) {
-            return ((a["last_active_ago"] || 10e10) > (b["last_active_ago"] || 10e10) ? 1 : -1);
+            // Sort members on their last_active absolute time
+            var aLastActiveTS = 0, bLastActiveTS = 0;
+            if (undefined !== a.last_active_ago) {
+                aLastActiveTS = a.last_updated - a.last_active_ago;
+            }
+            if (undefined !== b.last_active_ago) {
+                bLastActiveTS = b.last_updated - b.last_active_ago;
+            }
+            if (aLastActiveTS || bLastActiveTS) {
+                return bLastActiveTS - aLastActiveTS;
+            }
+            else {
+                // If they do not have last_active_ago, sort them according to their presence state
+                // Online users go first amongs members who do not have last_active_ago
+                var presenceLevels = {
+                    offline: 1,
+                    unavailable: 2,
+                    online: 4,
+                    free_for_chat: 3
+                };
+                var aPresence = (a.presence in presenceLevels) ? presenceLevels[a.presence] : 0;
+                var bPresence = (b.presence in presenceLevels) ? presenceLevels[b.presence] : 0;
+                return bPresence - aPresence;
+            }
         });
         return filtered;
     };

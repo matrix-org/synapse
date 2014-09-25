@@ -400,6 +400,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         // Find the max power level
         var maxPowerLevel = 0;
         for (var i in $scope.members) {
+            if (!$scope.members.hasOwnProperty(i)) continue;
+
             var member = $scope.members[i];
             if (member.powerLevel) {
                 maxPowerLevel = Math.max(maxPowerLevel, member.powerLevel);
@@ -409,6 +411,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         // Normalized them on a 0..100% scale to be use in css width
         if (maxPowerLevel) {
             for (var i in $scope.members) {
+                if (!$scope.members.hasOwnProperty(i)) continue;
+
                 var member = $scope.members[i];
                 member.powerLevelNorm = (member.powerLevel * 100) / maxPowerLevel;
             }
@@ -479,6 +483,15 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                             else {
                                 promise = matrixService.joinAlias(room_alias).then(
                                     function(response) {
+                                        // TODO: factor out the common housekeeping whenever we try to join a room or alias
+                                        matrixService.roomState(response.room_id).then(
+                                            function(response) {
+                                                eventHandlerService.handleEvents(response.data, false, true);
+                                            },
+                                            function(error) {
+                                                $scope.feedback = "Failed to get room state for: " + response.room_id;
+                                            }
+                                        );                                        
                                         $location.url("room/" + room_alias);
                                     },
                                     function(error) {
@@ -702,19 +715,24 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 // The room members is available in the data fetched by initialSync
                 if ($rootScope.events.rooms[$scope.room_id]) {
 
-                    // There is no need to do a 1st pagination (initialSync provided enough to fill a page)
-                    if ($rootScope.events.rooms[$scope.room_id].messages.length) {
-                        $scope.state.first_pagination = false;
+                    var messages = $rootScope.events.rooms[$scope.room_id].messages;
+
+                    if (0 === messages.length
+                    || (1 === messages.length && "m.room.member" === messages[0].type && "invite" === messages[0].content.membership && $scope.state.user_id === messages[0].state_key)) {
+                        // If we just joined a room, we won't have this history from initial sync, so we should try to paginate it anyway    
+                        $scope.state.first_pagination = true;
                     }
                     else {
-                        // except if we just joined a room, we won't have this history from initial sync, so we should try to paginate it anyway                        
-                        $scope.state.first_pagination = true;
+                        // There is no need to do a 1st pagination (initialSync provided enough to fill a page)
+                        $scope.state.first_pagination = false;
                     }
 
                     var members = $rootScope.events.rooms[$scope.room_id].members;
 
                     // Update the member list
                     for (var i in members) {
+                        if (!members.hasOwnProperty(i)) continue;
+
                         var member = members[i];
                         updateMemberList(member);
                     }
@@ -732,6 +750,16 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     $scope.state.waiting_for_joined_event = true;
                     matrixService.join($scope.room_id).then(
                         function() {
+                            // TODO: factor out the common housekeeping whenever we try to join a room or alias
+                            matrixService.roomState($scope.room_id).then(
+                                function(response) {
+                                    eventHandlerService.handleEvents(response.data, false, true);
+                                },
+                                function(error) {
+                                    console.error("Failed to get room state for: " + $scope.room_id);
+                                }
+                            );                                        
+                            
                             // onInit3 will be called once the joined m.room.member event is received from the events stream
                             // This avoids to get the joined information twice in parallel:
                             //    - one from the events stream
@@ -740,6 +768,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                         },
                         function(reason) {
                             console.log("Can't join room: " + JSON.stringify(reason));
+                            // FIXME: what if it wasn't a perms problem?
                             $scope.state.permission_denied = "You do not have permission to join this room";
                         });
                 }
@@ -809,7 +838,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         
         matrixService.leave($scope.room_id).then(
             function(response) {
-                console.log("Left room ");
+                console.log("Left room " + $scope.room_id);
                 $location.url("home");
             },
             function(error) {

@@ -77,7 +77,7 @@ class FederationTestCase(unittest.TestCase):
         self.datastore.persist_event.assert_called_once_with(
             ANY, False, is_new_state=False
         )
-        self.notifier.on_new_room_event.assert_called_once_with(ANY)
+        self.notifier.on_new_room_event.assert_called_once_with(ANY, extra_users=[])
 
     @defer.inlineCallbacks
     def test_invite_join_target_this(self):

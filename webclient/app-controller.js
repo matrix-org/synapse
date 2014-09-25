@@ -67,6 +67,16 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         }
     };
     
+    $scope.leave = function(room_id) {
+        matrixService.leave(room_id).then(
+            function(response) {
+                console.log("Left room " + room_id);
+            },
+            function(error) {
+                console.log("Failed to leave room " + room_id + ": " + error.data.error);
+            });
+    };
+    
     // Logs the user out 
     $scope.logout = function() {
         

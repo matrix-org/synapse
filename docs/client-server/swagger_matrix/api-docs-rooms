@@ -639,7 +639,7 @@
         {
           "method": "GET",
           "summary": "Get a list of all the current state events for this room.",
-          "notes": "NOT YET IMPLEMENTED.",
+          "notes": "This is equivalent to the events returned under the 'state' key for this room in /initialSync.",
           "type": "array",
           "items": {
             "$ref": "Event"

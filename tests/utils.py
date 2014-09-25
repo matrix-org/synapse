@@ -262,7 +262,7 @@ class MemoryDataStore(object):
         return defer.succeed("invite")
 
     def get_ops_levels(self, room_id):
-        return defer.succeed((5, 5))
+        return defer.succeed((5, 5, 5))
 
 
 def _format_call(args, kwargs):

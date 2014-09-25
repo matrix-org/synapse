@@ -42,6 +42,10 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
         displayName: "",
         avatarUrl: ""
     };
+    
+    $scope.newChat = {
+        user: ""
+    };
 
     var refresh = function() {
         
@@ -82,18 +86,24 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
     
     // Go to a room
     $scope.goToRoom = function(room_id) {
-        // Simply open the room page on this room id
-        //$location.url("room/" + room_id);
         matrixService.join(room_id).then(
             function(response) {
+                var final_room_id = room_id;
                 if (response.data.hasOwnProperty("room_id")) {
-                    if (response.data.room_id != room_id) {
-                        $location.url("room/" + response.data.room_id);
-                        return;
-                     }
+                    final_room_id = response.data.room_id;
                 }
 
-                $location.url("room/" + room_id);
+                // TODO: factor out the common housekeeping whenever we try to join a room or alias
+                matrixService.roomState(final_room_id).then(
+                    function(response) {
+                        eventHandlerService.handleEvents(response.data, false, true);
+                    },
+                    function(error) {
+                        $scope.feedback = "Failed to get room state for: " + final_room_id;
+                    }
+                );                                        
+
+                $location.url("room/" + final_room_id);
             },
             function(error) {
                 $scope.feedback = "Can't join room: " + JSON.stringify(error.data);
@@ -104,6 +114,15 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
     $scope.joinAlias = function(room_alias) {
         matrixService.joinAlias(room_alias).then(
             function(response) {
+                // TODO: factor out the common housekeeping whenever we try to join a room or alias
+                matrixService.roomState(response.room_id).then(
+                    function(response) {
+                        eventHandlerService.handleEvents(response.data, false, true);
+                    },
+                    function(error) {
+                        $scope.feedback = "Failed to get room state for: " + response.room_id;
+                    }
+                );                                        
                 // Go to this room
                 $location.url("room/" + room_alias);
             },
@@ -112,6 +131,32 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
             }
         );
     };
+    
+    // FIXME: factor this out between user-controller and home-controller etc.
+    $scope.messageUser = function() {    
+        
+        // FIXME: create a new room every time, for now
+        
+        matrixService.create(null, 'private').then(
+            function(response) { 
+                // This room has been created. Refresh the rooms list
+                var room_id = response.data.room_id;
+                console.log("Created room with id: "+ room_id);
+                
+                matrixService.invite(room_id, $scope.newChat.user).then(
+                    function() {
+                        $scope.feedback = "Invite sent successfully";
+                        $scope.$parent.goToPage("/room/" + room_id);
+                    },
+                    function(reason) {
+                        $scope.feedback = "Failure: " + JSON.stringify(reason);
+                    });
+            },
+            function(error) {
+                $scope.feedback = "Failure: " + JSON.stringify(error.data);
+            });                
+    };
+    
  
     $scope.onInit = function() {
         // Load profile data
