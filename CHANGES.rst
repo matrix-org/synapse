@@ -11,6 +11,7 @@ Homeserver:
  * Add support specifying and retrieving turn server configuration.
 
 Webclient:
+ * Add button to send messages to users from the home page.
  * Add support for using TURN for VoIP calls.
  * Show display name change messages.
  * Fix bug where the client didn't get the state of a newly joined room
@@ -19,6 +20,8 @@ Webclient:
  * Fix bug where holding down the down arrow caused chrome to chew 100% CPU.
  * Fix bug where desktop notifications occasionally used "Undefined" as the
    display name.
+ * Fix more places where we sometimes saw room IDs incorrectly.
+ * Fix bug which caused lag when entering text in the text box.
 
 Changes in synapse 0.3.3 (2014-09-22)
 =====================================
