@@ -34,11 +34,12 @@ coturn Setup
 
  4. Make a config file in /etc/turnserver.conf. You can customise
     a config file from turnserver.conf.default. The relevant
-    lines are::
+    lines, with example values, are::
 
       lt-cred-mech
       use-auth-secret
       static-auth-secret=[your secret key here]
+      realm=turn.myserver.org
 
     See turnserver.conf.default for explanations of the options.
     One way to generate the static-auth-secret is with pwgen::
