@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users(
     name TEXT,
     password_hash TEXT,
     creation_ts INTEGER,
+    admin BOOL DEFAULT 0 NOT NULL,
     UNIQUE(name) ON CONFLICT ROLLBACK
 );
 
@@ -29,3 +30,13 @@ CREATE TABLE IF NOT EXISTS access_tokens(
     FOREIGN KEY(user_id) REFERENCES users(id),
     UNIQUE(token) ON CONFLICT ROLLBACK
 );
+
+CREATE TABLE IF NOT EXISTS user_ips (
+    user TEXT NOT NULL,
+    access_token TEXT NOT NULL,
+    ip TEXT NOT NULL,
+    CONSTRAINT user_ip UNIQUE (user, access_token, ip) ON CONFLICT IGNORE
+);
+
+CREATE INDEX IF NOT EXISTS user_ips_user ON user_ips(user);
+

@@ -206,6 +206,7 @@ class Auth(object):
 
         defer.returnValue(True)
 
+    @defer.inlineCallbacks
     def get_user_by_req(self, request):
         """ Get a registered user's ID.
 
@@ -218,7 +219,14 @@ class Auth(object):
         """
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
-            return self.get_user_by_token(request.args["access_token"][0])
+            access_token = request.args["access_token"][0]
+            user = yield self.get_user_by_token(access_token)
+
+            ip_addr = self.hs.get_ip_from_request(request)
+            if user and access_token and ip_addr:
+                self.store.insert_client_ip(user, access_token, ip_addr)
+
+            defer.returnValue(user)
         except KeyError:
             raise AuthError(403, "Missing access token.")
 

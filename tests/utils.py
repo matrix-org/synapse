@@ -264,6 +264,9 @@ class MemoryDataStore(object):
     def get_ops_levels(self, room_id):
         return defer.succeed((5, 5, 5))
 
+    def insert_client_ip(self, user, access_token, ip_addr):
+        return defer.succeed(None)
+
 
 def _format_call(args, kwargs):
     return ", ".join(

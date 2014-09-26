@@ -51,10 +51,12 @@ class PresenceStateTestCase(unittest.TestCase):
             datastore=Mock(spec=[
                 "get_presence_state",
                 "set_presence_state",
+                "insert_client_ip",
             ]),
             http_client=None,
             resource_for_client=self.mock_resource,
             resource_for_federation=self.mock_resource,
+            config=Mock(),
         )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -131,10 +133,12 @@ class PresenceListTestCase(unittest.TestCase):
                 "set_presence_list_accepted",
                 "del_presence_list",
                 "get_presence_list",
+                "insert_client_ip",
             ]),
             http_client=None,
             resource_for_client=self.mock_resource,
-            resource_for_federation=self.mock_resource
+            resource_for_federation=self.mock_resource,
+            config=Mock(),
         )
         hs.handlers = JustPresenceHandlers(hs)
 
