@@ -69,7 +69,11 @@ class RoomPermissionsTestCase(RestTestCase):
         hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
-            return hs.parse_userid(self.auth_user_id)
+            return {
+                "user": hs.parse_userid(self.auth_user_id),
+                "admin": False,
+                "device_id": None,
+            }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
         self.auth_user_id = self.rmcreator_id
@@ -425,7 +429,11 @@ class RoomsMemberListTestCase(RestTestCase):
         self.auth_user_id = self.user_id
 
         def _get_user_by_token(token=None):
-            return hs.parse_userid(self.auth_user_id)
+            return {
+                "user": hs.parse_userid(self.auth_user_id),
+                "admin": False,
+                "device_id": None,
+            }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
@@ -508,7 +516,11 @@ class RoomsCreateTestCase(RestTestCase):
         hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
-            return hs.parse_userid(self.auth_user_id)
+            return {
+                "user": hs.parse_userid(self.auth_user_id),
+                "admin": False,
+                "device_id": None,
+            }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
@@ -605,7 +617,11 @@ class RoomTopicTestCase(RestTestCase):
         hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
-            return hs.parse_userid(self.auth_user_id)
+            return {
+                "user": hs.parse_userid(self.auth_user_id),
+                "admin": False,
+                "device_id": None,
+            }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
@@ -715,7 +731,16 @@ class RoomMemberStateTestCase(RestTestCase):
         hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
-            return hs.parse_userid(self.auth_user_id)
+            return {
+                "user": hs.parse_userid(self.auth_user_id),
+                "admin": False,
+                "device_id": None,
+            }
+            return {
+                "user": hs.parse_userid(self.auth_user_id),
+                "admin": False,
+                "device_id": None,
+            }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
@@ -847,7 +872,11 @@ class RoomMessagesTestCase(RestTestCase):
         hs.get_handlers().federation_handler = Mock()
 
         def _get_user_by_token(token=None):
-            return hs.parse_userid(self.auth_user_id)
+            return {
+                "user": hs.parse_userid(self.auth_user_id),
+                "admin": False,
+                "device_id": None,
+            }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)

@@ -88,27 +88,40 @@ class RegistrationStore(SQLBaseStore):
             query, user_id
         )
 
-    @defer.inlineCallbacks
     def get_user_by_token(self, token):
         """Get a user from the given access token.
 
         Args:
             token (str): The access token of a user.
         Returns:
-            str: The user ID of the user.
+            dict: Including the name (user_id), device_id and whether they are
+                an admin.
         Raises:
             StoreError if no user was found.
         """
-        user_id = yield self.runInteraction(self._query_for_auth,
-                                                     token)
-        defer.returnValue(user_id)
+        return self.runInteraction(
+            self._query_for_auth,
+            token
+        )
+
+    def is_server_admin(self, user):
+        return self._simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user.to_string()},
+            retcol="admin",
+        )
 
     def _query_for_auth(self, txn, token):
-        txn.execute("SELECT users.name FROM access_tokens LEFT JOIN users" +
-                    " ON users.id = access_tokens.user_id WHERE token = ?",
-                    [token])
-        row = txn.fetchone()
-        if row:
-            return row[0]
+        sql = (
+            "SELECT users.name, users.admin, access_tokens.device_id "
+            "FROM users "
+            "INNER JOIN access_tokens on users.id = access_tokens.user_id "
+            "WHERE token = ?"
+        )
+
+        cursor = txn.execute(sql, (token,))
+        rows = self.cursor_to_dict(cursor)
+        if rows:
+            return rows[0]
 
         raise StoreError(404, "Token not found.")
