@@ -246,7 +246,7 @@ class Auth(object):
         """ Get a registered user's ID.
 
         Args:
-            token (str)- The access token to get the user by.
+            token (str): The access token to get the user by.
         Returns:
             dict : dict that includes the user, device_id, and whether the
                 user is a server admin.

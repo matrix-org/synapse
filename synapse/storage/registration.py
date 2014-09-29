@@ -94,7 +94,8 @@ class RegistrationStore(SQLBaseStore):
         Args:
             token (str): The access token of a user.
         Returns:
-            str: The user ID of the user.
+            dict: Including the name (user_id), device_id and whether they are
+                an admin.
         Raises:
             StoreError if no user was found.
         """
