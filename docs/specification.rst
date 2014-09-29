@@ -78,9 +78,10 @@ The functionality that Matrix provides includes:
   + Mapping of 3PIDs to Matrix IDs
 
 The end goal of Matrix is to be a ubiquitous messaging layer for synchronising
-arbitrary data between sets of people, devices and services - be that for instant
-messages, VoIP call setups, or any other objects that need to be reliably and
-persistently pushed from A to B in an interoperable and federated manner.
+arbitrary data between sets of people, devices and services - be that for
+instant messages, VoIP call setups, or any other objects that need to be
+reliably and persistently pushed from A to B in an interoperable and federated
+manner.
 
 
 Architecture
@@ -1120,8 +1121,8 @@ There are several APIs provided to ``GET`` events for a room:
     
 |/rooms/<room_id>/initialSync|_
   Description:
-    Get all relevant events for a room. This includes state events, paginated non-state
-    events and presence events.
+    Get all relevant events for a room. This includes state events, paginated
+    non-state events and presence events.
   Response format:
     `` { TODO } ``
   Example:
@@ -1129,20 +1130,22 @@ There are several APIs provided to ``GET`` events for a room:
 
 Redactions
 ----------
-Since events are extensible it is possible for malicious users and/or servers to add
-keys that are, for example offensive or illegal. Since some events cannot be simply
-deleted, e.g. membership events, we instead 'redact' events. This involves removing
-all keys from an event that are not required by the protocol. This stripped down
-event is thereafter returned anytime a client or remote server requests it.
+Since events are extensible it is possible for malicious users and/or servers
+to add keys that are, for example offensive or illegal. Since some events
+cannot be simply deleted, e.g. membership events, we instead 'redact' events.
+This involves removing all keys from an event that are not required by the
+protocol. This stripped down event is thereafter returned anytime a client or
+remote server requests it.
 
-Events that have been redacted include a ``redacted_because`` key whose value is the
-event that caused it to be redacted, which may include a reason.
+Events that have been redacted include a ``redacted_because`` key whose value
+is the event that caused it to be redacted, which may include a reason.
 
-Redacting an event cannot be undone, allowing server owners to delete the offending
-content from the databases.
+Redacting an event cannot be undone, allowing server owners to delete the
+offending content from the databases.
 
-Currently, only room admins can redact events by sending a ``m.room.redacted`` event,
-but server admins also need to be able to redact events by a similar mechanism.
+Currently, only room admins can redact events by sending a ``m.room.redacted``
+event, but server admins also need to be able to redact events by a similar
+mechanism.
 
 
 Room Events
@@ -1346,13 +1349,15 @@ prefixed with ``m.``
   JSON format:
     ``{ "reason": "string" }``
   Description:
-    Events can be redacted by either room or server admins. Redacting an event means that
-    all keys not required by the protocol are stripped off, allowing admins to remove
-    offensive or illegal content that may have been attached to any event. This cannot be
-    undone, allowing server owners to physically delete the offending data.
-    There is also a concept of a moderator hiding a non-state event, which can be undone,
-    but cannot be applied to state events.
-    The event that has been redacted is specified in the ``redacts`` event level key.
+    Events can be redacted by either room or server admins. Redacting an event
+    means that all keys not required by the protocol are stripped off, allowing
+    admins to remove offensive or illegal content that may have been attached
+    to any event. This cannot be undone, allowing server owners to physically
+    delete the offending data.  There is also a concept of a moderator hiding a
+    non-state event, which can be undone, but cannot be applied to state
+    events.
+    The event that has been redacted is specified in the ``redacts`` event
+    level key.
 
 m.room.message msgtypes
 -----------------------
@@ -1731,8 +1736,8 @@ There are three main kinds of communication that occur between home servers:
    These are single request/response interactions between a given pair of
    servers, initiated by one side sending an HTTPS GET request to obtain some
    information, and responded by the other. They are not persisted and contain
-   no long-term significant history. They simply request a snapshot state at the
-   instant the query is made.
+   no long-term significant history. They simply request a snapshot state at
+   the instant the query is made.
 
 :Ephemeral Data Units (EDUs):
    These are notifications of events that are pushed from one home server to
