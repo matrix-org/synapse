@@ -778,6 +778,23 @@ There are several APIs provided to ``GET`` events for a room:
   Example:
     TODO
 
+Redactions
+----------
+Since events are extensible it is possible for malicious users and/or servers to add
+keys that are, for example offensive or illegal. Since some events cannot be simply
+deleted, e.g. membership events, we instead 'redact' events. This involves removing
+all keys from an event that are not required by the protocol. This stripped down
+event is thereafter returned anytime a client or remote server requests it.
+
+Events that have been redacted include a ``redacted_because`` key whose value is the
+event that caused it to be redacted, which may include a reason.
+
+Redacting an event cannot be undone, allowing server owners to delete the offending
+content from the databases.
+
+Currently, only room admins can redact events by sending a ``m.room.redacted`` event,
+but server admins also need to be able to redact events by a similar mechanism.
+
 
 Room Events
 ===========
