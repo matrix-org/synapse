@@ -376,7 +376,7 @@ their home server. This is achieved via the |initialSync|_ API. This API also
 returns an ``end`` token which can be used with the event stream.
 
 
-Registration and login
+Registration and Login
 ======================
 
 Clients must register with a home server in order to use Matrix. After
@@ -391,27 +391,29 @@ home servers should authorise their users who want to login to their existing
 accounts, but instead defines the standard interface which implementations
 should follow so that ANY client can login to ANY home server. Clients login
 using the |login|_ API. Clients register using the |register|_ API.
-Registration follows the same procedure as login, but the path requests are
-sent to are different.
+Registration follows the same general procedure as login, but the path requests
+are sent to and the details contained in them are different.
 
-The registration/login process breaks down into the following:
-  1. Determine the requirements for logging in.
-  2. Submit the login stage credentials.
-  3. Get credentials or be told the next stage in the login process and repeat 
-     step 2.
-     
-As each home server may have different ways of logging in, the client needs to
-know how they should login. All distinct login stages MUST have a corresponding
-``type``.  A ``type`` is a namespaced string which details the mechanism for
-logging in.
+In both registration and login cases, the process takes the form of one or more
+stages, where at each stage the client submits a set of data for a given stage
+type and awaits a response from the server, which will either be a final
+success or a request to perform an additional stage. This exchange continues
+until the final success.
+
+In order to determine up-front what the server's requirements are, the client
+can request from the server a complete description of all of its acceptable
+flows of the registration or login process. It can then inspect the list of
+returned flows looking for one for which it believes it can complete all of the
+required stages, and perform it. As each home server may have different ways of
+logging in, the client needs to know how they should login. All distinct login
+stages MUST have a corresponding ``type``. A ``type`` is a namespaced string
+which details the mechanism for logging in.
 
 A client may be able to login via multiple valid login flows, and should choose
 a single flow when logging in. A flow is a series of login stages. The home
-server MUST respond with all the valid login flows when requested::
+server MUST respond with all the valid login flows when requested by a simple
+``GET`` request directly to the ``/login`` or ``/register`` paths::
 
-  The client can login via 3 paths: 1a and 1b, 2a and 2b, or 3. The client should
-  select one of these paths.
-  
   {
     "flows": [
       {
@@ -428,8 +430,12 @@ server MUST respond with all the valid login flows when requested::
     ]
   }
 
-After the login is completed, the client's fully-qualified user ID and a new
-access token MUST be returned::
+The client can now select which flow it wishes to use, and begin making
+``POST`` requests to the ``/login`` or ``/register`` paths with JSON body
+content containing the name of the stage as the ``type`` key, along with
+whatever additional parameters are required for that login or registration type
+(see below). After the flow is completed, the client's fully-qualified user
+ID and a new access token MUST be returned::
 
   {
     "user_id": "@user:matrix.org",
@@ -440,9 +446,10 @@ The ``user_id`` key is particularly useful if the home server wishes to support
 localpart entry of usernames (e.g. "user" rather than "@user:matrix.org"), as
 the client may not be able to determine its ``user_id`` in this case.
 
-If a login has multiple requests, the home server may wish to create a session.
-If a home server responds with a 'session' key to a request, clients MUST
-submit it in subsequent requests until the login is completed::
+If the flow has multiple stages to it, the home server may wish to create a
+session to store context between requests. If a home server responds with a
+``session`` key to a request, clients MUST submit it in subsequent requests
+until the flow is completed::
 
   {
     "session": "<session id>"
