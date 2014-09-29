@@ -3,7 +3,9 @@ CREATE TABLE IF NOT EXISTS user_ips (
     user TEXT NOT NULL,
     access_token TEXT NOT NULL,
     ip TEXT NOT NULL,
-    CONSTRAINT user_ip UNIQUE (user, access_token, ip) ON CONFLICT IGNORE
+    user_agent TEXT NOT NULL,
+    last_used INTEGER NOT NULL,
+    CONSTRAINT user_ip UNIQUE (user, access_token, ip, user_agent) ON CONFLICT REPLACE
 );
 
 CREATE INDEX IF NOT EXISTS user_ips_user ON user_ips(user);

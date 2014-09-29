@@ -223,8 +223,17 @@ class Auth(object):
             user = yield self.get_user_by_token(access_token)
 
             ip_addr = self.hs.get_ip_from_request(request)
+            user_agent = request.requestHeaders.getRawHeaders(
+                "User-Agent",
+                default=[""]
+            )[0]
             if user and access_token and ip_addr:
-                self.store.insert_client_ip(user, access_token, ip_addr)
+                self.store.insert_client_ip(
+                    user,
+                    access_token,
+                    ip_addr,
+                    user_agent
+                )
 
             defer.returnValue(user)
         except KeyError:

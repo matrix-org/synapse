@@ -294,13 +294,15 @@ class DataStore(RoomMemberStore, RoomStore,
 
         defer.returnValue(self.min_token)
 
-    def insert_client_ip(self, user, access_token, ip):
+    def insert_client_ip(self, user, access_token, ip, user_agent):
         return self._simple_insert(
             "user_ips",
             {
                 "user": user.to_string(),
                 "access_token": access_token,
-                "ip": ip
+                "ip": ip,
+                "user_agent": user_agent,
+                "last_used": int(self._clock.time()),
             }
         )
 
