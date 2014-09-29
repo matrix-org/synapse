@@ -38,7 +38,7 @@ class WhoisRestServlet(RestServlet):
         if not target_user.is_mine:
             raise SynapseError(400, "Can only whois a local user")
 
-        ret = yield self.handlers.admin_handler.get_whois(auth_user)
+        ret = yield self.handlers.admin_handler.get_whois(target_user)
 
         defer.returnValue((200, ret))
 
