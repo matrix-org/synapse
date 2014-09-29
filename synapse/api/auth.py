@@ -220,7 +220,8 @@ class Auth(object):
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
             access_token = request.args["access_token"][0]
-            user = yield self.get_user_by_token(access_token)
+            user_info = yield self.get_user_by_token(access_token)
+            user = user_info["user"]
 
             ip_addr = self.hs.get_ip_from_request(request)
             user_agent = request.requestHeaders.getRawHeaders(
@@ -229,10 +230,11 @@ class Auth(object):
             )[0]
             if user and access_token and ip_addr:
                 self.store.insert_client_ip(
-                    user,
-                    access_token,
-                    ip_addr,
-                    user_agent
+                    user=user,
+                    access_token=access_token,
+                    device_id=user_info["device_id"],
+                    ip=ip_addr,
+                    user_agent=user_agent
                 )
 
             defer.returnValue(user)
@@ -246,15 +248,23 @@ class Auth(object):
         Args:
             token (str)- The access token to get the user by.
         Returns:
-            UserID : User ID object of the user who has that access token.
+            dict : dict that includes the user, device_id, and whether the
+                user is a server admin.
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            user_id = yield self.store.get_user_by_token(token=token)
-            if not user_id:
+            ret = yield self.store.get_user_by_token(token=token)
+            if not ret:
                 raise StoreError()
-            defer.returnValue(self.hs.parse_userid(user_id))
+
+            user_info = {
+                "admin": bool(ret.get("admin", False)),
+                "device_id": ret.get("device_id"),
+                "user": self.hs.parse_userid(ret.get("name")),
+            }
+
+            defer.returnValue(user_info)
         except StoreError:
             raise AuthError(403, "Unrecognised access token.",
                             errcode=Codes.UNKNOWN_TOKEN)

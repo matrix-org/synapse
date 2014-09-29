@@ -294,16 +294,52 @@ class DataStore(RoomMemberStore, RoomStore,
 
         defer.returnValue(self.min_token)
 
-    def insert_client_ip(self, user, access_token, ip, user_agent):
+    def insert_client_ip(self, user, access_token, device_id, ip, user_agent):
         return self._simple_insert(
             "user_ips",
             {
                 "user": user.to_string(),
                 "access_token": access_token,
+                "device_id": device_id,
                 "ip": ip,
                 "user_agent": user_agent,
-                "last_used": int(self._clock.time()),
+                "last_seen": int(self._clock.time_msec()),
             }
+        )
+
+    def get_user_ip_and_agents(self, user):
+        return self._simple_select_list(
+            table="user_ips",
+            keyvalues={"user": user.to_string()},
+            retcols=[
+                "device_id", "access_token", "ip", "user_agent", "last_seen"
+            ],
+        )
+
+        d = {}
+        for r in res:
+            device = d.setdefault(r["device_id"], {})
+            session = device.setdefault(r["access_token"], [])
+            session.append({
+                "ip": r["ip"],
+                "user_agent": r["user_agent"],
+                "last_seen": r["last_seen"],
+            })
+
+        defer.returnValue(
+            [
+                {
+                    "device_id": k,
+                    "sessions": [
+                        {
+                            "access_token": x,
+                            "connections": y,
+                        }
+                        for x, y in v.items()
+                    ]
+                }
+                for k, v in d.items()
+            ]
         )
 
     def snapshot_room(self, room_id, user_id, state_type=None, state_key=None):
