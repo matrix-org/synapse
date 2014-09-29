@@ -195,13 +195,7 @@ class RegisterRestServlet(RestServlet):
             raise SynapseError(400, "Captcha response is required",
                                errcode=Codes.CAPTCHA_NEEDED)
 
-        # May be an X-Forwarding-For header depending on config
-        ip_addr = request.getClientIP()
-        if self.hs.config.captcha_ip_origin_is_x_forwarded:
-            # use the header
-            if request.requestHeaders.hasHeader("X-Forwarded-For"):
-                ip_addr = request.requestHeaders.getRawHeaders(
-                    "X-Forwarded-For")[0]
+        ip_addr = self.hs.get_ip_from_request(request)
 
         handler = self.handlers.registration_handler
         yield handler.check_recaptcha(

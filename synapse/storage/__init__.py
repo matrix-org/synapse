@@ -63,7 +63,7 @@ SCHEMAS = [
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class _RollbackButIsFineException(Exception):
@@ -293,6 +293,28 @@ class DataStore(RoomMemberStore, RoomStore,
         logger.debug("min_token is: %s", self.min_token)
 
         defer.returnValue(self.min_token)
+
+    def insert_client_ip(self, user, access_token, device_id, ip, user_agent):
+        return self._simple_insert(
+            "user_ips",
+            {
+                "user": user.to_string(),
+                "access_token": access_token,
+                "device_id": device_id,
+                "ip": ip,
+                "user_agent": user_agent,
+                "last_seen": int(self._clock.time_msec()),
+            }
+        )
+
+    def get_user_ip_and_agents(self, user):
+        return self._simple_select_list(
+            table="user_ips",
+            keyvalues={"user": user.to_string()},
+            retcols=[
+                "device_id", "access_token", "ip", "user_agent", "last_seen"
+            ],
+        )
 
     def snapshot_room(self, room_id, user_id, state_type=None, state_key=None):
         """Snapshot the room for an update by a user
