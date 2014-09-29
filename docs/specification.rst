@@ -86,8 +86,8 @@ persistently pushed from A to B in an interoperable and federated manner.
 Architecture
 ============
 
-Clients transmit data to other clients through home servers (HSes). Clients do not communicate with each
-other directly.
+Clients transmit data to other clients through home servers (HSes). Clients do
+not communicate with each other directly.
 
 ::
 
@@ -104,45 +104,51 @@ other directly.
        |                  |<--------( HTTP )-----------|                  |
        +------------------+        Federation          +------------------+
 
-A "Client" typically represents a human using a web application or mobile app. Clients use the
-"Client-to-Server" (C-S) API to communicate with their home server, which stores their profile data and
-their record of the conversations in which they participate. Each client is associated with a user account
-(and may optionally support multiple user accounts). A user account is represented by a unique "User ID". This
-ID is namespaced to the home server which allocated the account and looks like::
+A "Client" typically represents a human using a web application or mobile app.
+Clients use the "Client-to-Server" (C-S) API to communicate with their home
+server, which stores their profile data and their record of the conversations
+in which they participate. Each client is associated with a user account (and
+may optionally support multiple user accounts). A user account is represented
+by a unique "User ID". This ID is namespaced to the home server which allocated
+the account and looks like::
 
   @localpart:domain
 
-The ``localpart`` of a user ID may be a user name, or an opaque ID identifying this user. They are
-case-insensitive.
+The ``localpart`` of a user ID may be a user name, or an opaque ID identifying
+this user. They are case-insensitive.
 
 .. TODO
     - Need to specify precise grammar for Matrix IDs
 
-A "Home Server" is a server which provides C-S APIs and has the ability to federate with other HSes.
-It is typically responsible for multiple clients. "Federation" is the term used to describe the
-sharing of data between two or more home servers.
+A "Home Server" is a server which provides C-S APIs and has the ability to
+federate with other HSes.  It is typically responsible for multiple clients.
+"Federation" is the term used to describe the sharing of data between two or
+more home servers.
 
-Data in Matrix is encapsulated in an "event". An event is an action within the system. Typically each
-action (e.g. sending a message) correlates with exactly one event. Each event has a ``type`` which is used
-to differentiate different kinds of data. ``type`` values MUST be uniquely globally namespaced following
-Java's `package naming conventions <http://docs.oracle.com/javase/specs/jls/se5.0/html/packages.html#7.7>`,
-e.g. ``com.example.myapp.event``. The special top-level namespace ``m.`` is reserved for events defined
-in the Matrix specification. Events are usually sent in the context of a "Room".
+Data in Matrix is encapsulated in an "event". An event is an action within the
+system. Typically each action (e.g. sending a message) correlates with exactly
+one event. Each event has a ``type`` which is used to differentiate different
+kinds of data. ``type`` values MUST be uniquely globally namespaced following
+Java's `package naming conventions
+<http://docs.oracle.com/javase/specs/jls/se5.0/html/packages.html#7.7>`, e.g.
+``com.example.myapp.event``. The special top-level namespace ``m.`` is reserved
+for events defined in the Matrix specification. Events are usually sent in the
+context of a "Room".
 
 Room structure
 --------------
 
-A room is a conceptual place where users can send and receive events. Rooms 
-can be created, joined and left. Events are sent to a room, and all 
-participants in that room with sufficient access will receive the event. Rooms are uniquely 
+A room is a conceptual place where users can send and receive events. Rooms can
+be created, joined and left. Events are sent to a room, and all participants in
+that room with sufficient access will receive the event. Rooms are uniquely
 identified internally via a "Room ID", which look like::
 
   !opaque_id:domain
 
 There is exactly one room ID for each room. Whilst the room ID does contain a
-domain, it is simply for globally namespacing room IDs. The room does NOT reside on the
-domain specified. Room IDs are not meant to be human readable. They ARE
-case-sensitive.
+domain, it is simply for globally namespacing room IDs. The room does NOT
+reside on the domain specified. Room IDs are not meant to be human readable.
+They ARE case-sensitive.
 
 The following diagram shows an ``m.room.message`` event being sent in the room 
 ``!qporfwt:matrix.org``::
@@ -168,12 +174,13 @@ The following diagram shows an ``m.room.message`` event being sent in the room
                        |  - @bob:domain.com              |
                        |.................................|
 
-Federation maintains shared state between multiple home servers, such that when an event is
-sent to a room, the home server knows where to forward the event on to, and how to process
-the event. Home servers do not need to have completely shared state in order to participate 
-in a room. State is scoped to a single room, and federation ensures that all home servers 
-have the information they need, even if that means the home server has to request more 
-information from another home server before processing the event.
+Federation maintains shared state between multiple home servers, such that when
+an event is sent to a room, the home server knows where to forward the event on
+to, and how to process the event. Home servers do not need to have completely
+shared state in order to participate in a room. State is scoped to a single
+room, and federation ensures that all home servers have the information they
+need, even if that means the home server has to request more information from
+another home server before processing the event.
 
 Room Aliases
 ------------
@@ -185,12 +192,13 @@ Each room can also have multiple "Room Aliases", which looks like::
   .. TODO
       - Need to specify precise grammar for Room IDs
 
-A room alias "points" to a room ID and is the human-readable label by which rooms are
-publicised and discovered.  The room ID the alias is pointing to can be obtained
-by visiting the domain specified. They are case-insensitive. Note that the mapping 
-from a room alias to a room ID is not fixed, and may change over time to point to a 
-different room ID. For this reason, Clients SHOULD resolve the room alias to a room ID 
-once and then use that ID on subsequent requests.
+A room alias "points" to a room ID and is the human-readable label by which
+rooms are publicised and discovered.  The room ID the alias is pointing to can
+be obtained by visiting the domain specified. They are case-insensitive. Note
+that the mapping from a room alias to a room ID is not fixed, and may change
+over time to point to a different room ID. For this reason, Clients SHOULD
+resolve the room alias to a room ID once and then use that ID on subsequent
+requests.
 
 ::
 
@@ -213,50 +221,53 @@ once and then use that ID on subsequent requests.
 Identity
 --------
 
-Users in Matrix are identified via their user ID. However, existing ID namespaces can also
-be used in order to identify Matrix users. A Matrix "Identity" describes both the user ID
-and any other existing IDs from third party namespaces *linked* to their account.
+Users in Matrix are identified via their user ID. However, existing ID
+namespaces can also be used in order to identify Matrix users. A Matrix
+"Identity" describes both the user ID and any other existing IDs from third
+party namespaces *linked* to their account.
 
 Matrix users can *link* third-party IDs (3PIDs) such as email addresses, social
-network accounts and phone numbers to their 
-user ID. Linking 3PIDs creates a mapping from a 3PID to a user ID. This mapping
-can then be used by other Matrix users in order to discover other users, according
-to a strict set of privacy permissions.
+network accounts and phone numbers to their user ID. Linking 3PIDs creates a
+mapping from a 3PID to a user ID. This mapping can then be used by other Matrix
+users in order to discover other users, according to a strict set of privacy
+permissions.
 
-In order to ensure that the mapping from 3PID to user ID is genuine, a globally federated
-cluster of trusted "Identity Servers" (IS) are used to perform authentication of the 3PID.
-Identity servers are also used to preserve the mapping indefinitely, by replicating the
-mappings across multiple ISes.
+In order to ensure that the mapping from 3PID to user ID is genuine, a globally
+federated cluster of trusted "Identity Servers" (IS) are used to perform
+authentication of the 3PID.  Identity servers are also used to preserve the
+mapping indefinitely, by replicating the mappings across multiple ISes.
 
-Usage of an IS is not required in order for a client application to be part of 
-the Matrix ecosystem. However, by not using an IS, discovery of users is greatly
-impacted.
+Usage of an IS is not required in order for a client application to be part of
+the Matrix ecosystem. However, by not using an IS, discovery of users is
+greatly impacted.
 
 API Standards
 -------------
 
-The mandatory baseline for communication in Matrix is exchanging JSON objects over RESTful
-HTTP APIs. HTTPS is mandated as the baseline for server-server (federation) communication.
-HTTPS is recommended for client-server communication, although HTTP may be supported as a
-fallback to support basic HTTP clients. More efficient optional transports for
-client-server communication will in future be supported as optional extensions - e.g. a
+The mandatory baseline for communication in Matrix is exchanging JSON objects
+over RESTful HTTP APIs. HTTPS is mandated as the baseline for server-server
+(federation) communication.  HTTPS is recommended for client-server
+communication, although HTTP may be supported as a fallback to support basic
+HTTP clients. More efficient optional transports for client-server
+communication will in future be supported as optional extensions - e.g. a
 packed binary encoding over stream-cipher encrypted TCP socket for
 low-bandwidth/low-roundtrip mobile usage.
 
 .. TODO
   We need to specify capability negotiation for extensible transports
 
-For the default HTTP transport, all API calls use a Content-Type of ``application/json``.
-In addition, all strings MUST be encoded as UTF-8.
+For the default HTTP transport, all API calls use a Content-Type of
+``application/json``.  In addition, all strings MUST be encoded as UTF-8.
 
-Clients are authenticated using opaque ``access_token`` strings (see `Registration and
-Login`_ for details), passed as a querystring parameter on all requests.
+Clients are authenticated using opaque ``access_token`` strings (see
+`Registration and Login`_ for details), passed as a querystring parameter on
+all requests.
 
 .. TODO
   Need to specify any HMAC or access_token lifetime/ratcheting tricks
 
-Any errors which occur on the Matrix API level 
-MUST return a "standard error response". This is a JSON object which looks like::
+Any errors which occur on the Matrix API level MUST return a "standard error
+response". This is a JSON object which looks like::
 
   {
     "errcode": "<error code>",
@@ -264,12 +275,13 @@ MUST return a "standard error response". This is a JSON object which looks like:
   }
 
 The ``error`` string will be a human-readable error message, usually a sentence
-explaining what went wrong. The ``errcode`` string will be a unique string which can be 
-used to handle an error message e.g. ``M_FORBIDDEN``. These error codes should have their 
-namespace first in ALL CAPS, followed by a single _. For example, if there was a custom
-namespace ``com.mydomain.here``, and a ``FORBIDDEN`` code, the error code should look
-like ``COM.MYDOMAIN.HERE_FORBIDDEN``. There may be additional keys depending on 
-the error, but the keys ``error`` and ``errcode`` MUST always be present. 
+explaining what went wrong. The ``errcode`` string will be a unique string
+which can be used to handle an error message e.g. ``M_FORBIDDEN``. These error
+codes should have their namespace first in ALL CAPS, followed by a single _.
+For example, if there was a custom namespace ``com.mydomain.here``, and a
+``FORBIDDEN`` code, the error code should look like
+``COM.MYDOMAIN.HERE_FORBIDDEN``. There may be additional keys depending on the
+error, but the keys ``error`` and ``errcode`` MUST always be present. 
 
 Some standard error codes are below:
 
@@ -307,15 +319,17 @@ Some requests have unique error codes:
 :``M_LOGIN_EMAIL_URL_NOT_YET``:
   Encountered when polling for an email link which has not been clicked yet.
 
-The C-S API typically uses ``HTTP POST`` to submit requests. This means these requests are
-not idempotent. The C-S API also allows ``HTTP PUT`` to make requests idempotent. In order
-to use a ``PUT``, paths should be suffixed with ``/{txnId}``. ``{txnId}`` is a
-unique client-generated transaction ID which identifies the request, and is scoped to a given
-Client (identified by that client's ``access_token``). Crucially, it **only** serves to
-identify new requests from retransmits. After the request has finished, the ``{txnId}``
-value should be changed (how is not specified; a monotonically increasing integer is
-recommended). It is preferable to use ``HTTP PUT`` to make sure requests to send messages
-do not get sent more than once should clients need to retransmit requests.
+The C-S API typically uses ``HTTP POST`` to submit requests. This means these
+requests are not idempotent. The C-S API also allows ``HTTP PUT`` to make
+requests idempotent. In order to use a ``PUT``, paths should be suffixed with
+``/{txnId}``. ``{txnId}`` is a unique client-generated transaction ID which
+identifies the request, and is scoped to a given Client (identified by that
+client's ``access_token``). Crucially, it **only** serves to identify new
+requests from retransmits. After the request has finished, the ``{txnId}``
+value should be changed (how is not specified; a monotonically increasing
+integer is recommended). It is preferable to use ``HTTP PUT`` to make sure
+requests to send messages do not get sent more than once should clients need to
+retransmit requests.
 
 Valid requests look like::
 
@@ -344,12 +358,12 @@ In contrast, these are invalid requests::
 Receiving live updates on a client
 ----------------------------------
 
-Clients can receive new events by long-polling the home server. This will hold open the
-HTTP connection for a short period of time waiting for new events, returning early if an
-event occurs. This is called the `Event Stream`_. All events which are visible to the
-client will appear in the event stream. When the request
-returns, an ``end`` token is included in the response. This token can be used in the next
-request to continue where the client left off.
+Clients can receive new events by long-polling the home server. This will hold
+open the HTTP connection for a short period of time waiting for new events,
+returning early if an event occurs. This is called the `Event Stream`_. All
+events which are visible to the client will appear in the event stream. When
+the request returns, an ``end`` token is included in the response. This token
+can be used in the next request to continue where the client left off.
 
 .. TODO
   How do we filter the event stream?
@@ -357,9 +371,9 @@ request to continue where the client left off.
   setup RTT latency if we only do one event per request? Do we ever support streaming
   requests? Why not websockets?
 
-When the client first logs in, they will need to initially synchronise with their home
-server. This is achieved via the |initialSync|_ API. This API also returns an ``end``
-token which can be used with the event stream.
+When the client first logs in, they will need to initially synchronise with
+their home server. This is achieved via the |initialSync|_ API. This API also
+returns an ``end`` token which can be used with the event stream.
 
 Rooms
 =====
@@ -369,8 +383,8 @@ Creation
 .. TODO kegan
   - TODO: Key for invite these users?
   
-To create a room, a client has to use the |createRoom|_ API. There are various options
-which can be set when creating a room:
+To create a room, a client has to use the |createRoom|_ API. There are various
+options which can be set when creating a room:
 
 ``visibility``
   Type: 
@@ -380,9 +394,9 @@ which can be set when creating a room:
   Value:
     Either ``public`` or ``private``.
   Description:
-    A ``public`` visibility indicates that the room will be shown in the public room list. A
-    ``private`` visibility will hide the room from the public room list. Rooms default to
-    ``public`` visibility if this key is not included.
+    A ``public`` visibility indicates that the room will be shown in the public
+    room list. A ``private`` visibility will hide the room from the public room
+    list. Rooms default to ``public`` visibility if this key is not included.
 
 ``room_alias_name``
   Type: 
@@ -392,9 +406,9 @@ which can be set when creating a room:
   Value:
     The room alias localpart.
   Description:
-    If this is included, a room alias will be created and mapped to the newly created room.
-    The alias will belong on the same home server which created the room, e.g.
-    ``!qadnasoi:domain.com >>> #room_alias_name:domain.com``
+    If this is included, a room alias will be created and mapped to the newly
+    created room.  The alias will belong on the same home server which created
+    the room, e.g.  ``!qadnasoi:domain.com >>> #room_alias_name:domain.com``
 
 ``name``
   Type: 
@@ -404,8 +418,9 @@ which can be set when creating a room:
   Value:
     The ``name`` value for the ``m.room.name`` state event.
   Description:
-    If this is included, an ``m.room.name`` event will be sent into the room to indicate the
-    name of the room. See `Room Events`_ for more information on ``m.room.name``.
+    If this is included, an ``m.room.name`` event will be sent into the room to
+    indicate the name of the room. See `Room Events`_ for more information on
+    ``m.room.name``.
 
 ``topic``
   Type: 
@@ -415,8 +430,9 @@ which can be set when creating a room:
   Value:
     The ``topic`` value for the ``m.room.topic`` state event.
   Description:
-    If this is included, an ``m.room.topic`` event will be sent into the room to indicate the
-    topic for the room. See `Room Events`_ for more information on ``m.room.topic``.
+    If this is included, an ``m.room.topic`` event will be sent into the room
+    to indicate the topic for the room. See `Room Events`_ for more information
+    on ``m.room.topic``.
 
 ``invite``
   Type:
@@ -426,7 +442,8 @@ which can be set when creating a room:
   Value:
     A list of user ids to invite.
   Description:
-    This will tell the server to invite everyone in the list to the newly created room.
+    This will tell the server to invite everyone in the list to the newly
+    created room.
 
 Example::
 
@@ -437,20 +454,20 @@ Example::
     "topic": "All about happy hour"
   }
 
-The home server will create a ``m.room.create`` event when the room is
-created, which serves as the root of the PDU graph for this room. This
-event also has a ``creator`` key which contains the user ID of the room
-creator. It will also generate several other events in order to manage
-permissions in this room. This includes:
+The home server will create a ``m.room.create`` event when the room is created,
+which serves as the root of the PDU graph for this room. This event also has a
+``creator`` key which contains the user ID of the room creator. It will also
+generate several other events in order to manage permissions in this room. This
+includes:
 
  - ``m.room.power_levels`` : Sets the power levels of users.
  - ``m.room.join_rules`` : Whether the room is "invite-only" or not.
- - ``m.room.add_state_level``: The power level required in order to
-   add new state to the room (as opposed to updating exisiting state)
- - ``m.room.send_event_level`` : The power level required in order to
-   send a message in this room.
- - ``m.room.ops_level`` : The power level required in order to kick or
-   ban a user from the room.
+ - ``m.room.add_state_level``: The power level required in order to add new
+   state to the room (as opposed to updating exisiting state)
+ - ``m.room.send_event_level`` : The power level required in order to send a
+   message in this room.
+ - ``m.room.ops_level`` : The power level required in order to kick or ban a
+   user from the room.
 
 See `Room Events`_ for more information on these events.
 
@@ -482,11 +499,11 @@ Permissions
 Permissions for rooms are done via the concept of power levels - to do any
 action in a room a user must have a suitable power level. 
 
-Power levels for users are defined in ``m.room.power_levels``, where both
-a default and specific users' power levels can be set. By default all users
-have a power level of 0, other than the room creator whose power level defaults to 100.
-Power levels for users are tracked per-room even if the user is not present in 
-the room.
+Power levels for users are defined in ``m.room.power_levels``, where both a
+default and specific users' power levels can be set. By default all users have
+a power level of 0, other than the room creator whose power level defaults to
+100. Power levels for users are tracked per-room even if the user is not
+present in the room.
 
 State events may contain a ``required_power_level`` key, which indicates the
 minimum power a user must have before they can update that state key. The only
@@ -508,22 +525,24 @@ Joining rooms
 .. TODO kegan
   - TODO: What does the home server have to do to join a user to a room?
 
-Users need to join a room in order to send and receive events in that room. A user can join a
-room by making a request to |/join/<room_alias_or_id>|_ with::
+Users need to join a room in order to send and receive events in that room. A
+user can join a room by making a request to |/join/<room_alias_or_id>|_ with::
 
   {}
 
-Alternatively, a user can make a request to |/rooms/<room_id>/join|_ with the same request content.
-This is only provided for symmetry with the other membership APIs: ``/rooms/<room id>/invite`` and
-``/rooms/<room id>/leave``. If a room alias was specified, it will be automatically resolved to
-a room ID, which will then be joined. The room ID that was joined will be returned in response::
+Alternatively, a user can make a request to |/rooms/<room_id>/join|_ with the
+same request content.  This is only provided for symmetry with the other
+membership APIs: ``/rooms/<room id>/invite`` and ``/rooms/<room id>/leave``. If
+a room alias was specified, it will be automatically resolved to a room ID,
+which will then be joined. The room ID that was joined will be returned in
+response::
 
   {
     "room_id": "!roomid:domain"
   }
 
-The membership state for the joining user can also be modified directly to be ``join``
-by sending the following request to 
+The membership state for the joining user can also be modified directly to be
+``join`` by sending the following request to
 ``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
 
   {
@@ -532,11 +551,12 @@ by sending the following request to
 
 See the `Room events`_ section for more information on ``m.room.member``.
 
-After the user has joined a room, they will receive subsequent events in that room. This room
-will now appear as an entry in the |initialSync|_ API.
+After the user has joined a room, they will receive subsequent events in that
+room. This room will now appear as an entry in the |initialSync|_ API.
 
-Some rooms enforce that a user is *invited* to a room before they can join that room. Other
-rooms will allow anyone to join the room even if they have not received an invite.
+Some rooms enforce that a user is *invited* to a room before they can join that
+room. Other rooms will allow anyone to join the room even if they have not
+received an invite.
 
 Inviting users
 --------------
@@ -546,20 +566,20 @@ Inviting users
   - What does the home server have to do?
   - TODO: In what circumstances will direct member editing NOT be equivalent to ``/invite``?
 
-The purpose of inviting users to a room is to notify them that the room exists 
-so they can choose to become a member of that room. Some rooms require that all 
-users who join a room are previously invited to it (an "invite-only" room). 
-Whether a given room is an "invite-only" room is determined by the room config 
+The purpose of inviting users to a room is to notify them that the room exists
+so they can choose to become a member of that room. Some rooms require that all
+users who join a room are previously invited to it (an "invite-only" room).
+Whether a given room is an "invite-only" room is determined by the room config
 key ``TODO``. It can have one of the following values:
 
  - TODO Room config invite only value explanation
  - TODO Room config free-to-join value explanation
 
-Only users who have a membership state of ``join`` in a room can invite new 
-users to said room. The person being invited must not be in the ``join`` state 
-in the room. The fully-qualified user ID must be specified when inviting a user, 
-as the user may reside on a different home server. To invite a user, send the 
-following request to |/rooms/<room_id>/invite|_, which will manage the 
+Only users who have a membership state of ``join`` in a room can invite new
+users to said room. The person being invited must not be in the ``join`` state
+in the room. The fully-qualified user ID must be specified when inviting a
+user, as the user may reside on a different home server. To invite a user, send
+the following request to |/rooms/<room_id>/invite|_, which will manage the
 entire invitation process::
 
   {
@@ -583,10 +603,11 @@ Leaving rooms
   - TODO: Under what conditions should a room NOT be purged?
 
 
-A user can leave a room to stop receiving events for that room. A user must have
-joined the room before they are eligible to leave the room. If the room is an
-"invite-only" room, they will need to be re-invited before they can re-join the room.
-To leave a room, a request should be made to |/rooms/<room_id>/leave|_ with::
+A user can leave a room to stop receiving events for that room. A user must
+have joined the room before they are eligible to leave the room. If the room is
+an "invite-only" room, they will need to be re-invited before they can re-join
+the room.  To leave a room, a request should be made to
+|/rooms/<room_id>/leave|_ with::
 
   {}
 
@@ -600,33 +621,34 @@ directly by sending the following request to
 
 See the `Room events`_ section for more information on ``m.room.member``.
 
-Once a user has left a room, that room will no longer appear on the |initialSync|_
-API. Be aware that leaving a room is not equivalent to have never been
-in that room. A user who has previously left a room still maintains some residual state in
-that room. Their membership state will be marked as ``leave``. This contrasts with
-a user who has *never been invited or joined to that room* who will not have any
-membership state for that room. 
+Once a user has left a room, that room will no longer appear on the
+|initialSync|_ API. Be aware that leaving a room is not equivalent to have
+never been in that room. A user who has previously left a room still maintains
+some residual state in that room. Their membership state will be marked as
+``leave``. This contrasts with a user who has *never been invited or joined to
+that room* who will not have any membership state for that room. 
 
 If all members in a room leave, that room becomes eligible for deletion. 
 
 Banning users in a room
 -----------------------
-A user may decide to ban another user in a room. 'Banning' forces the target user
-to leave the room and prevents them from re-joining the room. A banned user will
-not be treated as a joined user, and so will not be able to send or receive events
-in the room. In order to ban someone, the user performing the ban MUST have the 
-required power level. To ban a user, a request should be made to 
-|/rooms/<room_id>/ban|_ with::
+A user may decide to ban another user in a room. 'Banning' forces the target
+user to leave the room and prevents them from re-joining the room. A banned
+user will not be treated as a joined user, and so will not be able to send or
+receive events in the room. In order to ban someone, the user performing the
+ban MUST have the required power level. To ban a user, a request should be made
+to |/rooms/<room_id>/ban|_ with::
 
   {
     "user_id": "<user id to ban"
     "reason": "string: <reason for the ban>"
   }
   
-Banning a user adjusts the banned member's membership state to ``ban`` and adjusts
-the power level of this event to a level higher than the banned person. Like 
-with other membership changes, a user can directly adjust the target member's 
-state, by making a request to ``/rooms/<room id>/state/m.room.member/<user id>``::
+Banning a user adjusts the banned member's membership state to ``ban`` and
+adjusts the power level of this event to a level higher than the banned person.
+Like with other membership changes, a user can directly adjust the target
+member's state, by making a request to
+``/rooms/<room id>/state/m.room.member/<user id>``::
 
   {
     "membership": "ban"
@@ -637,31 +659,34 @@ Events in a room
 Room events can be split into two categories:
 
 :State Events:
-  These are events which replace events that came before it, depending on a set of unique keys.
-  These keys are the event ``type`` and a ``state_key``. Events with the same set of keys will
-  be overwritten. Typically, state events are used to store state, hence their name.
+  These are events which replace events that came before it, depending on a set
+  of unique keys.  These keys are the event ``type`` and a ``state_key``.
+  Events with the same set of keys will be overwritten. Typically, state events
+  are used to store state, hence their name.
 
 :Non-state events:
-  These are events which cannot be overwritten after sending. The list of events continues
-  to grow as more events are sent. As this list grows, it becomes necessary to
-  provide a mechanism for navigating this list. Pagination APIs are used to view the list
-  of historical non-state events. Typically, non-state events are used to send messages.
+  These are events which cannot be overwritten after sending. The list of
+  events continues to grow as more events are sent. As this list grows, it
+  becomes necessary to provide a mechanism for navigating this list. Pagination
+  APIs are used to view the list of historical non-state events. Typically,
+  non-state events are used to send messages.
 
-This specification outlines several events, all with the event type prefix ``m.``. However,
-applications may wish to add their own type of event, and this can be achieved using the 
-REST API detailed in the following sections. If new events are added, the event ``type`` 
-key SHOULD follow the Java package naming convention, e.g. ``com.example.myapp.event``. 
-This ensures event types are suitably namespaced for each application and reduces the 
-risk of clashes.
+This specification outlines several events, all with the event type prefix
+``m.``. However, applications may wish to add their own type of event, and this
+can be achieved using the REST API detailed in the following sections. If new
+events are added, the event ``type`` key SHOULD follow the Java package naming
+convention, e.g. ``com.example.myapp.event``.  This ensures event types are
+suitably namespaced for each application and reduces the risk of clashes.
 
 State events
 ------------
-State events can be sent by ``PUT`` ing to |/rooms/<room_id>/state/<event_type>/<state_key>|_.
-These events will be overwritten if ``<room id>``, ``<event type>`` and ``<state key>`` all match.
-If the state event has no ``state_key``, it can be omitted from the path. These requests 
-**cannot use transaction IDs** like other ``PUT`` paths because they cannot be differentiated 
-from the ``state_key``. Furthermore, ``POST`` is unsupported on state paths. Valid requests
-look like::
+State events can be sent by ``PUT`` ing to
+|/rooms/<room_id>/state/<event_type>/<state_key>|_.  These events will be
+overwritten if ``<room id>``, ``<event type>`` and ``<state key>`` all match.
+If the state event has no ``state_key``, it can be omitted from the path. These
+requests **cannot use transaction IDs** like other ``PUT`` paths because they
+cannot be differentiated from the ``state_key``. Furthermore, ``POST`` is
+unsupported on state paths. Valid requests look like::
 
   PUT /rooms/!roomid:domain/state/m.example.event
   { "key" : "without a state key" }
@@ -682,8 +707,8 @@ Care should be taken to avoid setting the wrong ``state key``::
   PUT /rooms/!roomid:domain/state/m.another.example.event/11
   { "key" : "with '11' as the state key, but was probably intended to be a txnId" }
 
-The ``state_key`` is often used to store state about individual users, by using the user ID as the
-``state_key`` value. For example::
+The ``state_key`` is often used to store state about individual users, by using
+the user ID as the ``state_key`` value. For example::
 
   PUT /rooms/!roomid:domain/state/m.favorite.animal.event/%40my_user%3Adomain.com
   { "animal" : "cat", "reason": "fluffy" }
@@ -697,10 +722,11 @@ See `Room Events`_ for the ``m.`` event specification.
 
 Non-state events
 ----------------
-Non-state events can be sent by sending a request to |/rooms/<room_id>/send/<event_type>|_.
-These requests *can* use transaction IDs and ``PUT``/``POST`` methods. Non-state events 
-allow access to historical events and pagination, making it best suited for sending messages.
-For example::
+Non-state events can be sent by sending a request to
+|/rooms/<room_id>/send/<event_type>|_.  These requests *can* use transaction
+IDs and ``PUT``/``POST`` methods. Non-state events allow access to historical
+events and pagination, making it best suited for sending messages.  For
+example::
 
   POST /rooms/!roomid:domain/send/m.custom.example.message
   { "text": "Hello world!" }
@@ -715,16 +741,17 @@ Syncing rooms
 .. NOTE::
   This section is a work in progress.
 
-When a client logs in, they may have a list of rooms which they have already joined. These rooms
-may also have a list of events associated with them. The purpose of 'syncing' is to present the
-current room and event information in a convenient, compact manner. The events returned are not
-limited to room events; presence events will also be returned. There are two APIs provided:
+When a client logs in, they may have a list of rooms which they have already
+joined. These rooms may also have a list of events associated with them. The
+purpose of 'syncing' is to present the current room and event information in a
+convenient, compact manner. The events returned are not limited to room events;
+presence events will also be returned. There are two APIs provided:
 
- - |initialSync|_ : A global sync which will present room and event information for all rooms
-   the user has joined.
+ - |initialSync|_ : A global sync which will present room and event information
+   for all rooms the user has joined.
 
- - |/rooms/<room_id>/initialSync|_ : A sync scoped to a single room. Presents room and event
-   information for this room only.
+ - |/rooms/<room_id>/initialSync|_ : A sync scoped to a single room. Presents
+   room and event information for this room only.
 
 .. TODO kegan
   - TODO: JSON response format for both types
@@ -761,9 +788,9 @@ There are several APIs provided to ``GET`` events for a room:
 
 |/rooms/<room_id>/messages|_
   Description:
-    Get all ``m.room.message`` and ``m.room.member`` events. This API supports pagination
-	using ``from`` and ``to`` query parameters, coupled with the ``start`` and ``end``
-	tokens from an |initialSync|_ API.
+    Get all ``m.room.message`` and ``m.room.member`` events. This API supports
+    pagination using ``from`` and ``to`` query parameters, coupled with the
+    ``start`` and ``end`` tokens from an |initialSync|_ API.
   Response format:
     ``{ "start": "<token>", "end": "<token>" }``
   Example:
@@ -800,11 +827,12 @@ prefixed with ``m.``
   Example:
     ``{ "name" : "My Room" }``
   Description:
-    A room has an opaque room ID which is not human-friendly to read. A room alias is
-    human-friendly, but not all rooms have room aliases. The room name is a human-friendly
-    string designed to be displayed to the end-user. The room name is not *unique*, as
-    multiple rooms can have the same room name set. The room name can also be set when 
-    creating a room using |createRoom|_ with the ``name`` key.
+    A room has an opaque room ID which is not human-friendly to read. A room
+    alias is human-friendly, but not all rooms have room aliases. The room name
+    is a human-friendly string designed to be displayed to the end-user. The
+    room name is not *unique*, as multiple rooms can have the same room name
+    set. The room name can also be set when creating a room using |createRoom|_
+    with the ``name`` key.
 
 ``m.room.topic``
   Summary:
@@ -816,10 +844,11 @@ prefixed with ``m.``
   Example:
     ``{ "topic" : "Welcome to the real world." }``
   Description:
-    A topic is a short message detailing what is currently being discussed in the room. 
-    It can also be used as a way to display extra information about the room, which may
-    not be suitable for the room name. The room topic can also be set when creating a
-    room using |createRoom|_ with the ``topic`` key.
+    A topic is a short message detailing what is currently being discussed in
+    the room.  It can also be used as a way to display extra information about
+    the room, which may not be suitable for the room name. The room topic can
+    also be set when creating a room using |createRoom|_ with the ``topic``
+    key.
 
 ``m.room.member``
   Summary:
@@ -831,12 +860,12 @@ prefixed with ``m.``
   Example:
     ``{ "membership" : "join" }``
   Description:
-    Adjusts the membership state for a user in a room. It is preferable to use the
-    membership APIs (``/rooms/<room id>/invite`` etc) when performing membership actions
-    rather than adjusting the state directly as there are a restricted set of valid
-    transformations. For example, user A cannot force user B to join a room, and trying
-    to force this state change directly will fail. See the `Rooms`_ section for how to 
-    use the membership APIs.
+    Adjusts the membership state for a user in a room. It is preferable to use
+    the membership APIs (``/rooms/<room id>/invite`` etc) when performing
+    membership actions rather than adjusting the state directly as there are a
+    restricted set of valid transformations. For example, user A cannot force
+    user B to join a room, and trying to force this state change directly will
+    fail. See the `Rooms`_ section for how to use the membership APIs.
 
 ``m.room.create``
   Summary:
@@ -923,7 +952,8 @@ prefixed with ``m.``
 
 ``m.room.aliases``
   Summary:
-    These state events are used to inform the room about what room aliases it has.
+    These state events are used to inform the room about what room aliases it
+    has.
   Type:
     State event
   JSON format:
@@ -931,11 +961,10 @@ prefixed with ``m.``
   Example:
     ``{ "aliases": ["#foo:example.com"] }``
   Description:
-    A server `may` inform the room that it has added or removed an alias for 
+    A server `may` inform the room that it has added or removed an alias for
     the room. This is purely for informational purposes and may become stale.
     Clients `should` check that the room alias is still valid before using it.
-    The ``state_key`` of the event is the homeserver which owns the room 
-    alias.
+    The ``state_key`` of the event is the homeserver which owns the room alias.
 
 ``m.room.message``
   Summary:
@@ -947,11 +976,12 @@ prefixed with ``m.``
   Example:
     ``{ "msgtype": "m.text", "body": "Testing" }``
   Description:
-    This event is used when sending messages in a room. Messages are not limited to be text.
-    The ``msgtype`` key outlines the type of message, e.g. text, audio, image, video, etc.
-    Whilst not required, the ``body`` key SHOULD be used with every kind of ``msgtype`` as
-    a fallback mechanism when a client cannot render the message. For more information on 
-    the types of messages which can be sent, see `m.room.message msgtypes`_.
+    This event is used when sending messages in a room. Messages are not
+    limited to be text.  The ``msgtype`` key outlines the type of message, e.g.
+    text, audio, image, video, etc.  Whilst not required, the ``body`` key
+    SHOULD be used with every kind of ``msgtype`` as a fallback mechanism when
+    a client cannot render the message. For more information on the types of
+    messages which can be sent, see `m.room.message msgtypes`_.
 
 ``m.room.message.feedback``
   Summary:
@@ -963,16 +993,17 @@ prefixed with ``m.``
   Example:
     ``{ "type": "delivered", "target_event_id": "e3b2icys" }``
   Description:
-    Feedback events are events sent to acknowledge a message in some way. There are two
-    supported acknowledgements: ``delivered`` (sent when the event has been received) and 
-    ``read`` (sent when the event has been observed by the end-user). The ``target_event_id``
-    should reference the ``m.room.message`` event being acknowledged. 
+    Feedback events are events sent to acknowledge a message in some way. There
+    are two supported acknowledgements: ``delivered`` (sent when the event has
+    been received) and ``read`` (sent when the event has been observed by the
+    end-user). The ``target_event_id`` should reference the ``m.room.message``
+    event being acknowledged. 
 
 m.room.message msgtypes
 -----------------------
-Each ``m.room.message`` MUST have a ``msgtype`` key which identifies the type of
-message being sent. Each type has their own required and optional keys, as outlined
-below:
+Each ``m.room.message`` MUST have a ``msgtype`` key which identifies the type
+of message being sent. Each type has their own required and optional keys, as
+outlined below:
 
 ``m.text``
   Required keys:
@@ -994,12 +1025,12 @@ below:
   Required keys:
     - ``url`` : "string" - The URL to the image.
   Optional keys:
-    - ``info`` : "string" - info : JSON object (ImageInfo) - The image info for image 
-      referred to in ``url``.
+    - ``info`` : "string" - info : JSON object (ImageInfo) - The image info for
+      image referred to in ``url``.
     - ``thumbnail_url`` : "string" - The URL to the thumbnail.
-    - ``thumbnail_info`` : JSON object (ImageInfo) - The image info for the image 
-      referred to in ``thumbnail_url``.
-    - ``body`` : "string" - The alt text of the image, or some kind of content 
+    - ``thumbnail_info`` : JSON object (ImageInfo) - The image info for the
+      image referred to in ``thumbnail_url``.
+    - ``body`` : "string" - The alt text of the image, or some kind of content
       description for accessibility e.g. "image attachment".
 
   ImageInfo: 
@@ -1016,10 +1047,10 @@ below:
   Required keys:
     - ``url`` : "string" - The URL to the audio.
   Optional keys:
-    - ``info`` : JSON object (AudioInfo) - The audio info for the audio referred to in 
-      ``url``.
-    - ``body`` : "string" - A description of the audio e.g. "Bee Gees - 
-      Stayin' Alive", or some kind of content description for accessibility e.g. 
+    - ``info`` : JSON object (AudioInfo) - The audio info for the audio
+      referred to in ``url``.
+    - ``body`` : "string" - A description of the audio e.g. "Bee Gees - Stayin'
+      Alive", or some kind of content description for accessibility e.g.
       "audio attachment".
   AudioInfo: 
     Information about a piece of audio::
@@ -1034,10 +1065,11 @@ below:
   Required keys:
     - ``url`` : "string" - The URL to the video.
   Optional keys:
-    - ``info`` : JSON object (VideoInfo) - The video info for the video referred to in 
-      ``url``.
-    - ``body`` : "string" - A description of the video e.g. "Gangnam style", 
-      or some kind of content description for accessibility e.g. "video attachment".
+    - ``info`` : JSON object (VideoInfo) - The video info for the video
+      referred to in ``url``.
+    - ``body`` : "string" - A description of the video e.g. "Gangnam style", or
+      some kind of content description for accessibility e.g. "video
+      attachment".
 
   VideoInfo: 
     Information about a video::
@@ -1056,18 +1088,18 @@ below:
   Required keys:
     - ``geo_uri`` : "string" - The geo URI representing the location.
   Optional keys:
-    - ``thumbnail_url`` : "string" - The URL to a thumnail of the location being 
-      represented.
-    - ``thumbnail_info`` : JSON object (ImageInfo) - The image info for the image 
-      referred to in ``thumbnail_url``.
-    - ``body`` : "string" - A description of the location e.g. "Big Ben, 
-      London, UK", or some kind of content description for accessibility e.g. 
+    - ``thumbnail_url`` : "string" - The URL to a thumnail of the location
+      being represented.
+    - ``thumbnail_info`` : JSON object (ImageInfo) - The image info for the
+      image referred to in ``thumbnail_url``.
+    - ``body`` : "string" - A description of the location e.g. "Big Ben,
+      London, UK", or some kind of content description for accessibility e.g.
       "location attachment".
 
 The following keys can be attached to any ``m.room.message``:
 
   Optional keys:
-    - ``sender_ts`` : integer - A timestamp (ms resolution) representing the 
+    - ``sender_ts`` : integer - A timestamp (ms resolution) representing the
       wall-clock time when the message was sent from the client.
 
 Presence
@@ -1078,20 +1110,22 @@ Presence
 Each user has the concept of presence information. This encodes the
 "availability" of that user, suitable for display on other user's clients. This
 is transmitted as an ``m.presence`` event and is one of the few events which
-are sent *outside the context of a room*. The basic piece of presence information 
-is represented by the ``presence`` key, which is an enum of one of the following:
+are sent *outside the context of a room*. The basic piece of presence
+information is represented by the ``presence`` key, which is an enum of one of
+the following:
 
-  - ``online`` : The default state when the user is connected to an event stream.
+  - ``online`` : The default state when the user is connected to an event
+    stream.
   - ``unavailable`` : The user is not reachable at this time.
   - ``offline`` : The user is not connected to an event stream.
-  - ``free_for_chat`` : The user is generally willing to receive messages 
+  - ``free_for_chat`` : The user is generally willing to receive messages
     moreso than default.
-  - ``hidden`` : TODO. Behaves as offline, but allows the user to see the client 
-    state anyway and generally interact with client features.
+  - ``hidden`` : TODO. Behaves as offline, but allows the user to see the
+    client state anyway and generally interact with client features.
 
-This basic ``presence`` field applies to the user as a whole, regardless of how many
-client devices they have connected. The home server should synchronise this
-status choice among multiple devices to ensure the user gets a consistent
+This basic ``presence`` field applies to the user as a whole, regardless of how
+many client devices they have connected. The home server should synchronise
+this status choice among multiple devices to ensure the user gets a consistent
 experience.
 
 In addition, the server maintains a timestamp of the last time it saw an active
@@ -1122,7 +1156,7 @@ Transmission
 Presence List
 -------------
 Each user's home server stores a "presence list" for that user. This stores a
-list of other user IDs the user has chosen to add to it. To be added to this 
+list of other user IDs the user has chosen to add to it. To be added to this
 list, the user being added must receive permission from the list owner. Once
 granted, both user's HS(es) store this information. Since such subscriptions
 are likely to be bidirectional, HSes may wish to automatically accept requests
@@ -1153,9 +1187,9 @@ Typing notifications
 
 Voice over IP
 =============
-Matrix can also be used to set up VoIP calls. This is part of the core specification,
-although is still in a very early stage. Voice (and video) over Matrix is based on
-the WebRTC standards.
+Matrix can also be used to set up VoIP calls. This is part of the core
+specification, although is still in a very early stage. Voice (and video) over
+Matrix is based on the WebRTC standards.
 
 Call events are sent to a room, like any other event. This means that clients
 must only send call events to rooms with exactly two participants as currently
@@ -1170,13 +1204,11 @@ This event is sent by the caller when they wish to establish a call.
     - ``call_id`` : "string" - A unique identifier for the call
     - ``offer`` : "offer object" - The session description
     - ``version`` : "integer" - The version of the VoIP specification this
-                                message adheres to. This specification is
-                                version 0.
+      message adheres to. This specification is version 0.
     - ``lifetime`` : "integer" - The time in milliseconds that the invite is
-                                 valid for. Once the invite age exceeds this
-                                 value, clients should discard it. They
-                                 should also no longer show the call as
-                                 awaiting an answer in the UI.
+      valid for. Once the invite age exceeds this value, clients should discard
+      it. They should also no longer show the call as awaiting an answer in the
+      UI.
       
   Optional keys:
     None.
@@ -1185,48 +1217,54 @@ This event is sent by the caller when they wish to establish a call.
 
 ``Offer Object``
   Required keys:
-    - ``type`` : "string" - The type of session description, in this case 'offer'
+    - ``type`` : "string" - The type of session description, in this case
+      'offer'
     - ``sdp`` : "string" - The SDP text of the session description
 
 ``m.call.candidates``
-This event is sent by callers after sending an invite and by the callee after answering.
-Its purpose is to give the other party additional ICE candidates to try using to
-communicate.
+This event is sent by callers after sending an invite and by the callee after
+answering.  Its purpose is to give the other party additional ICE candidates to
+try using to communicate.
 
   Required keys:
     - ``call_id`` : "string" - The ID of the call this event relates to
-    - ``version`` : "integer" - The version of the VoIP specification this messages
-                                adheres to. his specification is version 0.
-    - ``candidates`` : "array of candidate objects" - Array of object describing the candidates.
+    - ``version`` : "integer" - The version of the VoIP specification this
+      messages adheres to. his specification is version 0.
+    - ``candidates`` : "array of candidate objects" - Array of object
+      describing the candidates.
 
 ``Candidate Object``
 
   Required Keys:
-    - ``sdpMid`` : "string" - The SDP media type this candidate is intended for.
+    - ``sdpMid`` : "string" - The SDP media type this candidate is intended
+      for.
     - ``sdpMLineIndex`` : "integer" - The index of the SDP 'm' line this
-                                      candidate is intended for
+      candidate is intended for
     - ``candidate`` : "string" - The SDP 'a' line of the candidate
 
 ``m.call.answer``
 
   Required keys:
     - ``call_id`` : "string" - The ID of the call this event relates to
-    - ``version`` : "integer" - The version of the VoIP specification this messages
+    - ``version`` : "integer" - The version of the VoIP specification this
+      messages
     - ``answer`` : "answer object" - Object giving the SDK answer
 
 ``Answer Object``
 
   Required keys:
-    - ``type`` : "string" - The type of session description. 'answer' in this case.
+    - ``type`` : "string" - The type of session description. 'answer' in this
+      case.
     - ``sdp`` : "string" - The SDP text of the session description
 
 ``m.call.hangup``
-Sent by either party to signal their termination of the call. This can be sent either once
-the call has has been established or before to abort the call.
+Sent by either party to signal their termination of the call. This can be sent
+either once the call has has been established or before to abort the call.
 
   Required keys:
     - ``call_id`` : "string" - The ID of the call this event relates to
-    - ``version`` : "integer" - The version of the VoIP specification this messages
+    - ``version`` : "integer" - The version of the VoIP specification this
+      messages
 
 Message Exchange
 ----------------
@@ -1272,8 +1310,8 @@ The rules for dealing with such a situation are as follows:
  - If an invite to a room is received whilst the client is preparing to send an
    invite to the same room, the client should cancel its outgoing call and
    instead automatically accept the incoming call on behalf of the user.
- - If an invite to a room is received after the client has sent an invite to the
-   same room and is waiting for a response, the client should perform a
+ - If an invite to a room is received after the client has sent an invite to
+   the same room and is waiting for a response, the client should perform a
    lexicographical comparison of the call IDs of the two calls and use the
    lesser of the two calls, aborting the greater. If the incoming call is the
    lesser, the client should accept this call on behalf of the user.
@@ -1297,14 +1335,15 @@ Profiles
   - Display name changes also generates m.room.member with displayname key f.e. room
     the user is in.
 
-Internally within Matrix users are referred to by their user ID, which is typically
-a compact unique identifier. Profiles grant users the ability to see human-readable 
-names for other users that are in some way meaningful to them. Additionally, 
-profiles can publish additional information, such as the user's age or location.
+Internally within Matrix users are referred to by their user ID, which is
+typically a compact unique identifier. Profiles grant users the ability to see
+human-readable names for other users that are in some way meaningful to them.
+Additionally, profiles can publish additional information, such as the user's
+age or location.
 
-A Profile consists of a display name, an avatar picture, and a set of other 
+A Profile consists of a display name, an avatar picture, and a set of other
 metadata fields that the user may wish to publish (email address, phone
-numbers, website URLs, etc...). This specification puts no requirements on the 
+numbers, website URLs, etc...). This specification puts no requirements on the
 display name other than it being a valid unicode string.
 
 
@@ -1312,20 +1351,20 @@ display name other than it being a valid unicode string.
 Registration and login
 ======================
 
-Clients must register with a home server in order to use Matrix. After 
+Clients must register with a home server in order to use Matrix. After
 registering, the client will be given an access token which must be used in ALL
 requests to that home server as a query parameter 'access_token'.
 
 If the client has already registered, they need to be able to login to their
-account. The home server may provide many different ways of logging in, such
-as user/password auth, login via a social network (OAuth2), login by confirming 
-a token sent to their email address, etc. This specification does not define how
-home servers should authorise their users who want to login to their existing 
-accounts, but instead defines the standard interface which implementations 
+account. The home server may provide many different ways of logging in, such as
+user/password auth, login via a social network (OAuth2), login by confirming a
+token sent to their email address, etc. This specification does not define how
+home servers should authorise their users who want to login to their existing
+accounts, but instead defines the standard interface which implementations
 should follow so that ANY client can login to ANY home server. Clients login
-using the |login|_ API. Clients register using the |register|_ API. Registration
-follows the same procedure as login, but the path requests are sent to are
-different.
+using the |login|_ API. Clients register using the |register|_ API.
+Registration follows the same procedure as login, but the path requests are
+sent to are different.
 
 The registration/login process breaks down into the following:
   1. Determine the requirements for logging in.
@@ -1333,13 +1372,14 @@ The registration/login process breaks down into the following:
   3. Get credentials or be told the next stage in the login process and repeat 
      step 2.
      
-As each home server may have different ways of logging in, the client needs to know how
-they should login. All distinct login stages MUST have a corresponding ``type``.
-A ``type`` is a namespaced string which details the mechanism for logging in.
+As each home server may have different ways of logging in, the client needs to
+know how they should login. All distinct login stages MUST have a corresponding
+``type``.  A ``type`` is a namespaced string which details the mechanism for
+logging in.
 
-A client may be able to login via multiple valid login flows, and should choose a single
-flow when logging in. A flow is a series of login stages. The home server MUST respond 
-with all the valid login flows when requested::
+A client may be able to login via multiple valid login flows, and should choose
+a single flow when logging in. A flow is a series of login stages. The home
+server MUST respond with all the valid login flows when requested::
 
   The client can login via 3 paths: 1a and 1b, 2a and 2b, or 3. The client should
   select one of these paths.
@@ -1360,21 +1400,21 @@ with all the valid login flows when requested::
     ]
   }
 
-After the login is completed, the client's fully-qualified user ID and a new access 
-token MUST be returned::
+After the login is completed, the client's fully-qualified user ID and a new
+access token MUST be returned::
 
   {
     "user_id": "@user:matrix.org",
     "access_token": "abcdef0123456789"
   }
 
-The ``user_id`` key is particularly useful if the home server wishes to support 
-localpart entry of usernames (e.g. "user" rather than "@user:matrix.org"), as the
-client may not be able to determine its ``user_id`` in this case.
+The ``user_id`` key is particularly useful if the home server wishes to support
+localpart entry of usernames (e.g. "user" rather than "@user:matrix.org"), as
+the client may not be able to determine its ``user_id`` in this case.
 
-If a login has multiple requests, the home server may wish to create a session. If
-a home server responds with a 'session' key to a request, clients MUST submit it in 
-subsequent requests until the login is completed::
+If a login has multiple requests, the home server may wish to create a session.
+If a home server responds with a 'session' key to a request, clients MUST
+submit it in subsequent requests until the login is completed::
 
   {
     "session": "<session id>"
@@ -1402,8 +1442,8 @@ To respond to this type, reply with::
     "password": "<password>"
   }
 
-The home server MUST respond with either new credentials, the next stage of the login
-process, or a standard error response.
+The home server MUST respond with either new credentials, the next stage of the
+login process, or a standard error response.
 
 OAuth2-based
 ------------
@@ -1425,22 +1465,22 @@ The server MUST respond with::
     "uri": <Authorization Request URI OR service selection URI>
   }
 
-The home server acts as a 'confidential' client for the purposes of OAuth2.
-If the uri is a ``sevice selection URI``, it MUST point to a webpage which prompts the 
-user to choose which service to authorize with. On selection of a service, this
-MUST link through to an ``Authorization Request URI``. If there is only 1 service which the
-home server accepts when logging in, this indirection can be skipped and the
-"uri" key can be the ``Authorization Request URI``. 
+The home server acts as a 'confidential' client for the purposes of OAuth2.  If
+the uri is a ``sevice selection URI``, it MUST point to a webpage which prompts
+the user to choose which service to authorize with. On selection of a service,
+this MUST link through to an ``Authorization Request URI``. If there is only 1
+service which the home server accepts when logging in, this indirection can be
+skipped and the "uri" key can be the ``Authorization Request URI``. 
 
-The client then visits the ``Authorization Request URI``, which then shows the OAuth2 
-Allow/Deny prompt. Hitting 'Allow' returns the ``redirect URI`` with the auth code. 
-Home servers can choose any path for the ``redirect URI``. The client should visit 
-the ``redirect URI``, which will then finish the OAuth2 login process, granting the 
-home server an access token for the chosen service. When the home server gets 
-this access token, it verifies that the cilent has authorised with the 3rd party, and 
-can now complete the login. The OAuth2 ``redirect URI`` (with auth code) MUST respond 
-with either new credentials, the next stage of the login process, or a standard error 
-response.
+The client then visits the ``Authorization Request URI``, which then shows the
+OAuth2 Allow/Deny prompt. Hitting 'Allow' returns the ``redirect URI`` with the
+auth code.  Home servers can choose any path for the ``redirect URI``. The
+client should visit the ``redirect URI``, which will then finish the OAuth2
+login process, granting the home server an access token for the chosen service.
+When the home server gets this access token, it verifies that the cilent has
+authorised with the 3rd party, and can now complete the login. The OAuth2
+``redirect URI`` (with auth code) MUST respond with either new credentials, the
+next stage of the login process, or a standard error response.
     
 For example, if a home server accepts OAuth2 from Google, it would return the 
 Authorization Request URI for Google::
@@ -1474,15 +1514,16 @@ To respond to this type, reply with::
     "email": "<email address>"
   }
 
-After validating the email address, the home server MUST send an email containing
-an authentication code and return::
+After validating the email address, the home server MUST send an email
+containing an authentication code and return::
 
   {
     "type": "m.login.email.code",
     "session": "<session id>"
   }
 
-The second request in this login stage involves sending this authentication code::
+The second request in this login stage involves sending this authentication
+code::
 
   {
     "type": "m.login.email.code",
@@ -1490,8 +1531,8 @@ The second request in this login stage involves sending this authentication code
     "code": "<code in email sent>"
   }
 
-The home server MUST respond to this with either new credentials, the next stage of 
-the login process, or a standard error response.
+The home server MUST respond to this with either new credentials, the next
+stage of the login process, or a standard error response.
 
 Email-based (url)
 -----------------
@@ -1509,8 +1550,8 @@ To respond to this type, reply with::
     "email": "<email address>"
   }
 
-After validating the email address, the home server MUST send an email containing
-an authentication URL and return::
+After validating the email address, the home server MUST send an email
+containing an authentication URL and return::
 
   {
     "type": "m.login.email.url",
@@ -1525,12 +1566,12 @@ client should perform another request::
     "session": "<session id>"
   }
 
-The home server MUST respond to this with either new credentials, the next stage of 
-the login process, or a standard error response. 
+The home server MUST respond to this with either new credentials, the next
+stage of the login process, or a standard error response. 
 
-A common client implementation will be to periodically poll until the link is clicked.
-If the link has not been visited yet, a standard error response with an errcode of 
-``M_LOGIN_EMAIL_URL_NOT_YET`` should be returned.
+A common client implementation will be to periodically poll until the link is
+clicked.  If the link has not been visited yet, a standard error response with
+an errcode of ``M_LOGIN_EMAIL_URL_NOT_YET`` should be returned.
 
 
 Email-based (identity server)
@@ -1540,8 +1581,9 @@ Email-based (identity server)
 :Description:
   Login is supported by authorising an email address with an identity server.
 
-Prior to submitting this, the client should authenticate with an identity server.
-After authenticating, the session information should be submitted to the home server.
+Prior to submitting this, the client should authenticate with an identity
+server.  After authenticating, the session information should be submitted to
+the home server.
 
 To respond to this type, reply with::
 
@@ -1560,10 +1602,11 @@ To respond to this type, reply with::
 
 N-Factor Authentication
 -----------------------
-Multiple login stages can be combined to create N-factor authentication during login.
+Multiple login stages can be combined to create N-factor authentication during
+login.
 
-This can be achieved by responding with the ``next`` login type on completion of a 
-previous login stage::
+This can be achieved by responding with the ``next`` login type on completion
+of a previous login stage::
 
   {
     "next": "<next login type>"
@@ -1610,9 +1653,9 @@ This can be represented conceptually as::
 
 Fallback
 --------
-Clients cannot be expected to be able to know how to process every single
-login type. If a client determines it does not know how to handle a given
-login type, it should request a login fallback page::
+Clients cannot be expected to be able to know how to process every single login
+type. If a client determines it does not know how to handle a given login type,
+it should request a login fallback page::
 
   GET matrix/client/api/v1/login/fallback
 
@@ -1629,17 +1672,17 @@ Identity
 Federation
 ==========
 
-Federation is the term used to describe how to communicate between Matrix home 
+Federation is the term used to describe how to communicate between Matrix home
 servers. Federation is a mechanism by which two home servers can exchange
 Matrix event messages, both as a real-time push of current events, and as a
 historic fetching mechanism to synchronise past history for clients to view. It
 uses HTTPS connections between each pair of servers involved as the underlying
-transport. Messages are exchanged between servers in real-time by active pushing
-from each server's HTTP client into the server of the other. Queries to fetch
-historic data for the purpose of back-filling scrollback buffers and the like
-can also be performed. Currently routing of messages between homeservers is full
-mesh (like email) - however, fan-out refinements to this design are currently
-under consideration.
+transport. Messages are exchanged between servers in real-time by active
+pushing from each server's HTTP client into the server of the other. Queries to
+fetch historic data for the purpose of back-filling scrollback buffers and the
+like can also be performed. Currently routing of messages between homeservers
+is full mesh (like email) - however, fan-out refinements to this design are
+currently under consideration.
 
 There are three main kinds of communication that occur between home servers:
 
@@ -1652,8 +1695,8 @@ There are three main kinds of communication that occur between home servers:
 
 :Ephemeral Data Units (EDUs):
    These are notifications of events that are pushed from one home server to
-   another. They are not persisted and contain no long-term significant history,
-   nor does the receiving home server have to reply to them.
+   another. They are not persisted and contain no long-term significant
+   history, nor does the receiving home server have to reply to them.
 
 :Persisted Data Units (PDUs):
    These are notifications of events that are broadcast from one home server to
@@ -1661,8 +1704,9 @@ There are three main kinds of communication that occur between home servers:
    They are persisted to long-term storage and form the record of history for
    that context.
 
-EDUs and PDUs are further wrapped in an envelope called a Transaction, which is 
-transferred from the origin to the destination home server using an HTTP PUT request.
+EDUs and PDUs are further wrapped in an envelope called a Transaction, which is
+transferred from the origin to the destination home server using an HTTP PUT
+request.
 
 
 Transactions
@@ -1671,16 +1715,18 @@ Transactions
   This section may be misleading or inaccurate.
 
 The transfer of EDUs and PDUs between home servers is performed by an exchange
-of Transaction messages, which are encoded as JSON objects, passed over an 
-HTTP PUT request. A Transaction is meaningful only to the pair of home servers that 
+of Transaction messages, which are encoded as JSON objects, passed over an HTTP
+PUT request. A Transaction is meaningful only to the pair of home servers that
 exchanged it; they are not globally-meaningful.
 
 Each transaction has:
  - An opaque transaction ID.
- - A timestamp (UNIX epoch time in milliseconds) generated by its origin server.
+ - A timestamp (UNIX epoch time in milliseconds) generated by its origin
+   server.
  - An origin and destination server name.
  - A list of "previous IDs".
- - A list of PDUs and EDUs - the actual message payload that the Transaction carries.
+ - A list of PDUs and EDUs - the actual message payload that the Transaction
+   carries.
  
 ``origin``
   Type: 
@@ -1719,20 +1765,20 @@ Each transaction has:
   "edus":[...]
  }
 
-The ``prev_ids`` field contains a list of previous transaction IDs that
-the ``origin`` server has sent to this ``destination``. Its purpose is to act as a
+The ``prev_ids`` field contains a list of previous transaction IDs that the
+``origin`` server has sent to this ``destination``. Its purpose is to act as a
 sequence checking mechanism - the destination server can check whether it has
 successfully received that Transaction, or ask for a retransmission if not.
 
 The ``pdus`` field of a transaction is a list, containing zero or more PDUs.[*]
-Each PDU is itself a JSON object containing a number of keys, the exact details of
-which will vary depending on the type of PDU. Similarly, the ``edus`` field is
-another list containing the EDUs. This key may be entirely absent if there are
-no EDUs to transfer.
+Each PDU is itself a JSON object containing a number of keys, the exact details
+of which will vary depending on the type of PDU. Similarly, the ``edus`` field
+is another list containing the EDUs. This key may be entirely absent if there
+are no EDUs to transfer.
 
 (* Normally the PDU list will be non-empty, but the server should cope with
-receiving an "empty" transaction, as this is useful for informing peers of other
-transaction IDs they should be aware of. This effectively acts as a push
+receiving an "empty" transaction, as this is useful for informing peers of
+other transaction IDs they should be aware of. This effectively acts as a push
 mechanism to encourage peers to continue to replicate content.)
 
 PDUs and EDUs
@@ -1744,8 +1790,8 @@ All PDUs have:
  - An ID
  - A context
  - A declaration of their type
- - A list of other PDU IDs that have been seen recently on that context (regardless of which origin
-   sent them)
+ - A list of other PDU IDs that have been seen recently on that context
+   (regardless of which origin sent them)
 
 ``context``
   Type:
@@ -1769,7 +1815,8 @@ All PDUs have:
   Type:
     Integer
   Description:
-    Timestamp in milliseconds on originating homeserver when this PDU was created.
+    Timestamp in milliseconds on originating homeserver when this PDU was
+    created.
 
 ``pdu_type``
   Type:
@@ -1781,7 +1828,7 @@ All PDUs have:
   Type:
     List of pairs of strings
   Description:
-    The originating homeserver and PDU ids of the most recent PDUs the 
+    The originating homeserver and PDU ids of the most recent PDUs the
     homeserver was aware of for this context when it made this PDU.
 
 ``depth``
@@ -1855,13 +1902,13 @@ For state updates:
 
 In contrast to Transactions, it is important to note that the ``prev_pdus``
 field of a PDU refers to PDUs that any origin server has sent, rather than
-previous IDs that this ``origin`` has sent. This list may refer to other PDUs sent
-by the same origin as the current one, or other origins.
+previous IDs that this ``origin`` has sent. This list may refer to other PDUs
+sent by the same origin as the current one, or other origins.
 
 Because of the distributed nature of participants in a Matrix conversation, it
 is impossible to establish a globally-consistent total ordering on the events.
-However, by annotating each outbound PDU at its origin with IDs of other PDUs it
-has received, a partial ordering can be constructed allowing causality
+However, by annotating each outbound PDU at its origin with IDs of other PDUs
+it has received, a partial ordering can be constructed allowing causality
 relationships to be preserved. A client can then display these messages to the
 end-user in some order consistent with their content and ensure that no message
 that is semantically in reply of an earlier one is ever displayed before it.
@@ -1934,8 +1981,8 @@ To fetch all the state of a given context::
     Response: JSON encoding of a single Transaction containing multiple PDUs
 
 Retrieves a snapshot of the entire current state of the given context. The
-response will contain a single Transaction, inside which will be a list of
-PDUs that encode the state.
+response will contain a single Transaction, inside which will be a list of PDUs
+that encode the state.
 
 To backfill events on a given context::
 
@@ -1943,11 +1990,10 @@ To backfill events on a given context::
     Query args: v, limit
     Response: JSON encoding of a single Transaction containing multiple PDUs
 
-Retrieves a sliding-window history of previous PDUs that occurred on the
-given context. Starting from the PDU ID(s) given in the "v" argument, the
-PDUs that preceeded it are retrieved, up to a total number given by the
-"limit" argument. These are then returned in a new Transaction containing all
-of the PDUs.
+Retrieves a sliding-window history of previous PDUs that occurred on the given
+context. Starting from the PDU ID(s) given in the "v" argument, the PDUs that
+preceeded it are retrieved, up to a total number given by the "limit" argument.
+These are then returned in a new Transaction containing all of the PDUs.
 
 
 To stream events all the events::
@@ -2122,9 +2168,9 @@ contents or metadata for messages in that room.
 
 Rate limiting
 -------------
-Home servers SHOULD implement rate limiting to reduce the risk of being overloaded. If a
-request is refused due to rate limiting, it should return a standard error response of
-the form::
+Home servers SHOULD implement rate limiting to reduce the risk of being
+overloaded. If a request is refused due to rate limiting, it should return a
+standard error response of the form::
 
   {
     "errcode": "M_LIMIT_EXCEEDED",
@@ -2132,8 +2178,8 @@ the form::
     "retry_after_ms": integer (optional)
   }
 
-The ``retry_after_ms`` key SHOULD be included to tell the client how long they have to wait
-in milliseconds before they can try again.
+The ``retry_after_ms`` key SHOULD be included to tell the client how long they
+have to wait in milliseconds before they can try again.
 
 .. TODO
   - Surely we should recommend an algorithm for the rate limiting, rather than letting every
