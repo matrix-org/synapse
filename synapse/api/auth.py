@@ -259,6 +259,9 @@ class Auth(object):
             raise AuthError(403, "Unrecognised access token.",
                             errcode=Codes.UNKNOWN_TOKEN)
 
+    def is_server_admin(self, user):
+        return self.store.is_server_admin(user)
+
     @defer.inlineCallbacks
     @log_function
     def _can_send_event(self, event):

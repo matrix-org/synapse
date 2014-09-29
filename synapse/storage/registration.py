@@ -103,6 +103,14 @@ class RegistrationStore(SQLBaseStore):
                                                      token)
         defer.returnValue(user_id)
 
+    @defer.inlineCallbacks
+    def is_server_admin(self, user):
+        return self._simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user.to_string()},
+            retcol="admin",
+        )
+
     def _query_for_auth(self, txn, token):
         txn.execute("SELECT users.name FROM access_tokens LEFT JOIN users" +
                     " ON users.id = access_tokens.user_id WHERE token = ?",
