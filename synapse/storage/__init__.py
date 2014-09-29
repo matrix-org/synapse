@@ -316,32 +316,6 @@ class DataStore(RoomMemberStore, RoomStore,
             ],
         )
 
-        d = {}
-        for r in res:
-            device = d.setdefault(r["device_id"], {})
-            session = device.setdefault(r["access_token"], [])
-            session.append({
-                "ip": r["ip"],
-                "user_agent": r["user_agent"],
-                "last_seen": r["last_seen"],
-            })
-
-        defer.returnValue(
-            [
-                {
-                    "device_id": k,
-                    "sessions": [
-                        {
-                            "access_token": x,
-                            "connections": y,
-                        }
-                        for x, y in v.items()
-                    ]
-                }
-                for k, v in d.items()
-            ]
-        )
-
     def snapshot_room(self, room_id, user_id, state_type=None, state_key=None):
         """Snapshot the room for an update by a user
         Args:
