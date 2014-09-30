@@ -105,7 +105,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 stream_ordering=stream_ordering,
                 is_new_state=is_new_state,
             )
-        except _RollbackButIsFineException as e:
+        except _RollbackButIsFineException:
             pass
 
     @defer.inlineCallbacks

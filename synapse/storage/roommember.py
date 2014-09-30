@@ -18,7 +18,6 @@ from twisted.internet import defer
 from ._base import SQLBaseStore
 
 from synapse.api.constants import Membership
-from synapse.util.logutils import log_function
 
 import logging
 
