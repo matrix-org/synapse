@@ -118,7 +118,7 @@ the account and looks like::
 The ``localpart`` of a user ID may be a user name, or an opaque ID identifying
 this user. They are case-insensitive.
 
-.. TODO
+.. TODO-spec
     - Need to specify precise grammar for Matrix IDs
 
 A "Home Server" is a server which provides C-S APIs and has the ability to
@@ -366,7 +366,7 @@ events which are visible to the client will appear in the event stream. When
 the request returns, an ``end`` token is included in the response. This token
 can be used in the next request to continue where the client left off.
 
-.. TODO
+.. TODO-spec
   How do we filter the event stream?
   Do we ever return multiple events in a single request?  Don't we get lots of request
   setup RTT latency if we only do one event per request? Do we ever support streaming
@@ -704,7 +704,7 @@ Rooms
 Creation
 --------
 .. TODO kegan
-  - TODO: Key for invite these users?
+  - TODO-spec: Key for invite these users?
   
 To create a room, a client has to use the |createRoom|_ API. There are various
 options which can be set when creating a room:
@@ -799,7 +799,7 @@ Modifying aliases
 .. NOTE::
   This section is a work in progress.
 
-.. TODO kegan
+.. TODO-doc kegan
     - path to edit aliases 
     - PUT /directory/room/<room alias>  { room_id : foo }
     - GET /directory/room/<room alias> { room_id : foo, servers: [a.com, b.com] }
@@ -811,11 +811,11 @@ Permissions
 .. NOTE::
   This section is a work in progress.
 
-.. TODO kegan
-    - TODO: What is a power level? How do they work? Defaults / required levels for X. How do they change
+.. TODO-doc kegan
+    - What is a power level? How do they work? Defaults / required levels for X. How do they change
       as people join and leave rooms? What do you do if you get a clash? Examples.
-    - TODO: List all actions which use power levels (sending msgs, inviting users, banning people, etc...)
-    - TODO: Room config - what is the event and what are the keys/values and explanations for them.
+    - List all actions which use power levels (sending msgs, inviting users, banning people, etc...)
+    - Room config - what is the event and what are the keys/values and explanations for them.
       Link through to respective sections where necessary. How does this tie in with permissions, e.g.
       give example of creating a read-only room.
 
@@ -845,7 +845,7 @@ defined in the following state events:
 
 Joining rooms
 -------------
-.. TODO kegan
+.. TODO-doc kegan
   - TODO: What does the home server have to do to join a user to a room?
 
 Users need to join a room in order to send and receive events in that room. A
@@ -883,7 +883,7 @@ received an invite.
 
 Inviting users
 --------------
-.. TODO kegan
+.. TODO-doc kegan
   - Can invite users to a room if the room config key TODO is set to TODO. Must have required power level.
   - Outline invite join dance. What is it? Why is it required? How does it work?
   - What does the home server have to do?
@@ -921,7 +921,7 @@ See the `Room events`_ section for more information on ``m.room.member``.
 
 Leaving rooms
 -------------
-.. TODO kegan
+.. TODO-spec kegan
   - TODO: Grace period before deletion?
   - TODO: Under what conditions should a room NOT be purged?
 
@@ -1076,7 +1076,7 @@ presence events will also be returned. There are two APIs provided:
  - |/rooms/<room_id>/initialSync|_ : A sync scoped to a single room. Presents
    room and event information for this room only.
 
-.. TODO kegan
+.. TODO-doc kegan
   - TODO: JSON response format for both types
   - TODO: when would you use global? when would you use scoped?
 
@@ -1098,7 +1098,7 @@ There are several APIs provided to ``GET`` events for a room:
   Response format:
     ``[ { state event }, { state event }, ... ]``
   Example:
-    TODO
+    TODO-doc
 
 
 |/rooms/<room_id>/members|_
@@ -1107,7 +1107,7 @@ There are several APIs provided to ``GET`` events for a room:
   Response format:
     ``{ "start": "<token>", "end": "<token>", "chunk": [ { m.room.member event }, ... ] }``
   Example:
-    TODO
+    TODO-doc
 
 |/rooms/<room_id>/messages|_
   Description:
@@ -1117,16 +1117,16 @@ There are several APIs provided to ``GET`` events for a room:
   Response format:
     ``{ "start": "<token>", "end": "<token>" }``
   Example:
-    TODO
+    TODO-doc
     
 |/rooms/<room_id>/initialSync|_
   Description:
     Get all relevant events for a room. This includes state events, paginated
     non-state events and presence events.
   Response format:
-    `` { TODO } ``
+    `` { TODO-doc } ``
   Example:
-    TODO
+    TODO-doc
 
 Redactions
 ----------
@@ -1153,7 +1153,7 @@ Room Events
 .. NOTE::
   This section is a work in progress.
 
-.. TODO dave?
+.. TODO-doc dave?
   - voip events?
 
 This specification outlines several standard event types, all of which are
@@ -1232,7 +1232,7 @@ prefixed with ``m.``
   Example:
     ``{ "join_rule": "public" }``
   Description:
-    TODO : Use docs/models/rooms.rst
+    TODO-doc : Use docs/models/rooms.rst
    
 ``m.room.power_levels``
   Summary:
@@ -1480,8 +1480,9 @@ the following:
   - ``offline`` : The user is not connected to an event stream.
   - ``free_for_chat`` : The user is generally willing to receive messages
     moreso than default.
-  - ``hidden`` : TODO. Behaves as offline, but allows the user to see the
-    client state anyway and generally interact with client features.
+  - ``hidden`` : Behaves as offline, but allows the user to see the client
+    state anyway and generally interact with client features. (Not yet
+    implemented in synapse).
 
 This basic ``presence`` field applies to the user as a whole, regardless of how
 many client devices they have connected. The home server should synchronise
@@ -1509,7 +1510,7 @@ Transmission
 .. NOTE::
   This section is a work in progress.
 
-.. TODO:
+.. TODO-doc:
   - Transmitted as an EDU.
   - Presence lists determine who to send to.
 
@@ -1534,16 +1535,22 @@ user, either:
 In the latter case, this allows for clients to display some minimal sense of
 presence information in a user list for a room.
 
+
 Typing notifications
 ====================
 .. NOTE::
   This section is a work in progress.
 
-.. TODO Leo
+.. TODO-doc Leo
     - what is the event type. Are they bundled with other event types? If so, which.
     - what are the valid keys / values. What do they represent. Any gotchas?
     - Timeouts. How do they work, who sets them and how do they expire. Does one
       have priority over another? Give examples.
+
+.. TODO-spec Leo
+    - actually define the client-server API; the only thing that currently
+      exists is entirely server-server
+
 
 Voice over IP
 =============
@@ -1681,12 +1688,13 @@ a call and the other party had accepted. Thusly, any media stream that had been
 setup for use on a call should be transferred and used for the call that
 replaces it.
  
+
 Profiles
 ========
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
+.. TODO-doc
   - Metadata extensibility
   - Changing profile info generates m.presence events ("presencelike")
   - keys on m.presence are optional, except presence which is required
@@ -1712,8 +1720,9 @@ Identity
 .. NOTE::
   This section is a work in progress.
 
-.. TODO Dave
+.. TODO-doc Dave
   - 3PIDs and identity server, functions
+
 
 Federation
 ==========
@@ -1884,10 +1893,9 @@ All PDUs have:
     The maximum depth of the previous PDUs plus one.
 
 
-.. TODO paul
-  [[TODO(paul): Update this structure so that 'pdu_id' is a two-element
-  [origin,ref] pair like the prev_pdus are]]
-  
+.. TODO-spec paul
+  - Update this structure so that 'pdu_id' is a two-element [origin,ref] pair
+    like the prev_pdus are
 
 For state updates:
 
@@ -1967,18 +1975,10 @@ keys exist to support this:
 
  {...,
   "is_state":true,
-  "state_key":TODO
-  "power_level":TODO
-  "prev_state_id":TODO
-  "prev_state_origin":TODO}
-
-.. TODO paul
-  [[TODO(paul): At this point we should probably have a long description of how
-  State management works, with descriptions of clobbering rules, power levels, etc
-  etc... But some of that detail is rather up-in-the-air, on the whiteboard, and
-  so on. This part needs refining. And writing in its own document as the details
-  relate to the server/system as a whole, not specifically to server-server
-  federation.]]
+  "state_key":TODO-doc
+  "power_level":TODO-doc
+  "prev_state_id":TODO-doc
+  "prev_state_origin":TODO-doc}
 
 EDUs, by comparison to PDUs, do not have an ID, a context, or a list of
 "previous" IDs. The only mandatory fields for these are the type, origin and
@@ -2005,7 +2005,7 @@ For active pushing of messages representing live activity "as it happens"::
 
   PUT .../send/:transaction_id/
     Body: JSON encoding of a single Transaction
-    Response: TODO
+    Response: TODO-doc
 
 The transaction_id path argument will override any ID given in the JSON body.
 The destination name will be set to that of the receiving server itself. Each
@@ -2068,7 +2068,7 @@ Backfilling
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
+.. TODO-doc
   - What it is, when is it used, how is it done
 
 SRV Records
@@ -2076,8 +2076,9 @@ SRV Records
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
+.. TODO-doc
   - Why it is needed
+
 
 Security
 ========
@@ -2119,7 +2120,7 @@ victim would then include in their view of the chatroom history. Other servers
 in the chatroom would reject the invalid messages and potentially reject the
 victims messages as well since they depended on the invalid messages.
 
-.. TODO
+.. TODO-spec
   Track trustworthiness of HS or users based on if they try to pretend they
   haven't seen recent events, and fake a splitbrain... --M
 
@@ -2227,7 +2228,7 @@ standard error response of the form::
 The ``retry_after_ms`` key SHOULD be included to tell the client how long they
 have to wait in milliseconds before they can try again.
 
-.. TODO
+.. TODO-spec
   - Surely we should recommend an algorithm for the rate limiting, rather than letting every
     homeserver come up with their own idea, causing totally unpredictable performance over
     federated rooms?
@@ -2236,30 +2237,33 @@ have to wait in milliseconds before they can try again.
   - Lawful intercept + Key Escrow
   TODO Mark
 
+
 Policy Servers
 ==============
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
+.. TODO-spec
   We should mention them in the Architecture section at least...
-  
+
+
 Content repository
 ==================
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
+.. TODO-spec
   - path to upload
   - format for thumbnail paths, mention what it is protecting against.
   - content size limit and associated M_ERROR.
+
 
 Address book repository
 =======================
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
+.. TODO-spec
   - format: POST(?) wodges of json, some possible processing, then return wodges of json on GET.
   - processing may remove dupes, merge contacts, pepper with extra info (e.g. matrix-ability of
     contacts), etc.
