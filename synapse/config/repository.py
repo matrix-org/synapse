@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from ._base import Config
-import os
 
 class ContentRepositoryConfig(Config):
     def __init__(self, args):

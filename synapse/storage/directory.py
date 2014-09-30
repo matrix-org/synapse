@@ -93,6 +93,36 @@ class DirectoryStore(SQLBaseStore):
                 }
             )
 
+    def delete_room_alias(self, room_alias):
+        return self.runInteraction(
+            self._delete_room_alias_txn,
+            room_alias,
+        )
+
+    def _delete_room_alias_txn(self, txn, room_alias):
+        cursor = txn.execute(
+            "SELECT room_id FROM room_aliases WHERE room_alias = ?",
+            (room_alias.to_string(),)
+        )
+
+        res = cursor.fetchone()
+        if res:
+            room_id = res[0]
+        else:
+            return None
+
+        txn.execute(
+            "DELETE FROM room_aliases WHERE room_alias = ?",
+            (room_alias.to_string(),)
+        )
+
+        txn.execute(
+            "DELETE FROM room_alias_servers WHERE room_alias = ?",
+            (room_alias.to_string(),)
+        )
+
+        return room_id
+
     def get_aliases_for_room(self, room_id):
         return self._simple_select_onecol(
             "room_aliases",

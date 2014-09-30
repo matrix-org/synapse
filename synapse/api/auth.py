@@ -19,7 +19,9 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
-from synapse.api.events.room import RoomMemberEvent, RoomPowerLevelsEvent
+from synapse.api.events.room import (
+    RoomMemberEvent, RoomPowerLevelsEvent, RoomRedactionEvent,
+)
 from synapse.util.logutils import log_function
 
 import logging
@@ -69,6 +71,9 @@ class Auth(object):
 
                 if event.type == RoomPowerLevelsEvent.TYPE:
                     yield self._check_power_levels(event)
+
+                if event.type == RoomRedactionEvent.TYPE:
+                    yield self._check_redaction(event)
 
                 defer.returnValue(True)
             else:
@@ -170,7 +175,7 @@ class Auth(object):
                     event.room_id,
                     event.user_id,
                 )
-                _, kick_level = yield self.store.get_ops_levels(event.room_id)
+                _, kick_level, _ = yield self.store.get_ops_levels(event.room_id)
 
                 if kick_level:
                     kick_level = int(kick_level)
@@ -187,7 +192,7 @@ class Auth(object):
                 event.user_id,
             )
 
-            ban_level, _ = yield self.store.get_ops_levels(event.room_id)
+            ban_level, _, _  = yield self.store.get_ops_levels(event.room_id)
 
             if ban_level:
                 ban_level = int(ban_level)
@@ -201,6 +206,7 @@ class Auth(object):
 
         defer.returnValue(True)
 
+    @defer.inlineCallbacks
     def get_user_by_req(self, request):
         """ Get a registered user's ID.
 
@@ -213,7 +219,25 @@ class Auth(object):
         """
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
-            return self.get_user_by_token(request.args["access_token"][0])
+            access_token = request.args["access_token"][0]
+            user_info = yield self.get_user_by_token(access_token)
+            user = user_info["user"]
+
+            ip_addr = self.hs.get_ip_from_request(request)
+            user_agent = request.requestHeaders.getRawHeaders(
+                "User-Agent",
+                default=[""]
+            )[0]
+            if user and access_token and ip_addr:
+                self.store.insert_client_ip(
+                    user=user,
+                    access_token=access_token,
+                    device_id=user_info["device_id"],
+                    ip=ip_addr,
+                    user_agent=user_agent
+                )
+
+            defer.returnValue(user)
         except KeyError:
             raise AuthError(403, "Missing access token.")
 
@@ -222,20 +246,31 @@ class Auth(object):
         """ Get a registered user's ID.
 
         Args:
-            token (str)- The access token to get the user by.
+            token (str): The access token to get the user by.
         Returns:
-            UserID : User ID object of the user who has that access token.
+            dict : dict that includes the user, device_id, and whether the
+                user is a server admin.
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            user_id = yield self.store.get_user_by_token(token=token)
-            if not user_id:
+            ret = yield self.store.get_user_by_token(token=token)
+            if not ret:
                 raise StoreError()
-            defer.returnValue(self.hs.parse_userid(user_id))
+
+            user_info = {
+                "admin": bool(ret.get("admin", False)),
+                "device_id": ret.get("device_id"),
+                "user": self.hs.parse_userid(ret.get("name")),
+            }
+
+            defer.returnValue(user_info)
         except StoreError:
             raise AuthError(403, "Unrecognised access token.",
                             errcode=Codes.UNKNOWN_TOKEN)
+
+    def is_server_admin(self, user):
+        return self.store.is_server_admin(user)
 
     @defer.inlineCallbacks
     @log_function
@@ -322,6 +357,29 @@ class Auth(object):
                 )
 
     @defer.inlineCallbacks
+    def _check_redaction(self, event):
+        user_level = yield self.store.get_power_level(
+            event.room_id,
+            event.user_id,
+        )
+
+        if user_level:
+            user_level = int(user_level)
+        else:
+            user_level = 0
+
+        _, _, redact_level  = yield self.store.get_ops_levels(event.room_id)
+
+        if not redact_level:
+            redact_level = 50
+
+        if user_level < redact_level:
+            raise AuthError(
+                403,
+                "You don't have permission to redact events"
+            )
+
+    @defer.inlineCallbacks
     def _check_power_levels(self, event):
         for k, v in event.content.items():
             if k == "default":
@@ -372,11 +430,11 @@ class Auth(object):
         }
 
         removed = set(old_people.keys()) - set(new_people.keys())
-        added = set(old_people.keys()) - set(new_people.keys())
+        added = set(new_people.keys()) - set(old_people.keys())
         same = set(old_people.keys()) & set(new_people.keys())
 
         for r in removed:
-            if int(old_list.content[r]) > user_level:
+            if int(old_list[r]) > user_level:
                 raise AuthError(
                     403,
                     "You don't have permission to remove user: %s" % (r, )

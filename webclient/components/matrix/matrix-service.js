@@ -264,7 +264,13 @@ angular.module('matrixService', [])
 
             return doRequest("GET", path, params);
         },
-
+        
+        // get room state for a specific room
+        roomState: function(room_id) {
+            var path = "/rooms/" + room_id + "/state";
+            return doRequest("GET", path);
+        },
+        
         // Joins a room
         join: function(room_id) {
             return this.membershipChange(room_id, undefined, "join");
@@ -697,11 +703,10 @@ angular.module('matrixService', [])
         createRoomIdToAliasMapping: function(roomId, alias) {
             roomIdToAlias[roomId] = alias;
             aliasToRoomId[alias] = roomId;
-            // localStorage.setItem(MAPPING_PREFIX+roomId, alias);
         },
         
         getRoomIdToAliasMapping: function(roomId) {
-            var alias = roomIdToAlias[roomId]; // was localStorage.getItem(MAPPING_PREFIX+roomId)
+            var alias = roomIdToAlias[roomId];
             //console.log("looking for alias for " + roomId + "; found: " + alias);
             return alias;
         },
@@ -762,6 +767,10 @@ angular.module('matrixService', [])
             var deferred = $q.defer();
             deferred.reject({data:{error: "Invalid room: " + room_id}});
             return deferred.promise;
+        },
+
+        getTurnServer: function() {
+            return doRequest("GET", "/voip/turnServer");
         }
 
     };

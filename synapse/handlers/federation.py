@@ -169,7 +169,15 @@ class FederationHandler(BaseHandler):
                     )
 
             if not backfilled:
-                yield self.notifier.on_new_room_event(event)
+                extra_users = []
+                if event.type == RoomMemberEvent.TYPE:
+                    target_user_id = event.state_key
+                    target_user = self.hs.parse_userid(target_user_id)
+                    extra_users.append(target_user)
+
+                yield self.notifier.on_new_room_event(
+                    event, extra_users=extra_users
+                )
 
         if event.type == RoomMemberEvent.TYPE:
             if event.membership == Membership.JOIN:

@@ -38,7 +38,8 @@ angular.module('UserController', ['matrixService'])
             $scope.user.avatar_url = response.data.avatar_url;
         }
     );
-    
+
+    // FIXME: factor this out between user-controller and home-controller etc.
     $scope.messageUser = function() {    
         
         // FIXME: create a new room every time, for now

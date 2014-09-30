@@ -30,7 +30,8 @@ class DirectoryStoreTestCase(unittest.TestCase):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
 
-        hs = HomeServer("test",
+        hs = HomeServer(
+            "test",
             db_pool=db_pool,
         )
 
@@ -60,9 +61,25 @@ class DirectoryStoreTestCase(unittest.TestCase):
             servers=["test"],
         )
 
-
         self.assertObjectHasAttributes(
-            {"room_id": self.room.to_string(),
-             "servers": ["test"]},
+            {
+                "room_id": self.room.to_string(),
+                "servers": ["test"],
+            },
+            (yield self.store.get_association_from_room_alias(self.alias))
+        )
+
+    @defer.inlineCallbacks
+    def test_delete_alias(self):
+        yield self.store.create_room_alias_association(
+            room_alias=self.alias,
+            room_id=self.room.to_string(),
+            servers=["test"],
+        )
+
+        room_id = yield self.store.delete_room_alias(self.alias)
+        self.assertEqual(self.room.to_string(), room_id)
+
+        self.assertIsNone(
             (yield self.store.get_association_from_room_alias(self.alias))
         )

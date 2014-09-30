@@ -50,10 +50,10 @@ class ProfileTestCase(unittest.TestCase):
             datastore=None,
         )
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_req(request=None):
             return hs.parse_userid(myid)
 
-        hs.get_auth().get_user_by_token = _get_user_by_token
+        hs.get_auth().get_user_by_req = _get_user_by_req
 
         hs.get_handlers().profile_handler = self.mock_handler
 

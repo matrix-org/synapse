@@ -17,7 +17,7 @@
             <div>{{ config.user_id }}</div>
         </div>
     </div>
-    
+        
     <h3>Recent conversations</h3>
         <div ng-include="'recents/recents.html'"></div>
     <br/>
@@ -52,17 +52,24 @@
     
     <div>
         <form>
-            <input size="40" ng-model="newRoom.room_alias" ng-enter="createNewRoom(newRoom.room_alias, newRoom.private)" placeholder="(e.g. foo_channel)"/>
+            <input size="40" ng-model="newRoom.room_alias" ng-enter="createNewRoom(newRoom.room_alias, newRoom.private)" placeholder="(e.g. foo)"/>
             <input type="checkbox" ng-model="newRoom.private">private
             <button ng-disabled="!newRoom.room_alias" ng-click="createNewRoom(newRoom.room_alias, newRoom.private)">Create room</button>    
         </form>
     </div>
     <div>
         <form>
-            <input size="40" ng-model="joinAlias.room_alias" ng-enter="joinAlias(joinAlias.room_alias)" placeholder="(e.g. #foo_channel:example.org)"/>
+            <input size="40" ng-model="joinAlias.room_alias" ng-enter="joinAlias(joinAlias.room_alias)" placeholder="(e.g. #foo:example.org)"/>
             <button ng-disabled="!joinAlias.room_alias" ng-click="joinAlias(joinAlias.room_alias)">Join room</button>    
         </form>
     </div>
+    <div>
+        <form>
+            <input size="40" ng-model="newChat.user" ng-enter="messageUser()" placeholder="e.g. @user:domain.com"/>
+            <button ng-disabled="!newChat.user" ng-click="messageUser()">Message user</button>
+        </form>
+    </div>
+    
     <br/>
     
     {{ feedback }}

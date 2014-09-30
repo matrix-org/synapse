@@ -146,6 +146,18 @@ class BaseHomeServer(object):
     def serialize_event(self, e):
         return serialize_event(self, e)
 
+    def get_ip_from_request(self, request):
+        # May be an X-Forwarding-For header depending on config
+        ip_addr = request.getClientIP()
+        if self.config.captcha_ip_origin_is_x_forwarded:
+            # use the header
+            if request.requestHeaders.hasHeader("X-Forwarded-For"):
+                ip_addr = request.requestHeaders.getRawHeaders(
+                    "X-Forwarded-For"
+                )[0]
+
+        return ip_addr
+
 # Build magic accessors for every dependency
 for depname in BaseHomeServer.DEPENDENCIES:
     BaseHomeServer._make_dependency_method(depname)

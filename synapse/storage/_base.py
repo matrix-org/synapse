@@ -17,6 +17,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.api.events.utils import prune_event
 from synapse.util.logutils import log_function
 
 import collections
@@ -345,7 +346,7 @@ class SQLBaseStore(object):
         return self.runInteraction(func)
 
     def _parse_event_from_row(self, row_dict):
-        d = copy.deepcopy({k: v for k, v in row_dict.items() if v})
+        d = copy.deepcopy({k: v for k, v in row_dict.items()})
 
         d.pop("stream_ordering", None)
         d.pop("topological_ordering", None)
@@ -373,8 +374,8 @@ class SQLBaseStore(object):
         sql = "SELECT * FROM events WHERE event_id = ?"
 
         for ev in events:
-           if hasattr(ev, "prev_state"):
-                # Load previous state_content. 
+            if hasattr(ev, "prev_state"):
+                # Load previous state_content.
                 # TODO: Should we be pulling this out above?
                 cursor = txn.execute(sql, (ev.prev_state,))
                 prevs = self.cursor_to_dict(cursor)
@@ -382,7 +383,31 @@ class SQLBaseStore(object):
                     prev = self._parse_event_from_row(prevs[0])
                     ev.prev_content = prev.content
 
+            if not hasattr(ev, "redacted"):
+                logger.debug("Doesn't have redacted key: %s", ev)
+                ev.redacted = self._has_been_redacted_txn(txn, ev)
+
+            if ev.redacted:
+                # Get the redaction event.
+                sql = "SELECT * FROM events WHERE event_id = ?"
+                txn.execute(sql, (ev.redacted,))
+
+                del_evs = self._parse_events_txn(
+                    txn, self.cursor_to_dict(txn)
+                )
+
+                if del_evs:
+                    prune_event(ev)
+                    ev.redacted_because = del_evs[0]
+
         return events
+
+    def _has_been_redacted_txn(self, txn, event):
+        sql = "SELECT event_id FROM redactions WHERE redacts = ?"
+        txn.execute(sql, (event.event_id,))
+        result = txn.fetchone()
+        return result[0] if result else None
+
 
 class Table(object):
     """ A base class used to store information about a particular table.

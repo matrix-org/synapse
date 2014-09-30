@@ -24,6 +24,7 @@ from synapse.api.events.room import (
     RoomAddStateLevelEvent,
     RoomSendEventLevelEvent,
     RoomOpsPowerLevelsEvent,
+    RoomRedactionEvent,
 )
 
 from synapse.util.logutils import log_function
@@ -57,12 +58,13 @@ SCHEMAS = [
     "im",
     "room_aliases",
     "keys",
+    "redactions",
 ]
 
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 5
 
 
 class _RollbackButIsFineException(Exception):
@@ -104,7 +106,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 stream_ordering=stream_ordering,
                 is_new_state=is_new_state,
             )
-        except _RollbackButIsFineException as e:
+        except _RollbackButIsFineException:
             pass
 
     @defer.inlineCallbacks
@@ -183,6 +185,8 @@ class DataStore(RoomMemberStore, RoomStore,
             self._store_send_event_level(txn, event)
         elif event.type == RoomOpsPowerLevelsEvent.TYPE:
             self._store_ops_level(txn, event)
+        elif event.type == RoomRedactionEvent.TYPE:
+            self._store_redaction(txn, event)
 
         vals = {
             "topological_ordering": event.depth,
@@ -204,7 +208,7 @@ class DataStore(RoomMemberStore, RoomStore,
         unrec = {
             k: v
             for k, v in event.get_full_dict().items()
-            if k not in vals.keys()
+            if k not in vals.keys() and k not in ["redacted", "redacted_because"]
         }
         vals["unrecognized_keys"] = json.dumps(unrec)
 
@@ -218,7 +222,8 @@ class DataStore(RoomMemberStore, RoomStore,
             )
             raise _RollbackButIsFineException("_persist_event")
 
-        if is_new_state and hasattr(event, "state_key"):
+        is_state = hasattr(event, "state_key") and event.state_key is not None
+        if is_new_state and is_state:
             vals = {
                 "event_id": event.event_id,
                 "room_id": event.room_id,
@@ -242,14 +247,28 @@ class DataStore(RoomMemberStore, RoomStore,
                 }
             )
 
+    def _store_redaction(self, txn, event):
+        txn.execute(
+            "INSERT OR IGNORE INTO redactions "
+            "(event_id, redacts) VALUES (?,?)",
+            (event.event_id, event.redacts)
+        )
+
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
+        del_sql = (
+            "SELECT event_id FROM redactions WHERE redacts = e.event_id "
+            "LIMIT 1"
+        )
+
         sql = (
-            "SELECT e.* FROM events as e "
+            "SELECT e.*, (%(redacted)s) AS redacted FROM events as e "
             "INNER JOIN current_state_events as c ON e.event_id = c.event_id "
             "INNER JOIN state_events as s ON e.event_id = s.event_id "
             "WHERE c.room_id = ? "
-        )
+        ) % {
+            "redacted": del_sql,
+        }
 
         if event_type:
             sql += " AND s.type = ? AND s.state_key = ? "
@@ -275,6 +294,28 @@ class DataStore(RoomMemberStore, RoomStore,
         logger.debug("min_token is: %s", self.min_token)
 
         defer.returnValue(self.min_token)
+
+    def insert_client_ip(self, user, access_token, device_id, ip, user_agent):
+        return self._simple_insert(
+            "user_ips",
+            {
+                "user": user.to_string(),
+                "access_token": access_token,
+                "device_id": device_id,
+                "ip": ip,
+                "user_agent": user_agent,
+                "last_seen": int(self._clock.time_msec()),
+            }
+        )
+
+    def get_user_ip_and_agents(self, user):
+        return self._simple_select_list(
+            table="user_ips",
+            keyvalues={"user": user.to_string()},
+            retcols=[
+                "device_id", "access_token", "ip", "user_agent", "last_seen"
+            ],
+        )
 
     def snapshot_room(self, room_id, user_id, state_type=None, state_key=None):
         """Snapshot the room for an update by a user

@@ -52,6 +52,7 @@ class PresenceStateTestCase(unittest.TestCase):
             datastore=Mock(spec=[
                 "get_presence_state",
                 "set_presence_state",
+                "insert_client_ip",
             ]),
             http_client=None,
             resource_for_client=self.mock_resource,
@@ -67,7 +68,11 @@ class PresenceStateTestCase(unittest.TestCase):
         self.datastore.get_presence_list = get_presence_list
 
         def _get_user_by_token(token=None):
-            return hs.parse_userid(myid)
+            return {
+                "user": hs.parse_userid(myid),
+                "admin": False,
+                "device_id": None,
+            }
 
         hs.get_auth().get_user_by_token = _get_user_by_token
 
@@ -135,6 +140,7 @@ class PresenceListTestCase(unittest.TestCase):
                 "set_presence_list_accepted",
                 "del_presence_list",
                 "get_presence_list",
+                "insert_client_ip",
             ]),
             http_client=None,
             resource_for_client=self.mock_resource,
@@ -152,7 +158,11 @@ class PresenceListTestCase(unittest.TestCase):
         self.datastore.has_presence_state = has_presence_state
 
         def _get_user_by_token(token=None):
-            return hs.parse_userid(myid)
+            return {
+                "user": hs.parse_userid(myid),
+                "admin": False,
+                "device_id": None,
+            }
 
         room_member_handler = hs.handlers.room_member_handler = Mock(
             spec=[

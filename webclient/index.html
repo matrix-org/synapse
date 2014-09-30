@@ -69,7 +69,7 @@
                         <span ng-show="currentCall.state == 'ringing' && currentCall && currentCall.type == 'voice'">Incoming Voice Call</span>
                         <span ng-show="currentCall.state == 'connecting'">Call Connecting...</span>
                         <span ng-show="currentCall.state == 'connected'">Call Connected</span>
-                        <span ng-show="currentCall.state == 'ended' && currentCall.hangupReason == 'ice_failed'">Media Connection Failed</span>
+                        <span ng-show="currentCall.state == 'ended' && currentCall.hangupReason == 'ice_failed'">Media Connection Failed{{ haveTurn ? "" : " (VoIP relaying unsupported by Home Server)" }}</span>
                         <span ng-show="currentCall.state == 'ended' && !currentCall.hangupReason && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'remote'">Call Rejected</span>
                         <span ng-show="currentCall.state == 'ended' && !currentCall.hangupReason && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'local'">Call Canceled</span>
                         <span ng-show="currentCall.state == 'ended' && currentCall.hangupReason == 'invite_timeout' && !currentCall.didConnect && currentCall.direction == 'outbound' && currentCall.hangupParty == 'local'">User Not Responding</span>
