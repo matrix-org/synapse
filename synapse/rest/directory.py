@@ -16,7 +16,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import AuthError, SynapseError, Codes
 from base import RestServlet, client_path_pattern
 
 import json
@@ -78,6 +78,24 @@ class ClientDirectoryServer(RestServlet):
         except:
             logger.exception("Failed to create association")
             raise
+
+        defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, room_alias):
+        user = yield self.auth.get_user_by_req(request)
+
+        is_admin = yield self.auth.is_server_admin(user)
+        if not is_admin:
+            raise AuthError(403, "You need to be a server admin")
+
+        dir_handler = self.handlers.directory_handler
+
+        room_alias = self.hs.parse_roomalias(urllib.unquote(room_alias))
+
+        yield dir_handler.delete_association(
+            user.to_string(), room_alias
+        )
 
         defer.returnValue((200, {}))
 

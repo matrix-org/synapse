@@ -57,7 +57,6 @@ class DirectoryHandler(BaseHandler):
         if not servers:
             raise SynapseError(400, "Failed to get server list")
 
-
         try:
             yield self.store.create_room_alias_association(
                 room_alias,
@@ -68,25 +67,19 @@ class DirectoryHandler(BaseHandler):
             defer.returnValue("Already exists")
 
         # TODO: Send the room event.
+        yield self._update_room_alias_events(user_id, room_id)
 
-        aliases = yield self.store.get_aliases_for_room(room_id)
+    @defer.inlineCallbacks
+    def delete_association(self, user_id, room_alias):
+        # TODO Check if server admin
 
-        event = self.event_factory.create_event(
-            etype=RoomAliasesEvent.TYPE,
-            state_key=self.hs.hostname,
-            room_id=room_id,
-            user_id=user_id,
-            content={"aliases": aliases},
-        )
+        if not room_alias.is_mine:
+            raise SynapseError(400, "Room alias must be local")
 
-        snapshot = yield self.store.snapshot_room(
-            room_id=room_id,
-            user_id=user_id,
-        )
+        room_id = yield self.store.delete_room_alias(room_alias)
 
-        yield self.state_handler.handle_new_event(event, snapshot)
-        yield self._on_new_room_event(event, snapshot, extra_users=[user_id])
-
+        if room_id:
+            yield self._update_room_alias_events(user_id, room_id)
 
     @defer.inlineCallbacks
     def get_association(self, room_alias):
@@ -142,3 +135,23 @@ class DirectoryHandler(BaseHandler):
             "room_id": result.room_id,
             "servers": result.servers,
         })
+
+    @defer.inlineCallbacks
+    def _update_room_alias_events(self, user_id, room_id):
+        aliases = yield self.store.get_aliases_for_room(room_id)
+
+        event = self.event_factory.create_event(
+            etype=RoomAliasesEvent.TYPE,
+            state_key=self.hs.hostname,
+            room_id=room_id,
+            user_id=user_id,
+            content={"aliases": aliases},
+        )
+
+        snapshot = yield self.store.snapshot_room(
+            room_id=room_id,
+            user_id=user_id,
+        )
+
+        yield self.state_handler.handle_new_event(event, snapshot)
+        yield self._on_new_room_event(event, snapshot, extra_users=[user_id])
