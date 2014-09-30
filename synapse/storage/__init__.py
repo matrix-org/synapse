@@ -56,6 +56,7 @@ SCHEMAS = [
     "presence",
     "im",
     "room_aliases",
+    "keys",
 ]
 
 

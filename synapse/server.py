@@ -34,6 +34,7 @@ from synapse.util.distributor import Distributor
 from synapse.util.lockutils import LockManager
 from synapse.streams.events import EventSources
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.crypto.keyring import Keyring
 
 
 class BaseHomeServer(object):
@@ -78,6 +79,7 @@ class BaseHomeServer(object):
         'resource_for_server_key',
         'event_sources',
         'ratelimiter',
+        'keyring',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -200,6 +202,9 @@ class HomeServer(BaseHomeServer):
 
     def build_ratelimiter(self):
         return Ratelimiter()
+
+    def build_keyring(self):
+        return Keyring(self)
 
     def register_servlets(self):
         """ Register all servlets associated with this HomeServer.

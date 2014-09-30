@@ -74,6 +74,7 @@ class FederationTestCase(unittest.TestCase):
                 datastore=self.mock_persistence,
                 clock=self.clock,
                 config=self.mock_config,
+                keyring=Mock(),
         )
         self.federation = initialize_http_replication(hs)
         self.distributor = hs.get_distributor()

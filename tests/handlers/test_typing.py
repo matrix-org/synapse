@@ -79,6 +79,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                 resource_for_federation=self.mock_federation_resource,
                 http_client=self.mock_http_client,
                 config=self.mock_config,
+                keyring=Mock(),
             )
         hs.handlers = JustTypingNotificationHandlers(hs)
 

@@ -66,6 +66,8 @@ class ReplicationLayer(object):
             hs, self.transaction_actions, transport_layer
         )
 
+        self.keyring = hs.get_keyring()
+
         self.handler = None
         self.edu_handlers = {}
         self.query_handlers = {}
@@ -291,6 +293,10 @@ class ReplicationLayer(object):
     @defer.inlineCallbacks
     @log_function
     def on_incoming_transaction(self, transaction_data):
+        yield self.keyring.verify_json_for_server(
+            transaction_data["origin"], transaction_data
+        )
+
         transaction = Transaction(**transaction_data)
 
         for p in transaction.pdus:
@@ -590,7 +596,7 @@ class _TransactionQueue(object):
 
             transaction = Transaction.create_new(
                 ts=self._clock.time_msec(),
-                transaction_id=self._next_txn_id,
+                transaction_id=str(self._next_txn_id),
                 origin=self.server_name,
                 destination=destination,
                 pdus=pdus,
@@ -611,20 +617,18 @@ class _TransactionQueue(object):
 
             # FIXME (erikj): This is a bit of a hack to make the Pdu age
             # keys work
-            def cb(transaction):
+            def json_data_cb():
+                data = transaction.get_dict()
                 now = int(self._clock.time_msec())
-                if "pdus" in transaction:
-                    for p in transaction["pdus"]:
+                if "pdus" in data:
+                    for p in data["pdus"]:
                         if "age_ts" in p:
                             p["age"] = now - int(p["age_ts"])
-
-                transaction = sign_json(transaction, server_name, signing_key)
-
-                return transaction
+                data = sign_json(data, server_name, signing_key)
+                return data
 
             code, response = yield self.transport_layer.send_transaction(
-                transaction,
-                on_send_callback=cb,
+                transaction, json_data_cb
             )
 
             logger.debug("TX [%s] Sent transaction", destination)

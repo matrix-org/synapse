@@ -17,7 +17,7 @@
 from tests import unittest
 from twisted.internet import defer, reactor
 
-from mock import Mock, call, ANY, NonCallableMock
+from mock import Mock, call, ANY, NonCallableMock, patch
 import json
 
 from tests.utils import (
@@ -59,7 +59,6 @@ class JustPresenceHandlers(object):
     def __init__(self, hs):
         self.presence_handler = PresenceHandler(hs)
 
-
 class PresenceStateTestCase(unittest.TestCase):
     """ Tests presence management. """
 
@@ -78,6 +77,7 @@ class PresenceStateTestCase(unittest.TestCase):
             resource_for_federation=Mock(),
             http_client=None,
             config=self.mock_config,
+            keyring=Mock(),
         )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -230,6 +230,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
             resource_for_federation=self.mock_federation_resource,
             http_client=self.mock_http_client,
             config=self.mock_config,
+            keyring=Mock(),
         )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -533,6 +534,7 @@ class PresencePushTestCase(unittest.TestCase):
                 resource_for_federation=self.mock_federation_resource,
                 http_client=self.mock_http_client,
                 config=self.mock_config,
+                keyring=Mock(),
             )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -1025,7 +1027,8 @@ class PresencePollingTestCase(unittest.TestCase):
                 resource_for_client=Mock(),
                 resource_for_federation=self.mock_federation_resource,
                 http_client=self.mock_http_client,
-                config = self.mock_config,
+                config=self.mock_config,
+                keyring=Mock(),
             )
         hs.handlers = JustPresenceHandlers(hs)
 
