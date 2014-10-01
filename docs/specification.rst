@@ -1527,6 +1527,15 @@ in the other direction will not). This timestamp is presented via a key called
 ``last_active_ago``, which gives the relative number of miliseconds since the
 message is generated/emitted, that the user was last seen active.
 
+Home servers can also use the user's choice of presence state as a signal for
+how to handle new private one-to-one chat message requests. For example, it
+might decide:
+
+  - ``free_for_chat`` : accept anything
+  - ``online`` : accept from anyone in my addres book list
+  - ``busy`` : accept from anyone in this "important people" group in my
+    address book list
+
 Transmission
 ------------
 .. NOTE::
@@ -1544,6 +1553,11 @@ list, the user being added must receive permission from the list owner. Once
 granted, both user's HS(es) store this information. Since such subscriptions
 are likely to be bidirectional, HSes may wish to automatically accept requests
 when a reverse subscription already exists.
+
+As a convenience, presence lists should support the ability to collect users
+into groups, which could allow things like inviting the entire group to a new
+("ad-hoc") chat room, or easy interaction with the profile information ACL
+implementation of the HS.
 
 Presence and Permissions
 ------------------------

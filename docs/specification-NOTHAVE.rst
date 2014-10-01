@@ -18,3 +18,13 @@ a sense of an "idle timer". This should be maintained individually by the
 user's clients, and the home server can take the highest reported time as that
 to report. When a user is offline, the home server can still report when the
 user was last seen online.
+
+Device Type
+-----------
+
+Client devices that may limit the user experience somewhat (such as "mobile"
+devices with limited ability to type on a real keyboard or read large amounts of
+text) should report this to the home server, as this is also useful information
+to report as "presence" if the user cannot be expected to provide a good typed
+response to messages.
+
