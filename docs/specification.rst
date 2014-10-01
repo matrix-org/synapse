@@ -1143,7 +1143,7 @@ is the event that caused it to be redacted, which may include a reason.
 Redacting an event cannot be undone, allowing server owners to delete the
 offending content from the databases.
 
-Currently, only room admins can redact events by sending a ``m.room.redacted``
+Currently, only room admins can redact events by sending a ``m.room.redaction``
 event, but server admins also need to be able to redact events by a similar
 mechanism.
 
