@@ -1536,22 +1536,6 @@ In the latter case, this allows for clients to display some minimal sense of
 presence information in a user list for a room.
 
 
-Typing notifications
-====================
-.. NOTE::
-  This section is a work in progress.
-
-.. TODO-doc Leo
-    - what is the event type. Are they bundled with other event types? If so, which.
-    - what are the valid keys / values. What do they represent. Any gotchas?
-    - Timeouts. How do they work, who sets them and how do they expire. Does one
-      have priority over another? Give examples.
-
-.. TODO-spec Leo
-    - actually define the client-server API; the only thing that currently
-      exists is entirely server-server
-
-
 Voice over IP
 =============
 Matrix can also be used to set up VoIP calls. This is part of the core
