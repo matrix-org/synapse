@@ -1497,14 +1497,6 @@ in the other direction will not). This timestamp is presented via a key called
 ``last_active_ago``, which gives the relative number of miliseconds since the
 message is generated/emitted, that the user was last seen active.
 
-Idle Time
----------
-As well as the basic ``presence`` field, the presence information can also show
-a sense of an "idle timer". This should be maintained individually by the
-user's clients, and the home server can take the highest reported time as that
-to report. When a user is offline, the home server can still report when the
-user was last seen online.
-
 Transmission
 ------------
 .. NOTE::
