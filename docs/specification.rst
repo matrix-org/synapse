@@ -1147,6 +1147,36 @@ Currently, only room admins can redact events by sending a ``m.room.redaction``
 event, but server admins also need to be able to redact events by a similar
 mechanism.
 
+Upon receipt of a redaction event, the server should strip off any keys not in
+the following list:
+
+ - ``event_id``
+ - ``type``
+ - ``room_id``
+ - ``user_id``
+ - ``state_key``
+ - ``prev_state``
+ - ``content``
+
+The content object should also be stripped of all keys, unless it is one of
+one of the following event types:
+
+ - ``m.room.member`` allows key ``membership``
+ - ``m.room.create`` allows key ``creator``
+ - ``m.room.join_rules`` allows key ``join_rule``
+ - ``m.room.power_levels`` allows keys that are user ids or ``default``
+ - ``m.room.add_state_level`` allows key ``level``
+ - ``m.room.send_event_level`` allows key ``level``
+ - ``m.room.ops_levels`` allows keys ``kick_level``, ``ban_level``
+   and ``redact_level``
+ - ``m.room.aliases`` allows key ``aliases``
+
+The redaction event should be added under the key ``redacted_because``.
+
+
+When a client receives a redaction event it should change the redacted event
+in the same way a server does.
+
 
 Room Events
 ===========
