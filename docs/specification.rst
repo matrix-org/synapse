@@ -1664,6 +1664,12 @@ Rejecting a presence invite::
 
   Content keys - as for m.presence_invite
 
+.. TODO-doc
+  - Explain the timing-based roundtrip reduction mechanism for presence
+    messages
+  - Explain the zero-byte presence inference logic
+  See also: docs/client-server/model/presence
+
 
 Voice over IP
 =============
