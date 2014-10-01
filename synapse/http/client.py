@@ -35,13 +35,6 @@ import urllib
 
 logger = logging.getLogger(__name__)
 
-# FIXME: SURELY these should be killed?!
-_destination_mappings = {
-    "red": "localhost:8080",
-    "blue": "localhost:8081",
-    "green": "localhost:8082",
-}
-
 
 class HttpClient(object):
     """ Interface for talking json over http
