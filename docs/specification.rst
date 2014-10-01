@@ -1536,15 +1536,6 @@ might decide:
   - ``busy`` : accept from anyone in this "important people" group in my
     address book list
 
-Transmission
-------------
-.. NOTE::
-  This section is a work in progress.
-
-.. TODO-doc:
-  - Transmitted as an EDU.
-  - Presence lists determine who to send to.
-
 Presence List
 -------------
 Each user's home server stores a "presence list" for that user. This stores a
@@ -1570,6 +1561,108 @@ user, either:
 
 In the latter case, this allows for clients to display some minimal sense of
 presence information in a user list for a room.
+
+Client API
+----------
+The client API for presence is on the following set of REST calls.
+
+Fetching basic status::
+
+  GET $PREFIX/presence/:user_id/status
+
+  Returned content: JSON object containing the following keys:
+    presence: "offline"|"unavailable"|"online"|"free_for_chat"
+    status_msg: (optional) string of freeform text
+    last_active_ago: miliseconds since the last activity by the user
+
+Setting basic status::
+
+  PUT $PREFIX/presence/:user_id/status
+
+  Content: JSON object containing the following keys:
+    presence and status_msg: as above
+
+When setting the status, the activity time is updated to reflect that activity;
+the client does not need to specify the ``last_active_ago`` field.
+
+Fetching the presence list::
+
+  GET $PREFIX/presence/list
+
+  Returned content: JSON array containing objects; each object containing the
+    following keys:
+    user_id: observed user ID
+    presence: "offline"|"unavailable"|"online"|"free_for_chat"
+    status_msg: (optional) string of freeform text
+    last_active_ago: miliseconds since the last activity by the user
+
+Maintaining the presence list::
+
+  POST $PREFIX/presence/list
+
+  Content: JSON object containing either or both of the following keys:
+    invite: JSON array of strings giving user IDs to send invites to
+    drop: JSON array of strings giving user IDs to remove from the list
+
+.. TODO-spec
+  - Define how users receive presence invites, and how they accept/decline them
+
+Server API
+----------
+The server API for presence is based entirely on exchange of the following
+EDUs. There are no PDUs or Federation Queries involved.
+
+Performing a presence update and poll subscription request::
+
+  EDU type: m.presence
+
+  Content keys:
+    push: (optional): list of push operations.
+      Each should be an object with the following keys:
+        user_id: string containing a User ID
+        presence: "offline"|"unavailable"|"online"|"free_for_chat"
+        status_msg: (optional) string of freeform text
+        last_active_ago: miliseconds since the last activity by the user
+
+    poll: (optional): list of strings giving User IDs
+
+    unpoll: (optional): list of strings giving User IDs
+
+The presence of this combined message is two-fold: it informs the recipient
+server of the current status of one or more users on the sending server (by the
+``push`` key), and it maintains the list of users on the recipient server that
+the sending server is interested in receiving updates for, by adding (by the
+``poll`` key) or removing them (by the ``unpoll`` key). The ``poll`` and
+``unpoll`` lists apply *changes* to the implied list of users; any existing IDs
+that the server sent as ``poll`` operations in a previous message are not
+removed until explicitly requested by a later ``unpoll``.
+
+On receipt of a message containing a non-empty ``poll`` list, the receiving
+server should immediately send the sending server a presence update EDU of its
+own, containing in a ``push`` list the current state of every user that was in
+the orginal EDU's ``poll`` list.
+
+Sending a presence invite::
+
+  EDU type: m.presence_invite
+
+  Content keys:
+    observed_user: string giving the User ID of the user whose presence is
+      requested (i.e. the recipient of the invite)
+    observer_user: string giving the User ID of the user who is requesting to
+      observe the presence (i.e. the sender of the invite)
+
+Accepting a presence invite::
+
+  EDU type: m.presence_accept
+
+  Content keys - as for m.presence_invite
+
+Rejecting a presence invite::
+
+  EDU type: m.presence_deny
+
+  Content keys - as for m.presence_invite
 
 
 Voice over IP
