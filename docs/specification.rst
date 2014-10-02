@@ -167,7 +167,7 @@ The following diagram shows an ``m.room.message`` event being sent in the room
        |   matrix.org     |<-------Federation------->|   domain.com     |
        +------------------+                          +------------------+
                 |       .................................        |
-                |______|     Partially Shared State      |_______|
+                |______|           Shared State          |_______|
                        | Room ID: !qporfwt:matrix.org    |
                        | Servers: matrix.org, domain.com |
                        | Members:                        |
@@ -177,11 +177,10 @@ The following diagram shows an ``m.room.message`` event being sent in the room
 
 Federation maintains shared state between multiple home servers, such that when
 an event is sent to a room, the home server knows where to forward the event on
-to, and how to process the event. Home servers do not need to have completely
-shared state in order to participate in a room. State is scoped to a single
-room, and federation ensures that all home servers have the information they
-need, even if that means the home server has to request more information from
-another home server before processing the event.
+to, and how to process the event. State is scoped to a single room, and
+federation ensures that all home servers have the information they need, even
+if that means the home server has to request more information from another home
+server before processing the event.
 
 Room Aliases
 ------------
