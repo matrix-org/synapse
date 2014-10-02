@@ -774,7 +774,7 @@ Example::
 
   {
     "visibility": "public", 
-    "room_alias_name": "the pub",
+    "room_alias_name": "thepub",
     "name": "The Grand Duke Pub",
     "topic": "All about happy hour"
   }
