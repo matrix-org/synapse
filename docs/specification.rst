@@ -721,7 +721,7 @@ options which can be set when creating a room:
   Description:
     A ``public`` visibility indicates that the room will be shown in the public
     room list. A ``private`` visibility will hide the room from the public room
-    list. Rooms default to ``public`` visibility if this key is not included.
+    list. Rooms default to ``private`` visibility if this key is not included.
 
 ``room_alias_name``
   Type: 
@@ -2038,7 +2038,7 @@ For state updates:
   Description:
     The asserted power level of the user performing the update.
     
-``min_update``
+``required_power_level``
   Type:
     Integer
   Description:
@@ -2056,7 +2056,7 @@ For state updates:
   Description:
     The PDU id of the update this replaces.
     
-``user``
+``user_id``
   Type:
     String
   Description:
