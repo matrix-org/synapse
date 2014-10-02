@@ -22,7 +22,8 @@ from synapse.api.errors import (
 )
 from ._base import BaseHandler
 import synapse.util.stringutils as stringutils
-from synapse.http.client import PlainHttpClient
+from synapse.http.client import IdentityServerHttpClient
+from synapse.http.client import CaptchaServerHttpClient
 
 import base64
 import bcrypt
@@ -154,7 +155,9 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _threepid_from_creds(self, creds):
-        httpCli = PlainHttpClient(self.hs)
+        # TODO: get this from the homeserver rather than creating a new one for
+        # each request
+        httpCli = IdentityServerHttpClient(self.hs)
         # XXX: make this configurable!
         trustedIdServers = ['matrix.org:8090']
         if not creds['idServer'] in trustedIdServers:
@@ -203,7 +206,9 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _submit_captcha(self, ip_addr, private_key, challenge, response):
-        client = PlainHttpClient(self.hs)
+        # TODO: get this from the homeserver rather than creating a new one for
+        # each request
+        client = CaptchaServerHttpClient(self.hs)
         data = yield client.post_urlencoded_get_raw(
             "www.google.com:80",
             "/recaptcha/api/verify",

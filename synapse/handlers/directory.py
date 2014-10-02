@@ -18,7 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError
-from synapse.http.client import HttpClient
+from synapse.http.client import MatrixHttpClient
 from synapse.api.events.room import RoomAliasesEvent
 
 import logging
@@ -98,7 +98,7 @@ class DirectoryHandler(BaseHandler):
                 query_type="directory",
                 args={
                     "room_alias": room_alias.to_string(),
-                    HttpClient.RETRY_DNS_LOOKUP_FAILURES: False
+                    MatrixHttpClient.RETRY_DNS_LOOKUP_FAILURES: False
                 }
             )
 
