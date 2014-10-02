@@ -1182,9 +1182,6 @@ Room Events
 .. NOTE::
   This section is a work in progress.
 
-.. TODO-doc dave?
-  - voip events?
-
 This specification outlines several standard event types, all of which are
 prefixed with ``m.``
 
