@@ -849,6 +849,7 @@ Joining rooms
 -------------
 .. TODO-doc kegan
   - TODO: What does the home server have to do to join a user to a room?
+    See SPEC-30.
 
 Users need to join a room in order to send and receive events in that room. A
 user can join a room by making a request to |/join/<room_alias_or_id>|_ with::
@@ -1389,6 +1390,10 @@ prefixed with ``m.``
 
 m.room.message msgtypes
 -----------------------
+
+.. TODO-spec
+   How a client should handle unknown message types.
+
 Each ``m.room.message`` MUST have a ``msgtype`` key which identifies the type
 of message being sent. Each type has their own required and optional keys, as
 outlined below:
