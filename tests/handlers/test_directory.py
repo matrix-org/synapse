@@ -20,7 +20,6 @@ from twisted.internet import defer
 from mock import Mock
 
 from synapse.server import HomeServer
-from synapse.http.client import MatrixHttpClient
 from synapse.handlers.directory import DirectoryHandler
 from synapse.storage.directory import RoomAliasMapping
 
@@ -95,8 +94,8 @@ class DirectoryTestCase(unittest.TestCase):
             query_type="directory",
             args={
                 "room_alias": "#another:remote",
-                MatrixHttpClient.RETRY_DNS_LOOKUP_FAILURES: False
-            }
+            },
+            retry_on_dns_fail=False,
         )
 
     @defer.inlineCallbacks

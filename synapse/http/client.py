@@ -183,7 +183,7 @@ class MatrixHttpClient(BaseHttpClient):
         defer.returnValue((response.code, body))
 
     @defer.inlineCallbacks
-    def get_json(self, destination, path, args={}):
+    def get_json(self, destination, path, args={}, retry_on_dns_fail=True):
         """ Get's some json from the given host homeserver and path
 
         Args:
@@ -202,13 +202,6 @@ class MatrixHttpClient(BaseHttpClient):
             where `response` is a dict representing the decoded JSON body.
         """
         logger.debug("get_json args: %s", args)
-
-        retry_on_dns_fail = True
-        if HttpClient.RETRY_DNS_LOOKUP_FAILURES in args:
-            # FIXME: This isn't ideal, but the interface exposed in get_json
-            # isn't comprehensive enough to give caller's any control over
-            # their connection mechanics.
-            retry_on_dns_fail = args.pop(HttpClient.RETRY_DNS_LOOKUP_FAILURES)
 
         query_bytes = urllib.urlencode(args, True)
         logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)

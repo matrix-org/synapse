@@ -253,7 +253,7 @@ class FederationTestCase(unittest.TestCase):
         response = yield self.federation.make_query(
             destination="remote",
             query_type="a-question",
-            args={"one": "1", "two": "2"}
+            args={"one": "1", "two": "2"},
         )
 
         self.assertEquals({"your": "response"}, response)
@@ -261,7 +261,8 @@ class FederationTestCase(unittest.TestCase):
         self.mock_http_client.get_json.assert_called_with(
             destination="remote",
             path="/_matrix/federation/v1/query/a-question",
-            args={"one": "1", "two": "2"}
+            args={"one": "1", "two": "2"},
+            retry_on_dns_fail=True,
         )
 
     @defer.inlineCallbacks

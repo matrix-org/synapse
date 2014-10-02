@@ -193,13 +193,14 @@ class TransportLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def make_query(self, destination, query_type, args):
+    def make_query(self, destination, query_type, args, retry_on_dns_fail):
         path = PREFIX + "/query/%s" % query_type
 
         response = yield self.client.get_json(
             destination=destination,
             path=path,
-            args=args
+            args=args,
+            retry_on_dns_fail=retry_on_dns_fail,
         )
 
         defer.returnValue(response)
