@@ -14,7 +14,7 @@ case "$1" in
   start)
     if [ ! -f "$CONFIGFILE" ]; then
       echo "No config file found"
-      echo "To generate a config file, run '$SYNAPSE -c $CONFIGFILE --generate-config'"
+      echo "To generate a config file, run '$SYNAPSE -c $CONFIGFILE --generate-config --server-name=<server name>'"
       exit 1
     fi
 

@@ -51,6 +51,7 @@ To get up and running:
 
 - To run your own **private** homeserver on localhost:8008, generate a basic
   config file: ``./synctl start`` will give you instructions on how to do this.
+  For this purpose, you can use 'localhost' or your hostname as a server name.
   Once you've done so, running ``./synctl start`` again will start your private
   home sserver. You will find a webclient running at http://localhost:8008.
   Please use a recent Chrome or Firefox for now (or Safari if you don't need
@@ -253,7 +254,7 @@ http://localhost:8080. Simply run::
 Running The Demo Web Client
 ===========================
 
-The homeserver runs a web client by default at http://localhost:8080.
+The homeserver runs a web client by default at https://localhost:8448/.
 
 If this is the first time you have used the client from that browser (it uses
 HTML5 local storage to remember its config), you will need to log in to your
@@ -273,7 +274,7 @@ account. Your name will take the form of::
 
 Specify your desired localpart in the topmost box of the "Register for an
 account" form, and click the "Register" button. Hostnames can contain ports if
-required due to lack of SRV records (e.g. @matthew:localhost:8080 on an
+required due to lack of SRV records (e.g. @matthew:localhost:8448 on an
 internal synapse sandbox running on localhost)
 
 
