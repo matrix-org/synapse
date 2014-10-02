@@ -46,11 +46,13 @@ To get up and running:
     - To simply play with an **existing** homeserver you can
       just go straight to http://matrix.org/alpha.
     
-    - To run your own **private** homeserver on localhost:8008, install synapse with
-      ``python setup.py develop --user`` and then run ``./synctl start`` twice (once to
-      generate a config; once to actually run) - you will find a webclient running at
-      http://localhost:8008. Please use a recent Chrome, Safari or Firefox for now...
-             
+    - To run your own **private** homeserver on localhost:8008, generate a basic
+      config file: ``./synctl start`` will give you instructions on how to do this.
+      Once you've done so, running ``./synctl start`` again will start your private
+      home sserver. You will find a webclient running at http://localhost:8008.
+      Please use a recent Chrome or Firefox for now (or Safari if you don't need
+      VoIP support).
+
     - To run a **public** homeserver and let it exchange messages with other homeservers
       and participate in the global Matrix federation, you must expose port 8448 to the
       internet and edit homeserver.yaml to specify server_name (the public DNS entry for
