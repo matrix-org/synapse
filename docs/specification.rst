@@ -792,7 +792,7 @@ includes:
  - ``m.room.send_event_level`` : The power level required in order to send a
    message in this room.
  - ``m.room.ops_level`` : The power level required in order to kick or ban a
-   user from the room.
+   user from the room or redact an event in the room.
 
 See `Room Events`_ for more information on these events.
 
@@ -1316,7 +1316,7 @@ prefixed with ``m.``
   Type: 
     State event
   JSON format:
-    ``{ "ban_level": <int>, "kick_level": <int> }``
+    ``{ "ban_level": <int>, "kick_level": <int>, "redact_level": <int> }``
   Example:
     ``{ "ban_level": 5, "kick_level": 5 }``
   Description:
