@@ -947,11 +947,7 @@ directly by sending the following request to
 See the `Room events`_ section for more information on ``m.room.member``.
 
 Once a user has left a room, that room will no longer appear on the
-|initialSync|_ API. Be aware that leaving a room is not equivalent to have
-never been in that room. A user who has previously left a room still maintains
-some residual state in that room. Their membership state will be marked as
-``leave``. This contrasts with a user who has *never been invited or joined to
-that room* who will not have any membership state for that room. 
+|initialSync|_ API.
 
 If all members in a room leave, that room becomes eligible for deletion. 
 
