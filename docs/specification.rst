@@ -1949,9 +1949,7 @@ is another list containing the EDUs. This key may be entirely absent if there
 are no EDUs to transfer.
 
 (* Normally the PDU list will be non-empty, but the server should cope with
-receiving an "empty" transaction, as this is useful for informing peers of
-other transaction IDs they should be aware of. This effectively acts as a push
-mechanism to encourage peers to continue to replicate content.)
+receiving an "empty" transaction.)
 
 PDUs and EDUs
 -------------
