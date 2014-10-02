@@ -241,8 +241,8 @@ authentication of the 3PID.  Identity servers are also used to preserve the
 mapping indefinitely, by replicating the mappings across multiple ISes.
 
 Usage of an IS is not required in order for a client application to be part of
-the Matrix ecosystem. However, by not using an IS, discovery of users is
-greatly impacted.
+the Matrix ecosystem. However, without one clients will not be able to look up
+user IDs using 3PIDs.
 
 API Standards
 -------------
