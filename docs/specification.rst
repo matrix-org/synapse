@@ -190,7 +190,7 @@ Each room can also have multiple "Room Aliases", which looks like::
   #room_alias:domain
 
   .. TODO
-      - Need to specify precise grammar for Room IDs
+      - Need to specify precise grammar for Room Aliases
 
 A room alias "points" to a room ID and is the human-readable label by which
 rooms are publicised and discovered.  The room ID the alias is pointing to can
@@ -199,6 +199,9 @@ that the mapping from a room alias to a room ID is not fixed, and may change
 over time to point to a different room ID. For this reason, Clients SHOULD
 resolve the room alias to a room ID once and then use that ID on subsequent
 requests.
+
+When resolving a room alias the server will also respond with a list of servers
+that are in the room that can be used to join via.
 
 ::
 
