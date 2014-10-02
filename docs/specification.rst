@@ -167,7 +167,7 @@ The following diagram shows an ``m.room.message`` event being sent in the room
        |   matrix.org     |<-------Federation------->|   domain.com     |
        +------------------+                          +------------------+
                 |       .................................        |
-                |______|     Partially Shared State      |_______|
+                |______|           Shared State          |_______|
                        | Room ID: !qporfwt:matrix.org    |
                        | Servers: matrix.org, domain.com |
                        | Members:                        |
@@ -177,11 +177,10 @@ The following diagram shows an ``m.room.message`` event being sent in the room
 
 Federation maintains shared state between multiple home servers, such that when
 an event is sent to a room, the home server knows where to forward the event on
-to, and how to process the event. Home servers do not need to have completely
-shared state in order to participate in a room. State is scoped to a single
-room, and federation ensures that all home servers have the information they
-need, even if that means the home server has to request more information from
-another home server before processing the event.
+to, and how to process the event. State is scoped to a single room, and
+federation ensures that all home servers have the information they need, even
+if that means the home server has to request more information from another home
+server before processing the event.
 
 Room Aliases
 ------------
@@ -191,7 +190,7 @@ Each room can also have multiple "Room Aliases", which looks like::
   #room_alias:domain
 
   .. TODO
-      - Need to specify precise grammar for Room IDs
+      - Need to specify precise grammar for Room Aliases
 
 A room alias "points" to a room ID and is the human-readable label by which
 rooms are publicised and discovered.  The room ID the alias is pointing to can
@@ -200,6 +199,9 @@ that the mapping from a room alias to a room ID is not fixed, and may change
 over time to point to a different room ID. For this reason, Clients SHOULD
 resolve the room alias to a room ID once and then use that ID on subsequent
 requests.
+
+When resolving a room alias the server will also respond with a list of servers
+that are in the room that can be used to join via.
 
 ::
 
@@ -239,8 +241,8 @@ authentication of the 3PID.  Identity servers are also used to preserve the
 mapping indefinitely, by replicating the mappings across multiple ISes.
 
 Usage of an IS is not required in order for a client application to be part of
-the Matrix ecosystem. However, by not using an IS, discovery of users is
-greatly impacted.
+the Matrix ecosystem. However, without one clients will not be able to look up
+user IDs using 3PIDs.
 
 API Standards
 -------------
@@ -719,7 +721,7 @@ options which can be set when creating a room:
   Description:
     A ``public`` visibility indicates that the room will be shown in the public
     room list. A ``private`` visibility will hide the room from the public room
-    list. Rooms default to ``public`` visibility if this key is not included.
+    list. Rooms default to ``private`` visibility if this key is not included.
 
 ``room_alias_name``
   Type: 
@@ -772,7 +774,7 @@ Example::
 
   {
     "visibility": "public", 
-    "room_alias_name": "the pub",
+    "room_alias_name": "thepub",
     "name": "The Grand Duke Pub",
     "topic": "All about happy hour"
   }
@@ -790,7 +792,7 @@ includes:
  - ``m.room.send_event_level`` : The power level required in order to send a
    message in this room.
  - ``m.room.ops_level`` : The power level required in order to kick or ban a
-   user from the room.
+   user from the room or redact an event in the room.
 
 See `Room Events`_ for more information on these events.
 
@@ -847,6 +849,7 @@ Joining rooms
 -------------
 .. TODO-doc kegan
   - TODO: What does the home server have to do to join a user to a room?
+    See SPEC-30.
 
 Users need to join a room in order to send and receive events in that room. A
 user can join a room by making a request to |/join/<room_alias_or_id>|_ with::
@@ -945,11 +948,7 @@ directly by sending the following request to
 See the `Room events`_ section for more information on ``m.room.member``.
 
 Once a user has left a room, that room will no longer appear on the
-|initialSync|_ API. Be aware that leaving a room is not equivalent to have
-never been in that room. A user who has previously left a room still maintains
-some residual state in that room. Their membership state will be marked as
-``leave``. This contrasts with a user who has *never been invited or joined to
-that room* who will not have any membership state for that room. 
+|initialSync|_ API.
 
 If all members in a room leave, that room becomes eligible for deletion. 
 
@@ -1314,7 +1313,7 @@ prefixed with ``m.``
   Type: 
     State event
   JSON format:
-    ``{ "ban_level": <int>, "kick_level": <int> }``
+    ``{ "ban_level": <int>, "kick_level": <int>, "redact_level": <int> }``
   Example:
     ``{ "ban_level": 5, "kick_level": 5 }``
   Description:
@@ -1391,6 +1390,10 @@ prefixed with ``m.``
 
 m.room.message msgtypes
 -----------------------
+
+.. TODO-spec
+   How a client should handle unknown message types.
+
 Each ``m.room.message`` MUST have a ``msgtype`` key which identifies the type
 of message being sent. Each type has their own required and optional keys, as
 outlined below:
@@ -1951,9 +1954,7 @@ is another list containing the EDUs. This key may be entirely absent if there
 are no EDUs to transfer.
 
 (* Normally the PDU list will be non-empty, but the server should cope with
-receiving an "empty" transaction, as this is useful for informing peers of
-other transaction IDs they should be aware of. This effectively acts as a push
-mechanism to encourage peers to continue to replicate content.)
+receiving an "empty" transaction.)
 
 PDUs and EDUs
 -------------
@@ -2036,7 +2037,7 @@ For state updates:
   Description:
     The asserted power level of the user performing the update.
     
-``min_update``
+``required_power_level``
   Type:
     Integer
   Description:
@@ -2054,7 +2055,7 @@ For state updates:
   Description:
     The PDU id of the update this replaces.
     
-``user``
+``user_id``
   Type:
     String
   Description:
