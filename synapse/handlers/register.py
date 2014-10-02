@@ -176,7 +176,7 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _bind_threepid(self, creds, mxid):
-        httpCli = PlainHttpClient(self.hs)
+        httpCli = IdentityServerHttpClient(self.hs)
         data = yield httpCli.post_urlencoded_get_json(
             creds['idServer'],
             "/_matrix/identity/api/v1/3pid/bind",

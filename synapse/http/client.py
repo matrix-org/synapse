@@ -236,9 +236,6 @@ class IdentityServerHttpClient(BaseHttpClient):
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, destination, path, args={}):
-        if destination in _destination_mappings:
-            destination = _destination_mappings[destination]
-
         logger.debug("post_urlencoded_get_json args: %s", args)
         query_bytes = urllib.urlencode(args, True)
 
@@ -246,7 +243,7 @@ class IdentityServerHttpClient(BaseHttpClient):
             destination.encode("ascii"),
             "POST",
             path.encode("ascii"),
-            producer=FileBodyProducer(StringIO(urllib.urlencode(args))),
+            producer=FileBodyProducer(StringIO(query_bytes)),
             headers_dict={
                 "Content-Type": ["application/x-www-form-urlencoded"]
             }
@@ -266,16 +263,13 @@ class CaptchaServerHttpClient(MatrixHttpClient):
     @defer.inlineCallbacks
     def post_urlencoded_get_raw(self, destination, path, accept_partial=False,
                                 args={}):
-        if destination in _destination_mappings:
-            destination = _destination_mappings[destination]
-
         query_bytes = urllib.urlencode(args, True)
 
         response = yield self._create_request(
             destination.encode("ascii"),
             "POST",
             path.encode("ascii"),
-            producer=FileBodyProducer(StringIO(urllib.urlencode(args))),
+            producer=FileBodyProducer(StringIO(query_bytes)),
             headers_dict={
                 "Content-Type": ["application/x-www-form-urlencoded"]
             }
