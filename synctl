@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SYNAPSE="synapse/app/homeserver.py"
+SYNAPSE="python -m synapse.app.homeserver"
 
 CONFIGFILE="homeserver.yaml"
 PIDFILE="homeserver.pid"
@@ -14,7 +14,7 @@ case "$1" in
   start)
     if [ ! -f "$CONFIGFILE" ]; then
       echo "No config file found"
-      echo "To generate a config file, run 'python --generate-config'"
+      echo "To generate a config file, run '$SYNAPSE -c $CONFIGFILE --generate-config'"
       exit 1
     fi
 
