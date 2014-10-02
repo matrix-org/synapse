@@ -1813,14 +1813,8 @@ Profiles
 .. NOTE::
   This section is a work in progress.
 
-.. TODO-doc
+.. TODO-spec
   - Metadata extensibility
-  - Changing profile info generates m.presence events ("presencelike")
-  - keys on m.presence are optional, except presence which is required
-  - m.room.member is populated with the current displayname at that point in time.
-  - That is added by the HS, not you.
-  - Display name changes also generates m.room.member with displayname key f.e. room
-    the user is in.
 
 Internally within Matrix users are referred to by their user ID, which is
 typically a compact unique identifier. Profiles grant users the ability to see
@@ -1831,7 +1825,106 @@ age or location.
 A Profile consists of a display name, an avatar picture, and a set of other
 metadata fields that the user may wish to publish (email address, phone
 numbers, website URLs, etc...). This specification puts no requirements on the
-display name other than it being a valid unicode string.
+display name other than it being a valid unicode string. Avatar images are not
+stored directly; instead the home server stores an ``http``-scheme URL where
+clients may fetch it from.
+
+Client API
+----------
+The client API for profile management consists of the following REST calls.
+
+Fetching a user account displayname::
+
+  GET $PREFIX/profile/:user_id/displayname
+
+  Returned content: JSON object containing the following keys:
+    displayname: string of freeform text
+
+This call may be used to fetch the user's own displayname or to query the name
+of other users; either locally or on remote systems hosted on other home
+servers.
+
+Setting a new displayname::
+
+  PUT $PREFIX/profile/:user_id/displayname
+
+  Content: JSON object containing the following keys:
+    displayname: string of freeform text
+
+Fetching a user account avatar URL::
+
+  GET $PREFIX/profile/:user_id/avatar_url
+
+  Returned content: JSON object containing the following keys:
+    avatar_url: string containing an http-scheme URL
+
+As with displayname, this call may be used to fetch either the user's own, or
+other users' avatar URL.
+
+Setting a new avatar URL::
+
+  PUT $PREFIX/profile/:user_id/avatar_url
+
+  Content: JSON object containing the following keys:
+    avatar_url: string containing an http-scheme URL
+
+Fetching combined account profile information::
+
+  GET $PREFIX/profile/:user_id
+
+  Returned content: JSON object containing the following keys:
+    displayname: string of freeform text
+    avatar_url: string containing an http-scheme URL
+
+At the current time, this API simply returns the displayname and avatar URL
+information, though it is intended to return more fields about the user's
+profile once they are defined. Client implementations should take care not to
+expect that these are the only two keys returned as future versions of this
+specification may yield more keys here.
+
+Server API
+----------
+The server API for profiles is based entirely on the following Federation
+Queries. There are no additional EDU or PDU types involved, other than the
+implicit ``m.presence`` and ``m.room.member`` events (see section below).
+
+Querying profile information::
+
+  Query type: profile
+
+  Arguments:
+    user_id: the ID of the user whose profile to return
+    field: (optional) string giving a field name
+
+  Returns: JSON object containing the following keys:
+    displayname: string of freeform text
+    avatar_url: string containing an http-scheme URL
+
+If the query contains the optional ``field`` key, it should give the name of a
+result field. If such is present, then the result should contain only a field
+of that name, with no others present. If not, the result should contain as much
+of the user's profile as the home server has available and can make public.
+
+Events on Change of Profile Information
+---------------------------------------
+Because the profile displayname and avatar information are likely to be used in
+many places of a client's display, changes to these fields cause an automatic
+propagation event to occur, informing likely-interested parties of the new
+values. This change is conveyed using two separate mechanisms:
+
+ - a ``m.room.member`` event is sent to every room the user is a member of,
+   to update the ``displayname`` and ``avatar_url``.
+ - a presence status update is sent, again containing the new values of the
+   ``displayname`` and ``avatar_url`` keys, in addition to the required
+   ``presence`` key containing the current presence state of the user.
+
+Both of these should be done automatically by the home server when a user
+successfully changes their displayname or avatar URL fields.
+
+Additionally, when home servers emit room membership events for their own
+users, they should include the displayname and avatar URL fields in these
+events so that clients already have these details to hand, and do not have to
+perform extra roundtrips to query it.
 
 
 Identity
