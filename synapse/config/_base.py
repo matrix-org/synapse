@@ -123,6 +123,7 @@ class Config(object):
                 #   style mode markers into the file, to hint to people that
                 #   this is a YAML file.
                 yaml.dump(config, config_file, default_flow_style=False)
+            print "A config file has been generated in %s (your server name is '%s'). Please review this file and customise it to your needs." % (config_args.config_path, config['server_name'])
             sys.exit(0)
 
         return cls(args)
