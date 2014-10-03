@@ -216,10 +216,6 @@ that are in the room that can be used to join via.
    | #golf   >> !wfeiofh:sport.com  |
    | #bike   >> !4rguxf:matrix.org  |
    |________________________________|
-
-.. TODO kegan
-   - show the actual API rather than pseudo-API?
-
        
 Identity
 --------
@@ -793,8 +789,8 @@ includes:
 
 See `Room Events`_ for more information on these events.
 
-Modifying aliases
------------------
+Room aliases
+------------
 .. NOTE::
   This section is a work in progress.
 
@@ -834,9 +830,6 @@ Permissions
   This section is a work in progress.
 
 .. TODO-doc kegan
-    - What is a power level? How do they work? Defaults / required levels for X. How do they change
-      as people join and leave rooms? What do you do if you get a clash? Examples.
-    - List all actions which use power levels (sending msgs, inviting users, banning people, etc...)
     - Room config - what is the event and what are the keys/values and explanations for them.
       Link through to respective sections where necessary. How does this tie in with permissions, e.g.
       give example of creating a read-only room.
@@ -847,12 +840,15 @@ action in a room a user must have a suitable power level.
 Power levels for users are defined in ``m.room.power_levels``, where both a
 default and specific users' power levels can be set. By default all users have
 a power level of 0, other than the room creator whose power level defaults to
-100. Power levels for users are tracked per-room even if the user is not
-present in the room.
+100. Users can grant other users increased power levels up to their own power 
+level. For example, user A with a power level of 50 could increase the power 
+level of user B to a maximum of level 50. Power levels for users are tracked 
+per-room even if the user is not present in the room.
 
 State events may contain a ``required_power_level`` key, which indicates the
 minimum power a user must have before they can update that state key. The only
-exception to this is when a user leaves a room.
+exception to this is when a user leaves a room, which revokes the user's right
+to update state events in that room.
 
 To perform certain actions there are additional power level requirements
 defined in the following state events:
@@ -861,8 +857,9 @@ defined in the following state events:
   events. Defaults to 50.
 - ``m.room.add_state_level`` defines the minimum level for adding new state,
   rather than updating existing state. Defaults to 50.
-- ``m.room.ops_level`` defines the minimum levels to ban and kick other users.
-  This defaults to a kick and ban levels of 50 each.
+- ``m.room.ops_level`` defines the minimum ``ban_level`` and ``kick_level`` to 
+  ban and kick other users respectively. This defaults to a kick and ban levels
+  of 50 each.
 
 
 Joining rooms
