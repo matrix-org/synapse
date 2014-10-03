@@ -1338,10 +1338,32 @@ prefixed with ``m.``
   Example:
     ``{ "aliases": ["#foo:example.com"] }``
   Description:
-    A server `may` inform the room that it has added or removed an alias for
-    the room. This is purely for informational purposes and may become stale.
-    Clients `should` check that the room alias is still valid before using it.
-    The ``state_key`` of the event is the homeserver which owns the room alias.
+    This event is sent by a homeserver directly to inform of changes to the
+    list of aliases it knows about for that room. As a special-case, the
+    ``state_key`` of the event is the homeserver which owns the room alias.
+    For example, an event might look like::
+
+      {
+        "type": "m.room.aliases",
+        "event_id": "012345678ab",
+        "room_id": "!xAbCdEfG:example.com",
+        "state_key": "example.com",
+        "content": {
+          "aliases": ["#foo:example.com"]
+        }
+      }
+
+    The event contains the full list of aliases now stored by the home server
+    that emitted it; additions or deletions are not explicitly mentioned as
+    being such. The entire set of known aliases for the room is then the union
+    of the individual lists declared by all such keys, one from each home
+    server holding at least one alias.
+
+    Clients `should` check the validity of any room alias given in this list
+    before presenting it to the user as trusted fact. The lists given by this
+    event should be considered simply as advice on which aliases might exist,
+    for which the client can perform the lookup to confirm whether it receives
+    the correct room ID.
 
 ``m.room.message``
   Summary:
