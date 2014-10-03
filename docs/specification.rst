@@ -705,9 +705,6 @@ Rooms
 
 Creation
 --------
-.. TODO kegan
-  - TODO-spec: Key for invite these users?
-  
 To create a room, a client has to use the |createRoom|_ API. There are various
 options which can be set when creating a room:
 
@@ -801,12 +798,35 @@ Modifying aliases
 .. NOTE::
   This section is a work in progress.
 
-.. TODO-doc kegan
-    - path to edit aliases 
-    - PUT /directory/room/<room alias>  { room_id : foo }
-    - GET /directory/room/<room alias> { room_id : foo, servers: [a.com, b.com] }
-    - format when retrieving list of aliases. NOT complete list.
-    - format for adding/removing aliases.
+Room aliases can be created by sending a ``PUT /directory/room/<room alias>``::
+
+  {
+    "room_id": <room id>
+  }
+
+They can be deleted by sending a ``DELETE /directory/room/<room alias>`` with
+no content. Only some privileged users may be able to delete room aliases, e.g.
+server admins, the creator of the room alias, etc. This specification does not
+outline the privilege level required for deleting room aliases.
+
+Rooms store a *partial* list of room aliases via the ``m.room.aliases`` state
+event. This alias list is partial because it cannot guarantee that the alias
+list is in any way accurate or up-to-date, as room aliases can point to 
+different room IDs over time. Crucially, the aliases in this event are
+**purely informational** and SHOULD NOT be treated as accurate. They SHOULD
+be checked before they are used or shared with another user. If a room
+appears to have a room alias of ``#alias:example.com``, this SHOULD be checked
+to make sure that the room's ID matches the ``room_id`` returned from the
+request.
+
+Room aliases can be checked in the same way they are resolved; by sending a 
+``GET /directory/room/<room alias>``::
+
+  {
+    "room_id": <room id>,
+    "servers": [ <domain>, <domain2>, <domain3> ]
+  }
+
 
 Permissions
 -----------
