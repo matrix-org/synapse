@@ -847,9 +847,8 @@ defined in the following state events:
 
 Joining rooms
 -------------
-.. TODO-doc kegan
-  - TODO: What does the home server have to do to join a user to a room?
-    See SPEC-30.
+.. TODO-doc What does the home server have to do to join a user to a room?
+   -  See SPEC-30.
 
 Users need to join a room in order to send and receive events in that room. A
 user can join a room by making a request to |/join/<room_alias_or_id>|_ with::
@@ -886,20 +885,21 @@ received an invite.
 
 Inviting users
 --------------
-.. TODO-doc kegan
-  - Can invite users to a room if the room config key TODO is set to TODO. Must have required power level.
+.. TODO-doc Invite-join dance 
   - Outline invite join dance. What is it? Why is it required? How does it work?
   - What does the home server have to do?
-  - TODO: In what circumstances will direct member editing NOT be equivalent to ``/invite``?
 
 The purpose of inviting users to a room is to notify them that the room exists
 so they can choose to become a member of that room. Some rooms require that all
 users who join a room are previously invited to it (an "invite-only" room).
 Whether a given room is an "invite-only" room is determined by the room config
-key ``TODO``. It can have one of the following values:
+key ``m.room.join_rules``. It can have one of the following values:
 
- - TODO Room config invite only value explanation
- - TODO Room config free-to-join value explanation
+``public``
+  This room is free for anyone to join without an invite.
+
+``invite``
+  This room can only be joined if you were invited.
 
 Only users who have a membership state of ``join`` in a room can invite new
 users to said room. The person being invited must not be in the ``join`` state
@@ -924,9 +924,14 @@ See the `Room events`_ section for more information on ``m.room.member``.
 
 Leaving rooms
 -------------
-.. TODO-spec kegan
-  - TODO: Grace period before deletion?
-  - TODO: Under what conditions should a room NOT be purged?
+.. TODO-spec - HS deleting rooms they are no longer a part of. Not implemented.
+  - This is actually Very Tricky. If all clients a HS is serving leave a room,
+  the HS will no longer get any new events for that room, because the servers
+  who get the events are determined on the *membership list*. There should
+  probably be a way for a HS to lurk on a room even if there are 0 of their
+  members in the room.
+  - Grace period before deletion?
+  - Under what conditions should a room NOT be purged?
 
 
 A user can leave a room to stop receiving events for that room. A user must
@@ -1078,6 +1083,10 @@ presence events will also be returned. There are two APIs provided:
 .. TODO-doc kegan
   - TODO: JSON response format for both types
   - TODO: when would you use global? when would you use scoped?
+  - Room-scoped initial sync is Very Tricky because typically people would
+    want to sync the room then listen for any new content from that point
+    onwards. The event stream cannot do this for a single room currently.
+    Not sure if room-scoped initial sync should be included at this time.
 
 Getting events for a room
 -------------------------
