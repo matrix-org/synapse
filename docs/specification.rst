@@ -829,21 +829,24 @@ Permissions
 .. NOTE::
   This section is a work in progress.
 
-.. TODO-doc kegan
-    - Room config - what is the event and what are the keys/values and explanations for them.
-      Link through to respective sections where necessary. How does this tie in with permissions, e.g.
-      give example of creating a read-only room.
-
 Permissions for rooms are done via the concept of power levels - to do any
-action in a room a user must have a suitable power level. 
+action in a room a user must have a suitable power level. Power levels are
+stored as state events in a given room. 
 
 Power levels for users are defined in ``m.room.power_levels``, where both a
-default and specific users' power levels can be set. By default all users have
-a power level of 0, other than the room creator whose power level defaults to
-100. Users can grant other users increased power levels up to their own power 
-level. For example, user A with a power level of 50 could increase the power 
-level of user B to a maximum of level 50. Power levels for users are tracked 
-per-room even if the user is not present in the room.
+default and specific users' power levels can be set::
+
+  {
+    "<user id 1>": <power level int>,
+    "<user id 2>": <power level int>,
+    "default": 0
+  }
+
+By default all users have a power level of 0, other than the room creator whose
+power level defaults to 100. Users can grant other users increased power levels
+up to their own power level. For example, user A with a power level of 50 could
+increase the power level of user B to a maximum of level 50. Power levels for 
+users are tracked per-room even if the user is not present in the room.
 
 State events may contain a ``required_power_level`` key, which indicates the
 minimum power a user must have before they can update that state key. The only
@@ -853,10 +856,10 @@ to update state events in that room.
 To perform certain actions there are additional power level requirements
 defined in the following state events:
 
-- ``m.room.send_event_level`` defines the minimum level for sending non-state 
-  events. Defaults to 50.
-- ``m.room.add_state_level`` defines the minimum level for adding new state,
-  rather than updating existing state. Defaults to 50.
+- ``m.room.send_event_level`` defines the minimum ``level`` for sending 
+  non-state events. Defaults to 50.
+- ``m.room.add_state_level`` defines the minimum ``level`` for adding new 
+  state, rather than updating existing state. Defaults to 50.
 - ``m.room.ops_level`` defines the minimum ``ban_level`` and ``kick_level`` to 
   ban and kick other users respectively. This defaults to a kick and ban levels
   of 50 each.
