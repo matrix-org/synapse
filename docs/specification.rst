@@ -1089,21 +1089,59 @@ When a client logs in, they may have a list of rooms which they have already
 joined. These rooms may also have a list of events associated with them. The
 purpose of 'syncing' is to present the current room and event information in a
 convenient, compact manner. The events returned are not limited to room events;
-presence events will also be returned. There are two APIs provided:
+presence events will also be returned. A single syncing API is provided:
 
  - |initialSync|_ : A global sync which will present room and event information
    for all rooms the user has joined.
 
+.. TODO-spec room-scoped initial sync
  - |/rooms/<room_id>/initialSync|_ : A sync scoped to a single room. Presents
    room and event information for this room only.
+ - Room-scoped initial sync is Very Tricky because typically people would
+   want to sync the room then listen for any new content from that point
+   onwards. The event stream cannot do this for a single room currently.
+   As a result, commenting room-scoped initial sync at this time.
 
-.. TODO-doc kegan
-  - TODO: JSON response format for both types
-  - TODO: when would you use global? when would you use scoped?
-  - Room-scoped initial sync is Very Tricky because typically people would
-    want to sync the room then listen for any new content from that point
-    onwards. The event stream cannot do this for a single room currently.
-    Not sure if room-scoped initial sync should be included at this time.
+The |initialSync|_ API contains the following keys:
+
+``presence``
+  Description:
+    Contains a list of presence information for users the client is interested
+    in.
+  Format:
+    A JSON array of ``m.presence`` events.
+
+``end``
+  Description:
+    Contains an event stream token which can be used with the `Event Stream`_.
+  Format:
+    A string containing the event stream token.
+
+``rooms``
+  Description:
+    Contains a list of room information for all rooms the client has joined,
+    and limited room information on rooms the client has been invited to.
+  Format:
+    A JSON array containing Room Information JSON objects.
+
+Room Information:
+  Description:
+    Contains all state events for the room, along with a limited amount of
+    the most recent non-state events, configured via the ``limit`` query
+    parameter. Also contains additional keys with room metadata, such as the
+    ``room_id`` and the client's ``membership`` to the room.
+  Format:
+    A JSON object with the following keys:
+      ``room_id``
+        A string containing the ID of the room being described.
+      ``membership``
+        A string representing the client's membership status in this room.
+      ``messages``
+        An event stream JSON object containing a ``chunk`` of recent non-state
+        events, along with an ``end`` token. *NB: The name of this key will be
+        changed in a later version.*
+      ``state``
+        A JSON array containing all the current state events for this room.
 
 Getting events for a room
 -------------------------
