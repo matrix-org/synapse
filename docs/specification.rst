@@ -2378,12 +2378,44 @@ SRV Records
 .. TODO-doc
   - Why it is needed
 
+State Conflict Resolution
+-------------------------
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO-doc
+  - How do conflicts arise (diagrams?)
+  - How are they resolved (incl tie breaks)
+  - How does this work with deleting current state
 
 Security
 ========
 
 .. NOTE::
   This section is a work in progress.
+
+Server-Server Authentication
+----------------------------
+
+.. TODO-doc
+  - Why is this needed.
+  - High level overview of process.
+  - Transaction/PDU signing
+  - How does this work with redactions? (eg hashing required keys only)
+
+End-to-End Encryption
+---------------------
+
+.. TODO-doc
+  - Why is this needed.
+  - Overview of process
+  - Implementation
+
+Lawful Interception
+-------------------
+
+Key Escrow Servers
+~~~~~~~~~~~~~~~~~~
 
 Threat Model
 ------------
@@ -2531,10 +2563,6 @@ have to wait in milliseconds before they can try again.
   - Surely we should recommend an algorithm for the rate limiting, rather than letting every
     homeserver come up with their own idea, causing totally unpredictable performance over
     federated rooms?
-  - crypto (s-s auth)
-  - E2E
-  - Lawful intercept + Key Escrow
-  TODO Mark
 
 
 Policy Servers
@@ -2543,7 +2571,11 @@ Policy Servers
   This section is a work in progress.
 
 .. TODO-spec
-  We should mention them in the Architecture section at least...
+  We should mention them in the Architecture section at least: how they fit
+  into the picture.
+
+Enforcing policies
+------------------
 
 
 Content repository
