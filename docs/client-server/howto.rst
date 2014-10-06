@@ -39,14 +39,15 @@ when accessing other APIs::
         "user_id": "@example:localhost"
     }
 
-NB: If a ``user_id`` is not specified, one will be randomly generated for you. 
+NB: If a ``user`` is not specified, one will be randomly generated for you. 
 If you do not specify a ``password``, you will be unable to login to the account
 if you forget the ``access_token``.
 
 Implementation note: The matrix specification does not enforce how users 
 register with a server. It just specifies the URL path and absolute minimum 
 keys. The reference home server uses a username/password to authenticate user,
-but other home servers may use different methods.
+but other home servers may use different methods. This is why you need to
+specify the ``type`` of method.
 
 Login
 -----
