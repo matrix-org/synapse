@@ -805,6 +805,11 @@ no content. Only some privileged users may be able to delete room aliases, e.g.
 server admins, the creator of the room alias, etc. This specification does not
 outline the privilege level required for deleting room aliases.
 
+As room aliases are scoped to a particular home server domain name, it is
+likely that a home server will reject attempts to maintain aliases on other
+domain names. This specification does not provide a way for home servers to
+send update requests to other servers.
+
 Rooms store a *partial* list of room aliases via the ``m.room.aliases`` state
 event. This alias list is partial because it cannot guarantee that the alias
 list is in any way accurate or up-to-date, as room aliases can point to 
@@ -822,6 +827,9 @@ Room aliases can be checked in the same way they are resolved; by sending a
     "room_id": <room id>,
     "servers": [ <domain>, <domain2>, <domain3> ]
   }
+
+Home servers can respond to resolve requests for aliases on other domains than
+their own by using the federation API to ask other domain name home servers.
 
 
 Permissions
