@@ -71,7 +71,7 @@ class StateTestCase(unittest.TestCase):
 
         is_new = yield self.state.handle_new_state(new_pdu)
 
-        self.assertTrue(is_new)
+        self.assertFalse(is_new)
 
         self.persistence.get_unresolved_state_tree.assert_called_once_with(
             new_pdu
