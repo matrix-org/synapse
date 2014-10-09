@@ -19,9 +19,6 @@ WARNING
 .. contents:: Table of Contents
 .. sectnum::
 
-Introduction
-============
-
 Matrix is a new set of open APIs for open-federated Instant Messaging and VoIP
 functionality, designed to create and support a new global real-time
 communication ecosystem on the internet. This specification is the ongoing
@@ -83,9 +80,11 @@ instant messages, VoIP call setups, or any other objects that need to be
 reliably and persistently pushed from A to B in an interoperable and federated
 manner.
 
+Basis
+=====
 
 Architecture
-============
+------------
 
 Clients transmit data to other clients through home servers (HSes). Clients do
 not communicate with each other directly.
@@ -137,7 +136,7 @@ for events defined in the Matrix specification. Events are usually sent in the
 context of a "Room".
 
 Room structure
---------------
+~~~~~~~~~~~~~~
 
 A room is a conceptual place where users can send and receive events. Rooms can
 be created, joined and left. Events are sent to a room, and all participants in
@@ -183,7 +182,7 @@ if that means the home server has to request more information from another home
 server before processing the event.
 
 Room Aliases
-------------
+~~~~~~~~~~~~
 
 Each room can also have multiple "Room Aliases", which looks like::
 
@@ -218,7 +217,7 @@ that are in the room that can be used to join via.
    |________________________________|
        
 Identity
---------
+~~~~~~~~
 
 Users in Matrix are identified via their user ID. However, existing ID
 namespaces can also be used in order to identify Matrix users. A Matrix
@@ -239,6 +238,97 @@ mapping indefinitely, by replicating the mappings across multiple ISes.
 Usage of an IS is not required in order for a client application to be part of
 the Matrix ecosystem. However, without one clients will not be able to look up
 user IDs using 3PIDs.
+
+Presence
+~~~~~~~~
+.. NOTE::
+  This section is a work in progress.
+
+Each user has the concept of presence information. This encodes the
+"availability" of that user, suitable for display on other user's clients. This
+is transmitted as an ``m.presence`` event and is one of the few events which
+are sent *outside the context of a room*. The basic piece of presence
+information is represented by the ``presence`` key, which is an enum of one of
+the following:
+
+  - ``online`` : The default state when the user is connected to an event
+    stream.
+  - ``unavailable`` : The user is not reachable at this time.
+  - ``offline`` : The user is not connected to an event stream.
+  - ``free_for_chat`` : The user is generally willing to receive messages
+    moreso than default.
+  - ``hidden`` : Behaves as offline, but allows the user to see the client
+    state anyway and generally interact with client features. (Not yet
+    implemented in synapse).
+
+This basic ``presence`` field applies to the user as a whole, regardless of how
+many client devices they have connected. The home server should synchronise
+this status choice among multiple devices to ensure the user gets a consistent
+experience.
+
+In addition, the server maintains a timestamp of the last time it saw an active
+action from the user; either sending a message to a room, or changing presence
+state from a lower to a higher level of availability (thus: changing state from
+``unavailable`` to ``online`` will count as an action for being active, whereas
+in the other direction will not). This timestamp is presented via a key called
+``last_active_ago``, which gives the relative number of miliseconds since the
+message is generated/emitted, that the user was last seen active.
+
+Home servers can also use the user's choice of presence state as a signal for
+how to handle new private one-to-one chat message requests. For example, it
+might decide:
+
+  - ``free_for_chat`` : accept anything
+  - ``online`` : accept from anyone in my addres book list
+  - ``busy`` : accept from anyone in this "important people" group in my
+    address book list
+
+Presence List
++++++++++++++
+Each user's home server stores a "presence list" for that user. This stores a
+list of other user IDs the user has chosen to add to it. To be added to this
+list, the user being added must receive permission from the list owner. Once
+granted, both user's HS(es) store this information. Since such subscriptions
+are likely to be bidirectional, HSes may wish to automatically accept requests
+when a reverse subscription already exists.
+
+As a convenience, presence lists should support the ability to collect users
+into groups, which could allow things like inviting the entire group to a new
+("ad-hoc") chat room, or easy interaction with the profile information ACL
+implementation of the HS.
+
+Presence and Permissions
+++++++++++++++++++++++++
+For a viewing user to be allowed to see the presence information of a target
+user, either:
+
+ - The target user has allowed the viewing user to add them to their presence
+   list, or
+ - The two users share at least one room in common
+
+In the latter case, this allows for clients to display some minimal sense of
+presence information in a user list for a room.
+
+Profiles
+~~~~~~~~
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO-spec
+  - Metadata extensibility
+
+Internally within Matrix users are referred to by their user ID, which is
+typically a compact unique identifier. Profiles grant users the ability to see
+human-readable names for other users that are in some way meaningful to them.
+Additionally, profiles can publish additional information, such as the user's
+age or location.
+
+A Profile consists of a display name, an avatar picture, and a set of other
+metadata fields that the user may wish to publish (email address, phone
+numbers, website URLs, etc...). This specification puts no requirements on the
+display name other than it being a valid unicode string. Avatar images are not
+stored directly; instead the home server stores an ``http``-scheme URL where
+clients may fetch it from.
 
 API Standards
 -------------
@@ -354,6 +444,89 @@ In contrast, these are invalid requests::
       "key": "This is a put but it is missing a txnId."
     }
 
+Glossary
+--------
+.. NOTE::
+  This section is a work in progress.
+
+Backfilling:
+  The process of synchronising historic state from one home server to another,
+  to backfill the event storage so that scrollback can be presented to the
+  client(s). Not to be confused with pagination.
+
+Context:
+  A single human-level entity of interest (currently, a chat room)
+
+EDU (Ephemeral Data Unit):
+  A message that relates directly to a given pair of home servers that are
+  exchanging it. EDUs are short-lived messages that related only to one single
+  pair of servers; they are not persisted for a long time and are not forwarded
+  on to other servers. Because of this, they have no internal ID nor previous
+  EDUs reference chain.
+
+Event:
+  A record of activity that records a single thing that happened on to a context
+  (currently, a chat room). These are the "chat messages" that Synapse makes
+  available.
+
+PDU (Persistent Data Unit):
+  A message that relates to a single context, irrespective of the server that
+  is communicating it. PDUs either encode a single Event, or a single State
+  change. A PDU is referred to by its PDU ID; the pair of its origin server
+  and local reference from that server.
+
+PDU ID:
+  The pair of PDU Origin and PDU Reference, that together globally uniquely
+  refers to a specific PDU.
+
+PDU Origin:
+  The name of the origin server that generated a given PDU. This may not be the
+  server from which it has been received, due to the way they are copied around
+  from server to server. The origin always records the original server that
+  created it.
+
+PDU Reference:
+  A local ID used to refer to a specific PDU from a given origin server. These
+  references are opaque at the protocol level, but may optionally have some
+  structured meaning within a given origin server or implementation.
+
+Presence:
+  The concept of whether a user is currently online, how available they declare
+  they are, and so on. See also: doc/model/presence
+
+Profile:
+  A set of metadata about a user, such as a display name, provided for the
+  benefit of other users. See also: doc/model/profiles
+
+Room ID:
+  An opaque string (of as-yet undecided format) that identifies a particular
+  room and used in PDUs referring to it.
+
+Room Alias:
+  A human-readable string of the form #name:some.domain that users can use as a
+  pointer to identify a room; a Directory Server will map this to its Room ID
+
+State:
+  A set of metadata maintained about a Context, which is replicated among the
+  servers in addition to the history of Events.
+
+User ID:
+  A string of the form @localpart:domain.name that identifies a user for
+  wire-protocol purposes. The localpart is meaningless outside of a particular
+  home server. This takes a human-readable form that end-users can use directly
+  if they so wish, avoiding the 3PIDs.
+
+Transaction:
+  A message which relates to the communication between a given pair of servers.
+  A transaction contains possibly-empty lists of PDUs and EDUs.
+
+.. TODO
+  This glossary contradicts the terms used above - especially on State Events v. "State"
+  and Non-State Events v. "Events".  We need better consistent names.
+
+Events
+======
+
 Receiving live updates on a client
 ----------------------------------
 
@@ -374,886 +547,8 @@ When the client first logs in, they will need to initially synchronise with
 their home server. This is achieved via the |initialSync|_ API. This API also
 returns an ``end`` token which can be used with the event stream.
 
-
-Registration and Login
-======================
-
-Clients must register with a home server in order to use Matrix. After
-registering, the client will be given an access token which must be used in ALL
-requests to that home server as a query parameter 'access_token'.
-
-If the client has already registered, they need to be able to login to their
-account. The home server may provide many different ways of logging in, such as
-user/password auth, login via a social network (OAuth2), login by confirming a
-token sent to their email address, etc. This specification does not define how
-home servers should authorise their users who want to login to their existing
-accounts, but instead defines the standard interface which implementations
-should follow so that ANY client can login to ANY home server. Clients login
-using the |login|_ API. Clients register using the |register|_ API.
-Registration follows the same general procedure as login, but the path requests
-are sent to and the details contained in them are different.
-
-In both registration and login cases, the process takes the form of one or more
-stages, where at each stage the client submits a set of data for a given stage
-type and awaits a response from the server, which will either be a final
-success or a request to perform an additional stage. This exchange continues
-until the final success.
-
-In order to determine up-front what the server's requirements are, the client
-can request from the server a complete description of all of its acceptable
-flows of the registration or login process. It can then inspect the list of
-returned flows looking for one for which it believes it can complete all of the
-required stages, and perform it. As each home server may have different ways of
-logging in, the client needs to know how they should login. All distinct login
-stages MUST have a corresponding ``type``. A ``type`` is a namespaced string
-which details the mechanism for logging in.
-
-A client may be able to login via multiple valid login flows, and should choose
-a single flow when logging in. A flow is a series of login stages. The home
-server MUST respond with all the valid login flows when requested by a simple
-``GET`` request directly to the ``/login`` or ``/register`` paths::
-
-  {
-    "flows": [
-      {
-        "type": "<login type1a>",
-        "stages": [ "<login type 1a>", "<login type 1b>" ]
-      },
-      {
-        "type": "<login type2a>",
-        "stages": [ "<login type 2a>", "<login type 2b>" ]
-      },
-      {
-        "type": "<login type3>"
-      }
-    ]
-  }
-
-The client can now select which flow it wishes to use, and begin making
-``POST`` requests to the ``/login`` or ``/register`` paths with JSON body
-content containing the name of the stage as the ``type`` key, along with
-whatever additional parameters are required for that login or registration type
-(see below). After the flow is completed, the client's fully-qualified user
-ID and a new access token MUST be returned::
-
-  {
-    "user_id": "@user:matrix.org",
-    "access_token": "abcdef0123456789"
-  }
-
-The ``user_id`` key is particularly useful if the home server wishes to support
-localpart entry of usernames (e.g. "user" rather than "@user:matrix.org"), as
-the client may not be able to determine its ``user_id`` in this case.
-
-If the flow has multiple stages to it, the home server may wish to create a
-session to store context between requests. If a home server responds with a
-``session`` key to a request, clients MUST submit it in subsequent requests
-until the flow is completed::
-
-  {
-    "session": "<session id>"
-  }
-
-This specification defines the following login types:
- - ``m.login.password``
- - ``m.login.oauth2``
- - ``m.login.email.code``
- - ``m.login.email.url``
- - ``m.login.email.identity``
-
-Password-based
---------------
-:Type: 
-  ``m.login.password``
-:Description: 
-  Login is supported via a username and password.
-
-To respond to this type, reply with::
-
-  {
-    "type": "m.login.password",
-    "user": "<user_id or user localpart>",
-    "password": "<password>"
-  }
-
-The home server MUST respond with either new credentials, the next stage of the
-login process, or a standard error response.
-
-OAuth2-based
-------------
-:Type: 
-  ``m.login.oauth2``
-:Description:
-  Login is supported via OAuth2 URLs. This login consists of multiple requests.
-
-To respond to this type, reply with::
-
-  {
-    "type": "m.login.oauth2",
-    "user": "<user_id or user localpart>"
-  }
-
-The server MUST respond with::
-
-  {
-    "uri": <Authorization Request URI OR service selection URI>
-  }
-
-The home server acts as a 'confidential' client for the purposes of OAuth2.  If
-the uri is a ``sevice selection URI``, it MUST point to a webpage which prompts
-the user to choose which service to authorize with. On selection of a service,
-this MUST link through to an ``Authorization Request URI``. If there is only 1
-service which the home server accepts when logging in, this indirection can be
-skipped and the "uri" key can be the ``Authorization Request URI``. 
-
-The client then visits the ``Authorization Request URI``, which then shows the
-OAuth2 Allow/Deny prompt. Hitting 'Allow' returns the ``redirect URI`` with the
-auth code.  Home servers can choose any path for the ``redirect URI``. The
-client should visit the ``redirect URI``, which will then finish the OAuth2
-login process, granting the home server an access token for the chosen service.
-When the home server gets this access token, it verifies that the cilent has
-authorised with the 3rd party, and can now complete the login. The OAuth2
-``redirect URI`` (with auth code) MUST respond with either new credentials, the
-next stage of the login process, or a standard error response.
-    
-For example, if a home server accepts OAuth2 from Google, it would return the 
-Authorization Request URI for Google::
-
-  {
-    "uri": "https://accounts.google.com/o/oauth2/auth?response_type=code&
-    client_id=CLIENT_ID&redirect_uri=REDIRECT_URI&scope=photos"
-  }
-
-The client then visits this URI and authorizes the home server. The client then
-visits the REDIRECT_URI with the auth code= query parameter which returns::
-
-  {
-    "user_id": "@user:matrix.org",
-    "access_token": "0123456789abcdef"
-  }
-
-Email-based (code)
-------------------
-:Type: 
-  ``m.login.email.code``
-:Description:
-  Login is supported by typing in a code which is sent in an email. This login 
-  consists of multiple requests.
-
-To respond to this type, reply with::
-
-  {
-    "type": "m.login.email.code",
-    "user": "<user_id or user localpart>",
-    "email": "<email address>"
-  }
-
-After validating the email address, the home server MUST send an email
-containing an authentication code and return::
-
-  {
-    "type": "m.login.email.code",
-    "session": "<session id>"
-  }
-
-The second request in this login stage involves sending this authentication
-code::
-
-  {
-    "type": "m.login.email.code",
-    "session": "<session id>",
-    "code": "<code in email sent>"
-  }
-
-The home server MUST respond to this with either new credentials, the next
-stage of the login process, or a standard error response.
-
-Email-based (url)
------------------
-:Type: 
-  ``m.login.email.url``
-:Description:
-  Login is supported by clicking on a URL in an email. This login consists of 
-  multiple requests.
-
-To respond to this type, reply with::
-
-  {
-    "type": "m.login.email.url",
-    "user": "<user_id or user localpart>",
-    "email": "<email address>"
-  }
-
-After validating the email address, the home server MUST send an email
-containing an authentication URL and return::
-
-  {
-    "type": "m.login.email.url",
-    "session": "<session id>"
-  }
-
-The email contains a URL which must be clicked. After it has been clicked, the
-client should perform another request::
-
-  {
-    "type": "m.login.email.url",
-    "session": "<session id>"
-  }
-
-The home server MUST respond to this with either new credentials, the next
-stage of the login process, or a standard error response. 
-
-A common client implementation will be to periodically poll until the link is
-clicked.  If the link has not been visited yet, a standard error response with
-an errcode of ``M_LOGIN_EMAIL_URL_NOT_YET`` should be returned.
-
-
-Email-based (identity server)
------------------------------
-:Type:
-  ``m.login.email.identity``
-:Description:
-  Login is supported by authorising an email address with an identity server.
-
-Prior to submitting this, the client should authenticate with an identity
-server.  After authenticating, the session information should be submitted to
-the home server.
-
-To respond to this type, reply with::
-
-  {
-    "type": "m.login.email.identity",
-    "threepidCreds": [
-      {
-        "sid": "<identity server session id>",
-        "clientSecret": "<identity server client secret>",
-        "idServer": "<url of identity server authed with, e.g. 'matrix.org:8090'>"
-      }
-    ]
-  }
-
-
-
-N-Factor Authentication
------------------------
-Multiple login stages can be combined to create N-factor authentication during
-login.
-
-This can be achieved by responding with the ``next`` login type on completion
-of a previous login stage::
-
-  {
-    "next": "<next login type>"
-  }
-
-If a home server implements N-factor authentication, it MUST respond with all 
-``stages`` when initially queried for their login requirements::
-
-  {
-    "type": "<1st login type>",
-    "stages": [ <1st login type>, <2nd login type>, ... , <Nth login type> ]
-  }
-
-This can be represented conceptually as::
-
-   _______________________
-  |    Login Stage 1      |
-  | type: "<login type1>" |
-  |  ___________________  |
-  | |_Request_1_________| | <-- Returns "session" key which is used throughout.
-  |  ___________________  |     
-  | |_Request_2_________| | <-- Returns a "next" value of "login type2"
-  |_______________________|
-            |
-            |
-   _________V_____________
-  |    Login Stage 2      |
-  | type: "<login type2>" |
-  |  ___________________  |
-  | |_Request_1_________| |
-  |  ___________________  |
-  | |_Request_2_________| |
-  |  ___________________  |
-  | |_Request_3_________| | <-- Returns a "next" value of "login type3"
-  |_______________________|
-            |
-            |
-   _________V_____________
-  |    Login Stage 3      |
-  | type: "<login type3>" |
-  |  ___________________  |
-  | |_Request_1_________| | <-- Returns user credentials
-  |_______________________|
-
-Fallback
---------
-Clients cannot be expected to be able to know how to process every single login
-type. If a client determines it does not know how to handle a given login type,
-it should request a login fallback page::
-
-  GET matrix/client/api/v1/login/fallback
-
-This MUST return an HTML page which can perform the entire login process.
-
-
-Rooms
-=====
-
-Creation
---------
-To create a room, a client has to use the |createRoom|_ API. There are various
-options which can be set when creating a room:
-
-``visibility``
-  Type: 
-    String
-  Optional: 
-    Yes
-  Value:
-    Either ``public`` or ``private``.
-  Description:
-    A ``public`` visibility indicates that the room will be shown in the public
-    room list. A ``private`` visibility will hide the room from the public room
-    list. Rooms default to ``private`` visibility if this key is not included.
-
-``room_alias_name``
-  Type: 
-    String
-  Optional: 
-    Yes
-  Value:
-    The room alias localpart.
-  Description:
-    If this is included, a room alias will be created and mapped to the newly
-    created room.  The alias will belong on the same home server which created
-    the room, e.g.  ``!qadnasoi:domain.com >>> #room_alias_name:domain.com``
-
-``name``
-  Type: 
-    String
-  Optional: 
-    Yes
-  Value:
-    The ``name`` value for the ``m.room.name`` state event.
-  Description:
-    If this is included, an ``m.room.name`` event will be sent into the room to
-    indicate the name of the room. See `Room Events`_ for more information on
-    ``m.room.name``.
-
-``topic``
-  Type: 
-    String
-  Optional: 
-    Yes
-  Value:
-    The ``topic`` value for the ``m.room.topic`` state event.
-  Description:
-    If this is included, an ``m.room.topic`` event will be sent into the room
-    to indicate the topic for the room. See `Room Events`_ for more information
-    on ``m.room.topic``.
-
-``invite``
-  Type:
-    List
-  Optional:
-    Yes
-  Value:
-    A list of user ids to invite.
-  Description:
-    This will tell the server to invite everyone in the list to the newly
-    created room.
-
-Example::
-
-  {
-    "visibility": "public", 
-    "room_alias_name": "thepub",
-    "name": "The Grand Duke Pub",
-    "topic": "All about happy hour"
-  }
-
-The home server will create a ``m.room.create`` event when the room is created,
-which serves as the root of the PDU graph for this room. This event also has a
-``creator`` key which contains the user ID of the room creator. It will also
-generate several other events in order to manage permissions in this room. This
-includes:
-
- - ``m.room.power_levels`` : Sets the power levels of users.
- - ``m.room.join_rules`` : Whether the room is "invite-only" or not.
- - ``m.room.add_state_level``: The power level required in order to add new
-   state to the room (as opposed to updating exisiting state)
- - ``m.room.send_event_level`` : The power level required in order to send a
-   message in this room.
- - ``m.room.ops_level`` : The power level required in order to kick or ban a
-   user from the room or redact an event in the room.
-
-See `Room Events`_ for more information on these events.
-
-Room aliases
-------------
-.. NOTE::
-  This section is a work in progress.
-
-Room aliases can be created by sending a ``PUT /directory/room/<room alias>``::
-
-  {
-    "room_id": <room id>
-  }
-
-They can be deleted by sending a ``DELETE /directory/room/<room alias>`` with
-no content. Only some privileged users may be able to delete room aliases, e.g.
-server admins, the creator of the room alias, etc. This specification does not
-outline the privilege level required for deleting room aliases.
-
-As room aliases are scoped to a particular home server domain name, it is
-likely that a home server will reject attempts to maintain aliases on other
-domain names. This specification does not provide a way for home servers to
-send update requests to other servers.
-
-Rooms store a *partial* list of room aliases via the ``m.room.aliases`` state
-event. This alias list is partial because it cannot guarantee that the alias
-list is in any way accurate or up-to-date, as room aliases can point to 
-different room IDs over time. Crucially, the aliases in this event are
-**purely informational** and SHOULD NOT be treated as accurate. They SHOULD
-be checked before they are used or shared with another user. If a room
-appears to have a room alias of ``#alias:example.com``, this SHOULD be checked
-to make sure that the room's ID matches the ``room_id`` returned from the
-request.
-
-Room aliases can be checked in the same way they are resolved; by sending a 
-``GET /directory/room/<room alias>``::
-
-  {
-    "room_id": <room id>,
-    "servers": [ <domain>, <domain2>, <domain3> ]
-  }
-
-Home servers can respond to resolve requests for aliases on other domains than
-their own by using the federation API to ask other domain name home servers.
-
-
-Permissions
------------
-.. NOTE::
-  This section is a work in progress.
-
-Permissions for rooms are done via the concept of power levels - to do any
-action in a room a user must have a suitable power level. Power levels are
-stored as state events in a given room. 
-
-Power levels for users are defined in ``m.room.power_levels``, where both a
-default and specific users' power levels can be set::
-
-  {
-    "<user id 1>": <power level int>,
-    "<user id 2>": <power level int>,
-    "default": 0
-  }
-
-By default all users have a power level of 0, other than the room creator whose
-power level defaults to 100. Users can grant other users increased power levels
-up to their own power level. For example, user A with a power level of 50 could
-increase the power level of user B to a maximum of level 50. Power levels for 
-users are tracked per-room even if the user is not present in the room.
-
-State events may contain a ``required_power_level`` key, which indicates the
-minimum power a user must have before they can update that state key. The only
-exception to this is when a user leaves a room, which revokes the user's right
-to update state events in that room.
-
-To perform certain actions there are additional power level requirements
-defined in the following state events:
-
-- ``m.room.send_event_level`` defines the minimum ``level`` for sending 
-  non-state events. Defaults to 50.
-- ``m.room.add_state_level`` defines the minimum ``level`` for adding new 
-  state, rather than updating existing state. Defaults to 50.
-- ``m.room.ops_level`` defines the minimum ``ban_level`` and ``kick_level`` to 
-  ban and kick other users respectively. This defaults to a kick and ban levels
-  of 50 each.
-
-
-Joining rooms
--------------
-.. TODO-doc What does the home server have to do to join a user to a room?
-   -  See SPEC-30.
-
-Users need to join a room in order to send and receive events in that room. A
-user can join a room by making a request to |/join/<room_alias_or_id>|_ with::
-
-  {}
-
-Alternatively, a user can make a request to |/rooms/<room_id>/join|_ with the
-same request content.  This is only provided for symmetry with the other
-membership APIs: ``/rooms/<room id>/invite`` and ``/rooms/<room id>/leave``. If
-a room alias was specified, it will be automatically resolved to a room ID,
-which will then be joined. The room ID that was joined will be returned in
-response::
-
-  {
-    "room_id": "!roomid:domain"
-  }
-
-The membership state for the joining user can also be modified directly to be
-``join`` by sending the following request to
-``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
-
-  {
-    "membership": "join"
-  }
-
-See the `Room events`_ section for more information on ``m.room.member``.
-
-After the user has joined a room, they will receive subsequent events in that
-room. This room will now appear as an entry in the |initialSync|_ API.
-
-Some rooms enforce that a user is *invited* to a room before they can join that
-room. Other rooms will allow anyone to join the room even if they have not
-received an invite.
-
-Inviting users
---------------
-.. TODO-doc Invite-join dance 
-  - Outline invite join dance. What is it? Why is it required? How does it work?
-  - What does the home server have to do?
-
-The purpose of inviting users to a room is to notify them that the room exists
-so they can choose to become a member of that room. Some rooms require that all
-users who join a room are previously invited to it (an "invite-only" room).
-Whether a given room is an "invite-only" room is determined by the room config
-key ``m.room.join_rules``. It can have one of the following values:
-
-``public``
-  This room is free for anyone to join without an invite.
-
-``invite``
-  This room can only be joined if you were invited.
-
-Only users who have a membership state of ``join`` in a room can invite new
-users to said room. The person being invited must not be in the ``join`` state
-in the room. The fully-qualified user ID must be specified when inviting a
-user, as the user may reside on a different home server. To invite a user, send
-the following request to |/rooms/<room_id>/invite|_, which will manage the
-entire invitation process::
-
-  {
-    "user_id": "<user id to invite>"
-  }
-
-Alternatively, the membership state for this user in this room can be modified 
-directly by sending the following request to 
-``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
-
-  {
-    "membership": "invite"
-  }
-
-See the `Room events`_ section for more information on ``m.room.member``.
-
-Leaving rooms
--------------
-.. TODO-spec - HS deleting rooms they are no longer a part of. Not implemented.
-  - This is actually Very Tricky. If all clients a HS is serving leave a room,
-  the HS will no longer get any new events for that room, because the servers
-  who get the events are determined on the *membership list*. There should
-  probably be a way for a HS to lurk on a room even if there are 0 of their
-  members in the room.
-  - Grace period before deletion?
-  - Under what conditions should a room NOT be purged?
-
-
-A user can leave a room to stop receiving events for that room. A user must
-have joined the room before they are eligible to leave the room. If the room is
-an "invite-only" room, they will need to be re-invited before they can re-join
-the room.  To leave a room, a request should be made to
-|/rooms/<room_id>/leave|_ with::
-
-  {}
-
-Alternatively, the membership state for this user in this room can be modified 
-directly by sending the following request to 
-``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
-
-  {
-    "membership": "leave"
-  }
-
-See the `Room events`_ section for more information on ``m.room.member``.
-
-Once a user has left a room, that room will no longer appear on the
-|initialSync|_ API.
-
-If all members in a room leave, that room becomes eligible for deletion. 
-
-Banning users in a room
------------------------
-A user may decide to ban another user in a room. 'Banning' forces the target
-user to leave the room and prevents them from re-joining the room. A banned
-user will not be treated as a joined user, and so will not be able to send or
-receive events in the room. In order to ban someone, the user performing the
-ban MUST have the required power level. To ban a user, a request should be made
-to |/rooms/<room_id>/ban|_ with::
-
-  {
-    "user_id": "<user id to ban"
-    "reason": "string: <reason for the ban>"
-  }
-  
-Banning a user adjusts the banned member's membership state to ``ban`` and
-adjusts the power level of this event to a level higher than the banned person.
-Like with other membership changes, a user can directly adjust the target
-member's state, by making a request to
-``/rooms/<room id>/state/m.room.member/<user id>``::
-
-  {
-    "membership": "ban"
-  }
-
-Events in a room
-----------------
-Room events can be split into two categories:
-
-:State Events:
-  These are events which replace events that came before it, depending on a set
-  of unique keys.  These keys are the event ``type`` and a ``state_key``.
-  Events with the same set of keys will be overwritten. Typically, state events
-  are used to store state, hence their name.
-
-:Non-state events:
-  These are events which cannot be overwritten after sending. The list of
-  events continues to grow as more events are sent. As this list grows, it
-  becomes necessary to provide a mechanism for navigating this list. Pagination
-  APIs are used to view the list of historical non-state events. Typically,
-  non-state events are used to send messages.
-
-This specification outlines several events, all with the event type prefix
-``m.``. However, applications may wish to add their own type of event, and this
-can be achieved using the REST API detailed in the following sections. If new
-events are added, the event ``type`` key SHOULD follow the Java package naming
-convention, e.g. ``com.example.myapp.event``.  This ensures event types are
-suitably namespaced for each application and reduces the risk of clashes.
-
-State events
-------------
-State events can be sent by ``PUT`` ing to
-|/rooms/<room_id>/state/<event_type>/<state_key>|_.  These events will be
-overwritten if ``<room id>``, ``<event type>`` and ``<state key>`` all match.
-If the state event has no ``state_key``, it can be omitted from the path. These
-requests **cannot use transaction IDs** like other ``PUT`` paths because they
-cannot be differentiated from the ``state_key``. Furthermore, ``POST`` is
-unsupported on state paths. Valid requests look like::
-
-  PUT /rooms/!roomid:domain/state/m.example.event
-  { "key" : "without a state key" }
-
-  PUT /rooms/!roomid:domain/state/m.another.example.event/foo
-  { "key" : "with 'foo' as the state key" }
-
-In contrast, these requests are invalid::
-
-  POST /rooms/!roomid:domain/state/m.example.event/
-  { "key" : "cannot use POST here" }
-
-  PUT /rooms/!roomid:domain/state/m.another.example.event/foo/11
-  { "key" : "txnIds are not supported" }
-
-Care should be taken to avoid setting the wrong ``state key``::
-
-  PUT /rooms/!roomid:domain/state/m.another.example.event/11
-  { "key" : "with '11' as the state key, but was probably intended to be a txnId" }
-
-The ``state_key`` is often used to store state about individual users, by using
-the user ID as the ``state_key`` value. For example::
-
-  PUT /rooms/!roomid:domain/state/m.favorite.animal.event/%40my_user%3Adomain.com
-  { "animal" : "cat", "reason": "fluffy" }
-
-In some cases, there may be no need for a ``state_key``, so it can be omitted::
-
-  PUT /rooms/!roomid:domain/state/m.room.bgd.color
-  { "color": "red", "hex": "#ff0000" }
-
-See `Room Events`_ for the ``m.`` event specification.
-
-Non-state events
-----------------
-Non-state events can be sent by sending a request to
-|/rooms/<room_id>/send/<event_type>|_.  These requests *can* use transaction
-IDs and ``PUT``/``POST`` methods. Non-state events allow access to historical
-events and pagination, making it best suited for sending messages.  For
-example::
-
-  POST /rooms/!roomid:domain/send/m.custom.example.message
-  { "text": "Hello world!" }
-
-  PUT /rooms/!roomid:domain/send/m.custom.example.message/11
-  { "text": "Goodbye world!" }
-
-See `Room Events`_ for the ``m.`` event specification.
-
-Syncing rooms
--------------
-.. NOTE::
-  This section is a work in progress.
-
-When a client logs in, they may have a list of rooms which they have already
-joined. These rooms may also have a list of events associated with them. The
-purpose of 'syncing' is to present the current room and event information in a
-convenient, compact manner. The events returned are not limited to room events;
-presence events will also be returned. A single syncing API is provided:
-
- - |initialSync|_ : A global sync which will present room and event information
-   for all rooms the user has joined.
-
-.. TODO-spec room-scoped initial sync
- - |/rooms/<room_id>/initialSync|_ : A sync scoped to a single room. Presents
-   room and event information for this room only.
- - Room-scoped initial sync is Very Tricky because typically people would
-   want to sync the room then listen for any new content from that point
-   onwards. The event stream cannot do this for a single room currently.
-   As a result, commenting room-scoped initial sync at this time.
-
-The |initialSync|_ API contains the following keys:
-
-``presence``
-  Description:
-    Contains a list of presence information for users the client is interested
-    in.
-  Format:
-    A JSON array of ``m.presence`` events.
-
-``end``
-  Description:
-    Contains an event stream token which can be used with the `Event Stream`_.
-  Format:
-    A string containing the event stream token.
-
-``rooms``
-  Description:
-    Contains a list of room information for all rooms the client has joined,
-    and limited room information on rooms the client has been invited to.
-  Format:
-    A JSON array containing Room Information JSON objects.
-
-Room Information:
-  Description:
-    Contains all state events for the room, along with a limited amount of
-    the most recent non-state events, configured via the ``limit`` query
-    parameter. Also contains additional keys with room metadata, such as the
-    ``room_id`` and the client's ``membership`` to the room.
-  Format:
-    A JSON object with the following keys:
-      ``room_id``
-        A string containing the ID of the room being described.
-      ``membership``
-        A string representing the client's membership status in this room.
-      ``messages``
-        An event stream JSON object containing a ``chunk`` of recent non-state
-        events, along with an ``end`` token. *NB: The name of this key will be
-        changed in a later version.*
-      ``state``
-        A JSON array containing all the current state events for this room.
-
-Getting events for a room
--------------------------
-There are several APIs provided to ``GET`` events for a room:
-
-``/rooms/<room id>/state/<event type>/<state key>``
-  Description:
-    Get the state event identified.
-  Response format:
-    A JSON object representing the state event **content**.
-  Example:
-    ``/rooms/!room:domain.com/state/m.room.name`` returns ``{ "name": "Room name" }``
-
-|/rooms/<room_id>/state|_
-  Description:
-    Get all state events for a room.
-  Response format:
-    ``[ { state event }, { state event }, ... ]``
-  Example:
-    TODO-doc
-
-
-|/rooms/<room_id>/members|_
-  Description:
-    Get all ``m.room.member`` state events.
-  Response format:
-    ``{ "start": "<token>", "end": "<token>", "chunk": [ { m.room.member event }, ... ] }``
-  Example:
-    TODO-doc
-
-|/rooms/<room_id>/messages|_
-  Description:
-    Get all ``m.room.message`` and ``m.room.member`` events. This API supports
-    pagination using ``from`` and ``to`` query parameters, coupled with the
-    ``start`` and ``end`` tokens from an |initialSync|_ API.
-  Response format:
-    ``{ "start": "<token>", "end": "<token>" }``
-  Example:
-    TODO-doc
-    
-|/rooms/<room_id>/initialSync|_
-  Description:
-    Get all relevant events for a room. This includes state events, paginated
-    non-state events and presence events.
-  Response format:
-    `` { TODO-doc } ``
-  Example:
-    TODO-doc
-
-Redactions
-----------
-Since events are extensible it is possible for malicious users and/or servers
-to add keys that are, for example offensive or illegal. Since some events
-cannot be simply deleted, e.g. membership events, we instead 'redact' events.
-This involves removing all keys from an event that are not required by the
-protocol. This stripped down event is thereafter returned anytime a client or
-remote server requests it.
-
-Events that have been redacted include a ``redacted_because`` key whose value
-is the event that caused it to be redacted, which may include a reason.
-
-Redacting an event cannot be undone, allowing server owners to delete the
-offending content from the databases.
-
-Currently, only room admins can redact events by sending a ``m.room.redaction``
-event, but server admins also need to be able to redact events by a similar
-mechanism.
-
-Upon receipt of a redaction event, the server should strip off any keys not in
-the following list:
-
- - ``event_id``
- - ``type``
- - ``room_id``
- - ``user_id``
- - ``state_key``
- - ``prev_state``
- - ``content``
-
-The content object should also be stripped of all keys, unless it is one of
-one of the following event types:
-
- - ``m.room.member`` allows key ``membership``
- - ``m.room.create`` allows key ``creator``
- - ``m.room.join_rules`` allows key ``join_rule``
- - ``m.room.power_levels`` allows keys that are user ids or ``default``
- - ``m.room.add_state_level`` allows key ``level``
- - ``m.room.send_event_level`` allows key ``level``
- - ``m.room.ops_levels`` allows keys ``kick_level``, ``ban_level``
-   and ``redact_level``
- - ``m.room.aliases`` allows key ``aliases``
-
-The redaction event should be added under the key ``redacted_because``.
-
-
-When a client receives a redaction event it should change the redacted event
-in the same way a server does.
-
-
 Room Events
-===========
+-----------
 .. NOTE::
   This section is a work in progress.
 
@@ -1483,7 +778,7 @@ prefixed with ``m.``
     level key.
 
 m.room.message msgtypes
------------------------
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. TODO-spec
    How a client should handle unknown message types.
@@ -1589,187 +884,29 @@ The following keys can be attached to any ``m.room.message``:
     - ``sender_ts`` : integer - A timestamp (ms resolution) representing the
       wall-clock time when the message was sent from the client.
 
-Presence
-========
-.. NOTE::
-  This section is a work in progress.
+Events on Change of Profile Information
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Because the profile displayname and avatar information are likely to be used in
+many places of a client's display, changes to these fields cause an automatic
+propagation event to occur, informing likely-interested parties of the new
+values. This change is conveyed using two separate mechanisms:
 
-Each user has the concept of presence information. This encodes the
-"availability" of that user, suitable for display on other user's clients. This
-is transmitted as an ``m.presence`` event and is one of the few events which
-are sent *outside the context of a room*. The basic piece of presence
-information is represented by the ``presence`` key, which is an enum of one of
-the following:
+ - a ``m.room.member`` event is sent to every room the user is a member of,
+   to update the ``displayname`` and ``avatar_url``.
+ - a presence status update is sent, again containing the new values of the
+   ``displayname`` and ``avatar_url`` keys, in addition to the required
+   ``presence`` key containing the current presence state of the user.
 
-  - ``online`` : The default state when the user is connected to an event
-    stream.
-  - ``unavailable`` : The user is not reachable at this time.
-  - ``offline`` : The user is not connected to an event stream.
-  - ``free_for_chat`` : The user is generally willing to receive messages
-    moreso than default.
-  - ``hidden`` : Behaves as offline, but allows the user to see the client
-    state anyway and generally interact with client features. (Not yet
-    implemented in synapse).
+Both of these should be done automatically by the home server when a user
+successfully changes their displayname or avatar URL fields.
 
-This basic ``presence`` field applies to the user as a whole, regardless of how
-many client devices they have connected. The home server should synchronise
-this status choice among multiple devices to ensure the user gets a consistent
-experience.
-
-In addition, the server maintains a timestamp of the last time it saw an active
-action from the user; either sending a message to a room, or changing presence
-state from a lower to a higher level of availability (thus: changing state from
-``unavailable`` to ``online`` will count as an action for being active, whereas
-in the other direction will not). This timestamp is presented via a key called
-``last_active_ago``, which gives the relative number of miliseconds since the
-message is generated/emitted, that the user was last seen active.
-
-Home servers can also use the user's choice of presence state as a signal for
-how to handle new private one-to-one chat message requests. For example, it
-might decide:
-
-  - ``free_for_chat`` : accept anything
-  - ``online`` : accept from anyone in my addres book list
-  - ``busy`` : accept from anyone in this "important people" group in my
-    address book list
-
-Presence List
--------------
-Each user's home server stores a "presence list" for that user. This stores a
-list of other user IDs the user has chosen to add to it. To be added to this
-list, the user being added must receive permission from the list owner. Once
-granted, both user's HS(es) store this information. Since such subscriptions
-are likely to be bidirectional, HSes may wish to automatically accept requests
-when a reverse subscription already exists.
-
-As a convenience, presence lists should support the ability to collect users
-into groups, which could allow things like inviting the entire group to a new
-("ad-hoc") chat room, or easy interaction with the profile information ACL
-implementation of the HS.
-
-Presence and Permissions
-------------------------
-For a viewing user to be allowed to see the presence information of a target
-user, either:
-
- - The target user has allowed the viewing user to add them to their presence
-   list, or
- - The two users share at least one room in common
-
-In the latter case, this allows for clients to display some minimal sense of
-presence information in a user list for a room.
-
-Client API
-----------
-The client API for presence is on the following set of REST calls.
-
-Fetching basic status::
-
-  GET $PREFIX/presence/:user_id/status
-
-  Returned content: JSON object containing the following keys:
-    presence: "offline"|"unavailable"|"online"|"free_for_chat"
-    status_msg: (optional) string of freeform text
-    last_active_ago: miliseconds since the last activity by the user
-
-Setting basic status::
-
-  PUT $PREFIX/presence/:user_id/status
-
-  Content: JSON object containing the following keys:
-    presence and status_msg: as above
-
-When setting the status, the activity time is updated to reflect that activity;
-the client does not need to specify the ``last_active_ago`` field.
-
-Fetching the presence list::
-
-  GET $PREFIX/presence/list
-
-  Returned content: JSON array containing objects; each object containing the
-    following keys:
-    user_id: observed user ID
-    presence: "offline"|"unavailable"|"online"|"free_for_chat"
-    status_msg: (optional) string of freeform text
-    last_active_ago: miliseconds since the last activity by the user
-
-Maintaining the presence list::
-
-  POST $PREFIX/presence/list
-
-  Content: JSON object containing either or both of the following keys:
-    invite: JSON array of strings giving user IDs to send invites to
-    drop: JSON array of strings giving user IDs to remove from the list
-
-.. TODO-spec
-  - Define how users receive presence invites, and how they accept/decline them
-
-Server API
-----------
-The server API for presence is based entirely on exchange of the following
-EDUs. There are no PDUs or Federation Queries involved.
-
-Performing a presence update and poll subscription request::
-
-  EDU type: m.presence
-
-  Content keys:
-    push: (optional): list of push operations.
-      Each should be an object with the following keys:
-        user_id: string containing a User ID
-        presence: "offline"|"unavailable"|"online"|"free_for_chat"
-        status_msg: (optional) string of freeform text
-        last_active_ago: miliseconds since the last activity by the user
-
-    poll: (optional): list of strings giving User IDs
-
-    unpoll: (optional): list of strings giving User IDs
-
-The presence of this combined message is two-fold: it informs the recipient
-server of the current status of one or more users on the sending server (by the
-``push`` key), and it maintains the list of users on the recipient server that
-the sending server is interested in receiving updates for, by adding (by the
-``poll`` key) or removing them (by the ``unpoll`` key). The ``poll`` and
-``unpoll`` lists apply *changes* to the implied list of users; any existing IDs
-that the server sent as ``poll`` operations in a previous message are not
-removed until explicitly requested by a later ``unpoll``.
-
-On receipt of a message containing a non-empty ``poll`` list, the receiving
-server should immediately send the sending server a presence update EDU of its
-own, containing in a ``push`` list the current state of every user that was in
-the orginal EDU's ``poll`` list.
-
-Sending a presence invite::
-
-  EDU type: m.presence_invite
-
-  Content keys:
-    observed_user: string giving the User ID of the user whose presence is
-      requested (i.e. the recipient of the invite)
-    observer_user: string giving the User ID of the user who is requesting to
-      observe the presence (i.e. the sender of the invite)
-
-Accepting a presence invite::
-
-  EDU type: m.presence_accept
-
-  Content keys - as for m.presence_invite
-
-Rejecting a presence invite::
-
-  EDU type: m.presence_deny
-
-  Content keys - as for m.presence_invite
-
-.. TODO-doc
-  - Explain the timing-based roundtrip reduction mechanism for presence
-    messages
-  - Explain the zero-byte presence inference logic
-  See also: docs/client-server/model/presence
-
+Additionally, when home servers emit room membership events for their own
+users, they should include the displayname and avatar URL fields in these
+events so that clients already have these details to hand, and do not have to
+perform extra roundtrips to query it.
 
 Voice over IP
-=============
+-------------
 Matrix can also be used to set up VoIP calls. This is part of the core
 specification, although is still in a very early stage. Voice (and video) over
 Matrix is based on the WebRTC standards.
@@ -1779,7 +916,7 @@ must only send call events to rooms with exactly two participants as currently
 the WebRTC standard is based around two-party communication.
 
 Events
-------
+~~~~~~
 ``m.call.invite``
 This event is sent by the caller when they wish to establish a call.
 
@@ -1850,7 +987,7 @@ either once the call has has been established or before to abort the call.
       messages
 
 Message Exchange
-----------------
+~~~~~~~~~~~~~~~~
 A call is set up with messages exchanged as follows:
 
 ::
@@ -1879,7 +1016,7 @@ Calls are negotiated according to the WebRTC specification.
 
 
 Glare
------
+~~~~~
 This specification aims to address the problem of two users calling each other
 at roughly the same time and their invites crossing on the wire. It is a far
 better experience for the users if their calls are connected if it is clear
@@ -1903,31 +1040,933 @@ The call setup should appear seamless to the user as if they had simply placed
 a call and the other party had accepted. Thusly, any media stream that had been
 setup for use on a call should be transferred and used for the call that
 replaces it.
- 
 
-Profiles
-========
+Client-Server API
+=================
+
+Registration and Login
+----------------------
+
+Clients must register with a home server in order to use Matrix. After
+registering, the client will be given an access token which must be used in ALL
+requests to that home server as a query parameter 'access_token'.
+
+If the client has already registered, they need to be able to login to their
+account. The home server may provide many different ways of logging in, such as
+user/password auth, login via a social network (OAuth2), login by confirming a
+token sent to their email address, etc. This specification does not define how
+home servers should authorise their users who want to login to their existing
+accounts, but instead defines the standard interface which implementations
+should follow so that ANY client can login to ANY home server. Clients login
+using the |login|_ API. Clients register using the |register|_ API.
+Registration follows the same general procedure as login, but the path requests
+are sent to and the details contained in them are different.
+
+In both registration and login cases, the process takes the form of one or more
+stages, where at each stage the client submits a set of data for a given stage
+type and awaits a response from the server, which will either be a final
+success or a request to perform an additional stage. This exchange continues
+until the final success.
+
+In order to determine up-front what the server's requirements are, the client
+can request from the server a complete description of all of its acceptable
+flows of the registration or login process. It can then inspect the list of
+returned flows looking for one for which it believes it can complete all of the
+required stages, and perform it. As each home server may have different ways of
+logging in, the client needs to know how they should login. All distinct login
+stages MUST have a corresponding ``type``. A ``type`` is a namespaced string
+which details the mechanism for logging in.
+
+A client may be able to login via multiple valid login flows, and should choose
+a single flow when logging in. A flow is a series of login stages. The home
+server MUST respond with all the valid login flows when requested by a simple
+``GET`` request directly to the ``/login`` or ``/register`` paths::
+
+  {
+    "flows": [
+      {
+        "type": "<login type1a>",
+        "stages": [ "<login type 1a>", "<login type 1b>" ]
+      },
+      {
+        "type": "<login type2a>",
+        "stages": [ "<login type 2a>", "<login type 2b>" ]
+      },
+      {
+        "type": "<login type3>"
+      }
+    ]
+  }
+
+The client can now select which flow it wishes to use, and begin making
+``POST`` requests to the ``/login`` or ``/register`` paths with JSON body
+content containing the name of the stage as the ``type`` key, along with
+whatever additional parameters are required for that login or registration type
+(see below). After the flow is completed, the client's fully-qualified user
+ID and a new access token MUST be returned::
+
+  {
+    "user_id": "@user:matrix.org",
+    "access_token": "abcdef0123456789"
+  }
+
+The ``user_id`` key is particularly useful if the home server wishes to support
+localpart entry of usernames (e.g. "user" rather than "@user:matrix.org"), as
+the client may not be able to determine its ``user_id`` in this case.
+
+If the flow has multiple stages to it, the home server may wish to create a
+session to store context between requests. If a home server responds with a
+``session`` key to a request, clients MUST submit it in subsequent requests
+until the flow is completed::
+
+  {
+    "session": "<session id>"
+  }
+
+This specification defines the following login types:
+ - ``m.login.password``
+ - ``m.login.oauth2``
+ - ``m.login.email.code``
+ - ``m.login.email.url``
+ - ``m.login.email.identity``
+
+Password-based
+~~~~~~~~~~~~~~
+:Type: 
+  ``m.login.password``
+:Description: 
+  Login is supported via a username and password.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.password",
+    "user": "<user_id or user localpart>",
+    "password": "<password>"
+  }
+
+The home server MUST respond with either new credentials, the next stage of the
+login process, or a standard error response.
+
+OAuth2-based
+~~~~~~~~~~~~
+:Type: 
+  ``m.login.oauth2``
+:Description:
+  Login is supported via OAuth2 URLs. This login consists of multiple requests.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.oauth2",
+    "user": "<user_id or user localpart>"
+  }
+
+The server MUST respond with::
+
+  {
+    "uri": <Authorization Request URI OR service selection URI>
+  }
+
+The home server acts as a 'confidential' client for the purposes of OAuth2.  If
+the uri is a ``sevice selection URI``, it MUST point to a webpage which prompts
+the user to choose which service to authorize with. On selection of a service,
+this MUST link through to an ``Authorization Request URI``. If there is only 1
+service which the home server accepts when logging in, this indirection can be
+skipped and the "uri" key can be the ``Authorization Request URI``. 
+
+The client then visits the ``Authorization Request URI``, which then shows the
+OAuth2 Allow/Deny prompt. Hitting 'Allow' returns the ``redirect URI`` with the
+auth code.  Home servers can choose any path for the ``redirect URI``. The
+client should visit the ``redirect URI``, which will then finish the OAuth2
+login process, granting the home server an access token for the chosen service.
+When the home server gets this access token, it verifies that the cilent has
+authorised with the 3rd party, and can now complete the login. The OAuth2
+``redirect URI`` (with auth code) MUST respond with either new credentials, the
+next stage of the login process, or a standard error response.
+    
+For example, if a home server accepts OAuth2 from Google, it would return the 
+Authorization Request URI for Google::
+
+  {
+    "uri": "https://accounts.google.com/o/oauth2/auth?response_type=code&
+    client_id=CLIENT_ID&redirect_uri=REDIRECT_URI&scope=photos"
+  }
+
+The client then visits this URI and authorizes the home server. The client then
+visits the REDIRECT_URI with the auth code= query parameter which returns::
+
+  {
+    "user_id": "@user:matrix.org",
+    "access_token": "0123456789abcdef"
+  }
+
+Email-based (code)
+~~~~~~~~~~~~~~~~~~
+:Type: 
+  ``m.login.email.code``
+:Description:
+  Login is supported by typing in a code which is sent in an email. This login 
+  consists of multiple requests.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.email.code",
+    "user": "<user_id or user localpart>",
+    "email": "<email address>"
+  }
+
+After validating the email address, the home server MUST send an email
+containing an authentication code and return::
+
+  {
+    "type": "m.login.email.code",
+    "session": "<session id>"
+  }
+
+The second request in this login stage involves sending this authentication
+code::
+
+  {
+    "type": "m.login.email.code",
+    "session": "<session id>",
+    "code": "<code in email sent>"
+  }
+
+The home server MUST respond to this with either new credentials, the next
+stage of the login process, or a standard error response.
+
+Email-based (url)
+~~~~~~~~~~~~~~~~~
+:Type: 
+  ``m.login.email.url``
+:Description:
+  Login is supported by clicking on a URL in an email. This login consists of 
+  multiple requests.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.email.url",
+    "user": "<user_id or user localpart>",
+    "email": "<email address>"
+  }
+
+After validating the email address, the home server MUST send an email
+containing an authentication URL and return::
+
+  {
+    "type": "m.login.email.url",
+    "session": "<session id>"
+  }
+
+The email contains a URL which must be clicked. After it has been clicked, the
+client should perform another request::
+
+  {
+    "type": "m.login.email.url",
+    "session": "<session id>"
+  }
+
+The home server MUST respond to this with either new credentials, the next
+stage of the login process, or a standard error response. 
+
+A common client implementation will be to periodically poll until the link is
+clicked.  If the link has not been visited yet, a standard error response with
+an errcode of ``M_LOGIN_EMAIL_URL_NOT_YET`` should be returned.
+
+
+Email-based (identity server)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+:Type:
+  ``m.login.email.identity``
+:Description:
+  Login is supported by authorising an email address with an identity server.
+
+Prior to submitting this, the client should authenticate with an identity
+server.  After authenticating, the session information should be submitted to
+the home server.
+
+To respond to this type, reply with::
+
+  {
+    "type": "m.login.email.identity",
+    "threepidCreds": [
+      {
+        "sid": "<identity server session id>",
+        "clientSecret": "<identity server client secret>",
+        "idServer": "<url of identity server authed with, e.g. 'matrix.org:8090'>"
+      }
+    ]
+  }
+
+
+
+N-Factor Authentication
+~~~~~~~~~~~~~~~~~~~~~~~
+Multiple login stages can be combined to create N-factor authentication during
+login.
+
+This can be achieved by responding with the ``next`` login type on completion
+of a previous login stage::
+
+  {
+    "next": "<next login type>"
+  }
+
+If a home server implements N-factor authentication, it MUST respond with all 
+``stages`` when initially queried for their login requirements::
+
+  {
+    "type": "<1st login type>",
+    "stages": [ <1st login type>, <2nd login type>, ... , <Nth login type> ]
+  }
+
+This can be represented conceptually as::
+
+   _______________________
+  |    Login Stage 1      |
+  | type: "<login type1>" |
+  |  ___________________  |
+  | |_Request_1_________| | <-- Returns "session" key which is used throughout.
+  |  ___________________  |     
+  | |_Request_2_________| | <-- Returns a "next" value of "login type2"
+  |_______________________|
+            |
+            |
+   _________V_____________
+  |    Login Stage 2      |
+  | type: "<login type2>" |
+  |  ___________________  |
+  | |_Request_1_________| |
+  |  ___________________  |
+  | |_Request_2_________| |
+  |  ___________________  |
+  | |_Request_3_________| | <-- Returns a "next" value of "login type3"
+  |_______________________|
+            |
+            |
+   _________V_____________
+  |    Login Stage 3      |
+  | type: "<login type3>" |
+  |  ___________________  |
+  | |_Request_1_________| | <-- Returns user credentials
+  |_______________________|
+
+Fallback
+~~~~~~~~
+Clients cannot be expected to be able to know how to process every single login
+type. If a client determines it does not know how to handle a given login type,
+it should request a login fallback page::
+
+  GET matrix/client/api/v1/login/fallback
+
+This MUST return an HTML page which can perform the entire login process.
+
+
+Rooms
+-----
+
+Creation
+~~~~~~~~
+To create a room, a client has to use the |createRoom|_ API. There are various
+options which can be set when creating a room:
+
+``visibility``
+  Type: 
+    String
+  Optional: 
+    Yes
+  Value:
+    Either ``public`` or ``private``.
+  Description:
+    A ``public`` visibility indicates that the room will be shown in the public
+    room list. A ``private`` visibility will hide the room from the public room
+    list. Rooms default to ``private`` visibility if this key is not included.
+
+``room_alias_name``
+  Type: 
+    String
+  Optional: 
+    Yes
+  Value:
+    The room alias localpart.
+  Description:
+    If this is included, a room alias will be created and mapped to the newly
+    created room.  The alias will belong on the same home server which created
+    the room, e.g.  ``!qadnasoi:domain.com >>> #room_alias_name:domain.com``
+
+``name``
+  Type: 
+    String
+  Optional: 
+    Yes
+  Value:
+    The ``name`` value for the ``m.room.name`` state event.
+  Description:
+    If this is included, an ``m.room.name`` event will be sent into the room to
+    indicate the name of the room. See `Room Events`_ for more information on
+    ``m.room.name``.
+
+``topic``
+  Type: 
+    String
+  Optional: 
+    Yes
+  Value:
+    The ``topic`` value for the ``m.room.topic`` state event.
+  Description:
+    If this is included, an ``m.room.topic`` event will be sent into the room
+    to indicate the topic for the room. See `Room Events`_ for more information
+    on ``m.room.topic``.
+
+``invite``
+  Type:
+    List
+  Optional:
+    Yes
+  Value:
+    A list of user ids to invite.
+  Description:
+    This will tell the server to invite everyone in the list to the newly
+    created room.
+
+Example::
+
+  {
+    "visibility": "public", 
+    "room_alias_name": "thepub",
+    "name": "The Grand Duke Pub",
+    "topic": "All about happy hour"
+  }
+
+The home server will create a ``m.room.create`` event when the room is created,
+which serves as the root of the PDU graph for this room. This event also has a
+``creator`` key which contains the user ID of the room creator. It will also
+generate several other events in order to manage permissions in this room. This
+includes:
+
+ - ``m.room.power_levels`` : Sets the power levels of users.
+ - ``m.room.join_rules`` : Whether the room is "invite-only" or not.
+ - ``m.room.add_state_level``: The power level required in order to add new
+   state to the room (as opposed to updating exisiting state)
+ - ``m.room.send_event_level`` : The power level required in order to send a
+   message in this room.
+ - ``m.room.ops_level`` : The power level required in order to kick or ban a
+   user from the room or redact an event in the room.
+
+See `Room Events`_ for more information on these events.
+
+Room aliases
+~~~~~~~~~~~~
 .. NOTE::
   This section is a work in progress.
 
+Room aliases can be created by sending a ``PUT /directory/room/<room alias>``::
+
+  {
+    "room_id": <room id>
+  }
+
+They can be deleted by sending a ``DELETE /directory/room/<room alias>`` with
+no content. Only some privileged users may be able to delete room aliases, e.g.
+server admins, the creator of the room alias, etc. This specification does not
+outline the privilege level required for deleting room aliases.
+
+As room aliases are scoped to a particular home server domain name, it is
+likely that a home server will reject attempts to maintain aliases on other
+domain names. This specification does not provide a way for home servers to
+send update requests to other servers.
+
+Rooms store a *partial* list of room aliases via the ``m.room.aliases`` state
+event. This alias list is partial because it cannot guarantee that the alias
+list is in any way accurate or up-to-date, as room aliases can point to 
+different room IDs over time. Crucially, the aliases in this event are
+**purely informational** and SHOULD NOT be treated as accurate. They SHOULD
+be checked before they are used or shared with another user. If a room
+appears to have a room alias of ``#alias:example.com``, this SHOULD be checked
+to make sure that the room's ID matches the ``room_id`` returned from the
+request.
+
+Room aliases can be checked in the same way they are resolved; by sending a 
+``GET /directory/room/<room alias>``::
+
+  {
+    "room_id": <room id>,
+    "servers": [ <domain>, <domain2>, <domain3> ]
+  }
+
+Home servers can respond to resolve requests for aliases on other domains than
+their own by using the federation API to ask other domain name home servers.
+
+
+Permissions
+~~~~~~~~~~~
+.. NOTE::
+  This section is a work in progress.
+
+Permissions for rooms are done via the concept of power levels - to do any
+action in a room a user must have a suitable power level. Power levels are
+stored as state events in a given room. 
+
+Power levels for users are defined in ``m.room.power_levels``, where both a
+default and specific users' power levels can be set::
+
+  {
+    "<user id 1>": <power level int>,
+    "<user id 2>": <power level int>,
+    "default": 0
+  }
+
+By default all users have a power level of 0, other than the room creator whose
+power level defaults to 100. Users can grant other users increased power levels
+up to their own power level. For example, user A with a power level of 50 could
+increase the power level of user B to a maximum of level 50. Power levels for 
+users are tracked per-room even if the user is not present in the room.
+
+State events may contain a ``required_power_level`` key, which indicates the
+minimum power a user must have before they can update that state key. The only
+exception to this is when a user leaves a room, which revokes the user's right
+to update state events in that room.
+
+To perform certain actions there are additional power level requirements
+defined in the following state events:
+
+- ``m.room.send_event_level`` defines the minimum ``level`` for sending 
+  non-state events. Defaults to 50.
+- ``m.room.add_state_level`` defines the minimum ``level`` for adding new 
+  state, rather than updating existing state. Defaults to 50.
+- ``m.room.ops_level`` defines the minimum ``ban_level`` and ``kick_level`` to 
+  ban and kick other users respectively. This defaults to a kick and ban levels
+  of 50 each.
+
+
+Joining rooms
+~~~~~~~~~~~~~
+.. TODO-doc What does the home server have to do to join a user to a room?
+   -  See SPEC-30.
+
+Users need to join a room in order to send and receive events in that room. A
+user can join a room by making a request to |/join/<room_alias_or_id>|_ with::
+
+  {}
+
+Alternatively, a user can make a request to |/rooms/<room_id>/join|_ with the
+same request content.  This is only provided for symmetry with the other
+membership APIs: ``/rooms/<room id>/invite`` and ``/rooms/<room id>/leave``. If
+a room alias was specified, it will be automatically resolved to a room ID,
+which will then be joined. The room ID that was joined will be returned in
+response::
+
+  {
+    "room_id": "!roomid:domain"
+  }
+
+The membership state for the joining user can also be modified directly to be
+``join`` by sending the following request to
+``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
+
+  {
+    "membership": "join"
+  }
+
+See the `Room events`_ section for more information on ``m.room.member``.
+
+After the user has joined a room, they will receive subsequent events in that
+room. This room will now appear as an entry in the |initialSync|_ API.
+
+Some rooms enforce that a user is *invited* to a room before they can join that
+room. Other rooms will allow anyone to join the room even if they have not
+received an invite.
+
+Inviting users
+~~~~~~~~~~~~~~
+.. TODO-doc Invite-join dance 
+  - Outline invite join dance. What is it? Why is it required? How does it work?
+  - What does the home server have to do?
+
+The purpose of inviting users to a room is to notify them that the room exists
+so they can choose to become a member of that room. Some rooms require that all
+users who join a room are previously invited to it (an "invite-only" room).
+Whether a given room is an "invite-only" room is determined by the room config
+key ``m.room.join_rules``. It can have one of the following values:
+
+``public``
+  This room is free for anyone to join without an invite.
+
+``invite``
+  This room can only be joined if you were invited.
+
+Only users who have a membership state of ``join`` in a room can invite new
+users to said room. The person being invited must not be in the ``join`` state
+in the room. The fully-qualified user ID must be specified when inviting a
+user, as the user may reside on a different home server. To invite a user, send
+the following request to |/rooms/<room_id>/invite|_, which will manage the
+entire invitation process::
+
+  {
+    "user_id": "<user id to invite>"
+  }
+
+Alternatively, the membership state for this user in this room can be modified 
+directly by sending the following request to 
+``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
+
+  {
+    "membership": "invite"
+  }
+
+See the `Room events`_ section for more information on ``m.room.member``.
+
+Leaving rooms
+~~~~~~~~~~~~~
+.. TODO-spec - HS deleting rooms they are no longer a part of. Not implemented.
+  - This is actually Very Tricky. If all clients a HS is serving leave a room,
+  the HS will no longer get any new events for that room, because the servers
+  who get the events are determined on the *membership list*. There should
+  probably be a way for a HS to lurk on a room even if there are 0 of their
+  members in the room.
+  - Grace period before deletion?
+  - Under what conditions should a room NOT be purged?
+
+
+A user can leave a room to stop receiving events for that room. A user must
+have joined the room before they are eligible to leave the room. If the room is
+an "invite-only" room, they will need to be re-invited before they can re-join
+the room.  To leave a room, a request should be made to
+|/rooms/<room_id>/leave|_ with::
+
+  {}
+
+Alternatively, the membership state for this user in this room can be modified 
+directly by sending the following request to 
+``/rooms/<room id>/state/m.room.member/<url encoded user id>``::
+
+  {
+    "membership": "leave"
+  }
+
+See the `Room events`_ section for more information on ``m.room.member``.
+
+Once a user has left a room, that room will no longer appear on the
+|initialSync|_ API.
+
+If all members in a room leave, that room becomes eligible for deletion. 
+
+Banning users in a room
+~~~~~~~~~~~~~~~~~~~~~~~
+A user may decide to ban another user in a room. 'Banning' forces the target
+user to leave the room and prevents them from re-joining the room. A banned
+user will not be treated as a joined user, and so will not be able to send or
+receive events in the room. In order to ban someone, the user performing the
+ban MUST have the required power level. To ban a user, a request should be made
+to |/rooms/<room_id>/ban|_ with::
+
+  {
+    "user_id": "<user id to ban"
+    "reason": "string: <reason for the ban>"
+  }
+  
+Banning a user adjusts the banned member's membership state to ``ban`` and
+adjusts the power level of this event to a level higher than the banned person.
+Like with other membership changes, a user can directly adjust the target
+member's state, by making a request to
+``/rooms/<room id>/state/m.room.member/<user id>``::
+
+  {
+    "membership": "ban"
+  }
+
+Events in a room
+~~~~~~~~~~~~~~~~
+Room events can be split into two categories:
+
+:State Events:
+  These are events which replace events that came before it, depending on a set
+  of unique keys.  These keys are the event ``type`` and a ``state_key``.
+  Events with the same set of keys will be overwritten. Typically, state events
+  are used to store state, hence their name.
+
+:Non-state events:
+  These are events which cannot be overwritten after sending. The list of
+  events continues to grow as more events are sent. As this list grows, it
+  becomes necessary to provide a mechanism for navigating this list. Pagination
+  APIs are used to view the list of historical non-state events. Typically,
+  non-state events are used to send messages.
+
+This specification outlines several events, all with the event type prefix
+``m.``. However, applications may wish to add their own type of event, and this
+can be achieved using the REST API detailed in the following sections. If new
+events are added, the event ``type`` key SHOULD follow the Java package naming
+convention, e.g. ``com.example.myapp.event``.  This ensures event types are
+suitably namespaced for each application and reduces the risk of clashes.
+
+State events
+~~~~~~~~~~~~
+State events can be sent by ``PUT`` ing to
+|/rooms/<room_id>/state/<event_type>/<state_key>|_.  These events will be
+overwritten if ``<room id>``, ``<event type>`` and ``<state key>`` all match.
+If the state event has no ``state_key``, it can be omitted from the path. These
+requests **cannot use transaction IDs** like other ``PUT`` paths because they
+cannot be differentiated from the ``state_key``. Furthermore, ``POST`` is
+unsupported on state paths. Valid requests look like::
+
+  PUT /rooms/!roomid:domain/state/m.example.event
+  { "key" : "without a state key" }
+
+  PUT /rooms/!roomid:domain/state/m.another.example.event/foo
+  { "key" : "with 'foo' as the state key" }
+
+In contrast, these requests are invalid::
+
+  POST /rooms/!roomid:domain/state/m.example.event/
+  { "key" : "cannot use POST here" }
+
+  PUT /rooms/!roomid:domain/state/m.another.example.event/foo/11
+  { "key" : "txnIds are not supported" }
+
+Care should be taken to avoid setting the wrong ``state key``::
+
+  PUT /rooms/!roomid:domain/state/m.another.example.event/11
+  { "key" : "with '11' as the state key, but was probably intended to be a txnId" }
+
+The ``state_key`` is often used to store state about individual users, by using
+the user ID as the ``state_key`` value. For example::
+
+  PUT /rooms/!roomid:domain/state/m.favorite.animal.event/%40my_user%3Adomain.com
+  { "animal" : "cat", "reason": "fluffy" }
+
+In some cases, there may be no need for a ``state_key``, so it can be omitted::
+
+  PUT /rooms/!roomid:domain/state/m.room.bgd.color
+  { "color": "red", "hex": "#ff0000" }
+
+See `Room Events`_ for the ``m.`` event specification.
+
+Non-state events
+~~~~~~~~~~~~~~~~
+Non-state events can be sent by sending a request to
+|/rooms/<room_id>/send/<event_type>|_.  These requests *can* use transaction
+IDs and ``PUT``/``POST`` methods. Non-state events allow access to historical
+events and pagination, making it best suited for sending messages.  For
+example::
+
+  POST /rooms/!roomid:domain/send/m.custom.example.message
+  { "text": "Hello world!" }
+
+  PUT /rooms/!roomid:domain/send/m.custom.example.message/11
+  { "text": "Goodbye world!" }
+
+See `Room Events`_ for the ``m.`` event specification.
+
+Syncing rooms
+~~~~~~~~~~~~~
+.. NOTE::
+  This section is a work in progress.
+
+When a client logs in, they may have a list of rooms which they have already
+joined. These rooms may also have a list of events associated with them. The
+purpose of 'syncing' is to present the current room and event information in a
+convenient, compact manner. The events returned are not limited to room events;
+presence events will also be returned. A single syncing API is provided:
+
+ - |initialSync|_ : A global sync which will present room and event information
+   for all rooms the user has joined.
+
+.. TODO-spec room-scoped initial sync
+ - |/rooms/<room_id>/initialSync|_ : A sync scoped to a single room. Presents
+   room and event information for this room only.
+ - Room-scoped initial sync is Very Tricky because typically people would
+   want to sync the room then listen for any new content from that point
+   onwards. The event stream cannot do this for a single room currently.
+   As a result, commenting room-scoped initial sync at this time.
+
+The |initialSync|_ API contains the following keys:
+
+``presence``
+  Description:
+    Contains a list of presence information for users the client is interested
+    in.
+  Format:
+    A JSON array of ``m.presence`` events.
+
+``end``
+  Description:
+    Contains an event stream token which can be used with the `Event Stream`_.
+  Format:
+    A string containing the event stream token.
+
+``rooms``
+  Description:
+    Contains a list of room information for all rooms the client has joined,
+    and limited room information on rooms the client has been invited to.
+  Format:
+    A JSON array containing Room Information JSON objects.
+
+Room Information:
+  Description:
+    Contains all state events for the room, along with a limited amount of
+    the most recent non-state events, configured via the ``limit`` query
+    parameter. Also contains additional keys with room metadata, such as the
+    ``room_id`` and the client's ``membership`` to the room.
+  Format:
+    A JSON object with the following keys:
+      ``room_id``
+        A string containing the ID of the room being described.
+      ``membership``
+        A string representing the client's membership status in this room.
+      ``messages``
+        An event stream JSON object containing a ``chunk`` of recent non-state
+        events, along with an ``end`` token. *NB: The name of this key will be
+        changed in a later version.*
+      ``state``
+        A JSON array containing all the current state events for this room.
+
+Getting events for a room
+~~~~~~~~~~~~~~~~~~~~~~~~~
+There are several APIs provided to ``GET`` events for a room:
+
+``/rooms/<room id>/state/<event type>/<state key>``
+  Description:
+    Get the state event identified.
+  Response format:
+    A JSON object representing the state event **content**.
+  Example:
+    ``/rooms/!room:domain.com/state/m.room.name`` returns ``{ "name": "Room name" }``
+
+|/rooms/<room_id>/state|_
+  Description:
+    Get all state events for a room.
+  Response format:
+    ``[ { state event }, { state event }, ... ]``
+  Example:
+    TODO-doc
+
+
+|/rooms/<room_id>/members|_
+  Description:
+    Get all ``m.room.member`` state events.
+  Response format:
+    ``{ "start": "<token>", "end": "<token>", "chunk": [ { m.room.member event }, ... ] }``
+  Example:
+    TODO-doc
+
+|/rooms/<room_id>/messages|_
+  Description:
+    Get all ``m.room.message`` and ``m.room.member`` events. This API supports
+    pagination using ``from`` and ``to`` query parameters, coupled with the
+    ``start`` and ``end`` tokens from an |initialSync|_ API.
+  Response format:
+    ``{ "start": "<token>", "end": "<token>" }``
+  Example:
+    TODO-doc
+    
+|/rooms/<room_id>/initialSync|_
+  Description:
+    Get all relevant events for a room. This includes state events, paginated
+    non-state events and presence events.
+  Response format:
+    `` { TODO-doc } ``
+  Example:
+    TODO-doc
+
+Redactions
+~~~~~~~~~~
+Since events are extensible it is possible for malicious users and/or servers
+to add keys that are, for example offensive or illegal. Since some events
+cannot be simply deleted, e.g. membership events, we instead 'redact' events.
+This involves removing all keys from an event that are not required by the
+protocol. This stripped down event is thereafter returned anytime a client or
+remote server requests it.
+
+Events that have been redacted include a ``redacted_because`` key whose value
+is the event that caused it to be redacted, which may include a reason.
+
+Redacting an event cannot be undone, allowing server owners to delete the
+offending content from the databases.
+
+Currently, only room admins can redact events by sending a ``m.room.redaction``
+event, but server admins also need to be able to redact events by a similar
+mechanism.
+
+Upon receipt of a redaction event, the server should strip off any keys not in
+the following list:
+
+ - ``event_id``
+ - ``type``
+ - ``room_id``
+ - ``user_id``
+ - ``state_key``
+ - ``prev_state``
+ - ``content``
+
+The content object should also be stripped of all keys, unless it is one of
+one of the following event types:
+
+ - ``m.room.member`` allows key ``membership``
+ - ``m.room.create`` allows key ``creator``
+ - ``m.room.join_rules`` allows key ``join_rule``
+ - ``m.room.power_levels`` allows keys that are user ids or ``default``
+ - ``m.room.add_state_level`` allows key ``level``
+ - ``m.room.send_event_level`` allows key ``level``
+ - ``m.room.ops_levels`` allows keys ``kick_level``, ``ban_level``
+   and ``redact_level``
+ - ``m.room.aliases`` allows key ``aliases``
+
+The redaction event should be added under the key ``redacted_because``.
+
+
+When a client receives a redaction event it should change the redacted event
+in the same way a server does.
+
+Presence
+~~~~~~~~
+The client API for presence is on the following set of REST calls.
+
+Fetching basic status::
+
+  GET $PREFIX/presence/:user_id/status
+
+  Returned content: JSON object containing the following keys:
+    presence: "offline"|"unavailable"|"online"|"free_for_chat"
+    status_msg: (optional) string of freeform text
+    last_active_ago: miliseconds since the last activity by the user
+
+Setting basic status::
+
+  PUT $PREFIX/presence/:user_id/status
+
+  Content: JSON object containing the following keys:
+    presence and status_msg: as above
+
+When setting the status, the activity time is updated to reflect that activity;
+the client does not need to specify the ``last_active_ago`` field.
+
+Fetching the presence list::
+
+  GET $PREFIX/presence/list
+
+  Returned content: JSON array containing objects; each object containing the
+    following keys:
+    user_id: observed user ID
+    presence: "offline"|"unavailable"|"online"|"free_for_chat"
+    status_msg: (optional) string of freeform text
+    last_active_ago: miliseconds since the last activity by the user
+
+Maintaining the presence list::
+
+  POST $PREFIX/presence/list
+
+  Content: JSON object containing either or both of the following keys:
+    invite: JSON array of strings giving user IDs to send invites to
+    drop: JSON array of strings giving user IDs to remove from the list
+
 .. TODO-spec
-  - Metadata extensibility
+  - Define how users receive presence invites, and how they accept/decline them
 
-Internally within Matrix users are referred to by their user ID, which is
-typically a compact unique identifier. Profiles grant users the ability to see
-human-readable names for other users that are in some way meaningful to them.
-Additionally, profiles can publish additional information, such as the user's
-age or location.
-
-A Profile consists of a display name, an avatar picture, and a set of other
-metadata fields that the user may wish to publish (email address, phone
-numbers, website URLs, etc...). This specification puts no requirements on the
-display name other than it being a valid unicode string. Avatar images are not
-stored directly; instead the home server stores an ``http``-scheme URL where
-clients may fetch it from.
-
-Client API
-----------
+Profiles
+~~~~~~~~
 The client API for profile management consists of the following REST calls.
 
 Fetching a user account displayname::
@@ -1979,62 +2018,61 @@ profile once they are defined. Client implementations should take care not to
 expect that these are the only two keys returned as future versions of this
 specification may yield more keys here.
 
-Server API
-----------
-The server API for profiles is based entirely on the following Federation
-Queries. There are no additional EDU or PDU types involved, other than the
-implicit ``m.presence`` and ``m.room.member`` events (see section below).
+Security
+--------
 
-Querying profile information::
+Rate limiting
+~~~~~~~~~~~~~
+Home servers SHOULD implement rate limiting to reduce the risk of being
+overloaded. If a request is refused due to rate limiting, it should return a
+standard error response of the form::
 
-  Query type: profile
+  {
+    "errcode": "M_LIMIT_EXCEEDED",
+    "error": "string",
+    "retry_after_ms": integer (optional)
+  }
 
-  Arguments:
-    user_id: the ID of the user whose profile to return
-    field: (optional) string giving a field name
+The ``retry_after_ms`` key SHOULD be included to tell the client how long they
+have to wait in milliseconds before they can try again.
 
-  Returns: JSON object containing the following keys:
-    displayname: string of freeform text
-    avatar_url: string containing an http-scheme URL
+.. TODO-spec
+  - Surely we should recommend an algorithm for the rate limiting, rather than letting every
+    homeserver come up with their own idea, causing totally unpredictable performance over
+    federated rooms?
 
-If the query contains the optional ``field`` key, it should give the name of a
-result field. If such is present, then the result should contain only a field
-of that name, with no others present. If not, the result should contain as much
-of the user's profile as the home server has available and can make public.
+End-to-End Encryption
+~~~~~~~~~~~~~~~~~~~~~
 
-Events on Change of Profile Information
----------------------------------------
-Because the profile displayname and avatar information are likely to be used in
-many places of a client's display, changes to these fields cause an automatic
-propagation event to occur, informing likely-interested parties of the new
-values. This change is conveyed using two separate mechanisms:
+.. TODO-doc
+  - Why is this needed.
+  - Overview of process
+  - Implementation
 
- - a ``m.room.member`` event is sent to every room the user is a member of,
-   to update the ``displayname`` and ``avatar_url``.
- - a presence status update is sent, again containing the new values of the
-   ``displayname`` and ``avatar_url`` keys, in addition to the required
-   ``presence`` key containing the current presence state of the user.
-
-Both of these should be done automatically by the home server when a user
-successfully changes their displayname or avatar URL fields.
-
-Additionally, when home servers emit room membership events for their own
-users, they should include the displayname and avatar URL fields in these
-events so that clients already have these details to hand, and do not have to
-perform extra roundtrips to query it.
-
-
-Identity
-========
+Content repository
+------------------
 .. NOTE::
   This section is a work in progress.
 
-.. TODO-doc Dave
-  - 3PIDs and identity server, functions
+.. TODO-spec
+  - path to upload
+  - format for thumbnail paths, mention what it is protecting against.
+  - content size limit and associated M_ERROR.
 
 
-Federation
-==========
+Address book repository
+-----------------------
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO-spec
+  - format: POST(?) wodges of json, some possible processing, then return wodges of json on GET.
+  - processing may remove dupes, merge contacts, pepper with extra info (e.g. matrix-ability of
+    contacts), etc.
+  - Standard json format for contacts? Piggy back off vcards?
+
+Federation API
+===============
 
 Federation is the term used to describe how to communicate between Matrix home
 servers. Federation is a mechanism by which two home servers can exchange
@@ -2396,11 +2434,91 @@ State Conflict Resolution
   - How are they resolved (incl tie breaks)
   - How does this work with deleting current state
 
-Security
-========
+Presence
+--------
+The server API for presence is based entirely on exchange of the following
+EDUs. There are no PDUs or Federation Queries involved.
 
-.. NOTE::
-  This section is a work in progress.
+Performing a presence update and poll subscription request::
+
+  EDU type: m.presence
+
+  Content keys:
+    push: (optional): list of push operations.
+      Each should be an object with the following keys:
+        user_id: string containing a User ID
+        presence: "offline"|"unavailable"|"online"|"free_for_chat"
+        status_msg: (optional) string of freeform text
+        last_active_ago: miliseconds since the last activity by the user
+
+    poll: (optional): list of strings giving User IDs
+
+    unpoll: (optional): list of strings giving User IDs
+
+The presence of this combined message is two-fold: it informs the recipient
+server of the current status of one or more users on the sending server (by the
+``push`` key), and it maintains the list of users on the recipient server that
+the sending server is interested in receiving updates for, by adding (by the
+``poll`` key) or removing them (by the ``unpoll`` key). The ``poll`` and
+``unpoll`` lists apply *changes* to the implied list of users; any existing IDs
+that the server sent as ``poll`` operations in a previous message are not
+removed until explicitly requested by a later ``unpoll``.
+
+On receipt of a message containing a non-empty ``poll`` list, the receiving
+server should immediately send the sending server a presence update EDU of its
+own, containing in a ``push`` list the current state of every user that was in
+the orginal EDU's ``poll`` list.
+
+Sending a presence invite::
+
+  EDU type: m.presence_invite
+
+  Content keys:
+    observed_user: string giving the User ID of the user whose presence is
+      requested (i.e. the recipient of the invite)
+    observer_user: string giving the User ID of the user who is requesting to
+      observe the presence (i.e. the sender of the invite)
+
+Accepting a presence invite::
+
+  EDU type: m.presence_accept
+
+  Content keys - as for m.presence_invite
+
+Rejecting a presence invite::
+
+  EDU type: m.presence_deny
+
+  Content keys - as for m.presence_invite
+
+.. TODO-doc
+  - Explain the timing-based roundtrip reduction mechanism for presence
+    messages
+  - Explain the zero-byte presence inference logic
+  See also: docs/client-server/model/presence
+
+Profiles
+--------
+The server API for profiles is based entirely on the following Federation
+Queries. There are no additional EDU or PDU types involved, other than the
+implicit ``m.presence`` and ``m.room.member`` events (see section below).
+
+Querying profile information::
+
+  Query type: profile
+
+  Arguments:
+    user_id: the ID of the user whose profile to return
+    field: (optional) string giving a field name
+
+  Returns: JSON object containing the following keys:
+    displayname: string of freeform text
+    avatar_url: string containing an http-scheme URL
+
+If the query contains the optional ``field`` key, it should give the name of a
+result field. If such is present, then the result should contain only a field
+of that name, with no others present. If not, the result should contain as much
+of the user's profile as the home server has available and can make public.
 
 Server-Server Authentication
 ----------------------------
@@ -2411,19 +2529,7 @@ Server-Server Authentication
   - Transaction/PDU signing
   - How does this work with redactions? (eg hashing required keys only)
 
-End-to-End Encryption
----------------------
 
-.. TODO-doc
-  - Why is this needed.
-  - Overview of process
-  - Implementation
-
-Lawful Interception
--------------------
-
-Key Escrow Servers
-~~~~~~~~~~~~~~~~~~
 
 Threat Model
 ------------
@@ -2552,26 +2658,20 @@ Threat: Disclosure to Servers Within Chatroom
 An attacker could take control of a server within a chatroom to expose message
 contents or metadata for messages in that room.
 
-Rate limiting
--------------
-Home servers SHOULD implement rate limiting to reduce the risk of being
-overloaded. If a request is refused due to rate limiting, it should return a
-standard error response of the form::
 
-  {
-    "errcode": "M_LIMIT_EXCEEDED",
-    "error": "string",
-    "retry_after_ms": integer (optional)
-  }
+Identity Servers
+================
+.. NOTE::
+  This section is a work in progress.
 
-The ``retry_after_ms`` key SHOULD be included to tell the client how long they
-have to wait in milliseconds before they can try again.
+.. TODO-doc Dave
+  - 3PIDs and identity server, functions
 
-.. TODO-spec
-  - Surely we should recommend an algorithm for the rate limiting, rather than letting every
-    homeserver come up with their own idea, causing totally unpredictable performance over
-    federated rooms?
+Lawful Interception
+-------------------
 
+Key Escrow Servers
+~~~~~~~~~~~~~~~~~~
 
 Policy Servers
 ==============
@@ -2586,108 +2686,6 @@ Enforcing policies
 ------------------
 
 
-Content repository
-==================
-.. NOTE::
-  This section is a work in progress.
-
-.. TODO-spec
-  - path to upload
-  - format for thumbnail paths, mention what it is protecting against.
-  - content size limit and associated M_ERROR.
-
-
-Address book repository
-=======================
-.. NOTE::
-  This section is a work in progress.
-
-.. TODO-spec
-  - format: POST(?) wodges of json, some possible processing, then return wodges of json on GET.
-  - processing may remove dupes, merge contacts, pepper with extra info (e.g. matrix-ability of
-    contacts), etc.
-  - Standard json format for contacts? Piggy back off vcards?
-
-
-Glossary
-========
-.. NOTE::
-  This section is a work in progress.
-
-Backfilling:
-  The process of synchronising historic state from one home server to another,
-  to backfill the event storage so that scrollback can be presented to the
-  client(s). Not to be confused with pagination.
-
-Context:
-  A single human-level entity of interest (currently, a chat room)
-
-EDU (Ephemeral Data Unit):
-  A message that relates directly to a given pair of home servers that are
-  exchanging it. EDUs are short-lived messages that related only to one single
-  pair of servers; they are not persisted for a long time and are not forwarded
-  on to other servers. Because of this, they have no internal ID nor previous
-  EDUs reference chain.
-
-Event:
-  A record of activity that records a single thing that happened on to a context
-  (currently, a chat room). These are the "chat messages" that Synapse makes
-  available.
-
-PDU (Persistent Data Unit):
-  A message that relates to a single context, irrespective of the server that
-  is communicating it. PDUs either encode a single Event, or a single State
-  change. A PDU is referred to by its PDU ID; the pair of its origin server
-  and local reference from that server.
-
-PDU ID:
-  The pair of PDU Origin and PDU Reference, that together globally uniquely
-  refers to a specific PDU.
-
-PDU Origin:
-  The name of the origin server that generated a given PDU. This may not be the
-  server from which it has been received, due to the way they are copied around
-  from server to server. The origin always records the original server that
-  created it.
-
-PDU Reference:
-  A local ID used to refer to a specific PDU from a given origin server. These
-  references are opaque at the protocol level, but may optionally have some
-  structured meaning within a given origin server or implementation.
-
-Presence:
-  The concept of whether a user is currently online, how available they declare
-  they are, and so on. See also: doc/model/presence
-
-Profile:
-  A set of metadata about a user, such as a display name, provided for the
-  benefit of other users. See also: doc/model/profiles
-
-Room ID:
-  An opaque string (of as-yet undecided format) that identifies a particular
-  room and used in PDUs referring to it.
-
-Room Alias:
-  A human-readable string of the form #name:some.domain that users can use as a
-  pointer to identify a room; a Directory Server will map this to its Room ID
-
-State:
-  A set of metadata maintained about a Context, which is replicated among the
-  servers in addition to the history of Events.
-
-User ID:
-  A string of the form @localpart:domain.name that identifies a user for
-  wire-protocol purposes. The localpart is meaningless outside of a particular
-  home server. This takes a human-readable form that end-users can use directly
-  if they so wish, avoiding the 3PIDs.
-
-Transaction:
-  A message which relates to the communication between a given pair of servers.
-  A transaction contains possibly-empty lists of PDUs and EDUs.
-
-.. TODO
-  This glossary contradicts the terms used above - especially on State Events v. "State"
-  and Non-State Events v. "Events".  We need better consistent names.
 
 .. Links through the external API docs are below
 .. =============================================
