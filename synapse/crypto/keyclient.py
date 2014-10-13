@@ -43,7 +43,7 @@ def fetch_server_key(server_name, ssl_context_factory):
             return
         except Exception as e:
             logger.exception(e)
-    raise IOError("Cannot get key for " % server_name)
+    raise IOError("Cannot get key for %s" % server_name)
 
 
 class SynapseKeyClientError(Exception):
@@ -93,7 +93,7 @@ class SynapseKeyClientProtocol(HTTPClient):
     def on_timeout(self):
         logger.debug("Timeout waiting for response from %s",
                      self.transport.getHost())
-        self.on_remote_key.errback(IOError("Timeout waiting for response"))
+        self.remote_key.errback(IOError("Timeout waiting for response"))
         self.transport.abortConnection()
 
 

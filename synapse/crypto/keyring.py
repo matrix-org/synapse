@@ -20,6 +20,7 @@ from syutil.crypto.signing_key import (
     is_signing_algorithm_supported, decode_verify_key_bytes
 )
 from syutil.base64util import decode_base64, encode_base64
+from synapse.api.errors import SynapseError, Codes
 
 from OpenSSL import crypto
 
@@ -38,8 +39,36 @@ class Keyring(object):
     @defer.inlineCallbacks
     def verify_json_for_server(self, server_name, json_object):
         key_ids = signature_ids(json_object, server_name)
-        verify_key = yield self.get_server_verify_key(server_name, key_ids)
-        verify_signed_json(json_object, server_name, verify_key)
+        if not key_ids:
+            raise SynapseError(
+                400,
+                "No supported algorithms in signing keys",
+                 Codes.UNAUTHORIZED,
+            )
+        try:
+            verify_key = yield self.get_server_verify_key(server_name, key_ids)
+        except IOError:
+            raise SynapseError(
+                502,
+                "Error downloading keys for %s" % (server_name,),
+                Codes.UNAUTHORIZED,
+            )
+        except:
+            raise SynapseError(
+                401,
+                "No key for %s with id %s" % (server_name, key_ids),
+                Codes.UNAUTHORIZED,
+            )
+        try:
+            verify_signed_json(json_object, server_name, verify_key)
+        except:
+            raise SynapseError(
+                401,
+                "Invalid signature for server %s with key %s:%s" % (
+                    server_name, verify_key.alg, verify_key.version
+                ),
+                Codes.UNAUTHORIZED,
+            )
 
     @defer.inlineCallbacks
     def get_server_verify_key(self, server_name, key_ids):

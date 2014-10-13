@@ -233,7 +233,7 @@ class TransportLayer(object):
                 return (origin, key, sig)
             except:
                 raise SynapseError(
-                    400, "Malformed Authorization Header", Codes.FORBIDDEN
+                    400, "Malformed Authorization header", Codes.UNAUTHORIZED
                 )
 
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
@@ -246,7 +246,7 @@ class TransportLayer(object):
 
         if not json_request["signatures"]:
             raise SynapseError(
-                401, "Missing Authorization headers", Codes.FORBIDDEN,
+                401, "Missing Authorization headers", Codes.UNAUTHORIZED,
             )
 
         yield self.keyring.verify_json_for_server(origin, json_request)
