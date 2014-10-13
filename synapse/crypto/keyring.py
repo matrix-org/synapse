@@ -42,7 +42,7 @@ class Keyring(object):
         if not key_ids:
             raise SynapseError(
                 400,
-                "No supported algorithms in signing keys",
+                "Not signed with a supported algorithm",
                  Codes.UNAUTHORIZED,
             )
         try:
