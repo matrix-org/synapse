@@ -177,16 +177,20 @@ class MatrixHttpClient(BaseHttpClient):
 
         request = sign_json(request, self.server_name, self.signing_key)
 
+        from syutil.jsonutil import encode_canonical_json
+        logger.debug("Signing " + " " * 11 + "%s %s",
+            self.server_name, encode_canonical_json(request))
+
         auth_headers = []
 
         for key,sig in request["signatures"][self.server_name].items():
-            auth_headers.append(
+            auth_headers.append(bytes(
                 "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (
                     self.server_name, key, sig,
                 )
-            )
+            ))
 
-        headers_dict["Authorization"] = auth_headers
+        headers_dict[b"Authorization"] = auth_headers
 
     @defer.inlineCallbacks
     def put_json(self, destination, path, data={}, json_data_callback=None):

@@ -221,6 +221,7 @@ class FederationTestCase(unittest.TestCase):
                 json_data_callback=ANY,
         )
 
+
     @defer.inlineCallbacks
     def test_recv_edu(self):
         recv_observer = Mock()

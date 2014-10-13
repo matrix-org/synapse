@@ -76,6 +76,9 @@ class MockHttpResource(HttpServer):
         mock_content.configure_mock(**config)
         mock_request.content = mock_content
 
+        mock_request.method = http_method
+        mock_request.uri = path
+
         # return the right path if the event requires it
         mock_request.path = path
 
