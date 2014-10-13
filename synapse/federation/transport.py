@@ -211,35 +211,43 @@ class TransportLayer(object):
 
         if request.method == "PUT":
             #TODO: Handle other method types? other content types?
-            content_bytes = request.content.read()
-            content = json.loads(content_bytes)
-            json_request["content"] = content
+            try:
+                content_bytes = request.content.read()
+                content = json.loads(content_bytes)
+                json_request["content"] = content
+            except:
+                raise SynapseError(400, "Unable to parse JSON", Codes.BAD_JSON)
 
         def parse_auth_header(header_str):
-            params = auth.split(" ")[1].split(",")
-            param_dict = dict(kv.split("=") for kv in params)
-            def strip_quotes(value):
-                if value.startswith("\""):
-                    return value[1:-1]
-                else:
-                    return value
-            origin = strip_quotes(param_dict["origin"])
-            key = strip_quotes(param_dict["key"])
-            sig = strip_quotes(param_dict["sig"])
-            return (origin, key, sig)
+            try:
+                params = auth.split(" ")[1].split(",")
+                param_dict = dict(kv.split("=") for kv in params)
+                def strip_quotes(value):
+                    if value.startswith("\""):
+                        return value[1:-1]
+                    else:
+                        return value
+                origin = strip_quotes(param_dict["origin"])
+                key = strip_quotes(param_dict["key"])
+                sig = strip_quotes(param_dict["sig"])
+                return (origin, key, sig)
+            except:
+                raise SynapseError(
+                    400, "Malformed Authorization Header", Codes.FORBIDDEN
+                )
 
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
-
-        if not auth_headers:
-            raise SynapseError(
-                401, "Missing Authorization headers", Codes.FORBIDDEN,
-            )
 
         for auth in auth_headers:
             if auth.startswith("X-Matrix"):
                 (origin, key, sig) = parse_auth_header(auth)
                 json_request["origin"] = origin
                 json_request["signatures"].setdefault(origin,{})[key] = sig
+
+        if not json_request["signatures"]:
+            raise SynapseError(
+                401, "Missing Authorization headers", Codes.FORBIDDEN,
+            )
 
         yield self.keyring.verify_json_for_server(origin, json_request)
 

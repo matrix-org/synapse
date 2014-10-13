@@ -79,6 +79,10 @@ class MockHttpResource(HttpServer):
         mock_request.method = http_method
         mock_request.uri = path
 
+        mock_request.requestHeaders.getRawHeaders.return_value=[
+            "X-Matrix origin=test,key=,sig="
+        ]
+
         # return the right path if the event requires it
         mock_request.path = path
 
