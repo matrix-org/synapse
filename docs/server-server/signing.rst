@@ -62,7 +62,7 @@ To check if an entity has signed a JSON object a server does the following
 
 1. Checks if the ``signatures`` object contains an entry with the name of the
    entity. If the entry is missing then the check fails.
-2. Removes any *signing key identifiers* from the entry with algrothims it
+2. Removes any *signing key identifiers* from the entry with algorithms it
    doesn't understand. If there are no *signing key identifiers* left then the
    check fails.
 3. Looks up *verification keys* for the remaining *signing key identifiers*
