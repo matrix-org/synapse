@@ -24,6 +24,7 @@ over a different (albeit still reliable) protocol.
 from twisted.internet import defer
 
 from synapse.api.urls import FEDERATION_PREFIX as PREFIX
+from synapse.api.errors import Codes, SynapseError
 from synapse.util.logutils import log_function
 
 import logging
@@ -230,8 +231,9 @@ class TransportLayer(object):
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
 
         if not auth_headers:
-            #TODO(markjh): Send a 401 response?
-            raise Exception("Missing auth headers")
+            raise SynapseError(
+                401, "Missing Authorization headers", Codes.FORBIDDEN,
+            )
 
         for auth in auth_headers:
             if auth.startswith("X-Matrix"):
@@ -239,9 +241,6 @@ class TransportLayer(object):
                 json_request["origin"] = origin
                 json_request["signatures"].setdefault(origin,{})[key] = sig
 
-        from syutil.jsonutil import encode_canonical_json
-        logger.debug("Checking  %s %s",
-            origin, encode_canonical_json(json_request))
         yield self.keyring.verify_json_for_server(origin, json_request)
 
         defer.returnValue((origin, content))
