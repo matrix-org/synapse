@@ -300,7 +300,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
                         "observed_user": "@cabbage:elsewhere",
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -329,7 +329,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
                         "observed_user": "@apple:test",
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -365,7 +365,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
                         "observed_user": "@durian:test",
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -786,7 +786,7 @@ class PresencePushTestCase(unittest.TestCase):
                         ],
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -802,7 +802,7 @@ class PresencePushTestCase(unittest.TestCase):
                         ],
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -928,7 +928,7 @@ class PresencePushTestCase(unittest.TestCase):
                         ],
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -943,7 +943,7 @@ class PresencePushTestCase(unittest.TestCase):
                         ],
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -973,7 +973,7 @@ class PresencePushTestCase(unittest.TestCase):
                         ],
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1175,7 +1175,7 @@ class PresencePollingTestCase(unittest.TestCase):
                         "poll": [ "@potato:remote" ],
                     },
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1188,7 +1188,7 @@ class PresencePollingTestCase(unittest.TestCase):
                         "push": [ {"user_id": "@clementine:test" }],
                     },
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1217,7 +1217,7 @@ class PresencePollingTestCase(unittest.TestCase):
                         "push": [ {"user_id": "@fig:test" }],
                     },
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1250,7 +1250,7 @@ class PresencePollingTestCase(unittest.TestCase):
                         "unpoll": [ "@potato:remote" ],
                     },
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1282,7 +1282,7 @@ class PresencePollingTestCase(unittest.TestCase):
                         ],
                     },
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )

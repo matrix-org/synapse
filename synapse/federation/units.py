@@ -190,6 +190,11 @@ class Transaction(JsonEncodedObject):
         "destination",
     ]
 
+    internal_keys = [
+        "transaction_id",
+        "destination",
+    ]
+
     required_keys = [
         "transaction_id",
         "origin",

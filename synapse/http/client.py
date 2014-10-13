@@ -26,6 +26,8 @@ from syutil.jsonutil import encode_canonical_json
 
 from synapse.api.errors import CodeMessageException, SynapseError
 
+from syutil.crypto.jsonsign import sign_json
+
 from StringIO import StringIO
 
 import json
@@ -147,7 +149,7 @@ class BaseHttpClient(object):
 
 
 class MatrixHttpClient(BaseHttpClient):
-    """ Wrapper around the twisted HTTP client api. Implements 
+    """ Wrapper around the twisted HTTP client api. Implements
 
     Attributes:
         agent (twisted.web.client.Agent): The twisted Agent used to send the
@@ -156,8 +158,38 @@ class MatrixHttpClient(BaseHttpClient):
 
     RETRY_DNS_LOOKUP_FAILURES = "__retry_dns"
 
+    def __init__(self, hs):
+        self.signing_key = hs.config.signing_key[0]
+        self.server_name = hs.hostname
+        BaseHttpClient.__init__(self, hs)
+
+    def sign_request(self, destination, method, url_bytes, headers_dict,
+                     content=None):
+        request = {
+            "method": method,
+            "uri": url_bytes,
+            "origin": self.server_name,
+            "destination": destination,
+        }
+
+        if content is not None:
+            request["content"] = content
+
+        request = sign_json(request, self.server_name, self.signing_key)
+
+        auth_headers = []
+
+        for key,sig in request["signatures"][self.server_name].items():
+            auth_headers.append(
+                "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (
+                    self.server_name, key, sig,
+                )
+            )
+
+        headers_dict["Authorization"] = auth_headers
+
     @defer.inlineCallbacks
-    def put_json(self, destination, path, data, on_send_callback=None):
+    def put_json(self, destination, path, data={}, json_data_callback=None):
         """ Sends the specifed json data using PUT
 
         Args:
@@ -166,6 +198,8 @@ class MatrixHttpClient(BaseHttpClient):
             path (str): The HTTP path.
             data (dict): A dict containing the data that will be used as
                 the request body. This will be encoded as JSON.
+            json_data_callback (callable): A callable returning the dict to
+                use as the request body.
 
         Returns:
             Deferred: Succeeds when we get a 2xx HTTP response. The result
@@ -173,13 +207,16 @@ class MatrixHttpClient(BaseHttpClient):
             CodeMessageException is raised.
         """
 
-        if not on_send_callback:
-            def on_send_callback(destination, method, path_bytes, producer):
-                pass
+        if not json_data_callback:
+            def json_data_callback():
+                return data
 
         def body_callback(method, url_bytes, headers_dict):
-            producer = _JsonProducer(data)
-            on_send_callback(destination, method, path, producer)
+            json_data = json_data_callback()
+            self.sign_request(
+                destination, method, url_bytes, headers_dict, json_data
+            )
+            producer = _JsonProducer(json_data)
             return producer
 
         response = yield self._create_request(
@@ -221,6 +258,7 @@ class MatrixHttpClient(BaseHttpClient):
         logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
 
         def body_callback(method, url_bytes, headers_dict):
+            self.sign_request(destination, method, url_bytes, headers_dict)
             return None
 
         response = yield self._create_request(

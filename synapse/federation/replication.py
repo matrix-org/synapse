@@ -25,8 +25,6 @@ from .persistence import PduActions, TransactionActions
 
 from synapse.util.logutils import log_function
 
-from syutil.crypto.jsonsign import sign_json
-
 import logging
 
 
@@ -65,8 +63,6 @@ class ReplicationLayer(object):
         self._transaction_queue = _TransactionQueue(
             hs, self.transaction_actions, transport_layer
         )
-
-        self.keyring = hs.get_keyring()
 
         self.handler = None
         self.edu_handlers = {}
@@ -296,10 +292,6 @@ class ReplicationLayer(object):
     @defer.inlineCallbacks
     @log_function
     def on_incoming_transaction(self, transaction_data):
-        yield self.keyring.verify_json_for_server(
-            transaction_data["origin"], transaction_data
-        )
-
         transaction = Transaction(**transaction_data)
 
         for p in transaction.pdus:
@@ -500,7 +492,6 @@ class _TransactionQueue(object):
     """
 
     def __init__(self, hs, transaction_actions, transport_layer):
-        self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
         self.transaction_actions = transaction_actions
         self.transport_layer = transport_layer
@@ -615,9 +606,6 @@ class _TransactionQueue(object):
 
             # Actually send the transaction
 
-            server_name = self.server_name
-            signing_key = self.signing_key
-
             # FIXME (erikj): This is a bit of a hack to make the Pdu age
             # keys work
             def json_data_cb():
@@ -627,7 +615,6 @@ class _TransactionQueue(object):
                     for p in data["pdus"]:
                         if "age_ts" in p:
                             p["age"] = now - int(p["age_ts"])
-                data = sign_json(data, server_name, signing_key)
                 return data
 
             code, response = yield self.transport_layer.send_transaction(

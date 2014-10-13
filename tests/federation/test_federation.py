@@ -186,7 +186,7 @@ class FederationTestCase(unittest.TestCase):
                         },
                     ]
                 },
-                on_send_callback=ANY,
+                json_data_callback=ANY,
         )
 
     @defer.inlineCallbacks
@@ -218,7 +218,7 @@ class FederationTestCase(unittest.TestCase):
                         }
                     ],
                 },
-                on_send_callback=ANY,
+                json_data_callback=ANY,
         )
 
     @defer.inlineCallbacks

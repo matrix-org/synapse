@@ -175,7 +175,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                         "typing": True,
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -226,7 +226,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                         "typing": False,
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
