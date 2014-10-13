@@ -31,6 +31,7 @@ from StringIO import StringIO
 import json
 import logging
 import urllib
+import urlparse
 
 
 logger = logging.getLogger(__name__)
@@ -68,16 +69,20 @@ class BaseHttpClient(object):
         self.hs = hs
 
     @defer.inlineCallbacks
-    def _create_request(self, destination, method, path_bytes, param_bytes=b"",
-                        query_bytes=b"", producer=None, headers_dict={},
-                        retry_on_dns_fail=True, on_send_callback=None):
+    def _create_request(self, destination, method, path_bytes,
+                        body_callback, headers_dict={}, param_bytes=b"",
+                        query_bytes=b"", retry_on_dns_fail=True):
         """ Creates and sends a request to the given url
         """
         headers_dict[b"User-Agent"] = [b"Synapse"]
         headers_dict[b"Host"] = [destination]
 
-        logger.debug("Sending request to %s: %s %s;%s?%s",
-                     destination, method, path_bytes, param_bytes, query_bytes)
+        url_bytes = urlparse.urlunparse(
+            ("", "", path_bytes, param_bytes, query_bytes, "",)
+        )
+
+        logger.debug("Sending request to %s: %s %s",
+                     destination, method, url_bytes)
 
         logger.debug(
             "Types: %s",
@@ -93,8 +98,8 @@ class BaseHttpClient(object):
         endpoint = self._getEndpoint(reactor, destination);
 
         while True:
-            if on_send_callback:
-                on_send_callback(destination, method, path_bytes, producer)
+
+            producer = body_callback(method, url_bytes, headers_dict)
 
             try:
                 response = yield self.agent.request(
@@ -167,13 +172,22 @@ class MatrixHttpClient(BaseHttpClient):
             will be the decoded JSON body. On a 4xx or 5xx error response a
             CodeMessageException is raised.
         """
+
+        if not on_send_callback:
+            def on_send_callback(destination, method, path_bytes, producer):
+                pass
+
+        def body_callback(method, url_bytes, headers_dict):
+            producer = _JsonProducer(data)
+            on_send_callback(destination, method, path, producer)
+            return producer
+
         response = yield self._create_request(
             destination.encode("ascii"),
             "PUT",
             path.encode("ascii"),
-            producer=_JsonProducer(data),
+            body_callback=body_callback,
             headers_dict={"Content-Type": ["application/json"]},
-            on_send_callback=on_send_callback,
         )
 
         logger.debug("Getting resp body")
@@ -206,11 +220,15 @@ class MatrixHttpClient(BaseHttpClient):
         query_bytes = urllib.urlencode(args, True)
         logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
 
+        def body_callback(method, url_bytes, headers_dict):
+            return None
+
         response = yield self._create_request(
             destination.encode("ascii"),
             "GET",
             path.encode("ascii"),
             query_bytes=query_bytes,
+            body_callback=body_callback,
             retry_on_dns_fail=retry_on_dns_fail
         )
 
@@ -239,11 +257,14 @@ class IdentityServerHttpClient(BaseHttpClient):
         logger.debug("post_urlencoded_get_json args: %s", args)
         query_bytes = urllib.urlencode(args, True)
 
+        def body_callback(method, url_bytes, headers_dict):
+            return FileBodyProducer(StringIO(query_bytes))
+
         response = yield self._create_request(
             destination.encode("ascii"),
             "POST",
             path.encode("ascii"),
-            producer=FileBodyProducer(StringIO(query_bytes)),
+            body_callback=body_callback,
             headers_dict={
                 "Content-Type": ["application/x-www-form-urlencoded"]
             }
@@ -265,11 +286,14 @@ class CaptchaServerHttpClient(MatrixHttpClient):
                                 args={}):
         query_bytes = urllib.urlencode(args, True)
 
+        def body_callback(method, url_bytes, headers_dict):
+            return FileBodyProducer(StringIO(query_bytes))
+
         response = yield self._create_request(
             destination.encode("ascii"),
             "POST",
             path.encode("ascii"),
-            producer=FileBodyProducer(StringIO(query_bytes)),
+            body_callback=body_callback,
             headers_dict={
                 "Content-Type": ["application/x-www-form-urlencoded"]
             }
