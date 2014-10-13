@@ -48,6 +48,22 @@
               "paramType": "body"
             }
           ]
+        },
+        {
+          "method": "DELETE",
+          "summary": "Removes a mapping of room alias to room ID.",
+          "notes": "Only privileged users can perform this action.",
+          "type": "void",
+          "nickname": "remove_room_alias",
+          "parameters": [
+            {
+              "name": "roomAlias",
+              "description": "The room alias to remove.",
+              "required": true,
+              "type": "string",
+              "paramType": "path"
+            }
+          ]
         }
       ]
     }

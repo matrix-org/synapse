@@ -163,7 +163,8 @@ class ReplicationLayer(object):
         return defer.succeed(None)
 
     @log_function
-    def make_query(self, destination, query_type, args):
+    def make_query(self, destination, query_type, args,
+                   retry_on_dns_fail=True):
         """Sends a federation Query to a remote homeserver of the given type
         and arguments.
 
@@ -178,7 +179,9 @@ class ReplicationLayer(object):
             a Deferred which will eventually yield a JSON object from the
             response
         """
-        return self.transport_layer.make_query(destination, query_type, args)
+        return self.transport_layer.make_query(
+            destination, query_type, args, retry_on_dns_fail=retry_on_dns_fail
+        )
 
     @defer.inlineCallbacks
     @log_function

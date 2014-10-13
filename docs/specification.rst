@@ -118,7 +118,7 @@ the account and looks like::
 The ``localpart`` of a user ID may be a user name, or an opaque ID identifying
 this user. They are case-insensitive.
 
-.. TODO
+.. TODO-spec
     - Need to specify precise grammar for Matrix IDs
 
 A "Home Server" is a server which provides C-S APIs and has the ability to
@@ -167,7 +167,7 @@ The following diagram shows an ``m.room.message`` event being sent in the room
        |   matrix.org     |<-------Federation------->|   domain.com     |
        +------------------+                          +------------------+
                 |       .................................        |
-                |______|     Partially Shared State      |_______|
+                |______|           Shared State          |_______|
                        | Room ID: !qporfwt:matrix.org    |
                        | Servers: matrix.org, domain.com |
                        | Members:                        |
@@ -177,11 +177,10 @@ The following diagram shows an ``m.room.message`` event being sent in the room
 
 Federation maintains shared state between multiple home servers, such that when
 an event is sent to a room, the home server knows where to forward the event on
-to, and how to process the event. Home servers do not need to have completely
-shared state in order to participate in a room. State is scoped to a single
-room, and federation ensures that all home servers have the information they
-need, even if that means the home server has to request more information from
-another home server before processing the event.
+to, and how to process the event. State is scoped to a single room, and
+federation ensures that all home servers have the information they need, even
+if that means the home server has to request more information from another home
+server before processing the event.
 
 Room Aliases
 ------------
@@ -191,7 +190,7 @@ Each room can also have multiple "Room Aliases", which looks like::
   #room_alias:domain
 
   .. TODO
-      - Need to specify precise grammar for Room IDs
+      - Need to specify precise grammar for Room Aliases
 
 A room alias "points" to a room ID and is the human-readable label by which
 rooms are publicised and discovered.  The room ID the alias is pointing to can
@@ -200,6 +199,9 @@ that the mapping from a room alias to a room ID is not fixed, and may change
 over time to point to a different room ID. For this reason, Clients SHOULD
 resolve the room alias to a room ID once and then use that ID on subsequent
 requests.
+
+When resolving a room alias the server will also respond with a list of servers
+that are in the room that can be used to join via.
 
 ::
 
@@ -214,10 +216,6 @@ requests.
    | #golf   >> !wfeiofh:sport.com  |
    | #bike   >> !4rguxf:matrix.org  |
    |________________________________|
-
-.. TODO kegan
-   - show the actual API rather than pseudo-API?
-
        
 Identity
 --------
@@ -239,8 +237,8 @@ authentication of the 3PID.  Identity servers are also used to preserve the
 mapping indefinitely, by replicating the mappings across multiple ISes.
 
 Usage of an IS is not required in order for a client application to be part of
-the Matrix ecosystem. However, by not using an IS, discovery of users is
-greatly impacted.
+the Matrix ecosystem. However, without one clients will not be able to look up
+user IDs using 3PIDs.
 
 API Standards
 -------------
@@ -366,7 +364,7 @@ events which are visible to the client will appear in the event stream. When
 the request returns, an ``end`` token is included in the response. This token
 can be used in the next request to continue where the client left off.
 
-.. TODO
+.. TODO-spec
   How do we filter the event stream?
   Do we ever return multiple events in a single request?  Don't we get lots of request
   setup RTT latency if we only do one event per request? Do we ever support streaming
@@ -703,9 +701,6 @@ Rooms
 
 Creation
 --------
-.. TODO kegan
-  - TODO: Key for invite these users?
-  
 To create a room, a client has to use the |createRoom|_ API. There are various
 options which can be set when creating a room:
 
@@ -719,7 +714,7 @@ options which can be set when creating a room:
   Description:
     A ``public`` visibility indicates that the room will be shown in the public
     room list. A ``private`` visibility will hide the room from the public room
-    list. Rooms default to ``public`` visibility if this key is not included.
+    list. Rooms default to ``private`` visibility if this key is not included.
 
 ``room_alias_name``
   Type: 
@@ -772,7 +767,7 @@ Example::
 
   {
     "visibility": "public", 
-    "room_alias_name": "the pub",
+    "room_alias_name": "thepub",
     "name": "The Grand Duke Pub",
     "topic": "All about happy hour"
   }
@@ -790,63 +785,98 @@ includes:
  - ``m.room.send_event_level`` : The power level required in order to send a
    message in this room.
  - ``m.room.ops_level`` : The power level required in order to kick or ban a
-   user from the room.
+   user from the room or redact an event in the room.
 
 See `Room Events`_ for more information on these events.
 
-Modifying aliases
------------------
+Room aliases
+------------
 .. NOTE::
   This section is a work in progress.
 
-.. TODO kegan
-    - path to edit aliases 
-    - PUT /directory/room/<room alias>  { room_id : foo }
-    - GET /directory/room/<room alias> { room_id : foo, servers: [a.com, b.com] }
-    - format when retrieving list of aliases. NOT complete list.
-    - format for adding/removing aliases.
+Room aliases can be created by sending a ``PUT /directory/room/<room alias>``::
+
+  {
+    "room_id": <room id>
+  }
+
+They can be deleted by sending a ``DELETE /directory/room/<room alias>`` with
+no content. Only some privileged users may be able to delete room aliases, e.g.
+server admins, the creator of the room alias, etc. This specification does not
+outline the privilege level required for deleting room aliases.
+
+As room aliases are scoped to a particular home server domain name, it is
+likely that a home server will reject attempts to maintain aliases on other
+domain names. This specification does not provide a way for home servers to
+send update requests to other servers.
+
+Rooms store a *partial* list of room aliases via the ``m.room.aliases`` state
+event. This alias list is partial because it cannot guarantee that the alias
+list is in any way accurate or up-to-date, as room aliases can point to 
+different room IDs over time. Crucially, the aliases in this event are
+**purely informational** and SHOULD NOT be treated as accurate. They SHOULD
+be checked before they are used or shared with another user. If a room
+appears to have a room alias of ``#alias:example.com``, this SHOULD be checked
+to make sure that the room's ID matches the ``room_id`` returned from the
+request.
+
+Room aliases can be checked in the same way they are resolved; by sending a 
+``GET /directory/room/<room alias>``::
+
+  {
+    "room_id": <room id>,
+    "servers": [ <domain>, <domain2>, <domain3> ]
+  }
+
+Home servers can respond to resolve requests for aliases on other domains than
+their own by using the federation API to ask other domain name home servers.
+
 
 Permissions
 -----------
 .. NOTE::
   This section is a work in progress.
 
-.. TODO kegan
-    - TODO: What is a power level? How do they work? Defaults / required levels for X. How do they change
-      as people join and leave rooms? What do you do if you get a clash? Examples.
-    - TODO: List all actions which use power levels (sending msgs, inviting users, banning people, etc...)
-    - TODO: Room config - what is the event and what are the keys/values and explanations for them.
-      Link through to respective sections where necessary. How does this tie in with permissions, e.g.
-      give example of creating a read-only room.
-
 Permissions for rooms are done via the concept of power levels - to do any
-action in a room a user must have a suitable power level. 
+action in a room a user must have a suitable power level. Power levels are
+stored as state events in a given room. 
 
 Power levels for users are defined in ``m.room.power_levels``, where both a
-default and specific users' power levels can be set. By default all users have
-a power level of 0, other than the room creator whose power level defaults to
-100. Power levels for users are tracked per-room even if the user is not
-present in the room.
+default and specific users' power levels can be set::
+
+  {
+    "<user id 1>": <power level int>,
+    "<user id 2>": <power level int>,
+    "default": 0
+  }
+
+By default all users have a power level of 0, other than the room creator whose
+power level defaults to 100. Users can grant other users increased power levels
+up to their own power level. For example, user A with a power level of 50 could
+increase the power level of user B to a maximum of level 50. Power levels for 
+users are tracked per-room even if the user is not present in the room.
 
 State events may contain a ``required_power_level`` key, which indicates the
 minimum power a user must have before they can update that state key. The only
-exception to this is when a user leaves a room.
+exception to this is when a user leaves a room, which revokes the user's right
+to update state events in that room.
 
 To perform certain actions there are additional power level requirements
 defined in the following state events:
 
-- ``m.room.send_event_level`` defines the minimum level for sending non-state 
-  events. Defaults to 50.
-- ``m.room.add_state_level`` defines the minimum level for adding new state,
-  rather than updating existing state. Defaults to 50.
-- ``m.room.ops_level`` defines the minimum levels to ban and kick other users.
-  This defaults to a kick and ban levels of 50 each.
+- ``m.room.send_event_level`` defines the minimum ``level`` for sending 
+  non-state events. Defaults to 50.
+- ``m.room.add_state_level`` defines the minimum ``level`` for adding new 
+  state, rather than updating existing state. Defaults to 50.
+- ``m.room.ops_level`` defines the minimum ``ban_level`` and ``kick_level`` to 
+  ban and kick other users respectively. This defaults to a kick and ban levels
+  of 50 each.
 
 
 Joining rooms
 -------------
-.. TODO kegan
-  - TODO: What does the home server have to do to join a user to a room?
+.. TODO-doc What does the home server have to do to join a user to a room?
+   -  See SPEC-30.
 
 Users need to join a room in order to send and receive events in that room. A
 user can join a room by making a request to |/join/<room_alias_or_id>|_ with::
@@ -883,20 +913,21 @@ received an invite.
 
 Inviting users
 --------------
-.. TODO kegan
-  - Can invite users to a room if the room config key TODO is set to TODO. Must have required power level.
+.. TODO-doc Invite-join dance 
   - Outline invite join dance. What is it? Why is it required? How does it work?
   - What does the home server have to do?
-  - TODO: In what circumstances will direct member editing NOT be equivalent to ``/invite``?
 
 The purpose of inviting users to a room is to notify them that the room exists
 so they can choose to become a member of that room. Some rooms require that all
 users who join a room are previously invited to it (an "invite-only" room).
 Whether a given room is an "invite-only" room is determined by the room config
-key ``TODO``. It can have one of the following values:
+key ``m.room.join_rules``. It can have one of the following values:
 
- - TODO Room config invite only value explanation
- - TODO Room config free-to-join value explanation
+``public``
+  This room is free for anyone to join without an invite.
+
+``invite``
+  This room can only be joined if you were invited.
 
 Only users who have a membership state of ``join`` in a room can invite new
 users to said room. The person being invited must not be in the ``join`` state
@@ -921,9 +952,14 @@ See the `Room events`_ section for more information on ``m.room.member``.
 
 Leaving rooms
 -------------
-.. TODO kegan
-  - TODO: Grace period before deletion?
-  - TODO: Under what conditions should a room NOT be purged?
+.. TODO-spec - HS deleting rooms they are no longer a part of. Not implemented.
+  - This is actually Very Tricky. If all clients a HS is serving leave a room,
+  the HS will no longer get any new events for that room, because the servers
+  who get the events are determined on the *membership list*. There should
+  probably be a way for a HS to lurk on a room even if there are 0 of their
+  members in the room.
+  - Grace period before deletion?
+  - Under what conditions should a room NOT be purged?
 
 
 A user can leave a room to stop receiving events for that room. A user must
@@ -945,11 +981,7 @@ directly by sending the following request to
 See the `Room events`_ section for more information on ``m.room.member``.
 
 Once a user has left a room, that room will no longer appear on the
-|initialSync|_ API. Be aware that leaving a room is not equivalent to have
-never been in that room. A user who has previously left a room still maintains
-some residual state in that room. Their membership state will be marked as
-``leave``. This contrasts with a user who has *never been invited or joined to
-that room* who will not have any membership state for that room. 
+|initialSync|_ API.
 
 If all members in a room leave, that room becomes eligible for deletion. 
 
@@ -1068,17 +1100,59 @@ When a client logs in, they may have a list of rooms which they have already
 joined. These rooms may also have a list of events associated with them. The
 purpose of 'syncing' is to present the current room and event information in a
 convenient, compact manner. The events returned are not limited to room events;
-presence events will also be returned. There are two APIs provided:
+presence events will also be returned. A single syncing API is provided:
 
  - |initialSync|_ : A global sync which will present room and event information
    for all rooms the user has joined.
 
+.. TODO-spec room-scoped initial sync
  - |/rooms/<room_id>/initialSync|_ : A sync scoped to a single room. Presents
    room and event information for this room only.
+ - Room-scoped initial sync is Very Tricky because typically people would
+   want to sync the room then listen for any new content from that point
+   onwards. The event stream cannot do this for a single room currently.
+   As a result, commenting room-scoped initial sync at this time.
 
-.. TODO kegan
-  - TODO: JSON response format for both types
-  - TODO: when would you use global? when would you use scoped?
+The |initialSync|_ API contains the following keys:
+
+``presence``
+  Description:
+    Contains a list of presence information for users the client is interested
+    in.
+  Format:
+    A JSON array of ``m.presence`` events.
+
+``end``
+  Description:
+    Contains an event stream token which can be used with the `Event Stream`_.
+  Format:
+    A string containing the event stream token.
+
+``rooms``
+  Description:
+    Contains a list of room information for all rooms the client has joined,
+    and limited room information on rooms the client has been invited to.
+  Format:
+    A JSON array containing Room Information JSON objects.
+
+Room Information:
+  Description:
+    Contains all state events for the room, along with a limited amount of
+    the most recent non-state events, configured via the ``limit`` query
+    parameter. Also contains additional keys with room metadata, such as the
+    ``room_id`` and the client's ``membership`` to the room.
+  Format:
+    A JSON object with the following keys:
+      ``room_id``
+        A string containing the ID of the room being described.
+      ``membership``
+        A string representing the client's membership status in this room.
+      ``messages``
+        An event stream JSON object containing a ``chunk`` of recent non-state
+        events, along with an ``end`` token. *NB: The name of this key will be
+        changed in a later version.*
+      ``state``
+        A JSON array containing all the current state events for this room.
 
 Getting events for a room
 -------------------------
@@ -1098,7 +1172,7 @@ There are several APIs provided to ``GET`` events for a room:
   Response format:
     ``[ { state event }, { state event }, ... ]``
   Example:
-    TODO
+    TODO-doc
 
 
 |/rooms/<room_id>/members|_
@@ -1107,7 +1181,7 @@ There are several APIs provided to ``GET`` events for a room:
   Response format:
     ``{ "start": "<token>", "end": "<token>", "chunk": [ { m.room.member event }, ... ] }``
   Example:
-    TODO
+    TODO-doc
 
 |/rooms/<room_id>/messages|_
   Description:
@@ -1117,16 +1191,16 @@ There are several APIs provided to ``GET`` events for a room:
   Response format:
     ``{ "start": "<token>", "end": "<token>" }``
   Example:
-    TODO
+    TODO-doc
     
 |/rooms/<room_id>/initialSync|_
   Description:
     Get all relevant events for a room. This includes state events, paginated
     non-state events and presence events.
   Response format:
-    `` { TODO } ``
+    `` { TODO-doc } ``
   Example:
-    TODO
+    TODO-doc
 
 Redactions
 ----------
@@ -1143,18 +1217,45 @@ is the event that caused it to be redacted, which may include a reason.
 Redacting an event cannot be undone, allowing server owners to delete the
 offending content from the databases.
 
-Currently, only room admins can redact events by sending a ``m.room.redacted``
+Currently, only room admins can redact events by sending a ``m.room.redaction``
 event, but server admins also need to be able to redact events by a similar
 mechanism.
+
+Upon receipt of a redaction event, the server should strip off any keys not in
+the following list:
+
+ - ``event_id``
+ - ``type``
+ - ``room_id``
+ - ``user_id``
+ - ``state_key``
+ - ``prev_state``
+ - ``content``
+
+The content object should also be stripped of all keys, unless it is one of
+one of the following event types:
+
+ - ``m.room.member`` allows key ``membership``
+ - ``m.room.create`` allows key ``creator``
+ - ``m.room.join_rules`` allows key ``join_rule``
+ - ``m.room.power_levels`` allows keys that are user ids or ``default``
+ - ``m.room.add_state_level`` allows key ``level``
+ - ``m.room.send_event_level`` allows key ``level``
+ - ``m.room.ops_levels`` allows keys ``kick_level``, ``ban_level``
+   and ``redact_level``
+ - ``m.room.aliases`` allows key ``aliases``
+
+The redaction event should be added under the key ``redacted_because``.
+
+
+When a client receives a redaction event it should change the redacted event
+in the same way a server does.
 
 
 Room Events
 ===========
 .. NOTE::
   This section is a work in progress.
-
-.. TODO dave?
-  - voip events?
 
 This specification outlines several standard event types, all of which are
 prefixed with ``m.``
@@ -1232,7 +1333,7 @@ prefixed with ``m.``
   Example:
     ``{ "join_rule": "public" }``
   Description:
-    TODO : Use docs/models/rooms.rst
+    TODO-doc : Use docs/models/rooms.rst
    
 ``m.room.power_levels``
   Summary:
@@ -1284,7 +1385,7 @@ prefixed with ``m.``
   Type: 
     State event
   JSON format:
-    ``{ "ban_level": <int>, "kick_level": <int> }``
+    ``{ "ban_level": <int>, "kick_level": <int>, "redact_level": <int> }``
   Example:
     ``{ "ban_level": 5, "kick_level": 5 }``
   Description:
@@ -1303,10 +1404,32 @@ prefixed with ``m.``
   Example:
     ``{ "aliases": ["#foo:example.com"] }``
   Description:
-    A server `may` inform the room that it has added or removed an alias for
-    the room. This is purely for informational purposes and may become stale.
-    Clients `should` check that the room alias is still valid before using it.
-    The ``state_key`` of the event is the homeserver which owns the room alias.
+    This event is sent by a homeserver directly to inform of changes to the
+    list of aliases it knows about for that room. As a special-case, the
+    ``state_key`` of the event is the homeserver which owns the room alias.
+    For example, an event might look like::
+
+      {
+        "type": "m.room.aliases",
+        "event_id": "012345678ab",
+        "room_id": "!xAbCdEfG:example.com",
+        "state_key": "example.com",
+        "content": {
+          "aliases": ["#foo:example.com"]
+        }
+      }
+
+    The event contains the full list of aliases now stored by the home server
+    that emitted it; additions or deletions are not explicitly mentioned as
+    being such. The entire set of known aliases for the room is then the union
+    of the individual lists declared by all such keys, one from each home
+    server holding at least one alias.
+
+    Clients `should` check the validity of any room alias given in this list
+    before presenting it to the user as trusted fact. The lists given by this
+    event should be considered simply as advice on which aliases might exist,
+    for which the client can perform the lookup to confirm whether it receives
+    the correct room ID.
 
 ``m.room.message``
   Summary:
@@ -1361,6 +1484,10 @@ prefixed with ``m.``
 
 m.room.message msgtypes
 -----------------------
+
+.. TODO-spec
+   How a client should handle unknown message types.
+
 Each ``m.room.message`` MUST have a ``msgtype`` key which identifies the type
 of message being sent. Each type has their own required and optional keys, as
 outlined below:
@@ -1480,8 +1607,9 @@ the following:
   - ``offline`` : The user is not connected to an event stream.
   - ``free_for_chat`` : The user is generally willing to receive messages
     moreso than default.
-  - ``hidden`` : TODO. Behaves as offline, but allows the user to see the
-    client state anyway and generally interact with client features.
+  - ``hidden`` : Behaves as offline, but allows the user to see the client
+    state anyway and generally interact with client features. (Not yet
+    implemented in synapse).
 
 This basic ``presence`` field applies to the user as a whole, regardless of how
 many client devices they have connected. The home server should synchronise
@@ -1496,22 +1624,14 @@ in the other direction will not). This timestamp is presented via a key called
 ``last_active_ago``, which gives the relative number of miliseconds since the
 message is generated/emitted, that the user was last seen active.
 
-Idle Time
----------
-As well as the basic ``presence`` field, the presence information can also show
-a sense of an "idle timer". This should be maintained individually by the
-user's clients, and the home server can take the highest reported time as that
-to report. When a user is offline, the home server can still report when the
-user was last seen online.
+Home servers can also use the user's choice of presence state as a signal for
+how to handle new private one-to-one chat message requests. For example, it
+might decide:
 
-Transmission
-------------
-.. NOTE::
-  This section is a work in progress.
-
-.. TODO:
-  - Transmitted as an EDU.
-  - Presence lists determine who to send to.
+  - ``free_for_chat`` : accept anything
+  - ``online`` : accept from anyone in my addres book list
+  - ``busy`` : accept from anyone in this "important people" group in my
+    address book list
 
 Presence List
 -------------
@@ -1521,6 +1641,11 @@ list, the user being added must receive permission from the list owner. Once
 granted, both user's HS(es) store this information. Since such subscriptions
 are likely to be bidirectional, HSes may wish to automatically accept requests
 when a reverse subscription already exists.
+
+As a convenience, presence lists should support the ability to collect users
+into groups, which could allow things like inviting the entire group to a new
+("ad-hoc") chat room, or easy interaction with the profile information ACL
+implementation of the HS.
 
 Presence and Permissions
 ------------------------
@@ -1534,16 +1659,114 @@ user, either:
 In the latter case, this allows for clients to display some minimal sense of
 presence information in a user list for a room.
 
-Typing notifications
-====================
-.. NOTE::
-  This section is a work in progress.
+Client API
+----------
+The client API for presence is on the following set of REST calls.
 
-.. TODO Leo
-    - what is the event type. Are they bundled with other event types? If so, which.
-    - what are the valid keys / values. What do they represent. Any gotchas?
-    - Timeouts. How do they work, who sets them and how do they expire. Does one
-      have priority over another? Give examples.
+Fetching basic status::
+
+  GET $PREFIX/presence/:user_id/status
+
+  Returned content: JSON object containing the following keys:
+    presence: "offline"|"unavailable"|"online"|"free_for_chat"
+    status_msg: (optional) string of freeform text
+    last_active_ago: miliseconds since the last activity by the user
+
+Setting basic status::
+
+  PUT $PREFIX/presence/:user_id/status
+
+  Content: JSON object containing the following keys:
+    presence and status_msg: as above
+
+When setting the status, the activity time is updated to reflect that activity;
+the client does not need to specify the ``last_active_ago`` field.
+
+Fetching the presence list::
+
+  GET $PREFIX/presence/list
+
+  Returned content: JSON array containing objects; each object containing the
+    following keys:
+    user_id: observed user ID
+    presence: "offline"|"unavailable"|"online"|"free_for_chat"
+    status_msg: (optional) string of freeform text
+    last_active_ago: miliseconds since the last activity by the user
+
+Maintaining the presence list::
+
+  POST $PREFIX/presence/list
+
+  Content: JSON object containing either or both of the following keys:
+    invite: JSON array of strings giving user IDs to send invites to
+    drop: JSON array of strings giving user IDs to remove from the list
+
+.. TODO-spec
+  - Define how users receive presence invites, and how they accept/decline them
+
+Server API
+----------
+The server API for presence is based entirely on exchange of the following
+EDUs. There are no PDUs or Federation Queries involved.
+
+Performing a presence update and poll subscription request::
+
+  EDU type: m.presence
+
+  Content keys:
+    push: (optional): list of push operations.
+      Each should be an object with the following keys:
+        user_id: string containing a User ID
+        presence: "offline"|"unavailable"|"online"|"free_for_chat"
+        status_msg: (optional) string of freeform text
+        last_active_ago: miliseconds since the last activity by the user
+
+    poll: (optional): list of strings giving User IDs
+
+    unpoll: (optional): list of strings giving User IDs
+
+The presence of this combined message is two-fold: it informs the recipient
+server of the current status of one or more users on the sending server (by the
+``push`` key), and it maintains the list of users on the recipient server that
+the sending server is interested in receiving updates for, by adding (by the
+``poll`` key) or removing them (by the ``unpoll`` key). The ``poll`` and
+``unpoll`` lists apply *changes* to the implied list of users; any existing IDs
+that the server sent as ``poll`` operations in a previous message are not
+removed until explicitly requested by a later ``unpoll``.
+
+On receipt of a message containing a non-empty ``poll`` list, the receiving
+server should immediately send the sending server a presence update EDU of its
+own, containing in a ``push`` list the current state of every user that was in
+the orginal EDU's ``poll`` list.
+
+Sending a presence invite::
+
+  EDU type: m.presence_invite
+
+  Content keys:
+    observed_user: string giving the User ID of the user whose presence is
+      requested (i.e. the recipient of the invite)
+    observer_user: string giving the User ID of the user who is requesting to
+      observe the presence (i.e. the sender of the invite)
+
+Accepting a presence invite::
+
+  EDU type: m.presence_accept
+
+  Content keys - as for m.presence_invite
+
+Rejecting a presence invite::
+
+  EDU type: m.presence_deny
+
+  Content keys - as for m.presence_invite
+
+.. TODO-doc
+  - Explain the timing-based roundtrip reduction mechanism for presence
+    messages
+  - Explain the zero-byte presence inference logic
+  See also: docs/client-server/model/presence
+
 
 Voice over IP
 =============
@@ -1681,19 +1904,14 @@ a call and the other party had accepted. Thusly, any media stream that had been
 setup for use on a call should be transferred and used for the call that
 replaces it.
  
+
 Profiles
 ========
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
+.. TODO-spec
   - Metadata extensibility
-  - Changing profile info generates m.presence events ("presencelike")
-  - keys on m.presence are optional, except presence which is required
-  - m.room.member is populated with the current displayname at that point in time.
-  - That is added by the HS, not you.
-  - Display name changes also generates m.room.member with displayname key f.e. room
-    the user is in.
 
 Internally within Matrix users are referred to by their user ID, which is
 typically a compact unique identifier. Profiles grant users the ability to see
@@ -1704,7 +1922,106 @@ age or location.
 A Profile consists of a display name, an avatar picture, and a set of other
 metadata fields that the user may wish to publish (email address, phone
 numbers, website URLs, etc...). This specification puts no requirements on the
-display name other than it being a valid unicode string.
+display name other than it being a valid unicode string. Avatar images are not
+stored directly; instead the home server stores an ``http``-scheme URL where
+clients may fetch it from.
+
+Client API
+----------
+The client API for profile management consists of the following REST calls.
+
+Fetching a user account displayname::
+
+  GET $PREFIX/profile/:user_id/displayname
+
+  Returned content: JSON object containing the following keys:
+    displayname: string of freeform text
+
+This call may be used to fetch the user's own displayname or to query the name
+of other users; either locally or on remote systems hosted on other home
+servers.
+
+Setting a new displayname::
+
+  PUT $PREFIX/profile/:user_id/displayname
+
+  Content: JSON object containing the following keys:
+    displayname: string of freeform text
+
+Fetching a user account avatar URL::
+
+  GET $PREFIX/profile/:user_id/avatar_url
+
+  Returned content: JSON object containing the following keys:
+    avatar_url: string containing an http-scheme URL
+
+As with displayname, this call may be used to fetch either the user's own, or
+other users' avatar URL.
+
+Setting a new avatar URL::
+
+  PUT $PREFIX/profile/:user_id/avatar_url
+
+  Content: JSON object containing the following keys:
+    avatar_url: string containing an http-scheme URL
+
+Fetching combined account profile information::
+
+  GET $PREFIX/profile/:user_id
+
+  Returned content: JSON object containing the following keys:
+    displayname: string of freeform text
+    avatar_url: string containing an http-scheme URL
+
+At the current time, this API simply returns the displayname and avatar URL
+information, though it is intended to return more fields about the user's
+profile once they are defined. Client implementations should take care not to
+expect that these are the only two keys returned as future versions of this
+specification may yield more keys here.
+
+Server API
+----------
+The server API for profiles is based entirely on the following Federation
+Queries. There are no additional EDU or PDU types involved, other than the
+implicit ``m.presence`` and ``m.room.member`` events (see section below).
+
+Querying profile information::
+
+  Query type: profile
+
+  Arguments:
+    user_id: the ID of the user whose profile to return
+    field: (optional) string giving a field name
+
+  Returns: JSON object containing the following keys:
+    displayname: string of freeform text
+    avatar_url: string containing an http-scheme URL
+
+If the query contains the optional ``field`` key, it should give the name of a
+result field. If such is present, then the result should contain only a field
+of that name, with no others present. If not, the result should contain as much
+of the user's profile as the home server has available and can make public.
+
+Events on Change of Profile Information
+---------------------------------------
+Because the profile displayname and avatar information are likely to be used in
+many places of a client's display, changes to these fields cause an automatic
+propagation event to occur, informing likely-interested parties of the new
+values. This change is conveyed using two separate mechanisms:
+
+ - a ``m.room.member`` event is sent to every room the user is a member of,
+   to update the ``displayname`` and ``avatar_url``.
+ - a presence status update is sent, again containing the new values of the
+   ``displayname`` and ``avatar_url`` keys, in addition to the required
+   ``presence`` key containing the current presence state of the user.
+
+Both of these should be done automatically by the home server when a user
+successfully changes their displayname or avatar URL fields.
+
+Additionally, when home servers emit room membership events for their own
+users, they should include the displayname and avatar URL fields in these
+events so that clients already have these details to hand, and do not have to
+perform extra roundtrips to query it.
 
 
 Identity
@@ -1712,8 +2029,9 @@ Identity
 .. NOTE::
   This section is a work in progress.
 
-.. TODO Dave
+.. TODO-doc Dave
   - 3PIDs and identity server, functions
+
 
 Federation
 ==========
@@ -1823,9 +2141,7 @@ is another list containing the EDUs. This key may be entirely absent if there
 are no EDUs to transfer.
 
 (* Normally the PDU list will be non-empty, but the server should cope with
-receiving an "empty" transaction, as this is useful for informing peers of
-other transaction IDs they should be aware of. This effectively acts as a push
-mechanism to encourage peers to continue to replicate content.)
+receiving an "empty" transaction.)
 
 PDUs and EDUs
 -------------
@@ -1884,10 +2200,9 @@ All PDUs have:
     The maximum depth of the previous PDUs plus one.
 
 
-.. TODO paul
-  [[TODO(paul): Update this structure so that 'pdu_id' is a two-element
-  [origin,ref] pair like the prev_pdus are]]
-  
+.. TODO-spec paul
+  - Update this structure so that 'pdu_id' is a two-element [origin,ref] pair
+    like the prev_pdus are
 
 For state updates:
 
@@ -1909,7 +2224,7 @@ For state updates:
   Description:
     The asserted power level of the user performing the update.
     
-``min_update``
+``required_power_level``
   Type:
     Integer
   Description:
@@ -1927,7 +2242,7 @@ For state updates:
   Description:
     The PDU id of the update this replaces.
     
-``user``
+``user_id``
   Type:
     String
   Description:
@@ -1967,18 +2282,10 @@ keys exist to support this:
 
  {...,
   "is_state":true,
-  "state_key":TODO
-  "power_level":TODO
-  "prev_state_id":TODO
-  "prev_state_origin":TODO}
-
-.. TODO paul
-  [[TODO(paul): At this point we should probably have a long description of how
-  State management works, with descriptions of clobbering rules, power levels, etc
-  etc... But some of that detail is rather up-in-the-air, on the whiteboard, and
-  so on. This part needs refining. And writing in its own document as the details
-  relate to the server/system as a whole, not specifically to server-server
-  federation.]]
+  "state_key":TODO-doc
+  "power_level":TODO-doc
+  "prev_state_id":TODO-doc
+  "prev_state_origin":TODO-doc}
 
 EDUs, by comparison to PDUs, do not have an ID, a context, or a list of
 "previous" IDs. The only mandatory fields for these are the type, origin and
@@ -1993,7 +2300,7 @@ destination home server names, and the actual nested content.
   
   
 Protocol URLs
-=============
+-------------
 .. WARNING::
   This section may be misleading or inaccurate.
 
@@ -2005,7 +2312,7 @@ For active pushing of messages representing live activity "as it happens"::
 
   PUT .../send/:transaction_id/
     Body: JSON encoding of a single Transaction
-    Response: TODO
+    Response: TODO-doc
 
 The transaction_id path argument will override any ID given in the JSON body.
 The destination name will be set to that of the receiving server itself. Each
@@ -2068,7 +2375,7 @@ Backfilling
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
+.. TODO-doc
   - What it is, when is it used, how is it done
 
 SRV Records
@@ -2076,14 +2383,47 @@ SRV Records
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
+.. TODO-doc
   - Why it is needed
+
+State Conflict Resolution
+-------------------------
+.. NOTE::
+  This section is a work in progress.
+
+.. TODO-doc
+  - How do conflicts arise (diagrams?)
+  - How are they resolved (incl tie breaks)
+  - How does this work with deleting current state
 
 Security
 ========
 
 .. NOTE::
   This section is a work in progress.
+
+Server-Server Authentication
+----------------------------
+
+.. TODO-doc
+  - Why is this needed.
+  - High level overview of process.
+  - Transaction/PDU signing
+  - How does this work with redactions? (eg hashing required keys only)
+
+End-to-End Encryption
+---------------------
+
+.. TODO-doc
+  - Why is this needed.
+  - Overview of process
+  - Implementation
+
+Lawful Interception
+-------------------
+
+Key Escrow Servers
+~~~~~~~~~~~~~~~~~~
 
 Threat Model
 ------------
@@ -2119,7 +2459,7 @@ victim would then include in their view of the chatroom history. Other servers
 in the chatroom would reject the invalid messages and potentially reject the
 victims messages as well since they depended on the invalid messages.
 
-.. TODO
+.. TODO-spec
   Track trustworthiness of HS or users based on if they try to pretend they
   haven't seen recent events, and fake a splitbrain... --M
 
@@ -2227,39 +2567,42 @@ standard error response of the form::
 The ``retry_after_ms`` key SHOULD be included to tell the client how long they
 have to wait in milliseconds before they can try again.
 
-.. TODO
+.. TODO-spec
   - Surely we should recommend an algorithm for the rate limiting, rather than letting every
     homeserver come up with their own idea, causing totally unpredictable performance over
     federated rooms?
-  - crypto (s-s auth)
-  - E2E
-  - Lawful intercept + Key Escrow
-  TODO Mark
+
 
 Policy Servers
 ==============
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
-  We should mention them in the Architecture section at least...
-  
+.. TODO-spec
+  We should mention them in the Architecture section at least: how they fit
+  into the picture.
+
+Enforcing policies
+------------------
+
+
 Content repository
 ==================
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
+.. TODO-spec
   - path to upload
   - format for thumbnail paths, mention what it is protecting against.
   - content size limit and associated M_ERROR.
+
 
 Address book repository
 =======================
 .. NOTE::
   This section is a work in progress.
 
-.. TODO
+.. TODO-spec
   - format: POST(?) wodges of json, some possible processing, then return wodges of json on GET.
   - processing may remove dupes, merge contacts, pepper with extra info (e.g. matrix-ability of
     contacts), etc.
