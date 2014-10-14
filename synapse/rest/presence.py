@@ -68,7 +68,7 @@ class PresenceStatusRestServlet(RestServlet):
         yield self.handlers.presence_handler.set_state(
             target_user=user, auth_user=auth_user, state=state)
 
-        defer.returnValue((200, ""))
+        defer.returnValue((200, {}))
 
     def on_OPTIONS(self, request):
         return (200, {})
@@ -141,7 +141,7 @@ class PresenceListRestServlet(RestServlet):
 
         yield defer.DeferredList(deferreds)
 
-        defer.returnValue((200, ""))
+        defer.returnValue((200, {}))
 
     def on_OPTIONS(self, request):
         return (200, {})
