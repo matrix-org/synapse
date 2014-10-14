@@ -40,6 +40,7 @@ from .stream import StreamStore
 from .pdu import StatePduStore, PduStore, PdusTable
 from .transactions import TransactionStore
 from .keys import KeyStore
+from .state import StateStore
 
 import json
 import logging
@@ -59,6 +60,7 @@ SCHEMAS = [
     "room_aliases",
     "keys",
     "redactions",
+    "state",
 ]
 
 
@@ -76,7 +78,7 @@ class _RollbackButIsFineException(Exception):
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, PduStore, StatePduStore, TransactionStore,
-                DirectoryStore, KeyStore):
+                DirectoryStore, KeyStore, StateStore):
 
     def __init__(self, hs):
         super(DataStore, self).__init__(hs)
@@ -221,6 +223,8 @@ class DataStore(RoomMemberStore, RoomStore,
                 exc_info=True,
             )
             raise _RollbackButIsFineException("_persist_event")
+
+        self._store_state_groups_txn(txn, event)
 
         is_state = hasattr(event, "state_key") and event.state_key is not None
         if is_new_state and is_state:
