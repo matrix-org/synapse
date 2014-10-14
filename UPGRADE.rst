@@ -1,3 +1,8 @@
+Upgrading to latest
+===================
+This breaks federation between old and new servers due to signing of
+transactions.
+
 Upgrading to v0.3.0
 ===================
 

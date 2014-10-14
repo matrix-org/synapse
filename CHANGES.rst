@@ -1,3 +1,7 @@
+Changes in latest
+=================
+This breaks federation becuase of signing
+
 Changes in synapse 0.3.4 (2014-09-25)
 =====================================
 This version adds support for using a TURN server. See docs/turn-howto.rst on
