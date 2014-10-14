@@ -177,10 +177,6 @@ class MatrixHttpClient(BaseHttpClient):
 
         request = sign_json(request, self.server_name, self.signing_key)
 
-        from syutil.jsonutil import encode_canonical_json
-        logger.debug("Signing " + " " * 11 + "%s %s",
-            self.server_name, encode_canonical_json(request))
-
         auth_headers = []
 
         for key,sig in request["signatures"][self.server_name].items():
