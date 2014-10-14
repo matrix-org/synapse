@@ -156,10 +156,14 @@ class Edu(JsonEncodedObject):
     ]
 
     required_keys = [
-        "origin",
-        "destination",
         "edu_type",
     ]
+
+#    TODO: SYN-103: Remove "origin" and "destination" keys.
+#    internal_keys = [
+#        "origin",
+#        "destination",
+#    ]
 
 
 class Transaction(JsonEncodedObject):

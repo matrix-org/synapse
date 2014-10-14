@@ -211,6 +211,7 @@ class FederationTestCase(unittest.TestCase):
                     "pdus": [],
                     "edus": [
                         {
+                            # TODO: SYN-103: Remove "origin" and "destination"
                             "origin": "test",
                             "destination": "remote",
                             "edu_type": "m.test",

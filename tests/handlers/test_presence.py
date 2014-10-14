@@ -43,6 +43,7 @@ def _expect_edu(destination, edu_type, content, origin="test"):
         "pdus": [],
         "edus": [
             {
+                # TODO: SYN-103: Remove "origin" and "destination" keys.
                 "origin": origin,
                 "destination": destination,
                 "edu_type": edu_type,
