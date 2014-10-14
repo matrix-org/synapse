@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 from mock import Mock
 
-from ..utils import MockHttpResource
+from ..utils import MockHttpResource, MockKey
 
 from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler
@@ -45,7 +45,8 @@ class PresenceStateTestCase(unittest.TestCase):
 
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
-
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
         hs = HomeServer("test",
             db_pool=None,
             datastore=Mock(spec=[
@@ -56,7 +57,7 @@ class PresenceStateTestCase(unittest.TestCase):
             http_client=None,
             resource_for_client=self.mock_resource,
             resource_for_federation=self.mock_resource,
-            config=Mock(),
+            config=self.mock_config,
         )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -125,6 +126,8 @@ class PresenceListTestCase(unittest.TestCase):
 
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
 
         hs = HomeServer("test",
             db_pool=None,
@@ -142,7 +145,7 @@ class PresenceListTestCase(unittest.TestCase):
             http_client=None,
             resource_for_client=self.mock_resource,
             resource_for_federation=self.mock_resource,
-            config=Mock(),
+            config=self.mock_config,
         )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -237,6 +240,9 @@ class PresenceEventStreamTestCase(unittest.TestCase):
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
+
         # HIDEOUS HACKERY
         # TODO(paul): This should be injected in via the HomeServer DI system
         from synapse.streams.events import (
@@ -267,6 +273,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 "cancel_call_later",
                 "time_msec",
             ]),
+            config=self.mock_config,
         )
 
         hs.get_clock().time_msec.return_value = 1000000

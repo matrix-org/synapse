@@ -25,9 +25,11 @@ from twisted.web.static import File
 from twisted.web.server import Site
 from synapse.http.server import JsonResource, RootRedirect
 from synapse.http.content_repository import ContentRepoResource
+from synapse.http.server_key_resource import LocalKey
 from synapse.http.client import MatrixHttpClient
 from synapse.api.urls import (
-    CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX
+    CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
+    SERVER_KEY_PREFIX,
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -63,6 +65,9 @@ class SynapseHomeServer(HomeServer):
             self, self.upload_dir, self.auth, self.content_addr
         )
 
+    def build_resource_for_server_key(self):
+        return LocalKey(self)
+
     def build_db_pool(self):
         return adbapi.ConnectionPool(
             "sqlite3", self.get_db_name(),
@@ -88,7 +93,8 @@ class SynapseHomeServer(HomeServer):
         desired_tree = [
             (CLIENT_PREFIX, self.get_resource_for_client()),
             (FEDERATION_PREFIX, self.get_resource_for_federation()),
-            (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo())
+            (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
+            (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
         ]
         if web_client:
             logger.info("Adding the web client.")

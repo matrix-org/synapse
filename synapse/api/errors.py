@@ -19,6 +19,7 @@ import logging
 
 
 class Codes(object):
+    UNAUTHORIZED = "M_UNAUTHORIZED"
     FORBIDDEN = "M_FORBIDDEN"
     BAD_JSON = "M_BAD_JSON"
     NOT_JSON = "M_NOT_JSON"

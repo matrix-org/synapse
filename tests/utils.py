@@ -76,6 +76,13 @@ class MockHttpResource(HttpServer):
         mock_content.configure_mock(**config)
         mock_request.content = mock_content
 
+        mock_request.method = http_method
+        mock_request.uri = path
+
+        mock_request.requestHeaders.getRawHeaders.return_value=[
+            "X-Matrix origin=test,key=,sig="
+        ]
+
         # return the right path if the event requires it
         mock_request.path = path
 
@@ -106,6 +113,21 @@ class MockHttpResource(HttpServer):
 
     def register_path(self, method, path_pattern, callback):
         self.callbacks.append((method, path_pattern, callback))
+
+
+class MockKey(object):
+    alg = "mock_alg"
+    version = "mock_version"
+
+    @property
+    def verify_key(self):
+        return self
+
+    def sign(self, message):
+        return b"\x9a\x87$"
+
+    def verify(self, message, sig):
+        assert sig == b"\x9a\x87$"
 
 
 class MockClock(object):

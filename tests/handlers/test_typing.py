@@ -20,7 +20,7 @@ from twisted.internet import defer
 from mock import Mock, call, ANY
 import json
 
-from ..utils import MockHttpResource, MockClock, DeferredMockCallable
+from ..utils import MockHttpResource, MockClock, DeferredMockCallable, MockKey
 
 from synapse.server import HomeServer
 from synapse.handlers.typing import TypingNotificationHandler
@@ -61,6 +61,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.mock_federation_resource = MockHttpResource()
 
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
                 clock=self.clock,
                 db_pool=None,
@@ -75,6 +78,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
                 resource_for_client=Mock(),
                 resource_for_federation=self.mock_federation_resource,
                 http_client=self.mock_http_client,
+                config=self.mock_config,
+                keyring=Mock(),
             )
         hs.handlers = JustTypingNotificationHandlers(hs)
 
@@ -170,7 +175,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                         "typing": True,
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -221,7 +226,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                         "typing": False,
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )

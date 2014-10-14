@@ -186,6 +186,8 @@ class Transaction(JsonEncodedObject):
         "previous_ids",
         "pdus",
         "edus",
+        "transaction_id",
+        "destination",
     ]
 
     internal_keys = [

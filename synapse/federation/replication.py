@@ -492,7 +492,6 @@ class _TransactionQueue(object):
     """
 
     def __init__(self, hs, transaction_actions, transport_layer):
-
         self.server_name = hs.hostname
         self.transaction_actions = transaction_actions
         self.transport_layer = transport_layer
@@ -591,7 +590,7 @@ class _TransactionQueue(object):
 
             transaction = Transaction.create_new(
                 ts=self._clock.time_msec(),
-                transaction_id=self._next_txn_id,
+                transaction_id=str(self._next_txn_id),
                 origin=self.server_name,
                 destination=destination,
                 pdus=pdus,
@@ -609,18 +608,17 @@ class _TransactionQueue(object):
 
             # FIXME (erikj): This is a bit of a hack to make the Pdu age
             # keys work
-            def cb(transaction):
+            def json_data_cb():
+                data = transaction.get_dict()
                 now = int(self._clock.time_msec())
-                if "pdus" in transaction:
-                    for p in transaction["pdus"]:
+                if "pdus" in data:
+                    for p in data["pdus"]:
                         if "age_ts" in p:
                             p["age"] = now - int(p["age_ts"])
-
-                return transaction
+                return data
 
             code, response = yield self.transport_layer.send_transaction(
-                transaction,
-                on_send_callback=cb,
+                transaction, json_data_cb
             )
 
             logger.debug("TX [%s] Sent transaction", destination)
