@@ -44,8 +44,16 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def _on_new_room_event(self, event, snapshot, extra_destinations=[],
-                           extra_users=[]):
+                           extra_users=[], suppress_auth=False):
         snapshot.fill_out_prev_events(event)
+
+        yield self.state_handler.annotate_state_groups(event)
+
+        if not suppress_auth:
+            yield self.auth.check(event, snapshot, raises=True)
+
+        if hasattr(event, "state_key"):
+            yield self.state_handler.handle_new_event(event, snapshot)
 
         yield self.store.persist_event(event)
 

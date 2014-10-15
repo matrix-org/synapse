@@ -21,6 +21,7 @@ from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.api.events.room import (
     RoomMemberEvent, RoomPowerLevelsEvent, RoomRedactionEvent,
+    RoomJoinRulesEvent, RoomOpsPowerLevelsEvent,
 )
 from synapse.util.logutils import log_function
 
@@ -55,11 +56,7 @@ class Auth(object):
                     defer.returnValue(allowed)
                     return
 
-                self._check_joined_room(
-                    member=snapshot.membership_state,
-                    user_id=snapshot.user_id,
-                    room_id=snapshot.room_id,
-                )
+                self.check_event_sender_in_room(event)
 
                 if is_state:
                     # TODO (erikj): This really only should be called for *new*
@@ -98,6 +95,16 @@ class Auth(object):
             pass
         defer.returnValue(None)
 
+    def check_event_sender_in_room(self, event):
+        key = (RoomMemberEvent.TYPE, event.user_id, )
+        member_event = event.state_events.get(key)
+
+        return self._check_joined_room(
+            member_event,
+            event.user_id,
+            event.room_id
+        )
+
     def _check_joined_room(self, member, user_id, room_id):
         if not member or member.membership != Membership.JOIN:
             raise AuthError(403, "User %s not in room %s (%s)" % (
@@ -114,28 +121,38 @@ class Auth(object):
             raise AuthError(403, "Room does not exist")
 
         # get info about the caller
-        try:
-            caller = yield self.store.get_room_member(
-                user_id=event.user_id,
-                room_id=event.room_id)
-        except:
-            caller = None
+        key = (RoomMemberEvent.TYPE, event.user_id, )
+        caller = event.old_state_events.get(key)
+
         caller_in_room = caller and caller.membership == "join"
 
         # get info about the target
-        try:
-            target = yield self.store.get_room_member(
-                user_id=target_user_id,
-                room_id=event.room_id)
-        except:
-            target = None
+        key = (RoomMemberEvent.TYPE, target_user_id, )
+        target = event.old_state_events.get(key)
+
         target_in_room = target and target.membership == "join"
 
         membership = event.content["membership"]
 
-        join_rule = yield self.store.get_room_join_rule(event.room_id)
-        if not join_rule:
+        key = (RoomJoinRulesEvent.TYPE, "", )
+        join_rule_event = event.old_state_events.get(key)
+        if join_rule_event:
+            join_rule = join_rule_event.content.get(
+                "join_rule", JoinRules.INVITE
+            )
+        else:
             join_rule = JoinRules.INVITE
+
+        user_level = self._get_power_level_from_event_state(
+            event,
+            event.user_id,
+        )
+
+        ban_level, kick_level, redact_level = (
+            yield self._get_ops_level_from_event_state(
+                event
+            )
+        )
 
         if Membership.INVITE == membership:
             # TODO (erikj): We should probably handle this more intelligently
@@ -171,29 +188,16 @@ class Auth(object):
             if not caller_in_room:  # trying to leave a room you aren't joined
                 raise AuthError(403, "You are not in room %s." % event.room_id)
             elif target_user_id != event.user_id:
-                user_level = yield self.store.get_power_level(
-                    event.room_id,
-                    event.user_id,
-                )
-                _, kick_level, _ = yield self.store.get_ops_levels(event.room_id)
-
                 if kick_level:
                     kick_level = int(kick_level)
                 else:
-                    kick_level = 50
+                    kick_level = 50  # FIXME (erikj): What should we do here?
 
                 if user_level < kick_level:
                     raise AuthError(
                         403, "You cannot kick user %s." % target_user_id
                     )
         elif Membership.BAN == membership:
-            user_level = yield self.store.get_power_level(
-                event.room_id,
-                event.user_id,
-            )
-
-            ban_level, _, _  = yield self.store.get_ops_levels(event.room_id)
-
             if ban_level:
                 ban_level = int(ban_level)
             else:
@@ -205,6 +209,29 @@ class Auth(object):
             raise AuthError(500, "Unknown membership %s" % membership)
 
         defer.returnValue(True)
+
+    def _get_power_level_from_event_state(self, event, user_id):
+        key = (RoomPowerLevelsEvent.TYPE, "", )
+        power_level_event = event.old_state_events.get(key)
+        level = None
+        if power_level_event:
+            level = power_level_event.content[user_id]
+            if not level:
+                level = power_level_event.content["default"]
+
+        return level
+
+    def _get_ops_level_from_event_state(self, event):
+        key = (RoomOpsPowerLevelsEvent.TYPE, "", )
+        ops_event = event.old_state_events.get(key)
+
+        if ops_event:
+            return (
+                ops_event.content.get("ban_level"),
+                ops_event.content.get("kick_level"),
+                ops_event.content.get("redact_level"),
+            )
+        return None, None, None,
 
     @defer.inlineCallbacks
     def get_user_by_req(self, request):
@@ -282,8 +309,8 @@ class Auth(object):
         else:
             send_level = 0
 
-        user_level = yield self.store.get_power_level(
-            event.room_id,
+        user_level = self._get_power_level_from_event_state(
+            event,
             event.user_id,
         )
 
@@ -308,8 +335,8 @@ class Auth(object):
 
         add_level = int(add_level)
 
-        user_level = yield self.store.get_power_level(
-            event.room_id,
+        user_level = self._get_power_level_from_event_state(
+            event,
             event.user_id,
         )
 
@@ -333,8 +360,8 @@ class Auth(object):
         if current_state:
             current_state = current_state[0]
 
-        user_level = yield self.store.get_power_level(
-            event.room_id,
+        user_level = self._get_power_level_from_event_state(
+            event,
             event.user_id,
         )
 
@@ -363,10 +390,10 @@ class Auth(object):
             event.user_id,
         )
 
-        if user_level:
-            user_level = int(user_level)
-        else:
-            user_level = 0
+        user_level = self._get_power_level_from_event_state(
+            event,
+            event.user_id,
+        )
 
         _, _, redact_level  = yield self.store.get_ops_levels(event.room_id)
 

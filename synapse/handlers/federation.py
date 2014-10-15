@@ -95,6 +95,8 @@ class FederationHandler(BaseHandler):
 
         logger.debug("Got event: %s", event.event_id)
 
+        yield self.state_handler.annotate_state_groups(event)
+
         with (yield self.lock_manager.lock(pdu.context)):
             if event.is_state and not backfilled:
                 is_new_state = yield self.state_handler.handle_new_state(
@@ -195,7 +197,12 @@ class FederationHandler(BaseHandler):
 
         for pdu in pdus:
             event = self.pdu_codec.event_from_pdu(pdu)
+
+            # FIXME (erikj): Not sure this actually works :/
+            yield self.state_handler.annotate_state_groups(event)
+
             events.append(event)
+
             yield self.store.persist_event(event, backfilled=True)
 
         defer.returnValue(events)
@@ -235,6 +242,7 @@ class FederationHandler(BaseHandler):
         new_event.destinations = [target_host]
 
         snapshot.fill_out_prev_events(new_event)
+        yield self.state_handler.annotate_state_groups(new_event)
         yield self.handle_new_event(new_event, snapshot)
 
         # TODO (erikj): Time out here.
@@ -254,11 +262,10 @@ class FederationHandler(BaseHandler):
                 is_public=False
             )
         except:
+            # FIXME
             pass
 
-
         defer.returnValue(True)
-
 
     @log_function
     def _on_user_joined(self, user, room_id):

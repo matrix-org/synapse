@@ -129,8 +129,9 @@ class RoomCreationHandler(BaseHandler):
 
             logger.debug("Event: %s", event)
 
-            yield self.state_handler.handle_new_event(event, snapshot)
-            yield self._on_new_room_event(event, snapshot, extra_users=[user])
+            yield self._on_new_room_event(
+                event, snapshot, extra_users=[user], suppress_auth=True
+            )
 
         for event in creation_events:
             yield handle_event(event)
@@ -396,8 +397,6 @@ class RoomMemberHandler(BaseHandler):
             yield self._do_join(event, snapshot, do_auth=do_auth)
         else:
             # This is not a JOIN, so we can handle it normally.
-            if do_auth:
-                yield self.auth.check(event, snapshot, raises=True)
 
             # If we're banning someone, set a req power level
             if event.membership == Membership.BAN:
@@ -419,6 +418,7 @@ class RoomMemberHandler(BaseHandler):
                 event,
                 membership=event.content["membership"],
                 snapshot=snapshot,
+                do_auth=do_auth,
             )
 
         defer.returnValue({"room_id": room_id})
@@ -507,14 +507,11 @@ class RoomMemberHandler(BaseHandler):
         if not have_joined:
             logger.debug("Doing normal join")
 
-            if do_auth:
-                yield self.auth.check(event, snapshot, raises=True)
-
-            yield self.state_handler.handle_new_event(event, snapshot)
             yield self._do_local_membership_update(
                 event,
                 membership=event.content["membership"],
                 snapshot=snapshot,
+                do_auth=do_auth,
             )
 
         user = self.hs.parse_userid(event.user_id)
@@ -558,7 +555,8 @@ class RoomMemberHandler(BaseHandler):
 
         defer.returnValue([r.room_id for r in rooms])
 
-    def _do_local_membership_update(self, event, membership, snapshot):
+    def _do_local_membership_update(self, event, membership, snapshot,
+                                    do_auth):
         destinations = []
 
         # If we're inviting someone, then we should also send it to that
@@ -575,8 +573,9 @@ class RoomMemberHandler(BaseHandler):
 
         return self._on_new_room_event(
             event, snapshot, extra_destinations=destinations,
-            extra_users=[target_user]
+            extra_users=[target_user], suppress_auth=(not do_auth),
         )
+
 
 class RoomListHandler(BaseHandler):
 

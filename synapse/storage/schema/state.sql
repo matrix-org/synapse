@@ -14,7 +14,7 @@
  */
 
 CREATE TABLE IF NOT EXISTS state_groups(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     room_id TEXT NOT NULL,
     event_id TEXT NOT NULL
 );

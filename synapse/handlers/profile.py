@@ -218,5 +218,6 @@ class ProfileHandler(BaseHandler):
                 user_id=j.state_key,
             )
 
-            yield self.state_handler.handle_new_event(new_event, snapshot)
-            yield self._on_new_room_event(new_event, snapshot)
+            yield self._on_new_room_event(
+                new_event, snapshot, suppress_auth=True
+            )

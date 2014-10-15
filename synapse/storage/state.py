@@ -74,7 +74,7 @@ class StateStore(SQLBaseStore):
                 }
             )
 
-            for state in event.state_events:
+            for state in event.state_events.values():
                 self._simple_insert_txn(
                     txn,
                     table="state_groups_state",

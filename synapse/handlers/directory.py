@@ -152,5 +152,6 @@ class DirectoryHandler(BaseHandler):
             user_id=user_id,
         )
 
-        yield self.state_handler.handle_new_event(event, snapshot)
-        yield self._on_new_room_event(event, snapshot, extra_users=[user_id])
+        yield self._on_new_room_event(
+            event, snapshot, extra_users=[user_id], suppress_auth=True
+        )

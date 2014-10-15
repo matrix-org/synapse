@@ -87,10 +87,9 @@ class MessageHandler(BaseHandler):
 
         snapshot = yield self.store.snapshot_room(event.room_id, event.user_id)
 
-        if not suppress_auth:
-            yield self.auth.check(event, snapshot, raises=True)
-
-        yield self._on_new_room_event(event, snapshot)
+        yield self._on_new_room_event(
+            event, snapshot, suppress_auth=suppress_auth
+        )
 
         self.hs.get_handlers().presence_handler.bump_presence_active_time(
             user
@@ -149,12 +148,8 @@ class MessageHandler(BaseHandler):
             state_key=event.state_key,
         )
 
-        yield self.auth.check(event, snapshot, raises=True)
-
         if stamp_event:
             event.content["hsob_ts"] = int(self.clock.time_msec())
-
-        yield self.state_handler.handle_new_event(event, snapshot)
 
         yield self._on_new_room_event(event, snapshot)
 
@@ -226,8 +221,6 @@ class MessageHandler(BaseHandler):
             event.content["hsob_ts"] = int(self.clock.time_msec())
 
         snapshot = yield self.store.snapshot_room(event.room_id, event.user_id)
-
-        yield self.auth.check(event, snapshot, raises=True)
 
         # store message in db
         yield self._on_new_room_event(event, snapshot)
