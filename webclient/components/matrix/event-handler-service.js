@@ -460,7 +460,6 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                         handleRoomAliases(event, isLiveEvent);
                         break;
                     case "m.room.message":
-                    case "org.matrix.custom.text.html":
                         handleMessage(event, isLiveEvent);
                         break;
                     case "m.room.member":
