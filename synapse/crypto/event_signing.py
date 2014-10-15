@@ -15,6 +15,7 @@
 # limitations under the License.
 
 
+from synapse.federation.units import Pdu
 from synapse.api.events.utils import prune_pdu
 from syutil.jsonutil import encode_canonical_json
 from syutil.base64util import encode_base64, decode_base64
@@ -25,8 +26,7 @@ import hashlib
 
 def hash_event_pdu(pdu, hash_algortithm=hashlib.sha256):
     hashed = _compute_hash(pdu, hash_algortithm)
-    hashes[hashed.name] = encode_base64(hashed.digest())
-    pdu.hashes = hashes
+    pdu.hashes[hashed.name] = encode_base64(hashed.digest())
     return pdu
 
 

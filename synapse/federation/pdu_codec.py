@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from .units import Pdu
+from synapse.crypto.event_signing import hash_event_pdu, sign_event_pdu
 
 import copy
 
@@ -33,6 +34,7 @@ def encode_event_id(pdu_id, origin):
 class PduCodec(object):
 
     def __init__(self, hs):
+        self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
         self.event_factory = hs.get_event_factory()
         self.clock = hs.get_clock()
@@ -99,4 +101,6 @@ class PduCodec(object):
         if "ts" not in kwargs:
             kwargs["ts"] = int(self.clock.time_msec())
 
-        return Pdu(**kwargs)
+        pdu = Pdu(**kwargs)
+        pdu = hash_event_pdu(pdu)
+        return sign_event_pdu(pdu, self.server_name, self.signing_key)

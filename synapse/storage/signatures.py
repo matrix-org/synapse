@@ -47,7 +47,7 @@ class SignatureStore(SQLBaseStore):
             algorithm (str): Hashing algorithm.
             hash_bytes (bytes): Hash function output bytes.
         """
-        self._simple_insert_txn(self, txn, "pdu_hashes", {
+        self._simple_insert_txn(txn, "pdu_hashes", {
             "pdu_id": pdu_id,
             "origin": origin,
             "algorithm": algorithm,
@@ -66,7 +66,7 @@ class SignatureStore(SQLBaseStore):
         query = (
             "SELECT key_id, signature"
             " FROM pdu_origin_signatures"
-            " WHERE WHERE pdu_id = ? and origin = ?"
+            " WHERE pdu_id = ? and origin = ?"
         )
         txn.execute(query, (pdu_id, origin))
         return dict(txn.fetchall())
@@ -81,7 +81,7 @@ class SignatureStore(SQLBaseStore):
             key_id (str): Id for the signing key.
             signature (bytes): The signature.
         """
-        self._simple_insert_txn(self, txn, "pdu_origin_signatures", {
+        self._simple_insert_txn(txn, "pdu_origin_signatures", {
             "pdu_id": pdu_id,
             "origin": origin,
             "key_id": key_id,

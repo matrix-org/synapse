@@ -23,14 +23,21 @@ from synapse.federation.units import Pdu
 
 from synapse.server import HomeServer
 
-from mock import Mock
+from mock import Mock, NonCallableMock
+
+from ..utils import MockKey
 
 
 class PduCodecTestCase(unittest.TestCase):
     def setUp(self):
-        self.hs = HomeServer("blargle.net")
-        self.event_factory = self.hs.get_event_factory()
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
 
+        self.hs = HomeServer(
+            "blargle.net",
+            config=self.mock_config,
+        )
+        self.event_factory = self.hs.get_event_factory()
         self.codec = PduCodec(self.hs)
 
     def test_decode_event_id(self):

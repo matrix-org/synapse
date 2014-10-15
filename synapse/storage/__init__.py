@@ -42,6 +42,7 @@ from .transactions import TransactionStore
 from .keys import KeyStore
 from .signatures import SignatureStore
 
+from syutil.base64util import decode_base64
 
 import json
 import logging
@@ -168,11 +169,11 @@ class DataStore(RoomMemberStore, RoomStore,
                 txn, pdu.pdu_id, pdu.origin, hash_alg, hash_bytes,
             )
 
-        signatures = pdu.sigatures.get(pdu.orgin, {})
+        signatures = pdu.signatures.get(pdu.origin, {})
 
-        for key_id, signature_base64 in signatures:
+        for key_id, signature_base64 in signatures.items():
             signature_bytes = decode_base64(signature_base64)
-            self.store_pdu_origin_signatures_txn(
+            self._store_pdu_origin_signature_txn(
                 txn, pdu.pdu_id, pdu.origin, key_id, signature_bytes,
             )
 
