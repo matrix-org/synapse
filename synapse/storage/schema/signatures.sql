@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS pdu_origin_signatures (
   origin TEXT,
   key_id TEXT,
   signature BLOB,
-  CONSTRAINT uniqueness UNIQUE (pdu_id, origin, algorithm)
+  CONSTRAINT uniqueness UNIQUE (pdu_id, origin, key_id)
 );
 
 CREATE INDEX IF NOT EXISTS pdu_origin_signatures_id ON pdu_origin_signatures (
-    pdu_id, origin,
+    pdu_id, origin
 );

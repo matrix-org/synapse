@@ -64,6 +64,11 @@ class PduStore(SQLBaseStore):
                 for r in PduEdgesTable.decode_results(txn.fetchall())
             ]
 
+            hashes = self._get_pdu_hashes_txn(txn, pdu_id, origin)
+            signatures = self._get_pdu_origin_signatures_txn(
+                txn, pdu_id, origin
+            )
+
             query = (
                 "SELECT %(fields)s FROM %(pdus)s as p "
                 "LEFT JOIN %(state)s as s "
@@ -80,7 +85,9 @@ class PduStore(SQLBaseStore):
 
             row = txn.fetchone()
             if row:
-                results.append(PduTuple(PduEntry(*row), edges))
+                results.append(PduTuple(
+                    PduEntry(*row), edges, hashes, signatures
+                ))
 
         return results
 
@@ -908,7 +915,7 @@ This does not include a prev_pdus key.
 
 PduTuple = namedtuple(
     "PduTuple",
-    ("pdu_entry", "prev_pdu_list")
+    ("pdu_entry", "prev_pdu_list", "hashes", "signatures")
 )
 """ This is a tuple of a `PduEntry` and a list of `PduIdTuple` that represent
 the `prev_pdus` key of a PDU.

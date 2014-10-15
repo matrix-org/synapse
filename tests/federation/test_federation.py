@@ -41,7 +41,7 @@ def make_pdu(prev_pdus=[], **kwargs):
     }
     pdu_fields.update(kwargs)
 
-    return PduTuple(PduEntry(**pdu_fields), prev_pdus)
+    return PduTuple(PduEntry(**pdu_fields), prev_pdus, {}, {})
 
 
 class FederationTestCase(unittest.TestCase):
@@ -183,6 +183,8 @@ class FederationTestCase(unittest.TestCase):
                             "is_state": False,
                             "content": {"testing": "content here"},
                             "depth": 1,
+                            "hashes": {},
+                            "signatures": {},
                         },
                     ]
                 },

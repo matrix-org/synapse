@@ -40,6 +40,8 @@ from .stream import StreamStore
 from .pdu import StatePduStore, PduStore, PdusTable
 from .transactions import TransactionStore
 from .keys import KeyStore
+from .signatures import SignatureStore
+
 
 import json
 import logging
@@ -59,6 +61,7 @@ SCHEMAS = [
     "room_aliases",
     "keys",
     "redactions",
+    "signatures",
 ]
 
 
@@ -76,7 +79,7 @@ class _RollbackButIsFineException(Exception):
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, PduStore, StatePduStore, TransactionStore,
-                DirectoryStore, KeyStore):
+                DirectoryStore, KeyStore, SignatureStore):
 
     def __init__(self, hs):
         super(DataStore, self).__init__(hs)
@@ -144,6 +147,8 @@ class DataStore(RoomMemberStore, RoomStore,
     def _persist_event_pdu_txn(self, txn, pdu):
         cols = dict(pdu.__dict__)
         unrec_keys = dict(pdu.unrecognized_keys)
+        del cols["hashes"]
+        del cols["signatures"]
         del cols["content"]
         del cols["prev_pdus"]
         cols["content_json"] = json.dumps(pdu.content)
@@ -156,6 +161,20 @@ class DataStore(RoomMemberStore, RoomStore,
         cols["unrecognized_keys"] = json.dumps(unrec_keys)
 
         logger.debug("Persisting: %s", repr(cols))
+
+        for hash_alg, hash_base64 in pdu.hashes.items():
+            hash_bytes = decode_base64(hash_base64)
+            self._store_pdu_hash_txn(
+                txn, pdu.pdu_id, pdu.origin, hash_alg, hash_bytes,
+            )
+
+        signatures = pdu.sigatures.get(pdu.orgin, {})
+
+        for key_id, signature_base64 in signatures:
+            signature_bytes = decode_base64(signature_base64)
+            self.store_pdu_origin_signatures_txn(
+                txn, pdu.pdu_id, pdu.origin, key_id, signature_bytes,
+            )
 
         if pdu.is_state:
             self._persist_state_txn(txn, pdu.prev_pdus, cols)

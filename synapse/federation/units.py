@@ -18,6 +18,7 @@ server protocol.
 """
 
 from synapse.util.jsonobject import JsonEncodedObject
+from syutil.base64util import encode_base64
 
 import logging
 import json
@@ -63,6 +64,8 @@ class Pdu(JsonEncodedObject):
         "depth",
         "content",
         "outlier",
+        "hashes",
+        "signatures",
         "is_state",  # Below this are keys valid only for State Pdus.
         "state_key",
         "power_level",
@@ -91,7 +94,7 @@ class Pdu(JsonEncodedObject):
     # just leaving it as a dict. (OR DO WE?!)
 
     def __init__(self, destinations=[], is_state=False, prev_pdus=[],
-                 outlier=False, **kwargs):
+                 outlier=False, hashes={}, signatures={}, **kwargs):
         if is_state:
             for required_key in ["state_key"]:
                 if required_key not in kwargs:
@@ -102,6 +105,8 @@ class Pdu(JsonEncodedObject):
             is_state=is_state,
             prev_pdus=prev_pdus,
             outlier=outlier,
+            hashes=hashes,
+            signatures=signatures,
             **kwargs
         )
 
@@ -125,6 +130,16 @@ class Pdu(JsonEncodedObject):
             args = {f: d[f] for f in cls.valid_keys if f in d}
             if "unrecognized_keys" in d and d["unrecognized_keys"]:
                 args.update(json.loads(d["unrecognized_keys"]))
+
+            hashes = {
+                alg: encode_base64(hsh)
+                for alg, hsh in pdu_tuple.hashes.items()
+            }
+
+            signatures = {
+                kid: encode_base64(sig)
+                for kid, sig in pdu_tuple.signatures.items()
+            }
 
             return Pdu(
                 prev_pdus=pdu_tuple.prev_pdu_list,
