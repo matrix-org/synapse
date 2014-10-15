@@ -319,7 +319,7 @@ class ReplicationLayer(object):
 
         if hasattr(transaction, "edus"):
             for edu in [Edu(**x) for x in transaction.edus]:
-                self.received_edu(edu.origin, edu.edu_type, edu.content)
+                self.received_edu(transaction.origin, edu.edu_type, edu.content)
 
         results = yield defer.DeferredList(dl)
 
