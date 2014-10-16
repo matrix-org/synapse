@@ -88,3 +88,34 @@ class SignatureStore(SQLBaseStore):
             "signature": buffer(signature_bytes),
         })
 
+    def _get_prev_pdu_hashes_txn(self, txn, pdu_id, origin):
+        """Get all the hashes for previous PDUs of a PDU
+        Args:
+            txn (cursor):
+            pdu_id (str): Id of the PDU.
+            origin (str): Origin of the PDU.
+        Returns:
+            dict of (pdu_id, origin) -> dict of algorithm -> hash_bytes.
+        """
+        query = (
+            "SELECT prev_pdu_id, prev_origin, algorithm, hash"
+            " FROM pdu_edge_hashes"
+            " WHERE pdu_id = ? and origin = ?"
+        )
+        txn.execute(query, (pdu_id, origin))
+        results = {}
+        for prev_pdu_id, prev_origin, algorithm, hash_bytes in txn.fetchall():
+            hashes = results.setdefault((prev_pdu_id, prev_origin), {})
+            hashes[algorithm] = hash_bytes
+        return results
+
+    def _store_prev_pdu_hash_txn(self, txn, pdu_id, origin, prev_pdu_id,
+                             prev_origin, algorithm, hash_bytes):
+        self._simple_insert_txn(txn, "pdu_edge_hashes", {
+            "pdu_id": pdu_id,
+            "origin": origin,
+            "prev_pdu_id": prev_pdu_id,
+            "prev_origin": prev_origin,
+            "algorithm": algorithm,
+            "hash": buffer(hash_bytes),
+        })

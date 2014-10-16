@@ -88,7 +88,7 @@ class PduCodecTestCase(unittest.TestCase):
         self.assertEquals(pdu.context, event.room_id)
         self.assertEquals(pdu.is_state, event.is_state)
         self.assertEquals(pdu.depth, event.depth)
-        self.assertEquals(["alice@bob.com"], event.prev_events)
+        self.assertEquals(pdu.prev_pdus, event.prev_pdus)
         self.assertEquals(pdu.content, event.content)
 
     def test_pdu_from_event(self):
@@ -144,7 +144,7 @@ class PduCodecTestCase(unittest.TestCase):
         self.assertEquals(pdu.context, event.room_id)
         self.assertEquals(pdu.is_state, event.is_state)
         self.assertEquals(pdu.depth, event.depth)
-        self.assertEquals(["alice@bob.com"], event.prev_events)
+        self.assertEquals(pdu.prev_pdus, event.prev_pdus)
         self.assertEquals(pdu.content, event.content)
         self.assertEquals(pdu.state_key, event.state_key)
 

@@ -65,13 +65,13 @@ class SynapseEvent(JsonEncodedObject):
 
     internal_keys = [
         "is_state",
-        "prev_events",
         "depth",
         "destinations",
         "origin",
         "outlier",
         "power_level",
         "redacted",
+        "prev_pdus",
     ]
 
     required_keys = [

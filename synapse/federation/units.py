@@ -141,8 +141,16 @@ class Pdu(JsonEncodedObject):
                 for kid, sig in pdu_tuple.signatures.items()
             }
 
+            prev_pdus = []
+            for prev_pdu in pdu_tuple.prev_pdu_list:
+                prev_hashes = pdu_tuple.edge_hashes.get(prev_pdu, {})
+                prev_hashes = {
+                    alg: encode_base64(hsh) for alg, hsh in prev_hashes.items()
+                }
+                prev_pdus.append((prev_pdu[0], prev_pdu[1], prev_hashes))
+
             return Pdu(
-                prev_pdus=pdu_tuple.prev_pdu_list,
+                prev_pdus=prev_pdus,
                 **args
             )
         else:

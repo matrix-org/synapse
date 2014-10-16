@@ -443,7 +443,7 @@ class ReplicationLayer(object):
             min_depth = yield self.store.get_min_depth_for_context(pdu.context)
 
             if min_depth and pdu.depth > min_depth:
-                for pdu_id, origin in pdu.prev_pdus:
+                for pdu_id, origin, hashes in pdu.prev_pdus:
                     exists = yield self._get_persisted_pdu(pdu_id, origin)
 
                     if not exists:

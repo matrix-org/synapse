@@ -72,10 +72,6 @@ class StateHandler(object):
 
         snapshot.fill_out_prev_events(event)
 
-        event.prev_events = [
-            e for e in event.prev_events if e != event.event_id
-        ]
-
         current_state = snapshot.prev_state_pdu
 
         if current_state:

@@ -34,3 +34,19 @@ CREATE TABLE IF NOT EXISTS pdu_origin_signatures (
 CREATE INDEX IF NOT EXISTS pdu_origin_signatures_id ON pdu_origin_signatures (
     pdu_id, origin
 );
+
+CREATE TABLE IF NOT EXISTS pdu_edge_hashes(
+    pdu_id TEXT,
+    origin TEXT,
+    prev_pdu_id TEXT,
+    prev_origin TEXT,
+    algorithm TEXT,
+    hash BLOB,
+    CONSTRAINT uniqueness UNIQUE (
+        pdu_id, origin, prev_pdu_id, prev_origin, algorithm
+    )
+);
+
+CREATE INDEX IF NOT EXISTS pdu_edge_hashes_id ON pdu_edge_hashes(
+    pdu_id, origin
+);
