@@ -89,7 +89,7 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def on_receive_pdu(self, pdu, backfilled):
         """ Called by the ReplicationLayer when we have a new pdu. We need to
-        do auth checks and put it throught the StateHandler.
+        do auth checks and put it through the StateHandler.
         """
         event = self.pdu_codec.event_from_pdu(pdu)
 
@@ -97,13 +97,17 @@ class FederationHandler(BaseHandler):
 
         yield self.state_handler.annotate_state_groups(event)
 
-        with (yield self.lock_manager.lock(pdu.context)):
-            if event.is_state and not backfilled:
-                is_new_state = yield self.state_handler.handle_new_state(
-                    pdu
-                )
-            else:
-                is_new_state = False
+        logger.debug("Event: %s", event)
+
+        if not backfilled:
+            yield self.auth.check(event, None, raises=True)
+
+        if event.is_state and not backfilled:
+            is_new_state = yield self.state_handler.handle_new_state(
+                pdu
+            )
+        else:
+            is_new_state = False
         # TODO: Implement something in federation that allows us to
         # respond to PDU.
 
@@ -266,6 +270,69 @@ class FederationHandler(BaseHandler):
             pass
 
         defer.returnValue(True)
+
+    @defer.inlineCallbacks
+    def on_make_join_request(self, context, user_id):
+        event = self.event_factory.create_event(
+            etype=RoomMemberEvent.TYPE,
+            content={"membership": Membership.JOIN},
+            room_id=context,
+            user_id=user_id,
+            state_key=user_id,
+        )
+
+        snapshot = yield self.store.snapshot_room(
+            event.room_id, event.user_id,
+        )
+        snapshot.fill_out_prev_events(event)
+
+        pdu = self.pdu_codec.pdu_from_event(event)
+
+        defer.returnValue(pdu)
+
+    @defer.inlineCallbacks
+    def on_send_join_request(self, origin, pdu):
+        event = self.pdu_codec.event_from_pdu(pdu)
+
+        yield self.state_handler.annotate_state_groups(event)
+        yield self.auth.check(event, None, raises=True)
+
+        is_new_state = yield self.state_handler.handle_new_state(
+            pdu
+        )
+
+        # FIXME (erikj):  All this is duplicated above :(
+
+        yield self.store.persist_event(
+            event,
+            backfilled=False,
+            is_new_state=is_new_state
+        )
+
+        extra_users = []
+        if event.type == RoomMemberEvent.TYPE:
+            target_user_id = event.state_key
+            target_user = self.hs.parse_userid(target_user_id)
+            extra_users.append(target_user)
+
+        yield self.notifier.on_new_room_event(
+            event, extra_users=extra_users
+        )
+
+        if event.type == RoomMemberEvent.TYPE:
+            if event.membership == Membership.JOIN:
+                user = self.hs.parse_userid(event.state_key)
+                self.distributor.fire(
+                    "user_joined_room", user=user, room_id=event.room_id
+                )
+
+        pdu.destinations = yield self.store.get_joined_hosts_for_room(
+            event.room_id
+        )
+
+        yield self.replication_layer.send_pdu(pdu)
+
+        defer.returnValue(event.state_events.values())
 
     @log_function
     def _on_user_joined(self, user, room_id):

@@ -21,7 +21,7 @@ from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.api.events.room import (
     RoomMemberEvent, RoomPowerLevelsEvent, RoomRedactionEvent,
-    RoomJoinRulesEvent, RoomOpsPowerLevelsEvent,
+    RoomJoinRulesEvent, RoomOpsPowerLevelsEvent, InviteJoinEvent,
 )
 from synapse.util.logutils import log_function
 
@@ -56,7 +56,8 @@ class Auth(object):
                     defer.returnValue(allowed)
                     return
 
-                self.check_event_sender_in_room(event)
+                if not event.type == InviteJoinEvent.TYPE:
+                    self.check_event_sender_in_room(event)
 
                 if is_state:
                     # TODO (erikj): This really only should be called for *new*
@@ -115,11 +116,6 @@ class Auth(object):
     def is_membership_change_allowed(self, event):
         target_user_id = event.state_key
 
-        # does this room even exist
-        room = yield self.store.get_room(event.room_id)
-        if not room:
-            raise AuthError(403, "Room does not exist")
-
         # get info about the caller
         key = (RoomMemberEvent.TYPE, event.user_id, )
         caller = event.old_state_events.get(key)
@@ -170,7 +166,7 @@ class Auth(object):
             # joined: It's a NOOP
             if event.user_id != target_user_id:
                 raise AuthError(403, "Cannot force another user to join.")
-            elif join_rule == JoinRules.PUBLIC or room.is_public:
+            elif join_rule == JoinRules.PUBLIC:
                 pass
             elif join_rule == JoinRules.INVITE:
                 if (
@@ -215,9 +211,9 @@ class Auth(object):
         power_level_event = event.old_state_events.get(key)
         level = None
         if power_level_event:
-            level = power_level_event.content[user_id]
+            level = power_level_event.content.get(user_id)
             if not level:
-                level = power_level_event.content["default"]
+                level = power_level_event.content.get("default", 0)
 
         return level
 

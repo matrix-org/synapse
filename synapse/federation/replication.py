@@ -393,9 +393,25 @@ class ReplicationLayer(object):
             response = yield self.query_handlers[query_type](args)
             defer.returnValue((200, response))
         else:
-            defer.returnValue((404, "No handler for Query type '%s'"
-                % (query_type)
-            ))
+            defer.returnValue(
+                (404, "No handler for Query type '%s'" % (query_type, ))
+            )
+
+    def on_make_join_request(self, context, user_id):
+        return self.handler.on_make_join_request(context, user_id)
+
+    @defer.inlineCallbacks
+    def on_send_join_request(self, origin, content):
+        pdu = Pdu(**content)
+        state = yield self.handler.on_send_join_request(origin, pdu)
+        defer.returnValue((200, self._transaction_from_pdus(state).get_dict()))
+
+    def make_join(self, destination, context, user_id):
+        return self.transport_layer.make_join(
+            destination=destination,
+            context=context,
+            user_id=user_id,
+        )
 
     @defer.inlineCallbacks
     @log_function

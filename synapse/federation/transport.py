@@ -198,6 +198,19 @@ class TransportLayer(object):
         defer.returnValue(response)
 
     @defer.inlineCallbacks
+    @log_function
+    def make_join(self, destination, context, user_id, retry_on_dns_fail=True):
+        path = PREFIX + "/make_join/%s/%s" % (context, user_id,)
+
+        response = yield self.client.get_json(
+            destination=destination,
+            path=path,
+            retry_on_dns_fail=retry_on_dns_fail,
+        )
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
     def _authenticate_request(self, request):
         json_request = {
             "method": request.method,
@@ -353,6 +366,12 @@ class TransportLayer(object):
             )
         )
 
+        self.server.register_path(
+            "GET",
+            re.compile("^" + PREFIX + "/make_join/([^/]*)/([^/]*)$"),
+            self._on_make_join_request
+        )
+
     @defer.inlineCallbacks
     @log_function
     def _on_send_request(self, origin, content, query, transaction_id):
@@ -438,7 +457,20 @@ class TransportLayer(object):
         versions = [v.split(",", 1) for v in v_list]
 
         return self.request_handler.on_backfill_request(
-            context, versions, limit)
+            context, versions, limit
+        )
+
+    @log_function
+    def _on_make_join_request(self, origin, content, query, context, user_id):
+        return self.request_handler.on_make_join_request(
+            context, user_id,
+        )
+
+    @log_function
+    def _on_send_join_request(self, origin, content, query):
+        return self.request_handler.on_send_join_request(
+            origin, content,
+        )
 
 
 class TransportReceivedHandler(object):
