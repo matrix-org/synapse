@@ -1,3 +1,16 @@
+Upgrading to v0.4.0
+===================
+
+This release needs an updated syutil version. Run::
+
+    python setup.py develop
+
+You will also need to upgrade your configuration as the signing key format has
+changed. Run::
+
+    python -m synapse.app.homeserver --config-path <CONFIG_> --generate-config
+
+
 Upgrading to v0.3.0
 ===================
 

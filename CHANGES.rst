@@ -5,6 +5,8 @@ compatible.
 
 The Matrix specification has been moved to a seperate git repository.
 
+You will also need an updated syutil and config. See UPGRADES.rst.
+
 Homeserver:
  * Sign federation transactions.
  * Rename timestamp keys in PDUs.
