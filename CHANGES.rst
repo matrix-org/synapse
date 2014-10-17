@@ -1,3 +1,8 @@
+Changes in synapse 0.4.1 (2014-10-17)
+=====================================
+Webclient:
+ * Fix bug with display of timestamps.
+
 Changes in synpase 0.4.0 (2014-10-17)
 =====================================
 This server includes changes to the federation protocol that is not backwards
