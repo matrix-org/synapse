@@ -101,7 +101,7 @@ class Pdu(JsonEncodedObject):
 
         super(Pdu, self).__init__(
             destinations=destinations,
-            is_state=is_state,
+            is_state=bool(is_state),
             prev_pdus=prev_pdus,
             outlier=outlier,
             hashes=hashes,

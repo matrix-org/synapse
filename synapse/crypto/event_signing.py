@@ -22,6 +22,9 @@ from syutil.base64util import encode_base64, decode_base64
 from syutil.crypto.jsonsign import sign_json, verify_signed_json
 
 import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def add_event_pdu_content_hash(pdu, hash_algorithm=hashlib.sha256):
@@ -48,7 +51,7 @@ def check_event_pdu_content_hash(pdu, hash_algorithm=hashlib.sha256):
 def _compute_content_hash(pdu, hash_algorithm):
     pdu_json = pdu.get_dict()
     #TODO: Make "age_ts" key internal
-    pdu_json.pop("age_ts")
+    pdu_json.pop("age_ts", None)
     pdu_json.pop("unsigned", None)
     pdu_json.pop("signatures", None)
     hashes = pdu_json.pop("hashes", {})
@@ -60,6 +63,7 @@ def compute_pdu_event_reference_hash(pdu, hash_algorithm=hashlib.sha256):
     tmp_pdu = Pdu(**pdu.get_dict())
     tmp_pdu = prune_pdu(tmp_pdu)
     pdu_json = tmp_pdu.get_dict()
+    pdu_json.pop("signatures", None)
     pdu_json_bytes = encode_canonical_json(pdu_json)
     hashed = hash_algorithm(pdu_json_bytes)
     return (hashed.name, hashed.digest())
