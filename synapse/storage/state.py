@@ -63,6 +63,9 @@ class StateStore(SQLBaseStore):
         )
 
     def _store_state_groups_txn(self, txn, event):
+        if not event.state_events:
+            return
+
         state_group = event.state_group
         if not state_group:
             state_group = self._simple_insert_txn(

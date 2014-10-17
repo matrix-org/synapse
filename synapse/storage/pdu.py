@@ -277,6 +277,12 @@ class PduStore(SQLBaseStore):
                 (context, depth)
             )
 
+    def get_latest_pdus_in_context(self, context):
+        return self.runInteraction(
+            self._get_latest_pdus_in_context,
+            context
+        )
+
     def _get_latest_pdus_in_context(self, txn, context):
         """Get's a list of the most current pdus for a given context. This is
         used when we are sending a Pdu and need to fill out the `prev_pdus`

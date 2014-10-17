@@ -22,6 +22,7 @@ from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.api.events.room import (
     RoomMemberEvent, RoomPowerLevelsEvent, RoomRedactionEvent,
     RoomJoinRulesEvent, RoomOpsPowerLevelsEvent, InviteJoinEvent,
+    RoomCreateEvent,
 )
 from synapse.util.logutils import log_function
 
@@ -58,6 +59,10 @@ class Auth(object):
                     defer.returnValue(True)
 
                 is_state = hasattr(event, "state_key")
+
+                if event.type == RoomCreateEvent.TYPE:
+                    # FIXME
+                    defer.returnValue(True)
 
                 if event.type == RoomMemberEvent.TYPE:
                     yield self._can_replace_state(event)

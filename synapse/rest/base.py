@@ -18,6 +18,11 @@ from synapse.api.urls import CLIENT_PREFIX
 from synapse.rest.transactions import HttpTransactionStore
 import re
 
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 
 def client_path_pattern(path_regex):
     """Creates a regex compiled client path with the correct client path

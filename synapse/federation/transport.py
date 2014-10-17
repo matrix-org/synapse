@@ -229,13 +229,36 @@ class TransportLayer(object):
             pdu_id,
         )
 
-        response = yield self.client.put_json(
+        code, content = yield self.client.put_json(
             destination=destination,
             path=path,
             data=content,
         )
 
-        defer.returnValue(response)
+        if not 200 <= code < 300:
+            raise RuntimeError("Got %d from send_join", code)
+
+        defer.returnValue(json.loads(content))
+
+    @defer.inlineCallbacks
+    @log_function
+    def send_invite(self, destination, context, pdu_id, origin, content):
+        path = PREFIX + "/invite/%s/%s/%s" % (
+            context,
+            origin,
+            pdu_id,
+        )
+
+        code, content = yield self.client.put_json(
+            destination=destination,
+            path=path,
+            data=content,
+        )
+
+        if not 200 <= code < 300:
+            raise RuntimeError("Got %d from send_invite", code)
+
+        defer.returnValue(json.loads(content))
 
     @defer.inlineCallbacks
     def _authenticate_request(self, request):
@@ -297,9 +320,13 @@ class TransportLayer(object):
         @defer.inlineCallbacks
         def new_handler(request, *args, **kwargs):
             (origin, content) = yield self._authenticate_request(request)
-            response = yield handler(
-                origin, content, request.args, *args, **kwargs
-            )
+            try:
+                response = yield handler(
+                    origin, content, request.args, *args, **kwargs
+                )
+            except:
+                logger.exception("Callback failed")
+                raise
             defer.returnValue(response)
         return new_handler
 
@@ -419,6 +446,17 @@ class TransportLayer(object):
             )
         )
 
+        self.server.register_path(
+            "PUT",
+            re.compile("^" + PREFIX + "/invite/([^/]*)/([^/]*)/([^/]*)$"),
+            self._with_authentication(
+                lambda origin, content, query, context, pdu_origin, pdu_id:
+                self._on_invite_request(
+                    origin, content, query,
+                )
+            )
+        )
+
     @defer.inlineCallbacks
     @log_function
     def _on_send_request(self, origin, content, query, transaction_id):
@@ -519,6 +557,15 @@ class TransportLayer(object):
     @log_function
     def _on_send_join_request(self, origin, content, query):
         content = yield self.request_handler.on_send_join_request(
+            origin, content,
+        )
+
+        defer.returnValue((200, content))
+
+    @defer.inlineCallbacks
+    @log_function
+    def _on_invite_request(self, origin, content, query):
+        content = yield self.request_handler.on_invite_request(
             origin, content,
         )
 

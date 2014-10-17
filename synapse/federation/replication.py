@@ -403,10 +403,17 @@ class ReplicationLayer(object):
             defer.returnValue(
                 (404, "No handler for Query type '%s'" % (query_type, ))
             )
+
     @defer.inlineCallbacks
     def on_make_join_request(self, context, user_id):
         pdu = yield self.handler.on_make_join_request(context, user_id)
         defer.returnValue(pdu.get_dict())
+
+    @defer.inlineCallbacks
+    def on_invite_request(self, origin, content):
+        pdu = Pdu(**content)
+        ret_pdu = yield self.handler.on_send_join_request(origin, pdu)
+        defer.returnValue((200, ret_pdu.get_dict()))
 
     @defer.inlineCallbacks
     def on_send_join_request(self, origin, content):
@@ -426,14 +433,22 @@ class ReplicationLayer(object):
 
         defer.returnValue(Pdu(**pdu_dict))
 
+    @defer.inlineCallbacks
     def send_join(self, destination, pdu):
-        return self.transport_layer.send_join(
+        _, content = yield self.transport_layer.send_join(
             destination,
             pdu.context,
             pdu.pdu_id,
             pdu.origin,
             pdu.get_dict(),
         )
+
+        logger.debug("Got content: %s", content)
+        pdus = [Pdu(outlier=True, **p) for p in content.get("pdus", [])]
+        for pdu in pdus:
+            yield self._handle_new_pdu(destination, pdu)
+
+        defer.returnValue(pdus)
 
     @defer.inlineCallbacks
     @log_function

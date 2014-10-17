@@ -199,7 +199,7 @@ class MessageHandler(BaseHandler):
                 raise RoomError(
                     403, "Member does not meet private room rules.")
 
-        data = yield self.store.get_current_state(
+        data = yield self.state_handler.get_current_state(
             room_id, event_type, state_key
         )
         defer.returnValue(data)
@@ -238,7 +238,7 @@ class MessageHandler(BaseHandler):
         yield self.auth.check_joined_room(room_id, user_id)
 
         # TODO: This is duplicating logic from snapshot_all_rooms
-        current_state = yield self.store.get_current_state(room_id)
+        current_state = yield self.state_handler.get_current_state(room_id)
         defer.returnValue([self.hs.serialize_event(c) for c in current_state])
 
     @defer.inlineCallbacks
@@ -315,7 +315,7 @@ class MessageHandler(BaseHandler):
                     "end": end_token.to_string(),
                 }
 
-                current_state = yield self.store.get_current_state(
+                current_state = yield self.state_handler.get_current_state(
                     event.room_id
                 )
                 d["state"] = [self.hs.serialize_event(c) for c in current_state]
