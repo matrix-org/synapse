@@ -38,6 +38,7 @@ class Keyring(object):
 
     @defer.inlineCallbacks
     def verify_json_for_server(self, server_name, json_object):
+        logger.debug("Verifying for %s", server_name)
         key_ids = signature_ids(json_object, server_name)
         if not key_ids:
             raise SynapseError(
