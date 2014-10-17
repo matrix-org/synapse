@@ -26,64 +26,17 @@ from syutil.jsonutil import encode_canonical_json
 
 from synapse.api.errors import CodeMessageException, SynapseError
 
+from syutil.crypto.jsonsign import sign_json
+
 from StringIO import StringIO
 
 import json
 import logging
 import urllib
+import urlparse
 
 
 logger = logging.getLogger(__name__)
-
-# FIXME: SURELY these should be killed?!
-_destination_mappings = {
-    "red": "localhost:8080",
-    "blue": "localhost:8081",
-    "green": "localhost:8082",
-}
-
-
-class HttpClient(object):
-    """ Interface for talking json over http
-    """
-    RETRY_DNS_LOOKUP_FAILURES = "__retry_dns"
-
-    def put_json(self, destination, path, data):
-        """ Sends the specifed json data using PUT
-
-        Args:
-            destination (str): The remote server to send the HTTP request
-                to.
-            path (str): The HTTP path.
-            data (dict): A dict containing the data that will be used as
-                the request body. This will be encoded as JSON.
-
-        Returns:
-            Deferred: Succeeds when we get a 2xx HTTP response. The result
-            will be the decoded JSON body. On a 4xx or 5xx error response a
-            CodeMessageException is raised.
-        """
-        pass
-
-    def get_json(self, destination, path, args=None):
-        """ Get's some json from the given host homeserver and path
-
-        Args:
-            destination (str): The remote server to send the HTTP request
-                to.
-            path (str): The HTTP path.
-            args (dict): A dictionary used to create query strings, defaults to
-                None.
-                **Note**: The value of each key is assumed to be an iterable
-                and *not* a string.
-
-        Returns:
-            Deferred: Succeeds when we get *any* HTTP response.
-
-            The result of the deferred is a tuple of `(code, response)`,
-            where `response` is a dict representing the decoded JSON body.
-        """
-        pass
 
 
 class MatrixHttpAgent(_AgentBase):
@@ -109,12 +62,8 @@ class MatrixHttpAgent(_AgentBase):
                                          parsed_URI.originForm)
 
 
-class TwistedHttpClient(HttpClient):
-    """ Wrapper around the twisted HTTP client api.
-
-    Attributes:
-        agent (twisted.web.client.Agent): The twisted Agent used to send the
-            requests.
+class BaseHttpClient(object):
+    """Base class for HTTP clients using twisted.
     """
 
     def __init__(self, hs):
@@ -122,111 +71,20 @@ class TwistedHttpClient(HttpClient):
         self.hs = hs
 
     @defer.inlineCallbacks
-    def put_json(self, destination, path, data, on_send_callback=None):
-        if destination in _destination_mappings:
-            destination = _destination_mappings[destination]
-
-        response = yield self._create_request(
-            destination.encode("ascii"),
-            "PUT",
-            path.encode("ascii"),
-            producer=_JsonProducer(data),
-            headers_dict={"Content-Type": ["application/json"]},
-            on_send_callback=on_send_callback,
-        )
-
-        logger.debug("Getting resp body")
-        body = yield readBody(response)
-        logger.debug("Got resp body")
-
-        defer.returnValue((response.code, body))
-
-    @defer.inlineCallbacks
-    def get_json(self, destination, path, args={}):
-        if destination in _destination_mappings:
-            destination = _destination_mappings[destination]
-
-        logger.debug("get_json args: %s", args)
-
-        retry_on_dns_fail = True
-        if HttpClient.RETRY_DNS_LOOKUP_FAILURES in args:
-            # FIXME: This isn't ideal, but the interface exposed in get_json
-            # isn't comprehensive enough to give caller's any control over
-            # their connection mechanics.
-            retry_on_dns_fail = args.pop(HttpClient.RETRY_DNS_LOOKUP_FAILURES)
-
-        query_bytes = urllib.urlencode(args, True)
-        logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
-
-        response = yield self._create_request(
-            destination.encode("ascii"),
-            "GET",
-            path.encode("ascii"),
-            query_bytes=query_bytes,
-            retry_on_dns_fail=retry_on_dns_fail
-        )
-
-        body = yield readBody(response)
-
-        defer.returnValue(json.loads(body))
-
-    @defer.inlineCallbacks
-    def post_urlencoded_get_json(self, destination, path, args={}):
-        if destination in _destination_mappings:
-            destination = _destination_mappings[destination]
-
-        logger.debug("post_urlencoded_get_json args: %s", args)
-        query_bytes = urllib.urlencode(args, True)
-
-        response = yield self._create_request(
-            destination.encode("ascii"),
-            "POST",
-            path.encode("ascii"),
-            producer=FileBodyProducer(StringIO(urllib.urlencode(args))),
-            headers_dict={"Content-Type": ["application/x-www-form-urlencoded"]}
-        )
-
-        body = yield readBody(response)
-
-        defer.returnValue(json.loads(body))
-        
-    # XXX FIXME : I'm so sorry.
-    @defer.inlineCallbacks
-    def post_urlencoded_get_raw(self, destination, path, accept_partial=False, args={}):
-        if destination in _destination_mappings:
-            destination = _destination_mappings[destination]
-
-        query_bytes = urllib.urlencode(args, True)
-
-        response = yield self._create_request(
-            destination.encode("ascii"),
-            "POST",
-            path.encode("ascii"),
-            producer=FileBodyProducer(StringIO(urllib.urlencode(args))),
-            headers_dict={"Content-Type": ["application/x-www-form-urlencoded"]}
-        )
-
-        try:
-            body = yield readBody(response)
-            defer.returnValue(body)
-        except PartialDownloadError as e:
-            if accept_partial:
-                defer.returnValue(e.response)
-            else:
-                raise e
-        
-
-    @defer.inlineCallbacks
-    def _create_request(self, destination, method, path_bytes, param_bytes=b"",
-                        query_bytes=b"", producer=None, headers_dict={},
-                        retry_on_dns_fail=True, on_send_callback=None):
+    def _create_request(self, destination, method, path_bytes,
+                        body_callback, headers_dict={}, param_bytes=b"",
+                        query_bytes=b"", retry_on_dns_fail=True):
         """ Creates and sends a request to the given url
         """
         headers_dict[b"User-Agent"] = [b"Synapse"]
         headers_dict[b"Host"] = [destination]
 
-        logger.debug("Sending request to %s: %s %s;%s?%s",
-                     destination, method, path_bytes, param_bytes, query_bytes)
+        url_bytes = urlparse.urlunparse(
+            ("", "", path_bytes, param_bytes, query_bytes, "",)
+        )
+
+        logger.debug("Sending request to %s: %s %s",
+                     destination, method, url_bytes)
 
         logger.debug(
             "Types: %s",
@@ -239,12 +97,11 @@ class TwistedHttpClient(HttpClient):
 
         retries_left = 5
 
-        # TODO: setup and pass in an ssl_context to enable TLS
         endpoint = self._getEndpoint(reactor, destination);
 
         while True:
-            if on_send_callback:
-                on_send_callback(destination, method, path_bytes, producer)
+
+            producer = body_callback(method, url_bytes, headers_dict)
 
             try:
                 response = yield self.agent.request(
@@ -290,6 +147,134 @@ class TwistedHttpClient(HttpClient):
 
         defer.returnValue(response)
 
+
+class MatrixHttpClient(BaseHttpClient):
+    """ Wrapper around the twisted HTTP client api. Implements
+
+    Attributes:
+        agent (twisted.web.client.Agent): The twisted Agent used to send the
+            requests.
+    """
+
+    RETRY_DNS_LOOKUP_FAILURES = "__retry_dns"
+
+    def __init__(self, hs):
+        self.signing_key = hs.config.signing_key[0]
+        self.server_name = hs.hostname
+        BaseHttpClient.__init__(self, hs)
+
+    def sign_request(self, destination, method, url_bytes, headers_dict,
+                     content=None):
+        request = {
+            "method": method,
+            "uri": url_bytes,
+            "origin": self.server_name,
+            "destination": destination,
+        }
+
+        if content is not None:
+            request["content"] = content
+
+        request = sign_json(request, self.server_name, self.signing_key)
+
+        auth_headers = []
+
+        for key,sig in request["signatures"][self.server_name].items():
+            auth_headers.append(bytes(
+                "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (
+                    self.server_name, key, sig,
+                )
+            ))
+
+        headers_dict[b"Authorization"] = auth_headers
+
+    @defer.inlineCallbacks
+    def put_json(self, destination, path, data={}, json_data_callback=None):
+        """ Sends the specifed json data using PUT
+
+        Args:
+            destination (str): The remote server to send the HTTP request
+                to.
+            path (str): The HTTP path.
+            data (dict): A dict containing the data that will be used as
+                the request body. This will be encoded as JSON.
+            json_data_callback (callable): A callable returning the dict to
+                use as the request body.
+
+        Returns:
+            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            will be the decoded JSON body. On a 4xx or 5xx error response a
+            CodeMessageException is raised.
+        """
+
+        if not json_data_callback:
+            def json_data_callback():
+                return data
+
+        def body_callback(method, url_bytes, headers_dict):
+            json_data = json_data_callback()
+            self.sign_request(
+                destination, method, url_bytes, headers_dict, json_data
+            )
+            producer = _JsonProducer(json_data)
+            return producer
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "PUT",
+            path.encode("ascii"),
+            body_callback=body_callback,
+            headers_dict={"Content-Type": ["application/json"]},
+        )
+
+        logger.debug("Getting resp body")
+        body = yield readBody(response)
+        logger.debug("Got resp body")
+
+        defer.returnValue((response.code, body))
+
+    @defer.inlineCallbacks
+    def get_json(self, destination, path, args={}, retry_on_dns_fail=True):
+        """ Get's some json from the given host homeserver and path
+
+        Args:
+            destination (str): The remote server to send the HTTP request
+                to.
+            path (str): The HTTP path.
+            args (dict): A dictionary used to create query strings, defaults to
+                None.
+                **Note**: The value of each key is assumed to be an iterable
+                and *not* a string.
+
+        Returns:
+            Deferred: Succeeds when we get *any* HTTP response.
+
+            The result of the deferred is a tuple of `(code, response)`,
+            where `response` is a dict representing the decoded JSON body.
+        """
+        logger.debug("get_json args: %s", args)
+
+        query_bytes = urllib.urlencode(args, True)
+        logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
+
+        def body_callback(method, url_bytes, headers_dict):
+            self.sign_request(destination, method, url_bytes, headers_dict)
+            return None
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "GET",
+            path.encode("ascii"),
+            query_bytes=query_bytes,
+            body_callback=body_callback,
+            retry_on_dns_fail=retry_on_dns_fail
+        )
+
+        body = yield readBody(response)
+
+        defer.returnValue(json.loads(body))
+
+
     def _getEndpoint(self, reactor, destination):
         return matrix_endpoint(
             reactor, destination, timeout=10,
@@ -297,10 +282,69 @@ class TwistedHttpClient(HttpClient):
         )
 
 
-class PlainHttpClient(TwistedHttpClient):
+class IdentityServerHttpClient(BaseHttpClient):
+    """Separate HTTP client for talking to the Identity servers since they
+    don't use SRV records and talk x-www-form-urlencoded rather than JSON.
+    """
+    def _getEndpoint(self, reactor, destination):
+        #TODO: This should be talking TLS
+        return matrix_endpoint(reactor, destination, timeout=10)
+
+    @defer.inlineCallbacks
+    def post_urlencoded_get_json(self, destination, path, args={}):
+        logger.debug("post_urlencoded_get_json args: %s", args)
+        query_bytes = urllib.urlencode(args, True)
+
+        def body_callback(method, url_bytes, headers_dict):
+            return FileBodyProducer(StringIO(query_bytes))
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "POST",
+            path.encode("ascii"),
+            body_callback=body_callback,
+            headers_dict={
+                "Content-Type": ["application/x-www-form-urlencoded"]
+            }
+        )
+
+        body = yield readBody(response)
+
+        defer.returnValue(json.loads(body))
+
+
+class CaptchaServerHttpClient(MatrixHttpClient):
+    """Separate HTTP client for talking to google's captcha servers"""
+
     def _getEndpoint(self, reactor, destination):
         return matrix_endpoint(reactor, destination, timeout=10)
-    
+
+    @defer.inlineCallbacks
+    def post_urlencoded_get_raw(self, destination, path, accept_partial=False,
+                                args={}):
+        query_bytes = urllib.urlencode(args, True)
+
+        def body_callback(method, url_bytes, headers_dict):
+            return FileBodyProducer(StringIO(query_bytes))
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "POST",
+            path.encode("ascii"),
+            body_callback=body_callback,
+            headers_dict={
+                "Content-Type": ["application/x-www-form-urlencoded"]
+            }
+        )
+
+        try:
+            body = yield readBody(response)
+            defer.returnValue(body)
+        except PartialDownloadError as e:
+            if accept_partial:
+                defer.returnValue(e.response)
+            else:
+                raise e
 
 def _print_ex(e):
     if hasattr(e, "reasons") and e.reasons:

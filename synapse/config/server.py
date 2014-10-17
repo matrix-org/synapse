@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import nacl.signing
 import os
-from ._base import Config
-from syutil.base64util import encode_base64, decode_base64
+from ._base import Config, ConfigError
+import syutil.crypto.signing_key
 
 
 class ServerConfig(Config):
@@ -70,9 +69,16 @@ class ServerConfig(Config):
                                   "content repository")
 
     def read_signing_key(self, signing_key_path):
-        signing_key_base64 = self.read_file(signing_key_path, "signing_key")
-        signing_key_bytes = decode_base64(signing_key_base64)
-        return nacl.signing.SigningKey(signing_key_bytes)
+        signing_keys = self.read_file(signing_key_path, "signing_key")
+        try:
+            return syutil.crypto.signing_key.read_signing_keys(
+                signing_keys.splitlines(True)
+            )
+        except Exception as e:
+            raise ConfigError(
+                "Error reading signing_key."
+                " Try running again with --generate-config"
+            )
 
     @classmethod
     def generate_config(cls, args, config_dir_path):
@@ -86,6 +92,21 @@ class ServerConfig(Config):
 
         if not os.path.exists(args.signing_key_path):
             with open(args.signing_key_path, "w") as signing_key_file:
-                key = nacl.signing.SigningKey.generate()
-                signing_key_file.write(encode_base64(key.encode()))
-
+                syutil.crypto.signing_key.write_signing_keys(
+                    signing_key_file,
+                    (syutil.crypto.SigningKey.generate("auto"),),
+                )
+        else:
+            signing_keys = cls.read_file(args.signing_key_path, "signing_key")
+            if len(signing_keys.split("\n")[0].split()) == 1:
+                # handle keys in the old format.
+                key = syutil.crypto.signing_key.decode_signing_key_base64(
+                    syutil.crypto.signing_key.NACL_ED25519,
+                    "auto",
+                    signing_keys.split("\n")[0]
+                )
+                with open(args.signing_key_path, "w") as signing_key_file:
+                    syutil.crypto.signing_key.write_signing_keys(
+                        signing_key_file,
+                        (key,),
+                    )

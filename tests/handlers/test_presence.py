@@ -17,11 +17,12 @@
 from tests import unittest
 from twisted.internet import defer, reactor
 
-from mock import Mock, call, ANY
+from mock import Mock, call, ANY, NonCallableMock, patch
 import json
 
 from tests.utils import (
-    MockHttpResource, MockClock, DeferredMockCallable, SQLiteMemoryDbPool
+    MockHttpResource, MockClock, DeferredMockCallable, SQLiteMemoryDbPool,
+    MockKey
 )
 
 from synapse.server import HomeServer
@@ -38,10 +39,11 @@ ONLINE = PresenceState.ONLINE
 def _expect_edu(destination, edu_type, content, origin="test"):
     return {
         "origin": origin,
-        "ts": 1000000,
+        "origin_server_ts": 1000000,
         "pdus": [],
         "edus": [
             {
+                # TODO: SYN-103: Remove "origin" and "destination" keys.
                 "origin": origin,
                 "destination": destination,
                 "edu_type": edu_type,
@@ -58,7 +60,6 @@ class JustPresenceHandlers(object):
     def __init__(self, hs):
         self.presence_handler = PresenceHandler(hs)
 
-
 class PresenceStateTestCase(unittest.TestCase):
     """ Tests presence management. """
 
@@ -67,12 +68,17 @@ class PresenceStateTestCase(unittest.TestCase):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
             clock=MockClock(),
             db_pool=db_pool,
             handlers=None,
             resource_for_federation=Mock(),
             http_client=None,
+            config=self.mock_config,
+            keyring=Mock(),
         )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -214,6 +220,9 @@ class PresenceInvitesTestCase(unittest.TestCase):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
             clock=MockClock(),
             db_pool=db_pool,
@@ -221,6 +230,8 @@ class PresenceInvitesTestCase(unittest.TestCase):
             resource_for_client=Mock(),
             resource_for_federation=self.mock_federation_resource,
             http_client=self.mock_http_client,
+            config=self.mock_config,
+            keyring=Mock(),
         )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -290,7 +301,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
                         "observed_user": "@cabbage:elsewhere",
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -319,7 +330,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
                         "observed_user": "@apple:test",
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -355,7 +366,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
                         "observed_user": "@durian:test",
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -503,6 +514,9 @@ class PresencePushTestCase(unittest.TestCase):
 
         self.mock_federation_resource = MockHttpResource()
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
                 clock=self.clock,
                 db_pool=None,
@@ -520,6 +534,8 @@ class PresencePushTestCase(unittest.TestCase):
                 resource_for_client=Mock(),
                 resource_for_federation=self.mock_federation_resource,
                 http_client=self.mock_http_client,
+                config=self.mock_config,
+                keyring=Mock(),
             )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -771,7 +787,7 @@ class PresencePushTestCase(unittest.TestCase):
                         ],
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -787,7 +803,7 @@ class PresencePushTestCase(unittest.TestCase):
                         ],
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -913,7 +929,7 @@ class PresencePushTestCase(unittest.TestCase):
                         ],
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -928,7 +944,7 @@ class PresencePushTestCase(unittest.TestCase):
                         ],
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -958,7 +974,7 @@ class PresencePushTestCase(unittest.TestCase):
                         ],
                     }
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -995,6 +1011,9 @@ class PresencePollingTestCase(unittest.TestCase):
 
         self.mock_federation_resource = MockHttpResource()
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
                 clock=MockClock(),
                 db_pool=None,
@@ -1009,6 +1028,8 @@ class PresencePollingTestCase(unittest.TestCase):
                 resource_for_client=Mock(),
                 resource_for_federation=self.mock_federation_resource,
                 http_client=self.mock_http_client,
+                config=self.mock_config,
+                keyring=Mock(),
             )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -1155,7 +1176,7 @@ class PresencePollingTestCase(unittest.TestCase):
                         "poll": [ "@potato:remote" ],
                     },
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1168,7 +1189,7 @@ class PresencePollingTestCase(unittest.TestCase):
                         "push": [ {"user_id": "@clementine:test" }],
                     },
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1197,7 +1218,7 @@ class PresencePollingTestCase(unittest.TestCase):
                         "push": [ {"user_id": "@fig:test" }],
                     },
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1230,7 +1251,7 @@ class PresencePollingTestCase(unittest.TestCase):
                         "unpoll": [ "@potato:remote" ],
                     },
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1262,7 +1283,7 @@ class PresencePollingTestCase(unittest.TestCase):
                         ],
                     },
                 ),
-                on_send_callback=ANY,
+                json_data_callback=ANY,
             ),
             defer.succeed((200, "OK"))
         )

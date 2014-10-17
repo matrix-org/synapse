@@ -58,8 +58,8 @@ class EventFactory(object):
                 random_string(10), self.hs.hostname
             )
 
-        if "ts" not in kwargs:
-            kwargs["ts"] = int(self.clock.time_msec())
+        if "origin_server_ts" not in kwargs:
+            kwargs["origin_server_ts"] = int(self.clock.time_msec())
 
         # The "age" key is a delta timestamp that should be converted into an
         # absolute timestamp the minute we see it.

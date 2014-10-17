@@ -14,7 +14,7 @@ $('.register').live('click', function() {
         url: "http://localhost:8008/_matrix/client/api/v1/register",
         type: "POST",
         contentType: "application/json; charset=utf-8",
-        data: JSON.stringify({ user_id: user, password: password }),
+        data: JSON.stringify({ user: user, password: password, type: "m.login.password" }),
         dataType: "json",
         success: function(data) {
             showLoggedIn(data);

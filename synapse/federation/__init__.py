@@ -22,6 +22,7 @@ from .transport import TransportLayer
 
 def initialize_http_replication(homeserver):
     transport = TransportLayer(
+        homeserver,
         homeserver.hostname,
         server=homeserver.get_resource_for_federation(),
         client=homeserver.get_http_client()

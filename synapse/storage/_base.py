@@ -121,7 +121,7 @@ class SQLBaseStore(object):
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
 
-    def _simple_insert(self, table, values, or_replace=False):
+    def _simple_insert(self, table, values, or_replace=False, or_ignore=False):
         """Executes an INSERT query on the named table.
 
         Args:
@@ -130,13 +130,16 @@ class SQLBaseStore(object):
             or_replace : bool; if True performs an INSERT OR REPLACE
         """
         return self.runInteraction(
-            self._simple_insert_txn, table, values, or_replace=or_replace
+            self._simple_insert_txn, table, values, or_replace=or_replace,
+            or_ignore=or_ignore,
         )
 
     @log_function
-    def _simple_insert_txn(self, txn, table, values, or_replace=False):
+    def _simple_insert_txn(self, txn, table, values, or_replace=False,
+                           or_ignore=False):
         sql = "%s INTO %s (%s) VALUES(%s)" % (
-            ("INSERT OR REPLACE" if or_replace else "INSERT"),
+            ("INSERT OR REPLACE" if or_replace else
+             "INSERT OR IGNORE" if or_ignore else "INSERT"),
             table,
             ", ".join(k for k in values),
             ", ".join("?" for k in values)
@@ -351,6 +354,7 @@ class SQLBaseStore(object):
         d.pop("stream_ordering", None)
         d.pop("topological_ordering", None)
         d.pop("processed", None)
+        d["origin_server_ts"] = d.pop("ts", 0)
 
         d.update(json.loads(row_dict["unrecognized_keys"]))
         d["content"] = json.loads(d["content"])
@@ -358,7 +362,7 @@ class SQLBaseStore(object):
 
         if "age_ts" not in d:
             # For compatibility
-            d["age_ts"] = d["ts"] if "ts" in d else 0
+            d["age_ts"] = d.get("origin_server_ts", 0)
 
         return self.event_factory.create_event(
             etype=d["type"],

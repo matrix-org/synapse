@@ -19,7 +19,7 @@ from tests import unittest
 # python imports
 from mock import Mock, ANY
 
-from ..utils import MockHttpResource, MockClock
+from ..utils import MockHttpResource, MockClock, MockKey
 
 from synapse.server import HomeServer
 from synapse.federation import initialize_http_replication
@@ -64,6 +64,8 @@ class FederationTestCase(unittest.TestCase):
         self.mock_persistence.get_received_txn_response.return_value = (
                 defer.succeed(None)
         )
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
         self.clock = MockClock()
         hs = HomeServer("test",
                 resource_for_federation=self.mock_resource,
@@ -71,6 +73,8 @@ class FederationTestCase(unittest.TestCase):
                 db_pool=None,
                 datastore=self.mock_persistence,
                 clock=self.clock,
+                config=self.mock_config,
+                keyring=Mock(),
         )
         self.federation = initialize_http_replication(hs)
         self.distributor = hs.get_distributor()
@@ -154,7 +158,7 @@ class FederationTestCase(unittest.TestCase):
                 origin="red",
                 destinations=["remote"],
                 context="my-context",
-                ts=123456789002,
+                origin_server_ts=123456789002,
                 pdu_type="m.test",
                 content={"testing": "content here"},
                 depth=1,
@@ -166,14 +170,14 @@ class FederationTestCase(unittest.TestCase):
                 "remote",
                 path="/_matrix/federation/v1/send/1000000/",
                 data={
-                    "ts": 1000000,
+                    "origin_server_ts": 1000000,
                     "origin": "test",
                     "pdus": [
                         {
                             "origin": "red",
                             "pdu_id": "abc123def456",
                             "prev_pdus": [],
-                            "ts": 123456789002,
+                            "origin_server_ts": 123456789002,
                             "context": "my-context",
                             "pdu_type": "m.test",
                             "is_state": False,
@@ -182,7 +186,7 @@ class FederationTestCase(unittest.TestCase):
                         },
                     ]
                 },
-                on_send_callback=ANY,
+                json_data_callback=ANY,
         )
 
     @defer.inlineCallbacks
@@ -203,10 +207,11 @@ class FederationTestCase(unittest.TestCase):
                 path="/_matrix/federation/v1/send/1000000/",
                 data={
                     "origin": "test",
-                    "ts": 1000000,
+                    "origin_server_ts": 1000000,
                     "pdus": [],
                     "edus": [
                         {
+                            # TODO: SYN-103: Remove "origin" and "destination"
                             "origin": "test",
                             "destination": "remote",
                             "edu_type": "m.test",
@@ -214,8 +219,9 @@ class FederationTestCase(unittest.TestCase):
                         }
                     ],
                 },
-                on_send_callback=ANY,
+                json_data_callback=ANY,
         )
+
 
     @defer.inlineCallbacks
     def test_recv_edu(self):
@@ -228,7 +234,7 @@ class FederationTestCase(unittest.TestCase):
                 "/_matrix/federation/v1/send/1001000/",
                 """{
                     "origin": "remote",
-                    "ts": 1001000,
+                    "origin_server_ts": 1001000,
                     "pdus": [],
                     "edus": [
                         {
@@ -253,7 +259,7 @@ class FederationTestCase(unittest.TestCase):
         response = yield self.federation.make_query(
             destination="remote",
             query_type="a-question",
-            args={"one": "1", "two": "2"}
+            args={"one": "1", "two": "2"},
         )
 
         self.assertEquals({"your": "response"}, response)
@@ -261,7 +267,8 @@ class FederationTestCase(unittest.TestCase):
         self.mock_http_client.get_json.assert_called_with(
             destination="remote",
             path="/_matrix/federation/v1/query/a-question",
-            args={"one": "1", "two": "2"}
+            args={"one": "1", "two": "2"},
+            retry_on_dns_fail=True,
         )
 
     @defer.inlineCallbacks

@@ -26,12 +26,16 @@ from synapse.federation.units import Pdu
 
 from mock import NonCallableMock, ANY
 
-from ..utils import get_mock_call_args
+from ..utils import get_mock_call_args, MockKey
 
 
 class FederationTestCase(unittest.TestCase):
 
     def setUp(self):
+
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         self.hostname = "test"
         hs = HomeServer(
             self.hostname,
@@ -48,6 +52,7 @@ class FederationTestCase(unittest.TestCase):
                 "room_member_handler",
                 "federation_handler",
             ]),
+            config=self.mock_config,
         )
 
         self.datastore = hs.get_datastore()
@@ -63,7 +68,7 @@ class FederationTestCase(unittest.TestCase):
             pdu_type=MessageEvent.TYPE,
             context="foo",
             content={"msgtype": u"fooo"},
-            ts=0,
+            origin_server_ts=0,
             pdu_id="a",
             origin="b",
         )
@@ -90,7 +95,7 @@ class FederationTestCase(unittest.TestCase):
             target_host=self.hostname,
             context=room_id,
             content={},
-            ts=0,
+            origin_server_ts=0,
             pdu_id="a",
             origin="b",
         )
@@ -122,7 +127,7 @@ class FederationTestCase(unittest.TestCase):
             state_key="@red:not%s" % self.hostname,
             context=room_id,
             content={},
-            ts=0,
+            origin_server_ts=0,
             pdu_id="a",
             origin="b",
         )

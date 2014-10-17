@@ -1,3 +1,14 @@
+Changes in synpase 0.4.0 (2014-10-17)
+=====================================
+This server includes changes to the federation protocol that is not backwards
+compatible.
+
+The Matrix specification has been moved to a seperate git repository.
+
+Homeserver:
+ * Sign federation transactions.
+ * Rename timestamp keys in PDUs.
+
 Changes in synapse 0.3.4 (2014-09-25)
 =====================================
 This version adds support for using a TURN server. See docs/turn-howto.rst on
