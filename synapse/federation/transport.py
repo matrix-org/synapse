@@ -256,10 +256,14 @@ class TransportLayer(object):
     def _with_authentication(self, handler):
         @defer.inlineCallbacks
         def new_handler(request, *args, **kwargs):
-            (origin, content) = yield self._authenticate_request(request)
-            response = yield handler(
-                origin, content, request.args, *args, **kwargs
-            )
+            try:
+                (origin, content) = yield self._authenticate_request(request)
+                response = yield handler(
+                    origin, content, request.args, *args, **kwargs
+                )
+            except:
+                logger.exception("_authenticate_request failed")
+                raise
             defer.returnValue(response)
         return new_handler
 
@@ -392,9 +396,13 @@ class TransportLayer(object):
             defer.returnValue((400, {"error": "Invalid transaction"}))
             return
 
-        code, response = yield self.received_handler.on_incoming_transaction(
-            transaction_data
-        )
+        try:
+            code, response = yield self.received_handler.on_incoming_transaction(
+                transaction_data
+            )
+        except:
+            logger.exception("on_incoming_transaction failed")
+            raise
 
         defer.returnValue((code, response))
 
