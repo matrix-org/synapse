@@ -31,7 +31,7 @@ setup(
     packages=find_packages(exclude=["tests"]),
     description="Reference Synapse Home Server",
     install_requires=[
-        "syutil==0.0.1",
+        "syutil==0.0.2",
         "Twisted>=14.0.0",
         "service_identity>=1.0.0",
         "pyyaml",
@@ -41,7 +41,7 @@ setup(
         "py-bcrypt",
     ],
     dependency_links=[
-        "git+ssh://git@github.com/matrix-org/syutil.git#egg=syutil-0.0.1",
+        "git+ssh://git@github.com/matrix-org/syutil.git#egg=syutil-0.0.2",
     ],
     setup_requires=[
         "setuptools_trial",
