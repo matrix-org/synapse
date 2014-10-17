@@ -16,7 +16,7 @@
 CREATE TABLE IF NOT EXISTS received_transactions(
     transaction_id TEXT, 
     origin TEXT, 
-    origin_server_ts INTEGER,
+    ts INTEGER,
     response_code INTEGER,
     response_json TEXT,
     has_been_referenced BOOL default 0, -- Whether thishas been referenced by a prev_tx
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS sent_transactions(
     destination TEXT,
     response_code INTEGER DEFAULT 0,
     response_json TEXT,
-    origin_server_ts INTEGER
+    ts INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS sent_transaction_dest ON sent_transactions(destination);

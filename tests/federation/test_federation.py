@@ -99,7 +99,7 @@ class FederationTestCase(unittest.TestCase):
                     origin="red",
                     context="my-context",
                     pdu_type="m.topic",
-                    origin_server_ts=123456789000,
+                    ts=123456789000,
                     depth=1,
                     is_state=True,
                     content_json='{"topic":"The topic"}',
@@ -134,7 +134,7 @@ class FederationTestCase(unittest.TestCase):
                     origin="red",
                     context="my-context",
                     pdu_type="m.text",
-                    origin_server_ts=123456789001,
+                    ts=123456789001,
                     depth=1,
                     content_json='{"text":"Here is the message"}',
                 )

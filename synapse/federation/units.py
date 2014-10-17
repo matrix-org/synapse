@@ -118,6 +118,7 @@ class Pdu(JsonEncodedObject):
         """
         if pdu_tuple:
             d = copy.copy(pdu_tuple.pdu_entry._asdict())
+            d["origin_server_ts"] = d.pop("ts")
 
             d["content"] = json.loads(d["content_json"])
             del d["content_json"]

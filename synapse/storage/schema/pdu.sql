@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS pdus(
     origin TEXT, 
     context TEXT,
     pdu_type TEXT,
-    origin_server_ts INTEGER,
+    ts INTEGER,
     depth INTEGER DEFAULT 0 NOT NULL,
     is_state BOOL, 
     content_json TEXT,
