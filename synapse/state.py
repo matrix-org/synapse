@@ -130,7 +130,13 @@ class StateHandler(object):
         defer.returnValue(is_new)
 
     @defer.inlineCallbacks
-    def annotate_state_groups(self, event):
+    def annotate_state_groups(self, event, state=None):
+        if state:
+            event.state_group = None
+            event.old_state_events = None
+            event.state_events = state
+            return
+
         state_groups = yield self.store.get_state_groups(
             event.prev_events
         )
@@ -177,7 +183,7 @@ class StateHandler(object):
         new_powers_deferreds = []
         for e in curr_events:
             new_powers_deferreds.append(
-                self.store.get_power_level(e.context, e.user_id)
+                self.store.get_power_level(e.room_id, e.user_id)
             )
 
         new_powers = yield defer.gatherResults(

@@ -72,7 +72,8 @@ class TransportLayer(object):
         self.received_handler = None
 
     @log_function
-    def get_context_state(self, destination, context):
+    def get_context_state(self, destination, context, pdu_id=None,
+                          pdu_origin=None):
         """ Requests all state for a given context (i.e. room) from the
         given server.
 
@@ -89,7 +90,14 @@ class TransportLayer(object):
 
         subpath = "/state/%s/" % context
 
-        return self._do_request_for_transaction(destination, subpath)
+        args = {}
+        if pdu_id and pdu_origin:
+            args["pdu_id"] = pdu_id
+            args["pdu_origin"] = pdu_origin
+
+        return self._do_request_for_transaction(
+            destination, subpath, args=args
+        )
 
     @log_function
     def get_pdu(self, destination, pdu_origin, pdu_id):
@@ -135,8 +143,10 @@ class TransportLayer(object):
 
         subpath = "/backfill/%s/" % context
 
-        args = {"v": ["%s,%s" % (i, o) for i, o in pdu_tuples]}
-        args["limit"] = limit
+        args = {
+            "v": ["%s,%s" % (i, o) for i, o in pdu_tuples],
+            "limit": limit,
+        }
 
         return self._do_request_for_transaction(
             dest,
@@ -206,6 +216,23 @@ class TransportLayer(object):
             destination=destination,
             path=path,
             retry_on_dns_fail=retry_on_dns_fail,
+        )
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
+    @log_function
+    def send_join(self, destination, context, pdu_id, origin, content):
+        path = PREFIX + "/send_join/%s/%s/%s" % (
+            context,
+            origin,
+            pdu_id,
+        )
+
+        response = yield self.client.put_json(
+            destination=destination,
+            path=path,
+            data=content,
         )
 
         defer.returnValue(response)
@@ -330,7 +357,11 @@ class TransportLayer(object):
             re.compile("^" + PREFIX + "/state/([^/]*)/$"),
             self._with_authentication(
                 lambda origin, content, query, context:
-                handler.on_context_state_request(context)
+                handler.on_context_state_request(
+                    context,
+                    query.get("pdu_id", [None])[0],
+                    query.get("pdu_origin", [None])[0]
+                )
             )
         )
 
@@ -369,7 +400,23 @@ class TransportLayer(object):
         self.server.register_path(
             "GET",
             re.compile("^" + PREFIX + "/make_join/([^/]*)/([^/]*)$"),
-            self._on_make_join_request
+            self._with_authentication(
+                lambda origin, content, query, context, user_id:
+                self._on_make_join_request(
+                    origin, content, query, context, user_id
+                )
+            )
+        )
+
+        self.server.register_path(
+            "PUT",
+            re.compile("^" + PREFIX + "/send_join/([^/]*)/([^/]*)/([^/]*)$"),
+            self._with_authentication(
+                lambda origin, content, query, context, pdu_origin, pdu_id:
+                self._on_send_join_request(
+                    origin, content, query,
+                )
+            )
         )
 
     @defer.inlineCallbacks
@@ -460,17 +507,22 @@ class TransportLayer(object):
             context, versions, limit
         )
 
+    @defer.inlineCallbacks
     @log_function
     def _on_make_join_request(self, origin, content, query, context, user_id):
-        return self.request_handler.on_make_join_request(
+        content = yield self.request_handler.on_make_join_request(
             context, user_id,
         )
+        defer.returnValue((200, content))
 
+    @defer.inlineCallbacks
     @log_function
     def _on_send_join_request(self, origin, content, query):
-        return self.request_handler.on_send_join_request(
+        content = yield self.request_handler.on_send_join_request(
             origin, content,
         )
+
+        defer.returnValue((200, content))
 
 
 class TransportReceivedHandler(object):

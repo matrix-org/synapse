@@ -48,6 +48,15 @@ class Auth(object):
         """
         try:
             if hasattr(event, "room_id"):
+                if not event.old_state_events:
+                    # Oh, we don't know what the state of the room was, so we
+                    # are trusting that this is allowed (at least for now)
+                    defer.returnValue(True)
+
+                if hasattr(event, "outlier") and event.outlier:
+                    # TODO (erikj): Auth for outliers is done differently.
+                    defer.returnValue(True)
+
                 is_state = hasattr(event, "state_key")
 
                 if event.type == RoomMemberEvent.TYPE:

@@ -51,12 +51,20 @@ class EventFactory(object):
         self.clock = hs.get_clock()
         self.hs = hs
 
+        self.event_id_count = 0
+
+    def create_event_id(self):
+        i = str(self.event_id_count)
+        self.event_id_count += 1
+
+        local_part = str(int(self.clock.time())) + i + random_string(5)
+
+        return "%s@%s" % (local_part, self.hs.hostname)
+
     def create_event(self, etype=None, **kwargs):
         kwargs["type"] = etype
         if "event_id" not in kwargs:
-            kwargs["event_id"] = "%s@%s" % (
-                random_string(10), self.hs.hostname
-            )
+            kwargs["event_id"] = self.create_event_id()
 
         if "ts" not in kwargs:
             kwargs["ts"] = int(self.clock.time_msec())
