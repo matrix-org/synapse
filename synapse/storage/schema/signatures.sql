@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-CREATE TABLE IF NOT EXISTS pdu_hashes (
+CREATE TABLE IF NOT EXISTS pdu_content_hashes (
   pdu_id TEXT,
   origin TEXT,
   algorithm TEXT,
@@ -21,7 +21,21 @@ CREATE TABLE IF NOT EXISTS pdu_hashes (
   CONSTRAINT uniqueness UNIQUE (pdu_id, origin, algorithm)
 );
 
-CREATE INDEX IF NOT EXISTS pdu_hashes_id ON pdu_hashes (pdu_id, origin);
+CREATE INDEX IF NOT EXISTS pdu_content_hashes_id ON pdu_content_hashes (
+    pdu_id, origin
+);
+
+CREATE TABLE IF NOT EXISTS pdu_reference_hashes (
+  pdu_id TEXT,
+  origin TEXT,
+  algorithm TEXT,
+  hash BLOB,
+  CONSTRAINT uniqueness UNIQUE (pdu_id, origin, algorithm)
+);
+
+CREATE INDEX IF NOT EXISTS pdu_reference_hashes_id ON pdu_reference_hashes (
+    pdu_id, origin
+);
 
 CREATE TABLE IF NOT EXISTS pdu_origin_signatures (
   pdu_id TEXT,

@@ -44,6 +44,8 @@ from .signatures import SignatureStore
 
 from syutil.base64util import decode_base64
 
+from synapse.crypto.event_signing import compute_pdu_event_reference_hash
+
 import json
 import logging
 import os
@@ -165,7 +167,7 @@ class DataStore(RoomMemberStore, RoomStore,
 
         for hash_alg, hash_base64 in pdu.hashes.items():
             hash_bytes = decode_base64(hash_base64)
-            self._store_pdu_hash_txn(
+            self._store_pdu_content_hash_txn(
                 txn, pdu.pdu_id, pdu.origin, hash_alg, hash_bytes,
             )
 
@@ -184,6 +186,11 @@ class DataStore(RoomMemberStore, RoomStore,
                     txn, pdu.pdu_id, pdu.origin, prev_pdu_id, prev_origin, alg,
                     hash_bytes
                 )
+
+        (ref_alg, ref_hash_bytes) = compute_pdu_event_reference_hash(pdu)
+        self._store_pdu_reference_hash_txn(
+            txn, pdu.pdu_id, pdu.origin, ref_alg, ref_hash_bytes
+        )
 
         if pdu.is_state:
             self._persist_state_txn(txn, pdu.prev_pdus, cols)

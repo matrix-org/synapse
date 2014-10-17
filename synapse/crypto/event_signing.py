@@ -24,15 +24,15 @@ from syutil.crypto.jsonsign import sign_json, verify_signed_json
 import hashlib
 
 
-def hash_event_pdu(pdu, hash_algortithm=hashlib.sha256):
-    hashed = _compute_hash(pdu, hash_algortithm)
+def add_event_pdu_content_hash(pdu, hash_algorithm=hashlib.sha256):
+    hashed = _compute_content_hash(pdu, hash_algorithm)
     pdu.hashes[hashed.name] = encode_base64(hashed.digest())
     return pdu
 
 
-def check_event_pdu_hash(pdu, hash_algorithm=hashlib.sha256):
+def check_event_pdu_content_hash(pdu, hash_algorithm=hashlib.sha256):
     """Check whether the hash for this PDU matches the contents"""
-    computed_hash = _compute_hash(pdu, hash_algortithm)
+    computed_hash = _compute_content_hash(pdu, hash_algortithm)
     if computed_hash.name not in pdu.hashes:
         raise Exception("Algorithm %s not in hashes %s" % (
             computed_hash.name, list(pdu.hashes)
@@ -45,13 +45,22 @@ def check_event_pdu_hash(pdu, hash_algorithm=hashlib.sha256):
     return message_hash_bytes == computed_hash.digest()
 
 
-def _compute_hash(pdu, hash_algorithm):
+def _compute_content_hash(pdu, hash_algorithm):
     pdu_json = pdu.get_dict()
     pdu_json.pop("meta", None)
     pdu_json.pop("signatures", None)
     hashes = pdu_json.pop("hashes", {})
     pdu_json_bytes = encode_canonical_json(pdu_json)
     return hash_algorithm(pdu_json_bytes)
+
+
+def compute_pdu_event_reference_hash(pdu, hash_algorithm=hashlib.sha256):
+    tmp_pdu = Pdu(**pdu.get_dict())
+    tmp_pdu = prune_pdu(tmp_pdu)
+    pdu_json = tmp_pdu.get_dict()
+    pdu_json_bytes = encode_canonical_json(pdu_json)
+    hashed = hash_algorithm(pdu_json_bytes)
+    return (hashed.name, hashed.digest())
 
 
 def sign_event_pdu(pdu, signature_name, signing_key):

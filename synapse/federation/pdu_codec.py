@@ -14,7 +14,9 @@
 # limitations under the License.
 
 from .units import Pdu
-from synapse.crypto.event_signing import hash_event_pdu, sign_event_pdu
+from synapse.crypto.event_signing import (
+    add_event_pdu_content_hash, sign_event_pdu
+)
 
 import copy
 
@@ -97,5 +99,5 @@ class PduCodec(object):
             kwargs["ts"] = int(self.clock.time_msec())
 
         pdu = Pdu(**kwargs)
-        pdu = hash_event_pdu(pdu)
+        pdu = add_event_pdu_content_hash(pdu)
         return sign_event_pdu(pdu, self.server_name, self.signing_key)

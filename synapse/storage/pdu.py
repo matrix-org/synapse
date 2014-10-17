@@ -69,7 +69,7 @@ class PduStore(SQLBaseStore):
 
             edge_hashes = self._get_prev_pdu_hashes_txn(txn, pdu_id, origin)
 
-            hashes = self._get_pdu_hashes_txn(txn, pdu_id, origin)
+            hashes = self._get_pdu_content_hashes_txn(txn, pdu_id, origin)
             signatures = self._get_pdu_origin_signatures_txn(
                 txn, pdu_id, origin
             )
@@ -317,7 +317,7 @@ class PduStore(SQLBaseStore):
 
         results = []
         for pdu_id, origin, depth in txn.fetchall():
-            hashes = self._get_pdu_hashes_txn(txn, pdu_id, origin)
+            hashes = self._get_pdu_reference_hashes_txn(txn, pdu_id, origin)
             sha256_bytes = hashes["sha256"]
             prev_hashes = {"sha256": encode_base64(sha256_bytes)}
             results.append((pdu_id, origin, prev_hashes, depth))
