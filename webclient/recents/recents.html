@@ -18,7 +18,7 @@
                          Declaring it in this way ensures the data-binding -->
                     {{ lastMsg = eventHandlerService.getLastMessage(room.room_id, true);"" }}
 
-                    {{ (lastMsg.ts) | date:'MMM d HH:mm' }}
+                    {{ (lastMsg.origin_server_ts) | date:'MMM d HH:mm' }}
                     
                     <img ng-click="leave(room.room_id); $event.stopPropagation();" src="img/close.png" width="10" height="10" style="margin-bottom: -1px; margin-left: 2px;" alt="close"/>
                 </td>

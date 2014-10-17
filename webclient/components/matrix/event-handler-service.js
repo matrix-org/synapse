@@ -148,10 +148,10 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
         // ts is later.
         var latestData = true;
         if (!isLiveEvent) {
-            var eventTs = event.ts;
+            var eventTs = event.origin_server_ts;
             var storedEvent = $rootScope.events.rooms[event.room_id][event.type];
             if (storedEvent) {
-                if (storedEvent.ts > eventTs) {
+                if (storedEvent.origin_server_ts > eventTs) {
                     // ignore it, we have a newer one already.
                     latestData = false;
                 }
