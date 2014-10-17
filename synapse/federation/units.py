@@ -68,11 +68,11 @@ class Pdu(JsonEncodedObject):
         "signatures",
         "is_state",  # Below this are keys valid only for State Pdus.
         "state_key",
-        "power_level",
         "prev_state_id",
         "prev_state_origin",
         "required_power_level",
         "user_id",
+        "meta"
     ]
 
     internal_keys = [
@@ -123,6 +123,10 @@ class Pdu(JsonEncodedObject):
         """
         if pdu_tuple:
             d = copy.copy(pdu_tuple.pdu_entry._asdict())
+
+            for k in d.keys():
+                if d[k] is None:
+                    del d[k]
 
             d["content"] = json.loads(d["content_json"])
             del d["content_json"]
