@@ -3,7 +3,7 @@ Changes in synpase 0.4.0 (2014-10-17)
 This server includes changes to the federation protocol that is not backwards
 compatible.
 
-The Matrix specification has been moved to a seperate git repository.
+The Matrix specification has been moved to a separate git repository.
 
 You will also need an updated syutil and config. See UPGRADES.rst.
 

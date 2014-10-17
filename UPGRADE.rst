@@ -8,7 +8,7 @@ This release needs an updated syutil version. Run::
 You will also need to upgrade your configuration as the signing key format has
 changed. Run::
 
-    python -m synapse.app.homeserver --config-path <CONFIG_> --generate-config
+    python -m synapse.app.homeserver --config-path <CONFIG> --generate-config
 
 
 Upgrading to v0.3.0
