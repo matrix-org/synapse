@@ -64,7 +64,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def send_message(self, event=None, suppress_auth=False, stamp_event=True):
+    def send_message(self, event=None, suppress_auth=False):
         """ Send a message.
 
         Args:
@@ -72,7 +72,6 @@ class MessageHandler(BaseHandler):
             suppress_auth (bool) : True to suppress auth for this message. This
             is primarily so the home server can inject messages into rooms at
             will.
-            stamp_event (bool) : True to stamp event content with server keys.
         Raises:
             SynapseError if something went wrong.
         """
@@ -81,9 +80,6 @@ class MessageHandler(BaseHandler):
         # TODO(paul): Why does 'event' not have a 'user' object?
         user = self.hs.parse_userid(event.user_id)
         assert user.is_mine, "User must be our own: %s" % (user,)
-
-        if stamp_event:
-            event.content["hsob_ts"] = int(self.clock.time_msec())
 
         snapshot = yield self.store.snapshot_room(event.room_id, event.user_id)
 
@@ -132,7 +128,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue(chunk)
 
     @defer.inlineCallbacks
-    def store_room_data(self, event=None, stamp_event=True):
+    def store_room_data(self, event=None):
         """ Stores data for a room.
 
         Args:
@@ -150,9 +146,6 @@ class MessageHandler(BaseHandler):
         )
 
         yield self.auth.check(event, snapshot, raises=True)
-
-        if stamp_event:
-            event.content["hsob_ts"] = int(self.clock.time_msec())
 
         yield self.state_handler.handle_new_event(event, snapshot)
 
@@ -221,10 +214,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def send_feedback(self, event, stamp_event=True):
-        if stamp_event:
-            event.content["hsob_ts"] = int(self.clock.time_msec())
-
+    def send_feedback(self, event):
         snapshot = yield self.store.snapshot_room(event.room_id, event.user_id)
 
         yield self.auth.check(event, snapshot, raises=True)

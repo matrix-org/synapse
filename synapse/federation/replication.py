@@ -427,7 +427,7 @@ class ReplicationLayer(object):
         return Transaction(
             origin=self.server_name,
             pdus=pdus,
-            ts=int(time_now),
+            origin_server_ts=int(time_now),
             destination=None,
         )
 
@@ -595,7 +595,7 @@ class _TransactionQueue(object):
             logger.debug("TX [%s] Persisting transaction...", destination)
 
             transaction = Transaction.create_new(
-                ts=int(self._clock.time_msec()),
+                origin_server_ts=int(self._clock.time_msec()),
                 transaction_id=str(self._next_txn_id),
                 origin=self.server_name,
                 destination=destination,

@@ -354,6 +354,7 @@ class SQLBaseStore(object):
         d.pop("stream_ordering", None)
         d.pop("topological_ordering", None)
         d.pop("processed", None)
+        d["origin_server_ts"] = d.pop("ts", 0)
 
         d.update(json.loads(row_dict["unrecognized_keys"]))
         d["content"] = json.loads(d["content"])
@@ -361,7 +362,7 @@ class SQLBaseStore(object):
 
         if "age_ts" not in d:
             # For compatibility
-            d["age_ts"] = d["ts"] if "ts" in d else 0
+            d["age_ts"] = d.get("origin_server_ts", 0)
 
         return self.event_factory.create_event(
             etype=d["type"],

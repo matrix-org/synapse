@@ -163,6 +163,8 @@ class DataStore(RoomMemberStore, RoomStore,
 
         cols["unrecognized_keys"] = json.dumps(unrec_keys)
 
+        cols["ts"] = cols.pop("origin_server_ts")
+
         logger.debug("Persisting: %s", repr(cols))
 
         for hash_alg, hash_base64 in pdu.hashes.items():

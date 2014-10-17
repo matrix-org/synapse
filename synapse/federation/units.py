@@ -41,7 +41,7 @@ class Pdu(JsonEncodedObject):
 
         {
             "pdu_id": "78c",
-            "ts": 1404835423000,
+            "origin_server_ts": 1404835423000,
             "origin": "bar",
             "prev_ids": [
                 ["23b", "foo"],
@@ -56,7 +56,7 @@ class Pdu(JsonEncodedObject):
         "pdu_id",
         "context",
         "origin",
-        "ts",
+        "origin_server_ts",
         "pdu_type",
         "destinations",
         "transaction_id",
@@ -84,7 +84,7 @@ class Pdu(JsonEncodedObject):
         "pdu_id",
         "context",
         "origin",
-        "ts",
+        "origin_server_ts",
         "pdu_type",
         "content",
     ]
@@ -122,6 +122,7 @@ class Pdu(JsonEncodedObject):
         """
         if pdu_tuple:
             d = copy.copy(pdu_tuple.pdu_entry._asdict())
+            d["origin_server_ts"] = d.pop("ts")
 
             for k in d.keys():
                 if d[k] is None:
@@ -212,7 +213,7 @@ class Transaction(JsonEncodedObject):
         "transaction_id",
         "origin",
         "destination",
-        "ts",
+        "origin_server_ts",
         "previous_ids",
         "pdus",
         "edus",
@@ -229,7 +230,7 @@ class Transaction(JsonEncodedObject):
         "transaction_id",
         "origin",
         "destination",
-        "ts",
+        "origin_server_ts",
         "pdus",
     ]
 
@@ -251,10 +252,10 @@ class Transaction(JsonEncodedObject):
     @staticmethod
     def create_new(pdus, **kwargs):
         """ Used to create a new transaction. Will auto fill out
-        transaction_id and ts keys.
+        transaction_id and origin_server_ts keys.
         """
-        if "ts" not in kwargs:
-            raise KeyError("Require 'ts' to construct a Transaction")
+        if "origin_server_ts" not in kwargs:
+            raise KeyError("Require 'origin_server_ts' to construct a Transaction")
         if "transaction_id" not in kwargs:
             raise KeyError(
                 "Require 'transaction_id' to construct a Transaction"

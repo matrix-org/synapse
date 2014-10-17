@@ -29,7 +29,7 @@ from synapse.handlers.typing import TypingNotificationHandler
 def _expect_edu(destination, edu_type, content, origin="test"):
     return {
         "origin": origin,
-        "ts": 1000000,
+        "origin_server_ts": 1000000,
         "pdus": [],
         "edus": [
             {
