@@ -789,7 +789,7 @@ class PdusTable(Table):
         "origin",
         "context",
         "pdu_type",
-        "ts",
+        "origin_server_ts",
         "depth",
         "is_state",
         "content_json",

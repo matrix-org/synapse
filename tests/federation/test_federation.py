@@ -99,7 +99,7 @@ class FederationTestCase(unittest.TestCase):
                     origin="red",
                     context="my-context",
                     pdu_type="m.topic",
-                    ts=123456789000,
+                    origin_server_ts=123456789000,
                     depth=1,
                     is_state=True,
                     content_json='{"topic":"The topic"}',
@@ -134,7 +134,7 @@ class FederationTestCase(unittest.TestCase):
                     origin="red",
                     context="my-context",
                     pdu_type="m.text",
-                    ts=123456789001,
+                    origin_server_ts=123456789001,
                     depth=1,
                     content_json='{"text":"Here is the message"}',
                 )
@@ -158,7 +158,7 @@ class FederationTestCase(unittest.TestCase):
                 origin="red",
                 destinations=["remote"],
                 context="my-context",
-                ts=123456789002,
+                origin_server_ts=123456789002,
                 pdu_type="m.test",
                 content={"testing": "content here"},
                 depth=1,
@@ -170,14 +170,14 @@ class FederationTestCase(unittest.TestCase):
                 "remote",
                 path="/_matrix/federation/v1/send/1000000/",
                 data={
-                    "ts": 1000000,
+                    "origin_server_ts": 1000000,
                     "origin": "test",
                     "pdus": [
                         {
                             "origin": "red",
                             "pdu_id": "abc123def456",
                             "prev_pdus": [],
-                            "ts": 123456789002,
+                            "origin_server_ts": 123456789002,
                             "context": "my-context",
                             "pdu_type": "m.test",
                             "is_state": False,
@@ -207,7 +207,7 @@ class FederationTestCase(unittest.TestCase):
                 path="/_matrix/federation/v1/send/1000000/",
                 data={
                     "origin": "test",
-                    "ts": 1000000,
+                    "origin_server_ts": 1000000,
                     "pdus": [],
                     "edus": [
                         {
@@ -234,7 +234,7 @@ class FederationTestCase(unittest.TestCase):
                 "/_matrix/federation/v1/send/1001000/",
                 """{
                     "origin": "remote",
-                    "ts": 1001000,
+                    "origin_server_ts": 1001000,
                     "pdus": [],
                     "edus": [
                         {

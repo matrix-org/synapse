@@ -361,7 +361,7 @@ class SQLBaseStore(object):
 
         if "age_ts" not in d:
             # For compatibility
-            d["age_ts"] = d["ts"] if "ts" in d else 0
+            d["age_ts"] = d["origin_server_ts"] if "origin_server_ts" in d else 0
 
         return self.event_factory.create_event(
             etype=d["type"],
