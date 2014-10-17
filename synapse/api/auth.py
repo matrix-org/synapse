@@ -49,12 +49,12 @@ class Auth(object):
         """
         try:
             if hasattr(event, "room_id"):
-                if not event.old_state_events:
+                if event.old_state_events is None:
                     # Oh, we don't know what the state of the room was, so we
                     # are trusting that this is allowed (at least for now)
                     defer.returnValue(True)
 
-                if hasattr(event, "outlier") and event.outlier:
+                if hasattr(event, "outlier") and event.outlier is True:
                     # TODO (erikj): Auth for outliers is done differently.
                     defer.returnValue(True)
 
@@ -65,8 +65,12 @@ class Auth(object):
                     defer.returnValue(True)
 
                 if event.type == RoomMemberEvent.TYPE:
-                    yield self._can_replace_state(event)
-                    allowed = yield self.is_membership_change_allowed(event)
+                    self._can_replace_state(event)
+                    allowed = self.is_membership_change_allowed(event)
+                    if allowed:
+                        logger.debug("Allowing! %s", event)
+                    else:
+                        logger.debug("Denying! %s", event)
                     defer.returnValue(allowed)
                     return
 
@@ -77,24 +81,28 @@ class Auth(object):
                     # TODO (erikj): This really only should be called for *new*
                     # state
                     yield self._can_add_state(event)
-                    yield self._can_replace_state(event)
+                    self._can_replace_state(event)
                 else:
                     yield self._can_send_event(event)
 
                 if event.type == RoomPowerLevelsEvent.TYPE:
-                    yield self._check_power_levels(event)
+                    self._check_power_levels(event)
 
                 if event.type == RoomRedactionEvent.TYPE:
-                    yield self._check_redaction(event)
+                    self._check_redaction(event)
 
+
+                logger.debug("Allowing! %s", event)
                 defer.returnValue(True)
             else:
                 raise AuthError(500, "Unknown event: %s" % event)
         except AuthError as e:
             logger.info("Event auth check failed on event %s with msg: %s",
                         event, e.msg)
+            logger.info("Denying! %s", event)
             if raises:
                 raise e
+
         defer.returnValue(False)
 
     @defer.inlineCallbacks
@@ -126,7 +134,7 @@ class Auth(object):
                 user_id, room_id, repr(member)
             ))
 
-    @defer.inlineCallbacks
+    @log_function
     def is_membership_change_allowed(self, event):
         target_user_id = event.state_key
 
@@ -159,9 +167,21 @@ class Auth(object):
         )
 
         ban_level, kick_level, redact_level = (
-            yield self._get_ops_level_from_event_state(
+            self._get_ops_level_from_event_state(
                 event
             )
+        )
+
+        logger.debug(
+            "is_membership_change_allowed: %s",
+            {
+                "caller_in_room": caller_in_room,
+                "target_in_room": target_in_room,
+                "membership": membership,
+                "join_rule": join_rule,
+                "target_user_id": target_user_id,
+                "event.user_id": event.user_id,
+            }
         )
 
         if Membership.INVITE == membership:
@@ -183,10 +203,7 @@ class Auth(object):
             elif join_rule == JoinRules.PUBLIC:
                 pass
             elif join_rule == JoinRules.INVITE:
-                if (
-                    not caller or caller.membership not in
-                    [Membership.INVITE, Membership.JOIN]
-                ):
+                if not caller_in_room:
                     raise AuthError(403, "You are not invited to this room.")
             else:
                 # TODO (erikj): may_join list
@@ -218,7 +235,7 @@ class Auth(object):
         else:
             raise AuthError(500, "Unknown membership %s" % membership)
 
-        defer.returnValue(True)
+        return True
 
     def _get_power_level_from_event_state(self, event, user_id):
         key = (RoomPowerLevelsEvent.TYPE, "", )
@@ -359,17 +376,7 @@ class Auth(object):
 
         defer.returnValue(True)
 
-    @defer.inlineCallbacks
     def _can_replace_state(self, event):
-        current_state = yield self.store.get_current_state(
-            event.room_id,
-            event.type,
-            event.state_key,
-        )
-
-        if current_state:
-            current_state = current_state[0]
-
         user_level = self._get_power_level_from_event_state(
             event,
             event.user_id,
@@ -383,6 +390,10 @@ class Auth(object):
         logger.debug(
             "Checking power level for %s, %s", event.user_id, user_level
         )
+
+        key = (event.type, event.state_key, )
+        current_state = event.old_state_events.get(key)
+
         if current_state and hasattr(current_state, "required_power_level"):
             req = current_state.required_power_level
 
@@ -393,19 +404,20 @@ class Auth(object):
                     "You don't have permission to change that state"
                 )
 
-    @defer.inlineCallbacks
     def _check_redaction(self, event):
-        user_level = yield self.store.get_power_level(
-            event.room_id,
-            event.user_id,
-        )
-
         user_level = self._get_power_level_from_event_state(
             event,
             event.user_id,
         )
 
-        _, _, redact_level  = yield self.store.get_ops_levels(event.room_id)
+        if user_level:
+            user_level = int(user_level)
+        else:
+            user_level = 0
+
+        _, _, redact_level = self.store._get_ops_level_from_event_state(
+            event.room_id
+        )
 
         if not redact_level:
             redact_level = 50
@@ -416,7 +428,6 @@ class Auth(object):
                 "You don't have permission to redact events"
             )
 
-    @defer.inlineCallbacks
     def _check_power_levels(self, event):
         for k, v in event.content.items():
             if k == "default":
@@ -436,19 +447,16 @@ class Auth(object):
             except:
                 raise SynapseError(400, "Not a valid power level: %s" % (v,))
 
-        current_state = yield self.store.get_current_state(
-            event.room_id,
-            event.type,
-            event.state_key,
-        )
+        key = (event.type, event.state_key, )
+        current_state = event.old_state_events.get(key)
 
         if not current_state:
             return
         else:
             current_state = current_state[0]
 
-        user_level = yield self.store.get_power_level(
-            event.room_id,
+        user_level = self._get_power_level_from_event_state(
+            event,
             event.user_id,
         )
 

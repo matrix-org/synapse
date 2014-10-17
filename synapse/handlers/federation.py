@@ -269,12 +269,12 @@ class FederationHandler(BaseHandler):
         del self.room_queues[room_id]
 
         for p in room_queue:
-            p.outlier = True
             yield self.on_receive_pdu(p, backfilled=False)
 
         defer.returnValue(True)
 
     @defer.inlineCallbacks
+    @log_function
     def on_make_join_request(self, context, user_id):
         event = self.event_factory.create_event(
             etype=RoomMemberEvent.TYPE,
@@ -289,15 +289,21 @@ class FederationHandler(BaseHandler):
         )
         snapshot.fill_out_prev_events(event)
 
+        yield self.state_handler.annotate_state_groups(event)
+        yield self.auth.check(event, None, raises=True)
+
         pdu = self.pdu_codec.pdu_from_event(event)
 
         defer.returnValue(pdu)
 
     @defer.inlineCallbacks
+    @log_function
     def on_send_join_request(self, origin, pdu):
         event = self.pdu_codec.event_from_pdu(pdu)
 
-        is_new_state= yield self.state_handler.annotate_state_groups(event)
+        event.outlier = False
+
+        is_new_state = yield self.state_handler.annotate_state_groups(event)
         yield self.auth.check(event, None, raises=True)
 
         # FIXME (erikj):  All this is duplicated above :(

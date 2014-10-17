@@ -22,6 +22,7 @@ from synapse.federation.pdu_codec import encode_event_id
 
 from collections import namedtuple
 
+import copy
 import logging
 import hashlib
 
@@ -143,13 +144,13 @@ class StateHandler(object):
         if hasattr(event, "outlier") and event.outlier:
             event.state_group = None
             event.old_state_events = None
-            event.state_events = None
+            event.state_events = {}
             defer.returnValue(False)
             return
 
         new_state = yield self.resolve_state_groups(event.prev_events)
 
-        event.old_state_events = new_state
+        event.old_state_events = copy.deepcopy(new_state)
 
         if hasattr(event, "state_key"):
             new_state[(event.type, event.state_key)] = event
@@ -164,9 +165,12 @@ class StateHandler(object):
         # FIXME: HACK!
         pdus = yield self.store.get_latest_pdus_in_context(room_id)
 
-        event_ids = [encode_event_id(p.pdu_id, p.origin) for p in pdus]
+        event_ids = [
+            encode_event_id(pdu_id, origin)
+            for pdu_id, origin, _ in pdus
+        ]
 
-        res = self.resolve_state_groups(event_ids)
+        res = yield self.resolve_state_groups(event_ids)
 
         if event_type:
             defer.returnValue(res.get((event_type, state_key)))
