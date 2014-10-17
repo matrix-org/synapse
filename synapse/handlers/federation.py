@@ -104,7 +104,6 @@ class FederationHandler(BaseHandler):
 
         if state:
             state = [self.pdu_codec.event_from_pdu(p) for p in state]
-            state = {(e.type, e.state_key): e for e in state}
 
         is_new_state = yield self.state_handler.annotate_state_groups(
             event,
@@ -250,7 +249,6 @@ class FederationHandler(BaseHandler):
             # FIXME: Auth these.
             is_new_state = yield self.state_handler.annotate_state_groups(
                 e,
-                state=state
             )
 
             yield self.store.persist_event(
