@@ -238,6 +238,11 @@ class TransportLayer(object):
 
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
 
+        if not auth_headers:
+            raise SynapseError(
+                401, "Missing Authorization headers", Codes.UNAUTHORIZED,
+            )
+
         for auth in auth_headers:
             if auth.startswith("X-Matrix"):
                 (origin, key, sig) = parse_auth_header(auth)
