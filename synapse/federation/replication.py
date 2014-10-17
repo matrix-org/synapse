@@ -295,10 +295,10 @@ class ReplicationLayer(object):
         transaction = Transaction(**transaction_data)
 
         for p in transaction.pdus:
-            if "meta" in p:
-                meta = p["meta"]
-                if "age" in meta:
-                    p["age"] = meta["age"]
+            if "unsigned" in p:
+                unsigned = p["unsigned"]
+                if "age" in unsigned:
+                    p["age"] = unsigned["age"]
             if "age" in p:
                 p["age_ts"] = int(self._clock.time_msec()) - int(p["age"])
                 del p["age"]
@@ -422,7 +422,7 @@ class ReplicationLayer(object):
         for p in pdus:
             if "age_ts" in p:
                 age = time_now - p["age_ts"]
-                p.setdefault("meta", {})["age"] = int(age)
+                p.setdefault("unsigned", {})["age"] = int(age)
                 del p["age_ts"]
         return Transaction(
             origin=self.server_name,
@@ -620,8 +620,8 @@ class _TransactionQueue(object):
                 if "pdus" in data:
                     for p in data["pdus"]:
                         if "age_ts" in p:
-                            meta = p.setdefault("meta", {})
-                            meta["age"] = now - int(p["age_ts"])
+                            unsigned = p.setdefault("unsigned", {})
+                            unsigned["age"] = now - int(p["age_ts"])
                             del p["age_ts"]
                 return data
 

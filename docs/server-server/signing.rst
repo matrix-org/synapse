@@ -1,13 +1,13 @@
 Signing JSON
 ============
 
-JSON is signed by encoding the JSON object without ``signatures`` or ``meta``
+JSON is signed by encoding the JSON object without ``signatures`` or ``unsigned``
 keys using a canonical encoding. The JSON bytes are then signed using the
 signature algorithm and the signature encoded using base64 with the padding
 stripped. The resulting base64 signature is added to an object under the
 *signing key identifier* which is added to the ``signatures`` object under the
 name of the server signing it which is added back to the original JSON object
-along with the ``meta`` object.
+along with the ``unsigned`` object.
 
 The *signing key identifier* is the concatenation of the *signing algorithm*
 and a *key version*. The *signing algorithm* identifies the algorithm used to
@@ -15,8 +15,8 @@ sign the JSON. The currently support value for *signing algorithm* is
 ``ed25519`` as implemented by NACL (http://nacl.cr.yp.to/). The *key version*
 is used to distinguish between different signing keys used by the same entity.
 
-The ``meta`` object and the ``signatures`` object are not covered by the
-signature. Therefore intermediate servers can add metadata such as time stamps
+The ``unsigned`` object and the ``signatures`` object are not covered by the
+signature. Therefore intermediate servers can add unsigneddata such as time stamps
 and additional signatures.
 
 
@@ -27,7 +27,7 @@ and additional signatures.
      "signing_keys": {
        "ed25519:1": "XSl0kuyvrXNj6A+7/tkrB9sxSbRi08Of5uRhxOqZtEQ"
      },
-     "meta": {
+     "unsigned": {
         "retrieved_ts_ms": 922834800000
      },
      "signatures": {
@@ -41,7 +41,7 @@ and additional signatures.
 
   def sign_json(json_object, signing_key, signing_name):
       signatures = json_object.pop("signatures", {})
-      meta = json_object.pop("meta", None)
+      unsigned = json_object.pop("unsigned", None)
 
       signed = signing_key.sign(encode_canonical_json(json_object))
       signature_base64 = encode_base64(signed.signature)
@@ -50,8 +50,8 @@ and additional signatures.
       signatures.setdefault(sigature_name, {})[key_id] = signature_base64
 
       json_object["signatures"] = signatures
-      if meta is not None:
-          json_object["meta"] = meta
+      if unsigned is not None:
+          json_object["unsigned"] = unsigned
 
       return json_object
 

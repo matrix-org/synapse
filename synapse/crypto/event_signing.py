@@ -47,7 +47,9 @@ def check_event_pdu_content_hash(pdu, hash_algorithm=hashlib.sha256):
 
 def _compute_content_hash(pdu, hash_algorithm):
     pdu_json = pdu.get_dict()
-    pdu_json.pop("meta", None)
+    #TODO: Make "age_ts" key internal
+    pdu_json.pop("age_ts")
+    pdu_json.pop("unsigned", None)
     pdu_json.pop("signatures", None)
     hashes = pdu_json.pop("hashes", {})
     pdu_json_bytes = encode_canonical_json(pdu_json)
