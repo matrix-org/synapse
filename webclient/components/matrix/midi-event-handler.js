@@ -88,11 +88,12 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
     getLogDuration: function(duration) {
         var fraction =  duration / this.beat;
         console.log(fraction);
-        var musicFraction;
-        var duration = Math.floor(Math.log2(1 / fraction)) - 1;
+
+        return Math.floor(Math.log2(1 / fraction)) - 1;
     },
     
     renderChord: function(duration, rest) {
+        var musicFraction;
         var logDuration = this.getLogDuration(duration);
         var trashIt = false; // Flag to ignore artefact(???)
         switch (logDuration) {
@@ -119,13 +120,10 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
                 // Too short, ignore it
                 trashIt = true;
                 break;
-            }
-
-            // Matthew is about to fix it 
-            if (trashIt) return;
-
         }
-        this.currentMeasureTime += duration;
+
+        // Matthew is about to fix it 
+        if (trashIt) return;
 
         var s = ":" + musicFraction + " ";
         
@@ -134,22 +132,22 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
         }
         else {
             var notes = [];
-            for (var note in chord.notes) {
-                if (chord.notes.hasOwnProperty(note)) {
+            for (var note in this.chord.notes) {
+                if (this.chord.notes.hasOwnProperty(note)) {
                     notes.push(note);
                 }
             }
         
             if (notes.length > 1) {
                 s += "(";
-                for (int i = 0; i < notes.length; i++) {
+                for (var i = 0; i < notes.length; i++) {
                     s += notes[i];
                     if (i < notes.length - 1) s+= ".";
                 }
                 s += ")";
             }
             else {
-                s += vexNote;
+                s += notes[0];
             }
         }
         
@@ -190,7 +188,7 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
             
             if (event.content.midi_ts - this.chord.start_midi_ts < 300) { // empirically
                 // just add it to the current chord we're building up.
-                this.chord.note[vexNote]++;
+                this.chord.notes[vexNote]++;
             }
             else {
                 // render the last note/chord
@@ -203,7 +201,8 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
                 }
                                 
                 // start a new chord
-                this.chord.notes = { vexNote };
+                this.chord.notes = {};
+                this.chord.notes[vexNote]++;
                 this.chord.start_midi_ts = midi_ts;
                 this.chord.end_midi_ts = 0;
             }
