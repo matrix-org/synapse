@@ -87,7 +87,7 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
     
     getLogDuration: function(duration) {
         var fraction =  duration / this.beat;
-        console.log(fraction);
+        //console.log(fraction);
 
         // log2(4) = 2  # 4 beats == whole bar == w
         // log2(2) = 1  # 2 beats == half = h
@@ -101,26 +101,26 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
         var logDuration = this.getLogDuration(duration);
         var trashIt = false; // Flag to ignore artefact(???)
         switch (logDuration) {
-            case 4:
+            case 2:
                 musicFraction = "w";
                 break;
-            case 2:
+            case 1:
                 musicFraction = "h";
                 break;
-            case 1:
+            case 0:
                 musicFraction = "q";
                 break;
-/*          // quantise to quavers for now
-            case 0:
+          // quantise to quavers for now
+            case -1:
                 musicFraction = "8";
                 break;
-            case -1:
+            case -2:
                 musicFraction = "16";
                 break;
-            case -2:
+            case -3:
                 musicFraction = "32";
                 break;
-*/
+
             default:
                 console.log("## Ignored note");
                 // Too short, ignore it
@@ -130,6 +130,8 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
 
         // Matthew is about to fix it 
         if (trashIt) return;
+        
+        this.currentMeasureTime += duration / this.beat;
 
         var s = ":" + musicFraction + " ";
         
@@ -202,7 +204,10 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
 
                 // check if it's been so long since the last note that we should do a rest.
                 var logDuration = this.getLogDuration(midi_ts - this.chord.end_midi_ts);
-                if (logDuration >= -2) {
+                
+                //console.log((midi_ts - this.chord.end_midi_ts) + " -> " + logDuration);
+                
+                if (logDuration >= 1) {
                     this.renderChord(midi_ts - this.chord.end_midi_ts, true);
                 }
                                 
