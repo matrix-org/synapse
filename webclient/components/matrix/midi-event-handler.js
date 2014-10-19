@@ -89,7 +89,11 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
         var fraction =  duration / this.beat;
         console.log(fraction);
 
-        return Math.floor(Math.log2(1 / fraction)) - 1;
+        // log2(4) = 2  # 4 beats == whole bar == w
+        // log2(2) = 1  # 2 beats == half = h
+        // log2(1) = 0
+
+        return Math.ceil(Math.log2(fraction));
     },
     
     renderChord: function(duration, rest) {
@@ -106,6 +110,7 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
             case 1:
                 musicFraction = "q";
                 break;
+/*          // quantise to quavers for now
             case 0:
                 musicFraction = "8";
                 break;
@@ -115,6 +120,7 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
             case -2:
                 musicFraction = "32";
                 break;
+*/
             default:
                 console.log("## Ignored note");
                 // Too short, ignore it
