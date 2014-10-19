@@ -650,6 +650,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     $scope.onInit = function() {
         console.log("onInit");
 
+        MidiEventHandler.init(eventHandlerService);
         MidiEventHandler.reset();
 
 

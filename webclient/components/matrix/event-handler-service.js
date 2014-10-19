@@ -483,10 +483,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                         break;
                         
                     case 'org.matrix.midi':
-                        //if (isLiveEvent) 
-                        {
-                            MidiEventHandler.handleEvent(event);
-                        }
+                        MidiEventHandler.handleEvent(event, isLiveEvent);
                         
                         break;
                         

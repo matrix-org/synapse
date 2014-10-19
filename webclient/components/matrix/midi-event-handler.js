@@ -28,22 +28,20 @@ var MidiEventHandler = {
     currentMeasureTime: 0,
     perLine: -1,
     
-    init: function () {
-        MIDI.loadPlugin({
-            soundfontUrl: "./soundfont/",
-            instrument: "acoustic_grand_piano",
-            callback: function () {
-                /*
-                var delay = 0; // play one note every quarter second
-                var note = 50; // the MIDI note
-                var velocity = 127; // how hard the note hits
-                // play the note
-                MIDI.setVolume(0, 127);
-                MIDI.noteOn(0, note, velocity, delay);
-                MIDI.noteOff(0, note, delay + 0.75);
-                */
+    pastMidiEventsInWrongOrder: [],
+    
+    init: function (eventHandlerService) {
+        
+        // During initialSync, handleEvent is called for each event from latest events to the past.
+        // Need to reorder them.
+        var self = this;
+        eventHandlerService.waitForInitialSyncCompletion().then(
+            function() {
+                for (var i = self.pastMidiEventsInWrongOrder.length - 1; i >= 0; i--) {
+                    self.handleEvent(self.pastMidiEventsInWrongOrder[i], true);
+                }
             }
-        });
+        );
     },
     
     reset: function() {
@@ -81,7 +79,12 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
         this.render();
     },
     
-    handleEvent: function(event) {
+    handleEvent: function(event, isLiveEvent) {
+        
+        if(!isLiveEvent) {
+            this.pastMidiEventsInWrongOrder.push(event);
+            return;
+        }
         
         if (0 === this.beat)
         {
@@ -120,8 +123,10 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
             
             var musicFraction;
 
+            // Flag to ignore artefact(???)
+            var trashIt = false;
            
-           var duration = Math.floor(Math.log2(1 / fraction)) - 1;
+            var duration = Math.floor(Math.log2(1 / fraction)) - 1;
             switch (duration) {
                 case 4:
                     musicFraction = "w";
@@ -141,8 +146,19 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
                 case -2:
                     musicFraction = "32";
                     break;
+                    
+                 default :
+
+                    console.log("## Ignored note");
+                    // Too short, ignore it
+                    trashIt = true;
+                    break;
 
             }
+            
+            // Matthew is about to fix it 
+            if (trashIt) return;
+            
             this.currentMeasureTime += duration;
 
             
