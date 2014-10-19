@@ -25,6 +25,12 @@ var MidiEventHandler = {
     
     vexTabString: "",
     
+    chord: {
+        start_midi_ts: 0,
+        end_midi_ts: 0,
+        notes: {},
+    },
+    
     currentMeasureTime: 0,
     perLine: -1,
     
@@ -79,6 +85,77 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
         this.render();
     },
     
+    getLogDuration: function(duration) {
+        var fraction =  duration / this.beat;
+        console.log(fraction);
+        var musicFraction;
+        var duration = Math.floor(Math.log2(1 / fraction)) - 1;
+    },
+    
+    renderChord: function(duration, rest) {
+        var logDuration = this.getLogDuration(duration);
+        var trashIt = false; // Flag to ignore artefact(???)
+        switch (logDuration) {
+            case 4:
+                musicFraction = "w";
+                break;
+            case 2:
+                musicFraction = "h";
+                break;
+            case 1:
+                musicFraction = "q";
+                break;
+            case 0:
+                musicFraction = "8";
+                break;
+            case -1:
+                musicFraction = "16";
+                break;
+            case -2:
+                musicFraction = "32";
+                break;
+            default:
+                console.log("## Ignored note");
+                // Too short, ignore it
+                trashIt = true;
+                break;
+            }
+
+            // Matthew is about to fix it 
+            if (trashIt) return;
+
+        }
+        this.currentMeasureTime += duration;
+
+        var s = ":" + musicFraction + " ";
+        
+        if (rest) {
+            s += "##";
+        }
+        else {
+            var notes = [];
+            for (var note in chord.notes) {
+                if (chord.notes.hasOwnProperty(note)) {
+                    notes.push(note);
+                }
+            }
+        
+            if (notes.length > 1) {
+                s += "(";
+                for (int i = 0; i < notes.length; i++) {
+                    s += notes[i];
+                    if (i < notes.length - 1) s+= ".";
+                }
+                s += ")";
+            }
+            else {
+                s += vexNote;
+            }
+        }
+        
+        this.addNote(s);        
+    },
+    
     handleEvent: function(event, isLiveEvent) {
         
         if(!isLiveEvent) {
@@ -105,72 +182,40 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
             return;
         }
         
-        
         var vexNote = this.getVexNote( this.getMidiNote(event.content.note) );
 
         if ("on" === event.content.state) {
-            this.notesON[vexNote] = parseInt(event.content.midi_ts);
+            var midi_ts = parseInt(event.content.midi_ts);
+            this.notesON[vexNote] = midi_ts;
+            
+            if (event.content.midi_ts - this.chord.start_midi_ts < 300) { // empirically
+                // just add it to the current chord we're building up.
+                this.chord.note[vexNote]++;
+            }
+            else {
+                // render the last note/chord
+                this.renderChord(this.chord.end_midi_ts - this.chord.start_midi_ts, false);
+
+                // check if it's been so long since the last note that we should do a rest.
+                var logDuration = this.getLogDuration(midi_ts - this.chord.end_midi_ts);
+                if (logDuration >= -2) {
+                    this.renderChord(midi_ts - this.chord.end_midi_ts, true);
+                }
+                                
+                // start a new chord
+                this.chord.notes = { vexNote };
+                this.chord.start_midi_ts = midi_ts;
+                this.chord.end_midi_ts = 0;
+            }
         }
-        else if (this.notesON[vexNote])
+        else if (this.notesON[vexNote]) // note is turning off.
         {
-            // How long the note last
-            var duration = parseInt(event.content.midi_ts) - this.notesON[vexNote];
+            // How long the note lasts
+            this.chord.end_midi_ts = parseInt(event.content.midi_ts);
             delete this.notesON[vexNote];
             
-            var fraction =  duration / this.beat;
-            
-            console.log(fraction);
-            
-            var musicFraction;
-
-            // Flag to ignore artefact(???)
-            var trashIt = false;
-           
-            var duration = Math.floor(Math.log2(1 / fraction)) - 1;
-            switch (duration) {
-                case 4:
-                    musicFraction = "w";
-                    break;
-                case 2:
-                    musicFraction = "h";
-                    break;
-                case 1:
-                    musicFraction = "q";
-                    break;
-                case 0:
-                    musicFraction = "8";
-                    break;
-                case -1:
-                    musicFraction = "16";
-                    break;
-                case -2:
-                    musicFraction = "32";
-                    break;
-                    
-                 default :
-
-                    console.log("## Ignored note");
-                    // Too short, ignore it
-                    trashIt = true;
-                    break;
-
-            }
-            
-            // Matthew is about to fix it 
-            if (trashIt) return;
-            
-            this.currentMeasureTime += duration;
-
-            
-            vexNote = ":" + musicFraction + " " + vexNote;
-            
-            this.addNote(vexNote);
+            // TODO: optimisation: we could render this note now if we know there are no others sounding...
         }
-    },
-    
-    c: function(fraction) {
-        return Math.floor(Math.log2(1 / fraction)) - 1;
-        
     },
             
     addNote: function (vexNote) {
