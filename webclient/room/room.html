@@ -68,6 +68,9 @@
          ng-hide="state.permission_denied" 
          ng-style="{ 'visibility': state.messages_visibility }"
          keep-scroll>
+        
+        <canvas id="boo" style="width:95%;"></canvas>
+
         <table id="messageTable" infinite-scroll="paginateMore()">
             <tr ng-repeat="msg in events.rooms[room_id].messages"
                 ng-class="(events.rooms[room_id].messages[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>

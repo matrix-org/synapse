@@ -440,7 +440,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             // will be available (as opposite to the global /initialSync done at startup)
             if (!isStateEvent) {    // Do not consider state events
                 if (event.event_id && eventMap[event.event_id]) {
-                    console.log("discarding duplicate event: " + JSON.stringify(event, undefined, 4));
+                    //console.log("discarding duplicate event: " + JSON.stringify(event, undefined, 4));
                     return;
                 }
                 else {
@@ -481,6 +481,15 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                     case 'm.room.topic':
                         handleRoomTopic(event, isLiveEvent, isStateEvent);
                         break;
+                        
+                    case 'org.matrix.midi':
+                        //if (isLiveEvent) 
+                        {
+                            MidiEventHandler.handleEvent(event);
+                        }
+                        
+                        break;
+                        
                     default:
                         console.log("Unable to handle event type " + event.type);
                         console.log(JSON.stringify(event, undefined, 4));

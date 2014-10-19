@@ -650,6 +650,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     $scope.onInit = function() {
         console.log("onInit");
 
+        MidiEventHandler.reset();
+
+
         // Does the room ID provided in the URL?
         var room_id_or_alias;
         if ($routeParams.room_id_or_alias) {
@@ -814,6 +817,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     // There are already messages, go to the last message
                     scrollToBottom(true);
                 }
+                
+                    MidiEventHandler.setReady();
             },
             function(error) {
                 $scope.feedback = "Failed get member list: " + error.data.error;
