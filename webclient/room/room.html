@@ -91,11 +91,11 @@
                             <span ng-if="msg.user_id === msg.state_key">
                                 {{ members[msg.state_key].displayname || msg.state_key }} left
                             </span>
-                            <span ng-if="msg.user_id !== msg.state_key">
+                            <span ng-if="msg.user_id !== msg.state_key && msg.prev_content">
                                 {{ members[msg.user_id].displayname || msg.user_id }}
-                                {{ {"join": "kicked", "ban": "unbanned"}[msg.content.prev] }}
+                                {{ {"invite": "kicked", "join": "kicked", "ban": "unbanned"}[msg.prev_content.membership] }}
                                 {{ members[msg.state_key].displayname || msg.state_key }}
-                                <span ng-if="'join' === msg.content.prev && msg.content.reason">
+                                <span ng-if="'join' === msg.prev_content.membership && msg.content.reason">
                                     : {{ msg.content.reason }}
                                 </span>
                             </span>
@@ -105,7 +105,7 @@
                             {{ members[msg.user_id].displayname || msg.user_id }}
                             {{ {"invite": "invited", "ban": "banned"}[msg.content.membership] }}
                             {{ members[msg.state_key].displayname || msg.state_key }}
-                            <span ng-if="'ban' === msg.content.prev && msg.content.reason">
+                            <span ng-if="msg.prev_content && 'ban' === msg.prev_content.membership && msg.content.reason">
                                 : {{ msg.content.reason }}
                             </span>
                         </span>                        
