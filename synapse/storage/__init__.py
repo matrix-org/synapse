@@ -452,10 +452,11 @@ def prepare_database(db_conn):
             db_conn.commit()
 
     else:
+        sql_script = "BEGIN TRANSACTION;"
         for sql_loc in SCHEMAS:
-            sql_script = read_schema(sql_loc)
-
-            c.executescript(sql_script)
+            sql_script += read_schema(sql_loc)
+        sql_script += "COMMIT TRANSACTION;"
+        c.executescript(sql_script)
         db_conn.commit()
         c.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
 
