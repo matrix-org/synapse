@@ -256,7 +256,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             // could be a membership change, display name change, etc.
             // Find out which one.
             var memberChanges = undefined;
-            if (event.prev_content && (event.prev_content.membership !== event.content.membership)) {
+            if ((event.prev_content === undefined && event.content.membership) || (event.prev_content && (event.prev_content.membership !== event.content.membership))) {
                 memberChanges = "membership";
             }
             else if (event.prev_content && (event.prev_content.displayname !== event.content.displayname)) {
