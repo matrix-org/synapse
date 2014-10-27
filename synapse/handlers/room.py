@@ -169,11 +169,6 @@ class RoomCreationHandler(BaseHandler):
             content=content
         )
 
-        yield self.hs.get_handlers().room_member_handler.change_membership(
-            join_event,
-            do_auth=False
-        )
-
         content = {"membership": Membership.INVITE}
         for invitee in invite_list:
             invite_event = self.event_factory.create_event(
