@@ -74,7 +74,7 @@ class ServerConfig(Config):
             return syutil.crypto.signing_key.read_signing_keys(
                 signing_keys.splitlines(True)
             )
-        except Exception as e:
+        except Exception:
             raise ConfigError(
                 "Error reading signing_key."
                 " Try running again with --generate-config"

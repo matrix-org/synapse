@@ -40,7 +40,14 @@ from .stream import StreamStore
 from .pdu import StatePduStore, PduStore, PdusTable
 from .transactions import TransactionStore
 from .keys import KeyStore
+
 from .state import StateStore
+from .signatures import SignatureStore
+
+from syutil.base64util import decode_base64
+
+from synapse.crypto.event_signing import compute_pdu_event_reference_hash
+
 
 import json
 import logging
@@ -61,6 +68,7 @@ SCHEMAS = [
     "keys",
     "redactions",
     "state",
+    "signatures",
 ]
 
 
@@ -78,7 +86,7 @@ class _RollbackButIsFineException(Exception):
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, PduStore, StatePduStore, TransactionStore,
-                DirectoryStore, KeyStore, StateStore):
+                DirectoryStore, KeyStore, StateStore, SignatureStore):
 
     def __init__(self, hs):
         super(DataStore, self).__init__(hs)
@@ -146,6 +154,8 @@ class DataStore(RoomMemberStore, RoomStore,
     def _persist_event_pdu_txn(self, txn, pdu):
         cols = dict(pdu.__dict__)
         unrec_keys = dict(pdu.unrecognized_keys)
+        del cols["hashes"]
+        del cols["signatures"]
         del cols["content"]
         del cols["prev_pdus"]
         cols["content_json"] = json.dumps(pdu.content)
@@ -160,6 +170,33 @@ class DataStore(RoomMemberStore, RoomStore,
         cols["ts"] = cols.pop("origin_server_ts")
 
         logger.debug("Persisting: %s", repr(cols))
+
+        for hash_alg, hash_base64 in pdu.hashes.items():
+            hash_bytes = decode_base64(hash_base64)
+            self._store_pdu_content_hash_txn(
+                txn, pdu.pdu_id, pdu.origin, hash_alg, hash_bytes,
+            )
+
+        signatures = pdu.signatures.get(pdu.origin, {})
+
+        for key_id, signature_base64 in signatures.items():
+            signature_bytes = decode_base64(signature_base64)
+            self._store_pdu_origin_signature_txn(
+                txn, pdu.pdu_id, pdu.origin, key_id, signature_bytes,
+            )
+
+        for prev_pdu_id, prev_origin, prev_hashes in pdu.prev_pdus:
+            for alg, hash_base64 in prev_hashes.items():
+                hash_bytes = decode_base64(hash_base64)
+                self._store_prev_pdu_hash_txn(
+                    txn, pdu.pdu_id, pdu.origin, prev_pdu_id, prev_origin, alg,
+                    hash_bytes
+                )
+
+        (ref_alg, ref_hash_bytes) = compute_pdu_event_reference_hash(pdu)
+        self._store_pdu_reference_hash_txn(
+            txn, pdu.pdu_id, pdu.origin, ref_alg, ref_hash_bytes
+        )
 
         if pdu.is_state:
             self._persist_state_txn(txn, pdu.prev_pdus, cols)
@@ -338,6 +375,7 @@ class DataStore(RoomMemberStore, RoomStore,
             prev_pdus = self._get_latest_pdus_in_context(
                 txn, room_id
             )
+
             if state_type is not None and state_key is not None:
                 prev_state_pdu = self._get_current_state_pdu(
                     txn, room_id, state_type, state_key
@@ -387,17 +425,16 @@ class Snapshot(object):
         self.prev_state_pdu = prev_state_pdu
 
     def fill_out_prev_events(self, event):
-        if hasattr(event, "prev_events"):
+        if hasattr(event, "prev_pdus"):
             return
 
-        es = [
-            "%s@%s" % (p_id, origin) for p_id, origin, _ in self.prev_pdus
+        event.prev_pdus = [
+            (p_id, origin, hashes)
+            for p_id, origin, hashes, _ in self.prev_pdus
         ]
 
-        event.prev_events = [e for e in es if e != event.event_id]
-
         if self.prev_pdus:
-            event.depth = max([int(v) for _, _, v in self.prev_pdus]) + 1
+            event.depth = max([int(v) for _, _, _, v in self.prev_pdus]) + 1
         else:
             event.depth = 0
 

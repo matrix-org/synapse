@@ -18,6 +18,7 @@ server protocol.
 """
 
 from synapse.util.jsonobject import JsonEncodedObject
+from syutil.base64util import encode_base64
 
 import logging
 import json
@@ -63,9 +64,10 @@ class Pdu(JsonEncodedObject):
         "depth",
         "content",
         "outlier",
+        "hashes",
+        "signatures",
         "is_state",  # Below this are keys valid only for State Pdus.
         "state_key",
-        "power_level",
         "prev_state_id",
         "prev_state_origin",
         "required_power_level",
@@ -91,7 +93,7 @@ class Pdu(JsonEncodedObject):
     # just leaving it as a dict. (OR DO WE?!)
 
     def __init__(self, destinations=[], is_state=False, prev_pdus=[],
-                 outlier=False, **kwargs):
+                 outlier=False, hashes={}, signatures={}, **kwargs):
         if is_state:
             for required_key in ["state_key"]:
                 if required_key not in kwargs:
@@ -99,9 +101,11 @@ class Pdu(JsonEncodedObject):
 
         super(Pdu, self).__init__(
             destinations=destinations,
-            is_state=is_state,
+            is_state=bool(is_state),
             prev_pdus=prev_pdus,
             outlier=outlier,
+            hashes=hashes,
+            signatures=signatures,
             **kwargs
         )
 
@@ -120,6 +124,10 @@ class Pdu(JsonEncodedObject):
             d = copy.copy(pdu_tuple.pdu_entry._asdict())
             d["origin_server_ts"] = d.pop("ts")
 
+            for k in d.keys():
+                if d[k] is None:
+                    del d[k]
+
             d["content"] = json.loads(d["content_json"])
             del d["content_json"]
 
@@ -127,8 +135,28 @@ class Pdu(JsonEncodedObject):
             if "unrecognized_keys" in d and d["unrecognized_keys"]:
                 args.update(json.loads(d["unrecognized_keys"]))
 
+            hashes = {
+                alg: encode_base64(hsh)
+                for alg, hsh in pdu_tuple.hashes.items()
+            }
+
+            signatures = {
+                kid: encode_base64(sig)
+                for kid, sig in pdu_tuple.signatures.items()
+            }
+
+            prev_pdus = []
+            for prev_pdu in pdu_tuple.prev_pdu_list:
+                prev_hashes = pdu_tuple.edge_hashes.get(prev_pdu, {})
+                prev_hashes = {
+                    alg: encode_base64(hsh) for alg, hsh in prev_hashes.items()
+                }
+                prev_pdus.append((prev_pdu[0], prev_pdu[1], prev_hashes))
+
             return Pdu(
-                prev_pdus=pdu_tuple.prev_pdu_list,
+                prev_pdus=prev_pdus,
+                hashes=hashes,
+                signatures=signatures,
                 **args
             )
         else:

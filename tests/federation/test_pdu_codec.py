@@ -23,14 +23,21 @@ from synapse.federation.units import Pdu
 
 from synapse.server import HomeServer
 
-from mock import Mock
+from mock import Mock, NonCallableMock
+
+from ..utils import MockKey
 
 
 class PduCodecTestCase(unittest.TestCase):
     def setUp(self):
-        self.hs = HomeServer("blargle.net")
-        self.event_factory = self.hs.get_event_factory()
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
 
+        self.hs = HomeServer(
+            "blargle.net",
+            config=self.mock_config,
+        )
+        self.event_factory = self.hs.get_event_factory()
         self.codec = PduCodec(self.hs)
 
     def test_decode_event_id(self):
@@ -81,7 +88,7 @@ class PduCodecTestCase(unittest.TestCase):
         self.assertEquals(pdu.context, event.room_id)
         self.assertEquals(pdu.is_state, event.is_state)
         self.assertEquals(pdu.depth, event.depth)
-        self.assertEquals(["alice@bob.com"], event.prev_events)
+        self.assertEquals(pdu.prev_pdus, event.prev_pdus)
         self.assertEquals(pdu.content, event.content)
 
     def test_pdu_from_event(self):
@@ -137,7 +144,7 @@ class PduCodecTestCase(unittest.TestCase):
         self.assertEquals(pdu.context, event.room_id)
         self.assertEquals(pdu.is_state, event.is_state)
         self.assertEquals(pdu.depth, event.depth)
-        self.assertEquals(["alice@bob.com"], event.prev_events)
+        self.assertEquals(pdu.prev_pdus, event.prev_pdus)
         self.assertEquals(pdu.content, event.content)
         self.assertEquals(pdu.state_key, event.state_key)
 

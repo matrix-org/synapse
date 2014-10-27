@@ -17,7 +17,6 @@
 from twisted.web.http import HTTPClient
 from twisted.internet.protocol import Factory
 from twisted.internet import defer, reactor
-from twisted.internet.endpoints import connectProtocol
 from synapse.http.endpoint import matrix_endpoint
 import json
 import logging

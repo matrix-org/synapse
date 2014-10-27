@@ -28,7 +28,7 @@ from synapse.server import HomeServer
 # python imports
 import json
 
-from ..utils import MockHttpResource, MemoryDataStore
+from ..utils import MockHttpResource, MemoryDataStore, MockKey
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
@@ -122,6 +122,9 @@ class EventStreamPermissionsTestCase(RestTestCase):
         persistence_service = Mock(spec=["get_latest_pdus_in_context"])
         persistence_service.get_latest_pdus_in_context.return_value = []
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer(
             "test",
             db_pool=None,
@@ -139,7 +142,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)

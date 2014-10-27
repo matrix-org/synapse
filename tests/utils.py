@@ -118,13 +118,14 @@ class MockHttpResource(HttpServer):
 class MockKey(object):
     alg = "mock_alg"
     version = "mock_version"
+    signature = b"\x9a\x87$"
 
     @property
     def verify_key(self):
         return self
 
     def sign(self, message):
-        return b"\x9a\x87$"
+        return self
 
     def verify(self, message, sig):
         assert sig == b"\x9a\x87$"

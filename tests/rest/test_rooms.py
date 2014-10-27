@@ -27,7 +27,7 @@ from synapse.server import HomeServer
 import json
 import urllib
 
-from ..utils import MockHttpResource, MemoryDataStore
+from ..utils import MockHttpResource, MemoryDataStore, MockKey
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
@@ -50,6 +50,9 @@ class RoomPermissionsTestCase(RestTestCase):
         persistence_service = Mock(spec=["get_latest_pdus_in_context"])
         persistence_service.get_latest_pdus_in_context.return_value = []
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer(
             "red",
             db_pool=None,
@@ -61,7 +64,7 @@ class RoomPermissionsTestCase(RestTestCase):
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -408,6 +411,9 @@ class RoomsMemberListTestCase(RestTestCase):
         persistence_service = Mock(spec=["get_latest_pdus_in_context"])
         persistence_service.get_latest_pdus_in_context.return_value = []
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer(
             "red",
             db_pool=None,
@@ -419,7 +425,7 @@ class RoomsMemberListTestCase(RestTestCase):
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -497,6 +503,9 @@ class RoomsCreateTestCase(RestTestCase):
         persistence_service = Mock(spec=["get_latest_pdus_in_context"])
         persistence_service.get_latest_pdus_in_context.return_value = []
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer(
             "red",
             db_pool=None,
@@ -508,7 +517,7 @@ class RoomsCreateTestCase(RestTestCase):
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -598,6 +607,9 @@ class RoomTopicTestCase(RestTestCase):
         persistence_service = Mock(spec=["get_latest_pdus_in_context"])
         persistence_service.get_latest_pdus_in_context.return_value = []
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer(
             "red",
             db_pool=None,
@@ -609,7 +621,7 @@ class RoomTopicTestCase(RestTestCase):
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -712,6 +724,9 @@ class RoomMemberStateTestCase(RestTestCase):
         persistence_service = Mock(spec=["get_latest_pdus_in_context"])
         persistence_service.get_latest_pdus_in_context.return_value = []
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer(
             "red",
             db_pool=None,
@@ -723,7 +738,7 @@ class RoomMemberStateTestCase(RestTestCase):
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -853,6 +868,9 @@ class RoomMessagesTestCase(RestTestCase):
         persistence_service = Mock(spec=["get_latest_pdus_in_context"])
         persistence_service.get_latest_pdus_in_context.return_value = []
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer(
             "red",
             db_pool=None,
@@ -864,7 +882,7 @@ class RoomMessagesTestCase(RestTestCase):
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
