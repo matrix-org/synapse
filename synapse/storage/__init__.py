@@ -66,7 +66,7 @@ SCHEMAS = [
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 class _RollbackButIsFineException(Exception):
@@ -156,6 +156,8 @@ class DataStore(RoomMemberStore, RoomStore,
         })
 
         cols["unrecognized_keys"] = json.dumps(unrec_keys)
+
+        cols["ts"] = cols.pop("origin_server_ts")
 
         logger.debug("Persisting: %s", repr(cols))
 
@@ -454,10 +456,11 @@ def prepare_database(db_conn):
             db_conn.commit()
 
     else:
+        sql_script = "BEGIN TRANSACTION;"
         for sql_loc in SCHEMAS:
-            sql_script = read_schema(sql_loc)
-
-            c.executescript(sql_script)
+            sql_script += read_schema(sql_loc)
+        sql_script += "COMMIT TRANSACTION;"
+        c.executescript(sql_script)
         db_conn.commit()
         c.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
 

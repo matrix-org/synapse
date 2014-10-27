@@ -59,7 +59,7 @@ angular.module('RecentsController')
                 return 1;
             }
             else {
-                return lastMsgRoomB.ts - lastMsgRoomA.ts;
+                return lastMsgRoomB.origin_server_ts - lastMsgRoomA.origin_server_ts;
             }
         });
         return filtered;

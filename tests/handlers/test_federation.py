@@ -68,7 +68,7 @@ class FederationTestCase(unittest.TestCase):
             pdu_type=MessageEvent.TYPE,
             context="foo",
             content={"msgtype": u"fooo"},
-            ts=0,
+            origin_server_ts=0,
             pdu_id="a",
             origin="b",
         )
@@ -95,7 +95,7 @@ class FederationTestCase(unittest.TestCase):
             target_host=self.hostname,
             context=room_id,
             content={},
-            ts=0,
+            origin_server_ts=0,
             pdu_id="a",
             origin="b",
         )
@@ -127,7 +127,7 @@ class FederationTestCase(unittest.TestCase):
             state_key="@red:not%s" % self.hostname,
             context=room_id,
             content={},
-            ts=0,
+            origin_server_ts=0,
             pdu_id="a",
             origin="b",
         )

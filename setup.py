@@ -31,9 +31,10 @@ setup(
     packages=find_packages(exclude=["tests"]),
     description="Reference Synapse Home Server",
     install_requires=[
-        "syutil==0.0.1",
+        "syutil==0.0.2",
         "Twisted>=14.0.0",
         "service_identity>=1.0.0",
+        "pyopenssl>=0.14",
         "pyyaml",
         "pyasn1",
         "pynacl",
@@ -41,11 +42,12 @@ setup(
         "py-bcrypt",
     ],
     dependency_links=[
-        "git+ssh://git@github.com/matrix-org/syutil.git#egg=syutil-0.0.1",
+        "https://github.com/matrix-org/syutil/tarball/v0.0.2#egg=syutil-0.0.2",
     ],
     setup_requires=[
         "setuptools_trial",
-        "setuptools>=1.0.0", # Needs setuptools that supports git+ssh. It's not obvious when support for this was introduced.
+        "setuptools>=1.0.0", # Needs setuptools that supports git+ssh.
+                             # TODO: Do we need this now? we don't use git+ssh.
         "mock"
     ],
     include_package_data=True,

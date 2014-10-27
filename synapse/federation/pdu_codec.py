@@ -96,7 +96,7 @@ class PduCodec(object):
             if k not in ["event_id", "room_id", "type", "prev_events"]
         })
 
-        if "ts" not in kwargs:
-            kwargs["ts"] = int(self.clock.time_msec())
+        if "origin_server_ts" not in kwargs:
+            kwargs["origin_server_ts"] = int(self.clock.time_msec())
 
         return Pdu(**kwargs)

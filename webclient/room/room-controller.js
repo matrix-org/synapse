@@ -603,9 +603,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             var echoMessage = {
                 content: {
                     body: (cmd === "/me" ? args : input),
-                    hsob_ts: new Date().getTime(), // fake a timestamp
                     msgtype: (cmd === "/me" ? "m.emote" : "m.text"),
                 },
+                origin_server_ts: new Date().getTime(), // fake a timestamp
                 room_id: $scope.room_id,
                 type: "m.room.message",
                 user_id: $scope.state.user_id,
@@ -640,7 +640,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 
                     if (echoMessage) {
                         // Mark the message as unsent for the rest of the page life
-                        echoMessage.content.hsob_ts = "Unsent";
+                        echoMessage.origin_server_ts = "Unsent";
                         echoMessage.echo_msg_state = "messageUnSent";
                     }
                 });

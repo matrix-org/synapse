@@ -101,7 +101,9 @@ class BaseHttpClient(object):
 
         while True:
 
-            producer = body_callback(method, url_bytes, headers_dict)
+            producer = None
+            if body_callback:
+                producer = body_callback(method, url_bytes, headers_dict)
 
             try:
                 response = yield self.agent.request(
@@ -176,10 +178,6 @@ class MatrixHttpClient(BaseHttpClient):
             request["content"] = content
 
         request = sign_json(request, self.server_name, self.signing_key)
-
-        from syutil.jsonutil import encode_canonical_json
-        logger.debug("Signing " + " " * 11 + "%s %s",
-            self.server_name, encode_canonical_json(request))
 
         auth_headers = []
 
@@ -316,6 +314,42 @@ class IdentityServerHttpClient(BaseHttpClient):
 
         defer.returnValue(json.loads(body))
 
+    @defer.inlineCallbacks
+    def get_json(self, destination, path, args={}, retry_on_dns_fail=True):
+        """ Get's some json from the given host homeserver and path
+
+        Args:
+            destination (str): The remote server to send the HTTP request
+                to.
+            path (str): The HTTP path.
+            args (dict): A dictionary used to create query strings, defaults to
+                None.
+                **Note**: The value of each key is assumed to be an iterable
+                and *not* a string.
+
+        Returns:
+            Deferred: Succeeds when we get *any* HTTP response.
+
+            The result of the deferred is a tuple of `(code, response)`,
+            where `response` is a dict representing the decoded JSON body.
+        """
+        logger.debug("get_json args: %s", args)
+
+        query_bytes = urllib.urlencode(args, True)
+        logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "GET",
+            path.encode("ascii"),
+            query_bytes=query_bytes,
+            retry_on_dns_fail=retry_on_dns_fail,
+            body_callback=None
+        )
+
+        body = yield readBody(response)
+
+        defer.returnValue(json.loads(body))
 
 class CaptchaServerHttpClient(MatrixHttpClient):
     """Separate HTTP client for talking to google's captcha servers"""

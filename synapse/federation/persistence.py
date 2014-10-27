@@ -157,7 +157,7 @@ class TransactionActions(object):
         transaction.prev_ids = yield self.store.prep_send_transaction(
             transaction.transaction_id,
             transaction.destination,
-            transaction.ts,
+            transaction.origin_server_ts,
             [(p["pdu_id"], p["origin"]) for p in transaction.pdus]
         )
 

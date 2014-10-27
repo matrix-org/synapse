@@ -321,7 +321,7 @@ class ReplicationLayer(object):
 
         if hasattr(transaction, "edus"):
             for edu in [Edu(**x) for x in transaction.edus]:
-                self.received_edu(edu.origin, edu.edu_type, edu.content)
+                self.received_edu(transaction.origin, edu.edu_type, edu.content)
 
         results = yield defer.DeferredList(dl)
 
@@ -474,7 +474,7 @@ class ReplicationLayer(object):
         return Transaction(
             origin=self.server_name,
             pdus=pdus,
-            ts=int(self._clock.time_msec()),
+            origin_server_ts=int(self._clock.time_msec()),
             destination=None,
         )
 
@@ -654,7 +654,7 @@ class _TransactionQueue(object):
             logger.debug("TX [%s] Persisting transaction...", destination)
 
             transaction = Transaction.create_new(
-                ts=self._clock.time_msec(),
+                origin_server_ts=self._clock.time_msec(),
                 transaction_id=str(self._next_txn_id),
                 origin=self.server_name,
                 destination=destination,

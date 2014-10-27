@@ -18,7 +18,7 @@
                          Declaring it in this way ensures the data-binding -->
                     {{ lastMsg = eventHandlerService.getLastMessage(room.room_id, true);"" }}
 
-                    {{ (lastMsg.ts) | date:'MMM d HH:mm' }}
+                    {{ (lastMsg.origin_server_ts) | date:'MMM d HH:mm' }}
                     
                     <img ng-click="leave(room.room_id); $event.stopPropagation();" src="img/close.png" width="10" height="10" style="margin-bottom: -1px; margin-left: 2px;" alt="close"/>
                 </td>
@@ -42,12 +42,12 @@
                                         <span ng-if="lastMsg.user_id === lastMsg.state_key">
                                             {{lastMsg.state_key | mUserDisplayName: room.room_id }} left
                                         </span>
-                                        <span ng-if="lastMsg.user_id !== lastMsg.state_key">
+                                        <span ng-if="lastMsg.user_id !== lastMsg.state_key && lastMsg.prev_content">
                                             {{ lastMsg.user_id | mUserDisplayName: room.room_id }}
-                                            {{ {"join": "kicked", "ban": "unbanned"}[lastMsg.content.prev] }}
+                                            {{ {"invite": "kicked", "join": "kicked", "ban": "unbanned"}[lastMsg.prev_content.membership] }}
                                             {{ lastMsg.state_key | mUserDisplayName: room.room_id }}
                                         </span>
-                                        <span ng-if="'join' === lastMsg.content.prev && lastMsg.content.reason">
+                                        <span ng-if="lastMsg.prev_content && 'join' === lastMsg.prev_content.membership && lastMsg.content.reason">
                                             : {{ lastMsg.content.reason }}
                                         </span>
                                     </span>
@@ -55,7 +55,7 @@
                                         {{ lastMsg.user_id | mUserDisplayName: room.room_id }}
                                         {{ {"invite": "invited", "ban": "banned"}[lastMsg.content.membership] }}
                                         {{ lastMsg.state_key | mUserDisplayName: room.room_id }}
-                                        <span ng-if="'ban' === lastMsg.content.prev && lastMsg.content.reason">
+                                        <span ng-if="lastMsg.prev_content && 'ban' === lastMsg.prev_content.membership && lastMsg.content.reason">
                                             : {{ lastMsg.content.reason }}
                                         </span>
                                     </span>         
