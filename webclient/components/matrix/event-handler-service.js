@@ -221,9 +221,19 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                         message = "* " + displayname + " " + message;
                     }
 
+                    var roomTitle = matrixService.getRoomIdToAliasMapping(event.room_id);
+                    var theRoom = $rootScope.events.rooms[event.room_id];
+                    if (!roomTitle && theRoom && theRoom["m.room.name"] && theRoom["m.room.name"].content) {
+                        roomTitle = theRoom["m.room.name"].content.name;
+                    }
+
+                    if (!roomTitle) {
+                        roomTitle = event.room_id;
+                    }
+                    
                     var notification = new window.Notification(
                         displayname +
-                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
+                        " (" + roomTitle + ")",
                     {
                         "body": message,
                         "icon": member ? member.avatar_url : undefined
