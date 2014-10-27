@@ -830,7 +830,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 $scope.userIDToInvite = "";
             },
             function(reason) {
-                $scope.feedback = "Failure: " + reason;
+                $scope.feedback = "Failure: " + reason.data.error;
             });
     };
 
