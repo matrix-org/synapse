@@ -18,7 +18,6 @@ from twisted.internet import defer
 
 from synapse.federation.pdu_codec import encode_event_id, decode_event_id
 from synapse.util.logutils import log_function
-from synapse.federation.pdu_codec import encode_event_id
 
 from collections import namedtuple
 
