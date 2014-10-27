@@ -344,7 +344,7 @@ class RoomInitialSyncRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
-        user = yield self.auth.get_user_by_req(request)
+        yield self.auth.get_user_by_req(request)
         # TODO: Get all the initial sync data for this room and return in the
         # same format as initial sync, that is:
         # {

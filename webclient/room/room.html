@@ -68,7 +68,6 @@
          ng-hide="state.permission_denied" 
          ng-style="{ 'visibility': state.messages_visibility }"
          keep-scroll>
-        <!-- FIXME: need to have better timestamp semantics than the (msg.content.hsob_ts || msg.ts) hack below -->
         <table id="messageTable" infinite-scroll="paginateMore()">
             <tr ng-repeat="msg in events.rooms[room_id].messages"
                 ng-class="(events.rooms[room_id].messages[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
@@ -76,7 +75,7 @@
                     <div class="sender" ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id"> {{ msg.user_id | mUserDisplayName: room_id }}</div>
                     <div class="timestamp"
                          ng-class="msg.echo_msg_state">
-                        {{ (msg.content.hsob_ts || msg.ts) | date:'MMM d HH:mm' }}
+                        {{ (msg.origin_server_ts) | date:'MMM d HH:mm' }}
                     </div>
                 </td>
                 <td class="avatar">
@@ -92,11 +91,11 @@
                             <span ng-if="msg.user_id === msg.state_key">
                                 {{ members[msg.state_key].displayname || msg.state_key }} left
                             </span>
-                            <span ng-if="msg.user_id !== msg.state_key">
+                            <span ng-if="msg.user_id !== msg.state_key && msg.prev_content">
                                 {{ members[msg.user_id].displayname || msg.user_id }}
-                                {{ {"join": "kicked", "ban": "unbanned"}[msg.content.prev] }}
+                                {{ {"invite": "kicked", "join": "kicked", "ban": "unbanned"}[msg.prev_content.membership] }}
                                 {{ members[msg.state_key].displayname || msg.state_key }}
-                                <span ng-if="'join' === msg.content.prev && msg.content.reason">
+                                <span ng-if="'join' === msg.prev_content.membership && msg.content.reason">
                                     : {{ msg.content.reason }}
                                 </span>
                             </span>
@@ -106,7 +105,7 @@
                             {{ members[msg.user_id].displayname || msg.user_id }}
                             {{ {"invite": "invited", "ban": "banned"}[msg.content.membership] }}
                             {{ members[msg.state_key].displayname || msg.state_key }}
-                            <span ng-if="'ban' === msg.content.prev && msg.content.reason">
+                            <span ng-if="msg.prev_content && 'ban' === msg.prev_content.membership && msg.content.reason">
                                 : {{ msg.content.reason }}
                             </span>
                         </span>                        

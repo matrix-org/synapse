@@ -36,7 +36,7 @@ class VoipRestServlet(RestServlet):
         if not turnUris or not turnSecret or not userLifetime:
             defer.returnValue( (200, {}) )
 
-        expiry = self.hs.get_clock().time_msec() + userLifetime
+        expiry = (self.hs.get_clock().time_msec() + userLifetime) / 1000
         username = "%d:%s" % (expiry, auth_user.to_string())
          
         mac = hmac.new(turnSecret, msg=username, digestmod=hashlib.sha1)

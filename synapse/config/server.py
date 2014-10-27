@@ -74,7 +74,7 @@ class ServerConfig(Config):
             return syutil.crypto.signing_key.read_signing_keys(
                 signing_keys.splitlines(True)
             )
-        except Exception as e:
+        except Exception:
             raise ConfigError(
                 "Error reading signing_key."
                 " Try running again with --generate-config"
@@ -94,7 +94,7 @@ class ServerConfig(Config):
             with open(args.signing_key_path, "w") as signing_key_file:
                 syutil.crypto.signing_key.write_signing_keys(
                     signing_key_file,
-                    (syutil.crypto.SigningKey.generate("auto"),),
+                    (syutil.crypto.signing_key.generate_singing_key("auto"),),
                 )
         else:
             signing_keys = cls.read_file(args.signing_key_path, "signing_key")

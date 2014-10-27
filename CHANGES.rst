@@ -1,6 +1,22 @@
-Changes in latest
-=================
-This breaks federation becuase of signing
+Changes in synapse 0.4.1 (2014-10-17)
+=====================================
+Webclient:
+ * Fix bug with display of timestamps.
+
+Changes in synpase 0.4.0 (2014-10-17)
+=====================================
+This release includes changes to the federation protocol and client-server API
+that is not backwards compatible.
+
+The Matrix specification has been moved to a separate git repository:
+http://github.com/matrix-org/matrix-doc
+
+You will also need an updated syutil and config. See UPGRADES.rst.
+
+Homeserver:
+ * Sign federation transactions to assert strong identity over federation.
+ * Rename timestamp keys in PDUs and events from 'ts' and 'hsob_ts' to 'origin_server_ts'.
+
 
 Changes in synapse 0.3.4 (2014-09-25)
 =====================================

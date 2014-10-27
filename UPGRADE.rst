@@ -1,7 +1,15 @@
-Upgrading to latest
+Upgrading to v0.4.0
 ===================
-This breaks federation between old and new servers due to signing of
-transactions.
+
+This release needs an updated syutil version. Run::
+
+    python setup.py develop
+
+You will also need to upgrade your configuration as the signing key format has
+changed. Run::
+
+    python -m synapse.app.homeserver --config-path <CONFIG> --generate-config
+
 
 Upgrading to v0.3.0
 ===================
