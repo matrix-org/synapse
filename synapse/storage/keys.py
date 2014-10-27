@@ -104,7 +104,6 @@ class KeyStore(SQLBaseStore):
             ts_now_ms (int): The time now in milliseconds
             verification_key (VerifyKey): The NACL verify key.
         """
-        verify_key_bytes = verify_key.encode()
         return self._simple_insert(
             table="server_signature_keys",
             values={
