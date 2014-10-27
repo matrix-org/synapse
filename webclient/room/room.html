@@ -84,10 +84,10 @@
                 </td>
                 <td ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble">
-                        <span ng-if="'join' === msg.content.membership && msg.changedKey === 'membership'">
+                        <span ng-if="'join' === msg.content.membership && msg.changedKey === 'membership'" ng-click="openJson(msg)">
                             {{ members[msg.state_key].displayname || msg.state_key }} joined
                         </span>
-                        <span ng-if="'leave' === msg.content.membership && msg.changedKey === 'membership'">
+                        <span ng-if="'leave' === msg.content.membership && msg.changedKey === 'membership'" ng-click="openJson(msg)">
                             <span ng-if="msg.user_id === msg.state_key">
                                 {{ members[msg.state_key].displayname || msg.state_key }} left
                             </span>
@@ -101,7 +101,7 @@
                             </span>
                         </span>
                         <span ng-if="'invite' === msg.content.membership && msg.changedKey === 'membership' || 
-                                     'ban' === msg.content.membership && msg.changedKey === 'membership'">
+                                     'ban' === msg.content.membership && msg.changedKey === 'membership'" ng-click="openJson(msg)">
                             {{ members[msg.user_id].displayname || msg.user_id }}
                             {{ {"invite": "invited", "ban": "banned"}[msg.content.membership] }}
                             {{ members[msg.state_key].displayname || msg.state_key }}
@@ -109,23 +109,25 @@
                                 : {{ msg.content.reason }}
                             </span>
                         </span>                        
-                        <span ng-if="msg.changedKey === 'displayname'">
+                        <span ng-if="msg.changedKey === 'displayname'" ng-click="openJson(msg)">
                             {{ msg.user_id }} changed their display name from {{ msg.prev_content.displayname }} to {{ msg.content.displayname }}
                         </span>
                         
                         <span ng-show='msg.content.msgtype === "m.emote"'
                               ng-class="msg.echo_msg_state"
-                              ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"/>
+                              ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"
+                              ng-click="openJson(msg)"/>
                         
                         <span ng-show='msg.content.msgtype === "m.text"' 
                               class="message"
+                              ng-click="openJson(msg)"
                               ng-class="containsBingWord(msg.content.body) && msg.user_id != state.user_id ? msg.echo_msg_state + ' messageBing' : msg.echo_msg_state"
                               ng-bind-html="(msg.content.msgtype === 'm.text' && msg.type === 'm.room.message' && msg.content.format === 'org.matrix.custom.html') ? 
                                                                                         (msg.content.formatted_body | unsanitizedLinky) :
                                              (msg.content.msgtype === 'm.text' && msg.type === 'm.room.message') ? (msg.content.body | linky:'_blank') : '' "/>
 
-                        <span ng-show='msg.type === "m.call.invite" && msg.user_id == state.user_id'>Outgoing Call{{ isWebRTCSupported ? '' : ' (But your browser does not support VoIP)' }}</span>
-                        <span ng-show='msg.type === "m.call.invite" && msg.user_id != state.user_id'>Incoming Call{{ isWebRTCSupported ? '' : ' (But your browser does not support VoIP)' }}</span>
+                        <span ng-show='msg.type === "m.call.invite" && msg.user_id == state.user_id' ng-click="openJson(msg)">Outgoing Call{{ isWebRTCSupported ? '' : ' (But your browser does not support VoIP)' }}</span>
+                        <span ng-show='msg.type === "m.call.invite" && msg.user_id != state.user_id' ng-click="openJson(msg)">Incoming Call{{ isWebRTCSupported ? '' : ' (But your browser does not support VoIP)' }}</span>
 
                         <div ng-show='msg.content.msgtype === "m.image"'>
                             <div ng-hide='msg.content.thumbnail_url' ng-style="msg.content.body.h && { 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
@@ -137,11 +139,11 @@
                             </div>
                         </div>
 
-                        <span ng-if="'m.room.topic' === msg.type">
+                        <span ng-if="'m.room.topic' === msg.type" ng-click="openJson(msg)">
                             {{ members[msg.user_id].displayname || msg.user_id }} changed the topic to: {{ msg.content.topic }}
                         </span>
 
-                        <span ng-if="'m.room.name' === msg.type">
+                        <span ng-if="'m.room.name' === msg.type" ng-click="openJson(msg)">
                             {{ members[msg.user_id].displayname || msg.user_id }} changed the room name to: {{ msg.content.name }}
                         </span>
 

@@ -140,6 +140,9 @@ angular.module('RegisterController', ['matrixService'])
                         $scope.feedback = "Captcha is required on this home " +
                                           "server.";
                     }
+                    else if (error.data.error) {
+                        $scope.feedback = error.data.error;
+                    }
                 }
                 else if (error.status === 0) {
                     $scope.feedback = "Unable to talk to the server.";
