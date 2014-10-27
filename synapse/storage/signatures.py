@@ -15,8 +15,6 @@
 
 from _base import SQLBaseStore
 
-from twisted.internet import defer
-
 
 class SignatureStore(SQLBaseStore):
     """Persistence for PDU signatures and hashes"""

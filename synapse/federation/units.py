@@ -155,6 +155,8 @@ class Pdu(JsonEncodedObject):
 
             return Pdu(
                 prev_pdus=prev_pdus,
+                hashes=hashes,
+                signatures=signatures,
                 **args
             )
         else:

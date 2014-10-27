@@ -35,12 +35,12 @@ def add_event_pdu_content_hash(pdu, hash_algorithm=hashlib.sha256):
 
 def check_event_pdu_content_hash(pdu, hash_algorithm=hashlib.sha256):
     """Check whether the hash for this PDU matches the contents"""
-    computed_hash = _compute_content_hash(pdu, hash_algortithm)
+    computed_hash = _compute_content_hash(pdu, hash_algorithm)
     if computed_hash.name not in pdu.hashes:
         raise Exception("Algorithm %s not in hashes %s" % (
             computed_hash.name, list(pdu.hashes)
         ))
-    message_hash_base64 = hashes[computed_hash.name]
+    message_hash_base64 = pdu.hashes[computed_hash.name]
     try:
         message_hash_bytes = decode_base64(message_hash_base64)
     except:
@@ -54,7 +54,7 @@ def _compute_content_hash(pdu, hash_algorithm):
     pdu_json.pop("age_ts", None)
     pdu_json.pop("unsigned", None)
     pdu_json.pop("signatures", None)
-    hashes = pdu_json.pop("hashes", {})
+    pdu_json.pop("hashes", None)
     pdu_json_bytes = encode_canonical_json(pdu_json)
     return hash_algorithm(pdu_json_bytes)
 
@@ -73,7 +73,7 @@ def sign_event_pdu(pdu, signature_name, signing_key):
     tmp_pdu = Pdu(**pdu.get_dict())
     tmp_pdu = prune_pdu(tmp_pdu)
     pdu_json = tmp_pdu.get_dict()
-    pdu_jdon = sign_json(pdu_json, signature_name, signing_key)
+    pdu_json = sign_json(pdu_json, signature_name, signing_key)
     pdu.signatures = pdu_json["signatures"]
     return pdu
 
