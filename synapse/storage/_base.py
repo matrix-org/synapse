@@ -39,14 +39,11 @@ class LoggingTransaction(object):
     def __init__(self, txn):
         object.__setattr__(self, "txn", txn)
 
-    def __getattribute__(self, name):
-        if name == "execute":
-            return object.__getattribute__(self, "execute")
-
-        return getattr(object.__getattribute__(self, "txn"), name)
+    def __getattr__(self, name):
+        return getattr(self.txn, name)
 
     def __setattr__(self, name, value):
-        setattr(object.__getattribute__(self, "txn"), name, value)
+        setattr(self.txn, name, value)
 
     def execute(self, sql, *args, **kwargs):
         # TODO(paul): Maybe use 'info' and 'debug' for values?
@@ -60,12 +57,9 @@ class LoggingTransaction(object):
             # Don't let logging failures stop SQL from working
             pass
 
-        # TODO(paul): Here would be an excellent place to put some timing
-        #   measurements, and log (warning?) slow queries.
-
         start = time.clock() * 1000
         try:
-            return object.__getattribute__(self, "txn").execute(
+            return self.txn.execute(
                 sql, *args, **kwargs
             )
         finally:
