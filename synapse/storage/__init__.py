@@ -40,6 +40,7 @@ from .stream import StreamStore
 from .pdu import StatePduStore, PduStore, PdusTable
 from .transactions import TransactionStore
 from .keys import KeyStore
+from .event_federation import EventFederationStore
 
 from .state import StateStore
 from .signatures import SignatureStore
@@ -69,6 +70,7 @@ SCHEMAS = [
     "redactions",
     "state",
     "signatures",
+    "event_edges",
 ]
 
 
@@ -83,10 +85,12 @@ class _RollbackButIsFineException(Exception):
     """
     pass
 
+
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, PduStore, StatePduStore, TransactionStore,
-                DirectoryStore, KeyStore, StateStore, SignatureStore):
+                DirectoryStore, KeyStore, StateStore, SignatureStore,
+                EventFederationStore, ):
 
     def __init__(self, hs):
         super(DataStore, self).__init__(hs)
@@ -230,6 +234,10 @@ class DataStore(RoomMemberStore, RoomStore,
         elif event.type == RoomRedactionEvent.TYPE:
             self._store_redaction(txn, event)
 
+        outlier = False
+        if hasattr(event, "outlier"):
+            outlier = event.outlier
+
         vals = {
             "topological_ordering": event.depth,
             "event_id": event.event_id,
@@ -237,20 +245,20 @@ class DataStore(RoomMemberStore, RoomStore,
             "room_id": event.room_id,
             "content": json.dumps(event.content),
             "processed": True,
+            "outlier": outlier,
+            "depth": event.depth,
         }
 
         if stream_ordering is not None:
             vals["stream_ordering"] = stream_ordering
 
-        if hasattr(event, "outlier"):
-            vals["outlier"] = event.outlier
-        else:
-            vals["outlier"] = False
-
         unrec = {
             k: v
             for k, v in event.get_full_dict().items()
-            if k not in vals.keys() and k not in ["redacted", "redacted_because"]
+            if k not in vals.keys() and k not in [
+                "redacted", "redacted_because", "signatures", "hashes",
+                "prev_events",
+            ]
         }
         vals["unrecognized_keys"] = json.dumps(unrec)
 
@@ -263,6 +271,14 @@ class DataStore(RoomMemberStore, RoomStore,
                 exc_info=True,
             )
             raise _RollbackButIsFineException("_persist_event")
+
+        self._handle_prev_events(
+            txn,
+            outlier=outlier,
+            event_id=event.event_id,
+            prev_events=event.prev_events,
+            room_id=event.room_id,
+        )
 
         self._store_state_groups_txn(txn, event)
 
@@ -290,6 +306,28 @@ class DataStore(RoomMemberStore, RoomStore,
                     "state_key": event.state_key,
                 }
             )
+
+        signatures = event.signatures.get(event.origin, {})
+
+        for key_id, signature_base64 in signatures.items():
+            signature_bytes = decode_base64(signature_base64)
+            self._store_event_origin_signature_txn(
+                txn, event.event_id, key_id, signature_bytes,
+            )
+
+        for prev_event_id, prev_hashes in event.prev_events:
+            for alg, hash_base64 in prev_hashes.items():
+                hash_bytes = decode_base64(hash_base64)
+                self._store_prev_event_hash_txn(
+                    txn, event.event_id, prev_event_id, alg, hash_bytes
+                )
+
+        (ref_alg, ref_hash_bytes) = compute_pdu_event_reference_hash(pdu)
+        self._store_pdu_reference_hash_txn(
+            txn, pdu.pdu_id, pdu.origin, ref_alg, ref_hash_bytes
+        )
+
+        self._update_min_depth_for_room_txn(txn, event.room_id, event.depth)
 
     def _store_redaction(self, txn, event):
         txn.execute(
@@ -373,7 +411,7 @@ class DataStore(RoomMemberStore, RoomStore,
         """
         def _snapshot(txn):
             membership_state = self._get_room_member(txn, user_id, room_id)
-            prev_pdus = self._get_latest_pdus_in_context(
+            prev_events = self._get_latest_events_in_room(
                 txn, room_id
             )
 
@@ -388,7 +426,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 store=self,
                 room_id=room_id,
                 user_id=user_id,
-                prev_pdus=prev_pdus,
+                prev_events=prev_events,
                 membership_state=membership_state,
                 state_type=state_type,
                 state_key=state_key,
@@ -404,7 +442,7 @@ class Snapshot(object):
         store (DataStore): The datastore.
         room_id (RoomId): The room of the snapshot.
         user_id (UserId): The user this snapshot is for.
-        prev_pdus (list): The list of PDU ids this snapshot is after.
+        prev_events (list): The list of event ids this snapshot is after.
         membership_state (RoomMemberEvent): The current state of the user in
             the room.
         state_type (str, optional): State type captured by the snapshot
@@ -413,29 +451,29 @@ class Snapshot(object):
             the previous value of the state type and key in the room.
     """
 
-    def __init__(self, store, room_id, user_id, prev_pdus,
+    def __init__(self, store, room_id, user_id, prev_events,
                  membership_state, state_type=None, state_key=None,
                  prev_state_pdu=None):
         self.store = store
         self.room_id = room_id
         self.user_id = user_id
-        self.prev_pdus = prev_pdus
+        self.prev_events = prev_events
         self.membership_state = membership_state
         self.state_type = state_type
         self.state_key = state_key
         self.prev_state_pdu = prev_state_pdu
 
     def fill_out_prev_events(self, event):
-        if hasattr(event, "prev_pdus"):
+        if hasattr(event, "prev_events"):
             return
 
-        event.prev_pdus = [
+        event.prev_events = [
             (p_id, origin, hashes)
-            for p_id, origin, hashes, _ in self.prev_pdus
+            for p_id, origin, hashes, _ in self.prev_events
         ]
 
-        if self.prev_pdus:
-            event.depth = max([int(v) for _, _, _, v in self.prev_pdus]) + 1
+        if self.prev_events:
+            event.depth = max([int(v) for _, _, _, v in self.prev_events]) + 1
         else:
             event.depth = 0
 

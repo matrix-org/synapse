@@ -47,7 +47,10 @@ class PduCodec(object):
         kwargs["event_id"] = encode_event_id(pdu.pdu_id, pdu.origin)
         kwargs["room_id"] = pdu.context
         kwargs["etype"] = pdu.pdu_type
-        kwargs["prev_pdus"] = pdu.prev_pdus
+        kwargs["prev_events"] = [
+            encode_event_id(i, o)
+            for i, o in pdu.prev_pdus
+        ]
 
         if hasattr(pdu, "prev_state_id") and hasattr(pdu, "prev_state_origin"):
             kwargs["prev_state"] = encode_event_id(
@@ -78,8 +81,8 @@ class PduCodec(object):
         d["context"] = event.room_id
         d["pdu_type"] = event.type
 
-        if hasattr(event, "prev_pdus"):
-            d["prev_pdus"] = event.prev_pdus
+        if hasattr(event, "prev_events"):
+            d["prev_pdus"] = [decode_event_id(e) for e in event.prev_events]
 
         if hasattr(event, "prev_state"):
             d["prev_state_id"], d["prev_state_origin"] = (
@@ -92,7 +95,7 @@ class PduCodec(object):
         kwargs = copy.deepcopy(event.unrecognized_keys)
         kwargs.update({
             k: v for k, v in d.items()
-            if k not in ["event_id", "room_id", "type"]
+            if k not in ["event_id", "room_id", "type", "prev_events"]
         })
 
         if "origin_server_ts" not in kwargs:

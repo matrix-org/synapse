@@ -71,7 +71,9 @@ class SynapseEvent(JsonEncodedObject):
         "outlier",
         "power_level",
         "redacted",
-        "prev_pdus",
+        "prev_events",
+        "hashes",
+        "signatures",
     ]
 
     required_keys = [
