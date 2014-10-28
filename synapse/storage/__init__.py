@@ -322,9 +322,10 @@ class DataStore(RoomMemberStore, RoomStore,
                     txn, event.event_id, prev_event_id, alg, hash_bytes
                 )
 
+        # TODO
         (ref_alg, ref_hash_bytes) = compute_pdu_event_reference_hash(pdu)
-        self._store_pdu_reference_hash_txn(
-            txn, pdu.pdu_id, pdu.origin, ref_alg, ref_hash_bytes
+        self._store_event_reference_hash_txn(
+            txn, event.event_id, ref_alg, ref_hash_bytes
         )
 
         self._update_min_depth_for_room_txn(txn, event.room_id, event.depth)

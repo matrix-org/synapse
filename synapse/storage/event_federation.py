@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
-from twisted.internet import defer
+from syutil.base64util import encode_base64
 
 import logging
 
@@ -36,7 +36,7 @@ class EventFederationStore(SQLBaseStore):
 
         results = []
         for pdu_id, origin, depth in txn.fetchall():
-            hashes = self._get_pdu_reference_hashes_txn(txn, pdu_id, origin)
+            hashes = self._get_prev_event_hashes_txn(txn, pdu_id, origin)
             sha256_bytes = hashes["sha256"]
             prev_hashes = {"sha256": encode_base64(sha256_bytes)}
             results.append((pdu_id, origin, prev_hashes, depth))
