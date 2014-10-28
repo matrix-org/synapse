@@ -23,6 +23,7 @@ from synapse.util.logutils import log_function
 import collections
 import copy
 import json
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -61,9 +62,15 @@ class LoggingTransaction(object):
 
         # TODO(paul): Here would be an excellent place to put some timing
         #   measurements, and log (warning?) slow queries.
-        return object.__getattribute__(self, "txn").execute(
-            sql, *args, **kwargs
-        )
+
+        start = time.clock() * 1000
+        try:
+            return object.__getattribute__(self, "txn").execute(
+                sql, *args, **kwargs
+            )
+        finally:
+            end = time.clock() * 1000
+            sql_logger.debug("[SQL time] %f", end - start)
 
 
 class SQLBaseStore(object):
