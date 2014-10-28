@@ -42,6 +42,7 @@ class TransactionStore(SQLBaseStore):
         """
 
         return self.runInteraction(
+            "get_received_txn_response",
             self._get_received_txn_response, transaction_id, origin
         )
 
@@ -73,6 +74,7 @@ class TransactionStore(SQLBaseStore):
         """
 
         return self.runInteraction(
+            "set_received_txn_response",
             self._set_received_txn_response,
             transaction_id, origin, code, response_dict
         )
@@ -106,6 +108,7 @@ class TransactionStore(SQLBaseStore):
         """
 
         return self.runInteraction(
+            "prep_send_transaction",
             self._prep_send_transaction,
             transaction_id, destination, origin_server_ts, pdu_list
         )
@@ -161,6 +164,7 @@ class TransactionStore(SQLBaseStore):
             response_json (str)
         """
         return self.runInteraction(
+            "delivered_txn",
             self._delivered_txn,
             transaction_id, destination, code, response_dict
         )
@@ -186,6 +190,7 @@ class TransactionStore(SQLBaseStore):
             list: A list of `ReceivedTransactionsTable.EntryType`
         """
         return self.runInteraction(
+            "get_transactions_after",
             self._get_transactions_after, transaction_id, destination
         )
 
@@ -216,6 +221,7 @@ class TransactionStore(SQLBaseStore):
             list: A list of PduTuple
         """
         return self.runInteraction(
+            "get_pdus_after_transaction",
             self._get_pdus_after_transaction,
             transaction_id, destination
         )

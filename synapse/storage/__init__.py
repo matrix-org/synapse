@@ -109,6 +109,7 @@ class DataStore(RoomMemberStore, RoomStore,
 
         try:
             yield self.runInteraction(
+                "persist_event",
                 self._persist_pdu_event_txn,
                 pdu=pdu,
                 event=event,
@@ -394,7 +395,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 prev_state_pdu=prev_state_pdu,
             )
 
-        return self.runInteraction(_snapshot)
+        return self.runInteraction("snapshot_room", _snapshot)
 
 
 class Snapshot(object):

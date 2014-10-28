@@ -150,6 +150,7 @@ class RoomStore(SQLBaseStore):
 
     def get_power_level(self, room_id, user_id):
         return self.runInteraction(
+            "get_power_level",
             self._get_power_level,
             room_id, user_id,
         )
@@ -183,6 +184,7 @@ class RoomStore(SQLBaseStore):
 
     def get_ops_levels(self, room_id):
         return self.runInteraction(
+            "get_ops_levels",
             self._get_ops_levels,
             room_id,
         )

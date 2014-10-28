@@ -47,7 +47,7 @@ class PduStore(SQLBaseStore):
         """
 
         return self.runInteraction(
-            self._get_pdu_tuple, pdu_id, origin
+            "get_pdu", self._get_pdu_tuple, pdu_id, origin
         )
 
     def _get_pdu_tuple(self, txn, pdu_id, origin):
@@ -108,6 +108,7 @@ class PduStore(SQLBaseStore):
         """
 
         return self.runInteraction(
+            "get_current_state_for_context",
             self._get_current_state_for_context,
             context
         )
@@ -156,6 +157,7 @@ class PduStore(SQLBaseStore):
         """
 
         return self.runInteraction(
+            "mark_pdu_as_processed",
             self._mark_as_processed, pdu_id, pdu_origin
         )
 
@@ -165,6 +167,7 @@ class PduStore(SQLBaseStore):
     def get_all_pdus_from_context(self, context):
         """Get a list of all PDUs for a given context."""
         return self.runInteraction(
+            "get_all_pdus_from_context",
             self._get_all_pdus_from_context, context,
         )
 
@@ -192,6 +195,7 @@ class PduStore(SQLBaseStore):
             list: A list of PduTuples
         """
         return self.runInteraction(
+            "get_backfill",
             self._get_backfill, context, pdu_list, limit
         )
 
@@ -253,6 +257,7 @@ class PduStore(SQLBaseStore):
             context (str)
         """
         return self.runInteraction(
+            "get_min_depth_for_context",
             self._get_min_depth_for_context, context
         )
 
@@ -291,6 +296,7 @@ class PduStore(SQLBaseStore):
 
     def get_latest_pdus_in_context(self, context):
         return self.runInteraction(
+            "get_latest_pdus_in_context",
             self._get_latest_pdus_in_context,
             context
         )
@@ -370,6 +376,7 @@ class PduStore(SQLBaseStore):
         """
 
         return self.runInteraction(
+            "is_pdu_new",
             self._is_pdu_new,
             pdu_id=pdu_id,
             origin=origin,
@@ -523,6 +530,7 @@ class StatePduStore(SQLBaseStore):
 
     def get_unresolved_state_tree(self, new_state_pdu):
         return self.runInteraction(
+            "get_unresolved_state_tree",
             self._get_unresolved_state_tree, new_state_pdu
         )
 
@@ -562,6 +570,7 @@ class StatePduStore(SQLBaseStore):
     def update_current_state(self, pdu_id, origin, context, pdu_type,
                              state_key):
         return self.runInteraction(
+            "update_current_state",
             self._update_current_state,
             pdu_id, origin, context, pdu_type, state_key
         )
@@ -601,6 +610,7 @@ class StatePduStore(SQLBaseStore):
         """
 
         return self.runInteraction(
+            "get_current_state_pdu",
             self._get_current_state_pdu, context, pdu_type, state_key
         )
 
@@ -660,6 +670,7 @@ class StatePduStore(SQLBaseStore):
             bool: True if the new_pdu clobbered the current state, False if not
         """
         return self.runInteraction(
+            "handle_new_state",
             self._handle_new_state, new_pdu
         )
 

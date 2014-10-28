@@ -59,6 +59,7 @@ class StateStore(SQLBaseStore):
 
     def store_state_groups(self, event):
         return self.runInteraction(
+            "store_state_groups",
             self._store_state_groups_txn, event
         )
 

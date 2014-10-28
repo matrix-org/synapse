@@ -309,7 +309,10 @@ class StreamStore(SQLBaseStore):
         defer.returnValue(ret)
 
     def get_room_events_max_id(self):
-        return self.runInteraction(self._get_room_events_max_id_txn)
+        return self.runInteraction(
+            "get_room_events_max_id",
+            self._get_room_events_max_id_txn
+        )
 
     def _get_room_events_max_id_txn(self, txn):
         txn.execute(
