@@ -985,10 +985,25 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     $scope.openJson = function(content) {
-        console.log("Displaying modal dialog for " + JSON.stringify(content));
+        $scope.event_selected = content;
+        // scope this so the template can check power levels and enable/disable
+        // buttons
+        $scope.pow = matrixService.getUserPowerLevel;
+
         var modalInstance = $modal.open({
-            template: "<pre>" + angular.toJson(content, true) + "</pre>"
+            templateUrl: 'eventInfoTemplate.html',
+            controller: 'EventInfoController',
+            scope: $scope
         });
     };
 
-}]);
+}])
+.controller('EventInfoController', function($scope, $modalInstance) {
+    console.log("Displaying modal dialog for >>>> " + JSON.stringify($scope.event_selected));
+    $scope.redact = function() {
+        console.log("User level = "+$scope.pow($scope.room_id, $scope.state.user_id)+
+                    " Redact level = "+$scope.events.rooms[$scope.room_id]["m.room.ops_levels"].content.redact_level);
+        console.log("Redact event >> " + JSON.stringify($scope.event_selected));
+        $modalInstance.dismiss();
+    };
+});

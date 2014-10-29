@@ -1,5 +1,18 @@
 <div ng-controller="RoomController" data-ng-init="onInit()" class="room" style="height: 100%;">
 
+    <script type="text/ng-template" id="eventInfoTemplate.html">
+        <div class="modal-body">
+            <pre> {{event_selected | json}} </pre>
+        </div>
+        <div class="modal-footer">
+            <button ng-click="redact()" type="button" class="btn btn-danger" 
+             ng-disabled="pow(room_id, state.user_id) < events.rooms[room_id]['m.room.ops_levels'].content.redact_level"
+             title="Delete this event on all home servers. This cannot be undone.">
+                Redact
+            </button>        
+        </div>
+    </script>
+
     <div id="roomHeader">
         <a href ng-click="goToPage('/')"><img src="img/logo-small.png" width="100" height="43" alt="[matrix]"/></a>
         <div class="roomHeaderInfo">
