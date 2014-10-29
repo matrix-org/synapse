@@ -238,6 +238,12 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                         "body": message,
                         "icon": member ? member.avatar_url : undefined
                     });
+
+                    notification.onclick = function() {
+                        console.log("notification.onclick() room=" + event.room_id);
+                        $rootScope.goToPage('room/' + (event.room_id)); 
+                    };
+
                     $timeout(function() {
                         notification.close();
                     }, 5 * 1000);
