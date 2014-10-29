@@ -207,7 +207,7 @@ class Notifier(object):
         )
 
         if timeout:
-            reactor.callLater(timeout/1000, self._timeout_listener, listener)
+            reactor.callLater(timeout/1000.0, self._timeout_listener, listener)
 
             self._register_with_keys(listener)
 
