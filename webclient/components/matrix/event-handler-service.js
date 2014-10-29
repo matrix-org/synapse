@@ -58,14 +58,29 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
         var shouldBing = false;
         
         // case-insensitive name check for user_id OR display_name if they exist
+        var userRegex = "";
         var myUserId = matrixService.config().user_id;
         if (myUserId) {
-            myUserId = myUserId.toLocaleLowerCase();
+            var localpart = getLocalPartFromUserId(myUserId);
+            if (localpart) {
+                localpart = localpart.toLocaleLowerCase();
+                userRegex += "\\b" + localpart + "\\b";
+            }
         }
         var myDisplayName = matrixService.config().display_name;
         if (myDisplayName) {
             myDisplayName = myDisplayName.toLocaleLowerCase();
+            if (userRegex.length > 0) {
+                userRegex += "|";
+            }
+            userRegex += "\\b" + myDisplayName + "\\b";
         }
+
+        var r = new RegExp(userRegex, 'i');
+        if (content.search(r) >= 0) {
+            shouldBing = true;
+        }
+
         if ( (myDisplayName && content.toLocaleLowerCase().indexOf(myDisplayName) != -1) ||
              (myUserId && content.toLocaleLowerCase().indexOf(myUserId) != -1) ) {
             shouldBing = true;
@@ -82,6 +97,18 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             }
         }
         return shouldBing;
+    };
+
+    var getLocalPartFromUserId = function(user_id) {
+        if (!user_id) {
+            return null;
+        }
+        var localpartRegex = /@(.*):\w+/i
+        var results = localpartRegex.exec(user_id);
+        if (results && results.length == 2) {
+            return results[1];
+        }
+        return null;
     };
 
     var initialSyncDeferred;
