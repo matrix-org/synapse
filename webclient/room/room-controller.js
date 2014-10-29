@@ -133,7 +133,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         // Do not autoscroll to the bottom to display the new event if the user is not at the bottom.
         // Exception: in case where the event is from the user, we want to force scroll to the bottom
         var objDiv = document.getElementById("messageTableWrapper");
-        if ((objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || force) {
+        // add a 10px buffer to this check so if the message list is not *quite*
+        // at the bottom it still scrolls since it basically is at the bottom.
+        if ((10 + objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || force) {
             
             $timeout(function() {
                 objDiv.scrollTop = objDiv.scrollHeight;
