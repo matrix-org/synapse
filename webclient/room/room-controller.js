@@ -995,6 +995,26 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             controller: 'EventInfoController',
             scope: $scope
         });
+
+        modalInstance.result.then(function(action) {
+            if (action === "redact") {
+                var eventId = $scope.event_selected.event_id;
+                console.log("Redacting event ID " + eventId);
+                matrixService.redactEvent(
+                    $scope.event_selected.room_id,
+                    eventId
+                ).then(function(response) {
+                    console.log("Redaction = " + JSON.stringify(response));
+                }, function(error) {
+                    console.error("Failed to redact event: "+JSON.stringify(error));
+                    if (error.data.error) {
+                        $scope.feedback = error.data.error;
+                    }
+                });
+            }
+        }, function() {
+            // any dismiss code
+        });
     };
 
 }])
@@ -1004,6 +1024,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         console.log("User level = "+$scope.pow($scope.room_id, $scope.state.user_id)+
                     " Redact level = "+$scope.events.rooms[$scope.room_id]["m.room.ops_levels"].content.redact_level);
         console.log("Redact event >> " + JSON.stringify($scope.event_selected));
-        $modalInstance.dismiss();
+        $modalInstance.close("redact");
     };
 });

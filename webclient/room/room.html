@@ -6,7 +6,7 @@
         </div>
         <div class="modal-footer">
             <button ng-click="redact()" type="button" class="btn btn-danger" 
-             ng-disabled="pow(room_id, state.user_id) < events.rooms[room_id]['m.room.ops_levels'].content.redact_level"
+             ng-disabled="!events.rooms[room_id]['m.room.ops_levels'].content.redact_level || !pow(room_id, state.user_id) || pow(room_id, state.user_id) < events.rooms[room_id]['m.room.ops_levels'].content.redact_level"
              title="Delete this event on all home servers. This cannot be undone.">
                 Redact
             </button>        
