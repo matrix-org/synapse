@@ -849,9 +849,6 @@ class PresenceEventSource(object):
 
         # TODO(paul): limit
 
-        updates = [(k, cachemap[k]) for k in cachemap
-                   if to_key < cachemap[k].serial < from_key]
-
         if updates:
             clock = self.clock
 
