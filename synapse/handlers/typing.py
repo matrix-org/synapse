@@ -158,4 +158,4 @@ class TypingNotificationEventSource(object):
         return 0
 
     def get_pagination_rows(self, user, pagination_config, key):
-        return ([], pagination_config.from_token)
+        return ([], pagination_config.from_key)

@@ -823,15 +823,12 @@ class PresenceEventSource(object):
     def get_pagination_rows(self, user, pagination_config, key):
         # TODO (erikj): Does this make sense? Ordering?
 
-        from_token = pagination_config.from_token
-        to_token = pagination_config.to_token
-
         observer_user = user
 
-        from_key = int(from_token.presence_key)
+        from_key = int(pagination_config.from_key)
 
-        if to_token:
-            to_key = int(to_token.presence_key)
+        if pagination_config.to_key:
+            to_key = int(pagination_config.to_key)
         else:
             to_key = -1
 
@@ -855,21 +852,9 @@ class PresenceEventSource(object):
             earliest_serial = max([x[1].serial for x in updates])
             data = [x[1].make_event(user=x[0], clock=clock) for x in updates]
 
-            if to_token:
-                next_token = to_token
-            else:
-                next_token = from_token
-
-            next_token = next_token.copy_and_replace(
-                "presence_key", earliest_serial
-            )
-            defer.returnValue((data, next_token))
+            defer.returnValue((data, earliest_serial))
         else:
-            if not to_token:
-                to_token = from_token.copy_and_replace(
-                    "presence_key", 0
-                )
-            defer.returnValue(([], to_token))
+            defer.returnValue(([], 0))
 
 
 class UserPresenceCache(object):
