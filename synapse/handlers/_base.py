@@ -16,6 +16,8 @@
 from twisted.internet import defer
 from synapse.api.errors import LimitExceededError
 
+from synapse.util.async import run_on_reactor
+
 class BaseHandler(object):
 
     def __init__(self, hs):
@@ -45,6 +47,8 @@ class BaseHandler(object):
     @defer.inlineCallbacks
     def _on_new_room_event(self, event, snapshot, extra_destinations=[],
                            extra_users=[], suppress_auth=False):
+        yield run_on_reactor()
+
         snapshot.fill_out_prev_events(event)
 
         yield self.state_handler.annotate_state_groups(event)

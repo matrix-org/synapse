@@ -24,6 +24,13 @@ logger = logging.getLogger(__name__)
 
 class EventFederationStore(SQLBaseStore):
 
+    def get_latest_events_in_room(self, room_id):
+        return self.runInteraction(
+            "get_latest_events_in_room",
+            self._get_latest_events_in_room,
+            room_id,
+        )
+
     def _get_latest_events_in_room(self, txn, room_id):
         self._simple_select_onecol_txn(
             txn,
@@ -34,12 +41,25 @@ class EventFederationStore(SQLBaseStore):
             retcol="event_id",
         )
 
+        sql = (
+            "SELECT e.event_id, e.depth FROM events as e "
+            "INNER JOIN event_forward_extremities as f "
+            "ON e.event_id = f.event_id "
+            "WHERE f.room_id = ?"
+        )
+
+        txn.execute(sql, (room_id, ))
+
         results = []
-        for pdu_id, origin, depth in txn.fetchall():
-            hashes = self._get_prev_event_hashes_txn(txn, pdu_id, origin)
-            sha256_bytes = hashes["sha256"]
-            prev_hashes = {"sha256": encode_base64(sha256_bytes)}
-            results.append((pdu_id, origin, prev_hashes, depth))
+        for event_id, depth in txn.fetchall():
+            hashes = self._get_prev_event_hashes_txn(txn, event_id)
+            prev_hashes = {
+                k: encode_base64(v) for k, v in hashes.items()
+                if k == "sha256"
+            }
+            results.append((event_id, prev_hashes, depth))
+
+        return results
 
     def _get_min_depth_interaction(self, txn, room_id):
         min_depth = self._simple_select_one_onecol_txn(
@@ -70,21 +90,21 @@ class EventFederationStore(SQLBaseStore):
 
     def _handle_prev_events(self, txn, outlier, event_id, prev_events,
                             room_id):
-        for e_id in prev_events:
+        for e_id, _ in prev_events:
             # TODO (erikj): This could be done as a bulk insert
             self._simple_insert_txn(
                 txn,
                 table="event_edges",
                 values={
                     "event_id": event_id,
-                    "prev_event": e_id,
+                    "prev_event_id": e_id,
                     "room_id": room_id,
                 }
             )
 
         # Update the extremities table if this is not an outlier.
         if not outlier:
-            for e_id in prev_events:
+            for e_id, _ in prev_events:
                 # TODO (erikj): This could be done as a bulk insert
                 self._simple_delete_txn(
                     txn,
@@ -116,7 +136,7 @@ class EventFederationStore(SQLBaseStore):
 
             # Insert all the prev_pdus as a backwards thing, they'll get
             # deleted in a second if they're incorrect anyway.
-            for e_id in prev_events:
+            for e_id, _ in prev_events:
                 # TODO (erikj): This could be done as a bulk insert
                 self._simple_insert_txn(
                     txn,
@@ -130,14 +150,11 @@ class EventFederationStore(SQLBaseStore):
             # Also delete from the backwards extremities table all ones that
             # reference pdus that we have already seen
             query = (
-                "DELETE FROM %(event_back)s as b WHERE EXISTS ("
-                "SELECT 1 FROM %(events)s AS events "
+                "DELETE FROM event_backward_extremities WHERE EXISTS ("
+                "SELECT 1 FROM events "
                 "WHERE "
-                "b.event_id = events.event_id "
+                "event_backward_extremities.event_id = events.event_id "
                 "AND not events.outlier "
                 ")"
-            ) % {
-                "event_back": "event_backward_extremities",
-                "events": "events",
-            }
+            )
             txn.execute(query)

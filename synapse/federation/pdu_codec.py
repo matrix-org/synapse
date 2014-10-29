@@ -48,8 +48,8 @@ class PduCodec(object):
         kwargs["room_id"] = pdu.context
         kwargs["etype"] = pdu.pdu_type
         kwargs["prev_events"] = [
-            encode_event_id(i, o)
-            for i, o in pdu.prev_pdus
+            (encode_event_id(i, o), s)
+            for i, o, s in pdu.prev_pdus
         ]
 
         if hasattr(pdu, "prev_state_id") and hasattr(pdu, "prev_state_origin"):
@@ -82,7 +82,13 @@ class PduCodec(object):
         d["pdu_type"] = event.type
 
         if hasattr(event, "prev_events"):
-            d["prev_pdus"] = [decode_event_id(e) for e in event.prev_events]
+            def f(e, s):
+                i, o = decode_event_id(e, self.server_name)
+                return i, o, s
+            d["prev_pdus"] = [
+                f(e, s)
+                for e, s in event.prev_events
+            ]
 
         if hasattr(event, "prev_state"):
             d["prev_state_id"], d["prev_state_origin"] = (

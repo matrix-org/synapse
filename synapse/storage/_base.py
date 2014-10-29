@@ -19,10 +19,12 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.api.events.utils import prune_event
 from synapse.util.logutils import log_function
+from syutil.base64util import encode_base64
 
 import collections
 import copy
 import json
+import sys
 import time
 
 
@@ -67,6 +69,9 @@ class LoggingTransaction(object):
             return self.txn.execute(
                 sql, *args, **kwargs
             )
+        except:
+                logger.exception("[SQL FAIL] {%s}", self.name)
+                raise
         finally:
             end = time.clock() * 1000
             sql_logger.debug("[SQL time] {%s} %f", self.name, end - start)
@@ -85,14 +90,20 @@ class SQLBaseStore(object):
         """Wraps the .runInteraction() method on the underlying db_pool."""
         def inner_func(txn, *args, **kwargs):
             start = time.clock() * 1000
-            txn_id = str(SQLBaseStore._TXN_ID)
-            SQLBaseStore._TXN_ID += 1
+            txn_id = SQLBaseStore._TXN_ID
 
-            name = "%s-%s" % (desc, txn_id, )
+            # We don't really need these to be unique, so lets stop it from
+            # growing really large.
+            self._TXN_ID = (self._TXN_ID + 1) % (sys.maxint - 1)
+
+            name = "%s-%x" % (desc, txn_id, )
 
             transaction_logger.debug("[TXN START] {%s}", name)
             try:
                 return func(LoggingTransaction(txn, name), *args, **kwargs)
+            except:
+                logger.exception("[TXN FAIL] {%s}", name)
+                raise
             finally:
                 end = time.clock() * 1000
                 transaction_logger.debug(
@@ -189,7 +200,6 @@ class SQLBaseStore(object):
               statement returns no rows
         """
         return self._simple_selectupdate_one(
-            "_simple_select_one",
             table, keyvalues, retcols=retcols, allow_none=allow_none
         )
 
@@ -215,11 +225,11 @@ class SQLBaseStore(object):
             txn,
             table=table,
             keyvalues=keyvalues,
-            retcols=retcol,
+            retcol=retcol,
         )
 
         if ret:
-            return ret[retcol]
+            return ret[0]
         else:
             if allow_none:
                 return None
@@ -434,6 +444,17 @@ class SQLBaseStore(object):
         sql = "SELECT * FROM events WHERE event_id = ?"
 
         for ev in events:
+            signatures = self._get_event_origin_signatures_txn(
+                txn, ev.event_id,
+            )
+
+            ev.signatures = {
+                k: encode_base64(v) for k, v in signatures.items()
+            }
+
+            prev_events = self._get_latest_events_in_room(txn, ev.room_id)
+            ev.prev_events = [(e_id, s,) for e_id, s, _ in prev_events]
+
             if hasattr(ev, "prev_state"):
                 # Load previous state_content.
                 # TODO: Should we be pulling this out above?

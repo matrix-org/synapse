@@ -71,6 +71,7 @@ SCHEMAS = [
     "state",
     "signatures",
     "event_edges",
+    "event_signatures",
 ]
 
 
@@ -134,7 +135,8 @@ class DataStore(RoomMemberStore, RoomStore,
                 "type",
                 "room_id",
                 "content",
-                "unrecognized_keys"
+                "unrecognized_keys",
+                "depth",
             ],
             allow_none=allow_none,
         )
@@ -263,7 +265,12 @@ class DataStore(RoomMemberStore, RoomStore,
         vals["unrecognized_keys"] = json.dumps(unrec)
 
         try:
-            self._simple_insert_txn(txn, "events", vals)
+            self._simple_insert_txn(
+                txn,
+                "events",
+                vals,
+                or_replace=(not outlier),
+            )
         except:
             logger.warn(
                 "Failed to persist, probably duplicate: %s",
@@ -307,13 +314,14 @@ class DataStore(RoomMemberStore, RoomStore,
                 }
             )
 
-        signatures = event.signatures.get(event.origin, {})
+        if hasattr(event, "signatures"):
+            signatures = event.signatures.get(event.origin, {})
 
-        for key_id, signature_base64 in signatures.items():
-            signature_bytes = decode_base64(signature_base64)
-            self._store_event_origin_signature_txn(
-                txn, event.event_id, key_id, signature_bytes,
-            )
+            for key_id, signature_base64 in signatures.items():
+                signature_bytes = decode_base64(signature_base64)
+                self._store_event_origin_signature_txn(
+                    txn, event.event_id, event.origin, key_id, signature_bytes,
+                )
 
         for prev_event_id, prev_hashes in event.prev_events:
             for alg, hash_base64 in prev_hashes.items():
@@ -323,10 +331,10 @@ class DataStore(RoomMemberStore, RoomStore,
                 )
 
         # TODO
-        (ref_alg, ref_hash_bytes) = compute_pdu_event_reference_hash(pdu)
-        self._store_event_reference_hash_txn(
-            txn, event.event_id, ref_alg, ref_hash_bytes
-        )
+        # (ref_alg, ref_hash_bytes) = compute_pdu_event_reference_hash(pdu)
+        # self._store_event_reference_hash_txn(
+        #    txn, event.event_id, ref_alg, ref_hash_bytes
+        # )
 
         self._update_min_depth_for_room_txn(txn, event.room_id, event.depth)
 
@@ -412,9 +420,7 @@ class DataStore(RoomMemberStore, RoomStore,
         """
         def _snapshot(txn):
             membership_state = self._get_room_member(txn, user_id, room_id)
-            prev_events = self._get_latest_events_in_room(
-                txn, room_id
-            )
+            prev_events = self._get_latest_events_in_room(txn, room_id)
 
             if state_type is not None and state_key is not None:
                 prev_state_pdu = self._get_current_state_pdu(
@@ -469,12 +475,12 @@ class Snapshot(object):
             return
 
         event.prev_events = [
-            (p_id, origin, hashes)
-            for p_id, origin, hashes, _ in self.prev_events
+            (event_id, hashes)
+            for event_id, hashes, _ in self.prev_events
         ]
 
         if self.prev_events:
-            event.depth = max([int(v) for _, _, _, v in self.prev_events]) + 1
+            event.depth = max([int(v) for _, _, v in self.prev_events]) + 1
         else:
             event.depth = 0
 
@@ -533,9 +539,10 @@ def prepare_database(db_conn):
             db_conn.commit()
 
     else:
-        sql_script = "BEGIN TRANSACTION;"
+        sql_script = "BEGIN TRANSACTION;\n"
         for sql_loc in SCHEMAS:
             sql_script += read_schema(sql_loc)
+            sql_script += "\n"
         sql_script += "COMMIT TRANSACTION;"
         c.executescript(sql_script)
         db_conn.commit()

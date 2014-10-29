@@ -143,7 +143,9 @@ class StateHandler(object):
             defer.returnValue(False)
             return
 
-        new_state = yield self.resolve_state_groups(event.prev_events)
+        new_state = yield self.resolve_state_groups(
+            [e for e, _ in event.prev_events]
+        )
 
         event.old_state_events = copy.deepcopy(new_state)
 
@@ -157,12 +159,11 @@ class StateHandler(object):
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
-        # FIXME: HACK!
-        pdus = yield self.store.get_latest_pdus_in_context(room_id)
+        events = yield self.store.get_latest_events_in_room(room_id)
 
         event_ids = [
-            encode_event_id(pdu_id, origin)
-            for pdu_id, origin, _ in pdus
+            e_id
+            for e_id, _ in events
         ]
 
         res = yield self.resolve_state_groups(event_ids)

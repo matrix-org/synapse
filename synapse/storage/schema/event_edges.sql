@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS event_forward_extremities(
 
 CREATE INDEX IF NOT EXISTS ev_extrem_room ON event_forward_extremities(room_id);
 CREATE INDEX IF NOT EXISTS ev_extrem_id ON event_forward_extremities(event_id);
---
+
 
 CREATE TABLE IF NOT EXISTS event_backward_extremities(
     event_id TEXT,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS event_backward_extremities(
 
 CREATE INDEX IF NOT EXISTS ev_b_extrem_room ON event_backward_extremities(room_id);
 CREATE INDEX IF NOT EXISTS ev_b_extrem_id ON event_backward_extremities(event_id);
---
+
 
 CREATE TABLE IF NOT EXISTS event_edges(
     event_id TEXT,
@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS event_edges(
 
 CREATE INDEX IF NOT EXISTS ev_edges_id ON event_edges(event_id);
 CREATE INDEX IF NOT EXISTS ev_edges_prev_id ON event_edges(prev_event_id);
---
 
 
 CREATE TABLE IF NOT EXISTS room_depth(
@@ -38,7 +37,7 @@ CREATE TABLE IF NOT EXISTS room_depth(
 );
 
 CREATE INDEX IF NOT EXISTS room_depth_room ON room_depth(room_id);
---
+
 
 create TABLE IF NOT EXISTS event_destinations(
     event_id TEXT,
@@ -48,4 +47,3 @@ create TABLE IF NOT EXISTS event_destinations(
 );
 
 CREATE INDEX IF NOT EXISTS event_destinations_id ON event_destinations(event_id);
---
