@@ -172,6 +172,17 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
     };
 
     var handleMessage = function(event, isLiveEvent) {
+        // Check for empty event content
+        var hasContent = false;
+        for (var prop in event.content) {
+            hasContent = true;
+            break;
+        }
+        if (!hasContent) {
+            // empty json object is a redacted event, so ignore.
+            return;
+        }
+
         if (isLiveEvent) {
             if (event.user_id === matrixService.config().user_id &&
                 (event.content.msgtype === "m.text" || event.content.msgtype === "m.emote") ) {
@@ -335,6 +346,31 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             $rootScope.events.rooms[event.room_id].messages.push(event);
         }
     };
+
+    var handleRedaction = function(event, isLiveEvent) {
+        if (!isLiveEvent) {
+            // we have nothing to remove, so just ignore it.
+            console.log("Received redacted event: "+JSON.stringify(event));
+            return;
+        }
+
+        // we need to remove something possibly: do we know the redacted
+        // event ID?
+        if (eventMap[event.redacts]) {
+            // remove event from list of messages in this room.
+            var eventList = $rootScope.events.rooms[event.room_id].messages;
+            for (var i=0; i<eventList.length; i++) {
+                if (eventList[i].event_id === event.redacts) {
+                    console.log("Removing event " + event.redacts);
+                    eventList.splice(i, 1);
+                    break;
+                }
+            }
+
+            // broadcast the redaction so controllers can nuke this
+            console.log("Redacted an event.");
+        }
+    }
     
     /**
      * Get the index of the event in $rootScope.events.rooms[room_id].messages
@@ -496,6 +532,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                         break;
                     case 'm.room.topic':
                         handleRoomTopic(event, isLiveEvent, isStateEvent);
+                        break;
+                    case 'm.room.redaction':
+                        handleRedaction(event, isLiveEvent);
                         break;
                     default:
                         console.log("Unable to handle event type " + event.type);
