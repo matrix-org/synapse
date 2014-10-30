@@ -15,23 +15,19 @@
 
     <script type="text/ng-template" id="roomInfoTemplate.html">
         <div class="modal-body">
-            <table id="roomInfoTable">
-                <tr>
-                <th>
-                    Event Type
-                </th>
-                <th>
-                    Content
-                </th>
-                </tr>
-                <tr ng-repeat="(key, event) in events.rooms[room_id] | stateEventsFilter">
-                    <td>
-                        <pre>{{ key }}</pre>
-                    </td>
-                    <td>
-                        <pre>{{ event.content | json }}</pre>
-                    </td>
-                </tr>
+            <table class="room-info">
+            <tr ng-repeat="(key, event) in events.rooms[room_id] | stateEventsFilter" class="room-info-event">
+                <td class="room-info-event-meta">
+                    <span class="monospace">{{ key }}</span>
+                    <br/>
+                    {{ (event.origin_server_ts) | date:'MMM d HH:mm' }}
+                    <br/>
+                    Set by: <span class="monospace">{{ event.user_id }}</span>
+                </td>
+                <td class="room-info-event-content">
+                    <pre>{{ event.content | json }}</pre>
+                </td>
+            </tr>
             </table>
         </div>
         <div class="modal-footer">
