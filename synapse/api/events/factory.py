@@ -21,6 +21,8 @@ from synapse.api.events.room import (
     RoomRedactionEvent,
 )
 
+from synapse.types import EventID
+
 from synapse.util.stringutils import random_string
 
 
@@ -59,7 +61,9 @@ class EventFactory(object):
 
         local_part = str(int(self.clock.time())) + i + random_string(5)
 
-        return "%s@%s" % (local_part, self.hs.hostname)
+        e_id = EventID.create_local(local_part, self.hs)
+
+        return e_id.to_string()
 
     def create_event(self, etype=None, **kwargs):
         kwargs["type"] = etype

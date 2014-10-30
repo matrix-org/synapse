@@ -28,7 +28,7 @@ from synapse.handlers import Handlers
 from synapse.rest import RestServletFactory
 from synapse.state import StateHandler
 from synapse.storage import DataStore
-from synapse.types import UserID, RoomAlias, RoomID
+from synapse.types import UserID, RoomAlias, RoomID, EventID
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.lockutils import LockManager
@@ -142,6 +142,11 @@ class BaseHomeServer(object):
         """Parse the string given by 's' as a Room ID and return a RoomID
         object."""
         return RoomID.from_string(s, hs=self)
+
+    def parse_eventid(self, s):
+        """Parse the string given by 's' as a Event ID and return a EventID
+        object."""
+        return EventID.from_string(s, hs=self)
 
     def serialize_event(self, e):
         return serialize_event(self, e)

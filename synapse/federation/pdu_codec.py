@@ -17,20 +17,9 @@ from .units import Pdu
 from synapse.crypto.event_signing import (
     add_event_pdu_content_hash, sign_event_pdu
 )
+from synapse.types import EventID
 
 import copy
-
-
-def decode_event_id(event_id, server_name):
-    parts = event_id.split("@")
-    if len(parts) < 2:
-        return (event_id, server_name)
-    else:
-        return (parts[0], "".join(parts[1:]))
-
-
-def encode_event_id(pdu_id, origin):
-    return "%s@%s" % (pdu_id, origin)
 
 
 class PduCodec(object):
@@ -40,20 +29,28 @@ class PduCodec(object):
         self.server_name = hs.hostname
         self.event_factory = hs.get_event_factory()
         self.clock = hs.get_clock()
+        self.hs = hs
+
+    def encode_event_id(self, local, domain):
+        return EventID.create(local, domain, self.hs).to_string()
+
+    def decode_event_id(self, event_id):
+        e_id = self.hs.parse_eventid(event_id)
+        return e_id.localpart, e_id.domain
 
     def event_from_pdu(self, pdu):
         kwargs = {}
 
-        kwargs["event_id"] = encode_event_id(pdu.pdu_id, pdu.origin)
+        kwargs["event_id"] = self.encode_event_id(pdu.pdu_id, pdu.origin)
         kwargs["room_id"] = pdu.context
         kwargs["etype"] = pdu.pdu_type
         kwargs["prev_events"] = [
-            (encode_event_id(i, o), s)
+            (self.encode_event_id(i, o), s)
             for i, o, s in pdu.prev_pdus
         ]
 
         if hasattr(pdu, "prev_state_id") and hasattr(pdu, "prev_state_origin"):
-            kwargs["prev_state"] = encode_event_id(
+            kwargs["prev_state"] = self.encode_event_id(
                 pdu.prev_state_id, pdu.prev_state_origin
             )
 
@@ -75,15 +72,15 @@ class PduCodec(object):
     def pdu_from_event(self, event):
         d = event.get_full_dict()
 
-        d["pdu_id"], d["origin"] = decode_event_id(
-            event.event_id, self.server_name
+        d["pdu_id"], d["origin"] = self.decode_event_id(
+            event.event_id
         )
         d["context"] = event.room_id
         d["pdu_type"] = event.type
 
         if hasattr(event, "prev_events"):
             def f(e, s):
-                i, o = decode_event_id(e, self.server_name)
+                i, o = self.decode_event_id(e)
                 return i, o, s
             d["prev_pdus"] = [
                 f(e, s)
@@ -92,7 +89,7 @@ class PduCodec(object):
 
         if hasattr(event, "prev_state"):
             d["prev_state_id"], d["prev_state_origin"] = (
-                decode_event_id(event.prev_state, self.server_name)
+                self.decode_event_id(event.prev_state)
             )
 
         if hasattr(event, "state_key"):

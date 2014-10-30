@@ -20,9 +20,10 @@ from ._base import BaseHandler
 from synapse.api.events.room import InviteJoinEvent, RoomMemberEvent
 from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
-from synapse.federation.pdu_codec import PduCodec, encode_event_id
+from synapse.federation.pdu_codec import PduCodec
 from synapse.api.errors import SynapseError
 from synapse.util.async import run_on_reactor
+from synapse.types import EventID
 
 from twisted.internet import defer, reactor
 
@@ -358,7 +359,9 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_state_for_pdu(self, pdu_id, pdu_origin):
-        event_id = encode_event_id(pdu_id, pdu_origin)
+        yield run_on_reactor()
+
+        event_id = EventID.create(pdu_id, pdu_origin, self.hs).to_string()
 
         state_groups = yield self.store.get_state_groups(
             [event_id]

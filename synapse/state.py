@@ -16,8 +16,10 @@
 
 from twisted.internet import defer
 
-from synapse.federation.pdu_codec import encode_event_id, decode_event_id
 from synapse.util.logutils import log_function
+from synapse.util.async import run_on_reactor
+
+from synapse.types import EventID
 
 from collections import namedtuple
 
@@ -43,6 +45,7 @@ class StateHandler(object):
         self.store = hs.get_datastore()
         self._replication = hs.get_replication_layer()
         self.server_name = hs.hostname
+        self.hs = hs
 
     @defer.inlineCallbacks
     @log_function
@@ -77,15 +80,17 @@ class StateHandler(object):
         current_state = snapshot.prev_state_pdu
 
         if current_state:
-            event.prev_state = encode_event_id(
-                current_state.pdu_id, current_state.origin
-            )
+            event.prev_state = EventID.create(
+                current_state.pdu_id, current_state.origin, self.hs
+            ).to_string()
 
         # TODO check current_state to see if the min power level is less
         # than the power level of the user
         # power_level = self._get_power_level_for_event(event)
 
-        pdu_id, origin = decode_event_id(event.event_id, self.server_name)
+        e_id = self.hs.parse_eventid(event.event_id)
+        pdu_id = e_id.localpart
+        origin = e_id.domain
 
         yield self.store.update_current_state(
             pdu_id=pdu_id,
@@ -129,6 +134,8 @@ class StateHandler(object):
     @defer.inlineCallbacks
     @log_function
     def annotate_state_groups(self, event, old_state=None):
+        yield run_on_reactor()
+
         if old_state:
             event.state_group = None
             event.old_state_events = old_state
