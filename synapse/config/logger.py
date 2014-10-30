@@ -19,6 +19,7 @@ from twisted.python.log import PythonLoggingObserver
 import logging
 import logging.config
 
+
 class LoggingConfig(Config):
     def __init__(self, args):
         super(LoggingConfig, self).__init__(args)
@@ -52,9 +53,9 @@ class LoggingConfig(Config):
 
             level = logging.INFO
             if self.verbosity:
-               level = logging.DEBUG
+                level = logging.DEBUG
 
-               # FIXME: we need a logging.WARN for a -q quiet option
+            # FIXME: we need a logging.WARN for a -q quiet option
             logger = logging.getLogger('')
             logger.setLevel(level)
             formatter = logging.Formatter(log_format)
@@ -62,7 +63,6 @@ class LoggingConfig(Config):
                 handler = logging.FileHandler(self.log_file)
             else:
                 handler = logging.StreamHandler()
-            print handler
             handler.setFormatter(formatter)
 
             handler.addFilter(LoggingContextFilter(request=""))

@@ -1,15 +1,23 @@
-from functools import wraps
-
 import threading
 import logging
 
+
 class LoggingContext(object):
+    """Additional context for log formatting. Contexts are scoped within a
+    "with" block. Contexts inherit the state of their parent contexts.
+    Args:
+        name (str): Name for the context for debugging.
+    """
+
     __slots__ = ["parent_context", "name", "__dict__"]
 
     thread_local = threading.local()
 
     class Sentinel(object):
+        """Sentinel to represent the root context"""
+
         __slots__ = []
+
         def copy_to(self, record):
             pass
 
@@ -20,13 +28,15 @@ class LoggingContext(object):
         self.name = name
 
     def __str__(self):
-        return "%s@%x" % (self.name, id(self)) 
+        return "%s@%x" % (self.name, id(self))
 
     @classmethod
     def current_context(cls):
+        """Get the current logging context from thread local storage"""
         return getattr(cls.thread_local, "current_context", cls.sentinel)
 
     def __enter__(self):
+        """Enters this logging context into thread local storage"""
         if self.parent_context is not None:
             raise Exception("Attempt to enter logging context multiple times")
         self.parent_context = self.current_context()
@@ -34,6 +44,11 @@ class LoggingContext(object):
         return self
 
     def __exit__(self, type, value, traceback):
+        """Restore the logging context in thread local storage to the state it
+        was before this context was entered.
+        Returns:
+            None to avoid suppressing any exeptions that were thrown.
+        """
         if self.thread_local.current_context is not self:
             logging.error(
                 "Current logging context %s is not the expected context %s",
@@ -44,29 +59,32 @@ class LoggingContext(object):
         self.parent_context = None
 
     def __getattr__(self, name):
+        """Delegate member lookup to parent context"""
         return getattr(self.parent_context, name)
 
     def copy_to(self, record):
+        """Copy fields from this context and its parents to the record"""
         if self.parent_context is not None:
             self.parent_context.copy_to(record)
         for key, value in self.__dict__.items():
             setattr(record, key, value)
 
-    @classmethod
-    def wrap_callback(cls, callback):
-        context = cls.current_context()
-        @wraps(callback)
-        def wrapped(*args, **kargs):
-            cls.thread_local.current_context = context
-            return callback(*args, **kargs)
-        return wrapped
-
 
 class LoggingContextFilter(logging.Filter):
+    """Logging filter that adds values from the current logging context to each
+    record.
+    Args:
+        **defaults: Default values to avoid formatters complaining about
+            missing fields
+    """
     def __init__(self, **defaults):
         self.defaults = defaults
 
     def filter(self, record):
+        """Add each fields from the logging contexts to the record.
+        Returns:
+            True to include the record in the log output.
+        """
         context = LoggingContext.current_context()
         for key, value in self.defaults.items():
             setattr(record, key, value)
@@ -75,11 +93,16 @@ class LoggingContextFilter(logging.Filter):
 
 
 class PreserveLoggingContext(object):
+    """Captures the current logging context and restores it when the scope is
+    exited. Used to restore the context after a function using
+    @defer.inlineCallbacks is resumed by a callback from the reactor."""
+
     __slots__ = ["current_context"]
+
     def __enter__(self):
+        """Captures the current logging context"""
         self.current_context = LoggingContext.current_context()
 
     def __exit__(self, type, value, traceback):
+        """Restores the current logging context"""
         LoggingContext.thread_local.current_context = self.current_context
-
-
