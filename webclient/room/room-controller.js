@@ -1043,12 +1043,19 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         $modalInstance.close("redact");
     };
 })
-.controller('RoomInfoController', function($scope, $modalInstance, $filter) {
+.controller('RoomInfoController', function($scope, $modalInstance, $filter, matrixService) {
     console.log("Displaying room info.");
 
     $scope.submit = function(event) {
         if (event.content) {
-            console.error("submit >>> " + JSON.stringify(event));
+            console.log("submit >>> " + JSON.stringify(event.content));
+            matrixService.sendStateEvent($scope.room_id, event.type, 
+                event.content, event.state_key).then(function(response) {
+                    $modalInstance.dismiss();
+                }, function(err) {
+                    $scope.feedback = err.data.error;
+                }
+            );
         }
     };
 

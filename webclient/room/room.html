@@ -24,7 +24,7 @@
                     <br/>
                     Set by: <span class="monospace">{{ event.user_id }}</span>
                     <br/>
-                    <button ng-click="submit(event)" type="button" class="btn btn-success">
+                    <button ng-click="submit(event)" type="button" class="btn btn-success" ng-disabled="!event.content">
                         Submit
                     </button>
                 </td>
