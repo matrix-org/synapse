@@ -17,15 +17,19 @@
         <div class="modal-body">
             <table class="room-info">
             <tr ng-repeat="(key, event) in events.rooms[room_id] | stateEventsFilter" class="room-info-event">
-                <td class="room-info-event-meta">
+                <td class="room-info-event-meta" width="30%">
                     <span class="monospace">{{ key }}</span>
                     <br/>
                     {{ (event.origin_server_ts) | date:'MMM d HH:mm' }}
                     <br/>
                     Set by: <span class="monospace">{{ event.user_id }}</span>
+                    <br/>
+                    <button ng-click="submit(event)" type="button" class="btn btn-success">
+                        Submit
+                    </button>
                 </td>
-                <td class="room-info-event-content">
-                    <pre>{{ event.content | json }}</pre>
+                <td class="room-info-event-content" width="70%">
+                    <textarea class="room-info-textarea-content" elastic ng-model="event.content | json"></textarea> 
                 </td>
             </tr>
             </table>

@@ -443,6 +443,12 @@ textarea, input {
     font-family: monospace;
 }
 
+.room-info-textarea-content {
+    height: auto;
+    width: 100%;
+    resize: vertical;
+}
+
 /*** Participant list ***/
 
 #usersTableWrapper {

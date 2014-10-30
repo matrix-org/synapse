@@ -1039,9 +1039,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
 .controller('RoomInfoController', function($scope, $modalInstance, $filter) {
     console.log("Displaying room info.");
 
-    $scope.submitState = function(eventType, content) {
-        console.log("Submitting " + eventType + " with " + content);
-    }
+    $scope.submit = function(event) {
+        console.error("submit >>> " + JSON.stringify(event));
+    };
 
     $scope.dismiss = $modalInstance.dismiss;
 
