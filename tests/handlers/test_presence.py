@@ -29,6 +29,7 @@ from synapse.server import HomeServer
 from synapse.api.constants import PresenceState
 from synapse.api.errors import SynapseError
 from synapse.handlers.presence import PresenceHandler, UserPresenceCache
+from synapse.streams.config import SourcePaginationConfig
 
 
 OFFLINE = PresenceState.OFFLINE
@@ -674,6 +675,21 @@ class PresencePushTestCase(unittest.TestCase):
                 }},
             ],
             msg="Presence event should be visible to self-reflection"
+        )
+
+        config = SourcePaginationConfig(from_key=1, to_key=0)
+        (chunk, _) = yield self.event_source.get_pagination_rows(
+            self.u_apple, config, None
+        )
+        self.assertEquals(chunk,
+            [
+                {"type": "m.presence",
+                 "content": {
+                     "user_id": "@apple:test",
+                     "presence": ONLINE,
+                     "last_active_ago": 0,
+                }},
+            ]
         )
 
         # Banana sees it because of presence subscription

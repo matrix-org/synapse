@@ -60,40 +60,45 @@ class RegisterRestServlet(RestServlet):
 
     def on_GET(self, request):
         if self.hs.config.enable_registration_captcha:
-            return (200, {
-                "flows": [
+            return (
+                200,
+                {"flows": [
                     {
                         "type": LoginType.RECAPTCHA,
-                        "stages": ([LoginType.RECAPTCHA,
-                                    LoginType.EMAIL_IDENTITY,
-                                    LoginType.PASSWORD])
+                        "stages": [
+                            LoginType.RECAPTCHA,
+                            LoginType.EMAIL_IDENTITY,
+                            LoginType.PASSWORD
+                        ]
                     },
                     {
                         "type": LoginType.RECAPTCHA,
                         "stages": [LoginType.RECAPTCHA, LoginType.PASSWORD]
                     }
-                ]
-            })
+                ]}
+            )
         else:
-            return (200, {
-                "flows": [
+            return (
+                200,
+                {"flows": [
                     {
                         "type": LoginType.EMAIL_IDENTITY,
-                        "stages": ([LoginType.EMAIL_IDENTITY,
-                                    LoginType.PASSWORD])
+                        "stages": [
+                            LoginType.EMAIL_IDENTITY, LoginType.PASSWORD
+                        ]
                     },
                     {
                         "type": LoginType.PASSWORD
                     }
-                ]
-            })
+                ]}
+            )
 
     @defer.inlineCallbacks
     def on_POST(self, request):
         register_json = _parse_json(request)
 
-        session = (register_json["session"] if "session" in register_json
-                  else None)
+        session = (register_json["session"]
+                   if "session" in register_json else None)
         login_type = None
         if "type" not in register_json:
             raise SynapseError(400, "Missing 'type' key.")
@@ -122,7 +127,9 @@ class RegisterRestServlet(RestServlet):
             defer.returnValue((200, response))
         except KeyError as e:
             logger.exception(e)
-            raise SynapseError(400, "Missing JSON keys for login type %s." % login_type)
+            raise SynapseError(400, "Missing JSON keys for login type %s." % (
+                login_type,
+            ))
 
     def on_OPTIONS(self, request):
         return (200, {})
@@ -183,8 +190,10 @@ class RegisterRestServlet(RestServlet):
                 session["user"] = register_json["user"]
                 defer.returnValue(None)
             else:
-                raise SynapseError(400, "Captcha bypass HMAC incorrect",
-                    errcode=Codes.CAPTCHA_NEEDED)
+                raise SynapseError(
+                    400, "Captcha bypass HMAC incorrect",
+                    errcode=Codes.CAPTCHA_NEEDED
+                )
 
         challenge = None
         user_response = None
@@ -230,12 +239,15 @@ class RegisterRestServlet(RestServlet):
 
         if ("user" in session and "user" in register_json and
                 session["user"] != register_json["user"]):
-            raise SynapseError(400, "Cannot change user ID during registration")
+            raise SynapseError(
+                400, "Cannot change user ID during registration"
+            )
 
         password = register_json["password"].encode("utf-8")
-        desired_user_id = (register_json["user"].encode("utf-8") if "user"
-                          in register_json else None)
-        if desired_user_id and urllib.quote(desired_user_id) != desired_user_id:
+        desired_user_id = (register_json["user"].encode("utf-8")
+                           if "user" in register_json else None)
+        if (desired_user_id
+                and urllib.quote(desired_user_id) != desired_user_id):
             raise SynapseError(
                 400,
                 "User ID must only contain characters which do not " +

@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import copy
+
 
 class JsonEncodedObject(object):
     """ A common base class for defining protocol units that are represented
@@ -88,6 +88,7 @@ class JsonEncodedObject(object):
 
     def __str__(self):
         return "(%s, %s)" % (self.__class__.__name__, repr(self.__dict__))
+
 
 def _encode(obj):
     if type(obj) is list:

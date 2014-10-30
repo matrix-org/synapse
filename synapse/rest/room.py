@@ -48,7 +48,9 @@ class RoomCreateRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, txn_id):
         try:
-            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+            defer.returnValue(
+                self.txns.get_client_transaction(request, txn_id)
+            )
         except KeyError:
             pass
 
@@ -98,8 +100,8 @@ class RoomStateEventRestServlet(RestServlet):
         no_state_key = "/rooms/(?P<room_id>[^/]*)/state/(?P<event_type>[^/]*)$"
 
         # /room/$roomid/state/$eventtype/$statekey
-        state_key = ("/rooms/(?P<room_id>[^/]*)/state/" +
-            "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$")
+        state_key = ("/rooms/(?P<room_id>[^/]*)/state/"
+                     "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$")
 
         http_server.register_path("GET",
                                   client_path_pattern(state_key),
@@ -133,7 +135,9 @@ class RoomStateEventRestServlet(RestServlet):
         )
 
         if not data:
-            raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
+            raise SynapseError(
+                404, "Event not found.", errcode=Codes.NOT_FOUND
+            )
         defer.returnValue((200, data[0].get_dict()["content"]))
 
     @defer.inlineCallbacks
@@ -195,7 +199,9 @@ class RoomSendEventRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, txn_id):
         try:
-            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+            defer.returnValue(
+                self.txns.get_client_transaction(request, txn_id)
+            )
         except KeyError:
             pass
 
@@ -254,7 +260,9 @@ class JoinRoomAliasServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_identifier, txn_id):
         try:
-            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+            defer.returnValue(
+                self.txns.get_client_transaction(request, txn_id)
+            )
         except KeyError:
             pass
 
@@ -293,7 +301,8 @@ class RoomMemberListRestServlet(RestServlet):
             target_user = self.hs.parse_userid(event["user_id"])
             # Presence is an optional cache; don't fail if we can't fetch it
             try:
-                presence_state = yield self.handlers.presence_handler.get_state(
+                presence_handler = self.handlers.presence_handler
+                presence_state = yield presence_handler.get_state(
                     target_user=target_user, auth_user=user
                 )
                 event["content"].update(presence_state)
@@ -359,11 +368,11 @@ class RoomInitialSyncRestServlet(RestServlet):
         #       { state event } , { state event }
         #   ]
         # }
-        # Probably worth keeping the keys room_id and membership for parity with
-        # /initialSync even though they must be joined to sync this and know the
-        # room ID, so clients can reuse the same code (room_id and membership
-        # are MANDATORY for /initialSync, so the code will expect it to be
-        # there)
+        # Probably worth keeping the keys room_id and membership for parity
+        # with /initialSync even though they must be joined to sync this and
+        # know the room ID, so clients can reuse the same code (room_id and
+        # membership are MANDATORY for /initialSync, so the code will expect
+        # it to be there)
         defer.returnValue((200, {}))
 
 
@@ -388,8 +397,8 @@ class RoomMembershipRestServlet(RestServlet):
 
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
-        PATTERN = ("/rooms/(?P<room_id>[^/]*)/" +
-            "(?P<membership_action>join|invite|leave|ban|kick)")
+        PATTERN = ("/rooms/(?P<room_id>[^/]*)/"
+                   "(?P<membership_action>join|invite|leave|ban|kick)")
         register_txn_path(self, PATTERN, http_server)
 
     @defer.inlineCallbacks
@@ -422,7 +431,9 @@ class RoomMembershipRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):
         try:
-            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+            defer.returnValue(
+                self.txns.get_client_transaction(request, txn_id)
+            )
         except KeyError:
             pass
 
@@ -430,6 +441,7 @@ class RoomMembershipRestServlet(RestServlet):
 
         self.txns.store_client_transaction(request, txn_id, response)
         defer.returnValue(response)
+
 
 class RoomRedactEventRestServlet(RestServlet):
     def register(self, http_server):
@@ -457,7 +469,9 @@ class RoomRedactEventRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_id, txn_id):
         try:
-            defer.returnValue(self.txns.get_client_transaction(request, txn_id))
+            defer.returnValue(
+                self.txns.get_client_transaction(request, txn_id)
+            )
         except KeyError:
             pass
 
@@ -503,10 +517,10 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
     )
     if with_get:
         http_server.register_path(
-        "GET",
-        client_path_pattern(regex_string + "/(?P<txn_id>[^/]*)$"),
-        servlet.on_GET
-    )
+            "GET",
+            client_path_pattern(regex_string + "/(?P<txn_id>[^/]*)$"),
+            servlet.on_GET
+        )
 
 
 def register_servlets(hs, http_server):

@@ -22,6 +22,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class SourcePaginationConfig(object):
+
+    """A configuration object which stores pagination parameters for a
+    specific event source."""
+
+    def __init__(self, from_key=None, to_key=None, direction='f',
+                 limit=0):
+        self.from_key = from_key
+        self.to_key = to_key
+        self.direction = 'f' if direction == 'f' else 'b'
+        self.limit = int(limit)
+
+
 class PaginationConfig(object):
 
     """A configuration object which stores pagination parameters."""
@@ -82,3 +95,13 @@ class PaginationConfig(object):
             "<PaginationConfig from_tok=%s, to_tok=%s, "
             "direction=%s, limit=%s>"
         ) % (self.from_token, self.to_token, self.direction, self.limit)
+
+    def get_source_config(self, source_name):
+        keyname = "%s_key" % source_name
+
+        return SourcePaginationConfig(
+            from_key=getattr(self.from_token, keyname),
+            to_key=getattr(self.to_token, keyname) if self.to_token else None,
+            direction=self.direction,
+            limit=self.limit,
+        )

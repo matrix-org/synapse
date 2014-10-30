@@ -30,9 +30,9 @@ class HttpTransactionStore(object):
         """Retrieve a response for this request.
 
         Args:
-            key (str): A transaction-independent key for this request. Typically
-            this is a combination of the path (without the transaction id) and
-            the user's access token.
+            key (str): A transaction-independent key for this request. Usually
+                this is a combination of the path (without the transaction id)
+                and the user's access token.
             txn_id (str): The transaction ID for this request
         Returns:
             A tuple of (HTTP response code, response content) or None.
@@ -51,9 +51,9 @@ class HttpTransactionStore(object):
         """Stores an HTTP response tuple.
 
         Args:
-            key (str): A transaction-independent key for this request. Typically
-            this is a combination of the path (without the transaction id) and
-            the user's access token.
+            key (str): A transaction-independent key for this request. Usually
+                this is a combination of the path (without the transaction id)
+                and the user's access token.
             txn_id (str): The transaction ID for this request.
             response (tuple): A tuple of (HTTP response code, response content)
         """
@@ -92,5 +92,3 @@ class HttpTransactionStore(object):
         token = request.args["access_token"][0]
         path_without_txn_id = request.path.rsplit("/", 1)[0]
         return path_without_txn_id + "/" + token
-
-

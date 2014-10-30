@@ -100,4 +100,3 @@ class SynapseKeyClientProtocol(HTTPClient):
 
 class SynapseKeyClientFactory(Factory):
     protocol = SynapseKeyClientProtocol
-
