@@ -54,6 +54,6 @@ setup(
     long_description=read("README.rst"),
     entry_points="""
     [console_scripts]
-    synapse-homeserver=synapse.app.homeserver:run
+    synapse-homeserver=synapse.app.homeserver:main
     """
 )

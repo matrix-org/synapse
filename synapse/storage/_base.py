@@ -19,6 +19,7 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.api.events.utils import prune_event
 from synapse.util.logutils import log_function
+from synapse.util.logcontext import PreserveLoggingContext, LoggingContext
 
 import collections
 import copy
@@ -74,12 +75,19 @@ class SQLBaseStore(object):
         self.event_factory = hs.get_event_factory()
         self._clock = hs.get_clock()
 
+    @defer.inlineCallbacks
     def runInteraction(self, func, *args, **kwargs):
         """Wraps the .runInteraction() method on the underlying db_pool."""
+        current_context = LoggingContext.current_context()
         def inner_func(txn, *args, **kwargs):
-            return func(LoggingTransaction(txn), *args, **kwargs)
-
-        return self._db_pool.runInteraction(inner_func, *args, **kwargs)
+            with LoggingContext("runInteraction") as context:
+                current_context.copy_to(context)
+                return func(LoggingTransaction(txn), *args, **kwargs)
+        with PreserveLoggingContext():
+            result = yield self._db_pool.runInteraction(
+                inner_func, *args, **kwargs
+            )
+        defer.returnValue(result)
 
     def cursor_to_dict(self, cursor):
         """Converts a SQL cursor into an list of dicts.
@@ -146,7 +154,7 @@ class SQLBaseStore(object):
         )
 
         logger.debug(
-            "[SQL] %s  Args=%s Func=%s",
+            "[SQL] %s Args=%s",
             sql, values.values(),
         )
 

@@ -33,6 +33,7 @@ from synapse.api.urls import (
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
+from synapse.util.logcontext import LoggingContext
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
@@ -240,7 +241,7 @@ def setup():
         daemon = Daemonize(
             app="synapse-homeserver",
             pid=config.pid_file,
-            action=reactor.run,
+            action=run,
             auto_close_fds=False,
             verbose=True,
             logger=logger,
@@ -250,6 +251,13 @@ def setup():
     else:
         reactor.run()
 
+def run():
+    with LoggingContext("run") as context:
+        reactor.run()
+
+def main():
+    with LoggingContext("main") as context:
+        setup()
 
 if __name__ == '__main__':
-    setup()
+    main()

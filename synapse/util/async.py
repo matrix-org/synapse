@@ -16,8 +16,11 @@
 
 from twisted.internet import defer, reactor
 
+from .logcontext import PreserveLoggingContext
 
+@defer.inlineCallbacks
 def sleep(seconds):
     d = defer.Deferred()
     reactor.callLater(seconds, d.callback, seconds)
-    return d
+    with PreserveLoggingContext():
+        yield d
