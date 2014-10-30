@@ -181,11 +181,16 @@ class SignatureStore(SQLBaseStore):
             algorithm (str): Hashing algorithm.
             hash_bytes (bytes): Hash function output bytes.
         """
-        self._simple_insert_txn(txn, "event_content_hashes", {
-            "event_id": event_id,
-            "algorithm": algorithm,
-            "hash": buffer(hash_bytes),
-        })
+        self._simple_insert_txn(
+            txn,
+            "event_content_hashes",
+            {
+                "event_id": event_id,
+                "algorithm": algorithm,
+                "hash": buffer(hash_bytes),
+            },
+            or_ignore=True,
+        )
 
     def _get_event_reference_hashes_txn(self, txn, event_id):
         """Get all the hashes for a given PDU.
@@ -212,11 +217,16 @@ class SignatureStore(SQLBaseStore):
             algorithm (str): Hashing algorithm.
             hash_bytes (bytes): Hash function output bytes.
         """
-        self._simple_insert_txn(txn, "event_reference_hashes", {
-            "event_id": event_id,
-            "algorithm": algorithm,
-            "hash": buffer(hash_bytes),
-        })
+        self._simple_insert_txn(
+            txn,
+            "event_reference_hashes",
+            {
+                "event_id": event_id,
+                "algorithm": algorithm,
+                "hash": buffer(hash_bytes),
+            },
+            or_ignore=True,
+        )
 
 
     def _get_event_origin_signatures_txn(self, txn, event_id):
@@ -245,12 +255,17 @@ class SignatureStore(SQLBaseStore):
             key_id (str): Id for the signing key.
             signature (bytes): The signature.
         """
-        self._simple_insert_txn(txn, "event_origin_signatures", {
-            "event_id": event_id,
-            "origin": origin,
-            "key_id": key_id,
-            "signature": buffer(signature_bytes),
-        })
+        self._simple_insert_txn(
+            txn,
+            "event_origin_signatures",
+            {
+                "event_id": event_id,
+                "origin": origin,
+                "key_id": key_id,
+                "signature": buffer(signature_bytes),
+            },
+            or_ignore=True,
+        )
 
     def _get_prev_event_hashes_txn(self, txn, event_id):
         """Get all the hashes for previous PDUs of a PDU
@@ -274,9 +289,14 @@ class SignatureStore(SQLBaseStore):
 
     def _store_prev_event_hash_txn(self, txn, event_id, prev_event_id,
                                  algorithm, hash_bytes):
-        self._simple_insert_txn(txn, "event_edge_hashes", {
-            "event_id": event_id,
-            "prev_event_id": prev_event_id,
-            "algorithm": algorithm,
-            "hash": buffer(hash_bytes),
-        })
+        self._simple_insert_txn(
+            txn,
+            "event_edge_hashes",
+            {
+                "event_id": event_id,
+                "prev_event_id": prev_event_id,
+                "algorithm": algorithm,
+                "hash": buffer(hash_bytes),
+            },
+            or_ignore=True,
+        )

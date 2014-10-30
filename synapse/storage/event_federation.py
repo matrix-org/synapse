@@ -99,7 +99,8 @@ class EventFederationStore(SQLBaseStore):
                     "event_id": event_id,
                     "prev_event_id": e_id,
                     "room_id": room_id,
-                }
+                },
+                or_ignore=True,
             )
 
         # Update the extremities table if this is not an outlier.
@@ -120,7 +121,7 @@ class EventFederationStore(SQLBaseStore):
             # We only insert as a forward extremity the new pdu if there are no
             # other pdus that reference it as a prev pdu
             query = (
-                "INSERT INTO %(table)s (event_id, room_id) "
+                "INSERT OR IGNORE INTO %(table)s (event_id, room_id) "
                 "SELECT ?, ? WHERE NOT EXISTS ("
                 "SELECT 1 FROM %(event_edges)s WHERE "
                 "prev_event_id = ? "
@@ -144,7 +145,8 @@ class EventFederationStore(SQLBaseStore):
                     values={
                         "event_id": e_id,
                         "room_id": room_id,
-                    }
+                    },
+                    or_ignore=True,
                 )
 
             # Also delete from the backwards extremities table all ones that
