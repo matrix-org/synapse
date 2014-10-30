@@ -112,7 +112,7 @@ class FederationHandler(BaseHandler):
 
         is_new_state = yield self.state_handler.annotate_state_groups(
             event,
-            state=state
+            old_state=state
         )
 
         logger.debug("Event: %s", event)
@@ -240,7 +240,7 @@ class FederationHandler(BaseHandler):
 
             is_new_state = yield self.state_handler.annotate_state_groups(
                 event,
-                state=state
+                old_state=state
             )
 
             logger.debug("do_invite_join event: %s", event)
@@ -279,7 +279,10 @@ class FederationHandler(BaseHandler):
             del self.room_queues[room_id]
 
             for p in room_queue:
-                yield self.on_receive_pdu(p, backfilled=False)
+                try:
+                    yield self.on_receive_pdu(p, backfilled=False)
+                except:
+                    pass
 
         defer.returnValue(True)
 
@@ -355,15 +358,30 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_state_for_pdu(self, pdu_id, pdu_origin):
+        event_id = encode_event_id(pdu_id, pdu_origin)
+
         state_groups = yield self.store.get_state_groups(
-            [encode_event_id(pdu_id, pdu_origin)]
+            [event_id]
         )
 
         if state_groups:
+            results = {
+                (e.type, e.state_key): e for e in state_groups[0].state
+            }
+
+            event = yield self.store.get_event(event_id)
+            if hasattr(event, "state_key"):
+                # Get previous state
+                if hasattr(event, "prev_state") and event.prev_state:
+                    prev_event = yield self.store.get_event(event.prev_state)
+                    results[(event.type, event.state_key)] = prev_event
+                else:
+                    del results[(event.type, event.state_key)]
+
             defer.returnValue(
                 [
                     self.pdu_codec.pdu_from_event(s)
-                    for s in state_groups[0].state
+                    for s in results.values()
                 ]
             )
         else:

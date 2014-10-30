@@ -128,11 +128,15 @@ class StateHandler(object):
 
     @defer.inlineCallbacks
     @log_function
-    def annotate_state_groups(self, event, state=None):
-        if state:
+    def annotate_state_groups(self, event, old_state=None):
+        if old_state:
             event.state_group = None
-            event.old_state_events = None
-            event.state_events = {(s.type, s.state_key): s for s in state}
+            event.old_state_events = old_state
+            event.state_events = {(s.type, s.state_key): s for s in old_state}
+
+            if hasattr(event, "state_key"):
+                event.state_events[(event.type, event.state_key)] = event
+
             defer.returnValue(False)
             return
 
@@ -163,7 +167,7 @@ class StateHandler(object):
 
         event_ids = [
             e_id
-            for e_id, _ in events
+            for e_id, _, _ in events
         ]
 
         res = yield self.resolve_state_groups(event_ids)
