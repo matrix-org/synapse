@@ -13,6 +13,34 @@
         </div>
     </script>
 
+    <script type="text/ng-template" id="roomInfoTemplate.html">
+        <div class="modal-body">
+            <table id="roomInfoTable">
+                <tr>
+                <th>
+                    Event Type
+                </th>
+                <th>
+                    Content
+                </th>
+                </tr>
+                <tr ng-repeat="(key, event) in events.rooms[room_id] | stateEventsFilter">
+                    <td>
+                        <pre>{{ key }}</pre>
+                    </td>
+                    <td>
+                        <pre>{{ event.content | json }}</pre>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="modal-footer">
+            <button ng-click="dismiss()" type="button" class="btn">
+                Close
+            </button>
+        </div>
+    </script>
+
     <div id="roomHeader">
         <a href ng-click="goToPage('/')"><img src="img/logo-small.png" width="100" height="43" alt="[matrix]"/></a>
         <div class="roomHeaderInfo">
@@ -215,6 +243,9 @@
                         title ="{{ !isWebRTCSupported ? 'VoIP requires webRTC but your browser does not support it' : (memberCount() == 2 ? '' : 'VoIP calls can only be made in rooms with two participants') }}"
                         >
                     Video Call
+                </button>
+                <button ng-click="openRoomInfo()">
+                    Room Info
                 </button>
             </div>
         

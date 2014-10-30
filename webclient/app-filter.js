@@ -76,6 +76,17 @@ angular.module('matrixWebClient')
         return filtered;
     };
 })
+.filter('stateEventsFilter', function($sce) {
+    return function(events) {
+        var filtered = {};
+        angular.forEach(events, function(value, key) {
+            if (value && typeof(value.state_key) === "string") {
+                filtered[key] = value;
+            }
+        });
+        return filtered;
+    };
+})
 .filter('unsafe', ['$sce', function($sce) {
     return function(text) {
         return $sce.trustAsHtml(text);

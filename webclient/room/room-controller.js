@@ -1017,6 +1017,15 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         });
     };
 
+    $scope.openRoomInfo = function() {
+        var modalInstance = $modal.open({
+            templateUrl: 'roomInfoTemplate.html',
+            controller: 'RoomInfoController',
+            size: 'lg',
+            scope: $scope
+        });
+    };
+
 }])
 .controller('EventInfoController', function($scope, $modalInstance) {
     console.log("Displaying modal dialog for >>>> " + JSON.stringify($scope.event_selected));
@@ -1026,4 +1035,14 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         console.log("Redact event >> " + JSON.stringify($scope.event_selected));
         $modalInstance.close("redact");
     };
+})
+.controller('RoomInfoController', function($scope, $modalInstance, $filter) {
+    console.log("Displaying room info.");
+
+    $scope.submitState = function(eventType, content) {
+        console.log("Submitting " + eventType + " with " + content);
+    }
+
+    $scope.dismiss = $modalInstance.dismiss;
+
 });
