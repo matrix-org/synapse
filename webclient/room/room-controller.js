@@ -1018,6 +1018,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     $scope.openRoomInfo = function() {
+        var stateFilter = $filter("stateEventsFilter");
+        var stateEvents = stateFilter($scope.events.rooms[$scope.room_id]);
+        // The modal dialog will 2-way bind this field, so we MUST make a deep
+        // copy of the state events else we will be *actually adjusing our view
+        // of the world* when fiddling with the JSON!! Apparently parse/stringify
+        // is faster than jQuery's extend when doing deep copies.
+        $scope.roomInfoStateEvents = JSON.parse(JSON.stringify(stateEvents));
         var modalInstance = $modal.open({
             templateUrl: 'roomInfoTemplate.html',
             controller: 'RoomInfoController',
@@ -1040,7 +1047,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     console.log("Displaying room info.");
 
     $scope.submit = function(event) {
-        console.error("submit >>> " + JSON.stringify(event));
+        if (event.content) {
+            console.error("submit >>> " + JSON.stringify(event));
+        }
     };
 
     $scope.dismiss = $modalInstance.dismiss;
