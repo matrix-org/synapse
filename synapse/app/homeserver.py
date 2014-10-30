@@ -252,11 +252,11 @@ def setup():
         reactor.run()
 
 def run():
-    with LoggingContext("run") as context:
+    with LoggingContext("run"):
         reactor.run()
 
 def main():
-    with LoggingContext("main") as context:
+    with LoggingContext("main"):
         setup()
 
 if __name__ == '__main__':
