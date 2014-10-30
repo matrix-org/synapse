@@ -564,6 +564,13 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                         handleRedaction(event, isLiveEvent);
                         break;
                     default:
+                        // if it is a state event, then just add it in so it
+                        // displays on the Room Info screen.
+                        if (typeof(event.state_key) === "string") { // incls. 0-len strings
+                            if (event.room_id) {
+                                handleRoomDateEvent(event, isLiveEvent, false);
+                            }
+                        }
                         console.log("Unable to handle event type " + event.type);
                         console.log(JSON.stringify(event, undefined, 4));
                         break;
