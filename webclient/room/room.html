@@ -24,7 +24,7 @@
                     <br/>
                     Set by: <span class="monospace">{{ event.user_id }}</span>
                     <br/>
-                    <span ng-show="event.required_power_level >= 0">Required power level: {{event.required_power_level}}</span>
+                    <span ng-show="event.required_power_level >= 0">Required power level: {{event.required_power_level}}<br/></span>
                     <button ng-click="submit(event)" type="button" class="btn btn-success" ng-disabled="!event.content">
                         Submit
                     </button>
