@@ -20,6 +20,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class ServerContextFactory(ssl.ContextFactory):
     """Factory for PyOpenSSL SSL contexts that are used to handle incoming
     connections and to make connections to remote servers."""
@@ -43,4 +44,3 @@ class ServerContextFactory(ssl.ContextFactory):
 
     def getContext(self):
         return self._context
-

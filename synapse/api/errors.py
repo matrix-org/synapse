@@ -54,7 +54,7 @@ class SynapseError(CodeMessageException):
         """Constructs a synapse error.
 
         Args:
-            code (int): The integer error code (typically an HTTP response code)
+            code (int): The integer error code (an HTTP response code)
             msg (str): The human-readable error message.
             err (str): The error code e.g 'M_FORBIDDEN'
         """
@@ -66,6 +66,7 @@ class SynapseError(CodeMessageException):
             self.msg,
             self.errcode,
         )
+
 
 class RoomError(SynapseError):
     """An error raised when a room event fails."""
@@ -116,6 +117,7 @@ class InvalidCaptchaError(SynapseError):
             self.errcode,
             error_url=self.error_url,
         )
+
 
 class LimitExceededError(SynapseError):
     """A client has sent too many requests and is being throttled.

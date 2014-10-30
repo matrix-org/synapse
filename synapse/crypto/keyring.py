@@ -44,7 +44,7 @@ class Keyring(object):
             raise SynapseError(
                 400,
                 "Not signed with a supported algorithm",
-                 Codes.UNAUTHORIZED,
+                Codes.UNAUTHORIZED,
             )
         try:
             verify_key = yield self.get_server_verify_key(server_name, key_ids)
@@ -100,7 +100,7 @@ class Keyring(object):
         )
 
         if ("signatures" not in response
-            or server_name not in response["signatures"]):
+                or server_name not in response["signatures"]):
             raise ValueError("Key response not signed by remote server")
 
         if "tls_certificate" not in response:

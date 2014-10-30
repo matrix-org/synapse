@@ -35,5 +35,8 @@ class EmailConfig(Config):
         email_group.add_argument(
             "--email-smtp-server",
             default="",
-            help="The SMTP server to send emails from (e.g. for password resets)."
+            help=(
+                "The SMTP server to send emails from (e.g. for password"
+                " resets)."
+            )
         )

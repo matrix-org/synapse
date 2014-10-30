@@ -16,7 +16,9 @@
 
 from twisted.internet import defer, reactor
 from twisted.internet.error import DNSLookupError
-from twisted.web.client import _AgentBase, _URI, readBody, FileBodyProducer, PartialDownloadError
+from twisted.web.client import (
+    _AgentBase, _URI, readBody, FileBodyProducer, PartialDownloadError
+)
 from twisted.web.http_headers import Headers
 
 from synapse.http.endpoint import matrix_endpoint
@@ -97,7 +99,7 @@ class BaseHttpClient(object):
 
         retries_left = 5
 
-        endpoint = self._getEndpoint(reactor, destination);
+        endpoint = self._getEndpoint(reactor, destination)
 
         while True:
 
@@ -181,7 +183,7 @@ class MatrixHttpClient(BaseHttpClient):
 
         auth_headers = []
 
-        for key,sig in request["signatures"][self.server_name].items():
+        for key, sig in request["signatures"][self.server_name].items():
             auth_headers.append(bytes(
                 "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (
                     self.server_name, key, sig,
@@ -276,7 +278,6 @@ class MatrixHttpClient(BaseHttpClient):
 
         defer.returnValue(json.loads(body))
 
-
     def _getEndpoint(self, reactor, destination):
         return matrix_endpoint(
             reactor, destination, timeout=10,
@@ -351,6 +352,7 @@ class IdentityServerHttpClient(BaseHttpClient):
 
         defer.returnValue(json.loads(body))
 
+
 class CaptchaServerHttpClient(MatrixHttpClient):
     """Separate HTTP client for talking to google's captcha servers"""
 
@@ -383,6 +385,7 @@ class CaptchaServerHttpClient(MatrixHttpClient):
                 defer.returnValue(e.response)
             else:
                 raise e
+
 
 def _print_ex(e):
     if hasattr(e, "reasons") and e.reasons:

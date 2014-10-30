@@ -33,7 +33,10 @@ class VoipConfig(Config):
         )
         group.add_argument(
             "--turn-shared-secret", type=str, default=None,
-            help="The shared secret used to compute passwords for the TURN server"
+            help=(
+                "The shared secret used to compute passwords for the TURN"
+                " server"
+            )
         )
         group.add_argument(
             "--turn-user-lifetime", type=int, default=(1000 * 60 * 60),

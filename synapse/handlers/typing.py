@@ -96,9 +96,10 @@ class TypingNotificationHandler(BaseHandler):
         remotedomains = set()
 
         rm_handler = self.homeserver.get_handlers().room_member_handler
-        yield rm_handler.fetch_room_distributions_into(room_id,
-                localusers=localusers, remotedomains=remotedomains,
-                ignore_user=user)
+        yield rm_handler.fetch_room_distributions_into(
+            room_id, localusers=localusers, remotedomains=remotedomains,
+            ignore_user=user
+        )
 
         for u in localusers:
             self.push_update_to_clients(
@@ -130,8 +131,9 @@ class TypingNotificationHandler(BaseHandler):
         localusers = set()
 
         rm_handler = self.homeserver.get_handlers().room_member_handler
-        yield rm_handler.fetch_room_distributions_into(room_id,
-                localusers=localusers)
+        yield rm_handler.fetch_room_distributions_into(
+            room_id, localusers=localusers
+        )
 
         for u in localusers:
             self.push_update_to_clients(
@@ -142,7 +144,7 @@ class TypingNotificationHandler(BaseHandler):
             )
 
     def push_update_to_clients(self, room_id, observer_user, observed_user,
-            typing):
+                               typing):
         # TODO(paul) steal this from presence.py
         pass
 

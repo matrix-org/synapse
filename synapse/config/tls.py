@@ -19,7 +19,7 @@ from OpenSSL import crypto
 import subprocess
 import os
 
-GENERATE_DH_PARAMS=False
+GENERATE_DH_PARAMS = False
 
 
 class TlsConfig(Config):

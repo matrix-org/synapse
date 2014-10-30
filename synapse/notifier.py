@@ -167,7 +167,8 @@ class Notifier(object):
                 )
 
         def eb(failure):
-            logger.error("Failed to notify listener",
+            logger.error(
+                "Failed to notify listener",
                 exc_info=(
                     failure.type,
                     failure.value,

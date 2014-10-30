@@ -108,9 +108,9 @@ class ProfileRestServlet(RestServlet):
         )
 
         defer.returnValue((200, {
-                                    "displayname": displayname,
-                                    "avatar_url": avatar_url
-                                }))
+            "displayname": displayname,
+            "avatar_url": avatar_url
+        }))
 
 
 def register_servlets(hs, http_server):

@@ -33,7 +33,9 @@ class RoomMemberStore(SQLBaseStore):
             target_user_id = event.state_key
             domain = self.hs.parse_userid(target_user_id).domain
         except:
-            logger.exception("Failed to parse target_user_id=%s", target_user_id)
+            logger.exception(
+                "Failed to parse target_user_id=%s", target_user_id
+            )
             raise
 
         logger.debug(
@@ -65,7 +67,8 @@ class RoomMemberStore(SQLBaseStore):
             # Check if this was the last person to have left.
             member_events = self._get_members_query_txn(
                 txn,
-                where_clause="c.room_id = ? AND m.membership = ? AND m.user_id != ?",
+                where_clause=("c.room_id = ? AND m.membership = ?"
+                              " AND m.user_id != ?"),
                 where_values=(event.room_id, Membership.JOIN, target_user_id,)
             )
 
@@ -119,7 +122,6 @@ class RoomMemberStore(SQLBaseStore):
             return self._parse_events_txn(txn, rows)[0]
         else:
             return None
-
 
     def get_room_members(self, room_id, membership=None):
         """Retrieve the current room member list for a room.
