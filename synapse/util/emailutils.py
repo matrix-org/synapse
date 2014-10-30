@@ -42,8 +42,8 @@ def send_email(smtp_server, from_addr, to_addr, subject, body):
         EmailException if there was a problem sending the mail.
     """
     if not smtp_server or not from_addr or not to_addr:
-        raise EmailException("Need SMTP server, from and to addresses. Check " +
-                             "the config to set these.")
+        raise EmailException("Need SMTP server, from and to addresses. Check"
+                             " the config to set these.")
 
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject

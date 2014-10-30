@@ -76,9 +76,7 @@ class PresenceHandler(BaseHandler):
             "stopped_user_eventstream", self.stopped_user_eventstream
         )
 
-        distributor.observe("user_joined_room",
-            self.user_joined_room
-        )
+        distributor.observe("user_joined_room", self.user_joined_room)
 
         distributor.declare("collect_presencelike_data")
 
@@ -156,14 +154,12 @@ class PresenceHandler(BaseHandler):
             defer.returnValue(True)
 
         if (yield self.store.user_rooms_intersect(
-            [u.to_string() for u in observer_user, observed_user]
-        )):
+                [u.to_string() for u in observer_user, observed_user])):
             defer.returnValue(True)
 
         if (yield self.store.is_presence_visible(
-            observed_localpart=observed_user.localpart,
-            observer_userid=observer_user.to_string(),
-        )):
+                observed_localpart=observed_user.localpart,
+                observer_userid=observer_user.to_string())):
             defer.returnValue(True)
 
         defer.returnValue(False)
@@ -171,7 +167,8 @@ class PresenceHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_state(self, target_user, auth_user):
         if target_user.is_mine:
-            visible = yield self.is_presence_visible(observer_user=auth_user,
+            visible = yield self.is_presence_visible(
+                observer_user=auth_user,
                 observed_user=target_user
             )
 
@@ -219,9 +216,9 @@ class PresenceHandler(BaseHandler):
                 )
 
         if state["presence"] not in self.STATE_LEVELS:
-            raise SynapseError(400, "'%s' is not a valid presence state" %
-                state["presence"]
-            )
+            raise SynapseError(400, "'%s' is not a valid presence state" % (
+                state["presence"],
+            ))
 
         logger.debug("Updating presence state of %s to %s",
                      target_user.localpart, state["presence"])
@@ -229,7 +226,7 @@ class PresenceHandler(BaseHandler):
         state_to_store = dict(state)
         state_to_store["state"] = state_to_store.pop("presence")
 
-        statuscache=self._get_or_offline_usercache(target_user)
+        statuscache = self._get_or_offline_usercache(target_user)
         was_level = self.STATE_LEVELS[statuscache.get_state()["presence"]]
         now_level = self.STATE_LEVELS[state["presence"]]
 
@@ -649,8 +646,9 @@ class PresenceHandler(BaseHandler):
             del state["user_id"]
 
             if "presence" not in state:
-                logger.warning("Received a presence 'push' EDU from %s without"
-                    + " a 'presence' key", origin
+                logger.warning(
+                    "Received a presence 'push' EDU from %s without a"
+                    " 'presence' key", origin
                 )
                 continue
 
@@ -745,7 +743,7 @@ class PresenceHandler(BaseHandler):
         defer.returnValue((localusers, remote_domains))
 
     def push_update_to_clients(self, observed_user, users_to_push=[],
-                                 room_ids=[], statuscache=None):
+                               room_ids=[], statuscache=None):
         self.notifier.on_new_user_event(
             users_to_push,
             room_ids,
@@ -765,8 +763,7 @@ class PresenceEventSource(object):
         presence = self.hs.get_handlers().presence_handler
 
         if (yield presence.store.user_rooms_intersect(
-            [u.to_string() for u in observer_user, observed_user]
-        )):
+                [u.to_string() for u in observer_user, observed_user])):
             defer.returnValue(True)
 
         if observed_user.is_mine:
@@ -823,15 +820,12 @@ class PresenceEventSource(object):
     def get_pagination_rows(self, user, pagination_config, key):
         # TODO (erikj): Does this make sense? Ordering?
 
-        from_token = pagination_config.from_token
-        to_token = pagination_config.to_token
-
         observer_user = user
 
-        from_key = int(from_token.presence_key)
+        from_key = int(pagination_config.from_key)
 
-        if to_token:
-            to_key = int(to_token.presence_key)
+        if pagination_config.to_key:
+            to_key = int(pagination_config.to_key)
         else:
             to_key = -1
 
@@ -841,7 +835,7 @@ class PresenceEventSource(object):
         updates = []
         # TODO(paul): use a DeferredList ? How to limit concurrency.
         for observed_user in cachemap.keys():
-            if not (to_key < cachemap[observed_user].serial < from_key):
+            if not (to_key < cachemap[observed_user].serial <= from_key):
                 continue
 
             if (yield self.is_visible(observer_user, observed_user)):
@@ -849,30 +843,15 @@ class PresenceEventSource(object):
 
         # TODO(paul): limit
 
-        updates = [(k, cachemap[k]) for k in cachemap
-                   if to_key < cachemap[k].serial < from_key]
-
         if updates:
             clock = self.clock
 
             earliest_serial = max([x[1].serial for x in updates])
             data = [x[1].make_event(user=x[0], clock=clock) for x in updates]
 
-            if to_token:
-                next_token = to_token
-            else:
-                next_token = from_token
-
-            next_token = next_token.copy_and_replace(
-                "presence_key", earliest_serial
-            )
-            defer.returnValue((data, next_token))
+            defer.returnValue((data, earliest_serial))
         else:
-            if not to_token:
-                to_token = from_token.copy_and_replace(
-                    "presence_key", 0
-                )
-            defer.returnValue(([], to_token))
+            defer.returnValue(([], 0))
 
 
 class UserPresenceCache(object):

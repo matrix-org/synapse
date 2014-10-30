@@ -54,7 +54,7 @@ class LoginHandler(BaseHandler):
         # pull out the hash for this user if they exist
         user_info = yield self.store.get_user_by_id(user_id=user)
         if not user_info:
-            logger.warn("Attempted to login as %s but they do not exist.", user)
+            logger.warn("Attempted to login as %s but they do not exist", user)
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
         stored_hash = user_info[0]["password_hash"]

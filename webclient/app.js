@@ -30,7 +30,8 @@ var matrixWebClient = angular.module('matrixWebClient', [
     'MatrixCall',
     'eventStreamService',
     'eventHandlerService',
-    'infinite-scroll'
+    'infinite-scroll',
+    'ui.bootstrap'
 ]);
 
 matrixWebClient.config(['$routeProvider', '$provide', '$httpProvider',

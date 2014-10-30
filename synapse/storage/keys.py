@@ -18,8 +18,9 @@ from _base import SQLBaseStore
 from twisted.internet import defer
 
 import OpenSSL
-from  syutil.crypto.signing_key import decode_verify_key_bytes
+from syutil.crypto.signing_key import decode_verify_key_bytes
 import hashlib
+
 
 class KeyStore(SQLBaseStore):
     """Persistence for signature verification keys and tls X.509 certificates

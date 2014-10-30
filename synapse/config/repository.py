@@ -15,6 +15,7 @@
 
 from ._base import Config
 
+
 class ContentRepositoryConfig(Config):
     def __init__(self, args):
         super(ContentRepositoryConfig, self).__init__(args)

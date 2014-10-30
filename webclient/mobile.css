@@ -65,13 +65,16 @@
     }
     
     #roomName {
-        float: left;
-        font-size: 14px ! important;
+        font-size: 12px ! important;
         margin-top: 0px ! important;
+    }
+
+    .roomTopicSection {
+        display: none;
     }
         
     #roomPage {
-        top: 35px ! important;
+        top: 40px ! important;
         left: 5px ! important;
         right: 5px ! important;
         bottom: 70px ! important;

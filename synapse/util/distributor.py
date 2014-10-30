@@ -42,7 +42,8 @@ class Distributor(object):
         if name in self.signals:
             raise KeyError("%r already has a signal named %s" % (self, name))
 
-        self.signals[name] = Signal(name,
+        self.signals[name] = Signal(
+            name,
             suppress_failures=self.suppress_failures,
         )
 

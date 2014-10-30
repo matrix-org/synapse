@@ -16,6 +16,7 @@
 from ._base import Config
 import os
 
+
 class DatabaseConfig(Config):
     def __init__(self, args):
         super(DatabaseConfig, self).__init__(args)
@@ -34,4 +35,3 @@ class DatabaseConfig(Config):
     def generate_config(cls, args, config_dir_path):
         super(DatabaseConfig, cls).generate_config(args, config_dir_path)
         args.database_path = os.path.abspath(args.database_path)
-

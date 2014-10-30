@@ -114,8 +114,12 @@ class MessageHandler(BaseHandler):
 
         user = self.hs.parse_userid(user_id)
 
-        events, next_token = yield data_source.get_pagination_rows(
-            user, pagin_config, room_id
+        events, next_key = yield data_source.get_pagination_rows(
+            user, pagin_config.get_source_config("room"), room_id
+        )
+
+        next_token = pagin_config.from_token.copy_and_replace(
+            "room_key", next_key
         )
 
         chunk = {
@@ -264,7 +268,7 @@ class MessageHandler(BaseHandler):
         presence_stream = self.hs.get_event_sources().sources["presence"]
         pagination_config = PaginationConfig(from_token=now_token)
         presence, _ = yield presence_stream.get_pagination_rows(
-            user, pagination_config, None
+            user, pagination_config.get_source_config("presence"), None
         )
 
         public_rooms = yield self.store.get_rooms(is_public=True)

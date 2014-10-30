@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
-.controller('RoomController', ['$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall',
-                               function($filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall) {
+.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall',
+                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -133,7 +133,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         // Do not autoscroll to the bottom to display the new event if the user is not at the bottom.
         // Exception: in case where the event is from the user, we want to force scroll to the bottom
         var objDiv = document.getElementById("messageTableWrapper");
-        if ((objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || force) {
+        // add a 10px buffer to this check so if the message list is not *quite*
+        // at the bottom it still scrolls since it basically is at the bottom.
+        if ((10 + objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || force) {
             
             $timeout(function() {
                 objDiv.scrollTop = objDiv.scrollHeight;
@@ -830,7 +832,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 $scope.userIDToInvite = "";
             },
             function(reason) {
-                $scope.feedback = "Failure: " + reason;
+                $scope.feedback = "Failure: " + reason.data.error;
             });
     };
 
@@ -982,4 +984,65 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         }
     };
 
-}]);
+    $scope.openJson = function(content) {
+        $scope.event_selected = content;
+        // scope this so the template can check power levels and enable/disable
+        // buttons
+        $scope.pow = matrixService.getUserPowerLevel;
+
+        var modalInstance = $modal.open({
+            templateUrl: 'eventInfoTemplate.html',
+            controller: 'EventInfoController',
+            scope: $scope
+        });
+
+        modalInstance.result.then(function(action) {
+            if (action === "redact") {
+                var eventId = $scope.event_selected.event_id;
+                console.log("Redacting event ID " + eventId);
+                matrixService.redactEvent(
+                    $scope.event_selected.room_id,
+                    eventId
+                ).then(function(response) {
+                    console.log("Redaction = " + JSON.stringify(response));
+                }, function(error) {
+                    console.error("Failed to redact event: "+JSON.stringify(error));
+                    if (error.data.error) {
+                        $scope.feedback = error.data.error;
+                    }
+                });
+            }
+        }, function() {
+            // any dismiss code
+        });
+    };
+
+    $scope.openRoomInfo = function() {
+        var modalInstance = $modal.open({
+            templateUrl: 'roomInfoTemplate.html',
+            controller: 'RoomInfoController',
+            size: 'lg',
+            scope: $scope
+        });
+    };
+
+}])
+.controller('EventInfoController', function($scope, $modalInstance) {
+    console.log("Displaying modal dialog for >>>> " + JSON.stringify($scope.event_selected));
+    $scope.redact = function() {
+        console.log("User level = "+$scope.pow($scope.room_id, $scope.state.user_id)+
+                    " Redact level = "+$scope.events.rooms[$scope.room_id]["m.room.ops_levels"].content.redact_level);
+        console.log("Redact event >> " + JSON.stringify($scope.event_selected));
+        $modalInstance.close("redact");
+    };
+})
+.controller('RoomInfoController', function($scope, $modalInstance, $filter) {
+    console.log("Displaying room info.");
+
+    $scope.submitState = function(eventType, content) {
+        console.log("Submitting " + eventType + " with " + content);
+    }
+
+    $scope.dismiss = $modalInstance.dismiss;
+
+});

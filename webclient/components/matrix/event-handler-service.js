@@ -58,14 +58,29 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
         var shouldBing = false;
         
         // case-insensitive name check for user_id OR display_name if they exist
+        var userRegex = "";
         var myUserId = matrixService.config().user_id;
         if (myUserId) {
-            myUserId = myUserId.toLocaleLowerCase();
+            var localpart = getLocalPartFromUserId(myUserId);
+            if (localpart) {
+                localpart = localpart.toLocaleLowerCase();
+                userRegex += "\\b" + localpart + "\\b";
+            }
         }
         var myDisplayName = matrixService.config().display_name;
         if (myDisplayName) {
             myDisplayName = myDisplayName.toLocaleLowerCase();
+            if (userRegex.length > 0) {
+                userRegex += "|";
+            }
+            userRegex += "\\b" + myDisplayName + "\\b";
         }
+
+        var r = new RegExp(userRegex, 'i');
+        if (content.search(r) >= 0) {
+            shouldBing = true;
+        }
+
         if ( (myDisplayName && content.toLocaleLowerCase().indexOf(myDisplayName) != -1) ||
              (myUserId && content.toLocaleLowerCase().indexOf(myUserId) != -1) ) {
             shouldBing = true;
@@ -82,6 +97,18 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             }
         }
         return shouldBing;
+    };
+
+    var getLocalPartFromUserId = function(user_id) {
+        if (!user_id) {
+            return null;
+        }
+        var localpartRegex = /@(.*):\w+/i
+        var results = localpartRegex.exec(user_id);
+        if (results && results.length == 2) {
+            return results[1];
+        }
+        return null;
     };
 
     var initialSyncDeferred;
@@ -172,6 +199,17 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
     };
 
     var handleMessage = function(event, isLiveEvent) {
+        // Check for empty event content
+        var hasContent = false;
+        for (var prop in event.content) {
+            hasContent = true;
+            break;
+        }
+        if (!hasContent) {
+            // empty json object is a redacted event, so ignore.
+            return;
+        }
+
         if (isLiveEvent) {
             if (event.user_id === matrixService.config().user_id &&
                 (event.content.msgtype === "m.text" || event.content.msgtype === "m.emote") ) {
@@ -221,13 +259,29 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                         message = "* " + displayname + " " + message;
                     }
 
+                    var roomTitle = matrixService.getRoomIdToAliasMapping(event.room_id);
+                    var theRoom = $rootScope.events.rooms[event.room_id];
+                    if (!roomTitle && theRoom && theRoom["m.room.name"] && theRoom["m.room.name"].content) {
+                        roomTitle = theRoom["m.room.name"].content.name;
+                    }
+
+                    if (!roomTitle) {
+                        roomTitle = event.room_id;
+                    }
+                    
                     var notification = new window.Notification(
                         displayname +
-                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
+                        " (" + roomTitle + ")",
                     {
                         "body": message,
                         "icon": member ? member.avatar_url : undefined
                     });
+
+                    notification.onclick = function() {
+                        console.log("notification.onclick() room=" + event.room_id);
+                        $rootScope.goToPage('room/' + (event.room_id)); 
+                    };
+
                     $timeout(function() {
                         notification.close();
                     }, 5 * 1000);
@@ -256,7 +310,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             // could be a membership change, display name change, etc.
             // Find out which one.
             var memberChanges = undefined;
-            if (event.prev_content && (event.prev_content.membership !== event.content.membership)) {
+            if ((event.prev_content === undefined && event.content.membership) || (event.prev_content && (event.prev_content.membership !== event.content.membership))) {
                 memberChanges = "membership";
             }
             else if (event.prev_content && (event.prev_content.displayname !== event.content.displayname)) {
@@ -319,6 +373,31 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             $rootScope.events.rooms[event.room_id].messages.push(event);
         }
     };
+
+    var handleRedaction = function(event, isLiveEvent) {
+        if (!isLiveEvent) {
+            // we have nothing to remove, so just ignore it.
+            console.log("Received redacted event: "+JSON.stringify(event));
+            return;
+        }
+
+        // we need to remove something possibly: do we know the redacted
+        // event ID?
+        if (eventMap[event.redacts]) {
+            // remove event from list of messages in this room.
+            var eventList = $rootScope.events.rooms[event.room_id].messages;
+            for (var i=0; i<eventList.length; i++) {
+                if (eventList[i].event_id === event.redacts) {
+                    console.log("Removing event " + event.redacts);
+                    eventList.splice(i, 1);
+                    break;
+                }
+            }
+
+            // broadcast the redaction so controllers can nuke this
+            console.log("Redacted an event.");
+        }
+    }
     
     /**
      * Get the index of the event in $rootScope.events.rooms[room_id].messages
@@ -480,6 +559,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                         break;
                     case 'm.room.topic':
                         handleRoomTopic(event, isLiveEvent, isStateEvent);
+                        break;
+                    case 'm.room.redaction':
+                        handleRedaction(event, isLiveEvent);
                         break;
                     default:
                         console.log("Unable to handle event type " + event.type);
