@@ -258,6 +258,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                     if (event.content.msgtype === "m.emote") {
                         message = "* " + displayname + " " + message;
                     }
+                    else if (event.content.msgtype === "m.image") {
+                        message = displayname + " sent an image.";
+                    }
 
                     var roomTitle = matrixService.getRoomIdToAliasMapping(event.room_id);
                     var theRoom = $rootScope.events.rooms[event.room_id];
