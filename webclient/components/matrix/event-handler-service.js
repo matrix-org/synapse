@@ -27,8 +27,8 @@ Typically, this service will store events or broadcast them to any listeners
 if typically all the $on method would do is update its own $scope.
 */
 angular.module('eventHandlerService', [])
-.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 'notificationService',
-function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService) {
+.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 'notificationService', 'modelService',
+function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService, modelService) {
     var ROOM_CREATE_EVENT = "ROOM_CREATE_EVENT";
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
