@@ -201,11 +201,14 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 // Notify when a user joins
                 if ((document.hidden  || matrixService.presence.unavailable === mPresence.getState())
                         && event.state_key !== $scope.state.user_id  && "join" === event.membership) {
-                        
+                    var userName = event.content.displayname;
+                    if (!userName) {
+                        userName = event.state_key;
+                    }
                     notificationService.showNotification(
-                        event.content.displayname +
+                        userName +
                         " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")",
-                        event.content.displayname + " joined",
+                        userName + " joined",
                         event.content.avatar_url ? event.content.avatar_url : undefined,
                         function() {
                             console.log("notification.onclick() room=" + event.room_id);
