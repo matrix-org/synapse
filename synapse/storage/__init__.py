@@ -67,7 +67,6 @@ SCHEMAS = [
     "keys",
     "redactions",
     "state",
-    "signatures",
     "event_edges",
     "event_signatures",
 ]
@@ -364,13 +363,6 @@ class DataStore(RoomMemberStore, RoomStore,
             membership_state = self._get_room_member(txn, user_id, room_id)
             prev_events = self._get_latest_events_in_room(txn, room_id)
 
-            if state_type is not None and state_key is not None:
-                prev_state_pdu = self._get_current_state_pdu(
-                    txn, room_id, state_type, state_key
-                )
-            else:
-                prev_state_pdu = None
-
             return Snapshot(
                 store=self,
                 room_id=room_id,
@@ -379,7 +371,6 @@ class DataStore(RoomMemberStore, RoomStore,
                 membership_state=membership_state,
                 state_type=state_type,
                 state_key=state_key,
-                prev_state_pdu=prev_state_pdu,
             )
 
         return self.runInteraction("snapshot_room", _snapshot)

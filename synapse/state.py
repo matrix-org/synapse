@@ -77,28 +77,17 @@ class StateHandler(object):
         snapshot.fill_out_prev_events(event)
         yield self.annotate_state_groups(event)
 
-        current_state = snapshot.prev_state_pdu
+        if event.old_state_events:
+            current_state = event.old_state_events.get(
+                (event.type, event.state_key)
+            )
 
-        if current_state:
-            event.prev_state = EventID.create(
-                current_state.pdu_id, current_state.origin, self.hs
-            ).to_string()
+            if current_state:
+                event.prev_state = current_state.event_id
 
         # TODO check current_state to see if the min power level is less
         # than the power level of the user
         # power_level = self._get_power_level_for_event(event)
-
-        e_id = self.hs.parse_eventid(event.event_id)
-        pdu_id = e_id.localpart
-        origin = e_id.domain
-
-        yield self.store.update_current_state(
-            pdu_id=pdu_id,
-            origin=origin,
-            context=key.context,
-            pdu_type=key.type,
-            state_key=key.state_key
-        )
 
         defer.returnValue(True)
 

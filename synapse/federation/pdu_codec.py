@@ -32,11 +32,11 @@ class PduCodec(object):
         self.hs = hs
 
     def encode_event_id(self, local, domain):
-        return EventID.create(local, domain, self.hs).to_string()
+        return local
 
     def decode_event_id(self, event_id):
         e_id = self.hs.parse_eventid(event_id)
-        return e_id.localpart, e_id.domain
+        return event_id, e_id.domain
 
     def event_from_pdu(self, pdu):
         kwargs = {}
