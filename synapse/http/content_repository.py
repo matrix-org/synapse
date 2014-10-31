@@ -38,8 +38,8 @@ class ContentRepoResource(resource.Resource):
 
     Uploads are POSTed to wherever this Resource is linked to. This resource
     returns a "content token" which can be used to GET this content again. The
-    token is typically a path, but it may not be. Tokens can expire, be one-time
-    uses, etc.
+    token is typically a path, but it may not be. Tokens can expire, be
+    one-time uses, etc.
 
     In this case, the token is a path to the file and contains 3 interesting
     sections:
@@ -175,10 +175,9 @@ class ContentRepoResource(resource.Resource):
             with open(fname, "wb") as f:
                 f.write(request.content.read())
 
-
             # FIXME (erikj): These should use constants.
             file_name = os.path.basename(fname)
-            # FIXME: we can't assume what the public mounted path of the repo is
+            # FIXME: we can't assume what the repo's public mounted path is
             # ...plus self-signed SSL won't work to remote clients anyway
             # ...and we can't assume that it's SSL anyway, as we might want to
             # server it via the non-SSL listener...
@@ -201,6 +200,3 @@ class ContentRepoResource(resource.Resource):
                 500,
                 json.dumps({"error": "Internal server error"}),
                 send_cors=True)
-
-
-

@@ -64,9 +64,11 @@ class RegistrationHandler(BaseHandler):
             user_id = user.to_string()
 
             token = self._generate_token(user_id)
-            yield self.store.register(user_id=user_id,
+            yield self.store.register(
+                user_id=user_id,
                 token=token,
-                password_hash=password_hash)
+                password_hash=password_hash
+            )
 
             self.distributor.fire("registered_user", user)
         else:
@@ -181,8 +183,11 @@ class RegistrationHandler(BaseHandler):
         data = yield httpCli.post_urlencoded_get_json(
             creds['idServer'],
             "/_matrix/identity/api/v1/3pid/bind",
-            {'sid': creds['sid'], 'clientSecret': creds['clientSecret'],
-            'mxid': mxid}
+            {
+                'sid': creds['sid'],
+                'clientSecret': creds['clientSecret'],
+                'mxid': mxid,
+            }
         )
         defer.returnValue(data)
 
@@ -223,5 +228,3 @@ class RegistrationHandler(BaseHandler):
             }
         )
         defer.returnValue(data)
-
-

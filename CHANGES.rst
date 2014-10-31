@@ -1,3 +1,19 @@
+Changes in synapse 0.4.2 (2014-10-31)
+=====================================
+
+Homeserver:
+ * Fix bugs where we did not notify users of correct presence updates.
+ * Fix bug where we did not handle sub second event stream timeouts.
+
+Webclient:
+ * Add ability to click on messages to see JSON.
+ * Add ability to redact messages.
+ * Add ability to view and edit all room state JSON.
+ * Handle incoming redactions.
+ * Improve feedback on errors.
+ * Fix bugs in mobile CSS.
+ * Fix bugs with desktop notifications.
+
 Changes in synapse 0.4.1 (2014-10-17)
 =====================================
 Webclient:

@@ -34,23 +34,23 @@ class VoipRestServlet(RestServlet):
         turnSecret = self.hs.config.turn_shared_secret
         userLifetime = self.hs.config.turn_user_lifetime
         if not turnUris or not turnSecret or not userLifetime:
-            defer.returnValue( (200, {}) )
+            defer.returnValue((200, {}))
 
         expiry = (self.hs.get_clock().time_msec() + userLifetime) / 1000
         username = "%d:%s" % (expiry, auth_user.to_string())
-         
+
         mac = hmac.new(turnSecret, msg=username, digestmod=hashlib.sha1)
-        # We need to use standard base64 encoding here, *not* syutil's encode_base64
-        # because we need to add the standard padding to get the same result as the
-        # TURN server.
+        # We need to use standard base64 encoding here, *not* syutil's
+        # encode_base64 because we need to add the standard padding to get the
+        # same result as the TURN server.
         password = base64.b64encode(mac.digest())
 
-        defer.returnValue( (200, {
+        defer.returnValue((200, {
             'username': username,
             'password': password,
             'ttl': userLifetime / 1000,
             'uris': turnUris,
-        }) )
+        }))
 
     def on_OPTIONS(self, request):
         return (200, {})

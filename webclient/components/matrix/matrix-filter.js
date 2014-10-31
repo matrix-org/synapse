@@ -47,7 +47,6 @@ angular.module('matrixFilter', [])
             else if (room.members && !isPublicRoom) {    // Do not rename public room
             
                 var user_id = matrixService.config().user_id;
-
                 // Else, build the name from its users
                 // Limit the room renaming to 1:1 room
                 if (2 === Object.keys(room.members).length) {
@@ -65,8 +64,16 @@ angular.module('matrixFilter', [])
                     
                     var otherUserId;
 
-                    if (Object.keys(room.members)[0] && Object.keys(room.members)[0] !== user_id) {
+                    if (Object.keys(room.members)[0]) {
                         otherUserId = Object.keys(room.members)[0];
+                        // this could be an invite event (from event stream)
+                        if (otherUserId === user_id && 
+                                room.members[user_id].content.membership === "invite") {
+                            // this is us being invited to this room, so the
+                            // *user_id* is the other user ID and not the state
+                            // key.
+                            otherUserId = room.members[user_id].user_id;
+                        }
                     }
                     else {
                         // it's got to be an invite, or failing that a self-chat;

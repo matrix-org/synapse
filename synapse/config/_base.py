@@ -116,18 +116,25 @@ class Config(object):
             config = {}
             for key, value in vars(args).items():
                 if (key not in set(["config_path", "generate_config"])
-                    and value is not None):
+                        and value is not None):
                     config[key] = value
             with open(config_args.config_path, "w") as config_file:
                 # TODO(paul) it would be lovely if we wrote out vim- and emacs-
                 #   style mode markers into the file, to hint to people that
                 #   this is a YAML file.
                 yaml.dump(config, config_file, default_flow_style=False)
-            print "A config file has been generated in %s for server name '%s') with corresponding SSL keys and self-signed certificates. Please review this file and customise it to your needs." % (config_args.config_path, config['server_name'])
-            print "If this server name is incorrect, you will need to regenerate the SSL certificates"
+            print (
+                "A config file has been generated in %s for server name"
+                " '%s' with corresponding SSL keys and self-signed"
+                " certificates. Please review this file and customise it to"
+                " your needs."
+            ) % (
+                config_args.config_path, config['server_name']
+            )
+            print (
+                "If this server name is incorrect, you will need to regenerate"
+                " the SSL certificates"
+            )
             sys.exit(0)
 
         return cls(args)
-
-
-

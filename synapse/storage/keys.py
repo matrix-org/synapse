@@ -18,8 +18,9 @@ from _base import SQLBaseStore
 from twisted.internet import defer
 
 import OpenSSL
-from  syutil.crypto.signing_key import decode_verify_key_bytes
+from syutil.crypto.signing_key import decode_verify_key_bytes
 import hashlib
+
 
 class KeyStore(SQLBaseStore):
     """Persistence for signature verification keys and tls X.509 certificates
@@ -104,7 +105,6 @@ class KeyStore(SQLBaseStore):
             ts_now_ms (int): The time now in milliseconds
             verification_key (VerifyKey): The NACL verify key.
         """
-        verify_key_bytes = verify_key.encode()
         return self._simple_insert(
             table="server_signature_keys",
             values={

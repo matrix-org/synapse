@@ -169,11 +169,6 @@ class RoomCreationHandler(BaseHandler):
             content=content
         )
 
-        yield self.hs.get_handlers().room_member_handler.change_membership(
-            join_event,
-            do_auth=False
-        )
-
         content = {"membership": Membership.INVITE}
         for invitee in invite_list:
             invite_event = self.event_factory.create_event(
@@ -617,23 +612,14 @@ class RoomEventSource(object):
         return self.store.get_room_events_max_id()
 
     @defer.inlineCallbacks
-    def get_pagination_rows(self, user, pagination_config, key):
-        from_token = pagination_config.from_token
-        to_token = pagination_config.to_token
-        limit = pagination_config.limit
-        direction = pagination_config.direction
-
-        to_key = to_token.room_key if to_token else None
-
+    def get_pagination_rows(self, user, config, key):
         events, next_key = yield self.store.paginate_room_events(
             room_id=key,
-            from_key=from_token.room_key,
-            to_key=to_key,
-            direction=direction,
-            limit=limit,
+            from_key=config.from_key,
+            to_key=config.to_key,
+            direction=config.direction,
+            limit=config.limit,
             with_feedback=True
         )
 
-        next_token = from_token.copy_and_replace("room_key", next_key)
-
-        defer.returnValue((events, next_token))
+        defer.returnValue((events, next_key))

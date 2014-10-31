@@ -14,6 +14,7 @@
 
 from ._base import Config
 
+
 class RatelimitConfig(Config):
 
     def __init__(self, args):

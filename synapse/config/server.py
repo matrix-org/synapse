@@ -34,7 +34,7 @@ class ServerConfig(Config):
         if not args.content_addr:
             host = args.server_name
             if ':' not in host:
-                host  = "%s:%d" % (host, args.bind_port)
+                host = "%s:%d" % (host, args.bind_port)
             args.content_addr = "https://%s" % (host,)
 
         self.content_addr = args.content_addr
@@ -74,7 +74,7 @@ class ServerConfig(Config):
             return syutil.crypto.signing_key.read_signing_keys(
                 signing_keys.splitlines(True)
             )
-        except Exception as e:
+        except Exception:
             raise ConfigError(
                 "Error reading signing_key."
                 " Try running again with --generate-config"

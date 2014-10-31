@@ -15,11 +15,21 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
-.controller('RoomController', ['$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall',
-                               function($filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall) {
+.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'notificationService',
+                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, notificationService) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
+    
+    // .html needs this
+    $scope.containsBingWord = function(content) {
+        return notificationService.containsBingWord(
+            matrixService.config().user_id,
+            matrixService.config().display_name,
+            matrixService.config().bingWords,
+            content
+        );
+    };
 
     // Room ids. Computed and resolved in onInit
     $scope.room_id = undefined;
@@ -133,7 +143,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         // Do not autoscroll to the bottom to display the new event if the user is not at the bottom.
         // Exception: in case where the event is from the user, we want to force scroll to the bottom
         var objDiv = document.getElementById("messageTableWrapper");
-        if ((objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || force) {
+        // add a 10px buffer to this check so if the message list is not *quite*
+        // at the bottom it still scrolls since it basically is at the bottom.
+        if ((10 + objDiv.offsetHeight + objDiv.scrollTop >= objDiv.scrollHeight) || force) {
             
             $timeout(function() {
                 objDiv.scrollTop = objDiv.scrollHeight;
@@ -189,16 +201,20 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 // Notify when a user joins
                 if ((document.hidden  || matrixService.presence.unavailable === mPresence.getState())
                         && event.state_key !== $scope.state.user_id  && "join" === event.membership) {
-                    var notification = new window.Notification(
-                        event.content.displayname +
-                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
-                    {
-                        "body": event.content.displayname + " joined",
-                        "icon": event.content.avatar_url ? event.content.avatar_url : undefined
-                    });
-                    $timeout(function() {
-                        notification.close();
-                    }, 5 * 1000);
+                    var userName = event.content.displayname;
+                    if (!userName) {
+                        userName = event.state_key;
+                    }
+                    notificationService.showNotification(
+                        userName +
+                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")",
+                        userName + " joined",
+                        event.content.avatar_url ? event.content.avatar_url : undefined,
+                        function() {
+                            console.log("notification.onclick() room=" + event.room_id);
+                            $rootScope.goToPage('room/' + event.room_id); 
+                        }
+                    );
                 }
             }
         }
@@ -830,7 +846,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 $scope.userIDToInvite = "";
             },
             function(reason) {
-                $scope.feedback = "Failure: " + reason;
+                $scope.feedback = "Failure: " + reason.data.error;
             });
     };
 
@@ -982,4 +998,88 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         }
     };
 
-}]);
+    $scope.openJson = function(content) {
+        $scope.event_selected = content;
+        // scope this so the template can check power levels and enable/disable
+        // buttons
+        $scope.pow = matrixService.getUserPowerLevel;
+
+        var modalInstance = $modal.open({
+            templateUrl: 'eventInfoTemplate.html',
+            controller: 'EventInfoController',
+            scope: $scope
+        });
+
+        modalInstance.result.then(function(action) {
+            if (action === "redact") {
+                var eventId = $scope.event_selected.event_id;
+                console.log("Redacting event ID " + eventId);
+                matrixService.redactEvent(
+                    $scope.event_selected.room_id,
+                    eventId
+                ).then(function(response) {
+                    console.log("Redaction = " + JSON.stringify(response));
+                }, function(error) {
+                    console.error("Failed to redact event: "+JSON.stringify(error));
+                    if (error.data.error) {
+                        $scope.feedback = error.data.error;
+                    }
+                });
+            }
+        }, function() {
+            // any dismiss code
+        });
+    };
+
+    $scope.openRoomInfo = function() {
+        $scope.roomInfo = {};
+        $scope.roomInfo.newEvent = {
+            content: {},
+            type: "",
+            state_key: ""
+        };
+
+        var stateFilter = $filter("stateEventsFilter");
+        var stateEvents = stateFilter($scope.events.rooms[$scope.room_id]);
+        // The modal dialog will 2-way bind this field, so we MUST make a deep
+        // copy of the state events else we will be *actually adjusing our view
+        // of the world* when fiddling with the JSON!! Apparently parse/stringify
+        // is faster than jQuery's extend when doing deep copies.
+        $scope.roomInfo.stateEvents = JSON.parse(JSON.stringify(stateEvents));
+        var modalInstance = $modal.open({
+            templateUrl: 'roomInfoTemplate.html',
+            controller: 'RoomInfoController',
+            size: 'lg',
+            scope: $scope
+        });
+    };
+
+}])
+.controller('EventInfoController', function($scope, $modalInstance) {
+    console.log("Displaying modal dialog for >>>> " + JSON.stringify($scope.event_selected));
+    $scope.redact = function() {
+        console.log("User level = "+$scope.pow($scope.room_id, $scope.state.user_id)+
+                    " Redact level = "+$scope.events.rooms[$scope.room_id]["m.room.ops_levels"].content.redact_level);
+        console.log("Redact event >> " + JSON.stringify($scope.event_selected));
+        $modalInstance.close("redact");
+    };
+})
+.controller('RoomInfoController', function($scope, $modalInstance, $filter, matrixService) {
+    console.log("Displaying room info.");
+
+    $scope.submit = function(event) {
+        if (event.content) {
+            console.log("submit >>> " + JSON.stringify(event.content));
+            matrixService.sendStateEvent($scope.room_id, event.type, 
+                event.content, event.state_key).then(function(response) {
+                    $modalInstance.dismiss();
+                }, function(err) {
+                    $scope.feedback = err.data.error;
+                }
+            );
+        }
+    };
+
+    $scope.dismiss = $modalInstance.dismiss;
+
+});

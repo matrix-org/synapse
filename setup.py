@@ -34,6 +34,7 @@ setup(
         "syutil==0.0.2",
         "Twisted>=14.0.0",
         "service_identity>=1.0.0",
+        "pyopenssl>=0.14",
         "pyyaml",
         "pyasn1",
         "pynacl",

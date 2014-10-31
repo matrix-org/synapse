@@ -27,8 +27,8 @@ Typically, this service will store events or broadcast them to any listeners
 if typically all the $on method would do is update its own $scope.
 */
 angular.module('eventHandlerService', [])
-.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 
-function(matrixService, $rootScope, $q, $timeout, mPresence) {
+.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 'notificationService',
+function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService) {
     var ROOM_CREATE_EVENT = "ROOM_CREATE_EVENT";
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
@@ -45,44 +45,6 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
     var eventMap = {};
 
     $rootScope.presence = {};
-    
-    // TODO: This is attached to the rootScope so .html can just go containsBingWord
-    // for determining classes so it is easy to highlight bing messages. It seems a
-    // bit strange to put the impl in this service though, but I can't think of a better
-    // file to put it in.
-    $rootScope.containsBingWord = function(content) {
-        if (!content || $.type(content) != "string") {
-            return false;
-        }
-        var bingWords = matrixService.config().bingWords;
-        var shouldBing = false;
-        
-        // case-insensitive name check for user_id OR display_name if they exist
-        var myUserId = matrixService.config().user_id;
-        if (myUserId) {
-            myUserId = myUserId.toLocaleLowerCase();
-        }
-        var myDisplayName = matrixService.config().display_name;
-        if (myDisplayName) {
-            myDisplayName = myDisplayName.toLocaleLowerCase();
-        }
-        if ( (myDisplayName && content.toLocaleLowerCase().indexOf(myDisplayName) != -1) ||
-             (myUserId && content.toLocaleLowerCase().indexOf(myUserId) != -1) ) {
-            shouldBing = true;
-        }
-        
-        // bing word list check
-        if (bingWords && !shouldBing) {
-            for (var i=0; i<bingWords.length; i++) {
-                var re = RegExp(bingWords[i]);
-                if (content.search(re) != -1) {
-                    shouldBing = true;
-                    break;
-                }
-            }
-        }
-        return shouldBing;
-    };
 
     var initialSyncDeferred;
 
@@ -172,6 +134,17 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
     };
 
     var handleMessage = function(event, isLiveEvent) {
+        // Check for empty event content
+        var hasContent = false;
+        for (var prop in event.content) {
+            hasContent = true;
+            break;
+        }
+        if (!hasContent) {
+            // empty json object is a redacted event, so ignore.
+            return;
+        }
+
         if (isLiveEvent) {
             if (event.user_id === matrixService.config().user_id &&
                 (event.content.msgtype === "m.text" || event.content.msgtype === "m.emote") ) {
@@ -190,7 +163,12 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             }
             
             if (window.Notification && event.user_id != matrixService.config().user_id) {
-                var shouldBing = $rootScope.containsBingWord(event.content.body);
+                var shouldBing = notificationService.containsBingWord(
+                    matrixService.config().user_id,
+                    matrixService.config().display_name,
+                    matrixService.config().bingWords,
+                    event.content.body
+                );
 
                 // Ideally we would notify only when the window is hidden (i.e. document.hidden = true).
                 //
@@ -220,17 +198,29 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                     if (event.content.msgtype === "m.emote") {
                         message = "* " + displayname + " " + message;
                     }
+                    else if (event.content.msgtype === "m.image") {
+                        message = displayname + " sent an image.";
+                    }
 
-                    var notification = new window.Notification(
-                        displayname +
-                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
-                    {
-                        "body": message,
-                        "icon": member ? member.avatar_url : undefined
-                    });
-                    $timeout(function() {
-                        notification.close();
-                    }, 5 * 1000);
+                    var roomTitle = matrixService.getRoomIdToAliasMapping(event.room_id);
+                    var theRoom = $rootScope.events.rooms[event.room_id];
+                    if (!roomTitle && theRoom && theRoom["m.room.name"] && theRoom["m.room.name"].content) {
+                        roomTitle = theRoom["m.room.name"].content.name;
+                    }
+
+                    if (!roomTitle) {
+                        roomTitle = event.room_id;
+                    }
+                    
+                    notificationService.showNotification(
+                        displayname + " (" + roomTitle + ")",
+                        message,
+                        member ? member.avatar_url : undefined,
+                        function() {
+                            console.log("notification.onclick() room=" + event.room_id);
+                            $rootScope.goToPage('room/' + event.room_id); 
+                        }
+                    );
                 }
             }
         }
@@ -256,7 +246,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             // could be a membership change, display name change, etc.
             // Find out which one.
             var memberChanges = undefined;
-            if (event.content.prev !== event.content.membership) {
+            if ((event.prev_content === undefined && event.content.membership) || (event.prev_content && (event.prev_content.membership !== event.content.membership))) {
                 memberChanges = "membership";
             }
             else if (event.prev_content && (event.prev_content.displayname !== event.content.displayname)) {
@@ -319,6 +309,31 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             $rootScope.events.rooms[event.room_id].messages.push(event);
         }
     };
+
+    var handleRedaction = function(event, isLiveEvent) {
+        if (!isLiveEvent) {
+            // we have nothing to remove, so just ignore it.
+            console.log("Received redacted event: "+JSON.stringify(event));
+            return;
+        }
+
+        // we need to remove something possibly: do we know the redacted
+        // event ID?
+        if (eventMap[event.redacts]) {
+            // remove event from list of messages in this room.
+            var eventList = $rootScope.events.rooms[event.room_id].messages;
+            for (var i=0; i<eventList.length; i++) {
+                if (eventList[i].event_id === event.redacts) {
+                    console.log("Removing event " + event.redacts);
+                    eventList.splice(i, 1);
+                    break;
+                }
+            }
+
+            // broadcast the redaction so controllers can nuke this
+            console.log("Redacted an event.");
+        }
+    }
     
     /**
      * Get the index of the event in $rootScope.events.rooms[room_id].messages
@@ -481,7 +496,17 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                     case 'm.room.topic':
                         handleRoomTopic(event, isLiveEvent, isStateEvent);
                         break;
+                    case 'm.room.redaction':
+                        handleRedaction(event, isLiveEvent);
+                        break;
                     default:
+                        // if it is a state event, then just add it in so it
+                        // displays on the Room Info screen.
+                        if (typeof(event.state_key) === "string") { // incls. 0-len strings
+                            if (event.room_id) {
+                                handleRoomDateEvent(event, isLiveEvent, false);
+                            }
+                        }
                         console.log("Unable to handle event type " + event.type);
                         console.log(JSON.stringify(event, undefined, 4));
                         break;

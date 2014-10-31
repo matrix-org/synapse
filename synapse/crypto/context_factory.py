@@ -16,6 +16,10 @@ from twisted.internet import ssl
 from OpenSSL import SSL
 from twisted.internet._sslverify import _OpenSSLECCurve, _defaultCurveName
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class ServerContextFactory(ssl.ContextFactory):
     """Factory for PyOpenSSL SSL contexts that are used to handle incoming
@@ -31,7 +35,7 @@ class ServerContextFactory(ssl.ContextFactory):
             _ecCurve = _OpenSSLECCurve(_defaultCurveName)
             _ecCurve.addECKeyToContext(context)
         except:
-            pass
+            logger.exception("Failed to enable eliptic curve for TLS")
         context.set_options(SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3)
         context.use_certificate(config.tls_certificate)
         context.use_privatekey(config.tls_private_key)
@@ -40,4 +44,3 @@ class ServerContextFactory(ssl.ContextFactory):
 
     def getContext(self):
         return self._context
-

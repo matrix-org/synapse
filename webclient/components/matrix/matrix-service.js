@@ -438,6 +438,14 @@ angular.module('matrixService', [])
             return this.sendMessage(room_id, msg_id, content);
         },
 
+        redactEvent: function(room_id, event_id) {
+            var path = "/rooms/$room_id/redact/$event_id";
+            path = path.replace("$room_id", room_id);
+            path = path.replace("$event_id", event_id);
+            var content = {};
+            return doRequest("POST", path, undefined, content);
+        },
+
         // get a snapshot of the members in a room.
         getMemberList: function(room_id) {
             // Like the cmd client, escape room ids

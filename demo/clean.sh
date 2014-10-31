@@ -14,3 +14,4 @@ fi
 find "$DIR" -name "*.log" -delete
 find "$DIR" -name "*.db" -delete
 
+rm -rf $DIR/etc
