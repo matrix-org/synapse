@@ -138,8 +138,10 @@ class StateHandler(object):
 
         if old_state:
             event.state_group = None
-            event.old_state_events = old_state
-            event.state_events = {(s.type, s.state_key): s for s in old_state}
+            event.old_state_events = {
+                (s.type, s.state_key): s for s in old_state
+            }
+            event.state_events = event.old_state_events
 
             if hasattr(event, "state_key"):
                 event.state_events[(event.type, event.state_key)] = event
