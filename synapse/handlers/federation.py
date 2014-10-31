@@ -415,6 +415,28 @@ class FederationHandler(BaseHandler):
             for e in events
         ])
 
+    @defer.inlineCallbacks
+    @log_function
+    def get_persisted_pdu(self, pdu_id, origin):
+        """ Get a PDU from the database with given origin and id.
+
+        Returns:
+            Deferred: Results in a `Pdu`.
+        """
+        event = yield self.store.get_event(
+            self.pdu_codec.encode_event_id(pdu_id, origin),
+            allow_none=True,
+        )
+
+        if event:
+            defer.returnValue(self.pdu_codec.pdu_from_event(event))
+        else:
+            defer.returnValue(None)
+
+    @log_function
+    def get_min_depth_for_context(self, context):
+        return self.store.get_min_depth(context)
+
     @log_function
     def _on_user_joined(self, user, room_id):
         waiters = self.waiting_for_join_list.get((user.to_string(), room_id), [])

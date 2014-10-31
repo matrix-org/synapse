@@ -78,6 +78,13 @@ class EventFederationStore(SQLBaseStore):
 
         return results
 
+    def get_min_depth(self, room_id):
+        return self.runInteraction(
+            "get_min_depth",
+            self._get_min_depth_interaction,
+            room_id,
+        )
+
     def _get_min_depth_interaction(self, txn, room_id):
         min_depth = self._simple_select_one_onecol_txn(
             txn,

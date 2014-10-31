@@ -106,7 +106,6 @@ class ReplicationLayer(object):
 
         self.query_handlers[query_type] = handler
 
-    @defer.inlineCallbacks
     @log_function
     def send_pdu(self, pdu):
         """Informs the replication layer about a new PDU generated within the
@@ -135,7 +134,7 @@ class ReplicationLayer(object):
         logger.debug("[%s] Persisting PDU", pdu.pdu_id)
 
         # Save *before* trying to send
-        yield self.store.persist_event(pdu=pdu)
+        # yield self.store.persist_event(pdu=pdu)
 
         logger.debug("[%s] Persisted PDU", pdu.pdu_id)
         logger.debug("[%s] transaction_layer.enqueue_pdu... ", pdu.pdu_id)
@@ -359,12 +358,13 @@ class ReplicationLayer(object):
                 pdu_id, pdu_origin
             )
         else:
-            results = yield self.store.get_current_state_for_context(
-                context
-            )
-            pdus = [Pdu.from_pdu_tuple(p) for p in results]
-
-        logger.debug("Context returning %d results", len(pdus))
+            raise NotImplementedError("Specify an event")
+        #     results = yield self.store.get_current_state_for_context(
+        #         context
+        #     )
+        #     pdus = [Pdu.from_pdu_tuple(p) for p in results]
+        #
+        # logger.debug("Context returning %d results", len(pdus))
 
         defer.returnValue((200, self._transaction_from_pdus(pdus).get_dict()))
 
@@ -456,7 +456,6 @@ class ReplicationLayer(object):
 
         defer.returnValue(pdus)
 
-    @defer.inlineCallbacks
     @log_function
     def _get_persisted_pdu(self, pdu_id, pdu_origin):
         """ Get a PDU from the database with given origin and id.
@@ -464,9 +463,7 @@ class ReplicationLayer(object):
         Returns:
             Deferred: Results in a `Pdu`.
         """
-        pdu_tuple = yield self.store.get_pdu(pdu_id, pdu_origin)
-
-        defer.returnValue(Pdu.from_pdu_tuple(pdu_tuple))
+        return self.handler.get_persisted_pdu(pdu_id, pdu_origin)
 
     def _transaction_from_pdus(self, pdu_list):
         """Returns a new Transaction containing the given PDUs suitable for
@@ -502,7 +499,9 @@ class ReplicationLayer(object):
         # Get missing pdus if necessary.
         if not pdu.outlier:
             # We only backfill backwards to the min depth.
-            min_depth = yield self.store.get_min_depth_for_context(pdu.context)
+            min_depth = yield self.handler.get_min_depth_for_context(
+                pdu.context
+            )
 
             if min_depth and pdu.depth > min_depth:
                 for pdu_id, origin, hashes in pdu.prev_pdus:
@@ -529,7 +528,7 @@ class ReplicationLayer(object):
                 )
 
         # Persist the Pdu, but don't mark it as processed yet.
-        yield self.store.persist_event(pdu=pdu)
+        # yield self.store.persist_event(pdu=pdu)
 
         if not backfilled:
             ret = yield self.handler.on_receive_pdu(
