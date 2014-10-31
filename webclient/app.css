@@ -418,6 +418,37 @@ textarea, input {
     margin-top: 15px;
 }
 
+/*** Room Info Dialog ***/
+
+.room-info {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.room-info-event {
+    border-bottom: 1pt solid black;
+}
+
+.room-info-event-meta {
+    padding-top: 1em;
+    padding-bottom: 1em;
+}
+
+.room-info-event-content {
+    padding-top: 1em;
+    padding-bottom: 1em;
+}
+
+.monospace {
+    font-family: monospace;
+}
+
+.room-info-textarea-content {
+    height: auto;
+    width: 100%;
+    resize: vertical;
+}
+
 /*** Participant list ***/
 
 #usersTableWrapper {

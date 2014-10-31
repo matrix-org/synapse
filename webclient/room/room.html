@@ -15,23 +15,36 @@
 
     <script type="text/ng-template" id="roomInfoTemplate.html">
         <div class="modal-body">
-            <table id="roomInfoTable">
-                <tr>
-                <th>
-                    Event Type
-                </th>
-                <th>
-                    Content
-                </th>
-                </tr>
-                <tr ng-repeat="(key, event) in events.rooms[room_id] | stateEventsFilter">
-                    <td>
-                        <pre>{{ key }}</pre>
-                    </td>
-                    <td>
-                        <pre>{{ event.content | json }}</pre>
-                    </td>
-                </tr>
+            <table class="room-info">
+            <tr ng-repeat="(key, event) in roomInfo.stateEvents" class="room-info-event">
+                <td class="room-info-event-meta" width="30%">
+                    <span class="monospace">{{ key }}</span>
+                    <br/>
+                    {{ (event.origin_server_ts) | date:'MMM d HH:mm' }}
+                    <br/>
+                    Set by: <span class="monospace">{{ event.user_id }}</span>
+                    <br/>
+                    <span ng-show="event.required_power_level >= 0">Required power level: {{event.required_power_level}}<br/></span>
+                    <button ng-click="submit(event)" type="button" class="btn btn-success" ng-disabled="!event.content">
+                        Submit
+                    </button>
+                </td>
+                <td class="room-info-event-content" width="70%">
+                    <textarea class="room-info-textarea-content" msd-elastic ng-model="event.content" asjson></textarea> 
+                </td>
+            </tr>
+            <tr>
+                <td class="room-info-event-meta" width="30%">
+                    <input ng-model="roomInfo.newEvent.type" placeholder="your.event.type" />
+                    <br/>
+                    <button ng-click="submit(roomInfo.newEvent)" type="button" class="btn btn-success" ng-disabled="!roomInfo.newEvent.content || !roomInfo.newEvent.type">
+                        Submit
+                    </button>
+                </td>
+                <td class="room-info-event-content" width="70%">
+                    <textarea class="room-info-textarea-content" msd-elastic ng-model="roomInfo.newEvent.content" asjson></textarea>
+                </td>
+            </tr>
             </table>
         </div>
         <div class="modal-footer">

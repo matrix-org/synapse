@@ -1018,6 +1018,20 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     $scope.openRoomInfo = function() {
+        $scope.roomInfo = {};
+        $scope.roomInfo.newEvent = {
+            content: {},
+            type: "",
+            state_key: ""
+        };
+
+        var stateFilter = $filter("stateEventsFilter");
+        var stateEvents = stateFilter($scope.events.rooms[$scope.room_id]);
+        // The modal dialog will 2-way bind this field, so we MUST make a deep
+        // copy of the state events else we will be *actually adjusing our view
+        // of the world* when fiddling with the JSON!! Apparently parse/stringify
+        // is faster than jQuery's extend when doing deep copies.
+        $scope.roomInfo.stateEvents = JSON.parse(JSON.stringify(stateEvents));
         var modalInstance = $modal.open({
             templateUrl: 'roomInfoTemplate.html',
             controller: 'RoomInfoController',
@@ -1036,12 +1050,21 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         $modalInstance.close("redact");
     };
 })
-.controller('RoomInfoController', function($scope, $modalInstance, $filter) {
+.controller('RoomInfoController', function($scope, $modalInstance, $filter, matrixService) {
     console.log("Displaying room info.");
 
-    $scope.submitState = function(eventType, content) {
-        console.log("Submitting " + eventType + " with " + content);
-    }
+    $scope.submit = function(event) {
+        if (event.content) {
+            console.log("submit >>> " + JSON.stringify(event.content));
+            matrixService.sendStateEvent($scope.room_id, event.type, 
+                event.content, event.state_key).then(function(response) {
+                    $modalInstance.dismiss();
+                }, function(err) {
+                    $scope.feedback = err.data.error;
+                }
+            );
+        }
+    };
 
     $scope.dismiss = $modalInstance.dismiss;
 
