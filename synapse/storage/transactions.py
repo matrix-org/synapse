@@ -142,15 +142,15 @@ class TransactionStore(SQLBaseStore):
 
         # Update the tx id -> pdu id mapping
 
-        values = [
-            (transaction_id, destination, pdu[0], pdu[1])
-            for pdu in pdu_list
-        ]
-
-        logger.debug("Inserting: %s", repr(values))
-
-        query = TransactionsToPduTable.insert_statement()
-        txn.executemany(query, values)
+        # values = [
+        #     (transaction_id, destination, pdu[0], pdu[1])
+        #     for pdu in pdu_list
+        # ]
+        #
+        # logger.debug("Inserting: %s", repr(values))
+        #
+        # query = TransactionsToPduTable.insert_statement()
+        # txn.executemany(query, values)
 
         return prev_txns
 
