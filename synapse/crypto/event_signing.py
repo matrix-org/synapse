@@ -16,11 +16,12 @@
 
 
 from synapse.federation.units import Pdu
-from synapse.api.events.utils import prune_pdu
+from synapse.api.events.utils import prune_pdu, prune_event
 from syutil.jsonutil import encode_canonical_json
 from syutil.base64util import encode_base64, decode_base64
 from syutil.crypto.jsonsign import sign_json, verify_signed_json
 
+import copy
 import hashlib
 import logging
 
@@ -66,6 +67,16 @@ def compute_pdu_event_reference_hash(pdu, hash_algorithm=hashlib.sha256):
     pdu_json.pop("signatures", None)
     pdu_json_bytes = encode_canonical_json(pdu_json)
     hashed = hash_algorithm(pdu_json_bytes)
+    return (hashed.name, hashed.digest())
+
+
+def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
+    tmp_event = copy.deepcopy(event)
+    tmp_event = prune_event(tmp_event)
+    event_json = tmp_event.get_dict()
+    event_json.pop("signatures", None)
+    event_json_bytes = encode_canonical_json(event_json)
+    hashed = hash_algorithm(event_json_bytes)
     return (hashed.name, hashed.digest())
 
 

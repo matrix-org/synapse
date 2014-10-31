@@ -46,7 +46,7 @@ from .signatures import SignatureStore
 
 from syutil.base64util import decode_base64
 
-from synapse.crypto.event_signing import compute_pdu_event_reference_hash
+from synapse.crypto.event_signing import compute_event_reference_hash
 
 
 import json
@@ -271,11 +271,10 @@ class DataStore(RoomMemberStore, RoomStore,
                     txn, event.event_id, prev_event_id, alg, hash_bytes
                 )
 
-        # TODO
-        # (ref_alg, ref_hash_bytes) = compute_pdu_event_reference_hash(pdu)
-        # self._store_event_reference_hash_txn(
-        #    txn, event.event_id, ref_alg, ref_hash_bytes
-        # )
+        (ref_alg, ref_hash_bytes) = compute_event_reference_hash(event)
+        self._store_event_reference_hash_txn(
+            txn, event.event_id, ref_alg, ref_hash_bytes
+        )
 
         self._update_min_depth_for_room_txn(txn, event.room_id, event.depth)
 

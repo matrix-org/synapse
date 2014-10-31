@@ -69,7 +69,7 @@ class EventFederationStore(SQLBaseStore):
 
         results = []
         for event_id, depth in txn.fetchall():
-            hashes = self._get_prev_event_hashes_txn(txn, event_id)
+            hashes = self._get_event_reference_hashes_txn(txn, event_id)
             prev_hashes = {
                 k: encode_base64(v) for k, v in hashes.items()
                 if k == "sha256"
