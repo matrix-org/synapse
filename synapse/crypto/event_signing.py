@@ -94,3 +94,23 @@ def verify_signed_event_pdu(pdu, signature_name, verify_key):
     tmp_pdu = prune_pdu(tmp_pdu)
     pdu_json = tmp_pdu.get_dict()
     verify_signed_json(pdu_json, signature_name, verify_key)
+
+
+def add_hashes_and_signatures(event, signature_name, signing_key,
+                              hash_algorithm=hashlib.sha256):
+    tmp_event = copy.deepcopy(event)
+    tmp_event = prune_event(tmp_event)
+    redact_json = tmp_event.get_dict()
+    redact_json.pop("signatures", None)
+    redact_json = sign_json(redact_json, signature_name, signing_key)
+    event.signatures = redact_json["signatures"]
+
+    event_json = event.get_full_dict()
+    #TODO: We need to sign the JSON that is going out via fedaration.
+    event_json.pop("age_ts", None)
+    event_json.pop("unsigned", None)
+    event_json.pop("signatures", None)
+    event_json.pop("hashes", None)
+    event_json_bytes = encode_canonical_json(event_json)
+    hashed = hash_algorithm(event_json_bytes)
+    event.hashes[hashed.name] = encode_base64(hashed.digest())
