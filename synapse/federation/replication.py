@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 from .units import Transaction, Pdu, Edu
 
-from .persistence import PduActions, TransactionActions
+from .persistence import TransactionActions
 
 from synapse.util.logutils import log_function
 

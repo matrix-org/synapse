@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore, Table
-from .pdu import PdusTable
 
 from collections import namedtuple
 
@@ -206,50 +205,6 @@ class TransactionStore(SQLBaseStore):
         txn.execute(query, (destination, transaction_id, destination))
 
         return ReceivedTransactionsTable.decode_results(txn.fetchall())
-
-    def get_pdus_after_transaction(self, transaction_id, destination):
-        """For a given local transaction_id that we sent to a given destination
-        home server, return a list of PDUs that were sent to that destination
-        after it.
-
-        Args:
-            txn
-            transaction_id (str)
-            destination (str)
-
-        Returns
-            list: A list of PduTuple
-        """
-        return self.runInteraction(
-            "get_pdus_after_transaction",
-            self._get_pdus_after_transaction,
-            transaction_id, destination
-        )
-
-    def _get_pdus_after_transaction(self, txn, transaction_id, destination):
-
-        # Query that first get's all transaction_ids with an id greater than
-        # the one given from the `sent_transactions` table. Then JOIN on this
-        # from the `tx->pdu` table to get a list of (pdu_id, origin) that
-        # specify the pdus that were sent in those transactions.
-        query = (
-            "SELECT pdu_id, pdu_origin FROM %(tx_pdu)s as tp "
-            "INNER JOIN %(sent_tx)s as st "
-            "ON tp.transaction_id = st.transaction_id "
-            "AND tp.destination = st.destination "
-            "WHERE st.id > ("
-            "SELECT id FROM %(sent_tx)s "
-            "WHERE transaction_id = ? AND destination = ?"
-        ) % {
-            "tx_pdu": TransactionsToPduTable.table_name,
-            "sent_tx": SentTransactions.table_name,
-        }
-
-        txn.execute(query, (transaction_id, destination))
-
-        pdus = PdusTable.decode_results(txn.fetchall())
-
-        return self._get_pdu_tuples(txn, pdus)
 
 
 class ReceivedTransactionsTable(Table):
