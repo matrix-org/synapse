@@ -415,8 +415,8 @@ class Auth(object):
         else:
             user_level = 0
 
-        _, _, redact_level = self.store._get_ops_level_from_event_state(
-            event.room_id
+        _, _, redact_level = self._get_ops_level_from_event_state(
+            event
         )
 
         if not redact_level:
