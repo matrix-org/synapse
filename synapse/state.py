@@ -104,35 +104,6 @@ class StateHandler(object):
 
     @defer.inlineCallbacks
     @log_function
-    def handle_new_state(self, new_pdu):
-        """ Apply conflict resolution to `new_pdu`.
-
-        This should be called on every new state pdu, regardless of whether or
-        not there is a conflict.
-
-        This function is safe against the race of it getting called with two
-        `PDU`s trying to update the same state.
-        """
-
-        # This needs to be done in a transaction.
-
-        is_new = yield self._handle_new_state(new_pdu)
-
-        logger.debug("is_new: %s %s %s", is_new, new_pdu.pdu_id, new_pdu.origin)
-
-        if is_new:
-            yield self.store.update_current_state(
-                pdu_id=new_pdu.pdu_id,
-                origin=new_pdu.origin,
-                context=new_pdu.context,
-                pdu_type=new_pdu.pdu_type,
-                state_key=new_pdu.state_key
-            )
-
-        defer.returnValue(is_new)
-
-    @defer.inlineCallbacks
-    @log_function
     def annotate_state_groups(self, event, old_state=None):
         yield run_on_reactor()
 
@@ -266,67 +237,6 @@ class StateHandler(object):
         # return self._persistence.get_power_level_for_user(event.room_id,
             # event.sender)
         return event.power_level
-
-    @defer.inlineCallbacks
-    @log_function
-    def _handle_new_state(self, new_pdu):
-        tree, missing_branch = yield self.store.get_unresolved_state_tree(
-            new_pdu
-        )
-        new_branch, current_branch = tree
-
-        logger.debug(
-            "_handle_new_state new=%s, current=%s",
-            new_branch, current_branch
-        )
-
-        if missing_branch is not None:
-            # We're missing some PDUs. Fetch them.
-            # TODO (erikj): Limit this.
-            missing_prev = tree[missing_branch][-1]
-
-            pdu_id = missing_prev.prev_state_id
-            origin = missing_prev.prev_state_origin
-
-            is_missing = yield self.store.get_pdu(pdu_id, origin) is None
-            if not is_missing:
-                raise Exception("Conflict resolution failed")
-
-            yield self._replication.get_pdu(
-                destination=missing_prev.origin,
-                pdu_origin=origin,
-                pdu_id=pdu_id,
-                outlier=True
-            )
-
-            updated_current = yield self._handle_new_state(new_pdu)
-            defer.returnValue(updated_current)
-
-        if not current_branch:
-            # There is no current state
-            defer.returnValue(True)
-            return
-
-        n = new_branch[-1]
-        c = current_branch[-1]
-
-        common_ancestor = n.pdu_id == c.pdu_id and n.origin == c.origin
-
-        if common_ancestor:
-            # We found a common ancestor!
-
-            if len(current_branch) == 1:
-                # This is a direct clobber so we can just...
-                defer.returnValue(True)
-
-        else:
-            # We didn't find a common ancestor. This is probably fine.
-            pass
-
-        result = yield self._do_conflict_res(
-            new_branch, current_branch, common_ancestor
-        )
-        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def _do_conflict_res(self, new_branch, current_branch, common_ancestor):
