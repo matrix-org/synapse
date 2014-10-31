@@ -33,7 +33,7 @@ angular.module('modelService', [])
         this.room_id = room_id;
         this.old_room_state = new RoomState();
         this.current_room_state = new RoomState();
-        this.messages = []; // events which can be displayed on the UI. TODO move?
+        this.events = []; // events which can be displayed on the UI. TODO move?
     };
     Room.prototype = {
         addMessageEvents: function addMessageEvents(events, toFront) {
@@ -43,22 +43,26 @@ angular.module('modelService', [])
         },
         
         addMessageEvent: function addMessageEvent(event, toFront) {
+            // every message must reference the RoomMember which made it *at
+            // that time* so things like display names display correctly.
             if (toFront) {
-                this.messages.unshift(event);
+                event.room_member = this.old_room_state.getStateEvent("m.room.member", event.user_id);
+                this.events.unshift(event);
             }
             else {
-                this.messages.push(event);
+                event.room_member = this.current_room_state.getStateEvent("m.room.member", event.user_id);
+                this.events.push(event);
             }
         },
         
         addOrReplaceMessageEvent: function addOrReplaceMessageEvent(event, toFront) {
             // Start looking from the tail since the first goal of this function 
             // is to find a message among the latest ones
-            for (var i = this.messages.length - 1; i >= 0; i--) {
-                var storedEvent = this.messages[i];
+            for (var i = this.events.length - 1; i >= 0; i--) {
+                var storedEvent = this.events[i];
                 if (storedEvent.event_id === event.event_id) {
                     // It's clobbering time!
-                    this.messages[i] = event;
+                    this.events[i] = event;
                     return;
                 }
             }

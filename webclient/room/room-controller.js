@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
-.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'notificationService',
-                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, notificationService) {
+.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'notificationService', 'modelService',
+                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, notificationService, modelService) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -254,11 +254,11 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             $scope.state.paginating = true;
         }
         
-        console.log("paginateBackMessages from " + $rootScope.events.rooms[$scope.room_id].pagination.earliest_token + " for " + numItems);
+        console.log("paginateBackMessages from " + $scope.room.old_room_state.pagination_token + " for " + numItems);
         var originalTopRow = $("#messageTable>tbody>tr:first")[0];
         
         // Paginate events from the point in cache
-        matrixService.paginateBackMessages($scope.room_id, $rootScope.events.rooms[$scope.room_id].pagination.earliest_token, numItems).then(
+        matrixService.paginateBackMessages($scope.room_id, $scope.room.old_room_state.pagination_token, numItems).then(
             function(response) {
 
                 eventHandlerService.handleRoomMessages($scope.room_id, response.data, false, 'b');
@@ -717,6 +717,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     
     var onInit2 = function() {
         console.log("onInit2");
+        // =============================
+        $scope.room = modelService.getRoom($scope.room_id);
+        // =============================
         
         // Scroll down as soon as possible so that we point to the last message
         // if it already exists in memory

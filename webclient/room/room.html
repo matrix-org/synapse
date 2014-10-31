@@ -123,10 +123,10 @@
          ng-style="{ 'visibility': state.messages_visibility }"
          keep-scroll>
         <table id="messageTable" infinite-scroll="paginateMore()">
-            <tr ng-repeat="msg in events.rooms[room_id].messages"
-                ng-class="(events.rooms[room_id].messages[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
+            <tr ng-repeat="msg in room.events track by $index"
+                ng-class="(room.events[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
                 <td class="leftBlock">
-                    <div class="sender" ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id"> {{ msg.user_id | mUserDisplayName: room_id }}</div>
+                    <div class="sender" ng-hide="room.events[$index - 1].user_id === msg.user_id"> {{ msg.user_id | mUserDisplayName: room_id }}</div>
                     <div class="timestamp"
                          ng-class="msg.echo_msg_state">
                         {{ (msg.origin_server_ts) | date:'MMM d HH:mm' }}
@@ -134,7 +134,7 @@
                 </td>
                 <td class="avatar">
                     <img class="avatarImage" ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
-                         ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
+                         ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
                 <td ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble" ng-click="openJson(msg)">
@@ -204,7 +204,7 @@
                 </td>
                 <td class="rightBlock">
                     <img class="avatarImage" ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.png' }}" width="32" height="32"
-                         ng-hide="events.rooms[room_id].messages[$index - 1].user_id === msg.user_id || msg.user_id !== state.user_id"/>
+                         ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id !== state.user_id"/>
                 </td>
             </tr>
         </table>

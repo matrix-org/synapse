@@ -96,7 +96,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
             __room.old_room_state.storeStateEvents(room.state);
             __room.old_room_state.pagination_token = room.messages.start;
             
-            __room.addMessageEvents(room.messages.chunk);
+            $rootScope["debug_"+room_id] = __room;
         }
     };
 
@@ -589,6 +589,10 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                 
                 // Store how far back we've paginated
                 $rootScope.events.rooms[room_id].pagination.earliest_token = messages.end;
+                
+                var __room = modelService.getRoom(room_id);
+                __room.old_room_state.pagination_token = messages.end;
+                
             }
             else {
                 // InitialSync returns messages in chronological order
@@ -597,6 +601,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                 }
                 // Store where to start pagination
                 $rootScope.events.rooms[room_id].pagination.earliest_token = messages.start;
+                
+                var __room = modelService.getRoom(room_id);
+                __room.old_room_state.pagination_token = messages.start;
             }
         },
 
