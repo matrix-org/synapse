@@ -36,15 +36,33 @@ angular.module('modelService', [])
         this.messages = []; // events which can be displayed on the UI. TODO move?
     };
     Room.prototype = {
-        addMessages: function addMessages(events, toFront) {
+        addMessageEvents: function addMessageEvents(events, toFront) {
             for (var i=0; i<events.length; i++) {
-                if (toFront) {
-                    this.messages.unshift(events[i]);
-                }
-                else {
-                    this.messages.push(events[i]);
+                this.addMessageEvent(events[i], toFront);
+            }
+        },
+        
+        addMessageEvent: function addMessageEvent(event, toFront) {
+            if (toFront) {
+                this.messages.unshift(event);
+            }
+            else {
+                this.messages.push(event);
+            }
+        },
+        
+        addOrReplaceMessageEvent: function addOrReplaceMessageEvent(event, toFront) {
+            // Start looking from the tail since the first goal of this function 
+            // is to find a message among the latest ones
+            for (var i = this.messages.length - 1; i >= 0; i--) {
+                var storedEvent = this.messages[i];
+                if (storedEvent.event_id === event.event_id) {
+                    // It's clobbering time!
+                    this.messages[i] = event;
+                    return;
                 }
             }
+            this.addMessageEvent(event, toFront);
         },
         
         leave: function leave() {
@@ -81,6 +99,10 @@ angular.module('modelService', [])
             for (var i=0; i<events.length; i++) {
                 this.storeStateEvent(events[i]);
             }
+        },
+        
+        getStateEvent: function getStateEvent(event_type, state_key) {
+            return this.state_events[event_type + state_key];
         }
     };
     
