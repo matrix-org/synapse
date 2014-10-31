@@ -181,7 +181,17 @@ class FederationHandler(BaseHandler):
     @log_function
     @defer.inlineCallbacks
     def backfill(self, dest, room_id, limit):
-        pdus = yield self.replication_layer.backfill(dest, room_id, limit)
+        extremities = yield self.store.get_oldest_events_in_room(room_id)
+
+        pdus = yield self.replication_layer.backfill(
+            dest,
+            room_id,
+            limit,
+            extremities=[
+                self.pdu_codec.decode_event_id(e)
+                for e in extremities
+            ]
+        )
 
         events = []
 
@@ -389,6 +399,21 @@ class FederationHandler(BaseHandler):
             )
         else:
             defer.returnValue([])
+
+    @defer.inlineCallbacks
+    @log_function
+    def on_backfill_request(self, context, pdu_list, limit):
+
+        events = yield self.store.get_backfill_events(
+            context,
+            [self.pdu_codec.encode_event_id(i, o) for i, o in pdu_list],
+            limit
+        )
+
+        defer.returnValue([
+            self.pdu_codec.pdu_from_event(e)
+            for e in events
+        ])
 
     @log_function
     def _on_user_joined(self, user, room_id):

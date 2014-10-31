@@ -24,6 +24,23 @@ logger = logging.getLogger(__name__)
 
 class EventFederationStore(SQLBaseStore):
 
+    def get_oldest_events_in_room(self, room_id):
+        return self.runInteraction(
+            "get_oldest_events_in_room",
+            self._get_oldest_events_in_room_txn,
+            room_id,
+        )
+
+    def _get_oldest_events_in_room_txn(self, txn, room_id):
+        return self._simple_select_onecol_txn(
+            txn,
+            table="event_backward_extremities",
+            keyvalues={
+                "room_id": room_id,
+            },
+            retcol="event_id",
+        )
+
     def get_latest_events_in_room(self, room_id):
         return self.runInteraction(
             "get_latest_events_in_room",
@@ -160,3 +177,70 @@ class EventFederationStore(SQLBaseStore):
                 ")"
             )
             txn.execute(query)
+
+
+    def get_backfill_events(self, room_id, event_list, limit):
+        """Get a list of Events for a given topic that occured before (and
+        including) the pdus in pdu_list. Return a list of max size `limit`.
+
+        Args:
+            txn
+            room_id (str)
+            event_list (list)
+            limit (int)
+
+        Return:
+            list: A list of PduTuples
+        """
+        return self.runInteraction(
+            "get_backfill_events",
+            self._get_backfill_events, room_id, event_list, limit
+        )
+
+    def _get_backfill_events(self, txn, room_id, event_list, limit):
+        logger.debug(
+            "_get_backfill_events: %s, %s, %s",
+            room_id, repr(event_list), limit
+        )
+
+        # We seed the pdu_results with the things from the pdu_list.
+        event_results = event_list
+
+        front = event_list
+
+        query = (
+            "SELECT prev_event_id FROM event_edges "
+            "WHERE room_id = ? AND event_id = ? "
+            "LIMIT ?"
+        )
+
+        # We iterate through all event_ids in `front` to select their previous
+        # events. These are dumped in `new_front`.
+        # We continue until we reach the limit *or* new_front is empty (i.e.,
+        # we've run out of things to select
+        while front and len(event_results) < limit:
+
+            new_front = []
+            for event_id in front:
+                logger.debug(
+                    "_backfill_interaction: id=%s",
+                    event_id
+                )
+
+                txn.execute(
+                    query,
+                    (room_id, event_id, limit - len(event_results))
+                )
+
+                for row in txn.fetchall():
+                    logger.debug(
+                        "_backfill_interaction: got id=%s",
+                        *row
+                    )
+                    new_front.append(row)
+
+            front = new_front
+            event_results += new_front
+
+        # We also want to update the `prev_pdus` attributes before returning.
+        return self._get_pdu_tuples(txn, event_results)
