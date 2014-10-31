@@ -86,6 +86,18 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
             }
             $rootScope.events.rooms[room_id].membership = room.membership;
         }
+        
+        // =========================================
+        var __room = modelService.getRoom(room_id);
+        if (room) { // /initialSync data
+            __room.current_room_state.storeStateEvents(room.state);
+            __room.current_room_state.pagination_token = room.messages.end;
+            
+            __room.old_room_state.storeStateEvents(room.state);
+            __room.old_room_state.pagination_token = room.messages.start;
+            
+            __room.addMessages(room.messages.chunk);
+        }
     };
 
     var resetRoomMessages = function(room_id) {

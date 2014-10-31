@@ -31,10 +31,22 @@ angular.module('modelService', [])
     /***** Room Object *****/
     var Room = function Room(room_id) {
         this.room_id = room_id;
-        this.old_room_state = RoomState();
-        this.current_room_state = RoomState();
+        this.old_room_state = new RoomState();
+        this.current_room_state = new RoomState();
+        this.messages = []; // events which can be displayed on the UI. TODO move?
     };
     Room.prototype = {
+        addMessages: function addMessages(events, toFront) {
+            for (var i=0; i<events.length; i++) {
+                if (toFront) {
+                    this.messages.unshift(events[i]);
+                }
+                else {
+                    this.messages.push(events[i]);
+                }
+            }
+        },
+        
         leave: function leave() {
             return matrixService.leave(this.room_id);
         }
@@ -46,7 +58,6 @@ angular.module('modelService', [])
         this.members = []; 
         // state events, the key is a compound of event type + state_key
         this.state_events = {}; 
-        // earliest token
         this.pagination_token = ""; 
     };
     RoomState.prototype = {
@@ -62,8 +73,14 @@ angular.module('modelService', [])
             return this.state_events[type + state_key];
         },
         
-        storeState: function storeState(event) {
+        storeStateEvent: function storeState(event) {
             this.state_events[event.type + event.state_key] = event;
+        },
+        
+        storeStateEvents: function storeState(events) {
+            for (var i=0; i<events.length; i++) {
+                this.storeStateEvent(events[i]);
+            }
         }
     };
     
