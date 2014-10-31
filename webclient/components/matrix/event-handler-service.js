@@ -212,22 +212,15 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                         roomTitle = event.room_id;
                     }
                     
-                    var notification = new window.Notification(
-                        displayname +
-                        " (" + roomTitle + ")",
-                    {
-                        "body": message,
-                        "icon": member ? member.avatar_url : undefined
-                    });
-
-                    notification.onclick = function() {
-                        console.log("notification.onclick() room=" + event.room_id);
-                        $rootScope.goToPage('room/' + (event.room_id)); 
-                    };
-
-                    $timeout(function() {
-                        notification.close();
-                    }, 5 * 1000);
+                    notificationService.showNotification(
+                        displayname + " (" + roomTitle + ")",
+                        message,
+                        member ? member.avatar_url : undefined,
+                        function() {
+                            console.log("notification.onclick() room=" + event.room_id);
+                            $rootScope.goToPage('room/' + event.room_id); 
+                        }
+                    );
                 }
             }
         }

@@ -201,16 +201,17 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 // Notify when a user joins
                 if ((document.hidden  || matrixService.presence.unavailable === mPresence.getState())
                         && event.state_key !== $scope.state.user_id  && "join" === event.membership) {
-                    var notification = new window.Notification(
+                        
+                    notificationService.showNotification(
                         event.content.displayname +
-                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
-                    {
-                        "body": event.content.displayname + " joined",
-                        "icon": event.content.avatar_url ? event.content.avatar_url : undefined
-                    });
-                    $timeout(function() {
-                        notification.close();
-                    }, 5 * 1000);
+                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")",
+                        event.content.displayname + " joined",
+                        event.content.avatar_url ? event.content.avatar_url : undefined,
+                        function() {
+                            console.log("notification.onclick() room=" + event.room_id);
+                            $rootScope.goToPage('room/' + event.room_id); 
+                        }
+                    );
                 }
             }
         }

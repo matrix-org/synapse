@@ -21,7 +21,7 @@ This service manages notifications: enabling, creating and showing them. This
 also contains 'bing word' logic.
 */
 angular.module('notificationService', [])
-.factory('notificationService', function($rootScope) {
+.factory('notificationService', ['$timeout', function($timeout) {
 
     var getLocalPartFromUserId = function(user_id) {
         if (!user_id) {
@@ -80,7 +80,25 @@ angular.module('notificationService', [])
                 }
             }
             return false;
+        },
+        
+        showNotification: function(title, body, icon, onclick) {
+            var notification = new window.Notification(
+                title,
+                {
+                    "body": body,
+                    "icon": icon
+                }
+            );
+
+            if (onclick) {
+                notification.onclick = onclick;
+            }
+
+            $timeout(function() {
+                notification.close();
+            }, 5 * 1000);
         }
     };
 
-});
+}]);
