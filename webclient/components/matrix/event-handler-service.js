@@ -289,6 +289,8 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
     };
     
     var handleRoomMember = function(event, isLiveEvent, isStateEvent) {
+        var __room = modelService.getRoom(event.room_id);
+        
         
         // add membership changes as if they were a room message if something interesting changed
         // Exception: Do not do this if the event is a room state event because such events already come
@@ -317,6 +319,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                 else {
                     $rootScope.events.rooms[event.room_id].messages.unshift(event);
                 }
+                // ============
+                
+                __room.addMessageEvent(event, !isLiveEvent);
             }
         }
         
@@ -324,6 +329,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
         // Do not care of events that come when paginating back
         if (isStateEvent || isLiveEvent) {
             $rootScope.events.rooms[event.room_id].members[event.state_key] = event;
+            __room.current_room_state.members[event.state_key] = event;
         }
         
         $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent, isStateEvent);

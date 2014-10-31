@@ -77,7 +77,7 @@ angular.module('modelService', [])
     /***** Room State Object *****/
     var RoomState = function RoomState() {
         // list of RoomMember
-        this.members = []; 
+        this.members = {}; 
         // state events, the key is a compound of event type + state_key
         this.state_events = {}; 
         this.pagination_token = ""; 

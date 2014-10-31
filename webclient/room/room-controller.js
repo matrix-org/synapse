@@ -64,7 +64,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 return;
             };
 
-            var nameEvent = $rootScope.events.rooms[$scope.room_id]['m.room.name'];
+            var nameEvent = $scope.room.current_room_state.state_events['m.room.name'];
             if (nameEvent) {
                 $scope.name.newNameText = nameEvent.content.name;
             }
@@ -105,7 +105,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 console.log("Warning: Already editing topic.");
                 return;
             }
-            var topicEvent = $rootScope.events.rooms[$scope.room_id]['m.room.topic'];
+            var topicEvent = $scope.room.current_room_state.state_events['m.room.topic'];
             if (topicEvent) {
                 $scope.topic.newTopicText = topicEvent.content.topic;
             }
@@ -492,7 +492,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                             
                             var room_id = matrixService.getAliasToRoomIdMapping(room_alias);
                             console.log("joining " + room_alias + " id=" + room_id);
-                            if ($rootScope.events.rooms[room_id]) {
+                            if ($scope.room) { // TODO actually check that you = join
                                 // don't send a join event for a room you're already in.
                                 $location.url("room/" + room_alias);
                             }
@@ -629,7 +629,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             };
 
             $('#mainInput').val('');
-            $rootScope.events.rooms[$scope.room_id].messages.push(echoMessage);
+            $scope.room.addMessageEvent(echoMessage);
             scrollToBottom();
         }
 
@@ -732,9 +732,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 var needsToJoin = true;
                 
                 // The room members is available in the data fetched by initialSync
-                if ($rootScope.events.rooms[$scope.room_id]) {
+                if ($scope.room) {
 
-                    var messages = $rootScope.events.rooms[$scope.room_id].messages;
+                    var messages = $scope.room.events;
 
                     if (0 === messages.length
                     || (1 === messages.length && "m.room.member" === messages[0].type && "invite" === messages[0].content.membership && $scope.state.user_id === messages[0].state_key)) {
@@ -746,7 +746,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                         $scope.state.first_pagination = false;
                     }
 
-                    var members = $rootScope.events.rooms[$scope.room_id].members;
+                    var members = $scope.room.current_room_state.members;
 
                     // Update the member list
                     for (var i in members) {
@@ -1042,8 +1042,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
             state_key: ""
         };
 
-        var stateFilter = $filter("stateEventsFilter");
-        var stateEvents = stateFilter($scope.events.rooms[$scope.room_id]);
+        var stateEvents = $scope.room.current_room_state.state_events;
         // The modal dialog will 2-way bind this field, so we MUST make a deep
         // copy of the state events else we will be *actually adjusing our view
         // of the world* when fiddling with the JSON!! Apparently parse/stringify
@@ -1062,7 +1061,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     console.log("Displaying modal dialog for >>>> " + JSON.stringify($scope.event_selected));
     $scope.redact = function() {
         console.log("User level = "+$scope.pow($scope.room_id, $scope.state.user_id)+
-                    " Redact level = "+$scope.events.rooms[$scope.room_id]["m.room.ops_levels"].content.redact_level);
+                    " Redact level = "+$scope.room.current_room_state.state_events["m.room.ops_levels"].content.redact_level);
         console.log("Redact event >> " + JSON.stringify($scope.event_selected));
         $modalInstance.close("redact");
     };
