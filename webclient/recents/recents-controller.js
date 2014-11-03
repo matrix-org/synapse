@@ -17,11 +17,14 @@
 'use strict';
 
 angular.module('RecentsController', ['matrixService', 'matrixFilter'])
-.controller('RecentsController', ['$rootScope', '$scope', 'eventHandlerService', 
-                               function($rootScope, $scope, eventHandlerService) {
+.controller('RecentsController', ['$rootScope', '$scope', 'eventHandlerService', 'modelService', 
+                               function($rootScope, $scope, eventHandlerService, modelService) {
 
     // Expose the service to the view
     $scope.eventHandlerService = eventHandlerService;
+    
+    // retrieve all rooms and expose them
+    $scope.rooms = modelService.getRooms();
 
     // $rootScope of the parent where the recents component is included can override this value
     // in order to highlight a specific room in the list

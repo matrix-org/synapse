@@ -25,22 +25,30 @@ angular.module('RecentsController')
         // The key, room_id, is already in value objects
         var filtered = [];
         angular.forEach(rooms, function(room, room_id) {
-            
+            room.recent = {};
+            var meEvent = room.current_room_state.state("m.room.member", user_id);
             // Show the room only if the user has joined it or has been invited
             // (ie, do not show it if he has been banned)
             var member = eventHandlerService.getMember(room_id, user_id);
+            room.recent.me = member;
             if (member && ("invite" === member.membership || "join" === member.membership)) {
-            
+                if ("invite" === member.membership) {
+                    room.recent.inviter = member.user_id;
+                }
                 // Count users here
                 // TODO: Compute it directly in eventHandlerService
-                room.numUsersInRoom = eventHandlerService.getUsersCountInRoom(room_id);
+                room.recent.numUsersInRoom = eventHandlerService.getUsersCountInRoom(room_id);
 
                 filtered.push(room);
             }
-            else if ("invite" === room.membership) {
+            else if (meEvent && "invite" === meEvent.content.membership) {
                 // The only information we have about the room is that the user has been invited
                 filtered.push(room);
             }
+            else {
+                console.error("Dropping "+room.room_id);
+            }
+            
         });
 
         // And time sort them

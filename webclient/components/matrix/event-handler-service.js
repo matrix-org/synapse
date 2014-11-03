@@ -86,18 +86,6 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
             }
             $rootScope.events.rooms[room_id].membership = room.membership;
         }
-        
-        // =========================================
-        var __room = modelService.getRoom(room_id);
-        if (room) { // /initialSync data
-            __room.current_room_state.storeStateEvents(room.state);
-            __room.current_room_state.pagination_token = room.messages.end;
-            
-            __room.old_room_state.storeStateEvents(room.state);
-            __room.old_room_state.pagination_token = room.messages.start;
-            
-            $rootScope["debug_"+room_id] = __room;
-        }
     };
 
     var resetRoomMessages = function(room_id) {
@@ -621,12 +609,44 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                 var room = rooms[i];
 
                 this.initRoom(room);
+                
+                // FIXME: This is ming: the HS should be sending down the m.room.member
+                // event for the invite in .state but it isn't, so fudge it for now.
+                if (room.inviter && room.membership === "invite") {
+                    var me = matrixService.config().user_id;
+                    var fakeEvent = {
+                        event_id: "__FAKE__" + room.room_id,
+                        user_id: room.inviter,
+                        origin_server_ts: 0,
+                        room_id: room.room_id,
+                        state_key: me,
+                        type: "m.room.member",
+                        content: {
+                            membership: "invite"
+                        }
+                    };
+                    if (!room.state) {
+                        room.state = [];
+                    }
+                    room.state.push(fakeEvent);
+                    console.log("RECV /initialSync invite >> "+JSON.stringify(fakeEvent));
+                }
+                
+                // ========================================= 
+                var __room = modelService.getRoom(room.room_id);
+                __room.current_room_state.storeStateEvents(room.state);
+                __room.old_room_state.storeStateEvents(room.state);
+                
+                
+
 
                 if ("messages" in room) {
                     this.handleRoomMessages(room.room_id, room.messages, false);
+                    __room.current_room_state.pagination_token = room.messages.end;
+                    __room.old_room_state.pagination_token = room.messages.start;
                 }
 
-                if ("state" in room) {
+                if ("state" in room) { // TODO FIXME  remove this.
                     this.handleEvents(room.state, false, true);
                 }
             }

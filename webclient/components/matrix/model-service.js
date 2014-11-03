@@ -100,9 +100,15 @@ angular.module('modelService', [])
         
         storeStateEvent: function storeState(event) {
             this.state_events[event.type + event.state_key] = event;
+            if (event.type === "m.room.member") {
+                this.members[event.state_key] = event;
+            }
         },
         
         storeStateEvents: function storeState(events) {
+            if (!events) {
+                return;
+            }
             for (var i=0; i<events.length; i++) {
                 this.storeStateEvent(events[i]);
             }
@@ -138,6 +144,10 @@ angular.module('modelService', [])
                 rooms[roomId] = new Room(roomId);
             }
             return rooms[roomId];
+        },
+        
+        getRooms: function() {
+            return rooms;
         }
     
     };
