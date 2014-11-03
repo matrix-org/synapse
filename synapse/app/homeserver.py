@@ -233,7 +233,10 @@ def setup():
         f.namespace['hs'] = hs
         reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
 
-    hs.start_listening(config.bind_port, config.unsecure_port)
+    bind_port = config.bind_port
+    if config.no_tls:
+        bind_port = None
+    hs.start_listening(bind_port, config.unsecure_port)
 
     if config.daemonize:
         print config.pid_file
