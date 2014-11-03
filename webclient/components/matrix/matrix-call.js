@@ -46,7 +46,7 @@ var isWebRTCSupported = function () {
 };
 
 angular.module('MatrixCall', [])
-.factory('MatrixCall', ['matrixService', 'matrixPhoneService', '$rootScope', '$timeout', function MatrixCallFactory(matrixService, matrixPhoneService, $rootScope, $timeout) {
+.factory('MatrixCall', ['matrixService', 'matrixPhoneService', 'modelService', '$rootScope', '$timeout', function MatrixCallFactory(matrixService, matrixPhoneService, modelService, $rootScope, $timeout) {
     $rootScope.isWebRTCSupported = isWebRTCSupported();
 
     var MatrixCall = function(room_id) {
@@ -213,7 +213,7 @@ angular.module('MatrixCall', [])
 
         var self = this;
 
-        var roomMembers = $rootScope.events.rooms[this.room_id].members;
+        var roomMembers = modelService.getRoom(this.room_id).current_room_state.members;
         if (roomMembers[matrixService.config().user_id].membership != 'join') {
             console.log("We need to join the room before we can accept this call");
             matrixService.join(this.room_id).then(function() {
