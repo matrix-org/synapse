@@ -22,9 +22,8 @@ not care where the event came from, it only needs enough context to be able to
 process them. Events may be coming from the event stream, the REST API (via 
 direct GETs or via a pagination stream API), etc.
 
-Typically, this service will store events or broadcast them to any listeners
-(e.g. controllers) via $broadcast. Alternatively, it may update the $rootScope
-if typically all the $on method would do is update its own $scope.
+Typically, this service will store events and broadcast them to any listeners
+(e.g. controllers) via $broadcast. 
 */
 angular.module('eventHandlerService', [])
 .factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 'notificationService', 'modelService',
@@ -44,6 +43,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
     // of the app, given we never try to reap memory yet)
     var eventMap = {};
 
+    // TODO: Remove this and replace with modelService.User objects.
     $rootScope.presence = {};
 
     var initialSyncDeferred;
@@ -64,23 +64,23 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
     
     // Generic method to handle events data
     var handleRoomStateEvent = function(event, isLiveEvent, addToRoomMessages) {
-        var __room = modelService.getRoom(event.room_id);
+        var room = modelService.getRoom(event.room_id);
         if (addToRoomMessages) {
             // some state events are displayed as messages, so add them.
-            __room.addMessageEvent(event, !isLiveEvent);
+            room.addMessageEvent(event, !isLiveEvent);
         }
         
         if (isLiveEvent) {
             // update the current room state with the latest state
-            __room.current_room_state.storeStateEvent(event);
+            room.current_room_state.storeStateEvent(event);
         }
         else {
             var eventTs = event.origin_server_ts;
-            var storedEvent = __room.current_room_state.getStateEvent(event.type, event.state_key);
+            var storedEvent = room.current_room_state.getStateEvent(event.type, event.state_key);
             if (storedEvent) {
                 if (storedEvent.origin_server_ts < eventTs) {
                     // the incoming event is newer, use it.
-                    __room.current_room_state.storeStateEvent(event);
+                    room.current_room_state.storeStateEvent(event);
                 }
             }
         }
@@ -173,16 +173,16 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
         
         // =======================
         
-        var __room = modelService.getRoom(event.room_id);
+        var room = modelService.getRoom(event.room_id);
         
         if (event.user_id !== matrixService.config().user_id) {
-            __room.addMessageEvent(event, !isLiveEvent);
+            room.addMessageEvent(event, !isLiveEvent);
             displayNotification(event);
         }
         else {
             // we may have locally echoed this, so we should replace the event
             // instead of just adding.
-            __room.addOrReplaceMessageEvent(event, !isLiveEvent);
+            room.addOrReplaceMessageEvent(event, !isLiveEvent);
         }
         
         // TODO send delivery receipt if isLiveEvent
@@ -191,7 +191,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
     };
     
     var handleRoomMember = function(event, isLiveEvent, isStateEvent) {
-        var __room = modelService.getRoom(event.room_id);
+        var room = modelService.getRoom(event.room_id);
         
         
         // add membership changes as if they were a room message if something interesting changed
@@ -216,14 +216,14 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
             // If there was a change we want to display, dump it in the message
             // list.
             if (memberChanges) {
-                __room.addMessageEvent(event, !isLiveEvent);
+                room.addMessageEvent(event, !isLiveEvent);
             }
         }
         
         // Use data from state event or the latest data from the stream.
         // Do not care of events that come when paginating back
         if (isStateEvent || isLiveEvent) {
-            __room.current_room_state.members[event.state_key] = event;
+            room.current_room_state.members[event.state_key] = event;
         }
         
         $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent, isStateEvent);
@@ -255,8 +255,8 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
     var handleCallEvent = function(event, isLiveEvent) {
         $rootScope.$broadcast(CALL_EVENT, event, isLiveEvent);
         if (event.type === 'm.call.invite') {
-            var __room = modelService.getRoom(event.room_id);
-            __room.addMessageEvent(event, !isLiveEvent);
+            var room = modelService.getRoom(event.room_id);
+            room.addMessageEvent(event, !isLiveEvent);
         }
     };
 
@@ -270,9 +270,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
         // we need to remove something possibly: do we know the redacted
         // event ID?
         if (eventMap[event.redacts]) {
-            var __room = modelService.getRoom(event.room_id);
+            var room = modelService.getRoom(event.room_id);
             // remove event from list of messages in this room.
-            var eventList = __room.events;
+            var eventList = room.events;
             for (var i=0; i<eventList.length; i++) {
                 if (eventList[i].event_id === event.redacts) {
                     console.log("Removing event " + event.redacts);
@@ -434,9 +434,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                 }
                 
                 // Store how far back we've paginated
-                var __room = modelService.getRoom(room_id);
-                __room.old_room_state.pagination_token = messages.end;
-                
+                var room = modelService.getRoom(room_id);
+                room.old_room_state.pagination_token = messages.end;
+
             }
             else {
                 // InitialSync returns messages in chronological order
@@ -444,8 +444,8 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                     this.handleEvent(events[i], isLiveEvents, isLiveEvents);
                 }
                 // Store where to start pagination
-                var __room = modelService.getRoom(room_id);
-                __room.old_room_state.pagination_token = messages.start;
+                var room = modelService.getRoom(room_id);
+                room.old_room_state.pagination_token = messages.start;
             }
         },
 
@@ -478,19 +478,14 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                     console.log("RECV /initialSync invite >> "+room.room_id);
                 }
                 
-                // ========================================= 
-                var __room = modelService.getRoom(room.room_id);
-                __room.current_room_state.storeStateEvents(room.state);
-                __room.old_room_state.storeStateEvents(room.state);
+                var newRoom = modelService.getRoom(room.room_id);
+                newRoom.current_room_state.storeStateEvents(room.state);
+                newRoom.old_room_state.storeStateEvents(room.state);
 
                 if ("messages" in room) {
                     this.handleRoomMessages(room.room_id, room.messages, false);
-                    __room.current_room_state.pagination_token = room.messages.end;
-                    __room.old_room_state.pagination_token = room.messages.start;
-                }
-
-                if ("state" in room) { // TODO FIXME  remove this.
-                    this.handleEvents(room.state, false, true);
+                    newRoom.current_room_state.pagination_token = room.messages.end;
+                    newRoom.old_room_state.pagination_token = room.messages.start;
                 }
             }
             var presence = response.data.presence;

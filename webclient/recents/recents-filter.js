@@ -45,14 +45,10 @@ angular.module('RecentsController')
                 // The only information we have about the room is that the user has been invited
                 filtered.push(room);
             }
-            else {
-                console.error("Dropping "+room.room_id);
-            }
-            
         });
 
         // And time sort them
-        // The room with the lastest message at first
+        // The room with the latest message at first
         filtered.sort(function (roomA, roomB) {
 
             var lastMsgRoomA = eventHandlerService.getLastMessage(roomA.room_id, true);
