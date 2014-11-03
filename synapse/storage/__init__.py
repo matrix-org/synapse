@@ -199,7 +199,10 @@ class DataStore(RoomMemberStore, RoomStore,
             k: v
             for k, v in event.get_full_dict().items()
             if k not in vals.keys() and k not in [
-                "redacted", "redacted_because", "signatures", "hashes",
+                "redacted",
+                "redacted_because",
+                "signatures",
+                "hashes",
                 "prev_events",
             ]
         }
