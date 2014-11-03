@@ -408,7 +408,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                             }
                         }
                         console.log("Unable to handle event type " + event.type);
-                        console.log(JSON.stringify(event, undefined, 4));
+                        // console.log(JSON.stringify(event, undefined, 4));
                         break;
                 }
             }
@@ -475,7 +475,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                         room.state = [];
                     }
                     room.state.push(fakeEvent);
-                    console.log("RECV /initialSync invite >> "+JSON.stringify(fakeEvent));
+                    console.log("RECV /initialSync invite >> "+room.room_id);
                 }
                 
                 // ========================================= 

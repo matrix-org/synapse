@@ -19,6 +19,8 @@
 angular.module('matrixFilter', [])
 
 // Compute the room name according to information we have
+// TODO: It would be nice if this was stateless and had no dependencies. That would
+//       make the business logic here a lot easier to see.
 .filter('mRoomName', ['$rootScope', 'matrixService', 'eventHandlerService', 'modelService', 
 function($rootScope, matrixService, eventHandlerService, modelService) {
     return function(room_id) {
@@ -29,93 +31,60 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
         var alias = matrixService.getRoomIdToAliasMapping(room_id);
         var room = modelService.getRoom(room_id).current_room_state;
         
-        if (room) {
-            // Get name from room state date
-            var room_name_event = room.state("m.room.name");
+        var room_name_event = room.state("m.room.name");
 
-            // Determine if it is a public room
-            var isPublicRoom = false;
-            if (room.state("m.room.join_rules") && room.state("m.room.join_rules").content) {
-                isPublicRoom = ("public" === room.state("m.room.join_rules").content.join_rule);
-            }
+        // Determine if it is a public room
+        var isPublicRoom = false;
+        if (room.state("m.room.join_rules") && room.state("m.room.join_rules").content) {
+            isPublicRoom = ("public" === room.state("m.room.join_rules").content.join_rule);
+        }
 
-            if (room_name_event) {
-                roomName = room_name_event.content.name;
-            }
-            else if (alias) {
-                roomName = alias;
-            }
-            else if (room.members.length > 0 && !isPublicRoom) {    // Do not rename public room
+        if (room_name_event) {
+            roomName = room_name_event.content.name;
+        }
+        else if (alias) {
+            roomName = alias;
+        }
+        else if (Object.keys(room.members).length > 0 && !isPublicRoom) { // Do not rename public room
+            var user_id = matrixService.config().user_id;
             
-                var user_id = matrixService.config().user_id;
-                // Else, build the name from its users
-                // Limit the room renaming to 1:1 room
-                if (2 === Object.keys(room.members).length) {
-                    for (var i in room.members) {
-                        if (!room.members.hasOwnProperty(i)) continue;
+            // this is a "one to one" room and should have the name of the other user.
+            if (Object.keys(room.members).length === 2) {
+                for (var i in room.members) {
+                    if (!room.members.hasOwnProperty(i)) continue;
 
-                        var member = room.members[i];
-                        if (member.state_key !== user_id) {
-                            roomName = eventHandlerService.getUserDisplayName(room_id, member.state_key);
-                            break;
-                        }
+                    var member = room.members[i];
+                    if (member.state_key !== user_id) {
+                        roomName = eventHandlerService.getUserDisplayName(room_id, member.state_key);
+                        break;
                     }
                 }
-                else if (Object.keys(room.members).length <= 1) {
-                    
-                    var otherUserId;
-
-                    if (Object.keys(room.members)[0]) {
-                        otherUserId = Object.keys(room.members)[0];
-                        // this could be an invite event (from event stream)
-                        if (otherUserId === user_id && 
-                                room.members[user_id].content.membership === "invite") {
-                            // this is us being invited to this room, so the
-                            // *user_id* is the other user ID and not the state
-                            // key.
-                            otherUserId = room.members[user_id].user_id;
-                        }
+            }
+            else if (Object.keys(room.members).length === 1) {
+                // this could be just us (self-chat) or could be the other person
+                // in a room if they have invited us to the room. Find out which.
+                var otherUserId = Object.keys(room.members)[0];
+                if (otherUserId === user_id) {
+                    // it's us, we may have been invited to this room or it could
+                    // be a self chat.
+                    if (room.members[otherUserId].content.membership === "invite") {
+                        // someone invited us, use the right ID.
+                        roomName = eventHandlerService.getUserDisplayName(room_id, room.members[otherUserId].user_id);
                     }
                     else {
-                        // it's got to be an invite, or failing that a self-chat;
-                        otherUserId = room.inviter || user_id;
-/*                        
-                        // XXX: This should all be unnecessary now thanks to using the /rooms/<room>/roomid API
-
-                        // The other member may be in the invite list, get all invited users
-                        var invitedUserIDs = [];
-                        
-                        // XXX: *SURELY* we shouldn't have to trawl through the whole messages list to
-                        // find invite - surely the other user should be in room.members with state invited? :/ --Matthew
-                        for (var i in room.messages) {
-                            var message = room.messages[i];
-                            if ("m.room.member" === message.type && "invite" === message.content.membership) {
-                                // Filter out the current user
-                                var member_id = message.state_key;
-                                if (member_id === user_id) {
-                                    member_id = message.user_id;
-                                }
-                                if (member_id !== user_id) {
-                                    // Make sure there is no duplicate user
-                                    if (-1 === invitedUserIDs.indexOf(member_id)) {
-                                        invitedUserIDs.push(member_id);
-                                    }
-                                }
-                            } 
-                        }
-
-                        // For now, only 1:1 room needs to be renamed. It means only 1 invited user
-                        if (1 === invitedUserIDs.length) {
-                            otherUserId = invitedUserIDs[0];
-                        }
-*/                        
+                        roomName = eventHandlerService.getUserDisplayName(room_id, otherUserId);
                     }
-                    
-                    // Get the user display name
+                }
+                else { // it isn't us, so use their name if we know it.
                     roomName = eventHandlerService.getUserDisplayName(room_id, otherUserId);
                 }
             }
+            else if (Object.keys(room.members).length === 0) {
+                // this shouldn't be possible
+                console.error("0 members in room >> " + room_id);
+            }
         }
+        
 
         // Always show the alias in the room displayed name
         if (roomName && alias && alias !== roomName) {
@@ -125,14 +94,6 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
         if (undefined === roomName) {
             // By default, use the room ID
             roomName = room_id;
-
-            // XXX: this is *INCREDIBLY* heavy logging for a function that calls every single
-            // time any kind of digest runs which refreshes a room name...
-            // commenting it out for now.
-
-            // Log some information that lead to this leak
-            // console.log("Room ID leak for " + room_id);
-            // console.log("room object: " + JSON.stringify(room, undefined, 4));   
         }
 
         return roomName;
