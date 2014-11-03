@@ -613,9 +613,27 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
             }
         },
 
-        handleInitialSyncDone: function(initialSyncData) {
+        handleInitialSyncDone: function(response) {
             console.log("# handleInitialSyncDone");
-            initialSyncDeferred.resolve(initialSyncData);
+
+            var rooms = response.data.rooms;
+            for (var i = 0; i < rooms.length; ++i) {
+                var room = rooms[i];
+
+                this.initRoom(room);
+
+                if ("messages" in room) {
+                    this.handleRoomMessages(room.room_id, room.messages, false);
+                }
+
+                if ("state" in room) {
+                    this.handleEvents(room.state, false, true);
+                }
+            }
+            var presence = response.data.presence;
+            this.handleEvents(presence, false);
+
+            initialSyncDeferred.resolve(response);
         },
 
         // Returns a promise that resolves when the initialSync request has been processed
