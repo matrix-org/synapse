@@ -15,6 +15,10 @@ import argparse
 import logging
 
 def get_targets(server_name):
+    if ":" in server_name:
+        target, port = server_name.split(":")
+        yield (target, int(port))
+        return
     try:
         answers = dns.resolver.query("_matrix._tcp." + server_name, "SRV")
         for srv in answers:
