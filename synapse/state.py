@@ -65,12 +65,6 @@ class StateHandler(object):
         if not hasattr(event, "state_key"):
             return
 
-        key = KeyStateTuple(
-            event.room_id,
-            event.type,
-            _get_state_key_from_event(event)
-        )
-
         # Now I need to fill out the prev state and work out if it has auth
         # (w.r.t. to power levels)
 
@@ -84,10 +78,6 @@ class StateHandler(object):
 
             if current_state:
                 event.prev_state = current_state.event_id
-
-        # TODO check current_state to see if the min power level is less
-        # than the power level of the user
-        # power_level = self._get_power_level_for_event(event)
 
         defer.returnValue(True)
 
@@ -220,78 +210,4 @@ class StateHandler(object):
                     e.event_id + e.user_id + e.room_id + e.type
                 ).hexdigest()
             )[0]
-        )
-
-    def _get_power_level_for_event(self, event):
-        # return self._persistence.get_power_level_for_user(event.room_id,
-            # event.sender)
-        return event.power_level
-
-    @defer.inlineCallbacks
-    def _do_conflict_res(self, new_branch, current_branch, common_ancestor):
-        conflict_res = [
-            self._do_power_level_conflict_res,
-            self._do_chain_length_conflict_res,
-            self._do_hash_conflict_res,
-        ]
-
-        for algo in conflict_res:
-            new_res, curr_res = yield defer.maybeDeferred(
-                algo,
-                new_branch, current_branch, common_ancestor
-            )
-
-            if new_res < curr_res:
-                defer.returnValue(False)
-            elif new_res > curr_res:
-                defer.returnValue(True)
-
-        raise Exception("Conflict resolution failed.")
-
-    @defer.inlineCallbacks
-    def _do_power_level_conflict_res(self, new_branch, current_branch,
-                                     common_ancestor):
-        new_powers_deferreds = []
-        for e in new_branch[:-1] if common_ancestor else new_branch:
-            if hasattr(e, "user_id"):
-                new_powers_deferreds.append(
-                    self.store.get_power_level(e.context, e.user_id)
-                )
-
-        current_powers_deferreds = []
-        for e in current_branch[:-1] if common_ancestor else current_branch:
-            if hasattr(e, "user_id"):
-                current_powers_deferreds.append(
-                    self.store.get_power_level(e.context, e.user_id)
-                )
-
-        new_powers = yield defer.gatherResults(
-            new_powers_deferreds,
-            consumeErrors=True
-        )
-
-        current_powers = yield defer.gatherResults(
-            current_powers_deferreds,
-            consumeErrors=True
-        )
-
-        max_power_new = max(new_powers)
-        max_power_current = max(current_powers)
-
-        defer.returnValue(
-            (max_power_new, max_power_current)
-        )
-
-    def _do_chain_length_conflict_res(self, new_branch, current_branch,
-                                      common_ancestor):
-        return (len(new_branch), len(current_branch))
-
-    def _do_hash_conflict_res(self, new_branch, current_branch,
-                              common_ancestor):
-        new_str = "".join([p.pdu_id + p.origin for p in new_branch])
-        c_str = "".join([p.pdu_id + p.origin for p in current_branch])
-
-        return (
-            hashlib.sha1(new_str).hexdigest(),
-            hashlib.sha1(c_str).hexdigest()
         )
