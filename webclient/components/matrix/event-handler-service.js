@@ -201,6 +201,13 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
         }
         else if (!isLiveEvent) {
             // mutate the old room state
+            var oldEvent = angular.copy(event);
+            if (event.prev_content) {
+                // the m.room.member event we are handling is the NEW event. When
+                // we keep going back in time, we want the PREVIOUS value for displaying
+                // names/etc, hence the clobber here.
+                event.content = event.prev_content;
+            }
             room.old_room_state.storeStateEvent(angular.copy(event));
         }
         
