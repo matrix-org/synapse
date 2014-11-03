@@ -113,4 +113,6 @@ def add_hashes_and_signatures(event, signature_name, signing_key,
     event_json.pop("hashes", None)
     event_json_bytes = encode_canonical_json(event_json)
     hashed = hash_algorithm(event_json_bytes)
+    if not hasattr(event, "hashes"):
+        event.hashes = {}
     event.hashes[hashed.name] = encode_base64(hashed.digest())
