@@ -18,6 +18,8 @@ from synapse.api.errors import LimitExceededError
 
 from synapse.util.async import run_on_reactor
 
+from synapse.crypto.event_signing import add_hashes_and_signatures
+
 class BaseHandler(object):
 
     def __init__(self, hs):
@@ -31,6 +33,9 @@ class BaseHandler(object):
         self.ratelimiter = hs.get_ratelimiter()
         self.clock = hs.get_clock()
         self.hs = hs
+
+        self.signing_key = hs.config.signing_key[0]
+        self.server_name = hs.hostname
 
     def ratelimit(self, user_id):
         time_now = self.clock.time()
@@ -52,6 +57,10 @@ class BaseHandler(object):
         snapshot.fill_out_prev_events(event)
 
         yield self.state_handler.annotate_state_groups(event)
+
+        yield add_hashes_and_signatures(
+            event, self.server_name, self.signing_key
+        )
 
         if not suppress_auth:
             yield self.auth.check(event, snapshot, raises=True)
