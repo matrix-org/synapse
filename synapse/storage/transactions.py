@@ -89,7 +89,7 @@ class TransactionStore(SQLBaseStore):
         txn.execute(query, (code, response_json, transaction_id, origin))
 
     def prep_send_transaction(self, transaction_id, destination,
-                              origin_server_ts, pdu_list):
+                              origin_server_ts):
         """Persists an outgoing transaction and calculates the values for the
         previous transaction id list.
 
@@ -100,7 +100,6 @@ class TransactionStore(SQLBaseStore):
             transaction_id (str)
             destination (str)
             origin_server_ts (int)
-            pdu_list (list)
 
         Returns:
             list: A list of previous transaction ids.
@@ -109,11 +108,11 @@ class TransactionStore(SQLBaseStore):
         return self.runInteraction(
             "prep_send_transaction",
             self._prep_send_transaction,
-            transaction_id, destination, origin_server_ts, pdu_list
+            transaction_id, destination, origin_server_ts
         )
 
     def _prep_send_transaction(self, txn, transaction_id, destination,
-                               origin_server_ts, pdu_list):
+                               origin_server_ts):
 
         # First we find out what the prev_txs should be.
         # Since we know that we are only sending one transaction at a time,
