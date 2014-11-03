@@ -69,6 +69,10 @@ class EventFactory(object):
         kwargs["type"] = etype
         if "event_id" not in kwargs:
             kwargs["event_id"] = self.create_event_id()
+            kwargs["origin"] = self.hs.hostname
+        else:
+            ev_id = self.hs.parse_eventid(kwargs["event_id"])
+            kwargs["origin"] = ev_id.domain
 
         if "origin_server_ts" not in kwargs:
             kwargs["origin_server_ts"] = int(self.clock.time_msec())
