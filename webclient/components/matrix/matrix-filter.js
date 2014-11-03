@@ -19,23 +19,24 @@
 angular.module('matrixFilter', [])
 
 // Compute the room name according to information we have
-.filter('mRoomName', ['$rootScope', 'matrixService', 'eventHandlerService', function($rootScope, matrixService, eventHandlerService) {
+.filter('mRoomName', ['$rootScope', 'matrixService', 'eventHandlerService', 'modelService', 
+function($rootScope, matrixService, eventHandlerService, modelService) {
     return function(room_id) {
         var roomName;
 
         // If there is an alias, use it
         // TODO: only one alias is managed for now
         var alias = matrixService.getRoomIdToAliasMapping(room_id);
-
-        var room = $rootScope.events.rooms[room_id];
+        var room = modelService.getRoom(room_id).current_room_state;
+        
         if (room) {
             // Get name from room state date
-            var room_name_event = room["m.room.name"];
+            var room_name_event = room.state("m.room.name");
 
             // Determine if it is a public room
             var isPublicRoom = false;
-            if (room["m.room.join_rules"] && room["m.room.join_rules"].content) {
-                isPublicRoom = ("public" === room["m.room.join_rules"].content.join_rule);
+            if (room.state("m.room.join_rules") && room.state("m.room.join_rules").content) {
+                isPublicRoom = ("public" === room.state("m.room.join_rules").content.join_rule);
             }
 
             if (room_name_event) {
@@ -44,7 +45,7 @@ angular.module('matrixFilter', [])
             else if (alias) {
                 roomName = alias;
             }
-            else if (room.members && !isPublicRoom) {    // Do not rename public room
+            else if (room.members.length > 0 && !isPublicRoom) {    // Do not rename public room
             
                 var user_id = matrixService.config().user_id;
                 // Else, build the name from its users

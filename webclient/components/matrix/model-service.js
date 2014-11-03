@@ -89,8 +89,11 @@ angular.module('modelService', [])
         // provided which can just be given the type and it will return the 
         // 0-len event by default.
         state: function state(type, state_key) {
+            if (!type) {
+                return undefined; // event type MUST be specified
+            }
             if (!state_key) {
-                return this.state_events[type];
+                return this.state_events[type]; // treat as 0-len state key
             }
             return this.state_events[type + state_key];
         },

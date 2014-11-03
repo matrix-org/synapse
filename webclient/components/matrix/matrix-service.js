@@ -724,57 +724,30 @@ angular.module('matrixService', [])
             //console.log("looking for roomId for " + alias + "; found: " + roomId);
             return roomId;
         },
-
-        /****** Power levels management ******/
-
-        /**
-         * Return the power level of an user in a particular room
-         * @param {String} room_id the room id
-         * @param {String} user_id the user id
-         * @returns {Number} a value between 0 and 10
-         */
-        getUserPowerLevel: function(room_id, user_id) {
-            var powerLevel = 0;
-            var room = $rootScope.events.rooms[room_id];
-            if (room && room["m.room.power_levels"]) {
-                if (user_id in room["m.room.power_levels"].content) {
-                    powerLevel = room["m.room.power_levels"].content[user_id];
-                }
-                else {
-                    // Use the room default user power
-                    powerLevel = room["m.room.power_levels"].content["default"];
-                }
-            }
-            return powerLevel;
-        },
             
         /**
          * Change or reset the power level of a user
          * @param {String} room_id the room id
          * @param {String} user_id the user id
-         * @param {Number} powerLevel a value between 0 and 10
+         * @param {Number} powerLevel The desired power level.
          *    If undefined, the user power level will be reset, ie he will use the default room user power level
+         * @param event The existing m.room.power_levels event if one exists.
          * @returns {promise} an $http promise
          */
-        setUserPowerLevel: function(room_id, user_id, powerLevel) {
-            
-            // Hack: currently, there is no home server API so do it by hand by updating
-            // the current m.room.power_levels of the room and send it to the server
-            var room = $rootScope.events.rooms[room_id];
-            if (room && room["m.room.power_levels"]) {
-                var content = angular.copy(room["m.room.power_levels"].content);
-                content[user_id] = powerLevel;
-                
-                var path = "/rooms/$room_id/state/m.room.power_levels";
-                path = path.replace("$room_id", encodeURIComponent(room_id));
-                
-                return doRequest("PUT", path, undefined, content);
+        setUserPowerLevel: function(room_id, user_id, powerLevel, event) {
+            var content = {};
+            if (event) {
+                // if there is an existing event, copy the content as it contains
+                // the power level values for other members which we do not want
+                // to modify.
+                content = angular.copy(event.content);
             }
-            
-            // The room does not exist or does not contain power_levels data
-            var deferred = $q.defer();
-            deferred.reject({data:{error: "Invalid room: " + room_id}});
-            return deferred.promise;
+            content[user_id] = powerLevel;
+                
+            var path = "/rooms/$room_id/state/m.room.power_levels";
+            path = path.replace("$room_id", encodeURIComponent(room_id));
+                
+            return doRequest("PUT", path, undefined, content);
         },
 
         getTurnServer: function() {

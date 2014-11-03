@@ -404,7 +404,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     var updateUserPowerLevel = function(user_id) {
         var member = $scope.members[user_id];
         if (member) {
-            member.powerLevel = matrixService.getUserPowerLevel($scope.room_id, user_id);
+            member.powerLevel = eventHandlerService.getUserPowerLevel($scope.room_id, user_id);
             
             normaliseMembersPowerLevels();
         }
@@ -576,7 +576,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                                 powerLevel = parseInt(matches[3]);
                             }
                             if (powerLevel !== NaN) {
-                                promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel);
+                                var powerLevelEvent = $scope.room.current_room_state.state("m.room.power_levels");
+                                promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel, powerLevelEvent);
                             }
                         }
                     }
@@ -591,7 +592,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     if (args) {
                         var matches = args.match(/^(\S+)$/);
                         if (matches) {
-                            promise = matrixService.setUserPowerLevel($scope.room_id, args, undefined);
+                            var powerLevelEvent = $scope.room.current_room_state.state("m.room.power_levels");
+                            promise = matrixService.setUserPowerLevel($scope.room_id, args, undefined, powerLevelEvent);
                         }
                     }
                     
@@ -1005,7 +1007,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         $scope.event_selected = content;
         // scope this so the template can check power levels and enable/disable
         // buttons
-        $scope.pow = matrixService.getUserPowerLevel;
+        $scope.pow = eventHandlerService.getUserPowerLevel;
 
         var modalInstance = $modal.open({
             templateUrl: 'eventInfoTemplate.html',
