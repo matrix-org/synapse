@@ -1,5 +1,4 @@
 
-from synapse.crypto.event_signing import verify_signed_event_pdu
 from syutil.crypto.jsonsign import verify_signed_json
 from syutil.crypto.signing_key import (
     decode_verify_key_bytes, write_signing_keys

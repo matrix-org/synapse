@@ -65,8 +65,7 @@ class Pdu(JsonEncodedObject):
         "content",
         "outlier",
         "hashes",
-        "signatures",
-        "is_state",  # Below this are keys valid only for State Pdus.
+        "signatures",  # Below this are keys valid only for State Pdus.
         "state_key",
         "prev_state",
         "required_power_level",
@@ -91,16 +90,10 @@ class Pdu(JsonEncodedObject):
     # TODO: We need to make this properly load content rather than
     # just leaving it as a dict. (OR DO WE?!)
 
-    def __init__(self, destinations=[], is_state=False, prev_events=[],
+    def __init__(self, destinations=[], prev_events=[],
                  outlier=False, hashes={}, signatures={}, **kwargs):
-        if is_state:
-            for required_key in ["state_key"]:
-                if required_key not in kwargs:
-                    raise RuntimeError("Key %s is required" % required_key)
-
         super(Pdu, self).__init__(
             destinations=destinations,
-            is_state=bool(is_state),
             prev_events=prev_events,
             outlier=outlier,
             hashes=hashes,

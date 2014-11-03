@@ -14,10 +14,6 @@
 # limitations under the License.
 
 from .units import Pdu
-from synapse.crypto.event_signing import (
-    add_event_pdu_content_hash, sign_event_pdu
-)
-from synapse.types import EventID
 
 import copy
 
@@ -49,17 +45,10 @@ class PduCodec(object):
     def pdu_from_event(self, event):
         d = event.get_full_dict()
 
-        if hasattr(event, "state_key"):
-            d["is_state"] = True
-
         kwargs = copy.deepcopy(event.unrecognized_keys)
         kwargs.update({
             k: v for k, v in d.items()
         })
 
-        if "origin_server_ts" not in kwargs:
-            kwargs["origin_server_ts"] = int(self.clock.time_msec())
-
         pdu = Pdu(**kwargs)
-        pdu = add_event_pdu_content_hash(pdu)
-        return sign_event_pdu(pdu, self.server_name, self.signing_key)
+        return pdu

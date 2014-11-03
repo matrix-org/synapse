@@ -15,11 +15,11 @@
 # limitations under the License.
 
 
-from synapse.federation.units import Pdu
-from synapse.api.events.utils import prune_pdu, prune_event
+from synapse.api.events.utils import prune_event
 from syutil.jsonutil import encode_canonical_json
 from syutil.base64util import encode_base64, decode_base64
-from syutil.crypto.jsonsign import sign_json, verify_signed_json
+from syutil.crypto.jsonsign import sign_json
+from synapse.api.events.room import GenericEvent
 
 import copy
 import hashlib
@@ -28,20 +28,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def add_event_pdu_content_hash(pdu, hash_algorithm=hashlib.sha256):
-    hashed = _compute_content_hash(pdu, hash_algorithm)
-    pdu.hashes[hashed.name] = encode_base64(hashed.digest())
-    return pdu
-
-
-def check_event_pdu_content_hash(pdu, hash_algorithm=hashlib.sha256):
+def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     """Check whether the hash for this PDU matches the contents"""
-    computed_hash = _compute_content_hash(pdu, hash_algorithm)
-    if computed_hash.name not in pdu.hashes:
+    computed_hash = _compute_content_hash(event, hash_algorithm)
+    if computed_hash.name not in event.hashes:
         raise Exception("Algorithm %s not in hashes %s" % (
-            computed_hash.name, list(pdu.hashes)
+            computed_hash.name, list(event.hashes)
         ))
-    message_hash_base64 = pdu.hashes[computed_hash.name]
+    message_hash_base64 = event.hashes[computed_hash.name]
     try:
         message_hash_bytes = decode_base64(message_hash_base64)
     except:
@@ -49,62 +43,7 @@ def check_event_pdu_content_hash(pdu, hash_algorithm=hashlib.sha256):
     return message_hash_bytes == computed_hash.digest()
 
 
-def _compute_content_hash(pdu, hash_algorithm):
-    pdu_json = pdu.get_dict()
-    #TODO: Make "age_ts" key internal
-    pdu_json.pop("age_ts", None)
-    pdu_json.pop("unsigned", None)
-    pdu_json.pop("signatures", None)
-    pdu_json.pop("hashes", None)
-    pdu_json_bytes = encode_canonical_json(pdu_json)
-    return hash_algorithm(pdu_json_bytes)
-
-
-def compute_pdu_event_reference_hash(pdu, hash_algorithm=hashlib.sha256):
-    tmp_pdu = Pdu(**pdu.get_dict())
-    tmp_pdu = prune_pdu(tmp_pdu)
-    pdu_json = tmp_pdu.get_dict()
-    pdu_json.pop("signatures", None)
-    pdu_json_bytes = encode_canonical_json(pdu_json)
-    hashed = hash_algorithm(pdu_json_bytes)
-    return (hashed.name, hashed.digest())
-
-
-def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
-    tmp_event = copy.deepcopy(event)
-    tmp_event = prune_event(tmp_event)
-    event_json = tmp_event.get_dict()
-    event_json.pop("signatures", None)
-    event_json_bytes = encode_canonical_json(event_json)
-    hashed = hash_algorithm(event_json_bytes)
-    return (hashed.name, hashed.digest())
-
-
-def sign_event_pdu(pdu, signature_name, signing_key):
-    tmp_pdu = Pdu(**pdu.get_dict())
-    tmp_pdu = prune_pdu(tmp_pdu)
-    pdu_json = tmp_pdu.get_dict()
-    pdu_json = sign_json(pdu_json, signature_name, signing_key)
-    pdu.signatures = pdu_json["signatures"]
-    return pdu
-
-
-def verify_signed_event_pdu(pdu, signature_name, verify_key):
-    tmp_pdu = Pdu(**pdu.get_dict())
-    tmp_pdu = prune_pdu(tmp_pdu)
-    pdu_json = tmp_pdu.get_dict()
-    verify_signed_json(pdu_json, signature_name, verify_key)
-
-
-def add_hashes_and_signatures(event, signature_name, signing_key,
-                              hash_algorithm=hashlib.sha256):
-    tmp_event = copy.deepcopy(event)
-    tmp_event = prune_event(tmp_event)
-    redact_json = tmp_event.get_dict()
-    redact_json.pop("signatures", None)
-    redact_json = sign_json(redact_json, signature_name, signing_key)
-    event.signatures = redact_json["signatures"]
-
+def _compute_content_hash(event, hash_algorithm):
     event_json = event.get_full_dict()
     #TODO: We need to sign the JSON that is going out via fedaration.
     event_json.pop("age_ts", None)
@@ -112,7 +51,44 @@ def add_hashes_and_signatures(event, signature_name, signing_key,
     event_json.pop("signatures", None)
     event_json.pop("hashes", None)
     event_json_bytes = encode_canonical_json(event_json)
+    return hash_algorithm(event_json_bytes)
+
+
+def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
+    # FIXME(erikj): GenericEvent!
+    tmp_event = GenericEvent(**event.get_full_dict())
+    tmp_event = prune_event(tmp_event)
+    event_json = tmp_event.get_dict()
+    event_json.pop("signatures", None)
+    event_json.pop("age_ts", None)
+    event_json.pop("unsigned", None)
+    event_json_bytes = encode_canonical_json(event_json)
     hashed = hash_algorithm(event_json_bytes)
+    return (hashed.name, hashed.digest())
+
+
+def compute_event_signature(event, signature_name, signing_key):
+    tmp_event = copy.deepcopy(event)
+    tmp_event = prune_event(tmp_event)
+    redact_json = tmp_event.get_full_dict()
+    redact_json.pop("signatures", None)
+    redact_json.pop("age_ts", None)
+    redact_json.pop("unsigned", None)
+    logger.debug("Signing event: %s", redact_json)
+    redact_json = sign_json(redact_json, signature_name, signing_key)
+    return redact_json["signatures"]
+
+
+def add_hashes_and_signatures(event, signature_name, signing_key,
+                              hash_algorithm=hashlib.sha256):
+    hashed = _compute_content_hash(event, hash_algorithm=hash_algorithm)
+
     if not hasattr(event, "hashes"):
         event.hashes = {}
     event.hashes[hashed.name] = encode_base64(hashed.digest())
+
+    event.signatures = compute_event_signature(
+        event,
+        signature_name=signature_name,
+        signing_key=signing_key,
+    )

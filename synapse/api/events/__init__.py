@@ -61,6 +61,7 @@ class SynapseEvent(JsonEncodedObject):
         "prev_content",
         "prev_state",
         "redacted_because",
+        "origin_server_ts",
     ]
 
     internal_keys = [

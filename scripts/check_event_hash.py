@@ -6,6 +6,7 @@ import hashlib
 import sys
 import json
 
+
 class dictobj(dict):
     def __init__(self, *args, **kargs):
         dict.__init__(self, *args, **kargs)
@@ -14,9 +15,12 @@ class dictobj(dict):
     def get_dict(self):
         return dict(self)
 
+    def get_full_dict(self):
+        return dict(self)
+
 
 def main():
-    parser = parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument("input_json", nargs="?", type=argparse.FileType('r'),
                         default=sys.stdin)
     args = parser.parse_args()
@@ -29,14 +33,14 @@ def main():
     }
 
     for alg_name in event_json.hashes:
-        if check_event_pdu_content_hash(event_json, algorithms[alg_name]):
+        if check_event_content_hash(event_json, algorithms[alg_name]):
             print "PASS content hash %s" % (alg_name,)
         else:
             print "FAIL content hash %s" % (alg_name,)
 
     for algorithm in algorithms.values():
-        name, h_bytes = compute_pdu_event_reference_hash(event_json, algorithm)
-        print "Reference hash %s: %s" % (name, encode_base64(bytes))
+        name, h_bytes = compute_event_reference_hash(event_json, algorithm)
+        print "Reference hash %s: %s" % (name, encode_base64(h_bytes))
 
 if __name__=="__main__":
     main()
