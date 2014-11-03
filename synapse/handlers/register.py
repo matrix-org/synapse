@@ -15,7 +15,6 @@
 
 """Contains functions for registering clients."""
 from twisted.internet import defer
-from twisted.python import log
 
 from synapse.types import UserID
 from synapse.api.errors import (
@@ -129,7 +128,7 @@ class RegistrationHandler(BaseHandler):
             try:
                 threepid = yield self._threepid_from_creds(c)
             except:
-                log.err()
+                logger.exception("Couldn't validate 3pid")
                 raise RegistrationError(400, "Couldn't validate 3pid")
 
             if not threepid:
