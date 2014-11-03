@@ -148,6 +148,17 @@ angular.module('modelService', [])
         
         getRooms: function() {
             return rooms;
+        },
+        
+        /**
+         * Get the member object of a room member
+         * @param {String} room_id the room id
+         * @param {String} user_id the id of the user
+         * @returns {undefined | Object} the member object of this user in this room if he is part of the room
+         */
+        getMember: function(room_id, user_id) {
+            var room = this.getRoom(room_id);
+            return room.current_room_state.members[user_id];
         }
     
     };

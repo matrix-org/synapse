@@ -17,7 +17,7 @@
 'use strict';
 
 angular.module('RecentsController')
-.filter('orderRecents', ["matrixService", "eventHandlerService", function(matrixService, eventHandlerService) {
+.filter('orderRecents', ["matrixService", "eventHandlerService", "modelService", function(matrixService, eventHandlerService, modelService) {
     return function(rooms) {
         var user_id = matrixService.config().user_id;
 
@@ -29,7 +29,7 @@ angular.module('RecentsController')
             var meEvent = room.current_room_state.state("m.room.member", user_id);
             // Show the room only if the user has joined it or has been invited
             // (ie, do not show it if he has been banned)
-            var member = eventHandlerService.getMember(room_id, user_id);
+            var member = modelService.getMember(room_id, user_id);
             room.recent.me = member;
             if (member && ("invite" === member.membership || "join" === member.membership)) {
                 if ("invite" === member.membership) {
