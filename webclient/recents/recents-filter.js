@@ -31,8 +31,8 @@ angular.module('RecentsController')
             // (ie, do not show it if he has been banned)
             var member = modelService.getMember(room_id, user_id);
             room.recent.me = member;
-            if (member && ("invite" === member.membership || "join" === member.membership)) {
-                if ("invite" === member.membership) {
+            if (member && ("invite" === member.content.membership || "join" === member.content.membership)) {
+                if ("invite" === member.content.membership) {
                     room.recent.inviter = member.user_id;
                 }
                 // Count users here

@@ -9,7 +9,7 @@
                     {{ room.room_id | mRoomName }}
                 </td>
                 <td class="recentsRoomSummaryUsersCount">
-                    <span ng-show="undefined !== room.numUsersInRoom">
+                    <span ng-show="undefined !== room.recent.numUsersInRoom">
                         {{ room.recent.numUsersInRoom || '1' }} {{ room.recent.numUsersInRoom == 1 ? 'user' : 'users' }}                     
                     </span>
                 </td>

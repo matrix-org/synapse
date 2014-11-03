@@ -540,13 +540,12 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
 
             var room = modelService.getRoom(room_id);
             memberCount = 0;
-
             for (var i in room.current_room_state.members) {
                 if (!room.current_room_state.members.hasOwnProperty(i)) continue;
 
                 var member = room.current_room_state.members[i];
 
-                if ("join" === member.membership) {
+                if ("join" === member.content.membership) {
                     memberCount = memberCount + 1;
                 }
             }
