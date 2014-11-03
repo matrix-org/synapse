@@ -72,8 +72,7 @@ class TransportLayer(object):
         self.received_handler = None
 
     @log_function
-    def get_context_state(self, destination, context, pdu_id=None,
-                          pdu_origin=None):
+    def get_context_state(self, destination, context, event_id=None):
         """ Requests all state for a given context (i.e. room) from the
         given server.
 
@@ -91,60 +90,59 @@ class TransportLayer(object):
         subpath = "/state/%s/" % context
 
         args = {}
-        if pdu_id and pdu_origin:
-            args["pdu_id"] = pdu_id
-            args["pdu_origin"] = pdu_origin
+        if event_id:
+            args["event_id"] = event_id
 
         return self._do_request_for_transaction(
             destination, subpath, args=args
         )
 
     @log_function
-    def get_pdu(self, destination, pdu_origin, pdu_id):
+    def get_event(self, destination, event_id):
         """ Requests the pdu with give id and origin from the given server.
 
         Args:
             destination (str): The host name of the remote home server we want
                 to get the state from.
-            pdu_origin (str): The home server which created the PDU.
-            pdu_id (str): The id of the PDU being requested.
+            event_id (str): The id of the event being requested.
 
         Returns:
             Deferred: Results in a dict received from the remote homeserver.
         """
-        logger.debug("get_pdu dest=%s, pdu_origin=%s, pdu_id=%s",
-                     destination, pdu_origin, pdu_id)
+        logger.debug("get_pdu dest=%s, event_id=%s",
+                     destination, event_id)
 
-        subpath = "/pdu/%s/%s/" % (pdu_origin, pdu_id)
+        subpath = "/event/%s/" % (event_id, )
 
         return self._do_request_for_transaction(destination, subpath)
 
     @log_function
-    def backfill(self, dest, context, pdu_tuples, limit):
+    def backfill(self, dest, context, event_tuples, limit):
         """ Requests `limit` previous PDUs in a given context before list of
         PDUs.
 
         Args:
             dest (str)
             context (str)
-            pdu_tuples (list)
+            event_tuples (list)
             limt (int)
 
         Returns:
             Deferred: Results in a dict received from the remote homeserver.
         """
         logger.debug(
-            "backfill dest=%s, context=%s, pdu_tuples=%s, limit=%s",
-            dest, context, repr(pdu_tuples), str(limit)
+            "backfill dest=%s, context=%s, event_tuples=%s, limit=%s",
+            dest, context, repr(event_tuples), str(limit)
         )
 
-        if not pdu_tuples:
+        if not event_tuples:
+            # TODO: raise?
             return
 
-        subpath = "/backfill/%s/" % context
+        subpath = "/backfill/%s/" % (context,)
 
         args = {
-            "v": ["%s,%s" % (i, o) for i, o in pdu_tuples],
+            "v": event_tuples,
             "limit": limit,
         }
 
@@ -222,11 +220,10 @@ class TransportLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_join(self, destination, context, pdu_id, origin, content):
-        path = PREFIX + "/send_join/%s/%s/%s" % (
+    def send_join(self, destination, context, event_id, content):
+        path = PREFIX + "/send_join/%s/%s" % (
             context,
-            origin,
-            pdu_id,
+            event_id,
         )
 
         code, content = yield self.client.put_json(
@@ -242,11 +239,10 @@ class TransportLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_invite(self, destination, context, pdu_id, origin, content):
-        path = PREFIX + "/invite/%s/%s/%s" % (
+    def send_invite(self, destination, context, event_id, content):
+        path = PREFIX + "/invite/%s/%s" % (
             context,
-            origin,
-            pdu_id,
+            event_id,
         )
 
         code, content = yield self.client.put_json(
@@ -376,10 +372,10 @@ class TransportLayer(object):
         # data_id pair.
         self.server.register_path(
             "GET",
-            re.compile("^" + PREFIX + "/pdu/([^/]*)/([^/]*)/$"),
+            re.compile("^" + PREFIX + "/event/([^/]*)/$"),
             self._with_authentication(
-                lambda origin, content, query, pdu_origin, pdu_id:
-                handler.on_pdu_request(pdu_origin, pdu_id)
+                lambda origin, content, query, event_id:
+                handler.on_pdu_request(event_id)
             )
         )
 
@@ -391,8 +387,7 @@ class TransportLayer(object):
                 lambda origin, content, query, context:
                 handler.on_context_state_request(
                     context,
-                    query.get("pdu_id", [None])[0],
-                    query.get("pdu_origin", [None])[0]
+                    query.get("event_id", [None])[0],
                 )
             )
         )
@@ -442,9 +437,9 @@ class TransportLayer(object):
 
         self.server.register_path(
             "PUT",
-            re.compile("^" + PREFIX + "/send_join/([^/]*)/([^/]*)/([^/]*)$"),
+            re.compile("^" + PREFIX + "/send_join/([^/]*)/([^/]*)$"),
             self._with_authentication(
-                lambda origin, content, query, context, pdu_origin, pdu_id:
+                lambda origin, content, query, context, event_id:
                 self._on_send_join_request(
                     origin, content, query,
                 )
@@ -453,9 +448,9 @@ class TransportLayer(object):
 
         self.server.register_path(
             "PUT",
-            re.compile("^" + PREFIX + "/invite/([^/]*)/([^/]*)/([^/]*)$"),
+            re.compile("^" + PREFIX + "/invite/([^/]*)/([^/]*)$"),
             self._with_authentication(
-                lambda origin, content, query, context, pdu_origin, pdu_id:
+                lambda origin, content, query, context, event_id:
                 self._on_invite_request(
                     origin, content, query,
                 )
@@ -548,7 +543,7 @@ class TransportLayer(object):
 
         limit = int(limits[-1])
 
-        versions = [v.split(",", 1) for v in v_list]
+        versions = v_list
 
         return self.request_handler.on_backfill_request(
             context, versions, limit
@@ -579,120 +574,3 @@ class TransportLayer(object):
         )
 
         defer.returnValue((200, content))
-
-
-class TransportReceivedHandler(object):
-    """ Callbacks used when we receive a transaction
-    """
-    def on_incoming_transaction(self, transaction):
-        """ Called on PUT /send/<transaction_id>, or on response to a request
-        that we sent (e.g. a backfill request)
-
-        Args:
-            transaction (synapse.transaction.Transaction): The transaction that
-                was sent to us.
-
-        Returns:
-            twisted.internet.defer.Deferred: A deferred that gets fired when
-            the transaction has finished being processed.
-
-            The result should be a tuple in the form of
-            `(response_code, respond_body)`, where `response_body` is a python
-            dict that will get serialized to JSON.
-
-            On errors, the dict should have an `error` key with a brief message
-            of what went wrong.
-        """
-        pass
-
-
-class TransportRequestHandler(object):
-    """ Handlers used when someone want's data from us
-    """
-    def on_pull_request(self, versions):
-        """ Called on GET /pull/?v=...
-
-        This is hit when a remote home server wants to get all data
-        after a given transaction. Mainly used when a home server comes back
-        online and wants to get everything it has missed.
-
-        Args:
-            versions (list): A list of transaction_ids that should be used to
-                determine what PDUs the remote side have not yet seen.
-
-        Returns:
-            Deferred: Resultsin a tuple in the form of
-            `(response_code, respond_body)`, where `response_body` is a python
-            dict that will get serialized to JSON.
-
-            On errors, the dict should have an `error` key with a brief message
-            of what went wrong.
-        """
-        pass
-
-    def on_pdu_request(self, pdu_origin, pdu_id):
-        """ Called on GET /pdu/<pdu_origin>/<pdu_id>/
-
-        Someone wants a particular PDU. This PDU may or may not have originated
-        from us.
-
-        Args:
-            pdu_origin (str)
-            pdu_id (str)
-
-        Returns:
-            Deferred: Resultsin a tuple in the form of
-            `(response_code, respond_body)`, where `response_body` is a python
-            dict that will get serialized to JSON.
-
-            On errors, the dict should have an `error` key with a brief message
-            of what went wrong.
-        """
-        pass
-
-    def on_context_state_request(self, context):
-        """ Called on GET /state/<context>/
-
-        Gets hit when someone wants all the *current* state for a given
-        contexts.
-
-        Args:
-            context (str): The name of the context that we're interested in.
-
-        Returns:
-            twisted.internet.defer.Deferred: A deferred that gets fired when
-            the transaction has finished being processed.
-
-            The result should be a tuple in the form of
-            `(response_code, respond_body)`, where `response_body` is a python
-            dict that will get serialized to JSON.
-
-            On errors, the dict should have an `error` key with a brief message
-            of what went wrong.
-        """
-        pass
-
-    def on_backfill_request(self, context, versions, limit):
-        """ Called on GET /backfill/<context>/?v=...&limit=...
-
-        Gets hit when we want to backfill backwards on a given context from
-        the given point.
-
-        Args:
-            context (str): The context to backfill
-            versions (list): A list of 2-tuples representing where to backfill
-                from, in the form `(pdu_id, origin)`
-            limit (int): How many pdus to return.
-
-        Returns:
-            Deferred: Results in a tuple in the form of
-            `(response_code, respond_body)`, where `response_body` is a python
-            dict that will get serialized to JSON.
-
-            On errors, the dict should have an `error` key with a brief message
-            of what went wrong.
-        """
-        pass
-
-    def on_query_request(self):
-        """ Called on a GET /query/<query_type> request. """

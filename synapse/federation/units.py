@@ -34,13 +34,13 @@ class Pdu(JsonEncodedObject):
 
     A Pdu can be classified as "state". For a given context, we can efficiently
     retrieve all state pdu's that haven't been clobbered. Clobbering is done
-    via a unique constraint on the tuple (context, pdu_type, state_key). A pdu
+    via a unique constraint on the tuple (context, type, state_key). A pdu
     is a state pdu if `is_state` is True.
 
     Example pdu::
 
         {
-            "pdu_id": "78c",
+            "event_id": "$78c:example.com",
             "origin_server_ts": 1404835423000,
             "origin": "bar",
             "prev_ids": [
@@ -53,14 +53,14 @@ class Pdu(JsonEncodedObject):
     """
 
     valid_keys = [
-        "pdu_id",
-        "context",
+        "event_id",
+        "room_id",
         "origin",
         "origin_server_ts",
-        "pdu_type",
+        "type",
         "destinations",
         "transaction_id",
-        "prev_pdus",
+        "prev_events",
         "depth",
         "content",
         "outlier",
@@ -68,8 +68,7 @@ class Pdu(JsonEncodedObject):
         "signatures",
         "is_state",  # Below this are keys valid only for State Pdus.
         "state_key",
-        "prev_state_id",
-        "prev_state_origin",
+        "prev_state",
         "required_power_level",
         "user_id",
     ]
@@ -81,18 +80,18 @@ class Pdu(JsonEncodedObject):
     ]
 
     required_keys = [
-        "pdu_id",
-        "context",
+        "event_id",
+        "room_id",
         "origin",
         "origin_server_ts",
-        "pdu_type",
+        "type",
         "content",
     ]
 
     # TODO: We need to make this properly load content rather than
     # just leaving it as a dict. (OR DO WE?!)
 
-    def __init__(self, destinations=[], is_state=False, prev_pdus=[],
+    def __init__(self, destinations=[], is_state=False, prev_events=[],
                  outlier=False, hashes={}, signatures={}, **kwargs):
         if is_state:
             for required_key in ["state_key"]:
@@ -102,65 +101,12 @@ class Pdu(JsonEncodedObject):
         super(Pdu, self).__init__(
             destinations=destinations,
             is_state=bool(is_state),
-            prev_pdus=prev_pdus,
+            prev_events=prev_events,
             outlier=outlier,
             hashes=hashes,
             signatures=signatures,
             **kwargs
         )
-
-    @classmethod
-    def from_pdu_tuple(cls, pdu_tuple):
-        """ Converts a PduTuple to a Pdu
-
-        Args:
-            pdu_tuple (synapse.persistence.transactions.PduTuple): The tuple to
-                convert
-
-        Returns:
-            Pdu
-        """
-        if pdu_tuple:
-            d = copy.copy(pdu_tuple.pdu_entry._asdict())
-            d["origin_server_ts"] = d.pop("ts")
-
-            for k in d.keys():
-                if d[k] is None:
-                    del d[k]
-
-            d["content"] = json.loads(d["content_json"])
-            del d["content_json"]
-
-            args = {f: d[f] for f in cls.valid_keys if f in d}
-            if "unrecognized_keys" in d and d["unrecognized_keys"]:
-                args.update(json.loads(d["unrecognized_keys"]))
-
-            hashes = {
-                alg: encode_base64(hsh)
-                for alg, hsh in pdu_tuple.hashes.items()
-            }
-
-            signatures = {
-                kid: encode_base64(sig)
-                for kid, sig in pdu_tuple.signatures.items()
-            }
-
-            prev_pdus = []
-            for prev_pdu in pdu_tuple.prev_pdu_list:
-                prev_hashes = pdu_tuple.edge_hashes.get(prev_pdu, {})
-                prev_hashes = {
-                    alg: encode_base64(hsh) for alg, hsh in prev_hashes.items()
-                }
-                prev_pdus.append((prev_pdu[0], prev_pdu[1], prev_hashes))
-
-            return Pdu(
-                prev_pdus=prev_pdus,
-                hashes=hashes,
-                signatures=signatures,
-                **args
-            )
-        else:
-            return None
 
     def __str__(self):
         return "(%s, %s)" % (self.__class__.__name__, repr(self.__dict__))

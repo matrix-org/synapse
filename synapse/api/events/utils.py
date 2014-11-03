@@ -32,7 +32,7 @@ def prune_event(event):
 def prune_pdu(pdu):
     """Removes keys that contain unrestricted and non-essential data from a PDU
     """
-    return _prune_event_or_pdu(pdu.pdu_type, pdu)
+    return _prune_event_or_pdu(pdu.type, pdu)
 
 def _prune_event_or_pdu(event_type, event):
     # Remove all extraneous fields.

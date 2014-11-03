@@ -139,7 +139,7 @@ class FederationHandler(BaseHandler):
             # Huh, let's try and get the current state
             try:
                 yield self.replication_layer.get_state_for_context(
-                    event.origin, event.room_id, pdu.pdu_id, pdu.origin,
+                    event.origin, event.room_id, event.event_id,
                 )
 
                 hosts = yield self.store.get_joined_hosts_for_room(
@@ -368,10 +368,8 @@ class FederationHandler(BaseHandler):
         ])
 
     @defer.inlineCallbacks
-    def get_state_for_pdu(self, pdu_id, pdu_origin):
+    def get_state_for_pdu(self, event_id):
         yield run_on_reactor()
-
-        event_id = EventID.create(pdu_id, pdu_origin, self.hs).to_string()
 
         state_groups = yield self.store.get_state_groups(
             [event_id]
@@ -406,7 +404,7 @@ class FederationHandler(BaseHandler):
 
         events = yield self.store.get_backfill_events(
             context,
-            [self.pdu_codec.encode_event_id(i, o) for i, o in pdu_list],
+            pdu_list,
             limit
         )
 
@@ -417,14 +415,14 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def get_persisted_pdu(self, pdu_id, origin):
+    def get_persisted_pdu(self, event_id):
         """ Get a PDU from the database with given origin and id.
 
         Returns:
             Deferred: Results in a `Pdu`.
         """
         event = yield self.store.get_event(
-            self.pdu_codec.encode_event_id(pdu_id, origin),
+            event_id,
             allow_none=True,
         )
 
