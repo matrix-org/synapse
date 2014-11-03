@@ -15,11 +15,21 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
-.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall',
-                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall) {
+.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'notificationService',
+                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, notificationService) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
+    
+    // .html needs this
+    $scope.containsBingWord = function(content) {
+        return notificationService.containsBingWord(
+            matrixService.config().user_id,
+            matrixService.config().display_name,
+            matrixService.config().bingWords,
+            content
+        );
+    };
 
     // Room ids. Computed and resolved in onInit
     $scope.room_id = undefined;
@@ -191,16 +201,20 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                 // Notify when a user joins
                 if ((document.hidden  || matrixService.presence.unavailable === mPresence.getState())
                         && event.state_key !== $scope.state.user_id  && "join" === event.membership) {
-                    var notification = new window.Notification(
-                        event.content.displayname +
-                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")", // FIXME: don't leak room_ids here
-                    {
-                        "body": event.content.displayname + " joined",
-                        "icon": event.content.avatar_url ? event.content.avatar_url : undefined
-                    });
-                    $timeout(function() {
-                        notification.close();
-                    }, 5 * 1000);
+                    var userName = event.content.displayname;
+                    if (!userName) {
+                        userName = event.state_key;
+                    }
+                    notificationService.showNotification(
+                        userName +
+                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")",
+                        userName + " joined",
+                        event.content.avatar_url ? event.content.avatar_url : undefined,
+                        function() {
+                            console.log("notification.onclick() room=" + event.room_id);
+                            $rootScope.goToPage('room/' + event.room_id); 
+                        }
+                    );
                 }
             }
         }

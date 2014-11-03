@@ -27,8 +27,8 @@ Typically, this service will store events or broadcast them to any listeners
 if typically all the $on method would do is update its own $scope.
 */
 angular.module('eventHandlerService', [])
-.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 
-function(matrixService, $rootScope, $q, $timeout, mPresence) {
+.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 'notificationService',
+function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService) {
     var ROOM_CREATE_EVENT = "ROOM_CREATE_EVENT";
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
@@ -45,71 +45,6 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
     var eventMap = {};
 
     $rootScope.presence = {};
-    
-    // TODO: This is attached to the rootScope so .html can just go containsBingWord
-    // for determining classes so it is easy to highlight bing messages. It seems a
-    // bit strange to put the impl in this service though, but I can't think of a better
-    // file to put it in.
-    $rootScope.containsBingWord = function(content) {
-        if (!content || $.type(content) != "string") {
-            return false;
-        }
-        var bingWords = matrixService.config().bingWords;
-        var shouldBing = false;
-        
-        // case-insensitive name check for user_id OR display_name if they exist
-        var userRegex = "";
-        var myUserId = matrixService.config().user_id;
-        if (myUserId) {
-            var localpart = getLocalPartFromUserId(myUserId);
-            if (localpart) {
-                localpart = localpart.toLocaleLowerCase();
-                userRegex += "\\b" + localpart + "\\b";
-            }
-        }
-        var myDisplayName = matrixService.config().display_name;
-        if (myDisplayName) {
-            myDisplayName = myDisplayName.toLocaleLowerCase();
-            if (userRegex.length > 0) {
-                userRegex += "|";
-            }
-            userRegex += "\\b" + myDisplayName + "\\b";
-        }
-
-        var r = new RegExp(userRegex, 'i');
-        if (content.search(r) >= 0) {
-            shouldBing = true;
-        }
-
-        if ( (myDisplayName && content.toLocaleLowerCase().indexOf(myDisplayName) != -1) ||
-             (myUserId && content.toLocaleLowerCase().indexOf(myUserId) != -1) ) {
-            shouldBing = true;
-        }
-        
-        // bing word list check
-        if (bingWords && !shouldBing) {
-            for (var i=0; i<bingWords.length; i++) {
-                var re = RegExp(bingWords[i]);
-                if (content.search(re) != -1) {
-                    shouldBing = true;
-                    break;
-                }
-            }
-        }
-        return shouldBing;
-    };
-
-    var getLocalPartFromUserId = function(user_id) {
-        if (!user_id) {
-            return null;
-        }
-        var localpartRegex = /@(.*):\w+/i
-        var results = localpartRegex.exec(user_id);
-        if (results && results.length == 2) {
-            return results[1];
-        }
-        return null;
-    };
 
     var initialSyncDeferred;
 
@@ -228,7 +163,12 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
             }
             
             if (window.Notification && event.user_id != matrixService.config().user_id) {
-                var shouldBing = $rootScope.containsBingWord(event.content.body);
+                var shouldBing = notificationService.containsBingWord(
+                    matrixService.config().user_id,
+                    matrixService.config().display_name,
+                    matrixService.config().bingWords,
+                    event.content.body
+                );
 
                 // Ideally we would notify only when the window is hidden (i.e. document.hidden = true).
                 //
@@ -258,6 +198,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                     if (event.content.msgtype === "m.emote") {
                         message = "* " + displayname + " " + message;
                     }
+                    else if (event.content.msgtype === "m.image") {
+                        message = displayname + " sent an image.";
+                    }
 
                     var roomTitle = matrixService.getRoomIdToAliasMapping(event.room_id);
                     var theRoom = $rootScope.events.rooms[event.room_id];
@@ -269,22 +212,15 @@ function(matrixService, $rootScope, $q, $timeout, mPresence) {
                         roomTitle = event.room_id;
                     }
                     
-                    var notification = new window.Notification(
-                        displayname +
-                        " (" + roomTitle + ")",
-                    {
-                        "body": message,
-                        "icon": member ? member.avatar_url : undefined
-                    });
-
-                    notification.onclick = function() {
-                        console.log("notification.onclick() room=" + event.room_id);
-                        $rootScope.goToPage('room/' + (event.room_id)); 
-                    };
-
-                    $timeout(function() {
-                        notification.close();
-                    }, 5 * 1000);
+                    notificationService.showNotification(
+                        displayname + " (" + roomTitle + ")",
+                        message,
+                        member ? member.avatar_url : undefined,
+                        function() {
+                            console.log("notification.onclick() room=" + event.room_id);
+                            $rootScope.goToPage('room/' + event.room_id); 
+                        }
+                    );
                 }
             }
         }
