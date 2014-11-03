@@ -193,6 +193,17 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
     var handleRoomMember = function(event, isLiveEvent, isStateEvent) {
         var room = modelService.getRoom(event.room_id);
         
+        // modify state before adding the message so it points to the right thing.
+        // The events are copied to avoid referencing the same event when adding
+        // the message (circular json structures)
+        if (isStateEvent || isLiveEvent) {
+            room.current_room_state.storeStateEvent(angular.copy(event));
+        }
+        else if (!isLiveEvent) {
+            // mutate the old room state
+            room.old_room_state.storeStateEvent(angular.copy(event));
+        }
+        
         
         // add membership changes as if they were a room message if something interesting changed
         // Exception: Do not do this if the event is a room state event because such events already come
@@ -220,11 +231,7 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
             }
         }
         
-        // Use data from state event or the latest data from the stream.
-        // Do not care of events that come when paginating back
-        if (isStateEvent || isLiveEvent) {
-            room.current_room_state.members[event.state_key] = event;
-        }
+        
         
         $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent, isStateEvent);
     };
@@ -439,7 +446,8 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
 
             }
             else {
-                // InitialSync returns messages in chronological order
+                // InitialSync returns messages in chronological order, so invert
+                // it to get most recent > oldest
                 for (var i=events.length - 1; i>=0; i--) {
                     this.handleEvent(events[i], isLiveEvents, isLiveEvents);
                 }
@@ -482,6 +490,8 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                 newRoom.current_room_state.storeStateEvents(room.state);
                 newRoom.old_room_state.storeStateEvents(room.state);
 
+                // this should be done AFTER storing state events since these
+                // messages may make the old_room_state diverge.
                 if ("messages" in room) {
                     this.handleRoomMessages(room.room_id, room.messages, false);
                     newRoom.current_room_state.pagination_token = room.messages.end;

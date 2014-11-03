@@ -127,14 +127,14 @@
             <tr ng-repeat="msg in room.events"
                 ng-class="(room.events[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
                 <td class="leftBlock">
-                    <div class="sender" ng-hide="room.events[$index - 1].user_id === msg.user_id"> {{ msg.user_id | mUserDisplayName: room_id }}</div>
+                    <div class="sender" ng-hide="room.events[$index - 1].user_id === msg.user_id"> {{ msg.room_member.content.displayname || msg.user_id | mUserDisplayName: room_id }}</div>
                     <div class="timestamp"
                          ng-class="msg.echo_msg_state">
                         {{ (msg.origin_server_ts) | date:'MMM d HH:mm' }}
                     </div>
                 </td>
                 <td class="avatar">
-                    <img class="avatarImage" ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
+                    <img class="avatarImage" ng-src="{{ msg.room_member.content.avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
                          ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
                 <td ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
