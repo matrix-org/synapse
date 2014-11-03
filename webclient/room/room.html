@@ -134,7 +134,8 @@
                     </div>
                 </td>
                 <td class="avatar">
-                    <img class="avatarImage" ng-src="{{ msg.room_member.content.avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
+                    <!-- msg.room_member.avatar_url is just backwards compat, and can be removed in the future. -->
+                    <img class="avatarImage" ng-src="{{ msg.room_member.content.avatar_url || msg.room_member.avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
                          ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
                 <td ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
