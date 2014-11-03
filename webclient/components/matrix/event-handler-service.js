@@ -193,6 +193,22 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
     var handleRoomMember = function(event, isLiveEvent, isStateEvent) {
         var room = modelService.getRoom(event.room_id);
         
+        // did something change?
+        var memberChanges = undefined;
+        if (!isStateEvent) {
+            // could be a membership change, display name change, etc.
+            // Find out which one.
+            if ((event.prev_content === undefined && event.content.membership) || (event.prev_content && (event.prev_content.membership !== event.content.membership))) {
+                memberChanges = "membership";
+            }
+            else if (event.prev_content && (event.prev_content.displayname !== event.content.displayname)) {
+                memberChanges = "displayname";
+            }
+            // mark the key which changed
+            event.changedKey = memberChanges;
+        }
+        
+        
         // modify state before adding the message so it points to the right thing.
         // The events are copied to avoid referencing the same event when adding
         // the message (circular json structures)
@@ -206,36 +222,17 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                 // the m.room.member event we are handling is the NEW event. When
                 // we keep going back in time, we want the PREVIOUS value for displaying
                 // names/etc, hence the clobber here.
+                // FIXME TODO: We can't be doing this, we should have separate keys for
+                //             avatar_url and displayname.
                 event.content = event.prev_content;
             }
-            room.old_room_state.storeStateEvent(angular.copy(event));
+            room.old_room_state.storeStateEvent(oldEvent);
         }
         
-        
-        // add membership changes as if they were a room message if something interesting changed
-        // Exception: Do not do this if the event is a room state event because such events already come
-        // as room messages events. Moreover, when they come as room messages events, they are relatively ordered
-        // with other other room messages
-        // FIXME this isn't true anymore, work out what this is doing.
-        if (!isStateEvent) {
-            // could be a membership change, display name change, etc.
-            // Find out which one.
-            var memberChanges = undefined;
-            if ((event.prev_content === undefined && event.content.membership) || (event.prev_content && (event.prev_content.membership !== event.content.membership))) {
-                memberChanges = "membership";
-            }
-            else if (event.prev_content && (event.prev_content.displayname !== event.content.displayname)) {
-                memberChanges = "displayname";
-            }
-
-            // mark the key which changed
-            event.changedKey = memberChanges;
-
-            // If there was a change we want to display, dump it in the message
-            // list.
-            if (memberChanges) {
-                room.addMessageEvent(event, !isLiveEvent);
-            }
+        // If there was a change we want to display, dump it in the message
+        // list. This has to be done after room state is updated.
+        if (memberChanges) {
+            room.addMessageEvent(event, !isLiveEvent);
         }
         
         
