@@ -19,8 +19,6 @@ from twisted.internet import defer
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
 
-from synapse.types import EventID
-
 from collections import namedtuple
 
 import copy

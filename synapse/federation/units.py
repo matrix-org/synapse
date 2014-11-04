@@ -18,11 +18,8 @@ server protocol.
 """
 
 from synapse.util.jsonobject import JsonEncodedObject
-from syutil.base64util import encode_base64
 
 import logging
-import json
-import copy
 
 
 logger = logging.getLogger(__name__)

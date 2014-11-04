@@ -17,15 +17,13 @@
 
 from ._base import BaseHandler
 
-from synapse.api.events.room import InviteJoinEvent, RoomMemberEvent
+from synapse.api.events.room import RoomMemberEvent
 from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
 from synapse.federation.pdu_codec import PduCodec
-from synapse.api.errors import SynapseError
 from synapse.util.async import run_on_reactor
-from synapse.types import EventID
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 
 import logging
 
