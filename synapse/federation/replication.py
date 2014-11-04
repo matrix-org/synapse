@@ -533,14 +533,6 @@ class ReplicationLayer(object):
         return "<ReplicationLayer(%s)>" % self.server_name
 
 
-class ReplicationHandler(object):
-    """This defines the methods that the :py:class:`.ReplicationLayer` will
-    use to communicate with the rest of the home server.
-    """
-    def on_receive_pdu(self, pdu):
-        raise NotImplementedError("on_receive_pdu")
-
-
 class _TransactionQueue(object):
     """This class makes sure we only have one transaction in flight at
     a time for a given destination.
