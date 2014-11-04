@@ -648,7 +648,7 @@ class _TransactionQueue(object):
         #  list of (pending_pdu, deferred, order)
         pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
         pending_edus = self.pending_edus_by_dest.pop(destination, [])
-        pending_failures = self.pending_failures_by_dest(destination, [])
+        pending_failures = self.pending_failures_by_dest.pop(destination, [])
 
         if not pending_pdus and not pending_edus and not pending_failures:
             return
