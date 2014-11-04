@@ -127,15 +127,15 @@
             <tr ng-repeat="msg in room.events"
                 ng-class="(room.events[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
                 <td class="leftBlock">
-                    <div class="sender" ng-hide="room.events[$index - 1].user_id === msg.user_id"> {{ msg.room_member.cnt.displayname || msg.user_id | mUserDisplayName: room_id }}</div>
+                    <div class="sender" ng-hide="room.events[$index - 1].user_id === msg.user_id"> {{ msg.__room_member.cnt.displayname || msg.user_id | mUserDisplayName: room_id }}</div>
                     <div class="timestamp"
                          ng-class="msg.echo_msg_state">
                         {{ (msg.origin_server_ts) | date:'MMM d HH:mm' }}
                     </div>
                 </td>
                 <td class="avatar">
-                    <!-- msg.room_member.avatar_url is just backwards compat, and can be removed in the future. -->
-                    <img class="avatarImage" ng-src="{{ msg.room_member.cnt.avatar_url || msg.room_member.avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
+                    <!-- msg.__room_member.avatar_url is just backwards compat, and can be removed in the future. -->
+                    <img class="avatarImage" ng-src="{{ msg.__room_member.cnt.avatar_url || msg.__room_member.avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
                          ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
                 <td ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
@@ -146,7 +146,7 @@
                         <span ng-if="'leave' === msg.content.membership && msg.changedKey === 'membership'">
                             <span ng-if="msg.user_id === msg.state_key">
                                 <!-- FIXME: This seems like a synapse bug that the 'leave' content doesn't give the displayname... -->
-                                {{ msg.room_member.cnt.displayname || members[msg.state_key].displayname || msg.state_key }} left
+                                {{ msg.__room_member.cnt.displayname || members[msg.state_key].displayname || msg.state_key }} left
                             </span>
                             <span ng-if="msg.user_id !== msg.state_key && msg.prev_content">
                                 {{ msg.content.displayname || members[msg.user_id].displayname || msg.user_id }}
@@ -159,9 +159,9 @@
                         </span>
                         <span ng-if="'invite' === msg.content.membership && msg.changedKey === 'membership' || 
                                      'ban' === msg.content.membership && msg.changedKey === 'membership'">
-                            {{ msg.content.displayname || members[msg.user_id].displayname || msg.user_id }}
+                            {{ msg.__room_member.cnt.displayname || msg.user_id }}
                             {{ {"invite": "invited", "ban": "banned"}[msg.content.membership] }}
-                            {{ msg.__target_room_member.displayname || msg.state_key }}
+                            {{ msg.__target_room_member.cnt.displayname || msg.state_key }}
                             <span ng-if="msg.prev_content && 'ban' === msg.prev_content.membership && msg.content.reason">
                                 : {{ msg.content.reason }}
                             </span>

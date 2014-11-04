@@ -1007,7 +1007,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         $scope.event_selected = angular.copy(content);
         
         // FIXME: Pre-calculated event data should be stripped in a nicer way.
-        $scope.event_selected.room_member = undefined;
+        $scope.event_selected.__room_member = undefined;
+        $scope.event_selected.__target_room_member = undefined;
         
         // scope this so the template can check power levels and enable/disable
         // buttons

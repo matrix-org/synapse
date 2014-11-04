@@ -46,7 +46,7 @@ angular.module('modelService', [])
             // every message must reference the RoomMember which made it *at
             // that time* so things like display names display correctly.
             var stateAtTheTime = toFront ? this.old_room_state : this.current_room_state;
-            event.room_member = stateAtTheTime.getStateEvent("m.room.member", event.user_id);
+            event.__room_member = stateAtTheTime.getStateEvent("m.room.member", event.user_id);
             if (event.type === "m.room.member" && event.content.membership === "invite") {
                 // give information on both the inviter and invitee
                 event.__target_room_member = stateAtTheTime.getStateEvent("m.room.member", event.state_key);

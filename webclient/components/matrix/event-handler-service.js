@@ -213,7 +213,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
         // The events are copied to avoid referencing the same event when adding
         // the message (circular json structures)
         if (isStateEvent || isLiveEvent) {
-            room.current_room_state.storeStateEvent(angular.copy(event));
+            var newEvent = angular.copy(event);
+            newEvent.cnt = event.content;
+            room.current_room_state.storeStateEvent(newEvent);
         }
         else if (!isLiveEvent) {
             // mutate the old room state
