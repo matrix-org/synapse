@@ -23,6 +23,8 @@ module.exports = function(config) {
       '../js/angular-animate.js',
       '../js/angular-sanitize.js',
       '../js/ng-infinite-scroll-matrix.js',
+      '../js/ui-bootstrap*',
+      '../js/elastic.js',  
       '../login/**/*.*',
       '../room/**/*.*',
       '../components/**/*.*',
@@ -33,6 +35,11 @@ module.exports = function(config) {
       '../app.js',
       '../app*',
       './unit/**/*.js'
+    ],
+
+    plugins: [
+        'karma-*',
+        require('./node_modules/karma-junit-reporter')
     ],
 
 
@@ -50,8 +57,11 @@ module.exports = function(config) {
     // test results reporter to use
     // possible values: 'dots', 'progress'
     // available reporters: https://npmjs.org/browse/keyword/karma-reporter
-    reporters: ['progress'],
-
+    reporters: ['progress', 'junit'],
+    junitReporter: {
+        outputFile: 'test-results.xml',
+        suite: ''
+    },
 
     // web server port
     port: 9876,
@@ -77,6 +87,6 @@ module.exports = function(config) {
 
     // Continuous Integration mode
     // if true, Karma captures browsers, runs the tests and exits
-    singleRun: false
+    singleRun: true
   });
 };
