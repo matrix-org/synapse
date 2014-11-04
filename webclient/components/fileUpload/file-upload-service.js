@@ -64,7 +64,8 @@ angular.module('mFileUpload', ['matrixService', 'mUtilities'])
         var imageMessage = {
             msgtype: "m.image",
             url: undefined,
-            body: {
+            body: "Image",
+            info: {
                 size: undefined,
                 w: undefined,
                 h: undefined,
@@ -90,7 +91,7 @@ angular.module('mFileUpload', ['matrixService', 'mUtilities'])
                         function(url) {
                             // Update message metadata
                             imageMessage.url = url;
-                            imageMessage.body = {
+                            imageMessage.info = {
                                 size: imageFile.size,
                                 w: size.width,
                                 h: size.height,
@@ -101,7 +102,7 @@ angular.module('mFileUpload', ['matrixService', 'mUtilities'])
                             // reuse the original image info for thumbnail data
                             if (!imageMessage.thumbnail_url) {
                                 imageMessage.thumbnail_url = imageMessage.url;
-                                imageMessage.thumbnail_info = imageMessage.body;
+                                imageMessage.thumbnail_info = imageMessage.info;
                             }
 
                             // We are done

@@ -422,7 +422,8 @@ angular.module('matrixService', [])
             var content = {
                  msgtype: "m.image",
                  url: image_url,
-                 body: image_body
+                 info: image_body,
+                 body: "Image"
             };
 
             return this.sendMessage(room_id, msg_id, content);
