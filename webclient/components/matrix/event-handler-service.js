@@ -218,14 +218,19 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
         else if (!isLiveEvent) {
             // mutate the old room state
             var oldEvent = angular.copy(event);
+            oldEvent.cnt = event.content;
             if (event.prev_content) {
                 // the m.room.member event we are handling is the NEW event. When
                 // we keep going back in time, we want the PREVIOUS value for displaying
                 // names/etc, hence the clobber here.
-                // FIXME TODO: We can't be doing this, we should have separate keys for
-                //             avatar_url and displayname.
-                event.content = event.prev_content;
+                oldEvent.cnt = event.prev_content;
             }
+            
+            if (event.changedKey === "membership" && event.content.membership === "join") {
+                // join has a prev_content but it doesn't contain all the info unlike the join, so use that.
+                oldEvent.cnt = event.content;
+            }
+            
             room.old_room_state.storeStateEvent(oldEvent);
         }
         
