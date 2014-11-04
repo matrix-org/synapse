@@ -408,7 +408,6 @@ class RoomMemberHandler(BaseHandler):
                 defer.returnValue({})
                 return
 
-            yield self.state_handler.handle_new_event(event, snapshot)
             yield self._do_local_membership_update(
                 event,
                 membership=event.content["membership"],
