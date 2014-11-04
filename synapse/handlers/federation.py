@@ -17,6 +17,7 @@
 
 from ._base import BaseHandler
 
+from synapse.api.errors import AuthError, FederationError
 from synapse.api.events.room import RoomMemberEvent
 from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
@@ -116,8 +117,15 @@ class FederationHandler(BaseHandler):
 
         logger.debug("Event: %s", event)
 
-        if not backfilled:
+        try:
             yield self.auth.check(event, None, raises=True)
+        except AuthError as e:
+            raise FederationError(
+                "ERROR",
+                e.code,
+                e.msg,
+                affected=event.event_id,
+            )
 
         is_new_state = is_new_state and not backfilled
 
