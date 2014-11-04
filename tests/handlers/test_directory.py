@@ -40,6 +40,7 @@ class DirectoryTestCase(unittest.TestCase):
         ])
 
         self.query_handlers = {}
+
         def register_query_handler(query_type, handler):
             self.query_handlers[query_type] = handler
         self.mock_federation.register_query_handler = register_query_handler
@@ -50,7 +51,8 @@ class DirectoryTestCase(unittest.TestCase):
         self.mock_config = Mock()
         self.mock_config.signing_key = [MockKey()]
 
-        hs = HomeServer("test",
+        hs = HomeServer(
+            "test",
             db_pool=db_pool,
             http_client=None,
             resource_for_federation=Mock(),
