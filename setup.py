@@ -43,6 +43,7 @@ setup(
     ],
     dependency_links=[
         "https://github.com/matrix-org/syutil/tarball/v0.0.2#egg=syutil-0.0.2",
+        "https://github.com/pyca/pynacl/tarball/52dbe2dc33f1#egg=pynacl-0.3.0",
     ],
     setup_requires=[
         "setuptools_trial",
