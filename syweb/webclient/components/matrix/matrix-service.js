@@ -267,7 +267,7 @@ angular.module('matrixService', [])
         
         // get room state for a specific room
         roomState: function(room_id) {
-            var path = "/rooms/" + room_id + "/state";
+            var path = "/rooms/" + encodeURIComponent(room_id) + "/state";
             return doRequest("GET", path);
         },
         
