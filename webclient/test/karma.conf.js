@@ -39,7 +39,6 @@ module.exports = function(config) {
 
     plugins: [
         'karma-*',
-        require('./node_modules/karma-junit-reporter')
     ],
 
 
