@@ -1,12 +1,30 @@
-Requires:
- - nodejs/npm
- - npm install karma
- - npm install jasmine
- - npm install protractor (e2e testing)
+Testing is done using Karma.
 
-Setting up continuous integration / run the unit tests (make sure you're in
-this directory so it can find the config file):
+
+UNIT TESTING
+============
+
+Requires the following:
+ - npm/nodejs
+ - phantomjs
+
+Requires the following node packages:
+ - npm install jasmine
+ - npm install karma
+ - npm install karma-jasmine
+ - npm install karma-phantomjs-launcher
+ - npm install karma-junit-reporter
+
+Make sure you're in this directory so it can find the config file and run:
   karma start
+
+You should see all the tests pass.
+
+
+E2E TESTING
+===========
+
+npm install protractor
 
 
 Setting up e2e tests (only if you don't have a selenium server to run the tests
