@@ -132,12 +132,11 @@ class FederationHandler(BaseHandler):
         # TODO: Implement something in federation that allows us to
         # respond to PDU.
 
-        with (yield self.room_lock.lock(event.room_id)):
-            yield self.store.persist_event(
-                event,
-                backfilled,
-                is_new_state=is_new_state
-            )
+        yield self.store.persist_event(
+            event,
+            backfilled,
+            is_new_state=is_new_state
+        )
 
         room = yield self.store.get_room(event.room_id)
 
