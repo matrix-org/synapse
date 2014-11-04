@@ -128,3 +128,37 @@ class StreamToken(
         d = self._asdict()
         d[key] = new_value
         return StreamToken(**d)
+
+
+class FederationError(RuntimeError):
+    """  This class is used to inform remote home servers about erroneous
+    PDUs they sent us.
+
+    FATAL: The remote server could not interpret the source event.
+        (e.g., it was missing a required field)
+    ERROR: The remote server interpreted the event, but it failed some other
+        check (e.g. auth)
+    WARN: The remote server accepted the event, but believes some part of it
+        is wrong (e.g., it referred to an invalid event)
+    """
+
+    def __init__(self, level, code, reason, affected, source=None):
+        if level not in ["FATAL", "ERROR", "WARN"]:
+            raise ValueError("Level is not valid: %s" % (level,))
+        self.level = level
+        self.code = code
+        self.reason = reason
+        self.affected = affected
+        self.source = source
+
+        msg = "%s %s: %s" % (level, code, reason,)
+        super(FederationError, self).__init__(msg)
+
+    def get_dict(self):
+        return {
+            "level": self.level,
+            "code": self.code,
+            "reason": self.reason,
+            "affected": self.affected,
+            "source": self.source if self.source else self.affected,
+        }
