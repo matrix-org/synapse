@@ -17,7 +17,7 @@
 'use strict';
 
 angular.module('RecentsController')
-.filter('orderRecents', ["matrixService", "eventHandlerService", function(matrixService, eventHandlerService) {
+.filter('orderRecents', ["matrixService", "eventHandlerService", "modelService", function(matrixService, eventHandlerService, modelService) {
     return function(rooms) {
         var user_id = matrixService.config().user_id;
 
@@ -25,26 +25,30 @@ angular.module('RecentsController')
         // The key, room_id, is already in value objects
         var filtered = [];
         angular.forEach(rooms, function(room, room_id) {
-            
+            room.recent = {};
+            var meEvent = room.current_room_state.state("m.room.member", user_id);
             // Show the room only if the user has joined it or has been invited
             // (ie, do not show it if he has been banned)
-            var member = eventHandlerService.getMember(room_id, user_id);
-            if (member && ("invite" === member.membership || "join" === member.membership)) {
-            
+            var member = modelService.getMember(room_id, user_id);
+            room.recent.me = member;
+            if (member && ("invite" === member.content.membership || "join" === member.content.membership)) {
+                if ("invite" === member.content.membership) {
+                    room.recent.inviter = member.user_id;
+                }
                 // Count users here
                 // TODO: Compute it directly in eventHandlerService
-                room.numUsersInRoom = eventHandlerService.getUsersCountInRoom(room_id);
+                room.recent.numUsersInRoom = eventHandlerService.getUsersCountInRoom(room_id);
 
                 filtered.push(room);
             }
-            else if ("invite" === room.membership) {
+            else if (meEvent && "invite" === meEvent.content.membership) {
                 // The only information we have about the room is that the user has been invited
                 filtered.push(room);
             }
         });
 
         // And time sort them
-        // The room with the lastest message at first
+        // The room with the latest message at first
         filtered.sort(function (roomA, roomB) {
 
             var lastMsgRoomA = eventHandlerService.getLastMessage(roomA.room_id, true);

@@ -21,8 +21,8 @@ limitations under the License.
 'use strict';
 
 angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'eventStreamService'])
-.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', '$timeout', '$animate', 'matrixService', 'mPresence', 'eventStreamService', 'eventHandlerService', 'matrixPhoneService',
-                               function($scope, $location, $rootScope, $timeout, $animate, matrixService, mPresence, eventStreamService, eventHandlerService, matrixPhoneService) {
+.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', '$timeout', '$animate', 'matrixService', 'mPresence', 'eventStreamService', 'eventHandlerService', 'matrixPhoneService', 'modelService',
+                               function($scope, $location, $rootScope, $timeout, $animate, matrixService, mPresence, eventStreamService, eventHandlerService, matrixPhoneService, modelService) {
          
     // Check current URL to avoid to display the logout button on the login page
     $scope.location = $location.path();
@@ -117,7 +117,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
             return;
         }
 
-        var roomMembers = angular.copy($rootScope.events.rooms[$rootScope.currentCall.room_id].members);
+        var roomMembers = angular.copy(modelService.getRoom($rootScope.currentCall.room_id).current_room_state.members);
         delete roomMembers[matrixService.config().user_id];
 
         $rootScope.currentCall.user_id = Object.keys(roomMembers)[0];

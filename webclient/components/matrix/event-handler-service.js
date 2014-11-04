@@ -22,13 +22,12 @@ not care where the event came from, it only needs enough context to be able to
 process them. Events may be coming from the event stream, the REST API (via 
 direct GETs or via a pagination stream API), etc.
 
-Typically, this service will store events or broadcast them to any listeners
-(e.g. controllers) via $broadcast. Alternatively, it may update the $rootScope
-if typically all the $on method would do is update its own $scope.
+Typically, this service will store events and broadcast them to any listeners
+(e.g. controllers) via $broadcast. 
 */
 angular.module('eventHandlerService', [])
-.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 'notificationService',
-function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService) {
+.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 'notificationService', 'modelService',
+function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService, modelService) {
     var ROOM_CREATE_EVENT = "ROOM_CREATE_EVENT";
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
@@ -44,93 +43,120 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
     // of the app, given we never try to reap memory yet)
     var eventMap = {};
 
+    // TODO: Remove this and replace with modelService.User objects.
     $rootScope.presence = {};
 
     var initialSyncDeferred;
 
     var reset = function() {
         initialSyncDeferred = $q.defer();
-
-        $rootScope.events = {
-            rooms: {} // will contain roomId: { messages:[], members:{userid1: event} }
-        };
-
+        
         $rootScope.presence = {};
 
         eventMap = {};
     };
     reset();
 
-    var initRoom = function(room_id, room) {
-        if (!(room_id in $rootScope.events.rooms)) {
-            console.log("Creating new rooms entry for " + room_id);
-            $rootScope.events.rooms[room_id] = {
-                room_id: room_id,
-                messages: [],
-                members: {},
-                // Pagination information
-                pagination: {
-                    earliest_token: "END"   // how far back we've paginated
-                }
-            };
-        }
-
-        if (room) { // we got an existing room object from initialsync, seemingly.
-            // Report all other metadata of the room object (membership, inviter, visibility, ...)
-            for (var field in room) {
-                if (!room.hasOwnProperty(field)) continue;
-
-                if (-1 === ["room_id", "messages", "state"].indexOf(field)) { // why indexOf - why not ===? --Matthew
-                    $rootScope.events.rooms[room_id][field] = room[field];
-                }
-            }
-            $rootScope.events.rooms[room_id].membership = room.membership;
-        }
-    };
-
     var resetRoomMessages = function(room_id) {
-        if ($rootScope.events.rooms[room_id]) {
-            $rootScope.events.rooms[room_id].messages = [];
-        }
+        var room = modelService.getRoom(room_id);
+        room.events = [];
     };
     
     // Generic method to handle events data
-    var handleRoomDateEvent = function(event, isLiveEvent, addToRoomMessages) {
-        // Add topic changes as if they were a room message
+    var handleRoomStateEvent = function(event, isLiveEvent, addToRoomMessages) {
+        var room = modelService.getRoom(event.room_id);
         if (addToRoomMessages) {
-            if (isLiveEvent) {
-                $rootScope.events.rooms[event.room_id].messages.push(event);
-            }
-            else {
-                $rootScope.events.rooms[event.room_id].messages.unshift(event);
-            }
+            // some state events are displayed as messages, so add them.
+            room.addMessageEvent(event, !isLiveEvent);
         }
-
-        // live events always update, but non-live events only update if the
-        // ts is later.
-        var latestData = true;
-        if (!isLiveEvent) {
+        
+        if (isLiveEvent) {
+            // update the current room state with the latest state
+            room.current_room_state.storeStateEvent(event);
+        }
+        else {
             var eventTs = event.origin_server_ts;
-            var storedEvent = $rootScope.events.rooms[event.room_id][event.type];
+            var storedEvent = room.current_room_state.getStateEvent(event.type, event.state_key);
             if (storedEvent) {
-                if (storedEvent.origin_server_ts > eventTs) {
-                    // ignore it, we have a newer one already.
-                    latestData = false;
+                if (storedEvent.origin_server_ts < eventTs) {
+                    // the incoming event is newer, use it.
+                    room.current_room_state.storeStateEvent(event);
                 }
             }
         }
-        if (latestData) {
-            $rootScope.events.rooms[event.room_id][event.type] = event;         
-        }
+        // TODO: handle old_room_state
     };
     
     var handleRoomCreate = function(event, isLiveEvent) {
-        // For now, we do not use the event data. Simply signal it to the app controllers
         $rootScope.$broadcast(ROOM_CREATE_EVENT, event, isLiveEvent);
     };
 
     var handleRoomAliases = function(event, isLiveEvent) {
         matrixService.createRoomIdToAliasMapping(event.room_id, event.content.aliases[0]);
+    };
+    
+    var displayNotification = function(event) {
+        if (window.Notification && event.user_id != matrixService.config().user_id) {
+            var shouldBing = notificationService.containsBingWord(
+                matrixService.config().user_id,
+                matrixService.config().display_name,
+                matrixService.config().bingWords,
+                event.content.body
+            );
+
+            // Ideally we would notify only when the window is hidden (i.e. document.hidden = true).
+            //
+            // However, Chrome on Linux and OSX currently returns document.hidden = false unless the window is
+            // explicitly showing a different tab.  So we need another metric to determine hiddenness - we
+            // simply use idle time.  If the user has been idle enough that their presence goes to idle, then
+            // we also display notifs when things happen.
+            //
+            // This is far far better than notifying whenever anything happens anyway, otherwise you get spammed
+            // to death with notifications when the window is in the foreground, which is horrible UX (especially
+            // if you have not defined any bingers and so get notified for everything).
+            var isIdle = (document.hidden || matrixService.presence.unavailable === mPresence.getState());
+            
+            // We need a way to let people get notifications for everything, if they so desire.  The way to do this
+            // is to specify zero bingwords.
+            var bingWords = matrixService.config().bingWords;
+            if (bingWords === undefined || bingWords.length === 0) {
+                shouldBing = true;
+            }
+            
+            if (shouldBing && isIdle) {
+                console.log("Displaying notification for "+JSON.stringify(event));
+                var member = modelService.getMember(event.room_id, event.user_id);
+                var displayname = getUserDisplayName(event.room_id, event.user_id);
+
+                var message = event.content.body;
+                if (event.content.msgtype === "m.emote") {
+                    message = "* " + displayname + " " + message;
+                }
+                else if (event.content.msgtype === "m.image") {
+                    message = displayname + " sent an image.";
+                }
+
+                var roomTitle = matrixService.getRoomIdToAliasMapping(event.room_id);
+                var theRoom = modelService.getRoom(event.room_id);
+                if (!roomTitle && theRoom.current_room_state.state("m.room.name") && theRoom.current_room_state.state("m.room.name").content) {
+                    roomTitle = theRoom.current_room_state.state("m.room.name").content.name;
+                }
+
+                if (!roomTitle) {
+                    roomTitle = event.room_id;
+                }
+                
+                notificationService.showNotification(
+                    displayname + " (" + roomTitle + ")",
+                    message,
+                    member ? member.avatar_url : undefined,
+                    function() {
+                        console.log("notification.onclick() room=" + event.room_id);
+                        $rootScope.goToPage('room/' + event.room_id); 
+                    }
+                );
+            }
+        }
     };
 
     var handleMessage = function(event, isLiveEvent) {
@@ -144,135 +170,79 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
             // empty json object is a redacted event, so ignore.
             return;
         }
-
-        if (isLiveEvent) {
-            if (event.user_id === matrixService.config().user_id &&
-                (event.content.msgtype === "m.text" || event.content.msgtype === "m.emote") ) {
-                // Assume we've already echoed it. So, there is a fake event in the messages list of the room
-                // Replace this fake event by the true one
-                var index = getRoomEventIndex(event.room_id, event.event_id);
-                if (index) {
-                    $rootScope.events.rooms[event.room_id].messages[index] = event;
-                }
-                else {
-                    $rootScope.events.rooms[event.room_id].messages.push(event);
-                }
-            }
-            else {
-                $rootScope.events.rooms[event.room_id].messages.push(event);
-            }
-            
-            if (window.Notification && event.user_id != matrixService.config().user_id) {
-                var shouldBing = notificationService.containsBingWord(
-                    matrixService.config().user_id,
-                    matrixService.config().display_name,
-                    matrixService.config().bingWords,
-                    event.content.body
-                );
-
-                // Ideally we would notify only when the window is hidden (i.e. document.hidden = true).
-                //
-                // However, Chrome on Linux and OSX currently returns document.hidden = false unless the window is
-                // explicitly showing a different tab.  So we need another metric to determine hiddenness - we
-                // simply use idle time.  If the user has been idle enough that their presence goes to idle, then
-                // we also display notifs when things happen.
-                //
-                // This is far far better than notifying whenever anything happens anyway, otherwise you get spammed
-                // to death with notifications when the window is in the foreground, which is horrible UX (especially
-                // if you have not defined any bingers and so get notified for everything).
-                var isIdle = (document.hidden || matrixService.presence.unavailable === mPresence.getState());
-                
-                // We need a way to let people get notifications for everything, if they so desire.  The way to do this
-                // is to specify zero bingwords.
-                var bingWords = matrixService.config().bingWords;
-                if (bingWords === undefined || bingWords.length === 0) {
-                    shouldBing = true;
-                }
-                
-                if (shouldBing && isIdle) {
-                    console.log("Displaying notification for "+JSON.stringify(event));
-                    var member = getMember(event.room_id, event.user_id);
-                    var displayname = getUserDisplayName(event.room_id, event.user_id);
-
-                    var message = event.content.body;
-                    if (event.content.msgtype === "m.emote") {
-                        message = "* " + displayname + " " + message;
-                    }
-                    else if (event.content.msgtype === "m.image") {
-                        message = displayname + " sent an image.";
-                    }
-
-                    var roomTitle = matrixService.getRoomIdToAliasMapping(event.room_id);
-                    var theRoom = $rootScope.events.rooms[event.room_id];
-                    if (!roomTitle && theRoom && theRoom["m.room.name"] && theRoom["m.room.name"].content) {
-                        roomTitle = theRoom["m.room.name"].content.name;
-                    }
-
-                    if (!roomTitle) {
-                        roomTitle = event.room_id;
-                    }
-                    
-                    notificationService.showNotification(
-                        displayname + " (" + roomTitle + ")",
-                        message,
-                        member ? member.avatar_url : undefined,
-                        function() {
-                            console.log("notification.onclick() room=" + event.room_id);
-                            $rootScope.goToPage('room/' + event.room_id); 
-                        }
-                    );
-                }
-            }
+        
+        // =======================
+        
+        var room = modelService.getRoom(event.room_id);
+        
+        if (event.user_id !== matrixService.config().user_id) {
+            room.addMessageEvent(event, !isLiveEvent);
+            displayNotification(event);
         }
         else {
-            $rootScope.events.rooms[event.room_id].messages.unshift(event);
+            // we may have locally echoed this, so we should replace the event
+            // instead of just adding.
+            room.addOrReplaceMessageEvent(event, !isLiveEvent);
         }
         
         // TODO send delivery receipt if isLiveEvent
         
-        // $broadcast this, as controllers may want to do funky things such as
-        // scroll to the bottom, etc which cannot be expressed via simple $scope
-        // updates.
         $rootScope.$broadcast(MSG_EVENT, event, isLiveEvent);
     };
     
     var handleRoomMember = function(event, isLiveEvent, isStateEvent) {
+        var room = modelService.getRoom(event.room_id);
         
-        // add membership changes as if they were a room message if something interesting changed
-        // Exception: Do not do this if the event is a room state event because such events already come
-        // as room messages events. Moreover, when they come as room messages events, they are relatively ordered
-        // with other other room messages
+        // did something change?
+        var memberChanges = undefined;
         if (!isStateEvent) {
             // could be a membership change, display name change, etc.
             // Find out which one.
-            var memberChanges = undefined;
             if ((event.prev_content === undefined && event.content.membership) || (event.prev_content && (event.prev_content.membership !== event.content.membership))) {
                 memberChanges = "membership";
             }
             else if (event.prev_content && (event.prev_content.displayname !== event.content.displayname)) {
                 memberChanges = "displayname";
             }
-
             // mark the key which changed
             event.changedKey = memberChanges;
-
-            // If there was a change we want to display, dump it in the message
-            // list.
-            if (memberChanges) {
-                if (isLiveEvent) {
-                    $rootScope.events.rooms[event.room_id].messages.push(event);
-                }
-                else {
-                    $rootScope.events.rooms[event.room_id].messages.unshift(event);
-                }
-            }
         }
         
-        // Use data from state event or the latest data from the stream.
-        // Do not care of events that come when paginating back
+        
+        // modify state before adding the message so it points to the right thing.
+        // The events are copied to avoid referencing the same event when adding
+        // the message (circular json structures)
         if (isStateEvent || isLiveEvent) {
-            $rootScope.events.rooms[event.room_id].members[event.state_key] = event;
+            var newEvent = angular.copy(event);
+            newEvent.cnt = event.content;
+            room.current_room_state.storeStateEvent(newEvent);
         }
+        else if (!isLiveEvent) {
+            // mutate the old room state
+            var oldEvent = angular.copy(event);
+            oldEvent.cnt = event.content;
+            if (event.prev_content) {
+                // the m.room.member event we are handling is the NEW event. When
+                // we keep going back in time, we want the PREVIOUS value for displaying
+                // names/etc, hence the clobber here.
+                oldEvent.cnt = event.prev_content;
+            }
+            
+            if (event.changedKey === "membership" && event.content.membership === "join") {
+                // join has a prev_content but it doesn't contain all the info unlike the join, so use that.
+                oldEvent.cnt = event.content;
+            }
+            
+            room.old_room_state.storeStateEvent(oldEvent);
+        }
+        
+        // If there was a change we want to display, dump it in the message
+        // list. This has to be done after room state is updated.
+        if (memberChanges) {
+            room.addMessageEvent(event, !isLiveEvent);
+        }
+        
+        
         
         $rootScope.$broadcast(MEMBER_EVENT, event, isLiveEvent, isStateEvent);
     };
@@ -283,30 +253,28 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
     };
     
     var handlePowerLevels = function(event, isLiveEvent) {
-        // Keep the latest data. Do not care of events that come when paginating back
-        if (!$rootScope.events.rooms[event.room_id][event.type] || isLiveEvent) {
-            $rootScope.events.rooms[event.room_id][event.type] = event;
-            $rootScope.$broadcast(POWERLEVEL_EVENT, event, isLiveEvent);   
-        }
+        handleRoomStateEvent(event, isLiveEvent);
+        $rootScope.$broadcast(POWERLEVEL_EVENT, event, isLiveEvent);   
     };
 
     var handleRoomName = function(event, isLiveEvent, isStateEvent) {
         console.log("handleRoomName room_id: " + event.room_id + " - isLiveEvent: " + isLiveEvent + " - name: " + event.content.name);
-        handleRoomDateEvent(event, isLiveEvent, !isStateEvent);
+        handleRoomStateEvent(event, isLiveEvent, !isStateEvent);
         $rootScope.$broadcast(NAME_EVENT, event, isLiveEvent);
     };
     
 
     var handleRoomTopic = function(event, isLiveEvent, isStateEvent) {
         console.log("handleRoomTopic room_id: " + event.room_id + " - isLiveEvent: " + isLiveEvent + " - topic: " + event.content.topic);
-        handleRoomDateEvent(event, isLiveEvent, !isStateEvent);
+        handleRoomStateEvent(event, isLiveEvent, !isStateEvent);
         $rootScope.$broadcast(TOPIC_EVENT, event, isLiveEvent);
     };
 
     var handleCallEvent = function(event, isLiveEvent) {
         $rootScope.$broadcast(CALL_EVENT, event, isLiveEvent);
         if (event.type === 'm.call.invite') {
-            $rootScope.events.rooms[event.room_id].messages.push(event);
+            var room = modelService.getRoom(event.room_id);
+            room.addMessageEvent(event, !isLiveEvent);
         }
     };
 
@@ -320,8 +288,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
         // we need to remove something possibly: do we know the redacted
         // event ID?
         if (eventMap[event.redacts]) {
+            var room = modelService.getRoom(event.room_id);
             // remove event from list of messages in this room.
-            var eventList = $rootScope.events.rooms[event.room_id].messages;
+            var eventList = room.events;
             for (var i=0; i<eventList.length; i++) {
                 if (eventList[i].event_id === event.redacts) {
                     console.log("Removing event " + event.redacts);
@@ -330,50 +299,9 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                 }
             }
 
-            // broadcast the redaction so controllers can nuke this
             console.log("Redacted an event.");
         }
     }
-    
-    /**
-     * Get the index of the event in $rootScope.events.rooms[room_id].messages
-     * @param {type} room_id the room id
-     * @param {type} event_id the event id to look for
-     * @returns {Number | undefined} the index. undefined if not found.
-     */
-    var getRoomEventIndex = function(room_id, event_id) {
-        var index;
-
-        var room = $rootScope.events.rooms[room_id];
-        if (room) {
-            // Start looking from the tail since the first goal of this function 
-            // is to find a messaged among the latest ones
-            for (var i = room.messages.length - 1; i > 0; i--) {
-                var message = room.messages[i];
-                if (event_id === message.event_id) {
-                    index = i;
-                    break;
-                }
-            }
-        }
-        return index;
-    };
-    
-    /**
-     * Get the member object of a room member
-     * @param {String} room_id the room id
-     * @param {String} user_id the id of the user
-     * @returns {undefined | Object} the member object of this user in this room if he is part of the room
-     */
-    var getMember = function(room_id, user_id) {
-        var member;
-
-        var room = $rootScope.events.rooms[room_id];
-        if (room) {
-            member = room.members[user_id];
-        }
-        return member;
-    };
 
     /**
      * Return the display name of an user acccording to data already downloaded
@@ -385,17 +313,17 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
         var displayName;
 
         // Get the user display name from the member list of the room
-        var member = getMember(room_id, user_id);
+        var member = modelService.getMember(room_id, user_id);
         if (member && member.content.displayname) { // Do not consider null displayname
             displayName = member.content.displayname;
 
             // Disambiguate users who have the same displayname in the room
             if (user_id !== matrixService.config().user_id) {
-                var room = $rootScope.events.rooms[room_id];
+                var room = modelService.getRoom(room_id);
 
-                for (var member_id in room.members) {
-                    if (room.members.hasOwnProperty(member_id) && member_id !== user_id) {
-                        var member2 = room.members[member_id];
+                for (var member_id in room.current_room_state.members) {
+                    if (room.current_room_state.members.hasOwnProperty(member_id) && member_id !== user_id) {
+                        var member2 = room.current_room_state.members[member_id];
                         if (member2.content.displayname && member2.content.displayname === displayName) {
                             displayName = displayName + " (" + user_id + ")";
                             break;
@@ -433,18 +361,8 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
             reset();
             $rootScope.$broadcast(RESET_EVENT);
         },
-        
-        initRoom: function(room) {
-            initRoom(room.room_id, room);
-        },
     
         handleEvent: function(event, isLiveEvent, isStateEvent) {
-
-            // FIXME: /initialSync on a particular room is not yet available
-            // So initRoom on a new room is not called. Make sure the room data is initialised here
-            if (event.room_id) {
-                initRoom(event.room_id);
-            }
 
             // Avoid duplicated events
             // Needed for rooms where initialSync has not been done. 
@@ -504,11 +422,11 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                         // displays on the Room Info screen.
                         if (typeof(event.state_key) === "string") { // incls. 0-len strings
                             if (event.room_id) {
-                                handleRoomDateEvent(event, isLiveEvent, false);
+                                handleRoomStateEvent(event, isLiveEvent, false);
                             }
                         }
                         console.log("Unable to handle event type " + event.type);
-                        console.log(JSON.stringify(event, undefined, 4));
+                        // console.log(JSON.stringify(event, undefined, 4));
                         break;
                 }
             }
@@ -524,8 +442,6 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
 
         // Handle messages from /initialSync or /messages
         handleRoomMessages: function(room_id, messages, isLiveEvents, dir) {
-            initRoom(room_id);
-
             var events = messages.chunk;
 
             // Handles messages according to their time order
@@ -536,21 +452,67 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                 }
                 
                 // Store how far back we've paginated
-                $rootScope.events.rooms[room_id].pagination.earliest_token = messages.end;
+                var room = modelService.getRoom(room_id);
+                room.old_room_state.pagination_token = messages.end;
+
             }
             else {
-                // InitialSync returns messages in chronological order
+                // InitialSync returns messages in chronological order, so invert
+                // it to get most recent > oldest
                 for (var i=events.length - 1; i>=0; i--) {
                     this.handleEvent(events[i], isLiveEvents, isLiveEvents);
                 }
                 // Store where to start pagination
-                $rootScope.events.rooms[room_id].pagination.earliest_token = messages.start;
+                var room = modelService.getRoom(room_id);
+                room.old_room_state.pagination_token = messages.start;
             }
         },
 
-        handleInitialSyncDone: function(initialSyncData) {
+        handleInitialSyncDone: function(response) {
             console.log("# handleInitialSyncDone");
-            initialSyncDeferred.resolve(initialSyncData);
+
+            var rooms = response.data.rooms;
+            for (var i = 0; i < rooms.length; ++i) {
+                var room = rooms[i];
+                
+                // FIXME: This is ming: the HS should be sending down the m.room.member
+                // event for the invite in .state but it isn't, so fudge it for now.
+                if (room.inviter && room.membership === "invite") {
+                    var me = matrixService.config().user_id;
+                    var fakeEvent = {
+                        event_id: "__FAKE__" + room.room_id,
+                        user_id: room.inviter,
+                        origin_server_ts: 0,
+                        room_id: room.room_id,
+                        state_key: me,
+                        type: "m.room.member",
+                        content: {
+                            membership: "invite"
+                        }
+                    };
+                    if (!room.state) {
+                        room.state = [];
+                    }
+                    room.state.push(fakeEvent);
+                    console.log("RECV /initialSync invite >> "+room.room_id);
+                }
+                
+                var newRoom = modelService.getRoom(room.room_id);
+                newRoom.current_room_state.storeStateEvents(room.state);
+                newRoom.old_room_state.storeStateEvents(room.state);
+
+                // this should be done AFTER storing state events since these
+                // messages may make the old_room_state diverge.
+                if ("messages" in room) {
+                    this.handleRoomMessages(room.room_id, room.messages, false);
+                    newRoom.current_room_state.pagination_token = room.messages.end;
+                    newRoom.old_room_state.pagination_token = room.messages.start;
+                }
+            }
+            var presence = response.data.presence;
+            this.handleEvents(presence, false);
+
+            initialSyncDeferred.resolve(response);
         },
 
         // Returns a promise that resolves when the initialSync request has been processed
@@ -571,15 +533,13 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
         getLastMessage: function(room_id, filterEcho) {
             var lastMessage;
 
-            var room = $rootScope.events.rooms[room_id];
-            if (room) {
-                for (var i = room.messages.length - 1; i >= 0; i--) {
-                    var message = room.messages[i];
+            var events = modelService.getRoom(room_id).events;
+            for (var i = events.length - 1; i >= 0; i--) {
+                var message = events[i];
 
-                    if (!filterEcho || undefined === message.echo_msg_state) {
-                        lastMessage = message;
-                        break;
-                    }
+                if (!filterEcho || undefined === message.echo_msg_state) {
+                    lastMessage = message;
+                    break;
                 }
             }
 
@@ -594,18 +554,15 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
         getUsersCountInRoom: function(room_id) {
             var memberCount;
 
-            var room = $rootScope.events.rooms[room_id];
-            if (room) {
-                memberCount = 0;
+            var room = modelService.getRoom(room_id);
+            memberCount = 0;
+            for (var i in room.current_room_state.members) {
+                if (!room.current_room_state.members.hasOwnProperty(i)) continue;
 
-                for (var i in room.members) {
-                    if (!room.members.hasOwnProperty(i)) continue;
+                var member = room.current_room_state.members[i];
 
-                    var member = room.members[i];
-
-                    if ("join" === member.membership) {
-                        memberCount = memberCount + 1;
-                    }
+                if ("join" === member.content.membership) {
+                    memberCount = memberCount + 1;
                 }
             }
 
@@ -613,13 +570,24 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
         },
         
         /**
-         * Get the member object of a room member
+         * Return the power level of an user in a particular room
          * @param {String} room_id the room id
-         * @param {String} user_id the id of the user
-         * @returns {undefined | Object} the member object of this user in this room if he is part of the room
+         * @param {String} user_id the user id
+         * @returns {Number} a value between 0 and 10
          */
-        getMember: function(room_id, user_id) {
-            return getMember(room_id, user_id);
+        getUserPowerLevel: function(room_id, user_id) {
+            var powerLevel = 0;
+            var room = modelService.getRoom(room_id).current_room_state;
+            if (room.state("m.room.power_levels")) {
+                if (user_id in room.state("m.room.power_levels").content) {
+                    powerLevel = room.state("m.room.power_levels").content[user_id];
+                }
+                else {
+                    // Use the room default user power
+                    powerLevel = room.state("m.room.power_levels").content["default"];
+                }
+            }
+            return powerLevel;
         },
         
         /**
@@ -630,18 +598,6 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
          */
         getUserDisplayName: function(room_id, user_id) {
             return getUserDisplayName(room_id, user_id);
-        },
-
-        setRoomVisibility: function(room_id, visible) {
-            if (!visible) {
-                return;
-            }
-            initRoom(room_id);
-            
-            var room = $rootScope.events.rooms[room_id];
-            if (room) {
-                room.visibility = visible;
-            }
         }
     };
 }]);

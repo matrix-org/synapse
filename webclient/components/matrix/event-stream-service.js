@@ -109,25 +109,6 @@ angular.module('eventStreamService', [])
         // without requiring to make an additional request
         matrixService.initialSync(30, false).then(
             function(response) {
-                var rooms = response.data.rooms;
-                for (var i = 0; i < rooms.length; ++i) {
-                    var room = rooms[i];
-                    
-                    eventHandlerService.initRoom(room);
-
-                    if ("messages" in room) {
-                        eventHandlerService.handleRoomMessages(room.room_id, room.messages, false);
-                    }
-                    
-                    if ("state" in room) {
-                        eventHandlerService.handleEvents(room.state, false, true);
-                    }
-                }
-
-                var presence = response.data.presence;
-                eventHandlerService.handleEvents(presence, false);
-
-                // Initial sync is done
                 eventHandlerService.handleInitialSyncDone(response);
 
                 // Start event streaming from that point
