@@ -171,7 +171,6 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         self.datastore.get_joined_hosts_for_room.side_effect = get_joined
 
-
         store_id = "store_id_fooo"
         self.datastore.persist_event.return_value = defer.succeed(store_id)
         self.datastore.get_room.return_value = defer.succeed(1)  # Not None.
@@ -203,10 +202,12 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             event
         )
         self.notifier.on_new_room_event.assert_called_once_with(
-                event, extra_users=[user])
+            event, extra_users=[user]
+        )
 
         join_signal_observer.assert_called_with(
-                user=user, room_id=room_id)
+            user=user, room_id=room_id
+        )
 
 
 class RoomCreationTest(unittest.TestCase):
@@ -216,7 +217,6 @@ class RoomCreationTest(unittest.TestCase):
 
         self.mock_config = NonCallableMock()
         self.mock_config.signing_key = [MockKey()]
-
 
         hs = HomeServer(
             self.hostname,
