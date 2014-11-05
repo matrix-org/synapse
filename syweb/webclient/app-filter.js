@@ -29,10 +29,10 @@ angular.module('matrixWebClient')
             return s + "s";
         }
         if (t < 60 * 60) {
-            return m + "m "; //  + s + "s";
+            return m + "m"; //  + s + "s";
         }
         if (t < 24 * 60 * 60) {
-            return h + "h "; // + m + "m";
+            return h + "h"; // + m + "m";
         }
         return d + "d "; // + h + "h";
     };
@@ -71,17 +71,6 @@ angular.module('matrixWebClient')
                 var aPresence = (a.presence in presenceLevels) ? presenceLevels[a.presence] : 0;
                 var bPresence = (b.presence in presenceLevels) ? presenceLevels[b.presence] : 0;
                 return bPresence - aPresence;
-            }
-        });
-        return filtered;
-    };
-})
-.filter('stateEventsFilter', function($sce) {
-    return function(events) {
-        var filtered = {};
-        angular.forEach(events, function(value, key) {
-            if (value && typeof(value.state_key) === "string") {
-                filtered[key] = value;
             }
         });
         return filtered;
