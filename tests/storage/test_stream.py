@@ -59,7 +59,11 @@ class StreamStoreTestCase(unittest.TestCase):
             membership=membership,
             content={"membership": membership},
             depth=self.depth,
+            prev_events=[],
         )
+
+        event.state_events = None
+        event.hashes = {}
 
         if prev_state:
             event.prev_state = prev_state
@@ -75,15 +79,21 @@ class StreamStoreTestCase(unittest.TestCase):
     def inject_message(self, room, user, body):
         self.depth += 1
 
+        event = self.event_factory.create_event(
+            etype=MessageEvent.TYPE,
+            user_id=user.to_string(),
+            room_id=room.to_string(),
+            content={"body": body, "msgtype": u"message"},
+            depth=self.depth,
+            prev_events=[],
+        )
+
+        event.state_events = None
+        event.hashes = {}
+
         # Have to create a join event using the eventfactory
         yield self.store.persist_event(
-            self.event_factory.create_event(
-                etype=MessageEvent.TYPE,
-                user_id=user.to_string(),
-                room_id=room.to_string(),
-                content={"body": body, "msgtype": u"message"},
-                depth=self.depth,
-            )
+            event
         )
 
     @defer.inlineCallbacks
