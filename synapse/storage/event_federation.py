@@ -49,15 +49,6 @@ class EventFederationStore(SQLBaseStore):
         )
 
     def _get_latest_events_in_room(self, txn, room_id):
-        self._simple_select_onecol_txn(
-            txn,
-            table="event_forward_extremities",
-            keyvalues={
-                "room_id": room_id,
-            },
-            retcol="event_id",
-        )
-
         sql = (
             "SELECT e.event_id, e.depth FROM events as e "
             "INNER JOIN event_forward_extremities as f "
@@ -75,6 +66,27 @@ class EventFederationStore(SQLBaseStore):
                 if k == "sha256"
             }
             results.append((event_id, prev_hashes, depth))
+
+        return results
+
+    def _get_prev_events(self, txn, event_id):
+        prev_ids = self._simple_select_onecol_txn(
+            txn,
+            table="event_edges",
+            keyvalues={
+                "event_id": event_id,
+            },
+            retcol="prev_event_id",
+        )
+
+        results = []
+        for prev_event_id in prev_ids:
+            hashes = self._get_event_reference_hashes_txn(txn, prev_event_id)
+            prev_hashes = {
+                k: encode_base64(v) for k, v in hashes.items()
+                if k == "sha256"
+            }
+            results.append((event_id, prev_hashes))
 
         return results
 

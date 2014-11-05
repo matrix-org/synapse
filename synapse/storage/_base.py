@@ -439,7 +439,7 @@ class SQLBaseStore(object):
     def _parse_events_txn(self, txn, rows):
         events = [self._parse_event_from_row(r) for r in rows]
 
-        sql = "SELECT * FROM events WHERE event_id = ?"
+        select_event_sql = "SELECT * FROM events WHERE event_id = ?"
 
         for ev in events:
             signatures = self._get_event_origin_signatures_txn(
@@ -450,13 +450,12 @@ class SQLBaseStore(object):
                 k: encode_base64(v) for k, v in signatures.items()
             }
 
-            prev_events = self._get_latest_events_in_room(txn, ev.room_id)
-            ev.prev_events = [(e_id, s,) for e_id, s, _ in prev_events]
+            ev.prev_events = self._get_prev_events(txn, ev.event_id)
 
             if hasattr(ev, "prev_state"):
                 # Load previous state_content.
                 # TODO: Should we be pulling this out above?
-                cursor = txn.execute(sql, (ev.prev_state,))
+                cursor = txn.execute(select_event_sql, (ev.prev_state,))
                 prevs = self.cursor_to_dict(cursor)
                 if prevs:
                     prev = self._parse_event_from_row(prevs[0])
@@ -468,8 +467,8 @@ class SQLBaseStore(object):
 
             if ev.redacted:
                 # Get the redaction event.
-                sql = "SELECT * FROM events WHERE event_id = ?"
-                txn.execute(sql, (ev.redacted,))
+                select_event_sql = "SELECT * FROM events WHERE event_id = ?"
+                txn.execute(select_event_sql, (ev.redacted,))
 
                 del_evs = self._parse_events_txn(
                     txn, self.cursor_to_dict(txn)
