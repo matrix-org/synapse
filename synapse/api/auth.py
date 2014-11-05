@@ -22,7 +22,7 @@ from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.api.events.room import (
     RoomMemberEvent, RoomPowerLevelsEvent, RoomRedactionEvent,
     RoomJoinRulesEvent, RoomOpsPowerLevelsEvent, InviteJoinEvent,
-    RoomCreateEvent,
+    RoomCreateEvent, RoomSendEventLevelEvent, RoomAddStateLevelEvent,
 )
 from synapse.util.logutils import log_function
 
@@ -37,8 +37,7 @@ class Auth(object):
         self.hs = hs
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def check(self, event, snapshot, raises=False):
+    def check(self, event, raises=False):
         """ Checks if this event is correctly authed.
 
         Returns:
@@ -52,17 +51,17 @@ class Auth(object):
                 if event.old_state_events is None:
                     # Oh, we don't know what the state of the room was, so we
                     # are trusting that this is allowed (at least for now)
-                    defer.returnValue(True)
+                    return True
 
                 if hasattr(event, "outlier") and event.outlier is True:
                     # TODO (erikj): Auth for outliers is done differently.
-                    defer.returnValue(True)
+                    return True
 
                 is_state = hasattr(event, "state_key")
 
                 if event.type == RoomCreateEvent.TYPE:
                     # FIXME
-                    defer.returnValue(True)
+                    return True
 
                 if event.type == RoomMemberEvent.TYPE:
                     self._can_replace_state(event)
@@ -71,8 +70,7 @@ class Auth(object):
                         logger.debug("Allowing! %s", event)
                     else:
                         logger.debug("Denying! %s", event)
-                    defer.returnValue(allowed)
-                    return
+                    return allowed
 
                 if not event.type == InviteJoinEvent.TYPE:
                     self.check_event_sender_in_room(event)
@@ -80,10 +78,10 @@ class Auth(object):
                 if is_state:
                     # TODO (erikj): This really only should be called for *new*
                     # state
-                    yield self._can_add_state(event)
+                    self._can_add_state(event)
                     self._can_replace_state(event)
                 else:
-                    yield self._can_send_event(event)
+                    self._can_send_event(event)
 
                 if event.type == RoomPowerLevelsEvent.TYPE:
                     self._check_power_levels(event)
@@ -91,9 +89,8 @@ class Auth(object):
                 if event.type == RoomRedactionEvent.TYPE:
                     self._check_redaction(event)
 
-
                 logger.debug("Allowing! %s", event)
-                defer.returnValue(True)
+                return True
             else:
                 raise AuthError(500, "Unknown event: %s" % event)
         except AuthError as e:
@@ -103,7 +100,7 @@ class Auth(object):
             if raises:
                 raise e
 
-        defer.returnValue(False)
+        return False
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id):
@@ -326,10 +323,15 @@ class Auth(object):
     def is_server_admin(self, user):
         return self.store.is_server_admin(user)
 
-    @defer.inlineCallbacks
     @log_function
     def _can_send_event(self, event):
-        send_level = yield self.store.get_send_event_level(event.room_id)
+        key = (RoomSendEventLevelEvent.TYPE, "", )
+        send_level_event = event.old_state_events.get(key)
+        send_level = None
+        if send_level_event:
+            send_level = send_level_event.content.get(event.user_id)
+            if not send_level:
+                send_level = send_level_event.content.get("level", 0)
 
         if send_level:
             send_level = int(send_level)
@@ -351,16 +353,21 @@ class Auth(object):
                 403, "You don't have permission to post to the room"
             )
 
-        defer.returnValue(True)
+        return True
 
-    @defer.inlineCallbacks
     def _can_add_state(self, event):
-        add_level = yield self.store.get_add_state_level(event.room_id)
+        key = (RoomAddStateLevelEvent.TYPE, "", )
+        add_level_event = event.old_state_events.get(key)
+        add_level = None
+        if add_level_event:
+            add_level = add_level_event.content.get(event.user_id)
+            if not add_level:
+                add_level = add_level_event.content.get("level", 0)
 
-        if not add_level:
-            defer.returnValue(True)
-
-        add_level = int(add_level)
+        if add_level:
+            add_level = int(add_level)
+        else:
+            add_level = 0
 
         user_level = self._get_power_level_from_event_state(
             event,
@@ -374,7 +381,7 @@ class Auth(object):
                 403, "You don't have permission to add state to the room"
             )
 
-        defer.returnValue(True)
+        return True
 
     def _can_replace_state(self, event):
         user_level = self._get_power_level_from_event_state(

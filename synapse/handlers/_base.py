@@ -20,6 +20,12 @@ from synapse.util.async import run_on_reactor
 
 from synapse.crypto.event_signing import add_hashes_and_signatures
 
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
 class BaseHandler(object):
 
     def __init__(self, hs):
@@ -58,15 +64,18 @@ class BaseHandler(object):
 
         yield self.state_handler.annotate_state_groups(event)
 
-        yield add_hashes_and_signatures(
+        logger.debug("Signing event...")
+
+        add_hashes_and_signatures(
             event, self.server_name, self.signing_key
         )
 
-        if not suppress_auth:
-            yield self.auth.check(event, snapshot, raises=True)
+        logger.debug("Signed event.")
 
-        if hasattr(event, "state_key"):
-            yield self.state_handler.handle_new_event(event, snapshot)
+        if not suppress_auth:
+            logger.debug("Authing...")
+            self.auth.check(event, raises=True)
+            logger.debug("Authed")
 
         yield self.store.persist_event(event)
 

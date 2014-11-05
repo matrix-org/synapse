@@ -188,11 +188,15 @@ class StateHandler(object):
             consumeErrors=True
         )
 
-        max_power = max([int(p) for p in new_powers])
+        new_powers = [
+            int(p) if p else 0 for p in new_powers
+        ]
+
+        max_power = max(new_powers)
 
         curr_events = [
             z[0] for z in zip(curr_events, new_powers)
-            if int(z[1]) == max_power
+            if z[1] == max_power
         ]
 
         if not curr_events:

@@ -118,7 +118,7 @@ class FederationHandler(BaseHandler):
         logger.debug("Event: %s", event)
 
         try:
-            yield self.auth.check(event, None, raises=True)
+            self.auth.check(event, raises=True)
         except AuthError as e:
             raise FederationError(
                 "ERROR",
@@ -319,7 +319,7 @@ class FederationHandler(BaseHandler):
         snapshot.fill_out_prev_events(event)
 
         yield self.state_handler.annotate_state_groups(event)
-        yield self.auth.check(event, None, raises=True)
+        self.auth.check(event, raises=True)
 
         pdu = self.pdu_codec.pdu_from_event(event)
 
@@ -333,7 +333,7 @@ class FederationHandler(BaseHandler):
         event.outlier = False
 
         is_new_state = yield self.state_handler.annotate_state_groups(event)
-        yield self.auth.check(event, None, raises=True)
+        self.auth.check(event, raises=True)
 
         # FIXME (erikj):  All this is duplicated above :(
 
