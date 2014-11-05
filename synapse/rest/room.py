@@ -148,7 +148,7 @@ class RoomStateEventRestServlet(RestServlet):
         content = _parse_json(request)
 
         event = self.event_factory.create_event(
-            etype=event_type,
+            etype=urllib.unquote(event_type),
             content=content,
             room_id=urllib.unquote(room_id),
             user_id=user.to_string(),

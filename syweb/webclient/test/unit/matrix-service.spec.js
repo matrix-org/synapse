@@ -238,7 +238,7 @@ describe('MatrixService', function() {
             homeserver: "http://example.com"
         });
         var roomId = "!fh38hfwfwef:example.com";
-        var eventType = "com.example.events.test";
+        var eventType = "com.example.events.test:special@characters";
         var content = {
             testing: "1 2 3"
         };
@@ -262,11 +262,11 @@ describe('MatrixService', function() {
             homeserver: "http://example.com"
         });
         var roomId = "!fh38hfwfwef:example.com";
-        var eventType = "com.example.events.test";
+        var eventType = "com.example.events.test:special@characters";
         var content = {
             testing: "1 2 3"
         };
-        var stateKey = "version1";
+        var stateKey = "version:1";
         matrixService.sendStateEvent(roomId, eventType, content, stateKey).then(
         function(response) {
             expect(response.data).toEqual({});
