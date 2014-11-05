@@ -100,7 +100,7 @@ class FederationTestCase(unittest.TestCase):
             old_state=None,
         )
 
-        self.auth.check.assert_called_once_with(ANY, None, raises=True)
+        self.auth.check.assert_called_once_with(ANY, raises=True)
 
         self.notifier.on_new_room_event.assert_called_once_with(
             ANY,
