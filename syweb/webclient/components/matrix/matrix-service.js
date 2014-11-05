@@ -443,7 +443,8 @@ angular.module('matrixService', [])
 
         redactEvent: function(room_id, event_id) {
             var path = "/rooms/$room_id/redact/$event_id";
-            path = path.replace("$room_id", room_id);
+            path = path.replace("$room_id", encodeURIComponent(room_id));
+            // TODO: encodeURIComponent when HS updated.
             path = path.replace("$event_id", event_id);
             var content = {};
             return doRequest("POST", path, undefined, content);
@@ -461,7 +462,7 @@ angular.module('matrixService', [])
         
         paginateBackMessages: function(room_id, from_token, limit) {
             var path = "/rooms/$room_id/messages";
-            path = path.replace("$room_id", room_id);
+            path = path.replace("$room_id", encodeURIComponent(room_id));
             var params = {
                 from: from_token,
                 limit: limit,
@@ -509,12 +510,12 @@ angular.module('matrixService', [])
 
         setProfileInfo: function(data, info_segment) {
             var path = "/profile/$user/" + info_segment;
-            path = path.replace("$user", config.user_id);
+            path = path.replace("$user", encodeURIComponent(config.user_id));
             return doRequest("PUT", path, undefined, data);
         },
 
         getProfileInfo: function(userId, info_segment) {
-            var path = "/profile/"+userId
+            var path = "/profile/"+encodeURIComponent(userId);
             if (info_segment) path += '/' + info_segment;
             return doRequest("GET", path);
         },
@@ -633,7 +634,7 @@ angular.module('matrixService', [])
         // Set the logged in user presence state
         setUserPresence: function(presence) {
             var path = "/presence/$user_id/status";
-            path = path.replace("$user_id", config.user_id);
+            path = path.replace("$user_id", encodeURIComponent(config.user_id));
             return doRequest("PUT", path, undefined, {
                 presence: presence
             });
