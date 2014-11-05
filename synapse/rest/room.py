@@ -182,7 +182,7 @@ class RoomSendEventRestServlet(RestServlet):
         content = _parse_json(request)
 
         event = self.event_factory.create_event(
-            etype=event_type,
+            etype=urllib.unquote(event_type),
             room_id=urllib.unquote(room_id),
             user_id=user.to_string(),
             content=content
@@ -458,7 +458,7 @@ class RoomRedactEventRestServlet(RestServlet):
             room_id=urllib.unquote(room_id),
             user_id=user.to_string(),
             content=content,
-            redacts=event_id,
+            redacts=urllib.unquote(event_id),
         )
 
         msg_handler = self.handlers.message_handler
