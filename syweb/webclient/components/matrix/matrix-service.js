@@ -375,7 +375,9 @@ angular.module('matrixService', [])
         
         
         sendStateEvent: function(room_id, eventType, content, state_key) {
-            var path = "/rooms/$room_id/state/"+ encodeURIComponent(eventType);
+            var path = "/rooms/$room_id/state/"+ eventType;
+            // TODO: uncomment this when matrix.org is updated, else all state events 500.
+            // var path = "/rooms/$room_id/state/"+ encodeURIComponent(eventType);
             if (state_key !== undefined) {
                 path += "/" + encodeURIComponent(state_key);
             }

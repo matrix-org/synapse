@@ -231,7 +231,7 @@ describe('MatrixService', function() {
         httpBackend.flush();
     }));
     
-    it('should be able to send generic state events without a state key', inject(
+    xit('should be able to send generic state events without a state key', inject(
     function(matrixService) {
         matrixService.setConfig({
             access_token: "foobar",
@@ -255,7 +255,7 @@ describe('MatrixService', function() {
         httpBackend.flush();
     }));
     
-    it('should be able to send generic state events with a state key', inject(
+    xit('should be able to send generic state events with a state key', inject(
     function(matrixService) {
         matrixService.setConfig({
             access_token: "foobar",
