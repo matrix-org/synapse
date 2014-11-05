@@ -25,9 +25,6 @@ import synapse.rest.room
 
 from synapse.server import HomeServer
 
-# python imports
-import json
-
 from ..utils import MockHttpResource, MemoryDataStore, MockKey
 from .utils import RestTestCase
 
@@ -49,7 +46,7 @@ class EventStreamPaginationApiTestCase(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_long_poll(self):
+    def TODO_test_long_poll(self):
         # stream from 'end' key, send (self+other) message, expect message.
 
         # stream from 'END', send (self+other) message, expect message.
@@ -64,7 +61,7 @@ class EventStreamPaginationApiTestCase(unittest.TestCase):
 
         pass
 
-    def test_stream_forward(self):
+    def TODO_test_stream_forward(self):
         # stream from START, expect injected items
 
         # stream from 'start' key, expect same content
@@ -80,14 +77,14 @@ class EventStreamPaginationApiTestCase(unittest.TestCase):
         # returned as end key
         pass
 
-    def test_limits(self):
+    def TODO_test_limits(self):
         # stream from a key, expect limit_num items
 
         # stream from START, expect limit_num items
 
         pass
 
-    def test_range(self):
+    def TODO_test_range(self):
         # stream from key to key, expect X items
 
         # stream from key to END, expect X items
@@ -97,7 +94,7 @@ class EventStreamPaginationApiTestCase(unittest.TestCase):
         # stream from START to END, expect all items
         pass
 
-    def test_direction(self):
+    def TODO_test_direction(self):
         # stream from END to START and fwds, expect newest first
 
         # stream from END to START and bwds, expect oldest first
@@ -116,7 +113,10 @@ class EventStreamPermissionsTestCase(RestTestCase):
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
-        state_handler = Mock(spec=["handle_new_event"])
+        state_handler = Mock(spec=[
+            "handle_new_event",
+            "annotate_state_groups"
+        ])
         state_handler.handle_new_event.return_value = True
 
         persistence_service = Mock(spec=["get_latest_pdus_in_context"])
@@ -151,6 +151,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
         hs.get_handlers().federation_handler = Mock()
 
         hs.get_clock().time_msec.return_value = 1000000
+        hs.get_clock().time.return_value = 1000
 
         synapse.rest.register.register_servlets(hs, self.mock_resource)
         synapse.rest.events.register_servlets(hs, self.mock_resource)
@@ -175,12 +176,14 @@ class EventStreamPermissionsTestCase(RestTestCase):
     def test_stream_basic_permissions(self):
         # invalid token, expect 403
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/events?access_token=%s" % ("invalid" + self.token))
+            "/events?access_token=%s" % ("invalid" + self.token, )
+        )
         self.assertEquals(403, code, msg=str(response))
 
         # valid token, expect content
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/events?access_token=%s&timeout=0" % (self.token))
+            "/events?access_token=%s&timeout=0" % (self.token,)
+        )
         self.assertEquals(200, code, msg=str(response))
         self.assertTrue("chunk" in response)
         self.assertTrue("start" in response)
@@ -188,15 +191,23 @@ class EventStreamPermissionsTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_stream_room_permissions(self):
-        room_id = yield self.create_room_as(self.other_user,
-                                            tok=self.other_token)
+        room_id = yield self.create_room_as(
+            self.other_user,
+            tok=self.other_token
+        )
         yield self.send(room_id, tok=self.other_token)
 
         # invited to room (expect no content for room)
-        yield self.invite(room_id, src=self.other_user, targ=self.user_id,
-                          tok=self.other_token)
+        yield self.invite(
+            room_id,
+            src=self.other_user,
+            targ=self.user_id,
+            tok=self.other_token
+        )
+
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/events?access_token=%s&timeout=0" % (self.token))
+            "/events?access_token=%s&timeout=0" % (self.token,)
+        )
         self.assertEquals(200, code, msg=str(response))
 
         self.assertEquals(0, len(response["chunk"]))
@@ -206,7 +217,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
 
         # left to room (expect no content for room)
 
-    def test_stream_items(self):
+    def TODO_test_stream_items(self):
         # new user, no content
 
         # join room, expect 1 item (join)
