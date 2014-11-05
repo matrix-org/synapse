@@ -51,6 +51,7 @@ def _expect_edu(destination, edu_type, content, origin="test"):
                 "content": content,
             }
         ],
+        "pdu_failures": [],
     }
 
 def _make_edu_json(origin, edu_type, content):
