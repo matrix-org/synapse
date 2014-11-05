@@ -123,9 +123,6 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         # Actual invocation
         yield self.room_member_handler.change_membership(event)
 
-        self.state_handler.handle_new_event.assert_called_once_with(
-            event, self.snapshot,
-        )
         self.federation.handle_new_event.assert_called_once_with(
             event, self.snapshot,
         )
@@ -186,9 +183,6 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         # Actual invocation
         yield self.room_member_handler.change_membership(event)
 
-        self.state_handler.handle_new_event.assert_called_once_with(
-            event, self.snapshot
-        )
         self.federation.handle_new_event.assert_called_once_with(
             event, self.snapshot
         )
