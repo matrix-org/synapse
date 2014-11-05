@@ -231,14 +231,14 @@ describe('MatrixService', function() {
         httpBackend.flush();
     }));
     
-    xit('should be able to send generic state events without a state key', inject(
+    it('should be able to send generic state events without a state key', inject(
     function(matrixService) {
         matrixService.setConfig({
             access_token: "foobar",
             homeserver: "http://example.com"
         });
         var roomId = "!fh38hfwfwef:example.com";
-        var eventType = "com.example.events.test:special@characters";
+        var eventType = "com.example.events.test";
         var content = {
             testing: "1 2 3"
         };
@@ -255,6 +255,8 @@ describe('MatrixService', function() {
         httpBackend.flush();
     }));
     
+    // TODO: Skipped since the webclient is purposefully broken so as not to
+    // 500 matrix.org
     xit('should be able to send generic state events with a state key', inject(
     function(matrixService) {
         matrixService.setConfig({
@@ -277,6 +279,57 @@ describe('MatrixService', function() {
             encodeURIComponent(eventType) + "/" + encodeURIComponent(stateKey)+
             "?access_token=foobar",
             content)
+            .respond({});
+        httpBackend.flush();
+    }));
+    
+    it('should be able to PUT generic events ', inject(
+    function(matrixService) {
+        matrixService.setConfig({
+            access_token: "foobar",
+            homeserver: "http://example.com"
+        });
+        var roomId = "!fh38hfwfwef:example.com";
+        var eventType = "com.example.events.test";
+        var txnId = "42";
+        var content = {
+            testing: "1 2 3"
+        };
+        matrixService.sendEvent(roomId, eventType, txnId, content).then(
+        function(response) {
+            expect(response.data).toEqual({});
+        });
+
+        httpBackend.expectPUT(
+            URL + "/rooms/" + encodeURIComponent(roomId) + "/send/" + 
+            encodeURIComponent(eventType) + "/" + encodeURIComponent(txnId)+
+            "?access_token=foobar",
+            content)
+            .respond({});
+        httpBackend.flush();
+    }));
+    
+    it('should be able to PUT text messages ', inject(
+    function(matrixService) {
+        matrixService.setConfig({
+            access_token: "foobar",
+            homeserver: "http://example.com"
+        });
+        var roomId = "!fh38hfwfwef:example.com";
+        var body = "ABC 123";
+        matrixService.sendTextMessage(roomId, body).then(
+        function(response) {
+            expect(response.data).toEqual({});
+        });
+
+        httpBackend.expectPUT(
+            new RegExp(URL + "/rooms/" + encodeURIComponent(roomId) + 
+            "/send/m.room.message/(.*)" +
+            "?access_token=foobar"),
+            {
+                body: body,
+                msgtype: "m.text"
+            })
             .respond({});
         httpBackend.flush();
     }));
