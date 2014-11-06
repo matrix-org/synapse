@@ -59,7 +59,6 @@ class SynapseEvent(JsonEncodedObject):
         "required_power_level",
         "age_ts",
         "prev_content",
-        "prev_state",
         "replaces_state",
         "redacted_because",
         "origin_server_ts",
@@ -76,6 +75,7 @@ class SynapseEvent(JsonEncodedObject):
         "prev_events",
         "hashes",
         "signatures",
+        "prev_state",
     ]
 
     required_keys = [
