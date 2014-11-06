@@ -19,7 +19,6 @@ from synapse.api.events.room import (
     RoomMemberEvent, RoomTopicEvent, FeedbackEvent,
     RoomNameEvent,
     RoomJoinRulesEvent,
-    RoomPowerLevelsEvent,
     RoomRedactionEvent,
 )
 
@@ -301,6 +300,17 @@ class DataStore(RoomMemberStore, RoomStore,
                 self._store_prev_event_hash_txn(
                     txn, event.event_id, prev_event_id, alg, hash_bytes
                 )
+
+        for auth_id, _ in event.auth_events:
+            self._simple_insert_txn(
+                txn,
+                table="event_auth",
+                values={
+                    "event_id": event.event_id,
+                    "room_id": event.room_id,
+                    "auth_id": auth_id,
+                },
+            )
 
         (ref_alg, ref_hash_bytes) = compute_event_reference_hash(event)
         self._store_event_reference_hash_txn(

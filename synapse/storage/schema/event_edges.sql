@@ -63,3 +63,13 @@ CREATE INDEX IF NOT EXISTS st_extrem_keys ON state_forward_extremities(
 );
 CREATE INDEX IF NOT EXISTS st_extrem_id ON state_forward_extremities(event_id);
 
+
+CREATE TABLE IF NOT EXISTS event_auth(
+    event_id TEXT NOT NULL,
+    auth_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    CONSTRAINT uniqueness UNIQUE (event_id, auth_id, room_id)
+);
+
+CREATE INDEX IF NOT EXISTS evauth_edges_id ON event_auth(event_id);
+CREATE INDEX IF NOT EXISTS evauth_edges_auth_id ON event_auth(auth_id);

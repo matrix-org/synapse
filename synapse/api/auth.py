@@ -21,8 +21,7 @@ from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.api.events.room import (
     RoomMemberEvent, RoomPowerLevelsEvent, RoomRedactionEvent,
-    RoomJoinRulesEvent, InviteJoinEvent,
-    RoomCreateEvent,
+    RoomJoinRulesEvent, RoomCreateEvent,
 )
 from synapse.util.logutils import log_function
 

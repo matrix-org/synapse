@@ -55,6 +55,18 @@ class SignatureStore(SQLBaseStore):
             or_ignore=True,
         )
 
+    def get_event_reference_hashes(self, event_ids):
+        def f(txn):
+            return [
+                self._get_event_reference_hashes_txn(txn, ev)
+                for ev in event_ids
+            ]
+
+        return self.runInteraction(
+            "get_event_reference_hashes",
+            f
+        )
+
     def _get_event_reference_hashes_txn(self, txn, event_id):
         """Get all the hashes for a given PDU.
         Args:

@@ -474,6 +474,8 @@ class SQLBaseStore(object):
                 if is_state == 0
             ]
 
+            ev.auth_events = self._get_auth_events(txn, ev.event_id)
+
             if hasattr(ev, "state_key"):
                 ev.prev_state = [
                     (e_id, h)
