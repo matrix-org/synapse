@@ -79,6 +79,6 @@ describe("RegisterController ", function() {
         scope.register();
         rootScope.$digest();
         
-        expect(scope.feedback).toNotEqual(prevFeedback);
+        expect(scope.feedback).not.toEqual(prevFeedback);
     });
 });
