@@ -175,7 +175,8 @@ angular.module('MatrixCall', [])
         this.state = 'ringing';
         this.direction = 'inbound';
 
-        if (window.mozRTCPeerConnection) {
+        // This also applied to the Safari OpenWebRTC extension so let's just do this all the time at least for now
+        //if (window.mozRTCPeerConnection) {
             // firefox's RTCPeerConnection doesn't add streams until it starts getting media on them
             // so we need to figure out whether a video channel has been offered by ourselves.
             if (this.msg.offer.sdp.indexOf('m=video') > -1) {
@@ -183,7 +184,7 @@ angular.module('MatrixCall', [])
             } else {
                 this.type = 'voice';
             }
-        }
+        //}
 
         var self = this;
         $timeout(function() {
