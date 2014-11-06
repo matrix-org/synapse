@@ -47,40 +47,6 @@ class StateHandler(object):
 
     @defer.inlineCallbacks
     @log_function
-    def handle_new_event(self, event, snapshot):
-        """ Given an event this works out if a) we have sufficient power level
-        to update the state and b) works out what the prev_state should be.
-
-        Returns:
-            Deferred: Resolved with a boolean indicating if we successfully
-            updated the state.
-
-        Raised:
-            AuthError
-        """
-        # This needs to be done in a transaction.
-
-        if not hasattr(event, "state_key"):
-            return
-
-        # Now I need to fill out the prev state and work out if it has auth
-        # (w.r.t. to power levels)
-
-        snapshot.fill_out_prev_events(event)
-        yield self.annotate_state_groups(event)
-
-        if event.old_state_events:
-            current_state = event.old_state_events.get(
-                (event.type, event.state_key)
-            )
-
-            if current_state:
-                event.prev_state = current_state.event_id
-
-        defer.returnValue(True)
-
-    @defer.inlineCallbacks
-    @log_function
     def annotate_state_groups(self, event, old_state=None):
         yield run_on_reactor()
 
@@ -111,7 +77,10 @@ class StateHandler(object):
         event.old_state_events = copy.deepcopy(new_state)
 
         if hasattr(event, "state_key"):
-            new_state[(event.type, event.state_key)] = event
+            key = (event.type, event.state_key)
+            if key in new_state:
+                event.replaces_state = new_state[key].event_id
+            new_state[key] = event
 
         event.state_group = None
         event.state_events = new_state

@@ -313,9 +313,7 @@ class FederationHandler(BaseHandler):
             state_key=user_id,
         )
 
-        snapshot = yield self.store.snapshot_room(
-            event.room_id, event.user_id,
-        )
+        snapshot = yield self.store.snapshot_room(event)
         snapshot.fill_out_prev_events(event)
 
         yield self.state_handler.annotate_state_groups(event)

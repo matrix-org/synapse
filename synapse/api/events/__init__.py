@@ -60,6 +60,7 @@ class SynapseEvent(JsonEncodedObject):
         "age_ts",
         "prev_content",
         "prev_state",
+        "replaces_state",
         "redacted_because",
         "origin_server_ts",
     ]
