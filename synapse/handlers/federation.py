@@ -386,8 +386,10 @@ class FederationHandler(BaseHandler):
             event = yield self.store.get_event(event_id)
             if hasattr(event, "state_key"):
                 # Get previous state
-                if hasattr(event, "prev_state") and event.prev_state:
-                    prev_event = yield self.store.get_event(event.prev_state)
+                if hasattr(event, "replaces_state") and event.replaces_state:
+                    prev_event = yield self.store.get_event(
+                        event.replaces_state
+                    )
                     results[(event.type, event.state_key)] = prev_event
                 else:
                     del results[(event.type, event.state_key)]
