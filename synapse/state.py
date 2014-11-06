@@ -18,6 +18,7 @@ from twisted.internet import defer
 
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
+from synapse.api.events.room import RoomPowerLevelsEvent
 
 from collections import namedtuple
 
@@ -141,21 +142,26 @@ class StateHandler(object):
 
         defer.returnValue(new_state)
 
+    def _get_power_level_from_event_state(self, event, user_id):
+        key = (RoomPowerLevelsEvent.TYPE, "", )
+        power_level_event = event.old_state_events.get(key)
+        level = None
+        if power_level_event:
+            level = power_level_event.content.get("users", {}).get(user_id)
+            if not level:
+                level = power_level_event.content.get("users_default", 0)
+
+        return level
+
     @defer.inlineCallbacks
     @log_function
     def _resolve_state_events(self, events):
         curr_events = events
 
-        new_powers_deferreds = []
-        for e in curr_events:
-            new_powers_deferreds.append(
-                self.store.get_power_level(e.room_id, e.user_id)
-            )
-
-        new_powers = yield defer.gatherResults(
-            new_powers_deferreds,
-            consumeErrors=True
-        )
+        new_powers = [
+            self._get_power_level_from_event_state(e, e.user_id)
+            for e in curr_events
+        ]
 
         new_powers = [
             int(p) if p else 0 for p in new_powers
