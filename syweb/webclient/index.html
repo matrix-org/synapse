@@ -85,7 +85,7 @@
                     </span>
                 </div>
                 <span ng-show="currentCall.state == 'ringing'">
-                    <button ng-click="answerCall()" ng-disabled="!isWebRTCSupported" title="{{isWebRTCSupported ? '' : 'Your browser does not support VoIP' }}">Answer {{ currentCall.type }} call</button>
+                    <button ng-click="answerCall()" ng-disabled="!isWebRTCSupported()" title="{{isWebRTCSupported() ? '' : 'Your browser does not support VoIP' }}">Answer {{ currentCall.type }} call</button>
                     <button ng-click="hangupCall()">Reject</button>
                 </span>
                 <button ng-click="hangupCall()" ng-show="currentCall && currentCall.state != 'ringing' && currentCall.state != 'ended' && currentCall.state != 'fledgling'">Hang up</button>

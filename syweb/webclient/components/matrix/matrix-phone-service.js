@@ -60,7 +60,7 @@ angular.module('matrixPhoneService', [])
             var MatrixCall = $injector.get('MatrixCall');
             var call = new MatrixCall(event.room_id);
 
-            if (!isWebRTCSupported()) {
+            if (!$rootScope.isWebRTCSupported()) {
                 console.log("Incoming call ID "+msg.call_id+" but this browser doesn't support WebRTC");
                 // don't hang up the call: there could be other clients connected that do support WebRTC and declining the
                 // the call on their behalf would be really annoying.

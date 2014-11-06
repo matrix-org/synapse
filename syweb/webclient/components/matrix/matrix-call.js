@@ -40,14 +40,11 @@ window.RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConne
 window.RTCSessionDescription = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription;
 window.RTCIceCandidate = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate;
 
-// Returns true if the browser supports all required features to make WebRTC call
-var isWebRTCSupported = function () {
-    return !!(navigator.getUserMedia || window.RTCPeerConnection || window.RTCSessionDescription || window.RTCIceCandidate);
-};
-
 angular.module('MatrixCall', [])
 .factory('MatrixCall', ['matrixService', 'matrixPhoneService', 'modelService', '$rootScope', '$timeout', function MatrixCallFactory(matrixService, matrixPhoneService, modelService, $rootScope, $timeout) {
-    $rootScope.isWebRTCSupported = isWebRTCSupported();
+    $rootScope.isWebRTCSupported = function () {
+        return !!(navigator.getUserMedia || window.RTCPeerConnection || window.RTCSessionDescription || window.RTCIceCandidate);
+    };
 
     var MatrixCall = function(room_id) {
         this.room_id = room_id;
