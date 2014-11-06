@@ -38,7 +38,7 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
         if (room.state("m.room.join_rules") && room.state("m.room.join_rules").content) {
             isPublicRoom = ("public" === room.state("m.room.join_rules").content.join_rule);
         }
-
+        
         if (room_name_event) {
             roomName = room_name_event.content.name;
         }
@@ -56,6 +56,9 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
                     var member = room.members[i];
                     if (member.state_key !== user_id) {
                         roomName = eventHandlerService.getUserDisplayName(room_id, member.state_key);
+                        if (!roomName) {
+                            roomName = member.state_key;
+                        }
                         break;
                     }
                 }
@@ -70,13 +73,22 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
                     if (room.members[otherUserId].content.membership === "invite") {
                         // someone invited us, use the right ID.
                         roomName = eventHandlerService.getUserDisplayName(room_id, room.members[otherUserId].user_id);
+                        if (!roomName) {
+                            roomName = room.members[otherUserId].user_id;
+                        }
                     }
                     else {
                         roomName = eventHandlerService.getUserDisplayName(room_id, otherUserId);
+                        if (!roomName) {
+                            roomName = user_id;
+                        }
                     }
                 }
                 else { // it isn't us, so use their name if we know it.
                     roomName = eventHandlerService.getUserDisplayName(room_id, otherUserId);
+                    if (!roomName) {
+                        roomName = otherUserId;
+                    }
                 }
             }
             else if (Object.keys(room.members).length === 0) {

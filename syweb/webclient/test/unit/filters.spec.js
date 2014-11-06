@@ -121,9 +121,8 @@ describe('mRoomName filter', function() {
     
     /**** ROOM ALIAS ****/
     
-    // FIXME
-    xit("should show the room alias if one exists for private (invite join_rules) rooms if a room name doesn't exist.", function() {
-        var testAlias = "#thealias:matrix.org";
+    it("should show the room alias if one exists for private (invite join_rules) rooms if a room name doesn't exist.", function() {
+        testAlias = "#thealias:matrix.org";
         testUserId = "@me:matrix.org";
         testRoomState.setJoinRule("invite");
         testRoomState.setMember(testUserId, "join");
@@ -131,9 +130,8 @@ describe('mRoomName filter', function() {
         expect(output).toEqual(testAlias);
     });
     
-    // FIXME
-    xit("should show the room alias if one exists for public (public join_rules) rooms if a room name doesn't exist.", function() {
-        var testAlias = "#thealias:matrix.org";
+    it("should show the room alias if one exists for public (public join_rules) rooms if a room name doesn't exist.", function() {
+        testAlias = "#thealias:matrix.org";
         testUserId = "@me:matrix.org";
         testRoomState.setJoinRule("public");
         testRoomState.setMember(testUserId, "join");
@@ -172,8 +170,7 @@ describe('mRoomName filter', function() {
         expect(output).toEqual(testDisplayName);
     });
     
-    // FIXME
-    xit("should show your user ID for private (invite join_rules) rooms if a room name and alias don't exist and it is a self-chat and they don't have a display name set.", function() {
+    it("should show your user ID for private (invite join_rules) rooms if a room name and alias don't exist and it is a self-chat and they don't have a display name set.", function() {
         testUserId = "@me:matrix.org";
         testRoomState.setJoinRule("private");
         testRoomState.setMember(testUserId, "join");
@@ -194,8 +191,7 @@ describe('mRoomName filter', function() {
         expect(output).toEqual(testOtherDisplayName);
     });
     
-    // FIXME
-    xit("should show the other user's ID for private (invite join_rules) rooms if a room name and alias don't exist and it is a 1:1-chat and they don't have a display name set.", function() {
+    it("should show the other user's ID for private (invite join_rules) rooms if a room name and alias don't exist and it is a 1:1-chat and they don't have a display name set.", function() {
         testUserId = "@me:matrix.org";
         otherUserId = "@alice:matrix.org";
         testRoomState.setJoinRule("private");
@@ -220,8 +216,7 @@ describe('mRoomName filter', function() {
         expect(output).toEqual(testOtherDisplayName);
     });
     
-    // FIXME
-    xit("should show the other user's ID for private (invite join_rules) rooms if you are invited to it and the inviter doesn't have a display name.", function() {
+    it("should show the other user's ID for private (invite join_rules) rooms if you are invited to it and the inviter doesn't have a display name.", function() {
         testUserId = "@me:matrix.org";
         testDisplayName = "Me";
         otherUserId = "@alice:matrix.org";
