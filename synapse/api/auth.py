@@ -58,22 +58,19 @@ class Auth(object):
                     # TODO (erikj): Auth for outliers is done differently.
                     return True
 
-                is_state = hasattr(event, "state_key")
-
                 if event.type == RoomCreateEvent.TYPE:
                     # FIXME
                     return True
 
+                self._can_send_event(event)
+
                 if event.type == RoomMemberEvent.TYPE:
-                    self._can_send_event(event)
                     allowed = self.is_membership_change_allowed(event)
                     if allowed:
                         logger.debug("Allowing! %s", event)
                     else:
                         logger.debug("Denying! %s", event)
                     return allowed
-
-                self._can_send_event(event)
 
                 if event.type == RoomPowerLevelsEvent.TYPE:
                     self._check_power_levels(event)
