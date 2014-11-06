@@ -141,7 +141,7 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
                 notificationService.showNotification(
                     displayname + " (" + roomTitle + ")",
                     message,
-                    member ? member.avatar_url : undefined,
+                    member ? member.event.content.avatar_url : undefined,
                     function() {
                         console.log("notification.onclick() room=" + event.room_id);
                         $rootScope.goToPage('room/' + event.room_id); 
@@ -306,6 +306,9 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
 
         // Get the user display name from the member list of the room
         var member = modelService.getMember(room_id, user_id);
+        if (member) {
+            member = member.event;
+        }
         if (member && member.content.displayname) { // Do not consider null displayname
             displayName = member.content.displayname;
 
@@ -315,7 +318,7 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
 
                 for (var member_id in room.current_room_state.members) {
                     if (room.current_room_state.members.hasOwnProperty(member_id) && member_id !== user_id) {
-                        var member2 = room.current_room_state.members[member_id];
+                        var member2 = room.current_room_state.members[member_id].event;
                         if (member2.content.displayname && member2.content.displayname === displayName) {
                             displayName = displayName + " (" + user_id + ")";
                             break;
@@ -551,7 +554,7 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
             for (var i in room.current_room_state.members) {
                 if (!room.current_room_state.members.hasOwnProperty(i)) continue;
 
-                var member = room.current_room_state.members[i];
+                var member = room.current_room_state.members[i].event;
 
                 if ("join" === member.content.membership) {
                     memberCount = memberCount + 1;

@@ -25,6 +25,6 @@ describe('ModelService', function() {
         });
         
         var user = modelService.getMember(roomId, userId);
-        expect(user.state_key).toEqual(userId);
+        expect(user.event.state_key).toEqual(userId);
     }));
 });

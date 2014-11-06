@@ -214,7 +214,7 @@ angular.module('MatrixCall', [])
         var self = this;
 
         var roomMembers = modelService.getRoom(this.room_id).current_room_state.members;
-        if (roomMembers[matrixService.config().user_id].membership != 'join') {
+        if (roomMembers[matrixService.config().user_id].event.content.membership != 'join') {
             console.log("We need to join the room before we can accept this call");
             matrixService.join(this.room_id).then(function() {
                 self.answer();

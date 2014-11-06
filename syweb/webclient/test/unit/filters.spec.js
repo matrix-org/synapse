@@ -86,11 +86,13 @@ describe('mRoomName filter', function() {
                     inviter_user_id = user_id;
                 }
                 this.s["m.room.member" + user_id] = {
-                    content: {
-                        membership: membership
-                    },
-                    state_key: user_id,
-                    user_id: inviter_user_id 
+                    event: {
+                        content: {
+                            membership: membership
+                        },
+                        state_key: user_id,
+                        user_id: inviter_user_id 
+                    }
                 };
                 this.members[user_id] = this.s["m.room.member" + user_id];
             }

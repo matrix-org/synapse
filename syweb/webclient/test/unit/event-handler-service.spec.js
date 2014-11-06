@@ -36,20 +36,28 @@ describe('EventHandlerService', function() {
                 current_room_state: {
                     members: {
                         "@adam:matrix.org": {
-                            content: { membership: "join" },
-                            user_id: "@adam:matrix.org"
+                            event: {
+                                content: { membership: "join" },
+                                user_id: "@adam:matrix.org"
+                            }
                         },
                         "@beth:matrix.org": {
-                            content: { membership: "invite" },
-                            user_id: "@beth:matrix.org"
+                            event: {
+                                content: { membership: "invite" },
+                                user_id: "@beth:matrix.org"
+                            }
                         },
                         "@charlie:matrix.org": {
-                            content: { membership: "join" },
-                            user_id: "@charlie:matrix.org"
+                            event: {
+                                content: { membership: "join" },
+                                user_id: "@charlie:matrix.org"
+                            }
                         },
                         "@danice:matrix.org": {
-                            content: { membership: "leave" },
-                            user_id: "@danice:matrix.org"
+                            event: {
+                                content: { membership: "leave" },
+                                user_id: "@danice:matrix.org"
+                            }
                         }
                     }
                 }
@@ -70,12 +78,16 @@ describe('EventHandlerService', function() {
                 current_room_state: {
                     members: {
                         "@adam:matrix.org": {
-                            content: { membership: "join" },
-                            user_id: "@adam:matrix.org"
+                            event: {
+                                content: { membership: "join" },
+                                user_id: "@adam:matrix.org"
+                            }
                         },
                         "@beth:matrix.org": {
-                            content: { membership: "join" },
-                            user_id: "@beth:matrix.org"
+                            event: {
+                                content: { membership: "join" },
+                                user_id: "@beth:matrix.org"
+                            }
                         }
                     },
                     s: {

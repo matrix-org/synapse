@@ -754,13 +754,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     for (var i in members) {
                         if (!members.hasOwnProperty(i)) continue;
 
-                        var member = members[i];
+                        var member = members[i].event;
                         updateMemberList(member);
                     }
 
                     // Check if the user has already join the room
                     if ($scope.state.user_id in members) {
-                        if ("join" === members[$scope.state.user_id].membership) {
+                        if ("join" === members[$scope.state.user_id].event.content.membership) {
                             needsToJoin = false;
                         }
                     }

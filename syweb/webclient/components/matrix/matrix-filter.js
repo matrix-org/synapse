@@ -53,7 +53,7 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
                 for (var i in room.members) {
                     if (!room.members.hasOwnProperty(i)) continue;
 
-                    var member = room.members[i];
+                    var member = room.members[i].event;
                     if (member.state_key !== user_id) {
                         roomName = eventHandlerService.getUserDisplayName(room_id, member.state_key);
                         if (!roomName) {
@@ -70,11 +70,11 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
                 if (otherUserId === user_id) {
                     // it's us, we may have been invited to this room or it could
                     // be a self chat.
-                    if (room.members[otherUserId].content.membership === "invite") {
+                    if (room.members[otherUserId].event.content.membership === "invite") {
                         // someone invited us, use the right ID.
-                        roomName = eventHandlerService.getUserDisplayName(room_id, room.members[otherUserId].user_id);
+                        roomName = eventHandlerService.getUserDisplayName(room_id, room.members[otherUserId].event.user_id);
                         if (!roomName) {
-                            roomName = room.members[otherUserId].user_id;
+                            roomName = room.members[otherUserId].event.user_id;
                         }
                     }
                     else {

@@ -106,7 +106,9 @@ angular.module('modelService', [])
         storeStateEvent: function storeState(event) {
             this.state_events[event.type + event.state_key] = event;
             if (event.type === "m.room.member") {
-                this.members[event.state_key] = event;
+                var rm = new RoomMember();
+                rm.event = event;
+                this.members[event.state_key] = rm;
             }
         },
         

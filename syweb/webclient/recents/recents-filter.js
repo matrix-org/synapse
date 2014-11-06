@@ -30,6 +30,9 @@ angular.module('RecentsController')
             // Show the room only if the user has joined it or has been invited
             // (ie, do not show it if he has been banned)
             var member = modelService.getMember(room_id, user_id);
+            if (member) {
+                member = member.event;
+            }
             room.recent.me = member;
             if (member && ("invite" === member.content.membership || "join" === member.content.membership)) {
                 if ("invite" === member.content.membership) {
