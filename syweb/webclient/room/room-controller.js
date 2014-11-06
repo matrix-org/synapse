@@ -207,7 +207,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
                     }
                     notificationService.showNotification(
                         userName +
-                        " (" + (matrixService.getRoomIdToAliasMapping(event.room_id) || event.room_id) + ")",
+                        " (" + $filter("mRoomName")(event.room_id) + ")",
                         userName + " joined",
                         event.content.avatar_url ? event.content.avatar_url : undefined,
                         function() {
