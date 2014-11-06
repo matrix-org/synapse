@@ -21,8 +21,7 @@ from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import StoreError, SynapseError
 from synapse.api.events.room import (
     RoomMemberEvent, RoomCreateEvent, RoomPowerLevelsEvent,
-    RoomJoinRulesEvent, RoomAddStateLevelEvent, RoomTopicEvent,
-    RoomSendEventLevelEvent, RoomOpsPowerLevelsEvent, RoomNameEvent,
+    RoomTopicEvent, RoomNameEvent, RoomJoinRulesEvent,
 )
 from synapse.util import stringutils
 from ._base import BaseHandler
@@ -139,7 +138,6 @@ class RoomCreationHandler(BaseHandler):
                 etype=RoomNameEvent.TYPE,
                 room_id=room_id,
                 user_id=user_id,
-                required_power_level=50,
                 content={"name": name},
             )
 
@@ -151,7 +149,6 @@ class RoomCreationHandler(BaseHandler):
                 etype=RoomTopicEvent.TYPE,
                 room_id=room_id,
                 user_id=user_id,
-                required_power_level=50,
                 content={"topic": topic},
             )
 
@@ -196,7 +193,6 @@ class RoomCreationHandler(BaseHandler):
         event_keys = {
             "room_id": room_id,
             "user_id": creator.to_string(),
-            "required_power_level": 100,
         }
 
         def create(etype, **content):
@@ -213,7 +209,21 @@ class RoomCreationHandler(BaseHandler):
 
         power_levels_event = self.event_factory.create_event(
             etype=RoomPowerLevelsEvent.TYPE,
-            content={creator.to_string(): 100, "default": 0},
+            content={
+                "users": {
+                    creator.to_string(): 100,
+                },
+                "users_default": 0,
+                "events": {
+                    RoomNameEvent.TYPE: 100,
+                    RoomPowerLevelsEvent.TYPE: 100,
+                },
+                "events_default": 0,
+                "state_default": 50,
+                "ban": 50,
+                "kick": 50,
+                "redact": 50
+            },
             **event_keys
         )
 
@@ -223,30 +233,10 @@ class RoomCreationHandler(BaseHandler):
             join_rule=join_rule,
         )
 
-        add_state_event = create(
-            etype=RoomAddStateLevelEvent.TYPE,
-            level=100,
-        )
-
-        send_event = create(
-            etype=RoomSendEventLevelEvent.TYPE,
-            level=0,
-        )
-
-        ops = create(
-            etype=RoomOpsPowerLevelsEvent.TYPE,
-            ban_level=50,
-            kick_level=50,
-            redact_level=50,
-        )
-
         return [
             creation_event,
             power_levels_event,
             join_rules_event,
-            add_state_event,
-            send_event,
-            ops,
         ]
 
 
@@ -387,16 +377,6 @@ class RoomMemberHandler(BaseHandler):
             yield self._do_join(event, snapshot, do_auth=do_auth)
         else:
             # This is not a JOIN, so we can handle it normally.
-
-            # If we're banning someone, set a req power level
-            if event.membership == Membership.BAN:
-                if not hasattr(event, "required_power_level") or event.required_power_level is None:
-                    # Add some default required_power_level
-                    user_level = yield self.store.get_power_level(
-                        event.room_id,
-                        event.user_id,
-                    )
-                    event.required_power_level = user_level
 
             if prev_state and prev_state.membership == event.membership:
                 # double same action, treat this event as a NOOP.

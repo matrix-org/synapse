@@ -16,8 +16,8 @@
 from synapse.api.events.room import (
     RoomTopicEvent, MessageEvent, RoomMemberEvent, FeedbackEvent,
     InviteJoinEvent, RoomConfigEvent, RoomNameEvent, GenericEvent,
-    RoomPowerLevelsEvent, RoomJoinRulesEvent, RoomOpsPowerLevelsEvent,
-    RoomCreateEvent, RoomAddStateLevelEvent, RoomSendEventLevelEvent,
+    RoomPowerLevelsEvent, RoomJoinRulesEvent,
+    RoomCreateEvent,
     RoomRedactionEvent,
 )
 
@@ -39,9 +39,6 @@ class EventFactory(object):
         RoomPowerLevelsEvent,
         RoomJoinRulesEvent,
         RoomCreateEvent,
-        RoomAddStateLevelEvent,
-        RoomSendEventLevelEvent,
-        RoomOpsPowerLevelsEvent,
         RoomRedactionEvent,
     ]
 

@@ -21,8 +21,8 @@ from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.api.events.room import (
     RoomMemberEvent, RoomPowerLevelsEvent, RoomRedactionEvent,
-    RoomJoinRulesEvent, RoomOpsPowerLevelsEvent, InviteJoinEvent,
-    RoomCreateEvent, RoomSendEventLevelEvent, RoomAddStateLevelEvent,
+    RoomJoinRulesEvent, InviteJoinEvent,
+    RoomCreateEvent,
 )
 from synapse.util.logutils import log_function
 
@@ -51,6 +51,7 @@ class Auth(object):
                 if event.old_state_events is None:
                     # Oh, we don't know what the state of the room was, so we
                     # are trusting that this is allowed (at least for now)
+                    logger.warn("Trusting event: %s", event.event_id)
                     return True
 
                 if hasattr(event, "outlier") and event.outlier is True:
@@ -64,7 +65,7 @@ class Auth(object):
                     return True
 
                 if event.type == RoomMemberEvent.TYPE:
-                    self._can_replace_state(event)
+                    self._can_send_event(event)
                     allowed = self.is_membership_change_allowed(event)
                     if allowed:
                         logger.debug("Allowing! %s", event)
@@ -72,16 +73,7 @@ class Auth(object):
                         logger.debug("Denying! %s", event)
                     return allowed
 
-                if not event.type == InviteJoinEvent.TYPE:
-                    self.check_event_sender_in_room(event)
-
-                if is_state:
-                    # TODO (erikj): This really only should be called for *new*
-                    # state
-                    self._can_add_state(event)
-                    self._can_replace_state(event)
-                else:
-                    self._can_send_event(event)
+                self._can_send_event(event)
 
                 if event.type == RoomPowerLevelsEvent.TYPE:
                     self._check_power_levels(event)
@@ -239,21 +231,21 @@ class Auth(object):
         power_level_event = event.old_state_events.get(key)
         level = None
         if power_level_event:
-            level = power_level_event.content.get(user_id)
+            level = power_level_event.content.get("users", {}).get(user_id)
             if not level:
-                level = power_level_event.content.get("default", 0)
+                level = power_level_event.content.get("users_default", 0)
 
         return level
 
     def _get_ops_level_from_event_state(self, event):
-        key = (RoomOpsPowerLevelsEvent.TYPE, "", )
-        ops_event = event.old_state_events.get(key)
+        key = (RoomPowerLevelsEvent.TYPE, "", )
+        power_level_event = event.old_state_events.get(key)
 
-        if ops_event:
+        if power_level_event:
             return (
-                ops_event.content.get("ban_level"),
-                ops_event.content.get("kick_level"),
-                ops_event.content.get("redact_level"),
+                power_level_event.content.get("ban", 50),
+                power_level_event.content.get("kick", 50),
+                power_level_event.content.get("redact", 50),
             )
         return None, None, None,
 
@@ -325,13 +317,22 @@ class Auth(object):
 
     @log_function
     def _can_send_event(self, event):
-        key = (RoomSendEventLevelEvent.TYPE, "", )
+        key = (RoomPowerLevelsEvent.TYPE, "", )
         send_level_event = event.old_state_events.get(key)
         send_level = None
         if send_level_event:
-            send_level = send_level_event.content.get(event.user_id)
+            send_level = send_level_event.content.get("events", {}).get(
+                event.type
+            )
             if not send_level:
-                send_level = send_level_event.content.get("level", 0)
+                if hasattr(event, "state_key"):
+                    send_level = send_level_event.content.get(
+                        "state_default", 50
+                    )
+                else:
+                    send_level = send_level_event.content.get(
+                        "events_default", 0
+                    )
 
         if send_level:
             send_level = int(send_level)
@@ -350,66 +351,10 @@ class Auth(object):
 
         if user_level < send_level:
             raise AuthError(
-                403, "You don't have permission to post to the room"
+                403, "You don't have permission to post that to the room"
             )
 
         return True
-
-    def _can_add_state(self, event):
-        key = (RoomAddStateLevelEvent.TYPE, "", )
-        add_level_event = event.old_state_events.get(key)
-        add_level = None
-        if add_level_event:
-            add_level = add_level_event.content.get(event.user_id)
-            if not add_level:
-                add_level = add_level_event.content.get("level", 0)
-
-        if add_level:
-            add_level = int(add_level)
-        else:
-            add_level = 0
-
-        user_level = self._get_power_level_from_event_state(
-            event,
-            event.user_id,
-        )
-
-        user_level = int(user_level)
-
-        if user_level < add_level:
-            raise AuthError(
-                403, "You don't have permission to add state to the room"
-            )
-
-        return True
-
-    def _can_replace_state(self, event):
-        user_level = self._get_power_level_from_event_state(
-            event,
-            event.user_id,
-        )
-
-        if user_level:
-            user_level = int(user_level)
-        else:
-            user_level = 0
-
-        logger.debug(
-            "Checking power level for %s, %s", event.user_id, user_level
-        )
-
-        key = (event.type, event.state_key, )
-        current_state = event.old_state_events.get(key)
-
-        if current_state and hasattr(current_state, "required_power_level"):
-            req = current_state.required_power_level
-
-            logger.debug("Checked power level for %s, %s", event.user_id, req)
-            if user_level < req:
-                raise AuthError(
-                    403,
-                    "You don't have permission to change that state"
-                )
 
     def _check_redaction(self, event):
         user_level = self._get_power_level_from_event_state(
@@ -417,17 +362,9 @@ class Auth(object):
             event.user_id,
         )
 
-        if user_level:
-            user_level = int(user_level)
-        else:
-            user_level = 0
-
         _, _, redact_level = self._get_ops_level_from_event_state(
             event
         )
-
-        if not redact_level:
-            redact_level = 50
 
         if user_level < redact_level:
             raise AuthError(
@@ -436,14 +373,9 @@ class Auth(object):
             )
 
     def _check_power_levels(self, event):
-        for k, v in event.content.items():
-            if k == "default":
-                continue
-
-            # FIXME (erikj): We don't want hsob_Ts in content.
-            if k == "hsob_ts":
-                continue
-
+        user_list = event.content.get("users", {})
+        # Validate users
+        for k, v in user_list.items():
             try:
                 self.hs.parse_userid(k)
             except:
@@ -459,72 +391,63 @@ class Auth(object):
 
         if not current_state:
             return
-        else:
-            current_state = current_state[0]
 
         user_level = self._get_power_level_from_event_state(
             event,
             event.user_id,
         )
 
-        if user_level:
-            user_level = int(user_level)
-        else:
-            user_level = 0
+       # Check other levels:
+        levels_to_check = [
+            ("users_default", []),
+            ("events_default", []),
+            ("ban", []),
+            ("redact", []),
+            ("kick", []),
+        ]
 
-        old_list = current_state.content
+        old_list = current_state.content.get("users")
+        for user in set(old_list.keys() + user_list.keys()):
+            levels_to_check.append(
+                (user, ["users"])
+            )
 
-        # FIXME (erikj)
-        old_people = {k: v for k, v in old_list.items() if k.startswith("@")}
-        new_people = {
-            k: v for k, v in event.content.items()
-            if k.startswith("@")
-        }
+        old_list = current_state.content.get("events")
+        new_list = event.content.get("events")
+        for ev_id in set(old_list.keys() + new_list.keys()):
+            levels_to_check.append(
+                (ev_id, ["events"])
+            )
 
-        removed = set(old_people.keys()) - set(new_people.keys())
-        added = set(new_people.keys()) - set(old_people.keys())
-        same = set(old_people.keys()) & set(new_people.keys())
+        old_state = current_state.content
+        new_state = event.content
 
-        for r in removed:
-            if int(old_list[r]) > user_level:
-                raise AuthError(
-                    403,
-                    "You don't have permission to remove user: %s" % (r, )
-                )
+        for level_to_check, dir in levels_to_check:
+            old_loc = old_state
+            for d in dir:
+                old_loc = old_loc.get(d, {})
 
-        for n in added:
-            if int(event.content[n]) > user_level:
+            new_loc = new_state
+            for d in dir:
+                new_loc = new_loc.get(d, {})
+
+            if level_to_check in old_loc:
+                old_level = int(old_loc[level_to_check])
+            else:
+                old_level = None
+
+            if level_to_check in new_loc:
+                new_level = int(new_loc[level_to_check])
+            else:
+                new_level = None
+
+            if new_level is not None and old_level is not None:
+                if new_level == old_level:
+                    continue
+
+            if old_level > user_level or new_level > user_level:
                 raise AuthError(
                     403,
                     "You don't have permission to add ops level greater "
                     "than your own"
                 )
-
-        for s in same:
-            if int(event.content[s]) != int(old_list[s]):
-                if int(event.content[s]) > user_level:
-                    raise AuthError(
-                        403,
-                        "You don't have permission to add ops level greater "
-                        "than your own"
-                    )
-
-        if "default" in old_list:
-            old_default = int(old_list["default"])
-
-            if old_default > user_level:
-                raise AuthError(
-                    403,
-                    "You don't have permission to add ops level greater than "
-                    "your own"
-                )
-
-            if "default" in event.content:
-                new_default = int(event.content["default"])
-
-                if new_default > user_level:
-                    raise AuthError(
-                        403,
-                        "You don't have permission to add ops level greater "
-                        "than your own"
-                    )

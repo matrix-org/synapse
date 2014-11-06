@@ -17,13 +17,9 @@ from twisted.internet import defer
 
 from synapse.api.events.room import (
     RoomMemberEvent, RoomTopicEvent, FeedbackEvent,
-#   RoomConfigEvent,
     RoomNameEvent,
     RoomJoinRulesEvent,
     RoomPowerLevelsEvent,
-    RoomAddStateLevelEvent,
-    RoomSendEventLevelEvent,
-    RoomOpsPowerLevelsEvent,
     RoomRedactionEvent,
 )
 
@@ -166,14 +162,6 @@ class DataStore(RoomMemberStore, RoomStore,
             self._store_room_topic_txn(txn, event)
         elif event.type == RoomJoinRulesEvent.TYPE:
             self._store_join_rule(txn, event)
-        elif event.type == RoomPowerLevelsEvent.TYPE:
-            self._store_power_levels(txn, event)
-        elif event.type == RoomAddStateLevelEvent.TYPE:
-            self._store_add_state_level(txn, event)
-        elif event.type == RoomSendEventLevelEvent.TYPE:
-            self._store_send_event_level(txn, event)
-        elif event.type == RoomOpsPowerLevelsEvent.TYPE:
-            self._store_ops_level(txn, event)
         elif event.type == RoomRedactionEvent.TYPE:
             self._store_redaction(txn, event)
 

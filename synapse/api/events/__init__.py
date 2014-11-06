@@ -56,12 +56,12 @@ class SynapseEvent(JsonEncodedObject):
         "user_id",  # sender/initiator
         "content",  # HTTP body, JSON
         "state_key",
-        "required_power_level",
         "age_ts",
         "prev_content",
         "replaces_state",
         "redacted_because",
         "origin_server_ts",
+        "auth_chains",
     ]
 
     internal_keys = [
@@ -70,7 +70,6 @@ class SynapseEvent(JsonEncodedObject):
         "destinations",
         "origin",
         "outlier",
-        "power_level",
         "redacted",
         "prev_events",
         "hashes",

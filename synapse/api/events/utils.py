@@ -15,7 +15,6 @@
 
 from .room import (
     RoomMemberEvent, RoomJoinRulesEvent, RoomPowerLevelsEvent,
-    RoomAddStateLevelEvent, RoomSendEventLevelEvent, RoomOpsPowerLevelsEvent,
     RoomAliasesEvent, RoomCreateEvent,
 )
 
@@ -52,17 +51,17 @@ def _prune_event_or_pdu(event_type, event):
     elif event_type == RoomJoinRulesEvent.TYPE:
         add_fields("join_rule")
     elif event_type == RoomPowerLevelsEvent.TYPE:
-        # TODO: Actually check these are valid user_ids etc.
-        add_fields("default")
-        for k, v in event.content.items():
-            if k.startswith("@") and isinstance(v, (int, long)):
-                new_content[k] = v
-    elif event_type == RoomAddStateLevelEvent.TYPE:
-        add_fields("level")
-    elif event_type == RoomSendEventLevelEvent.TYPE:
-        add_fields("level")
-    elif event_type == RoomOpsPowerLevelsEvent.TYPE:
-        add_fields("kick_level", "ban_level", "redact_level")
+        add_fields(
+            "users",
+            "users_default",
+            "events",
+            "events_default",
+            "events_default",
+            "state_default",
+            "ban",
+            "kick",
+            "redact",
+        )
     elif event_type == RoomAliasesEvent.TYPE:
         add_fields("aliases")
 
