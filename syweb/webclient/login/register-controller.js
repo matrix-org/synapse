@@ -124,7 +124,7 @@ angular.module('RegisterController', ['matrixService'])
                 $location.url("home");
             },
             function(error) {
-                console.trace("Registration error: "+error);
+                console.error("Registration error: "+JSON.stringify(error));
                 if (useCaptcha) {
                     Recaptcha.reload();
                 }
