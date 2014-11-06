@@ -76,8 +76,8 @@ describe("RegisterController ", function() {
         scope.account.pwd1 = "password";
         scope.account.pwd2 = "password";
         scope.account.desired_user_id = "bob";
-        scope.register();
-        rootScope.$digest();
+        scope.register(); // this depends on the result of a deferred
+        rootScope.$digest(); // which is delivered after the digest
         
         expect(scope.feedback).not.toEqual(prevFeedback);
     });

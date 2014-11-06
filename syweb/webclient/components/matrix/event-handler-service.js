@@ -26,8 +26,8 @@ Typically, this service will store events and broadcast them to any listeners
 (e.g. controllers) via $broadcast. 
 */
 angular.module('eventHandlerService', [])
-.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', 'mPresence', 'notificationService', 'modelService',
-function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService, modelService) {
+.factory('eventHandlerService', ['matrixService', '$rootScope', '$q', '$timeout', '$filter', 'mPresence', 'notificationService', 'modelService',
+function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificationService, modelService) {
     var ROOM_CREATE_EVENT = "ROOM_CREATE_EVENT";
     var MSG_EVENT = "MSG_EVENT";
     var MEMBER_EVENT = "MEMBER_EVENT";
@@ -135,16 +135,8 @@ function(matrixService, $rootScope, $q, $timeout, mPresence, notificationService
                 else if (event.content.msgtype === "m.image") {
                     message = displayname + " sent an image.";
                 }
-
-                var roomTitle = matrixService.getRoomIdToAliasMapping(event.room_id);
-                var theRoom = modelService.getRoom(event.room_id);
-                if (!roomTitle && theRoom.current_room_state.state("m.room.name") && theRoom.current_room_state.state("m.room.name").content) {
-                    roomTitle = theRoom.current_room_state.state("m.room.name").content.name;
-                }
-
-                if (!roomTitle) {
-                    roomTitle = event.room_id;
-                }
+                
+                var roomTitle = $filter("mRoomName")(event.room_id);
                 
                 notificationService.showNotification(
                     displayname + " (" + roomTitle + ")",
