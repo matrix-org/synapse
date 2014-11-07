@@ -274,13 +274,6 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def on_context_pdus_request(self, context):
-        raise NotImplementedError(
-            "on_context_pdus_request is a security violation"
-        )
-
-    @defer.inlineCallbacks
-    @log_function
     def on_backfill_request(self, context, versions, limit):
         pdus = yield self.handler.on_backfill_request(
             context, versions, limit

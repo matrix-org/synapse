@@ -403,15 +403,6 @@ class TransportLayer(object):
             )
         )
 
-        self.server.register_path(
-            "GET",
-            re.compile("^" + PREFIX + "/context/([^/]*)/$"),
-            self._with_authentication(
-                lambda origin, content, query, context:
-                handler.on_context_pdus_request(context)
-            )
-        )
-
         # This is when we receive a server-server Query
         self.server.register_path(
             "GET",
