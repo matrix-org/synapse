@@ -32,24 +32,21 @@ class EventFederationStore(SQLBaseStore):
         )
 
     def _get_auth_chain_txn(self, txn, event_id):
-        results = set([event_id])
+        results = set()
+
+        base_sql = (
+            "SELECT auth_id FROM event_auth WHERE %s"
+        )
 
         front = set([event_id])
         while front:
-            for ev_id in front:
-                new_front = set()
-                auth_ids = self._simple_select_onecol_txn(
-                    txn,
-                    table="event_auth",
-                    keyvalues={
-                        "event_id": ev_id,
-                    },
-                    retcol="auth_id",
-                )
+            sql = base_sql % (
+                " OR ".join(["event_id=?"] * len(front)),
+            )
 
-                new_front.update(auth_ids)
-            front = new_front
-            new_front.clear()
+            txn.execute(sql, list(front))
+            front = [r[0] for r in txn.fetchall()]
+            results.update(front)
 
         sql = "SELECT * FROM events WHERE event_id = ?"
         rows = []
