@@ -24,6 +24,41 @@ logger = logging.getLogger(__name__)
 
 class EventFederationStore(SQLBaseStore):
 
+    def get_auth_chain(self, event_id):
+        return self.runInteraction(
+            "get_auth_chain",
+            self._get_auth_chain_txn,
+            event_id
+        )
+
+    def _get_auth_chain_txn(self, txn, event_id):
+        results = set([event_id])
+
+        front = set([event_id])
+        while front:
+            for ev_id in front:
+                new_front = set()
+                auth_ids = self._simple_select_onecol_txn(
+                    txn,
+                    table="event_auth",
+                    keyvalues={
+                        "event_id": ev_id,
+                    },
+                    retcol="auth_id",
+                )
+
+                new_front.update(auth_ids)
+            front = new_front
+            new_front.clear()
+
+        sql = "SELECT * FROM events WHERE event_id = ?"
+        rows = []
+        for ev_id in results:
+            c = txn.execute(sql, (ev_id,))
+            rows.extend(self.cursor_to_dict(c))
+
+        return self._parse_events_txn(txn, rows)
+
     def get_oldest_events_in_room(self, room_id):
         return self.runInteraction(
             "get_oldest_events_in_room",
