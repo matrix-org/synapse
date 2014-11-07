@@ -426,8 +426,12 @@ class ReplicationLayer(object):
     @defer.inlineCallbacks
     def on_send_join_request(self, origin, content):
         pdu = Pdu(**content)
-        state = yield self.handler.on_send_join_request(origin, pdu)
-        defer.returnValue((200, self._transaction_from_pdus(state).get_dict()))
+        res_pdus = yield self.handler.on_send_join_request(origin, pdu)
+
+        defer.returnValue((200, {
+            "state": [p.get_dict() for p in res_pdus["state"]],
+            "auth_chain": [p.get_dict() for p in res_pdus["auth_chain"]],
+        }))
 
     @defer.inlineCallbacks
     def make_join(self, destination, context, user_id):
@@ -451,11 +455,17 @@ class ReplicationLayer(object):
         )
 
         logger.debug("Got content: %s", content)
-        pdus = [Pdu(outlier=True, **p) for p in content.get("pdus", [])]
-        for pdu in pdus:
+        state = [Pdu(outlier=True, **p) for p in content.get("state", [])]
+        for pdu in state:
             yield self._handle_new_pdu(destination, pdu)
 
-        defer.returnValue(pdus)
+        auth_chain = [
+            Pdu(outlier=True, **p) for p in content.get("auth_chain", [])
+        ]
+        for pdu in auth_chain:
+            yield self._handle_new_pdu(destination, pdu)
+
+        defer.returnValue(state)
 
     @log_function
     def _get_persisted_pdu(self, event_id):

@@ -366,10 +366,19 @@ class FederationHandler(BaseHandler):
 
         yield self.replication_layer.send_pdu(new_pdu)
 
-        defer.returnValue([
+        auth_chain = yield self.store.get_auth_chain(event.event_id)
+        pdu_auth_chain = [
             self.pdu_codec.pdu_from_event(e)
-            for e in event.state_events.values()
-        ])
+            for e in auth_chain
+        ]
+
+        defer.returnValue({
+            "state": [
+                self.pdu_codec.pdu_from_event(e)
+                for e in event.state_events.values()
+            ],
+            "auth_chain": pdu_auth_chain,
+        })
 
     @defer.inlineCallbacks
     def get_state_for_pdu(self, event_id):
