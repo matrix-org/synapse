@@ -23,6 +23,7 @@ from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
 from synapse.federation.pdu_codec import PduCodec
 from synapse.util.async import run_on_reactor
+from synapse.crypto.event_signing import compute_event_signature
 
 from twisted.internet import defer
 
@@ -212,6 +213,17 @@ class FederationHandler(BaseHandler):
 
         defer.returnValue(events)
 
+    @defer.inlineCallbacks
+    def send_invite(self, target_host, event):
+        pdu = yield self.replication_layer.send_invite(
+            destination=target_host,
+            context=event.room_id,
+            event_id=event.event_id,
+            pdu=self.pdu_codec.pdu_from_event(event)
+        )
+
+        defer.returnValue(self.pdu_codec.event_from_pdu(pdu))
+
     @log_function
     @defer.inlineCallbacks
     def do_invite_join(self, target_host, room_id, joinee, content, snapshot):
@@ -379,6 +391,31 @@ class FederationHandler(BaseHandler):
             ],
             "auth_chain": pdu_auth_chain,
         })
+
+    @defer.inlineCallbacks
+    def on_invite_request(self, origin, pdu):
+        event = self.pdu_codec.event_from_pdu(pdu)
+
+        event.outlier = True
+
+        event.signatures.update(
+            compute_event_signature(
+                event,
+                self.hs.hostname,
+                self.hs.config.signing_key[0]
+            )
+        )
+
+        yield self.state_handler.annotate_state_groups(event)
+
+        yield self.store.persist_event(
+            event,
+            backfilled=False,
+        )
+
+        yield self.notifier.on_new_room_event(event)
+
+        defer.returnValue(self.pdu_codec.pdu_from_event(event))
 
     @defer.inlineCallbacks
     def get_state_for_pdu(self, event_id):

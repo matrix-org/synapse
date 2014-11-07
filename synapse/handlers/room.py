@@ -361,13 +361,6 @@ class RoomMemberHandler(BaseHandler):
         if prev_state:
             event.content["prev"] = prev_state.membership
 
-#        if prev_state and prev_state.membership == event.membership:
-#            # treat this event as a NOOP.
-#            if do_auth:  # This is mainly to fix a unit test.
-#                yield self.auth.check(event, raises=True)
-#            defer.returnValue({})
-#            return
-
         room_id = event.room_id
 
         # If we're trying to join a room then we have to do this differently
@@ -521,25 +514,24 @@ class RoomMemberHandler(BaseHandler):
 
         defer.returnValue([r.room_id for r in rooms])
 
+    @defer.inlineCallbacks
     def _do_local_membership_update(self, event, membership, snapshot,
                                     do_auth):
-        destinations = []
-
         # If we're inviting someone, then we should also send it to that
         # HS.
         target_user_id = event.state_key
         target_user = self.hs.parse_userid(target_user_id)
-        if membership == Membership.INVITE:
-            host = target_user.domain
-            destinations.append(host)
+        if membership == Membership.INVITE and not target_user.is_mine:
+            do_invite_host = target_user.domain
+        else:
+            do_invite_host = None
 
-        # Always include target domain
-        host = target_user.domain
-        destinations.append(host)
-
-        return self._on_new_room_event(
-            event, snapshot, extra_destinations=destinations,
-            extra_users=[target_user], suppress_auth=(not do_auth),
+        yield self._on_new_room_event(
+            event,
+            snapshot,
+            extra_users=[target_user],
+            suppress_auth=(not do_auth),
+            do_invite_host=do_invite_host,
         )
 
 

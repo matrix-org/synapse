@@ -413,7 +413,7 @@ class ReplicationLayer(object):
     @defer.inlineCallbacks
     def on_invite_request(self, origin, content):
         pdu = Pdu(**content)
-        ret_pdu = yield self.handler.on_send_join_request(origin, pdu)
+        ret_pdu = yield self.handler.on_invite_request(origin, pdu)
         defer.returnValue((200, ret_pdu.get_dict()))
 
     @defer.inlineCallbacks
@@ -459,6 +459,19 @@ class ReplicationLayer(object):
             yield self._handle_new_pdu(destination, pdu)
 
         defer.returnValue(state)
+
+    @defer.inlineCallbacks
+    def send_invite(self, destination, context, event_id, pdu):
+        code, pdu_dict = yield self.transport_layer.send_invite(
+            destination=destination,
+            context=context,
+            event_id=event_id,
+            content=pdu.get_dict(),
+        )
+
+        logger.debug("Got response to send_invite: %s", pdu_dict)
+
+        defer.returnValue(Pdu(**pdu_dict))
 
     @log_function
     def _get_persisted_pdu(self, event_id):

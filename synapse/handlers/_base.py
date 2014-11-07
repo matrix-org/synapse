@@ -56,7 +56,8 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def _on_new_room_event(self, event, snapshot, extra_destinations=[],
-                           extra_users=[], suppress_auth=False):
+                           extra_users=[], suppress_auth=False,
+                           do_invite_host=None):
         yield run_on_reactor()
 
         snapshot.fill_out_prev_events(event)
@@ -79,6 +80,16 @@ class BaseHandler(object):
             logger.debug("Authed")
         else:
             logger.debug("Suppressed auth.")
+
+        if do_invite_host:
+            federation_handler = self.hs.get_handlers().federation_handler
+            invite_event = yield federation_handler.send_invite(
+                do_invite_host,
+                event
+            )
+
+            # FIXME: We need to check if the remote changed anything else
+            event.signatures = invite_event.signatures
 
         yield self.store.persist_event(event)
 
