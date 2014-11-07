@@ -376,10 +376,23 @@ class FederationHandler(BaseHandler):
                     "user_joined_room", user=user, room_id=event.room_id
                 )
 
-        new_pdu = self.pdu_codec.pdu_from_event(event);
-        new_pdu.destinations = yield self.store.get_joined_hosts_for_room(
-            event.room_id
-        )
+        new_pdu = self.pdu_codec.pdu_from_event(event)
+
+        destinations = set()
+
+        for k, s in event.state_events.items():
+            try:
+                if k[0] == RoomMemberEvent.TYPE:
+                    if s.content["membership"] == Membership.JOIN:
+                        destinations.add(
+                            self.hs.parse_userid(s.state_key).domain
+                        )
+            except:
+                logger.warn(
+                    "Failed to get destination from event %s", s.event_id
+                )
+
+        new_pdu.destinations = list(destinations)
 
         yield self.replication_layer.send_pdu(new_pdu)
 

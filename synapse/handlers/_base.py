@@ -18,6 +18,8 @@ from twisted.internet import defer
 from synapse.api.errors import LimitExceededError
 from synapse.util.async import run_on_reactor
 from synapse.crypto.event_signing import add_hashes_and_signatures
+from synapse.api.events.room import RoomMemberEvent
+from synapse.api.constants import Membership
 
 import logging
 
@@ -95,9 +97,19 @@ class BaseHandler(object):
 
         destinations = set(extra_destinations)
         # Send a PDU to all hosts who have joined the room.
-        destinations.update((yield self.store.get_joined_hosts_for_room(
-            event.room_id
-        )))
+
+        for k, s in event.state_events.items():
+            try:
+                if k[0] == RoomMemberEvent.TYPE:
+                    if s.content["membership"] == Membership.JOIN:
+                        destinations.add(
+                            self.hs.parse_userid(s.state_key).domain
+                        )
+            except:
+                logger.warn(
+                    "Failed to get destination from event %s", s.event_id
+                )
+
         event.destinations = list(destinations)
 
         self.notifier.on_new_room_event(event, extra_users=extra_users)
