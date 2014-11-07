@@ -18,11 +18,6 @@ from twisted.internet import defer
 from synapse.api.errors import LimitExceededError
 from synapse.util.async import run_on_reactor
 from synapse.crypto.event_signing import add_hashes_and_signatures
-from synapse.api.events.room import (
-    RoomCreateEvent, RoomMemberEvent, RoomPowerLevelsEvent, RoomJoinRulesEvent,
-)
-from synapse.api.constants import Membership, JoinRules
-from syutil.base64util import encode_base64
 
 import logging
 
@@ -60,53 +55,6 @@ class BaseHandler(object):
             )
 
     @defer.inlineCallbacks
-    def _add_auth(self, event):
-        if event.type == RoomCreateEvent.TYPE:
-            event.auth_events = []
-            return
-
-        auth_events = []
-
-        key = (RoomPowerLevelsEvent.TYPE, "", )
-        power_level_event = event.old_state_events.get(key)
-
-        if power_level_event:
-            auth_events.append(power_level_event.event_id)
-
-        key = (RoomJoinRulesEvent.TYPE, "", )
-        join_rule_event = event.old_state_events.get(key)
-
-        key = (RoomMemberEvent.TYPE, event.user_id, )
-        member_event = event.old_state_events.get(key)
-
-        if join_rule_event:
-            join_rule = join_rule_event.content.get("join_rule")
-            is_public = join_rule == JoinRules.PUBLIC if join_rule else False
-
-            if event.type == RoomMemberEvent.TYPE:
-                if event.content["membership"] == Membership.JOIN:
-                    if is_public:
-                        auth_events.append(join_rule_event.event_id)
-                elif member_event:
-                    auth_events.append(member_event.event_id)
-
-        if member_event:
-            if member_event.content["membership"] == Membership.JOIN:
-                auth_events.append(member_event.event_id)
-
-        hashes = yield self.store.get_event_reference_hashes(
-            auth_events
-        )
-        hashes = [
-            {
-                k: encode_base64(v) for k, v in h.items()
-                if k == "sha256"
-            }
-            for h in hashes
-        ]
-        event.auth_events = zip(auth_events, hashes)
-
-    @defer.inlineCallbacks
     def _on_new_room_event(self, event, snapshot, extra_destinations=[],
                            extra_users=[], suppress_auth=False):
         yield run_on_reactor()
@@ -115,7 +63,7 @@ class BaseHandler(object):
 
         yield self.state_handler.annotate_state_groups(event)
 
-        yield self._add_auth(event)
+        yield self.auth.add_auth_events(event)
 
         logger.debug("Signing event...")
 

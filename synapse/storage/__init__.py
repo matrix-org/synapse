@@ -310,6 +310,7 @@ class DataStore(RoomMemberStore, RoomStore,
                     "room_id": event.room_id,
                     "auth_id": auth_id,
                 },
+                or_ignore=True,
             )
 
         (ref_alg, ref_hash_bytes) = compute_event_reference_hash(event)

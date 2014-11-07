@@ -317,6 +317,7 @@ class FederationHandler(BaseHandler):
         snapshot.fill_out_prev_events(event)
 
         yield self.state_handler.annotate_state_groups(event)
+        yield self.auth.add_auth_events(event)
         self.auth.check(event, raises=True)
 
         pdu = self.pdu_codec.pdu_from_event(event)

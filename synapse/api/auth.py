@@ -24,6 +24,7 @@ from synapse.api.events.room import (
     RoomJoinRulesEvent, RoomCreateEvent,
 )
 from synapse.util.logutils import log_function
+from syutil.base64util import encode_base64
 
 import logging
 
@@ -61,8 +62,6 @@ class Auth(object):
                     # FIXME
                     return True
 
-                self._can_send_event(event)
-
                 if event.type == RoomMemberEvent.TYPE:
                     allowed = self.is_membership_change_allowed(event)
                     if allowed:
@@ -70,6 +69,8 @@ class Auth(object):
                     else:
                         logger.debug("Denying! %s", event)
                     return allowed
+
+                self._can_send_event(event)
 
                 if event.type == RoomPowerLevelsEvent.TYPE:
                     self._check_power_levels(event)
@@ -310,6 +311,54 @@ class Auth(object):
 
     def is_server_admin(self, user):
         return self.store.is_server_admin(user)
+
+    @defer.inlineCallbacks
+    def add_auth_events(self, event):
+        if event.type == RoomCreateEvent.TYPE:
+            event.auth_events = []
+            return
+
+        auth_events = []
+
+        key = (RoomPowerLevelsEvent.TYPE, "", )
+        power_level_event = event.old_state_events.get(key)
+
+        if power_level_event:
+            auth_events.append(power_level_event.event_id)
+
+        key = (RoomJoinRulesEvent.TYPE, "", )
+        join_rule_event = event.old_state_events.get(key)
+
+        key = (RoomMemberEvent.TYPE, event.user_id, )
+        member_event = event.old_state_events.get(key)
+
+        if join_rule_event:
+            join_rule = join_rule_event.content.get("join_rule")
+            is_public = join_rule == JoinRules.PUBLIC if join_rule else False
+
+            if event.type == RoomMemberEvent.TYPE:
+                if event.content["membership"] == Membership.JOIN:
+                    if is_public:
+                        auth_events.append(join_rule_event.event_id)
+                elif member_event:
+                    auth_events.append(member_event.event_id)
+
+        if member_event:
+            if member_event.content["membership"] == Membership.JOIN:
+                auth_events.append(member_event.event_id)
+
+        hashes = yield self.store.get_event_reference_hashes(
+            auth_events
+        )
+        hashes = [
+            {
+                k: encode_base64(v) for k, v in h.items()
+                if k == "sha256"
+            }
+            for h in hashes
+        ]
+        event.auth_events = zip(auth_events, hashes)
+
 
     @log_function
     def _can_send_event(self, event):

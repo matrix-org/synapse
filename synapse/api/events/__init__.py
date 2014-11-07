@@ -61,7 +61,6 @@ class SynapseEvent(JsonEncodedObject):
         "replaces_state",
         "redacted_because",
         "origin_server_ts",
-        "auth_events",
     ]
 
     internal_keys = [
@@ -75,6 +74,7 @@ class SynapseEvent(JsonEncodedObject):
         "hashes",
         "signatures",
         "prev_state",
+        "auth_events",
     ]
 
     required_keys = [
