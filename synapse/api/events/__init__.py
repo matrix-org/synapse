@@ -75,6 +75,7 @@ class SynapseEvent(JsonEncodedObject):
         "signatures",
         "prev_state",
         "auth_events",
+        "state_hash",
     ]
 
     required_keys = [

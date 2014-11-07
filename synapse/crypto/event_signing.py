@@ -45,7 +45,7 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
 
 def _compute_content_hash(event, hash_algorithm):
     event_json = event.get_full_dict()
-    #TODO: We need to sign the JSON that is going out via fedaration.
+    # TODO: We need to sign the JSON that is going out via fedaration.
     event_json.pop("age_ts", None)
     event_json.pop("unsigned", None)
     event_json.pop("signatures", None)
@@ -81,6 +81,15 @@ def compute_event_signature(event, signature_name, signing_key):
 
 def add_hashes_and_signatures(event, signature_name, signing_key,
                               hash_algorithm=hashlib.sha256):
+    if hasattr(event, "old_state_events"):
+        state_json_bytes = encode_canonical_json(
+            [e.event_id for e in event.old_state_events.values()]
+        )
+        hashed = hash_algorithm(state_json_bytes)
+        event.state_hash = {
+            hashed.name: encode_base64(hashed.digest())
+        }
+
     hashed = _compute_content_hash(event, hash_algorithm=hash_algorithm)
 
     if not hasattr(event, "hashes"):
