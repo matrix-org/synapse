@@ -112,8 +112,8 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         if (!$rootScope.currentCall) {
             // This causes the still frame to be flushed out of the video elements,
             // avoiding a flash of the last frame of the previous call when starting the next
-            angular.element('#localVideo')[0].load();
-            angular.element('#remoteVideo')[0].load();
+            if (angular.element('#localVideo')[0].load) angular.element('#localVideo')[0].load();
+            if (angular.element('#remoteVideo')[0].load) angular.element('#remoteVideo')[0].load();
             return;
         }
 
@@ -187,8 +187,8 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         }
         call.onError = $scope.onCallError;
         call.onHangup = $scope.onCallHangup;
-        call.localVideoElement = angular.element('#localVideo')[0];
-        call.remoteVideoElement = angular.element('#remoteVideo')[0];
+        call.localVideoSelector  = '#localVideo';
+        call.remoteVideoSelector  = '#remoteVideo';
         $rootScope.currentCall = call;
     });
 

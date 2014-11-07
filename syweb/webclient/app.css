@@ -136,17 +136,17 @@ textarea, input {
     transition: left linear 500ms, top linear 500ms, width linear 500ms, height linear 500ms;
 }
 
-#localVideo.mini {
+.mini #localVideo {
     top: 0px;
     left: 130px;
 }
 
-#localVideo.large {
+.large #localVideo {
     top: 70px;
     left: 20px;
 }
 
-#localVideo.ended {
+.ended #localVideo {
     -webkit-filter: grayscale(1);
     filter: grayscale(1);
 }
@@ -157,19 +157,19 @@ textarea, input {
     transition: left linear 500ms, top linear 500ms, width linear 500ms, height linear 500ms;
 }
 
-#remoteVideo.mini {
+.mini #remoteVideo {
     left: 260px;
     top: 0px;
     width: 128px;
 }
 
-#remoteVideo.large {
+.large #remoteVideo {
     left: 0px;
     top: 50px;
     width: 100%;
 }
 
-#remoteVideo.ended {
+.ended #remoteVideo {
     -webkit-filter: grayscale(1);
     filter: grayscale(1);
 }

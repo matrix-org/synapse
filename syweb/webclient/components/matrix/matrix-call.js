@@ -35,14 +35,14 @@ var forAllTracksOnStream = function(s, f) {
     forAllAudioTracksOnStream(s, f);
 }
 
-navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
-window.RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection; // but not mozRTCPeerConnection because its interface is not compatible
-window.RTCSessionDescription = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription;
-window.RTCIceCandidate = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate;
-
 angular.module('MatrixCall', [])
 .factory('MatrixCall', ['matrixService', 'matrixPhoneService', 'modelService', '$rootScope', '$timeout', function MatrixCallFactory(matrixService, matrixPhoneService, modelService, $rootScope, $timeout) {
     $rootScope.isWebRTCSupported = function () {
+        navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+        window.RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection; // but not mozRTCPeerConnection because its interface is not compatible
+        window.RTCSessionDescription = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription;
+        window.RTCIceCandidate = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate;
+
         return !!(navigator.getUserMedia || window.RTCPeerConnection || window.RTCSessionDescription || window.RTCIceCandidate);
     };
 
@@ -57,7 +57,7 @@ angular.module('MatrixCall', [])
         this.candidateSendTries = 0;
 
         var self = this;
-        $rootScope.$watch(this.remoteVideoElement, function (oldValue, newValue) {
+        $rootScope.$watch(this.getRemoteVideoElement(), function (oldValue, newValue) {
             self.tryPlayRemoteStream();
         });
 
@@ -252,8 +252,8 @@ angular.module('MatrixCall', [])
 
         // pausing now keeps the last frame (ish) of the video call in the video element
         // rather than it just turning black straight away
-        if (this.remoteVideoElement) this.remoteVideoElement.pause();
-        if (this.localVideoElement) this.localVideoElement.pause();
+        if (this.getRemoteVideoElement() && this.getRemoteVideoElement().pause) this.getRemoteVideoElement().pause();
+        if (this.getLocalVideoElement() && this.getLocalVideoElement().pause) this.getLocalVideoElement().pause();
 
         this.stopAllMedia();
         if (this.peerConn) this.peerConn.close();
@@ -278,11 +278,18 @@ angular.module('MatrixCall', [])
         }
         if (this.state == 'ended') return;
 
-        if (this.localVideoElement && this.type == 'video') {
+        var videoEl = this.getLocalVideoElement();
+
+        if (videoEl && this.type == 'video') {
             var vidTrack = stream.getVideoTracks()[0];
-            this.localVideoElement.src = URL.createObjectURL(stream);
-            this.localVideoElement.muted = true;
-            this.localVideoElement.play();
+            videoEl.autoplay = true;
+            videoEl.src = URL.createObjectURL(stream);
+            videoEl.muted = true;
+            var self = this;
+            $timeout(function() {
+                var vel = self.getLocalVideoElement();
+                if (vel.play) vel.play();
+            });
         }
 
         this.localAVStream = stream;
@@ -306,11 +313,18 @@ angular.module('MatrixCall', [])
     MatrixCall.prototype.gotUserMediaForAnswer = function(stream) {
         if (this.state == 'ended') return;
 
-        if (this.localVideoElement && this.type == 'video') {
+        var localVidEl = this.getLocalVideoElement();
+
+        if (localVidEl && this.type == 'video') {
+            localVidEl.autoplay = true;
             var vidTrack = stream.getVideoTracks()[0];
-            this.localVideoElement.src = URL.createObjectURL(stream);
-            this.localVideoElement.muted = true;
-            this.localVideoElement.play();
+            localVidEl.src = URL.createObjectURL(stream);
+            localVidEl.muted = true;
+            var self = this;
+            $timeout(function() {
+                var vel = self.getLocalVideoElement();
+                if (vel.play) vel.play();
+            });
         }
 
         this.localAVStream = stream;
@@ -339,11 +353,11 @@ angular.module('MatrixCall', [])
     }
 
     MatrixCall.prototype.gotRemoteIceCandidate = function(cand) {
-        console.log("Got remote ICE "+cand.sdpMid+" candidate: "+cand.candidate);
         if (this.state == 'ended') {
-            console.log("Ignoring remote ICE candidate because call has ended");
+            //console.log("Ignoring remote ICE candidate because call has ended");
             return;
         }
+        console.log("Got remote ICE "+cand.sdpMid+" candidate: "+cand.candidate);
         this.peerConn.addIceCandidate(new RTCIceCandidate(cand), function() {}, function(e) {});
     };
 
@@ -363,41 +377,46 @@ angular.module('MatrixCall', [])
             return;
         }
 
-        this.peerConn.setLocalDescription(description);
-
-        var content = {
-            version: 0,
-            call_id: this.call_id,
-            offer: description,
-            lifetime: MatrixCall.CALL_TIMEOUT
-        };
-        this.sendEventWithRetry('m.call.invite', content);
-
         var self = this;
-        $timeout(function() {
-            if (self.state == 'invite_sent') {
-                self.hangup('invite_timeout');
-            }
-        }, MatrixCall.CALL_TIMEOUT);
+        this.peerConn.setLocalDescription(description, function() {
+            var content = {
+                version: 0,
+                call_id: self.call_id,
+                // OpenWebRTC appears to add extra stuff (like the DTLS fingerprint) to the description
+                // when setting it on the peerconnection. According to the spec it should only add ICE
+                // candidates. Any ICE candidates that have already been generated at this point will
+                // probably be sent both in the offer and separately. Ho hum.
+                offer: self.peerConn.localDescription,
+                lifetime: MatrixCall.CALL_TIMEOUT
+            };
+            self.sendEventWithRetry('m.call.invite', content);
 
-        $rootScope.$apply(function() {
-            self.state = 'invite_sent';
-        });
+            $timeout(function() {
+                if (self.state == 'invite_sent') {
+                    self.hangup('invite_timeout');
+                }
+            }, MatrixCall.CALL_TIMEOUT);
+
+            $rootScope.$apply(function() {
+                self.state = 'invite_sent';
+            });
+        }, function() { console.log("Error setting local description!"); });
     };
 
     MatrixCall.prototype.createdAnswer = function(description) {
         console.log("Created answer: "+description);
-        this.peerConn.setLocalDescription(description);
-        var content = {
-            version: 0,
-            call_id: this.call_id,
-            answer: description
-        };
-        this.sendEventWithRetry('m.call.answer', content);
         var self = this;
-        $rootScope.$apply(function() {
-            self.state = 'connecting';
-        });
+        this.peerConn.setLocalDescription(description, function() {
+            var content = {
+                version: 0,
+                call_id: self.call_id,
+                answer: self.peerConn.localDescription
+            };
+            self.sendEventWithRetry('m.call.answer', content);
+            $rootScope.$apply(function() {
+                self.state = 'connecting';
+            });
+        }, function() { console.log("Error setting local description!"); } );
     };
 
     MatrixCall.prototype.getLocalOfferFailed = function(error) {
@@ -465,10 +484,15 @@ angular.module('MatrixCall', [])
     };
 
     MatrixCall.prototype.tryPlayRemoteStream = function(event) {
-        if (this.remoteVideoElement && this.remoteAVStream) {
-            var player = this.remoteVideoElement;
+        if (this.getRemoteVideoElement() && this.remoteAVStream) {
+            var player = this.getRemoteVideoElement();
+            player.autoplay = true;
             player.src = URL.createObjectURL(this.remoteAVStream);
-            player.play();
+            var self = this;
+            $timeout(function() {
+                var vel = self.getRemoteVideoElement();
+                if (vel.play) vel.play();
+            });
         }
     };
 
@@ -500,8 +524,8 @@ angular.module('MatrixCall', [])
 
     MatrixCall.prototype.onHangupReceived = function(msg) {
         console.log("Hangup received");
-        if (this.remoteVideoElement) this.remoteVideoElement.pause();
-        if (this.localVideoElement) this.localVideoElement.pause();
+        if (this.getRemoteVideoElement() && this.getRemoteVideoElement().pause) this.getRemoteVideoElement().pause();
+        if (this.getLocalVideoElement() && this.getLocalVideoElement().pause) this.getLocalVideoElement().pause();
         this.state = 'ended';
         this.hangupParty = 'remote';
         this.hangupReason = msg.reason;
@@ -524,8 +548,8 @@ angular.module('MatrixCall', [])
             newCall.gotUserMediaForAnswer(this.localAVStream);
             delete(this.localAVStream);
         }
-        newCall.localVideoElement = this.localVideoElement;
-        newCall.remoteVideoElement = this.remoteVideoElement;
+        newCall.localVideoSelector = this.localVideoSelector;
+        newCall.remoteVideoSelector = this.remoteVideoSelector;
         this.successor = newCall;
         this.hangup(true);
     };
@@ -599,6 +623,22 @@ angular.module('MatrixCall', [])
         $timeout(function() {
             self.sendCandidateQueue();
         }, delayMs);
+    };
+
+    MatrixCall.prototype.getLocalVideoElement = function() {
+        if (this.localVideoSelector) {
+            var t = angular.element(this.localVideoSelector);
+            if (t.length) return t[0];
+        }
+        return null;
+    };
+
+    MatrixCall.prototype.getRemoteVideoElement = function() {
+        if (this.remoteVideoSelector) {
+            var t = angular.element(this.remoteVideoSelector);
+            if (t.length) return t[0];
+        }
+        return null;
     };
 
     return MatrixCall;

@@ -919,8 +919,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         var call = new MatrixCall($scope.room_id);
         call.onError = $rootScope.onCallError;
         call.onHangup = $rootScope.onCallHangup;
-        call.localVideoElement = angular.element('#localVideo')[0];
-        call.remoteVideoElement = angular.element('#remoteVideo')[0];
+        call.localVideoSelector = '#localVideo';
+        call.remoteVideoSelector = '#remoteVideo';
         call.placeVideoCall();
         $rootScope.currentCall = call;
     };
