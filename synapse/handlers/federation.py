@@ -224,6 +224,11 @@ class FederationHandler(BaseHandler):
 
         defer.returnValue(self.pdu_codec.event_from_pdu(pdu))
 
+    @defer.inlineCallbacks
+    def on_event_auth(self, event_id):
+        auth = yield self.store.get_auth_chain(event_id)
+        defer.returnValue([self.pdu_codec.pdu_from_event(e) for e in auth])
+
     @log_function
     @defer.inlineCallbacks
     def do_invite_join(self, target_host, room_id, joinee, content, snapshot):

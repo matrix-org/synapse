@@ -32,6 +32,24 @@ class EventFederationStore(SQLBaseStore):
         )
 
     def _get_auth_chain_txn(self, txn, event_id):
+        results = self._get_auth_chain_ids_txn(txn, event_id)
+
+        sql = "SELECT * FROM events WHERE event_id = ?"
+        rows = []
+        for ev_id in results:
+            c = txn.execute(sql, (ev_id,))
+            rows.extend(self.cursor_to_dict(c))
+
+        return self._parse_events_txn(txn, rows)
+
+    def get_auth_chain_ids(self, event_id):
+        return self.runInteraction(
+            "get_auth_chain_ids",
+            self._get_auth_chain_ids_txn,
+            event_id
+        )
+
+    def _get_auth_chain_ids_txn(self, txn, event_id):
         results = set()
 
         base_sql = (
@@ -48,13 +66,7 @@ class EventFederationStore(SQLBaseStore):
             front = [r[0] for r in txn.fetchall()]
             results.update(front)
 
-        sql = "SELECT * FROM events WHERE event_id = ?"
-        rows = []
-        for ev_id in results:
-            c = txn.execute(sql, (ev_id,))
-            rows.extend(self.cursor_to_dict(c))
-
-        return self._parse_events_txn(txn, rows)
+        return list(results)
 
     def get_oldest_events_in_room(self, room_id):
         return self.runInteraction(

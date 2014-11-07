@@ -427,6 +427,11 @@ class ReplicationLayer(object):
         }))
 
     @defer.inlineCallbacks
+    def on_event_auth(self, origin, context, event_id):
+        auth_pdus = yield self.handler.on_event_auth(event_id)
+        defer.returnValue((200, [a.get_dict() for a in auth_pdus]))
+
+    @defer.inlineCallbacks
     def make_join(self, destination, context, user_id):
         pdu_dict = yield self.transport_layer.make_join(
             destination=destination,
