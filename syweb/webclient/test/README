@@ -1,0 +1,51 @@
+Testing is done using Karma.
+
+
+UNIT TESTING
+============
+
+Requires the following:
+ - npm/nodejs
+ - phantomjs
+
+Requires the following node packages:
+ - npm install jasmine
+ - npm install karma
+ - npm install karma-jasmine
+ - npm install karma-phantomjs-launcher
+ - npm install karma-junit-reporter
+
+Make sure you're in this directory so it can find the config file and run:
+  karma start
+
+You should see all the tests pass.
+
+
+E2E TESTING
+===========
+
+npm install protractor
+
+
+Setting up e2e tests (only if you don't have a selenium server to run the tests
+on. If you do, edit the config to point to that url):
+
+  webdriver-manager update
+  webdriver-manager start
+
+  Create a file "environment-protractor.js" in this directory and type:
+    module.exports = {
+        seleniumAddress: 'http://localhost:4444/wd/hub',
+        baseUrl: "http://localhost:8008",
+        username: "YOUR_TEST_USERNAME",
+        password: "YOUR_TEST_PASSWORD"
+    }
+
+Running e2e tests:
+  protractor protractor.conf.js
+
+NOTE: This will create a public room on the target home server.
+
+
+
+

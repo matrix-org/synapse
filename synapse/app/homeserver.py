@@ -42,6 +42,7 @@ import os
 import re
 import sys
 import sqlite3
+import syweb
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,9 @@ class SynapseHomeServer(HomeServer):
         return JsonResource()
 
     def build_resource_for_web_client(self):
-        return File("webclient")  # TODO configurable?
+        syweb_path = os.path.dirname(syweb.__file__)
+        webclient_path = os.path.join(syweb_path, "webclient")
+        return File(webclient_path)  # TODO configurable?
 
     def build_resource_for_content_repo(self):
         return ContentRepoResource(
