@@ -71,6 +71,8 @@ class RedactionTestCase(unittest.TestCase):
 
         event.state_events = None
         event.hashes = {}
+        event.prev_state = []
+        event.auth_events = []
 
         # Have to create a join event using the eventfactory
         yield self.store.persist_event(
@@ -94,6 +96,7 @@ class RedactionTestCase(unittest.TestCase):
 
         event.state_events = None
         event.hashes = {}
+        event.auth_events = []
 
         yield self.store.persist_event(
             event
@@ -115,6 +118,7 @@ class RedactionTestCase(unittest.TestCase):
 
         event.state_events = None
         event.hashes = {}
+        event.auth_events = []
 
         yield self.store.persist_event(
             event
