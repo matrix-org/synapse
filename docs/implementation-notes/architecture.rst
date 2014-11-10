@@ -31,23 +31,23 @@ As of the end of Oct 2014, Synapse's overall architecture looks like::
 
 * Handlers: business logic of synapse itself.  Follows a set contract of BaseHandler:
 
- * BaseHandler gives us onNewRoomEvent which: (TODO: flesh this out and make it less cryptic):
+  - BaseHandler gives us onNewRoomEvent which: (TODO: flesh this out and make it less cryptic):
  
-   * handle_state(event)
-   * auth(event)
-   * persist_event(event)
-   * notify notifier or federation(event)
+    + handle_state(event)
+    + auth(event)
+    + persist_event(event)
+    + notify notifier or federation(event)
    
- * PresenceHandler: use distributor to get EDUs out of Federation.  Very
-   lightweight logic built on the distributor
- * TypingHandler: use distributor to get EDUs out of Federation.  Very
-   lightweight logic built on the distributor
- * EventsHandler: handles the events stream...
- * FederationHandler: - gets PDU from Federation Layer; turns into an event;
-   follows basehandler functionality.
- * RoomsHandler: does all the room logic, including members - lots of classes in
-   RoomsHandler.
- * ProfileHandler: talks to the storage to store/retrieve profile info.
+  - PresenceHandler: use distributor to get EDUs out of Federation.  Very
+    lightweight logic built on the distributor
+  - TypingHandler: use distributor to get EDUs out of Federation.  Very
+    lightweight logic built on the distributor
+  - EventsHandler: handles the events stream...
+  - FederationHandler: - gets PDU from Federation Layer; turns into an event;
+    follows basehandler functionality.
+  - RoomsHandler: does all the room logic, including members - lots of classes in
+    RoomsHandler.
+  - ProfileHandler: talks to the storage to store/retrieve profile info.
 
 * EventFactory: generates events of particular event types.
 * Notifier: Backs the events handler
