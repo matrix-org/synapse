@@ -984,6 +984,29 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 
+        # MemoryDataStore's get_current_state() isn't even approximately
+        # right. Longterm we'll be killing it in favour of a real
+        # SQLite :memory:-based test. For now lets patch it
+        efact = hs.get_event_factory()
+        def get_current_state(room_id):
+            """
+            TODO: these probably need content
+            ('!WxMBxqtWbMMdMEkRqY:red', 'm.room.send_event_level', ''),
+            ('!WxMBxqtWbMMdMEkRqY:red', 'm.room.power_levels', ''),
+            ('!WxMBxqtWbMMdMEkRqY:red', 'm.room.ops_levels', ''),
+            ('!WxMBxqtWbMMdMEkRqY:red', 'm.room.member', '@sid1:red'),
+            ('!WxMBxqtWbMMdMEkRqY:red', 'm.room.add_state_level', '')]
+            """
+            return [
+                efact.create_event(etype="m.room.create", room_id=room_id,
+                    content={},
+                ),
+                efact.create_event(etype="m.room.join_rules", room_id=room_id,
+                    content={},
+                ),
+            ]
+        hs.datastore.get_current_state = get_current_state
+
         # create the room
         self.room_id = yield self.create_room_as(self.user_id)
 
@@ -994,6 +1017,18 @@ class RoomInitialSyncTestCase(RestTestCase):
         self.assertEquals(200, code)
 
         self.assertEquals(self.room_id, response["room_id"])
+
+        # Room state is easier to assert on if we unpack it into a dict
+        state = {}
+        for event in response["state"]:
+            if "state_key" not in event:
+                continue
+            t = event["type"]
+            if t not in state:
+                state[t] = []
+            state[t].append(event)
+
+        self.assertTrue("m.room.create" in state)
 
 #        (code, response) = yield self.mock_resource.trigger("GET", path, None)
 #        self.assertEquals(200, code, msg=str(response))
