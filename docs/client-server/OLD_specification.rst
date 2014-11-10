@@ -4,7 +4,7 @@ Matrix Client-Server API
 
 
 .. WARNING::
-  This specification is old. Please see /docs/specification.rst instead.
+  This specification is old. Please see matrix-doc/specification instead.
 
 
 

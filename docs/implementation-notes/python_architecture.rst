@@ -1,3 +1,9 @@
+.. WARNING::
+  These architecture notes are spectacularly old, and date back to when Synapse 
+  was just federation code in isolation.  This should be merged into the main
+  spec.
+  
+
 = Server to Server =
 
 == Server to Server Stack ==
