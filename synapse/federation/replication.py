@@ -549,7 +549,6 @@ class ReplicationLayer(object):
                     origin, pdu.room_id, pdu.event_id,
                 )
 
-
         if not backfilled:
             ret = yield self.handler.on_receive_pdu(
                 pdu,

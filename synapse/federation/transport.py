@@ -284,7 +284,7 @@ class TransportLayer(object):
         origin = None
 
         if request.method == "PUT":
-            #TODO: Handle other method types? other content types?
+            # TODO: Handle other method types? other content types?
             try:
                 content_bytes = request.content.read()
                 content = json.loads(content_bytes)
@@ -296,11 +296,13 @@ class TransportLayer(object):
             try:
                 params = auth.split(" ")[1].split(",")
                 param_dict = dict(kv.split("=") for kv in params)
+
                 def strip_quotes(value):
                     if value.startswith("\""):
                         return value[1:-1]
                     else:
                         return value
+
                 origin = strip_quotes(param_dict["origin"])
                 key = strip_quotes(param_dict["key"])
                 sig = strip_quotes(param_dict["sig"])
@@ -321,7 +323,7 @@ class TransportLayer(object):
             if auth.startswith("X-Matrix"):
                 (origin, key, sig) = parse_auth_header(auth)
                 json_request["origin"] = origin
-                json_request["signatures"].setdefault(origin,{})[key] = sig
+                json_request["signatures"].setdefault(origin, {})[key] = sig
 
         if not json_request["signatures"]:
             raise SynapseError(
@@ -515,7 +517,8 @@ class TransportLayer(object):
             return
 
         try:
-            code, response = yield self.received_handler.on_incoming_transaction(
+            handler = self.received_handler
+            code, response = yield handler.on_incoming_transaction(
                 transaction_data
             )
         except:

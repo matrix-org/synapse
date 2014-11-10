@@ -521,6 +521,9 @@ class FederationHandler(BaseHandler):
 
     @log_function
     def _on_user_joined(self, user, room_id):
-        waiters = self.waiting_for_join_list.get((user.to_string(), room_id), [])
+        waiters = self.waiting_for_join_list.get(
+            (user.to_string(), room_id),
+            []
+        )
         while waiters:
             waiters.pop().callback(None)

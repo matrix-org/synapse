@@ -494,11 +494,13 @@ def prepare_database(db_conn):
         user_version = row[0]
 
         if user_version > SCHEMA_VERSION:
-            raise ValueError("Cannot use this database as it is too " +
+            raise ValueError(
+                "Cannot use this database as it is too " +
                 "new for the server to understand"
             )
         elif user_version < SCHEMA_VERSION:
-            logging.info("Upgrading database from version %d",
+            logging.info(
+                "Upgrading database from version %d",
                 user_version
             )
 
@@ -520,4 +522,3 @@ def prepare_database(db_conn):
         c.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
 
     c.close()
-

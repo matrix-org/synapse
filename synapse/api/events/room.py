@@ -153,6 +153,7 @@ class RoomPowerLevelsEvent(SynapseStateEvent):
     def get_content_template(self):
         return {}
 
+
 class RoomAliasesEvent(SynapseStateEvent):
     TYPE = "m.room.aliases"
 

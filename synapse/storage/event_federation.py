@@ -215,7 +215,7 @@ class EventFederationStore(SQLBaseStore):
         min_depth = self._simple_select_one_onecol_txn(
             txn,
             table="room_depth",
-            keyvalues={"room_id": room_id,},
+            keyvalues={"room_id": room_id},
             retcol="min_depth",
             allow_none=True,
         )
@@ -267,10 +267,8 @@ class EventFederationStore(SQLBaseStore):
                     }
                 )
 
-
-
-            # We only insert as a forward extremity the new pdu if there are no
-            # other pdus that reference it as a prev pdu
+            # We only insert as a forward extremity the new pdu if there are
+            # no other pdus that reference it as a prev pdu
             query = (
                 "INSERT OR IGNORE INTO %(table)s (event_id, room_id) "
                 "SELECT ?, ? WHERE NOT EXISTS ("
@@ -311,7 +309,6 @@ class EventFederationStore(SQLBaseStore):
                 ")"
             )
             txn.execute(query)
-
 
     def get_backfill_events(self, room_id, event_list, limit):
         """Get a list of Events for a given topic that occured before (and

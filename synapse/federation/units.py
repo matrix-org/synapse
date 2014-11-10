@@ -192,7 +192,9 @@ class Transaction(JsonEncodedObject):
         transaction_id and origin_server_ts keys.
         """
         if "origin_server_ts" not in kwargs:
-            raise KeyError("Require 'origin_server_ts' to construct a Transaction")
+            raise KeyError(
+                "Require 'origin_server_ts' to construct a Transaction"
+            )
         if "transaction_id" not in kwargs:
             raise KeyError(
                 "Require 'transaction_id' to construct a Transaction"
@@ -204,6 +206,3 @@ class Transaction(JsonEncodedObject):
         kwargs["pdus"] = [p.get_dict() for p in pdus]
 
         return Transaction(**kwargs)
-
-
-

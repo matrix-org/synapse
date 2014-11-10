@@ -369,7 +369,6 @@ class Auth(object):
         ]
         event.auth_events = zip(auth_events, hashes)
 
-
     @log_function
     def _can_send_event(self, event):
         key = (RoomPowerLevelsEvent.TYPE, "", )
@@ -452,7 +451,7 @@ class Auth(object):
             event.user_id,
         )
 
-       # Check other levels:
+        # Check other levels:
         levels_to_check = [
             ("users_default", []),
             ("events_default", []),
