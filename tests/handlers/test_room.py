@@ -58,9 +58,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "profile_handler",
                 "federation_handler",
             ]),
-            auth=NonCallableMock(spec_set=["check"]),
+            auth=NonCallableMock(spec_set=["check", "add_auth_events"]),
             state_handler=NonCallableMock(spec_set=[
-                "handle_new_event",
                 "annotate_state_groups",
             ]),
             config=self.mock_config,
@@ -68,6 +67,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         self.federation = NonCallableMock(spec_set=[
             "handle_new_event",
+            "send_invite",
             "get_state_for_room",
         ])
 
@@ -110,7 +110,6 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         joined = ["red", "green"]
 
-        self.state_handler.handle_new_event.return_value = defer.succeed(True)
         self.datastore.get_joined_hosts_for_room.return_value = (
             defer.succeed(joined)
         )
@@ -120,6 +119,18 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         self.datastore.get_room_member.return_value = defer.succeed(None)
 
+        event.state_events = {
+            (RoomMemberEvent.TYPE, "@alice:green"): self._create_member(
+                user_id="@alice:green",
+                room_id=room_id,
+            ),
+            (RoomMemberEvent.TYPE, "@bob:red"): self._create_member(
+                user_id="@bob:red",
+                room_id=room_id,
+            ),
+            (RoomMemberEvent.TYPE, target_user_id): event,
+        }
+
         # Actual invocation
         yield self.room_member_handler.change_membership(event)
 
@@ -128,7 +139,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            set(["blue", "red", "green"]),
+            set(["red", "green"]),
             set(event.destinations)
         )
 
@@ -147,21 +158,13 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         room_id = "!foo:red"
         user_id = "@bob:red"
         user = self.hs.parse_userid(user_id)
-        target_user_id = "@bob:red"
-        content = {"membership": Membership.JOIN}
 
-        event = self.hs.get_event_factory().create_event(
-            etype=RoomMemberEvent.TYPE,
+        event = self._create_member(
             user_id=user_id,
-            state_key=target_user_id,
             room_id=room_id,
-            membership=Membership.JOIN,
-            content=content,
         )
 
         joined = ["red", "green"]
-
-        self.state_handler.handle_new_event.return_value = defer.succeed(True)
 
         def get_joined(*args):
             return defer.succeed(joined)
@@ -179,6 +182,14 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         join_signal_observer = Mock()
         self.distributor.observe("user_joined_room", join_signal_observer)
+
+        event.state_events = {
+            (RoomMemberEvent.TYPE, "@alice:green"): self._create_member(
+                user_id="@alice:green",
+                room_id=room_id,
+            ),
+            (RoomMemberEvent.TYPE, user_id): event,
+        }
 
         # Actual invocation
         yield self.room_member_handler.change_membership(event)
@@ -201,6 +212,16 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         join_signal_observer.assert_called_with(
             user=user, room_id=room_id
+        )
+
+    def _create_member(self, user_id, room_id):
+        return self.hs.get_event_factory().create_event(
+            etype=RoomMemberEvent.TYPE,
+            user_id=user_id,
+            state_key=user_id,
+            room_id=room_id,
+            membership=Membership.JOIN,
+            content={"membership": Membership.JOIN},
         )
 
 
@@ -228,9 +249,8 @@ class RoomCreationTest(unittest.TestCase):
                 "room_member_handler",
                 "federation_handler",
             ]),
-            auth=NonCallableMock(spec_set=["check"]),
+            auth=NonCallableMock(spec_set=["check", "add_auth_events"]),
             state_handler=NonCallableMock(spec_set=[
-                "handle_new_event",
                 "annotate_state_groups",
             ]),
             ratelimiter=NonCallableMock(spec_set=[
@@ -258,6 +278,11 @@ class RoomCreationTest(unittest.TestCase):
             "change_membership"
         ])
         self.room_member_handler = self.handlers.room_member_handler
+
+        def annotate(event):
+            event.state_events = {}
+            return defer.succeed(None)
+        self.state_handler.annotate_state_groups.side_effect = annotate
 
         def hosts(room):
             return defer.succeed([])
