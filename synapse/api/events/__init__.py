@@ -86,8 +86,8 @@ class SynapseEvent(JsonEncodedObject):
 
     def __init__(self, raises=True, **kwargs):
         super(SynapseEvent, self).__init__(**kwargs)
-        if "content" in kwargs:
-            self.check_json(self.content, raises=raises)
+        # if "content" in kwargs:
+        #     self.check_json(self.content, raises=raises)
 
     def get_content_template(self):
         """ Retrieve the JSON template for this event as a dict.

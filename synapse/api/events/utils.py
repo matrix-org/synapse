@@ -18,24 +18,31 @@ from .room import (
     RoomAliasesEvent, RoomCreateEvent,
 )
 
+
 def prune_event(event):
-    """ Prunes the given event of all keys we don't know about or think could
-    potentially be dodgy.
+    """ Returns a pruned version of the given event, which removes all keys we
+    don't know about or think could potentially be dodgy.
 
     This is used when we "redact" an event. We want to remove all fields that
     the user has specified, but we do want to keep necessary information like
     type, state_key etc.
     """
-    return _prune_event_or_pdu(event.type, event)
+    event_type = event.type
 
-def prune_pdu(pdu):
-    """Removes keys that contain unrestricted and non-essential data from a PDU
-    """
-    return _prune_event_or_pdu(pdu.type, pdu)
-
-def _prune_event_or_pdu(event_type, event):
-    # Remove all extraneous fields.
-    event.unrecognized_keys = {}
+    allowed_keys = [
+        "event_id",
+        "user_id",
+        "room_id",
+        "hashes",
+        "signatures",
+        "content",
+        "type",
+        "state_key",
+        "depth",
+        "prev_events",
+        "prev_state",
+        "auth_events",
+    ]
 
     new_content = {}
 
@@ -65,6 +72,12 @@ def _prune_event_or_pdu(event_type, event):
     elif event_type == RoomAliasesEvent.TYPE:
         add_fields("aliases")
 
-    event.content = new_content
+    allowed_fields = {
+        k: v
+        for k, v in event.get_full_dict().items()
+        if k in allowed_keys
+    }
 
-    return event
+    allowed_fields["content"] = new_content
+
+    return type(event)(**allowed_fields)

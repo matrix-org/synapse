@@ -56,17 +56,15 @@ class Pdu(JsonEncodedObject):
         "origin_server_ts",
         "type",
         "destinations",
-        "transaction_id",
         "prev_events",
         "depth",
         "content",
-        "outlier",
         "hashes",
+        "user_id",
+        "auth_events",
         "signatures",  # Below this are keys valid only for State Pdus.
         "state_key",
         "prev_state",
-        "required_power_level",
-        "user_id",
     ]
 
     internal_keys = [

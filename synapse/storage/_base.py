@@ -509,7 +509,7 @@ class SQLBaseStore(object):
                 )
 
                 if del_evs:
-                    prune_event(ev)
+                    ev = prune_event(ev)
                     ev.redacted_because = del_evs[0]
 
         return events

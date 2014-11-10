@@ -55,9 +55,7 @@ def _compute_content_hash(event, hash_algorithm):
 
 
 def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
-    # FIXME(erikj): GenericEvent!
-    tmp_event = GenericEvent(**event.get_full_dict())
-    tmp_event = prune_event(tmp_event)
+    tmp_event = prune_event(event)
     event_json = tmp_event.get_dict()
     event_json.pop("signatures", None)
     event_json.pop("age_ts", None)
@@ -68,8 +66,7 @@ def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
 
 
 def compute_event_signature(event, signature_name, signing_key):
-    tmp_event = copy.deepcopy(event)
-    tmp_event = prune_event(tmp_event)
+    tmp_event = prune_event(event)
     redact_json = tmp_event.get_full_dict()
     redact_json.pop("signatures", None)
     redact_json.pop("age_ts", None)
