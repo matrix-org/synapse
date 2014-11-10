@@ -1017,6 +1017,7 @@ class RoomInitialSyncTestCase(RestTestCase):
         self.assertEquals(200, code)
 
         self.assertEquals(self.room_id, response["room_id"])
+        self.assertEquals("join", response["membership"])
 
         # Room state is easier to assert on if we unpack it into a dict
         state = {}

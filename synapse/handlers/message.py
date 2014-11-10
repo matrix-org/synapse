@@ -336,11 +336,17 @@ class MessageHandler(BaseHandler):
                       feedback=False):
         yield self.auth.check_joined_room(room_id, user_id)
 
+        # TODO: These concurrently
         state_tuples = yield self.store.get_current_state(room_id)
         state = [self.hs.serialize_event(x) for x in state_tuples]
 
+        member_event = (yield self.store.get_room_member(
+            user_id=user_id,
+            room_id=room_id
+        ))
+
         defer.returnValue({
-            #"membership": membership,
+            "membership": member_event.membership,
             "room_id": room_id,
             #"messages": messages,
             "state": state,
