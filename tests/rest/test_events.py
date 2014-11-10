@@ -25,7 +25,7 @@ import synapse.rest.room
 
 from synapse.server import HomeServer
 
-from ..utils import MockHttpResource, MemoryDataStore, MockKey
+from ..utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
@@ -113,25 +113,20 @@ class EventStreamPermissionsTestCase(RestTestCase):
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
-        state_handler = Mock(spec=[
-            "handle_new_event",
-            "annotate_state_groups"
-        ])
-        state_handler.handle_new_event.return_value = True
-
         persistence_service = Mock(spec=["get_latest_pdus_in_context"])
         persistence_service.get_latest_pdus_in_context.return_value = []
 
         self.mock_config = NonCallableMock()
         self.mock_config.signing_key = [MockKey()]
 
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+
         hs = HomeServer(
             "test",
-            db_pool=None,
+            db_pool=db_pool,
             http_client=None,
             replication_layer=Mock(),
-            state_handler=state_handler,
-            datastore=MemoryDataStore(),
             persistence_service=persistence_service,
             clock=Mock(spec=[
                 "call_later",
