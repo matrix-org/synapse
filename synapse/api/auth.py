@@ -70,6 +70,7 @@ class Auth(object):
                         logger.debug("Denying! %s", event)
                     return allowed
 
+                self.check_event_sender_in_room(event)
                 self._can_send_event(event)
 
                 if event.type == RoomPowerLevelsEvent.TYPE:
@@ -83,8 +84,10 @@ class Auth(object):
             else:
                 raise AuthError(500, "Unknown event: %s" % event)
         except AuthError as e:
-            logger.info("Event auth check failed on event %s with msg: %s",
-                        event, e.msg)
+            logger.info(
+                "Event auth check failed on event %s with msg: %s",
+                event, e.msg
+            )
             logger.info("Denying! %s", event)
             if raises:
                 raise e
@@ -277,7 +280,7 @@ class Auth(object):
                 default=[""]
             )[0]
             if user and access_token and ip_addr:
-                self.store.insert_client_ip(
+                yield self.store.insert_client_ip(
                     user=user,
                     access_token=access_token,
                     device_id=user_info["device_id"],
@@ -349,7 +352,8 @@ class Auth(object):
         if event.type == RoomMemberEvent.TYPE:
             e_type = event.content["membership"]
             if e_type in [Membership.JOIN, Membership.INVITE]:
-                auth_events.append(join_rule_event.event_id)
+                if join_rule_event:
+                    auth_events.append(join_rule_event.event_id)
 
                 if member_event and not is_public:
                     auth_events.append(member_event.event_id)
@@ -405,7 +409,9 @@ class Auth(object):
 
         if user_level < send_level:
             raise AuthError(
-                403, "You don't have permission to post that to the room"
+                403,
+                "You don't have permission to post that to the room. " +
+                "user_level (%d) < send_level (%d)" % (user_level, send_level)
             )
 
         return True

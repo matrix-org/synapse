@@ -22,6 +22,7 @@
 from synapse.federation import initialize_http_replication
 from synapse.api.events import serialize_event
 from synapse.api.events.factory import EventFactory
+from synapse.api.events.validator import EventValidator
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
@@ -80,6 +81,7 @@ class BaseHomeServer(object):
         'event_sources',
         'ratelimiter',
         'keyring',
+        'event_validator',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -222,6 +224,9 @@ class HomeServer(BaseHomeServer):
 
     def build_keyring(self):
         return Keyring(self)
+
+    def build_event_validator(self):
+        return EventValidator(self)
 
     def register_servlets(self):
         """ Register all servlets associated with this HomeServer.

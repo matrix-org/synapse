@@ -107,12 +107,16 @@ class RegistrationStore(SQLBaseStore):
             token
         )
 
+    @defer.inlineCallbacks
     def is_server_admin(self, user):
-        return self._simple_select_one_onecol(
+        res = yield self._simple_select_one_onecol(
             table="users",
             keyvalues={"name": user.to_string()},
             retcol="admin",
+            allow_none=True,
         )
+
+        defer.returnValue(res if res else False)
 
     def _query_for_auth(self, txn, token):
         sql = (
