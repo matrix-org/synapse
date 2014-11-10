@@ -64,6 +64,8 @@ class RoomMemberStoreTestCase(unittest.TestCase):
 
         event.state_events = None
         event.hashes = {}
+        event.prev_state = {}
+        event.auth_events = {}
 
         yield self.store.persist_event(
             event
