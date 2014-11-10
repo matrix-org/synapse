@@ -3,24 +3,27 @@ Synapse Architecture
 
 As of the end of Oct 2014, Synapse's overall architecture looks like::
 
-                                   Notifier
-                                     ^  |
-                                     |  |
-                           .------------|------.
-                           | handlers/  |      |
-                           |            v      |
-                           | Event*Handler<---------> rest/* <=> Client
-                           | Rooms*Handler     |
-  HSes <=> federation/* <==> FederationHandler |
-               |           | PresenceHandler   |
-               |           | TypingHandler     |
-               |           '-------------------'
-               |                 |     |
-               |              state/*  |
-               |                 |     |
-               |                 v     v
-               `--------------> storage/*
-                                   |
+        synapse
+        .-----------------------------------------------------.
+        |                          Notifier                   |
+        |                            ^  |                     |
+        |                            |  |                     |
+        |                  .------------|------.              |
+        |                  | handlers/  |      |              |
+        |                  |            v      |              |
+        |                  | Event*Handler<---------> rest/* <=> Client
+        |                  | Rooms*Handler     |              |
+  HSes <=> federation/* <==> FederationHandler |              |
+        |      |           | PresenceHandler   |              |
+        |      |           | TypingHandler     |              |
+        |      |           '-------------------'              |
+        |      |                 |     |                      |
+        |      |              state/*  |                      |
+        |      |                 |     |                      |
+        |      |                 v     v                      |
+        |      `--------------> storage/*                     |
+        |                          |                          |
+        '--------------------------|--------------------------'
                                    v
                                 .----.
                                 | DB |
