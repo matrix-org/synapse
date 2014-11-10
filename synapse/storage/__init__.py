@@ -16,9 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.events.room import (
-    RoomMemberEvent, RoomTopicEvent, FeedbackEvent,
-    RoomNameEvent,
-    RoomJoinRulesEvent,
+    RoomMemberEvent, RoomTopicEvent, FeedbackEvent, RoomNameEvent,
     RoomRedactionEvent,
 )
 
@@ -95,8 +93,7 @@ class DataStore(RoomMemberStore, RoomStore,
 
     @defer.inlineCallbacks
     @log_function
-    def persist_event(self, event=None, backfilled=False, pdu=None,
-                      is_new_state=True):
+    def persist_event(self, event, backfilled=False, is_new_state=True):
         stream_ordering = None
         if backfilled:
             if not self.min_token_deferred.called:
@@ -107,8 +104,7 @@ class DataStore(RoomMemberStore, RoomStore,
         try:
             yield self.runInteraction(
                 "persist_event",
-                self._persist_pdu_event_txn,
-                pdu=pdu,
+                self._persist_event_txn,
                 event=event,
                 backfilled=backfilled,
                 stream_ordering=stream_ordering,
@@ -139,15 +135,6 @@ class DataStore(RoomMemberStore, RoomStore,
         event = self._parse_event_from_row(events_dict)
         defer.returnValue(event)
 
-    def _persist_pdu_event_txn(self, txn, pdu=None, event=None,
-                               backfilled=False, stream_ordering=None,
-                               is_new_state=True):
-        if event is not None:
-            return self._persist_event_txn(
-                txn, event, backfilled, stream_ordering,
-                is_new_state=is_new_state,
-            )
-
     @log_function
     def _persist_event_txn(self, txn, event, backfilled, stream_ordering=None,
                            is_new_state=True):
@@ -159,8 +146,6 @@ class DataStore(RoomMemberStore, RoomStore,
             self._store_room_name_txn(txn, event)
         elif event.type == RoomTopicEvent.TYPE:
             self._store_room_topic_txn(txn, event)
-        elif event.type == RoomJoinRulesEvent.TYPE:
-            self._store_join_rule(txn, event)
         elif event.type == RoomRedactionEvent.TYPE:
             self._store_redaction(txn, event)
 

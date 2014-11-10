@@ -132,22 +132,6 @@ class RoomStore(SQLBaseStore):
 
         defer.returnValue(ret)
 
-    @defer.inlineCallbacks
-    def get_room_join_rule(self, room_id):
-        sql = (
-            "SELECT join_rule FROM room_join_rules as r "
-            "INNER JOIN current_state_events as c "
-            "ON r.event_id = c.event_id "
-            "WHERE c.room_id = ? "
-        )
-
-        rows = yield self._execute(None, sql, room_id)
-
-        if len(rows) == 1:
-            defer.returnValue(rows[0][0])
-        else:
-            defer.returnValue(None)
-
     def _store_room_topic_txn(self, txn, event):
         self._simple_insert_txn(
             txn,
@@ -168,17 +152,6 @@ class RoomStore(SQLBaseStore):
                 "room_id": event.room_id,
                 "name": event.name,
             }
-        )
-
-    def _store_join_rule(self, txn, event):
-        self._simple_insert_txn(
-            txn,
-            "room_join_rules",
-            {
-                "event_id": event.event_id,
-                "room_id": event.room_id,
-                "join_rule": event.content["join_rule"],
-            },
         )
 
 
