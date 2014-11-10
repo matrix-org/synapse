@@ -128,13 +128,14 @@ class Auth(object):
         key = (RoomMemberEvent.TYPE, event.user_id, )
         caller = event.old_state_events.get(key)
 
-        caller_in_room = caller and caller.membership == "join"
+        caller_in_room = caller and caller.membership == Membership.JOIN
+        caller_invited = caller and caller.membership == Membership.INVITE
 
         # get info about the target
         key = (RoomMemberEvent.TYPE, target_user_id, )
         target = event.old_state_events.get(key)
 
-        target_in_room = target and target.membership == "join"
+        target_in_room = target and target.membership == Membership.JOIN
 
         membership = event.content["membership"]
 
@@ -162,6 +163,7 @@ class Auth(object):
             "is_membership_change_allowed: %s",
             {
                 "caller_in_room": caller_in_room,
+                "caller_invited": caller_invited,
                 "target_in_room": target_in_room,
                 "membership": membership,
                 "join_rule": join_rule,
@@ -189,7 +191,7 @@ class Auth(object):
             elif join_rule == JoinRules.PUBLIC:
                 pass
             elif join_rule == JoinRules.INVITE:
-                if not caller_in_room:
+                if not caller_in_room and not caller_invited:
                     raise AuthError(403, "You are not invited to this room.")
             else:
                 # TODO (erikj): may_join list
