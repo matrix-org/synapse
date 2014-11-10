@@ -337,15 +337,17 @@ class Auth(object):
         if join_rule_event:
             join_rule = join_rule_event.content.get("join_rule")
             is_public = join_rule == JoinRules.PUBLIC if join_rule else False
+        else:
+            is_public = False
 
-            if event.type == RoomMemberEvent.TYPE:
-                if event.content["membership"] == Membership.JOIN:
-                    if is_public:
-                        auth_events.append(join_rule_event.event_id)
-                elif member_event:
+        if event.type == RoomMemberEvent.TYPE:
+            e_type = event.content["membership"]
+            if e_type in [Membership.JOIN, Membership.INVITE]:
+                auth_events.append(join_rule_event.event_id)
+
+                if member_event and not is_public:
                     auth_events.append(member_event.event_id)
-
-        if member_event:
+        elif member_event:
             if member_event.content["membership"] == Membership.JOIN:
                 auth_events.append(member_event.event_id)
 

@@ -431,7 +431,10 @@ class FederationHandler(BaseHandler):
             backfilled=False,
         )
 
-        yield self.notifier.on_new_room_event(event)
+        target_user = self.hs.parse_userid(event.state_key)
+        yield self.notifier.on_new_room_event(
+            event, extra_users=[target_user],
+        )
 
         defer.returnValue(self.pdu_codec.pdu_from_event(event))
 
