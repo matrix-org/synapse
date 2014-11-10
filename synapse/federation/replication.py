@@ -356,12 +356,6 @@ class ReplicationLayer(object):
             )
         else:
             raise NotImplementedError("Specify an event")
-        #     results = yield self.store.get_current_state_for_context(
-        #         context
-        #     )
-        #     pdus = [Pdu.from_pdu_tuple(p) for p in results]
-        #
-        # logger.debug("Context returning %d results", len(pdus))
 
         defer.returnValue((200, self._transaction_from_pdus(pdus).get_dict()))
 
@@ -381,21 +375,6 @@ class ReplicationLayer(object):
     @log_function
     def on_pull_request(self, origin, versions):
         raise NotImplementedError("Pull transacions not implemented")
-
-        # transaction_id = max([int(v) for v in versions])
-        #
-        # response = yield self.pdu_actions.after_transaction(
-        #     transaction_id,
-        #     origin,
-        #     self.server_name
-        # )
-        #
-        # if not response:
-        #     response = []
-        #
-        # defer.returnValue(
-        #     (200, self._transaction_from_pdus(response).get_dict())
-        # )
 
     @defer.inlineCallbacks
     def on_query_request(self, query_type, args):
@@ -570,8 +549,6 @@ class ReplicationLayer(object):
                     origin, pdu.room_id, pdu.event_id,
                 )
 
-        # Persist the Pdu, but don't mark it as processed yet.
-        # yield self.store.persist_event(pdu=pdu)
 
         if not backfilled:
             ret = yield self.handler.on_receive_pdu(
