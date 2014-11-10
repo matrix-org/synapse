@@ -436,8 +436,12 @@ class FederationHandler(BaseHandler):
         defer.returnValue(self.pdu_codec.pdu_from_event(event))
 
     @defer.inlineCallbacks
-    def get_state_for_pdu(self, event_id):
+    def get_state_for_pdu(self, origin, room_id, event_id):
         yield run_on_reactor()
+
+        in_room = yield self.auth.check_host_in_room(room_id, origin)
+        if not in_room:
+            raise AuthError(403, "Host not in room.")
 
         state_groups = yield self.store.get_state_groups(
             [event_id]
@@ -488,7 +492,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def get_persisted_pdu(self, event_id):
+    def get_persisted_pdu(self, origin, event_id):
         """ Get a PDU from the database with given origin and id.
 
         Returns:
@@ -500,6 +504,13 @@ class FederationHandler(BaseHandler):
         )
 
         if event:
+            in_room = yield self.auth.check_host_in_room(
+                event.room_id,
+                origin
+            )
+            if not in_room:
+                raise AuthError(403, "Host not in room.")
+
             defer.returnValue(self.pdu_codec.pdu_from_event(event))
         else:
             defer.returnValue(None)

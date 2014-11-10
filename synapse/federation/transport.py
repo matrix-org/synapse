@@ -390,7 +390,7 @@ class TransportLayer(object):
             re.compile("^" + PREFIX + "/event/([^/]*)/$"),
             self._with_authentication(
                 lambda origin, content, query, event_id:
-                handler.on_pdu_request(event_id)
+                handler.on_pdu_request(origin, event_id)
             )
         )
 
@@ -401,6 +401,7 @@ class TransportLayer(object):
             self._with_authentication(
                 lambda origin, content, query, context:
                 handler.on_context_state_request(
+                    origin,
                     context,
                     query.get("event_id", [None])[0],
                 )

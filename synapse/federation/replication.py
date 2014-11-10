@@ -347,10 +347,12 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def on_context_state_request(self, context, event_id):
+    def on_context_state_request(self, origin, context, event_id):
         if event_id:
             pdus = yield self.handler.get_state_for_pdu(
-                event_id
+                origin,
+                context,
+                event_id,
             )
         else:
             raise NotImplementedError("Specify an event")
@@ -365,8 +367,8 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def on_pdu_request(self, event_id):
-        pdu = yield self._get_persisted_pdu(event_id)
+    def on_pdu_request(self, origin, event_id):
+        pdu = yield self._get_persisted_pdu(origin, event_id)
 
         if pdu:
             defer.returnValue(
@@ -499,13 +501,13 @@ class ReplicationLayer(object):
         defer.returnValue(Pdu(**pdu_dict))
 
     @log_function
-    def _get_persisted_pdu(self, event_id):
+    def _get_persisted_pdu(self, origin, event_id):
         """ Get a PDU from the database with given origin and id.
 
         Returns:
             Deferred: Results in a `Pdu`.
         """
-        return self.handler.get_persisted_pdu(event_id)
+        return self.handler.get_persisted_pdu(origin, event_id)
 
     def _transaction_from_pdus(self, pdu_list):
         """Returns a new Transaction containing the given PDUs suitable for
