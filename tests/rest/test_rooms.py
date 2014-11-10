@@ -993,6 +993,8 @@ class RoomInitialSyncTestCase(RestTestCase):
                 "/rooms/%s/initialSync" % self.room_id)
         self.assertEquals(200, code)
 
+        self.assertEquals(self.room_id, response["room_id"])
+
 #        (code, response) = yield self.mock_resource.trigger("GET", path, None)
 #        self.assertEquals(200, code, msg=str(response))
 #        self.assert_dict(json.loads(content), response)

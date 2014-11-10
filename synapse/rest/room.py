@@ -353,27 +353,12 @@ class RoomInitialSyncRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
-        yield self.auth.get_user_by_req(request)
-        # TODO: Get all the initial sync data for this room and return in the
-        # same format as initial sync, that is:
-        # {
-        #   membership: join,
-        #   messages: [
-        #       chunk: [ msg events ],
-        #       start: s_tok,
-        #       end: e_tok
-        #   ],
-        #   room_id: foo,
-        #   state: [
-        #       { state event } , { state event }
-        #   ]
-        # }
-        # Probably worth keeping the keys room_id and membership for parity
-        # with /initialSync even though they must be joined to sync this and
-        # know the room ID, so clients can reuse the same code (room_id and
-        # membership are MANDATORY for /initialSync, so the code will expect
-        # it to be there)
-        defer.returnValue((200, {}))
+        user = yield self.auth.get_user_by_req(request)
+        events = yield self.handlers.message_handler.snapshot_room(
+            room_id=room_id,
+            user_id=user.to_string(),
+        )
+        defer.returnValue((200, events))
 
 
 class RoomTriggerBackfill(RestServlet):

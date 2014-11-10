@@ -331,4 +331,15 @@ class MessageHandler(BaseHandler):
 
         defer.returnValue(ret)
 
+    @defer.inlineCallbacks
+    def snapshot_room(self, user_id, room_id, pagin_config=None,
+                      feedback=False):
+        yield self.auth.check_joined_room(room_id, user_id)
 
+        defer.returnValue({
+            #"membership": membership,
+            "room_id": room_id,
+            #"messages": messages,
+            #"state": state,
+            #"presence": presence,
+        })
