@@ -469,7 +469,7 @@ class SQLBaseStore(object):
 
         select_event_sql = "SELECT * FROM events WHERE event_id = ?"
 
-        for ev in events:
+        for i, ev in enumerate(events):
             signatures = self._get_event_origin_signatures_txn(
                 txn, ev.event_id,
             )
@@ -522,6 +522,7 @@ class SQLBaseStore(object):
 
                 if del_evs:
                     ev = prune_event(ev)
+                    events[i] = ev
                     ev.redacted_because = del_evs[0]
 
         return events
