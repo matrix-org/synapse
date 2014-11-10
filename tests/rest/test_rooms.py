@@ -940,6 +940,59 @@ class RoomMessagesTestCase(RestTestCase):
         (code, response) = yield self.mock_resource.trigger("PUT", path, content)
         self.assertEquals(200, code, msg=str(response))
 
+
+class RoomInitialSyncTestCase(RestTestCase):
+    """ Tests /rooms/$room_id/initialSync. """
+    user_id = "@sid1:red"
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
+        self.auth_user_id = self.user_id
+
+        state_handler = Mock(spec=["handle_new_event"])
+        state_handler.handle_new_event.return_value = True
+
+        persistence_service = Mock(spec=["get_latest_pdus_in_context"])
+        persistence_service.get_latest_pdus_in_context.return_value = []
+
+        hs = HomeServer(
+            "red",
+            db_pool=None,
+            http_client=None,
+            datastore=MemoryDataStore(),
+            replication_layer=Mock(),
+            state_handler=state_handler,
+            persistence_service=persistence_service,
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=NonCallableMock(),
+        )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
+
+        hs.get_handlers().federation_handler = Mock()
+
+        def _get_user_by_token(token=None):
+            return {
+                "user": hs.parse_userid(self.auth_user_id),
+                "admin": False,
+                "device_id": None,
+            }
+        hs.get_auth().get_user_by_token = _get_user_by_token
+
+        synapse.rest.room.register_servlets(hs, self.mock_resource)
+
+        # create the room
+        self.room_id = yield self.create_room_as(self.user_id)
+
+    @defer.inlineCallbacks
+    def test_initial_sync(self):
+        (code, response) = yield self.mock_resource.trigger_get(
+                "/rooms/%s/initialSync" % self.room_id)
+        self.assertEquals(200, code)
+
 #        (code, response) = yield self.mock_resource.trigger("GET", path, None)
 #        self.assertEquals(200, code, msg=str(response))
 #        self.assert_dict(json.loads(content), response)
