@@ -413,7 +413,7 @@ class TransportLayer(object):
             self._with_authentication(
                 lambda origin, content, query, context:
                 self._on_backfill_request(
-                    context, query["v"], query["limit"]
+                    origin, context, query["v"], query["limit"]
                 )
             )
         )
@@ -552,7 +552,7 @@ class TransportLayer(object):
         defer.returnValue(data)
 
     @log_function
-    def _on_backfill_request(self, context, v_list, limits):
+    def _on_backfill_request(self, origin, context, v_list, limits):
         if not limits:
             return defer.succeed(
                 (400, {"error": "Did not include limit param"})
@@ -563,7 +563,7 @@ class TransportLayer(object):
         versions = v_list
 
         return self.request_handler.on_backfill_request(
-            context, versions, limit
+            origin, context, versions, limit
         )
 
     @defer.inlineCallbacks

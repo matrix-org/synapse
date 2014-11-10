@@ -193,10 +193,7 @@ class FederationHandler(BaseHandler):
             dest,
             room_id,
             limit,
-            extremities=[
-                self.pdu_codec.decode_event_id(e)
-                for e in extremities
-            ]
+            extremities=extremities,
         )
 
         events = []
@@ -473,7 +470,10 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_backfill_request(self, context, pdu_list, limit):
+    def on_backfill_request(self, origin, context, pdu_list, limit):
+        in_room = yield self.auth.check_host_in_room(context, origin)
+        if not in_room:
+            raise AuthError(403, "Host not in room.")
 
         events = yield self.store.get_backfill_events(
             context,

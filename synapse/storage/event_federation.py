@@ -371,10 +371,10 @@ class EventFederationStore(SQLBaseStore):
                         "_backfill_interaction: got id=%s",
                         *row
                     )
-                    new_front.append(row)
+                    new_front.append(row[0])
 
             front = new_front
             event_results += new_front
 
         # We also want to update the `prev_pdus` attributes before returning.
-        return self._get_pdu_tuples(txn, event_results)
+        return self._get_events_txn(txn, event_results)

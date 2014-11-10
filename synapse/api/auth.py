@@ -104,6 +104,12 @@ class Auth(object):
             pass
         defer.returnValue(None)
 
+    @defer.inlineCallbacks
+    def check_host_in_room(self, room_id, host):
+        joined_hosts = yield self.store.get_joined_hosts_for_room(room_id)
+
+        defer.returnValue(host in joined_hosts)
+
     def check_event_sender_in_room(self, event):
         key = (RoomMemberEvent.TYPE, event.user_id, )
         member_event = event.state_events.get(key)

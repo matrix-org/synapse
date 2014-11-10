@@ -205,7 +205,7 @@ class ReplicationLayer(object):
 
         pdus = [Pdu(outlier=False, **p) for p in transaction.pdus]
         for pdu in pdus:
-            yield self._handle_new_pdu(pdu, backfilled=True)
+            yield self._handle_new_pdu(dest, pdu, backfilled=True)
 
         defer.returnValue(pdus)
 
@@ -274,9 +274,9 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def on_backfill_request(self, context, versions, limit):
+    def on_backfill_request(self, origin, context, versions, limit):
         pdus = yield self.handler.on_backfill_request(
-            context, versions, limit
+            origin, context, versions, limit
         )
 
         defer.returnValue((200, self._transaction_from_pdus(pdus).get_dict()))
@@ -408,13 +408,22 @@ class ReplicationLayer(object):
     @defer.inlineCallbacks
     def on_make_join_request(self, context, user_id):
         pdu = yield self.handler.on_make_join_request(context, user_id)
-        defer.returnValue(pdu.get_dict())
+        defer.returnValue({
+            "event": pdu.get_dict(),
+        })
 
     @defer.inlineCallbacks
     def on_invite_request(self, origin, content):
         pdu = Pdu(**content)
         ret_pdu = yield self.handler.on_invite_request(origin, pdu)
-        defer.returnValue((200, ret_pdu.get_dict()))
+        defer.returnValue(
+            (
+                200,
+                {
+                    "event": ret_pdu.get_dict(),
+                }
+            )
+        )
 
     @defer.inlineCallbacks
     def on_send_join_request(self, origin, content):
@@ -429,15 +438,24 @@ class ReplicationLayer(object):
     @defer.inlineCallbacks
     def on_event_auth(self, origin, context, event_id):
         auth_pdus = yield self.handler.on_event_auth(event_id)
-        defer.returnValue((200, [a.get_dict() for a in auth_pdus]))
+        defer.returnValue(
+            (
+                200,
+                {
+                    "auth_chain": [a.get_dict() for a in auth_pdus],
+                }
+            )
+        )
 
     @defer.inlineCallbacks
     def make_join(self, destination, context, user_id):
-        pdu_dict = yield self.transport_layer.make_join(
+        ret = yield self.transport_layer.make_join(
             destination=destination,
             context=context,
             user_id=user_id,
         )
+
+        pdu_dict = ret["event"]
 
         logger.debug("Got response to make_join: %s", pdu_dict)
 
@@ -467,12 +485,14 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     def send_invite(self, destination, context, event_id, pdu):
-        code, pdu_dict = yield self.transport_layer.send_invite(
+        code, content = yield self.transport_layer.send_invite(
             destination=destination,
             context=context,
             event_id=event_id,
             content=pdu.get_dict(),
         )
+
+        pdu_dict = content["event"]
 
         logger.debug("Got response to send_invite: %s", pdu_dict)
 

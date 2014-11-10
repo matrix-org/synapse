@@ -447,6 +447,18 @@ class SQLBaseStore(object):
             **d
         )
 
+    def _get_events_txn(self, txn, event_ids):
+        # FIXME (erikj): This should be batched?
+
+        sql = "SELECT * FROM events WHERE event_id = ?"
+
+        event_rows = []
+        for e_id in event_ids:
+            c = txn.execute(sql, (e_id,))
+            event_rows.extend(self.cursor_to_dict(c))
+
+        return self._parse_events_txn(txn, event_rows)
+
     def _parse_events(self, rows):
         return self.runInteraction(
             "_parse_events", self._parse_events_txn, rows
