@@ -48,7 +48,7 @@ class StreamStoreTestCase(unittest.TestCase):
         self.depth = 1
 
     @defer.inlineCallbacks
-    def inject_room_member(self, room, user, membership, prev_state=None):
+    def inject_room_member(self, room, user, membership, replaces_state=None):
         self.depth += 1
 
         event = self.event_factory.create_event(
@@ -64,9 +64,12 @@ class StreamStoreTestCase(unittest.TestCase):
 
         event.state_events = None
         event.hashes = {}
+        event.prev_state = []
+        event.auth_events = []
 
-        if prev_state:
-            event.prev_state = prev_state
+        if replaces_state:
+            event.prev_state = [(replaces_state, "hash")]
+            event.replaces_state = replaces_state
 
         # Have to create a join event using the eventfactory
         yield self.store.persist_event(
@@ -90,6 +93,7 @@ class StreamStoreTestCase(unittest.TestCase):
 
         event.state_events = None
         event.hashes = {}
+        event.auth_events = []
 
         # Have to create a join event using the eventfactory
         yield self.store.persist_event(
@@ -216,7 +220,7 @@ class StreamStoreTestCase(unittest.TestCase):
 
         event2 = yield self.inject_room_member(
             self.room1, self.u_alice, Membership.JOIN,
-            prev_state=event1.event_id,
+            replaces_state=event1.event_id,
         )
 
         end = yield self.store.get_room_events_max_id()
@@ -233,4 +237,7 @@ class StreamStoreTestCase(unittest.TestCase):
 
         event = results[0]
 
-        self.assertTrue(hasattr(event, "prev_content"), msg="No prev_content key")
+        self.assertTrue(
+            hasattr(event, "prev_content"),
+            msg="No prev_content key"
+        )
