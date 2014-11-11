@@ -64,7 +64,7 @@ class BaseHandler(object):
 
         snapshot.fill_out_prev_events(event)
 
-        yield self.state_handler.annotate_state_groups(event)
+        yield self.state_handler.annotate_event_with_state(event)
 
         yield self.auth.add_auth_events(event)
 

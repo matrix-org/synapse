@@ -36,7 +36,7 @@ class FederationTestCase(unittest.TestCase):
         self.mock_config.signing_key = [MockKey()]
 
         self.state_handler = NonCallableMock(spec_set=[
-            "annotate_state_groups",
+            "annotate_event_with_state",
         ])
 
         self.auth = NonCallableMock(spec_set=[
@@ -85,7 +85,7 @@ class FederationTestCase(unittest.TestCase):
         self.datastore.persist_event.return_value = defer.succeed(None)
         self.datastore.get_room.return_value = defer.succeed(True)
 
-        self.state_handler.annotate_state_groups.return_value = (
+        self.state_handler.annotate_event_with_state.return_value = (
             defer.succeed(False)
         )
 
@@ -95,7 +95,7 @@ class FederationTestCase(unittest.TestCase):
             ANY, False, is_new_state=False
         )
 
-        self.state_handler.annotate_state_groups.assert_called_once_with(
+        self.state_handler.annotate_event_with_state.assert_called_once_with(
             ANY,
             old_state=None,
         )

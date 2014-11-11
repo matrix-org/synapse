@@ -44,7 +44,7 @@ class StateTestCase(unittest.TestCase):
             self.create_event(type="test2", state_key=""),
         ]
 
-        yield self.state.annotate_state_groups(event, old_state=old_state)
+        yield self.state.annotate_event_with_state(event, old_state=old_state)
 
         for k, v in event.old_state_events.items():
             type, state_key = k
@@ -66,7 +66,7 @@ class StateTestCase(unittest.TestCase):
             self.create_event(type="test2", state_key=""),
         ]
 
-        yield self.state.annotate_state_groups(event, old_state=old_state)
+        yield self.state.annotate_event_with_state(event, old_state=old_state)
 
         for k, v in event.old_state_events.items():
             type, state_key = k
@@ -99,7 +99,7 @@ class StateTestCase(unittest.TestCase):
             group_name: old_state,
         }
 
-        yield self.state.annotate_state_groups(event)
+        yield self.state.annotate_event_with_state(event)
 
         for k, v in event.old_state_events.items():
             type, state_key = k
@@ -141,7 +141,7 @@ class StateTestCase(unittest.TestCase):
             group_name: old_state,
         }
 
-        yield self.state.annotate_state_groups(event)
+        yield self.state.annotate_event_with_state(event)
 
         for k, v in event.old_state_events.items():
             type, state_key = k
@@ -199,7 +199,7 @@ class StateTestCase(unittest.TestCase):
             group_name_2: old_state_2,
         }
 
-        yield self.state.annotate_state_groups(event)
+        yield self.state.annotate_event_with_state(event)
 
         self.assertEqual(len(event.old_state_events), 5)
 
@@ -235,7 +235,7 @@ class StateTestCase(unittest.TestCase):
             group_name_2: old_state_2,
         }
 
-        yield self.state.annotate_state_groups(event)
+        yield self.state.annotate_event_with_state(event)
 
         self.assertEqual(len(event.old_state_events), 5)
 

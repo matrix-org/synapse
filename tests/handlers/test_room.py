@@ -60,7 +60,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             ]),
             auth=NonCallableMock(spec_set=["check", "add_auth_events"]),
             state_handler=NonCallableMock(spec_set=[
-                "annotate_state_groups",
+                "annotate_event_with_state",
             ]),
             config=self.mock_config,
         )
@@ -251,7 +251,7 @@ class RoomCreationTest(unittest.TestCase):
             ]),
             auth=NonCallableMock(spec_set=["check", "add_auth_events"]),
             state_handler=NonCallableMock(spec_set=[
-                "annotate_state_groups",
+                "annotate_event_with_state",
             ]),
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
@@ -282,7 +282,7 @@ class RoomCreationTest(unittest.TestCase):
         def annotate(event):
             event.state_events = {}
             return defer.succeed(None)
-        self.state_handler.annotate_state_groups.side_effect = annotate
+        self.state_handler.annotate_event_with_state.side_effect = annotate
 
         def hosts(room):
             return defer.succeed([])
@@ -311,6 +311,6 @@ class RoomCreationTest(unittest.TestCase):
         self.assertEquals(user_id, join_event.user_id)
         self.assertEquals(user_id, join_event.state_key)
 
-        self.assertTrue(self.state_handler.annotate_state_groups.called)
+        self.assertTrue(self.state_handler.annotate_event_with_state.called)
 
         self.assertTrue(self.federation.handle_new_event.called)

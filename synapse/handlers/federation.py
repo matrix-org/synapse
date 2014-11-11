@@ -111,7 +111,7 @@ class FederationHandler(BaseHandler):
         if state:
             state = [self.pdu_codec.event_from_pdu(p) for p in state]
 
-        is_new_state = yield self.state_handler.annotate_state_groups(
+        is_new_state = yield self.state_handler.annotate_event_with_state(
             event,
             old_state=state
         )
@@ -202,7 +202,7 @@ class FederationHandler(BaseHandler):
             event = self.pdu_codec.event_from_pdu(pdu)
 
             # FIXME (erikj): Not sure this actually works :/
-            yield self.state_handler.annotate_state_groups(event)
+            yield self.state_handler.annotate_event_with_state(event)
 
             events.append(event)
 
@@ -268,7 +268,7 @@ class FederationHandler(BaseHandler):
 
             logger.debug("do_invite_join state: %s", state)
 
-            is_new_state = yield self.state_handler.annotate_state_groups(
+            is_new_state = yield self.state_handler.annotate_event_with_state(
                 event,
                 old_state=state
             )
@@ -289,7 +289,7 @@ class FederationHandler(BaseHandler):
                 # FIXME: Auth these.
                 e.outlier = True
 
-                yield self.state_handler.annotate_state_groups(
+                yield self.state_handler.annotate_event_with_state(
                     e,
                 )
 
@@ -330,7 +330,7 @@ class FederationHandler(BaseHandler):
         snapshot = yield self.store.snapshot_room(event)
         snapshot.fill_out_prev_events(event)
 
-        yield self.state_handler.annotate_state_groups(event)
+        yield self.state_handler.annotate_event_with_state(event)
         yield self.auth.add_auth_events(event)
         self.auth.check(event, raises=True)
 
@@ -345,7 +345,7 @@ class FederationHandler(BaseHandler):
 
         event.outlier = False
 
-        is_new_state = yield self.state_handler.annotate_state_groups(event)
+        is_new_state = yield self.state_handler.annotate_event_with_state(event)
         self.auth.check(event, raises=True)
 
         # FIXME (erikj):  All this is duplicated above :(
@@ -421,7 +421,7 @@ class FederationHandler(BaseHandler):
             )
         )
 
-        yield self.state_handler.annotate_state_groups(event)
+        yield self.state_handler.annotate_event_with_state(event)
 
         yield self.store.persist_event(
             event,

@@ -45,7 +45,7 @@ class StateHandler(object):
 
     @defer.inlineCallbacks
     @log_function
-    def annotate_state_groups(self, event, old_state=None):
+    def annotate_event_with_state(self, event, old_state=None):
         yield run_on_reactor()
 
         if old_state:
