@@ -230,9 +230,9 @@ class RoomPermissionsTestCase(RestTestCase):
                            "PUT", topic_path, topic_content)
         self.assertEquals(403, code, msg=str(response))
 
-        # get topic in created PRIVATE room and invited, expect 200 (or 404)
+        # get topic in created PRIVATE room and invited, expect 403
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
-        self.assertEquals(404, code, msg=str(response))
+        self.assertEquals(403, code, msg=str(response))
 
         # set/get topic in created PRIVATE room and joined, expect 200
         yield self.join(room=self.created_rmid, user=self.user_id)
@@ -256,10 +256,10 @@ class RoomPermissionsTestCase(RestTestCase):
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
         self.assertEquals(403, code, msg=str(response))
 
-        # get topic in PUBLIC room, not joined, expect 200 (or 404)
+        # get topic in PUBLIC room, not joined, expect 403
         (code, response) = yield self.mock_resource.trigger_get(
                            "/rooms/%s/state/m.room.topic" % self.created_public_rmid)
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(403, code, msg=str(response))
 
         # set topic in PUBLIC room, not joined, expect 403
         (code, response) = yield self.mock_resource.trigger(
@@ -326,12 +326,12 @@ class RoomPermissionsTestCase(RestTestCase):
     def test_membership_public_room_perms(self):
         room = self.created_public_rmid
         # get membership of self, get membership of other, public room + invite
-        # expect all 200s - public rooms, you can see who is in them.
+        # expect 403
         yield self.invite(room=room, src=self.rmcreator_id,
                           targ=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
-            room=room, expect_code=200)
+            room=room, expect_code=403)
 
         # get membership of self, get membership of other, public room + joined
         # expect all 200s
@@ -341,11 +341,11 @@ class RoomPermissionsTestCase(RestTestCase):
             room=room, expect_code=200)
 
         # get membership of self, get membership of other, public room + left
-        # expect all 200s - public rooms, you can always see who is in them.
+        # expect 403.
         yield self.leave(room=room, user=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
-            room=room, expect_code=200)
+            room=room, expect_code=403)
 
     @defer.inlineCallbacks
     def test_invited_permissions(self):

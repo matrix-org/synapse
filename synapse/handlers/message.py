@@ -147,49 +147,19 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_room_data(self, user_id=None, room_id=None,
-                      event_type=None, state_key="",
-                      public_room_rules=[],
-                      private_room_rules=["join"]):
+                      event_type=None, state_key=""):
         """ Get data from a room.
 
         Args:
             event : The room path event
-            public_room_rules : A list of membership states the user can be in,
-            in order to read this data IN A PUBLIC ROOM. An empty list means
-            'any state'.
-            private_room_rules : A list of membership states the user can be
-            in, in order to read this data IN A PRIVATE ROOM. An empty list
-            means 'any state'.
         Returns:
             The path data content.
         Raises:
             SynapseError if something went wrong.
         """
-        if event_type == RoomTopicEvent.TYPE:
-            # anyone invited/joined can read the topic
-            private_room_rules = ["invite", "join"]
-
-        # does this room exist
-        room = yield self.store.get_room(room_id)
-        if not room:
-            raise RoomError(403, "Room does not exist.")
-
-        # does this user exist in this room
-        member = yield self.store.get_room_member(
-            room_id=room_id,
-            user_id="" if not user_id else user_id)
-
-        member_state = member.membership if member else None
-
-        if room.is_public and public_room_rules:
-            # make sure the user meets public room rules
-            if member_state not in public_room_rules:
-                raise RoomError(403, "Member does not meet public room rules.")
-        elif not room.is_public and private_room_rules:
-            # make sure the user meets private room rules
-            if member_state not in private_room_rules:
-                raise RoomError(
-                    403, "Member does not meet private room rules.")
+        have_joined = yield self.auth.check_joined_room(room_id, user_id)
+        if not have_joined:
+            raise RoomError(403, "User not in room.")
 
         data = yield self.state_handler.get_current_state(
             room_id, event_type, state_key
