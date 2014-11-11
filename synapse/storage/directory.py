@@ -95,6 +95,7 @@ class DirectoryStore(SQLBaseStore):
 
     def delete_room_alias(self, room_alias):
         return self.runInteraction(
+            "delete_room_alias",
             self._delete_room_alias_txn,
             room_alias,
         )

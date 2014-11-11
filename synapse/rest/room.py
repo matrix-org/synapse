@@ -138,7 +138,7 @@ class RoomStateEventRestServlet(RestServlet):
             raise SynapseError(
                 404, "Event not found.", errcode=Codes.NOT_FOUND
             )
-        defer.returnValue((200, data[0].get_dict()["content"]))
+        defer.returnValue((200, data.get_dict()["content"]))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, state_key):
@@ -154,6 +154,9 @@ class RoomStateEventRestServlet(RestServlet):
             user_id=user.to_string(),
             state_key=urllib.unquote(state_key)
             )
+
+        self.validator.validate(event)
+
         if event_type == RoomMemberEvent.TYPE:
             # membership events are special
             handler = self.handlers.room_member_handler
@@ -187,6 +190,8 @@ class RoomSendEventRestServlet(RestServlet):
             user_id=user.to_string(),
             content=content
         )
+
+        self.validator.validate(event)
 
         msg_handler = self.handlers.message_handler
         yield msg_handler.send_message(event)
@@ -253,6 +258,9 @@ class JoinRoomAliasServlet(RestServlet):
                 user_id=user.to_string(),
                 state_key=user.to_string()
             )
+
+            self.validator.validate(event)
+
             handler = self.handlers.room_member_handler
             yield handler.change_membership(event)
             defer.returnValue((200, {}))
@@ -424,6 +432,9 @@ class RoomMembershipRestServlet(RestServlet):
             user_id=user.to_string(),
             state_key=state_key
         )
+
+        self.validator.validate(event)
+
         handler = self.handlers.room_member_handler
         yield handler.change_membership(event)
         defer.returnValue((200, {}))
@@ -460,6 +471,8 @@ class RoomRedactEventRestServlet(RestServlet):
             content=content,
             redacts=urllib.unquote(event_id),
         )
+
+        self.validator.validate(event)
 
         msg_handler = self.handlers.message_handler
         yield msg_handler.send_message(event)

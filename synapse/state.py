@@ -16,11 +16,13 @@
 
 from twisted.internet import defer
 
-from synapse.federation.pdu_codec import encode_event_id, decode_event_id
 from synapse.util.logutils import log_function
+from synapse.util.async import run_on_reactor
+from synapse.api.events.room import RoomPowerLevelsEvent
 
 from collections import namedtuple
 
+import copy
 import logging
 import hashlib
 
@@ -35,230 +37,169 @@ KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 
 
 class StateHandler(object):
-    """ Repsonsible for doing state conflict resolution.
+    """ Responsible for doing state conflict resolution.
     """
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
-        self._replication = hs.get_replication_layer()
-        self.server_name = hs.hostname
 
     @defer.inlineCallbacks
     @log_function
-    def handle_new_event(self, event, snapshot):
-        """ Given an event this works out if a) we have sufficient power level
-        to update the state and b) works out what the prev_state should be.
+    def annotate_state_groups(self, event, old_state=None):
+        yield run_on_reactor()
 
-        Returns:
-            Deferred: Resolved with a boolean indicating if we succesfully
-            updated the state.
+        if old_state:
+            event.state_group = None
+            event.old_state_events = {
+                (s.type, s.state_key): s for s in old_state
+            }
+            event.state_events = event.old_state_events
 
-        Raised:
-            AuthError
-        """
-        # This needs to be done in a transaction.
+            if hasattr(event, "state_key"):
+                event.state_events[(event.type, event.state_key)] = event
 
-        if not hasattr(event, "state_key"):
+            defer.returnValue(False)
             return
 
-        key = KeyStateTuple(
-            event.room_id,
-            event.type,
-            _get_state_key_from_event(event)
-        )
+        if hasattr(event, "outlier") and event.outlier:
+            event.state_group = None
+            event.old_state_events = None
+            event.state_events = {}
+            defer.returnValue(False)
+            return
 
-        # Now I need to fill out the prev state and work out if it has auth
-        # (w.r.t. to power levels)
+        ids = [e for e, _ in event.prev_events]
 
-        snapshot.fill_out_prev_events(event)
+        ret = yield self.resolve_state_groups(ids)
+        state_group, new_state = ret
 
-        event.prev_events = [
-            e for e in event.prev_events if e != event.event_id
+        event.old_state_events = copy.deepcopy(new_state)
+
+        if hasattr(event, "state_key"):
+            key = (event.type, event.state_key)
+            if key in new_state:
+                event.replaces_state = new_state[key].event_id
+            new_state[key] = event
+        elif state_group:
+            event.state_group = state_group
+            event.state_events = new_state
+            defer.returnValue(False)
+
+        event.state_group = None
+        event.state_events = new_state
+
+        defer.returnValue(hasattr(event, "state_key"))
+
+    @defer.inlineCallbacks
+    def get_current_state(self, room_id, event_type=None, state_key=""):
+        events = yield self.store.get_latest_events_in_room(room_id)
+
+        event_ids = [
+            e_id
+            for e_id, _, _ in events
         ]
 
-        current_state = snapshot.prev_state_pdu
+        res = yield self.resolve_state_groups(event_ids)
 
-        if current_state:
-            event.prev_state = encode_event_id(
-                current_state.pdu_id, current_state.origin
-            )
-
-        # TODO check current_state to see if the min power level is less
-        # than the power level of the user
-        # power_level = self._get_power_level_for_event(event)
-
-        pdu_id, origin = decode_event_id(event.event_id, self.server_name)
-
-        yield self.store.update_current_state(
-            pdu_id=pdu_id,
-            origin=origin,
-            context=key.context,
-            pdu_type=key.type,
-            state_key=key.state_key
-        )
-
-        defer.returnValue(True)
-
-    @defer.inlineCallbacks
-    @log_function
-    def handle_new_state(self, new_pdu):
-        """ Apply conflict resolution to `new_pdu`.
-
-        This should be called on every new state pdu, regardless of whether or
-        not there is a conflict.
-
-        This function is safe against the race of it getting called with two
-        `PDU`s trying to update the same state.
-        """
-
-        # This needs to be done in a transaction.
-
-        is_new = yield self._handle_new_state(new_pdu)
-
-        logger.debug("is_new: %s %s %s", is_new, new_pdu.pdu_id, new_pdu.origin)
-
-        if is_new:
-            yield self.store.update_current_state(
-                pdu_id=new_pdu.pdu_id,
-                origin=new_pdu.origin,
-                context=new_pdu.context,
-                pdu_type=new_pdu.pdu_type,
-                state_key=new_pdu.state_key
-            )
-
-        defer.returnValue(is_new)
-
-    def _get_power_level_for_event(self, event):
-        # return self._persistence.get_power_level_for_user(event.room_id,
-            # event.sender)
-        return event.power_level
-
-    @defer.inlineCallbacks
-    @log_function
-    def _handle_new_state(self, new_pdu):
-        tree, missing_branch = yield self.store.get_unresolved_state_tree(
-            new_pdu
-        )
-        new_branch, current_branch = tree
-
-        logger.debug(
-            "_handle_new_state new=%s, current=%s",
-            new_branch, current_branch
-        )
-
-        if missing_branch is not None:
-            # We're missing some PDUs. Fetch them.
-            # TODO (erikj): Limit this.
-            missing_prev = tree[missing_branch][-1]
-
-            pdu_id = missing_prev.prev_state_id
-            origin = missing_prev.prev_state_origin
-
-            is_missing = yield self.store.get_pdu(pdu_id, origin) is None
-            if not is_missing:
-                raise Exception("Conflict resolution failed")
-
-            yield self._replication.get_pdu(
-                destination=missing_prev.origin,
-                pdu_origin=origin,
-                pdu_id=pdu_id,
-                outlier=True
-            )
-
-            updated_current = yield self._handle_new_state(new_pdu)
-            defer.returnValue(updated_current)
-
-        if not current_branch:
-            # There is no current state
-            defer.returnValue(True)
+        if event_type:
+            defer.returnValue(res[1].get((event_type, state_key)))
             return
 
-        n = new_branch[-1]
-        c = current_branch[-1]
+        defer.returnValue(res[1].values())
 
-        common_ancestor = n.pdu_id == c.pdu_id and n.origin == c.origin
+    @defer.inlineCallbacks
+    @log_function
+    def resolve_state_groups(self, event_ids):
+        state_groups = yield self.store.get_state_groups(
+            event_ids
+        )
 
-        if common_ancestor:
-            # We found a common ancestor!
+        group_names = set(state_groups.keys())
+        if len(group_names) == 1:
+            name, state_list = state_groups.items().pop()
+            state = {
+                (e.type, e.state_key): e
+                for e in state_list
+            }
+            defer.returnValue((name, state))
 
-            if len(current_branch) == 1:
-                # This is a direct clobber so we can just...
-                defer.returnValue(True)
+        state = {}
+        for group, g_state in state_groups.items():
+            for s in g_state:
+                state.setdefault(
+                    (s.type, s.state_key),
+                    {}
+                )[s.event_id] = s
 
+        unconflicted_state = {
+            k: v.values()[0] for k, v in state.items()
+            if len(v.values()) == 1
+        }
+
+        conflicted_state = {
+            k: v.values()
+            for k, v in state.items()
+            if len(v.values()) > 1
+        }
+
+        try:
+            new_state = {}
+            new_state.update(unconflicted_state)
+            for key, events in conflicted_state.items():
+                new_state[key] = self._resolve_state_events(events)
+        except:
+            logger.exception("Failed to resolve state")
+            raise
+
+        defer.returnValue((None, new_state))
+
+    def _get_power_level_from_event_state(self, event, user_id):
+        if hasattr(event, "old_state_events") and event.old_state_events:
+            key = (RoomPowerLevelsEvent.TYPE, "", )
+            power_level_event = event.old_state_events.get(key)
+            level = None
+            if power_level_event:
+                level = power_level_event.content.get("users", {}).get(
+                    user_id
+                )
+                if not level:
+                    level = power_level_event.content.get("users_default", 0)
+
+            return level
         else:
-            # We didn't find a common ancestor. This is probably fine.
-            pass
+            return 0
 
-        result = yield self._do_conflict_res(
-            new_branch, current_branch, common_ancestor
-        )
-        defer.returnValue(result)
+    @log_function
+    def _resolve_state_events(self, events):
+        curr_events = events
 
-    @defer.inlineCallbacks
-    def _do_conflict_res(self, new_branch, current_branch, common_ancestor):
-        conflict_res = [
-            self._do_power_level_conflict_res,
-            self._do_chain_length_conflict_res,
-            self._do_hash_conflict_res,
+        new_powers = [
+            self._get_power_level_from_event_state(e, e.user_id)
+            for e in curr_events
         ]
 
-        for algo in conflict_res:
-            new_res, curr_res = yield defer.maybeDeferred(
-                algo,
-                new_branch, current_branch, common_ancestor
-            )
+        new_powers = [
+            int(p) if p else 0 for p in new_powers
+        ]
 
-            if new_res < curr_res:
-                defer.returnValue(False)
-            elif new_res > curr_res:
-                defer.returnValue(True)
+        max_power = max(new_powers)
 
-        raise Exception("Conflict resolution failed.")
+        curr_events = [
+            z[0] for z in zip(curr_events, new_powers)
+            if z[1] == max_power
+        ]
 
-    @defer.inlineCallbacks
-    def _do_power_level_conflict_res(self, new_branch, current_branch,
-                                     common_ancestor):
-        new_powers_deferreds = []
-        for e in new_branch[:-1] if common_ancestor else new_branch:
-            if hasattr(e, "user_id"):
-                new_powers_deferreds.append(
-                    self.store.get_power_level(e.context, e.user_id)
-                )
+        if not curr_events:
+            raise RuntimeError("Max didn't get a max?")
+        elif len(curr_events) == 1:
+            return curr_events[0]
 
-        current_powers_deferreds = []
-        for e in current_branch[:-1] if common_ancestor else current_branch:
-            if hasattr(e, "user_id"):
-                current_powers_deferreds.append(
-                    self.store.get_power_level(e.context, e.user_id)
-                )
-
-        new_powers = yield defer.gatherResults(
-            new_powers_deferreds,
-            consumeErrors=True
-        )
-
-        current_powers = yield defer.gatherResults(
-            current_powers_deferreds,
-            consumeErrors=True
-        )
-
-        max_power_new = max(new_powers)
-        max_power_current = max(current_powers)
-
-        defer.returnValue(
-            (max_power_new, max_power_current)
-        )
-
-    def _do_chain_length_conflict_res(self, new_branch, current_branch,
-                                      common_ancestor):
-        return (len(new_branch), len(current_branch))
-
-    def _do_hash_conflict_res(self, new_branch, current_branch,
-                              common_ancestor):
-        new_str = "".join([p.pdu_id + p.origin for p in new_branch])
-        c_str = "".join([p.pdu_id + p.origin for p in current_branch])
-
+        # TODO: For now, just choose the one with the largest event_id.
         return (
-            hashlib.sha1(new_str).hexdigest(),
-            hashlib.sha1(c_str).hexdigest()
+            sorted(
+                curr_events,
+                key=lambda e: hashlib.sha1(
+                    e.event_id + e.user_id + e.room_id + e.type
+                ).hexdigest()
+            )[0]
         )

@@ -24,7 +24,6 @@ from ..utils import MockHttpResource, MockClock, MockKey
 from synapse.server import HomeServer
 from synapse.federation import initialize_http_replication
 from synapse.federation.units import Pdu
-from synapse.storage.pdu import PduTuple, PduEntry
 
 
 def make_pdu(prev_pdus=[], **kwargs):
@@ -41,7 +40,7 @@ def make_pdu(prev_pdus=[], **kwargs):
     }
     pdu_fields.update(kwargs)
 
-    return PduTuple(PduEntry(**pdu_fields), prev_pdus)
+    return Pdu(prev_pdus=prev_pdus, **pdu_fields)
 
 
 class FederationTestCase(unittest.TestCase):
@@ -52,176 +51,184 @@ class FederationTestCase(unittest.TestCase):
             "put_json",
         ])
         self.mock_persistence = Mock(spec=[
-            "get_current_state_for_context",
-            "get_pdu",
-            "persist_event",
-            "update_min_depth_for_context",
             "prep_send_transaction",
             "delivered_txn",
             "get_received_txn_response",
             "set_received_txn_response",
         ])
         self.mock_persistence.get_received_txn_response.return_value = (
-                defer.succeed(None)
+            defer.succeed(None)
         )
         self.mock_config = Mock()
         self.mock_config.signing_key = [MockKey()]
         self.clock = MockClock()
-        hs = HomeServer("test",
-                resource_for_federation=self.mock_resource,
-                http_client=self.mock_http_client,
-                db_pool=None,
-                datastore=self.mock_persistence,
-                clock=self.clock,
-                config=self.mock_config,
-                keyring=Mock(),
+        hs = HomeServer(
+            "test",
+            resource_for_federation=self.mock_resource,
+            http_client=self.mock_http_client,
+            db_pool=None,
+            datastore=self.mock_persistence,
+            clock=self.clock,
+            config=self.mock_config,
+            keyring=Mock(),
         )
         self.federation = initialize_http_replication(hs)
         self.distributor = hs.get_distributor()
 
     @defer.inlineCallbacks
     def test_get_state(self):
-        self.mock_persistence.get_current_state_for_context.return_value = (
-            defer.succeed([])
-        )
+        mock_handler = Mock(spec=[
+            "get_state_for_pdu",
+        ])
+
+        self.federation.set_handler(mock_handler)
+
+        mock_handler.get_state_for_pdu.return_value = defer.succeed([])
 
         # Empty context initially
-        (code, response) = yield self.mock_resource.trigger("GET",
-                "/_matrix/federation/v1/state/my-context/", None)
+        (code, response) = yield self.mock_resource.trigger(
+            "GET",
+            "/_matrix/federation/v1/state/my-context/",
+            None
+        )
         self.assertEquals(200, code)
         self.assertFalse(response["pdus"])
 
         # Now lets give the context some state
-        self.mock_persistence.get_current_state_for_context.return_value = (
+        mock_handler.get_state_for_pdu.return_value = (
             defer.succeed([
                 make_pdu(
-                    pdu_id="the-pdu-id",
+                    event_id="the-pdu-id",
                     origin="red",
-                    context="my-context",
-                    pdu_type="m.topic",
-                    ts=123456789000,
+                    room_id="my-context",
+                    type="m.topic",
+                    origin_server_ts=123456789000,
                     depth=1,
-                    is_state=True,
-                    content_json='{"topic":"The topic"}',
+                    content={"topic": "The topic"},
                     state_key="",
                     power_level=1000,
-                    prev_state_id="last-pdu-id",
-                    prev_state_origin="blue",
+                    prev_state="last-pdu-id",
                 ),
             ])
         )
 
-        (code, response) = yield self.mock_resource.trigger("GET",
-                "/_matrix/federation/v1/state/my-context/", None)
+        (code, response) = yield self.mock_resource.trigger(
+            "GET",
+            "/_matrix/federation/v1/state/my-context/",
+            None
+        )
         self.assertEquals(200, code)
         self.assertEquals(1, len(response["pdus"]))
 
     @defer.inlineCallbacks
     def test_get_pdu(self):
-        self.mock_persistence.get_pdu.return_value = (
+        mock_handler = Mock(spec=[
+            "get_persisted_pdu",
+        ])
+
+        self.federation.set_handler(mock_handler)
+
+        mock_handler.get_persisted_pdu.return_value = (
             defer.succeed(None)
         )
 
-        (code, response) = yield self.mock_resource.trigger("GET",
-                "/_matrix/federation/v1/pdu/red/abc123def456/", None)
+        (code, response) = yield self.mock_resource.trigger(
+            "GET",
+            "/_matrix/federation/v1/event/abc123def456/",
+            None
+        )
         self.assertEquals(404, code)
 
         # Now insert such a PDU
-        self.mock_persistence.get_pdu.return_value = (
+        mock_handler.get_persisted_pdu.return_value = (
             defer.succeed(
                 make_pdu(
-                    pdu_id="abc123def456",
+                    event_id="abc123def456",
                     origin="red",
-                    context="my-context",
-                    pdu_type="m.text",
-                    ts=123456789001,
+                    room_id="my-context",
+                    type="m.text",
+                    origin_server_ts=123456789001,
                     depth=1,
-                    content_json='{"text":"Here is the message"}',
+                    content={"text": "Here is the message"},
                 )
             )
         )
 
-        (code, response) = yield self.mock_resource.trigger("GET",
-                "/_matrix/federation/v1/pdu/red/abc123def456/", None)
+        (code, response) = yield self.mock_resource.trigger(
+            "GET",
+            "/_matrix/federation/v1/event/abc123def456/",
+            None
+        )
         self.assertEquals(200, code)
         self.assertEquals(1, len(response["pdus"]))
-        self.assertEquals("m.text", response["pdus"][0]["pdu_type"])
+        self.assertEquals("m.text", response["pdus"][0]["type"])
 
     @defer.inlineCallbacks
     def test_send_pdu(self):
         self.mock_http_client.put_json.return_value = defer.succeed(
-                (200, "OK")
+            (200, "OK")
         )
 
         pdu = Pdu(
-                pdu_id="abc123def456",
-                origin="red",
-                destinations=["remote"],
-                context="my-context",
-                origin_server_ts=123456789002,
-                pdu_type="m.test",
-                content={"testing": "content here"},
-                depth=1,
+            event_id="abc123def456",
+            origin="red",
+            room_id="my-context",
+            type="m.text",
+            origin_server_ts=123456789001,
+            depth=1,
+            content={"text": "Here is the message"},
+            destinations=["remote"],
         )
 
         yield self.federation.send_pdu(pdu)
 
         self.mock_http_client.put_json.assert_called_with(
-                "remote",
-                path="/_matrix/federation/v1/send/1000000/",
-                data={
-                    "origin_server_ts": 1000000,
-                    "origin": "test",
-                    "pdus": [
-                        {
-                            "origin": "red",
-                            "pdu_id": "abc123def456",
-                            "prev_pdus": [],
-                            "origin_server_ts": 123456789002,
-                            "context": "my-context",
-                            "pdu_type": "m.test",
-                            "is_state": False,
-                            "content": {"testing": "content here"},
-                            "depth": 1,
-                        },
-                    ]
-                },
-                json_data_callback=ANY,
+            "remote",
+            path="/_matrix/federation/v1/send/1000000/",
+            data={
+                "origin_server_ts": 1000000,
+                "origin": "test",
+                "pdus": [
+                    pdu.get_dict(),
+                ],
+                'pdu_failures': [],
+            },
+            json_data_callback=ANY,
         )
 
     @defer.inlineCallbacks
     def test_send_edu(self):
         self.mock_http_client.put_json.return_value = defer.succeed(
-                (200, "OK")
+            (200, "OK")
         )
 
         yield self.federation.send_edu(
-                destination="remote",
-                edu_type="m.test",
-                content={"testing": "content here"},
+            destination="remote",
+            edu_type="m.test",
+            content={"testing": "content here"},
         )
 
         # MockClock ensures we can guess these timestamps
         self.mock_http_client.put_json.assert_called_with(
-                "remote",
-                path="/_matrix/federation/v1/send/1000000/",
-                data={
-                    "origin": "test",
-                    "origin_server_ts": 1000000,
-                    "pdus": [],
-                    "edus": [
-                        {
-                            # TODO: SYN-103: Remove "origin" and "destination"
-                            "origin": "test",
-                            "destination": "remote",
-                            "edu_type": "m.test",
-                            "content": {"testing": "content here"},
-                        }
-                    ],
-                },
-                json_data_callback=ANY,
+            "remote",
+            path="/_matrix/federation/v1/send/1000000/",
+            data={
+                "origin": "test",
+                "origin_server_ts": 1000000,
+                "pdus": [],
+                "edus": [
+                    {
+                        # TODO: SYN-103: Remove "origin" and "destination"
+                        "origin": "test",
+                        "destination": "remote",
+                        "edu_type": "m.test",
+                        "content": {"testing": "content here"},
+                    }
+                ],
+                'pdu_failures': [],
+            },
+            json_data_callback=ANY,
         )
-
 
     @defer.inlineCallbacks
     def test_recv_edu(self):
@@ -230,24 +237,26 @@ class FederationTestCase(unittest.TestCase):
 
         self.federation.register_edu_handler("m.test", recv_observer)
 
-        yield self.mock_resource.trigger("PUT",
-                "/_matrix/federation/v1/send/1001000/",
-                """{
-                    "origin": "remote",
-                    "origin_server_ts": 1001000,
-                    "pdus": [],
-                    "edus": [
-                        {
-                            "origin": "remote",
-                            "destination": "test",
-                            "edu_type": "m.test",
-                            "content": {"testing": "reply here"}
-                        }
-                    ]
-                }""")
+        yield self.mock_resource.trigger(
+            "PUT",
+            "/_matrix/federation/v1/send/1001000/",
+            """{
+                "origin": "remote",
+                "origin_server_ts": 1001000,
+                "pdus": [],
+                "edus": [
+                    {
+                        "origin": "remote",
+                        "destination": "test",
+                        "edu_type": "m.test",
+                        "content": {"testing": "reply here"}
+                    }
+                ]
+            }"""
+        )
 
         recv_observer.assert_called_with(
-                "remote", {"testing": "reply here"}
+            "remote", {"testing": "reply here"}
         )
 
     @defer.inlineCallbacks
@@ -278,8 +287,11 @@ class FederationTestCase(unittest.TestCase):
 
         self.federation.register_query_handler("a-question", recv_handler)
 
-        code, response = yield self.mock_resource.trigger("GET",
-            "/_matrix/federation/v1/query/a-question?three=3&four=4", None)
+        code, response = yield self.mock_resource.trigger(
+            "GET",
+            "/_matrix/federation/v1/query/a-question?three=3&four=4",
+            None
+        )
 
         self.assertEquals(200, code)
         self.assertEquals({"another": "response"}, response)

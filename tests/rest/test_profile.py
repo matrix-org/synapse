@@ -18,9 +18,9 @@
 from tests import unittest
 from twisted.internet import defer
 
-from mock import Mock
+from mock import Mock, NonCallableMock
 
-from ..utils import MockHttpResource
+from ..utils import MockHttpResource, MockKey
 
 from synapse.api.errors import SynapseError, AuthError
 from synapse.server import HomeServer
@@ -41,6 +41,9 @@ class ProfileTestCase(unittest.TestCase):
             "set_avatar_url",
         ])
 
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
             db_pool=None,
             http_client=None,
@@ -48,6 +51,7 @@ class ProfileTestCase(unittest.TestCase):
             federation=Mock(),
             replication_layer=Mock(),
             datastore=None,
+            config=self.mock_config,
         )
 
         def _get_user_by_req(request=None):

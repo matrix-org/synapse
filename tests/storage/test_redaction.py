@@ -61,12 +61,18 @@ class RedactionTestCase(unittest.TestCase):
             membership=membership,
             content={"membership": membership},
             depth=self.depth,
+            prev_events=[],
         )
 
         event.content.update(extra_content)
 
         if prev_state:
             event.prev_state = prev_state
+
+        event.state_events = None
+        event.hashes = {}
+        event.prev_state = []
+        event.auth_events = []
 
         # Have to create a join event using the eventfactory
         yield self.store.persist_event(
@@ -85,7 +91,12 @@ class RedactionTestCase(unittest.TestCase):
             room_id=room.to_string(),
             content={"body": body, "msgtype": u"message"},
             depth=self.depth,
+            prev_events=[],
         )
+
+        event.state_events = None
+        event.hashes = {}
+        event.auth_events = []
 
         yield self.store.persist_event(
             event
@@ -102,7 +113,12 @@ class RedactionTestCase(unittest.TestCase):
             content={"reason": reason},
             depth=self.depth,
             redacts=event_id,
+            prev_events=[],
         )
+
+        event.state_events = None
+        event.hashes = {}
+        event.auth_events = []
 
         yield self.store.persist_event(
             event

@@ -17,16 +17,15 @@ from twisted.internet import defer
 from tests import unittest
 
 from synapse.api.events.room import (
-    InviteJoinEvent, MessageEvent, RoomMemberEvent
+    MessageEvent,
 )
-from synapse.api.constants import Membership
 from synapse.handlers.federation import FederationHandler
 from synapse.server import HomeServer
 from synapse.federation.units import Pdu
 
 from mock import NonCallableMock, ANY
 
-from ..utils import get_mock_call_args, MockKey
+from ..utils import MockKey
 
 
 class FederationTestCase(unittest.TestCase):
@@ -35,6 +34,14 @@ class FederationTestCase(unittest.TestCase):
 
         self.mock_config = NonCallableMock()
         self.mock_config.signing_key = [MockKey()]
+
+        self.state_handler = NonCallableMock(spec_set=[
+            "annotate_state_groups",
+        ])
+
+        self.auth = NonCallableMock(spec_set=[
+            "check",
+        ])
 
         self.hostname = "test"
         hs = HomeServer(
@@ -53,6 +60,8 @@ class FederationTestCase(unittest.TestCase):
                 "federation_handler",
             ]),
             config=self.mock_config,
+            auth=self.auth,
+            state_handler=self.state_handler,
         )
 
         self.datastore = hs.get_datastore()
@@ -65,74 +74,35 @@ class FederationTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_msg(self):
         pdu = Pdu(
-            pdu_type=MessageEvent.TYPE,
-            context="foo",
+            type=MessageEvent.TYPE,
+            room_id="foo",
             content={"msgtype": u"fooo"},
             origin_server_ts=0,
-            pdu_id="a",
+            event_id="$a:b",
             origin="b",
         )
 
-        store_id = "ASD"
-        self.datastore.persist_event.return_value = defer.succeed(store_id)
+        self.datastore.persist_event.return_value = defer.succeed(None)
         self.datastore.get_room.return_value = defer.succeed(True)
+
+        self.state_handler.annotate_state_groups.return_value = (
+            defer.succeed(False)
+        )
 
         yield self.handlers.federation_handler.on_receive_pdu(pdu, False)
 
         self.datastore.persist_event.assert_called_once_with(
             ANY, False, is_new_state=False
         )
-        self.notifier.on_new_room_event.assert_called_once_with(ANY, extra_users=[])
 
-    @defer.inlineCallbacks
-    def test_invite_join_target_this(self):
-        room_id = "foo"
-        user_id = "@bob:red"
-
-        pdu = Pdu(
-            pdu_type=InviteJoinEvent.TYPE,
-            user_id=user_id,
-            target_host=self.hostname,
-            context=room_id,
-            content={},
-            origin_server_ts=0,
-            pdu_id="a",
-            origin="b",
+        self.state_handler.annotate_state_groups.assert_called_once_with(
+            ANY,
+            old_state=None,
         )
 
-        yield self.handlers.federation_handler.on_receive_pdu(pdu, False)
+        self.auth.check.assert_called_once_with(ANY, raises=True)
 
-        mem_handler = self.handlers.room_member_handler
-        self.assertEquals(1, mem_handler.change_membership.call_count)
-        call_args = get_mock_call_args(
-            lambda event, do_auth: None,
-            mem_handler.change_membership
+        self.notifier.on_new_room_event.assert_called_once_with(
+            ANY,
+            extra_users=[]
         )
-        self.assertEquals(False, call_args["do_auth"])
-
-        new_event = call_args["event"]
-        self.assertEquals(RoomMemberEvent.TYPE, new_event.type)
-        self.assertEquals(room_id, new_event.room_id)
-        self.assertEquals(user_id, new_event.state_key)
-        self.assertEquals(Membership.JOIN, new_event.membership)
-
-    @defer.inlineCallbacks
-    def test_invite_join_target_other(self):
-        room_id = "foo"
-        user_id = "@bob:red"
-
-        pdu = Pdu(
-            pdu_type=InviteJoinEvent.TYPE,
-            user_id=user_id,
-            state_key="@red:not%s" % self.hostname,
-            context=room_id,
-            content={},
-            origin_server_ts=0,
-            pdu_id="a",
-            origin="b",
-        )
-
-        yield self.handlers.federation_handler.on_receive_pdu(pdu, False)
-
-        mem_handler = self.handlers.room_member_handler
-        self.assertEquals(0, mem_handler.change_membership.call_count)
