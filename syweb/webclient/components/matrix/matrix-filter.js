@@ -114,7 +114,7 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
 
 // Return the user display name
 .filter('mUserDisplayName', ['eventHandlerService', function(eventHandlerService) {
-    return function(user_id, room_id) {
-        return eventHandlerService.getUserDisplayName(room_id, user_id);
+    return function(user_id, room_id, wrap) {
+        return eventHandlerService.getUserDisplayName(room_id, user_id, wrap);
     };
 }]);

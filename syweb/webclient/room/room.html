@@ -134,13 +134,7 @@
             </div>
             <div class="userName">
                 <pie-chart ng-show="member.powerLevelNorm" data="[ (member.powerLevelNorm + 0), (100 - member.powerLevelNorm) ]"></pie-chart>
-                <span ng-show="member.displayname">
-                    {{ member.id | mUserDisplayName: room_id }}
-                </span>
-                <span ng-hide="member.displayname">
-                    {{ member.id.substr(0, member.id.indexOf(':')) }}<br/>
-                    {{ member.id.substr(member.id.indexOf(':')) }}
-                </span>
+                {{ member.id | mUserDisplayName:room_id:true }}
                 <span ng-show="member.last_active_ago" style="color: #aaa">({{ member.last_active_ago + (now - member.last_updated) | duration }})</span>
             </div>
         </div>
@@ -159,7 +153,7 @@
                          ng-class="msg.echo_msg_state">
                         {{ (msg.origin_server_ts) | date:'MMM d HH:mm' }}
                     </div>
-                    <div class="sender" ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"> {{ msg.__room_member.cnt.displayname || msg.user_id | mUserDisplayName: room_id }}</div>
+                    <div class="sender" ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"> {{ msg.__room_member.cnt.displayname || msg.user_id | mUserDisplayName:room_id:true }}</div>
                 </td>
                 <td class="avatar">
                     <!-- msg.__room_member.avatar_url is just backwards compat, and can be removed in the future. -->

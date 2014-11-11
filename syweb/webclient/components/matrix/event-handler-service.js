@@ -299,9 +299,10 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
      * Return the display name of an user acccording to data already downloaded
      * @param {String} room_id the room id
      * @param {String} user_id the id of the user
+     * @param {boolean} wrap whether to insert whitespace into the userid (if displayname not available) to help it wrap
      * @returns {String} the user displayname or user_id if not available
      */
-    var getUserDisplayName = function(room_id, user_id) {
+    var getUserDisplayName = function(room_id, user_id, wrap) {
         var displayName;
 
         // Get the user display name from the member list of the room
@@ -337,6 +338,12 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
         if (undefined === displayName) {
             // By default, use the user ID
             displayName = user_id;
+            if (wrap) {
+                displayName = user_id.substr(0, user_id.indexOf(':')) + " " + user_id.substr(user_id.indexOf(':'));
+            }
+            else {
+                displayName = user_id;
+            }
         }
         return displayName;
     };
@@ -589,10 +596,11 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
          * Return the display name of an user acccording to data already downloaded
          * @param {String} room_id the room id
          * @param {String} user_id the id of the user
+         * @param {boolean} wrap whether to insert whitespace into the userid (if displayname not available) to help it wrap
          * @returns {String} the user displayname or user_id if not available
          */
-        getUserDisplayName: function(room_id, user_id) {
-            return getUserDisplayName(room_id, user_id);
+        getUserDisplayName: function(room_id, user_id, wrap) {
+            return getUserDisplayName(room_id, user_id, wrap);
         }
     };
 }]);

@@ -537,7 +537,7 @@ textarea, input {
     margin-bottom: 6px;
     text-align: center;
     font-size: 12px;
-    word-break: break-all;
+    word-wrap: break-word;
 }
 
 .userPowerLevel {
