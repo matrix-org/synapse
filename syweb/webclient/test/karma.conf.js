@@ -22,6 +22,8 @@ module.exports = function(config) {
       '../js/angular-route.js',
       '../js/angular-animate.js',
       '../js/angular-sanitize.js',
+      '../js/jquery.peity.min.js',
+      '../js/angular-peity.js',
       '../js/ng-infinite-scroll-matrix.js',
       '../js/ui-bootstrap*',
       '../js/elastic.js',  
