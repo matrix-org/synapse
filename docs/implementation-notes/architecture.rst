@@ -11,7 +11,7 @@ As of the end of Oct 2014, Synapse's overall architecture looks like::
         |                  .------------|------.              |
         |                  | handlers/  |      |              |
         |                  |            v      |              |
-        |                  | Event*Handler<---------> rest/* <=> Client
+        |                  | Event*Handler <--------> rest/* <=> Client
         |                  | Rooms*Handler     |              |
   HSes <=> federation/* <==> FederationHandler |              |
         |      |           | PresenceHandler   |              |
