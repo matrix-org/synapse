@@ -346,6 +346,7 @@ textarea, input {
 #mainInput {
     width: 100%;
     padding: 5px;
+    resize: vertical;
 }
 
 #attachButton {
