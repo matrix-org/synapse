@@ -304,6 +304,7 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
      */
     var getUserDisplayName = function(room_id, user_id, wrap) {
         var displayName;
+        // XXX: this is getting called *way* too often - at least once per every room member per every digest...
 
         // Get the user display name from the member list of the room
         var member = modelService.getMember(room_id, user_id);
@@ -337,14 +338,16 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
 
         if (undefined === displayName) {
             // By default, use the user ID
-            displayName = user_id;
-            if (wrap) {
+            if (wrap && user_id.indexOf(':') >= 0) {
                 displayName = user_id.substr(0, user_id.indexOf(':')) + " " + user_id.substr(user_id.indexOf(':'));
             }
             else {
                 displayName = user_id;
             }
         }
+        
+        //console.log("getUserDisplayName(" + room_id + ", " + user_id + ", " + wrap +") = " + displayName);
+        
         return displayName;
     };
 
