@@ -510,7 +510,7 @@ class ReplicationLayer(object):
     @log_function
     def _handle_new_pdu(self, origin, pdu, backfilled=False):
         # We reprocess pdus when we have seen them only as outliers
-        existing = yield self._get_persisted_pdu(pdu.event_id)
+        existing = yield self._get_persisted_pdu(origin, pdu.event_id)
 
         if existing and (not existing.outlier or pdu.outlier):
             logger.debug("Already seen pdu %s", pdu.event_id)
@@ -528,7 +528,7 @@ class ReplicationLayer(object):
 
             if min_depth and pdu.depth > min_depth:
                 for event_id, hashes in pdu.prev_events:
-                    exists = yield self._get_persisted_pdu(event_id)
+                    exists = yield self._get_persisted_pdu(origin, event_id)
 
                     if not exists:
                         logger.debug("Requesting pdu %s", event_id)
