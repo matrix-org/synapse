@@ -53,7 +53,7 @@ To get up and running:
   config file: ``./synctl start`` will give you instructions on how to do this.
   For this purpose, you can use 'localhost' or your hostname as a server name.
   Once you've done so, running ``./synctl start`` again will start your private
-  home sserver. You will find a webclient running at http://localhost:8008.
+  home server. You will find a webclient running at http://localhost:8008.
   Please use a recent Chrome or Firefox for now (or Safari if you don't need
   VoIP support).
 
