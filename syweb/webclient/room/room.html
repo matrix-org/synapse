@@ -103,8 +103,8 @@
                     Set Topic
                 </button>
                 <div ng-show="room.current_room_state.state_events['m.room.topic'].content.topic || topic.isEditing">
-                    <div ng-hide="topic.isEditing" ng-dblclick="topic.editTopic()" id="roomTopic">
-                        {{ room.current_room_state.state_events['m.room.topic'].content.topic | limitTo: 200}}
+                    <div ng-hide="topic.isEditing" ng-dblclick="topic.editTopic()" id="roomTopic"
+                         ng-bind-html="room.current_room_state.state_events['m.room.topic'].content.topic | limitTo: 200 | linky:'_blank'">
                     </div>
                     <form ng-submit="topic.updateTopic()" ng-show="topic.isEditing" class="roomTopicForm">
                         <input ng-model="topic.newTopicText" ng-blur="topic.cancelEdit()" class="roomTopicInput"  placeholder="Topic"/>
