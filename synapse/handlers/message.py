@@ -16,7 +16,6 @@
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
-from synapse.api.events.room import RoomTopicEvent
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
 from ._base import BaseHandler
@@ -24,7 +23,6 @@ from ._base import BaseHandler
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 
 class MessageHandler(BaseHandler):
@@ -59,7 +57,8 @@ class MessageHandler(BaseHandler):
 #            user_id=sender_id
 #        )
 
-        # TODO (erikj): Once we work out the correct c-s api we need to think on how to do this.
+        # TODO (erikj): Once we work out the correct c-s api we need to think
+        # on how to do this.
 
         defer.returnValue(None)
 
@@ -110,7 +109,9 @@ class MessageHandler(BaseHandler):
         data_source = self.hs.get_event_sources().sources["room"]
 
         if not pagin_config.from_token:
-            pagin_config.from_token = yield self.hs.get_event_sources().get_current_token()
+            pagin_config.from_token = (
+                yield self.hs.get_event_sources().get_current_token()
+            )
 
         user = self.hs.parse_userid(user_id)
 
@@ -247,8 +248,10 @@ class MessageHandler(BaseHandler):
             d = {
                 "room_id": event.room_id,
                 "membership": event.membership,
-                "visibility": ("public" if event.room_id in
-                              public_room_ids else "private"),
+                "visibility": (
+                    "public" if event.room_id in public_room_ids
+                    else "private"
+                ),
             }
 
             if event.membership == Membership.INVITE:
@@ -277,7 +280,9 @@ class MessageHandler(BaseHandler):
                 current_state = yield self.state_handler.get_current_state(
                     event.room_id
                 )
-                d["state"] = [self.hs.serialize_event(c) for c in current_state]
+                d["state"] = [
+                    self.hs.serialize_event(c) for c in current_state
+                ]
             except:
                 logger.exception("Failed to get snapshot")
 
@@ -288,5 +293,3 @@ class MessageHandler(BaseHandler):
         }
 
         defer.returnValue(ret)
-
-
