@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
+angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'angular-peity'])
 .controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'notificationService', 'modelService',
                                function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, notificationService, modelService) {
    'use strict';
@@ -905,7 +905,20 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
         paginate(MESSAGES_PER_PAGINATION);
     };
 
-    $scope.startVoiceCall = function() {
+    $scope.checkWebRTC = function() {
+        if (!$rootScope.isWebRTCSupported()) {
+            alert("Your browser does not support WebRTC");
+            return false;
+        }
+        if ($scope.memberCount() != 2) {
+            alert("WebRTC calls are currently only supported on rooms with two members");
+            return false;
+        }
+        return true;
+    };
+    
+    $scope.startVoiceCall = function() {        
+        if (!$scope.checkWebRTC()) return;
         var call = new MatrixCall($scope.room_id);
         call.onError = $rootScope.onCallError;
         call.onHangup = $rootScope.onCallHangup;
@@ -916,6 +929,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput'])
     };
 
     $scope.startVideoCall = function() {
+        if (!$scope.checkWebRTC()) return;
+
         var call = new MatrixCall($scope.room_id);
         call.onError = $rootScope.onCallError;
         call.onHangup = $rootScope.onCallHangup;

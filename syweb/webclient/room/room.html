@@ -15,6 +15,15 @@
 
     <script type="text/ng-template" id="roomInfoTemplate.html">
         <div class="modal-body">
+            <span>
+               Invite a user: 
+                    <input ng-model="userIDToInvite" size="32" type="text" ng-enter="inviteUser()" ng-disabled="state.permission_denied" placeholder="User ID (ex:@user:homeserver)"/>     
+                    <button ng-click="inviteUser()" ng-disabled="state.permission_denied">Invite</button>
+            </span>
+            <br/>
+            <br/>
+            <button ng-click="leaveRoom()" ng-disabled="state.permission_denied">Leave Room</button>
+            </br/>
             <table class="room-info">
             <tr ng-repeat="(key, event) in roomInfo.stateEvents" class="room-info-event">
                 <td class="room-info-event-meta" width="30%">
@@ -57,6 +66,26 @@
 
     <div id="roomHeader">
         <a href ng-click="goToPage('/')"><img src="img/logo-small.png" width="100" height="43" alt="[matrix]"/></a>
+
+        <div id="controlButtons">
+            <button ng-click="startVoiceCall()" class="controlButton"
+                    style="background: url('img/voice.png')"
+                    ng-show="(currentCall == undefined || currentCall.state == 'ended')"
+                    ng-disabled="state.permission_denied"
+                    >
+            </button>
+            <button ng-click="startVideoCall()" class="controlButton"
+                    style="background: url('img/video.png')"
+                    ng-show="(currentCall == undefined || currentCall.state == 'ended')"
+                    ng-disabled="state.permission_denied"
+                    >
+            </button>
+            <button ng-click="openRoomInfo()" class="controlButton"
+                    style="background: url('img/settings.png')"
+                    >
+            </button>
+        </div>
+
         <div class="roomHeaderInfo">
 
             <div class="roomNameSection">
@@ -91,32 +120,30 @@
     <div id="roomRecentsTableWrapper">
         <div ng-include="'recents/recents.html'"></div>
     </div>
-
+    
     <div id="usersTableWrapper" ng-hide="state.permission_denied">
-        <table id="usersTable">
-            <tr ng-repeat="member in members | orderMembersList">
-                <td class="userAvatar mouse-pointer" ng-click="$parent.goToUserPage(member.id)" ng-class="member.membership == 'invite' ? 'invited' : ''">
-                    <img class="userAvatarImage" 
-                         ng-src="{{member.avatar_url || 'img/default-profile.png'}}" 
-                         alt="{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
-                         title="{{ member.id }} - power: {{ member.powerLevel }}"
-                         width="80" height="80"/>
-                    <img class="userAvatarGradient" src="img/gradient.png" title="{{ member.id }}" width="80" height="24"/>
-                    <div class="userPowerLevel" ng-style="{'width': member.powerLevelNorm +'%'}"></div>
-                    <div class="userName">
-                        <div ng-show="member.displayname">
-                            {{ member.id | mUserDisplayName: room_id }}
-                        </div>
-                        <div ng-hide="member.displayname">
-                            {{ member.id.substr(0, member.id.indexOf(':')) }}<br/>
-                            {{ member.id.substr(member.id.indexOf(':')) }}
-                        </div>
-                    </div>
-                </td>
-                <td class="userPresence" ng-class="(member.presence === 'online' ? 'online' : (member.presence === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">
-                    <span ng-show="member.last_active_ago">{{ member.last_active_ago + (now - member.last_updated) | duration }}<br/>ago</span>
-                </td>
-        </table>
+        <div ng-repeat="member in members | orderMembersList" class="userAvatar">
+            <div class="userAvatarFrame" ng-class="(member.presence === 'online' ? 'online' : (member.presence === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">
+                <img class="userAvatarImage mouse-pointer" 
+                     ng-click="$parent.goToUserPage(member.id)"
+                     ng-src="{{member.avatar_url || 'img/default-profile.png'}}" 
+                     alt="{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
+                     title="{{ member.id }} - power: {{ member.powerLevel }}"
+                     width="80" height="80"/>
+                <!-- <div class="userPowerLevel" ng-style="{'width': member.powerLevelNorm +'%'}"></div> -->
+            </div>
+            <div class="userName">
+                <pie-chart ng-show="member.powerLevelNorm" data="[ (member.powerLevelNorm + 0), (100 - member.powerLevelNorm) ]"></pie-chart>
+                <span ng-show="member.displayname">
+                    {{ member.id | mUserDisplayName: room_id }}
+                </span>
+                <span ng-hide="member.displayname">
+                    {{ member.id.substr(0, member.id.indexOf(':')) }}<br/>
+                    {{ member.id.substr(member.id.indexOf(':')) }}
+                </span>
+                <span ng-show="member.last_active_ago" style="color: #aaa">({{ member.last_active_ago + (now - member.last_updated) | duration }})</span>
+            </div>
+        </div>
     </div>
     
     <div id="messageTableWrapper" 
@@ -126,19 +153,20 @@
         <table id="messageTable" infinite-scroll="paginateMore()">
             <tr ng-repeat="msg in room.events"
                 ng-class="(room.events[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
-                <td class="leftBlock">
-                    <div class="sender" ng-hide="room.events[$index - 1].user_id === msg.user_id"> {{ msg.__room_member.cnt.displayname || msg.user_id | mUserDisplayName: room_id }}</div>
+                <td class="leftBlock" ng-mouseover="state.showTs = 1" ng-mouseout="state.showTs = 0">
                     <div class="timestamp"
+                         ng-style="{ 'opacity': state.showTs ? 1.0 : 0.0 }"
                          ng-class="msg.echo_msg_state">
                         {{ (msg.origin_server_ts) | date:'MMM d HH:mm' }}
                     </div>
+                    <div class="sender" ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"> {{ msg.__room_member.cnt.displayname || msg.user_id | mUserDisplayName: room_id }}</div>
                 </td>
                 <td class="avatar">
                     <!-- msg.__room_member.avatar_url is just backwards compat, and can be removed in the future. -->
                     <img class="avatarImage" ng-src="{{ msg.__room_member.cnt.avatar_url || msg.__room_member.avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
                          ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
-                <td ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
+                <td style="vertical-align: bottom" ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble" ng-dblclick="openJson(msg)">
                         <span ng-if="'join' === msg.content.membership && msg.changedKey === 'membership'">
                             {{ msg.content.displayname || members[msg.state_key].displayname || msg.state_key }} joined
@@ -222,49 +250,10 @@
 
     <div id="controlPanel">
         <div id="controls">
-            <table id="inputBarTable">
-                <tr>
-                    <td id="userIdCell" width="1px">
-                        {{ state.user_id }} 
-                    </td>
-                    <td width="*">
-                        <textarea id="mainInput" rows="1" ng-enter="send()"
-                                  ng-disabled="state.permission_denied"
-                                  ng-focus="true" autocomplete="off" tab-complete command-history/>
-                    </td>
-                    <td id="buttonsCell">
-                        <button ng-click="send()" ng-disabled="state.permission_denied">Send</button>
-                        <button m-file-input="imageFileToSend" class="extraControls" ng-disabled="state.permission_denied">Image</button>
-                    </td>
-                </tr>
-            </table>
-
-            <div class="extraControls">
-                <span>
-                   Invite a user: 
-                        <input ng-model="userIDToInvite" size="32" type="text" ng-enter="inviteUser()" ng-disabled="state.permission_denied" placeholder="User ID (ex:@user:homeserver)"/>     
-                        <button ng-click="inviteUser()" ng-disabled="state.permission_denied">Invite</button>
-                </span>
-                <button ng-click="leaveRoom()" ng-disabled="state.permission_denied">Leave</button>
-                <button ng-click="startVoiceCall()"
-                        ng-show="(currentCall == undefined || currentCall.state == 'ended')"
-                        ng-disabled="state.permission_denied || !isWebRTCSupported() || memberCount() != 2"
-                        title ="{{ !isWebRTCSupported() ? 'VoIP requires webRTC but your browser does not support it' : (memberCount() == 2 ? '' : 'VoIP calls can only be made in rooms with two participants') }}"
-                        >
-                    Voice Call
-                </button>
-                <button ng-click="startVideoCall()"
-                        ng-show="(currentCall == undefined || currentCall.state == 'ended')"
-                        ng-disabled="state.permission_denied || !isWebRTCSupported() || memberCount() != 2"
-                        title ="{{ !isWebRTCSupported() ? 'VoIP requires webRTC but your browser does not support it' : (memberCount() == 2 ? '' : 'VoIP calls can only be made in rooms with two participants') }}"
-                        >
-                    Video Call
-                </button>
-                <button ng-click="openRoomInfo()">
-                    Room Info
-                </button>
-            </div>
-        
+            <button id="attachButton" m-file-input="imageFileToSend" class="extraControls" ng-disabled="state.permission_denied"></button>
+            <textarea id="mainInput" rows="1" ng-enter="send()"
+                      ng-disabled="state.permission_denied"
+                      ng-focus="true" autocomplete="off" tab-complete command-history/>
             {{ feedback }}
             <div ng-show="state.stream_failure">
                 {{ state.stream_failure.data.error || "Connection failure" }}

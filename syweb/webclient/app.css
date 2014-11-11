@@ -318,7 +318,7 @@ textarea, input {
     position: absolute;
     bottom: 0px;
     width: 100%;
-    height: 100px;
+    height: 70px;
     background-color: #f8f8f8;
     border-top: #aaa 1px solid;
 }
@@ -326,7 +326,9 @@ textarea, input {
 #controls {
     max-width: 1280px;
     padding: 12px;
+    padding-right: 42px;
     margin: auto;
+    position: relative;
 }
 
 #buttonsCell {
@@ -343,7 +345,17 @@ textarea, input {
 
 #mainInput {
     width: 100%;
-    resize: none;
+    padding: 5px;
+}
+
+#attachButton {
+    position: absolute;
+    margin-top: 3px;
+    right: 0px;
+    background: url('img/attach.png');
+    width: 25px;
+    height: 25px;
+    border: 0px;
 }
 
 .blink {
@@ -415,7 +427,8 @@ textarea, input {
 .roomHeaderInfo {
     text-align: right;
     float: right;
-    margin-top: 15px;
+    margin-top: 0px;
+    margin-right: 30px;
 }
 
 /*** Room Info Dialog ***/
@@ -449,15 +462,32 @@ textarea, input {
     resize: vertical;
 }
 
+/*** Control Buttons ***/
+#controlButtons {
+    float: right;
+    margin-right: -4px;
+    padding-bottom: 6px;
+}
+
+.controlButton {
+    border: 0px;
+    width: 30px;
+    height: 30px;
+    padding-left: 3px;
+    padding-right: 3px;
+}
+
 /*** Participant list ***/
 
 #usersTableWrapper {
     float: right;
-    width: 120px;
+    clear: right;
+    width: 100px;
     height: 100%;
     overflow-y: auto;
 }
 
+/*
 #usersTable {
     width: 100%;
     border-collapse: collapse;
@@ -473,36 +503,66 @@ textarea, input {
     position: relative;
     background-color: #000;
 }
+*/
 
-.userAvatar .userAvatarImage {
-    position: absolute;
-    top: 0px;
-    object-fit: cover;
-    width: 100%;
+.userAvatar {
 }
 
+.userAvatarFrame {
+    border-radius: 46px;
+    width: 80px;
+    margin: auto;
+    position: relative;
+    border: 3px solid #aaa;
+    background-color: #aaa;
+}
+
+.userAvatarImage {
+    border-radius: 40px;
+    text-align: center;
+    object-fit: cover;
+    display: block;
+}
+
+/*
 .userAvatar .userAvatarGradient {
     position: absolute;
     bottom: 20px;
     width: 100%;
 }
+*/
 
-.userAvatar .userName {
-    position: absolute;
-    color: #fff;
-    margin: 2px;
-    bottom: 0px;
+.userName {
+    margin-top: 3px;
+    margin-bottom: 6px;
+    text-align: center;
     font-size: 12px;
     word-break: break-all;
 }
 
-.userAvatar .userPowerLevel {
+.userPowerLevel {
     position: absolute;
-    bottom: 0px;
-    height: 2px;
+    bottom: -1px;
+    height: 1px;
     background-color: #f00;
 }
 
+.userPowerLevelBar {
+    display: inline;
+    position: absolute;
+    width: 2px;
+    height: 10px;
+/*    border: 1px solid #000;
+*/    background-color: #aaa;
+}
+
+.userPowerLevelMeter {
+    position: relative;
+    bottom: 0px;
+    background-color: #f00;
+}
+
+/*
 .userPresence {
     text-align: center;
     font-size: 12px;
@@ -510,12 +570,15 @@ textarea, input {
     background-color: #aaa;
     border-bottom: 1px #ddd solid;
 }
+*/
 
 .online {
+    border-color: #38AF00;
     background-color: #38AF00;
 }
 
 .unavailable {
+    border-color: #FFCC00;
     background-color: #FFCC00;
 }
 
@@ -538,18 +601,21 @@ textarea, input {
         
 #messageTable td {
     padding: 0px;
+/*  border: 1px solid #888; */
 }
 
 .leftBlock {
-    width: 14em;
+    width: 6em;
     word-wrap: break-word;
     vertical-align: top;
     background-color: #fff;
-    color: #888;
+    color: #aaa;
     font-weight: medium;
     font-size: 12px;
     text-align: right;
+/*
     border-top: 1px #ddd solid;
+*/
 }
 
 .rightBlock {
@@ -560,13 +626,24 @@ textarea, input {
 }        
 
 .sender, .timestamp {
-    padding-right: 1em;
-    padding-left: 1em;
-    padding-top: 3px;
+/*    padding-top: 3px;
+*/}
+
+.timestamp {
+    font-size: 10px;
+    color: #ccc;
+    height: 13px;
+    margin-top: 4px;
+*/    transition-property: opacity;
+    transition-duration: 0.3s;
 }
 
 .sender {
-    margin-bottom: -3px;
+    font-size: 12px;
+/*    
+    margin-top: 5px;
+    margin-bottom: -9px;
+*/
 }
 
 .avatar {
@@ -577,7 +654,11 @@ textarea, input {
 }
 
 .avatarImage {
+    position: relative;
+    top: 5px;
     object-fit: cover;
+    border-radius: 32px;
+    margin-top: 4px;
 }
         
 .emote {
@@ -591,6 +672,7 @@ textarea, input {
 }
 
 .image {
+    border: 1px solid #888;
     display: block;
     max-width:320px;
     max-height:320px;
@@ -603,19 +685,23 @@ textarea, input {
 }
 
 .bubble {
+/*
     background-color: #eee;
     border: 1px solid #d8d8d8;
-    display: inline-block;
     margin-bottom: -1px;
-    max-width: 90%;
-    font-size: 14px;
-    word-wrap: break-word;
     padding-top: 7px;
     padding-bottom: 5px;
+    -webkit-text-size-adjust:100%
+    vertical-align: middle;
+*/
+    display: inline-block;
+    max-width: 90%;
     padding-left: 1em;
     padding-right: 1em;
-    vertical-align: middle;
-    -webkit-text-size-adjust:100%
+    padding-top: 2px;
+    padding-bottom: 2px;
+    font-size: 14px;
+    word-wrap: break-word;
 }
 
 .bubble img {
@@ -623,9 +709,11 @@ textarea, input {
     max-height: auto;
 }
 
+/*
 .differentUser td {
     padding-bottom: 5px ! important;
 }
+*/
 
 .mine {
     text-align: right;
@@ -635,13 +723,15 @@ textarea, input {
 .text.membership .bubble,
 .mine .text.emote .bubble,
 .mine .text.membership .bubble
-  {
+{
     background-color: transparent ! important;    
     border: 0px ! important;
 }
 
 .mine .text .bubble {
+/*
     background-color: #f8f8ff ! important;    
+*/
     text-align: left ! important;
 }
 
@@ -701,6 +791,8 @@ textarea, input {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+    padding-left: 0.5em;
+    padding-right: 0.5em;
 }
 
 .recentsRoom {
@@ -751,7 +843,7 @@ textarea, input {
     padding-right: 10px;
     margin-right: 10px;
     height: 100%;
-    border-right: 1px solid #ddd;
+/*    border-right: 1px solid #ddd; */
     overflow-y: auto;
 }
 

@@ -1,4 +1,13 @@
 /*** Mobile voodoo ***/
+
+/** iPads **/
+@media all and (max-device-width: 768px) {
+    #roomRecentsTableWrapper {
+        display: none;
+    }
+}
+
+/** iPhones **/
 @media all and (max-device-width: 640px) {
             
     #messageTableWrapper {
@@ -37,11 +46,16 @@
         max-width: 640px ! important;
     }    
     
+    #controls {
+        padding: 0px;
+    }
+    
     #headerUserId,
     #roomHeader img,
     #userIdCell,
     #roomRecentsTableWrapper,
     #usersTableWrapper,
+    #controlButtons,
     .extraControls {
         display: none;
     }
@@ -62,6 +76,10 @@
 
     #roomHeader {
         padding-top: 10px;
+    }
+    
+    .roomHeaderInfo {
+        margin-right: 0px;
     }
     
     #roomName {
