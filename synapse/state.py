@@ -46,6 +46,24 @@ class StateHandler(object):
     @defer.inlineCallbacks
     @log_function
     def annotate_event_with_state(self, event, old_state=None):
+        """ Annotates the event with the current state events as of that event.
+
+        This method adds three new attributes to the event:
+            * `state_events`: The state up to and including the event. Encoded
+              as a dict mapping tuple (type, state_key) -> event.
+            * `old_state_events`: The state up to, but excluding, the event.
+              Encoded similarly as `state_events`.
+            * `state_group`: If there is an existing state group that can be
+              used, then return that. Otherwise return `None`. See state
+              storage for more information.
+
+        If the argument `old_state` is given (in the form of a list of
+        events), then they are used as a the values for `old_state_events` and
+        the value for `state_events` is generated from it. `state_group` is
+        set to None.
+
+        This needs to be called before persisting the event.
+        """
         yield run_on_reactor()
 
         if old_state:
@@ -92,6 +110,16 @@ class StateHandler(object):
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
+        """ Returns the current state for the room as a list. This is done by
+        calling `get_latest_events_in_room` to get the leading edges of the
+        event graph and then resolving any of the state conflicts.
+
+        This is equivalent to getting the state of an event that were to send
+        next before receiving any new events.
+
+        If `event_type` is specified, then the method returns only the one
+        event (or None) with that `event_type` and `state_key`.
+        """
         events = yield self.store.get_latest_events_in_room(room_id)
 
         event_ids = [
@@ -110,6 +138,13 @@ class StateHandler(object):
     @defer.inlineCallbacks
     @log_function
     def resolve_state_groups(self, event_ids):
+        """ Given a list of event_ids this method fetches the state at each
+        event, resolves conflicts between them and returns them.
+
+        Return format is a tuple: (`state_group`, `state_events`), where the
+        first is the name of a state group if one and only one is involved,
+        otherwise `None`.
+        """
         state_groups = yield self.store.get_state_groups(
             event_ids
         )
