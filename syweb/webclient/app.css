@@ -649,7 +649,7 @@ textarea, input {
 .avatar {
     width: 48px;
     text-align: right;
-    vertical-align: top;
+    vertical-align: bottom;
     line-height: 0;
 }
 
