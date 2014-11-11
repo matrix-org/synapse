@@ -350,6 +350,7 @@ textarea, input {
 
 #attachButton {
     position: absolute;
+    cursor: pointer;
     margin-top: 3px;
     right: 0px;
     background: url('img/attach.png');
@@ -470,6 +471,7 @@ textarea, input {
 }
 
 .controlButton {
+    cursor: pointer;
     border: 0px;
     width: 30px;
     height: 30px;
