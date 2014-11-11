@@ -42,9 +42,6 @@ class StateHandler(object):
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
-        self._replication = hs.get_replication_layer()
-        self.server_name = hs.hostname
-        self.hs = hs
 
     @defer.inlineCallbacks
     @log_function
@@ -71,9 +68,10 @@ class StateHandler(object):
             defer.returnValue(False)
             return
 
-        new_state = yield self.resolve_state_groups(
-            [e for e, _ in event.prev_events]
-        )
+        ids = [e for e, _ in event.prev_events]
+
+        ret = yield self.resolve_state_groups(ids)
+        state_group, new_state = ret
 
         event.old_state_events = copy.deepcopy(new_state)
 
@@ -82,6 +80,10 @@ class StateHandler(object):
             if key in new_state:
                 event.replaces_state = new_state[key].event_id
             new_state[key] = event
+        elif state_group:
+            event.state_group = state_group
+            event.state_events = new_state
+            defer.returnValue(False)
 
         event.state_group = None
         event.state_events = new_state
@@ -100,7 +102,7 @@ class StateHandler(object):
         res = yield self.resolve_state_groups(event_ids)
 
         if event_type:
-            defer.returnValue(res.get((event_type, state_key)))
+            defer.returnValue(res[1].get((event_type, state_key)))
             return
 
         defer.returnValue(res.values())
@@ -112,9 +114,18 @@ class StateHandler(object):
             event_ids
         )
 
+        group_names = set(state_groups.keys())
+        if len(group_names) == 1:
+            name, state_list = state_groups.items().pop()
+            state = {
+                (e.type, e.state_key): e
+                for e in state_list
+            }
+            defer.returnValue((name, state))
+
         state = {}
-        for group in state_groups:
-            for s in group.state:
+        for group, g_state in state_groups.items():
+            for s in g_state:
                 state.setdefault(
                     (s.type, s.state_key),
                     {}
@@ -135,25 +146,29 @@ class StateHandler(object):
             new_state = {}
             new_state.update(unconflicted_state)
             for key, events in conflicted_state.items():
-                new_state[key] = yield self._resolve_state_events(events)
+                new_state[key] = self._resolve_state_events(events)
         except:
             logger.exception("Failed to resolve state")
             raise
 
-        defer.returnValue(new_state)
+        defer.returnValue((None, new_state))
 
     def _get_power_level_from_event_state(self, event, user_id):
-        key = (RoomPowerLevelsEvent.TYPE, "", )
-        power_level_event = event.old_state_events.get(key)
-        level = None
-        if power_level_event:
-            level = power_level_event.content.get("users", {}).get(user_id)
-            if not level:
-                level = power_level_event.content.get("users_default", 0)
+        if hasattr(event, "old_state_events") and event.old_state_events:
+            key = (RoomPowerLevelsEvent.TYPE, "", )
+            power_level_event = event.old_state_events.get(key)
+            level = None
+            if power_level_event:
+                level = power_level_event.content.get("users", {}).get(
+                    user_id
+                )
+                if not level:
+                    level = power_level_event.content.get("users_default", 0)
 
-        return level
+            return level
+        else:
+            return 0
 
-    @defer.inlineCallbacks
     @log_function
     def _resolve_state_events(self, events):
         curr_events = events
@@ -177,10 +192,10 @@ class StateHandler(object):
         if not curr_events:
             raise RuntimeError("Max didn't get a max?")
         elif len(curr_events) == 1:
-            defer.returnValue(curr_events[0])
+            return curr_events[0]
 
         # TODO: For now, just choose the one with the largest event_id.
-        defer.returnValue(
+        return (
             sorted(
                 curr_events,
                 key=lambda e: hashlib.sha1(

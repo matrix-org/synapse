@@ -448,8 +448,9 @@ class FederationHandler(BaseHandler):
         )
 
         if state_groups:
+            _, state = state_groups.items().pop()
             results = {
-                (e.type, e.state_key): e for e in state_groups[0].state
+                (e.type, e.state_key): e for e in state
             }
 
             event = yield self.store.get_event(event_id)

@@ -16,11 +16,6 @@
 from ._base import SQLBaseStore
 from twisted.internet import defer
 
-from collections import namedtuple
-
-
-StateGroup = namedtuple("StateGroup", ("group", "state"))
-
 
 class StateStore(SQLBaseStore):
 
@@ -37,7 +32,7 @@ class StateStore(SQLBaseStore):
             if group:
                 groups.add(group)
 
-        res = []
+        res = {}
         for group in groups:
             state_ids = yield self._simple_select_onecol(
                 table="state_groups_state",
@@ -53,7 +48,7 @@ class StateStore(SQLBaseStore):
                 if s:
                     state.append(s)
 
-            res.append(StateGroup(group, state))
+            res[group] = state
 
         defer.returnValue(res)
 
