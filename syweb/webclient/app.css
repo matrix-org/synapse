@@ -601,11 +601,11 @@ textarea, input {
         
 #messageTable td {
     padding: 0px;
-/*  border: 1px solid #888; */
+/*    border: 1px solid #888; */
 }
 
 .leftBlock {
-    width: 6em;
+    width: 7em;
     word-wrap: break-word;
     vertical-align: top;
     background-color: #fff;
@@ -649,7 +649,7 @@ textarea, input {
 .avatar {
     width: 48px;
     text-align: right;
-    vertical-align: bottom;
+    vertical-align: top;
     line-height: 0;
 }
 
@@ -709,11 +709,9 @@ textarea, input {
     max-height: auto;
 }
 
-/*
-.differentUser td {
-    padding-bottom: 5px ! important;
+.differentUser .msg {
+    padding-top: 14px ! important;
 }
-*/
 
 .mine {
     text-align: right;

@@ -152,7 +152,7 @@
          keep-scroll>
         <table id="messageTable" infinite-scroll="paginateMore()">
             <tr ng-repeat="msg in room.events"
-                ng-class="(room.events[$index + 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
+                ng-class="(room.events[$index - 1].user_id !== msg.user_id ? 'differentUser' : '') + (msg.user_id === state.user_id ? ' mine' : '')" scroll-item>
                 <td class="leftBlock" ng-mouseover="state.showTs = 1" ng-mouseout="state.showTs = 0">
                     <div class="timestamp"
                          ng-style="{ 'opacity': state.showTs ? 1.0 : 0.0 }"
@@ -166,7 +166,7 @@
                     <img class="avatarImage" ng-src="{{ msg.__room_member.cnt.avatar_url || msg.__room_member.avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
                          ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
-                <td style="vertical-align: bottom" ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
+                <td class="msg" ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble" ng-dblclick="openJson(msg)">
                         <span ng-if="'join' === msg.content.membership && msg.changedKey === 'membership'">
                             {{ msg.content.displayname || members[msg.state_key].displayname || msg.state_key }} joined
