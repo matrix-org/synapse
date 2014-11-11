@@ -70,12 +70,18 @@ class EventValidator(object):
 
                 if type(content[key]) == dict:
                     # we must go deeper
-                    msg = self._check_json(content[key], template[key])
+                    msg = self._check_json_template(
+                        content[key],
+                        template[key]
+                    )
                     if msg:
                         return msg
                 elif type(content[key]) == list:
                     # make sure each item type in content matches the template
                     for entry in content[key]:
-                        msg = self._check_json(entry, template[key][0])
+                        msg = self._check_json_template(
+                            entry,
+                            template[key][0]
+                        )
                         if msg:
                             return msg
