@@ -34,6 +34,7 @@ graph/*.png
 graph/*.dot
 
 **/webclient/config.js
-webclient/test/environment-protractor.js
+**/webclient/test/coverage/
+**/webclient/test/environment-protractor.js
 
 uploads
