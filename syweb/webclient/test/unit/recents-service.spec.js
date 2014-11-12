@@ -112,4 +112,42 @@ describe('RecentsService', function() {
         expect(recentsService.getUnreadMessages()).toEqual({});
         expect(recentsService.getUnreadBingMessages()).toEqual({});
     }));
+    
+    it('should increment the unread message count.', inject(
+    function(recentsService) {
+        recentsService.setSelectedRoomId("!someotherroomid:localhost");
+        scope.$broadcast(MSG_EVENT, testEvent, testIsLive);
+    
+        var unread = {};
+        unread[testEvent.room_id] = 1;
+        expect(recentsService.getUnreadMessages()).toEqual(unread);
+        
+        scope.$broadcast(MSG_EVENT, testEvent, testIsLive);
+        
+        unread[testEvent.room_id] = 2;
+        expect(recentsService.getUnreadMessages()).toEqual(unread);
+    }));
+    
+    it('should set the bing event to the latest message to contain a bing word.', inject(
+    function(recentsService) {
+        recentsService.setSelectedRoomId("!someotherroomid:localhost");
+        testEventContainsBingWord = true;
+        scope.$broadcast(MSG_EVENT, testEvent, testIsLive);
+    
+        var nextEvent = angular.copy(testEvent);
+        nextEvent.content.body = "Goodbye cruel world.";
+        nextEvent.event_id = "erfuerhfeaaaa@localhost";
+        scope.$broadcast(MSG_EVENT, nextEvent, testIsLive);
+        
+        var bing = {};
+        bing[testEvent.room_id] = nextEvent;
+        expect(recentsService.getUnreadBingMessages()).toEqual(bing);
+    }));
+    
+    it('should do nothing when marking an unknown room ID as read.', inject(
+    function(recentsService) {
+        recentsService.markAsRead("!someotherroomid:localhost");
+        expect(recentsService.getUnreadMessages()).toEqual({});
+        expect(recentsService.getUnreadBingMessages()).toEqual({});
+    }));
 });
