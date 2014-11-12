@@ -39,7 +39,6 @@ angular.module('matrixService', [])
     // Current version of permanent storage
     var configVersion = 0;
     var prefixPath = "/_matrix/client/api/v1";
-    var MAPPING_PREFIX = "alias_for_";
 
     var doRequest = function(method, path, params, data, $httpParams) {
         if (!config) {

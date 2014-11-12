@@ -31,6 +31,10 @@ angular.module('modelService', [])
     // alias / id lookups
     var roomIdToAlias = {};
     var aliasToRoomId = {};
+    var setRoomIdToAliasMapping = function(roomId, alias) {
+        roomIdToAlias[roomId] = alias;
+        aliasToRoomId[alias] = roomId;
+    };
     
     /***** Room Object *****/
     var Room = function Room(room_id) {
@@ -113,6 +117,9 @@ angular.module('modelService', [])
                 var rm = new RoomMember();
                 rm.event = event;
                 this.members[event.state_key] = rm;
+            }
+            else if (event.type === "m.room.aliases") {
+                setRoomIdToAliasMapping(event.room_id, event.content.aliases[0]);
             }
         },
         
@@ -210,8 +217,7 @@ angular.module('modelService', [])
         },
         
         createRoomIdToAliasMapping: function(roomId, alias) {
-            roomIdToAlias[roomId] = alias;
-            aliasToRoomId[alias] = roomId;
+            setRoomIdToAliasMapping(roomId, alias);
         },
         
         getRoomIdToAliasMapping: function(roomId) {
