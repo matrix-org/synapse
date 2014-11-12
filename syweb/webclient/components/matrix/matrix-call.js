@@ -92,7 +92,8 @@ angular.module('MatrixCall', [])
         var pc;
         if (window.mozRTCPeerConnection) {
             var iceServers = [];
-            if (MatrixCall.turnServer) {
+            // https://github.com/EricssonResearch/openwebrtc/issues/85
+            if (MatrixCall.turnServer /*&& !this.isOpenWebRTC()*/) {
                 if (MatrixCall.turnServer.uris) {
                     for (var i = 0; i < MatrixCall.turnServer.uris.length; i++) {
                         iceServers.push({
@@ -110,7 +111,8 @@ angular.module('MatrixCall', [])
             pc = new window.mozRTCPeerConnection({"iceServers":iceServers});
         } else {
             var iceServers = [];
-            if (MatrixCall.turnServer) {
+            // https://github.com/EricssonResearch/openwebrtc/issues/85
+            if (MatrixCall.turnServer /*&& !this.isOpenWebRTC()*/) {
                 if (MatrixCall.turnServer.uris) {
                     iceServers.push({
                         'urls': MatrixCall.turnServer.uris,
@@ -492,6 +494,8 @@ angular.module('MatrixCall', [])
             $timeout(function() {
                 var vel = self.getRemoteVideoElement();
                 if (vel.play) vel.play();
+                // OpenWebRTC does not support oniceconnectionstatechange yet
+                if (self.isOpenWebRTC()) self.state = 'connected';
             });
         }
     };
@@ -639,6 +643,16 @@ angular.module('MatrixCall', [])
             if (t.length) return t[0];
         }
         return null;
+    };
+
+    MatrixCall.prototype.isOpenWebRTC = function() {
+        var scripts = angular.element('script');
+        for (var i = 0; i < scripts.length; i++) {
+            if (scripts[i].src.indexOf("owr.js") > -1) {
+                return true;
+            }
+        }
+        return false;
     };
 
     return MatrixCall;
