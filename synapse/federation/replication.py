@@ -453,9 +453,12 @@ class ReplicationLayer(object):
 
         state = [Pdu(outlier=True, **p) for p in content.get("state", [])]
 
-        auth_chain = [
-            Pdu(outlier=True, **p) for p in content.get("auth_chain", [])
-        ]
+        # FIXME: We probably want to do something with the auth_chain given
+        # to us
+
+        # auth_chain = [
+        #    Pdu(outlier=True, **p) for p in content.get("auth_chain", [])
+        # ]
 
         defer.returnValue(state)
 
