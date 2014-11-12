@@ -38,9 +38,22 @@ angular.module('recentsService', [])
         // room_id: <number>
     };
     
+    var BROADCAST_UNREAD_BING_MESSAGES = "recentsService:BROADCAST_UNREAD_BING_MESSAGES(room_id, event)";
+    var unreadBingMessages = {
+        // room_id: bingEvent
+    };
+    
     // listen for new unread messages
     $rootScope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
         if (isLive && event.room_id !== selectedRoomId) {
+            if (eventHandlerService.eventContainsBingWord(event)) {
+                if (!unreadBingMessages[event.room_id]) {
+                    unreadBingMessages[event.room_id] = {};
+                }
+                unreadBingMessages[event.room_id] = event;
+                $rootScope.$broadcast(BROADCAST_UNREAD_BING_MESSAGES, event.room_id, event);
+            }
+        
             if (!unreadMessages[event.room_id]) {
                 unreadMessages[event.room_id] = 0;
             }
@@ -66,11 +79,19 @@ angular.module('recentsService', [])
             return unreadMessages;
         },
         
+        getUnreadBingMessages: function() {
+            return unreadBingMessages;
+        },
+        
         markAsRead: function(room_id) {
             if (unreadMessages[room_id]) {
                 unreadMessages[room_id] = 0;
             }
+            if (unreadBingMessages[room_id]) {
+                unreadBingMessages[room_id] = undefined;
+            }
             $rootScope.$broadcast(BROADCAST_UNREAD_MESSAGES, room_id, 0);
+            $rootScope.$broadcast(BROADCAST_UNREAD_BING_MESSAGES, room_id, undefined);
         }
     
     };

@@ -38,6 +38,12 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter'])
         $scope.unreadMessages = recentsService.getUnreadMessages();
     });
     
+    // track the list of unread BING messages: the html will use this
+    $scope.unreadBings = recentsService.getUnreadBingMessages();
+    $scope.$on(recentsService.BROADCAST_UNREAD_BING_MESSAGES, function(ngEvent, room_id, event) {
+        $scope.unreadBings = recentsService.getUnreadBingMessages();
+    });
+    
     $scope.selectRoom = function(room) {
         recentsService.markAsRead(room.room_id);
         $rootScope.goToPage('room/' + (room.room_alias ? room.room_alias : room.room_id) );

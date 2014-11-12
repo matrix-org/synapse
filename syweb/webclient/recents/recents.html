@@ -3,7 +3,7 @@
         <tbody ng-repeat="(index, room) in rooms | orderRecents" 
                ng-click="selectRoom(room)" 
                class="recentsRoom"
-               ng-class="{'recentsRoomSelected': (room.room_id === recentsSelectedRoomID), 'recentsRoomUnread': (unreadMessages[room.room_id])}">
+               ng-class="{'recentsRoomSelected': (room.room_id === recentsSelectedRoomID), 'recentsRoomBing': (unreadBings[room.room_id]), 'recentsRoomUnread': (unreadMessages[room.room_id])}">
             <tr>
                 <td ng-class="room.current_room_state.state('m.room.join_rules').content.join_rule == 'public' ? 'recentsRoomName recentsPublicRoom' : 'recentsRoomName'">
                     {{ room.room_id | mRoomName }}
