@@ -458,6 +458,10 @@ textarea, input {
     font-family: monospace;
 }
 
+.redact-button {
+    float: left
+}
+
 .room-info-textarea-content {
     height: auto;
     width: 100%;

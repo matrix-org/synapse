@@ -5,11 +5,15 @@
             <pre> {{event_selected | json}} </pre>
         </div>
         <div class="modal-footer">
-            <button ng-click="redact()" type="button" class="btn btn-danger" 
+            <button ng-click="redact()" type="button" class="btn btn-danger redact-button" 
              ng-disabled="!room.current_room_state.state('m.room.ops_levels').content.redact_level || !pow(room_id, state.user_id) || pow(room_id, state.user_id) < room.current_room_state.state('m.room.ops_levels').content.redact_level"
              title="Delete this event on all home servers. This cannot be undone.">
                 Redact
-            </button>        
+            </button>
+
+            <button ng-click="dismiss()" type="button" class="btn">
+                Close
+            </button>
         </div>
     </script>
 

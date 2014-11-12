@@ -1087,6 +1087,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         console.log("Redact event >> " + JSON.stringify($scope.event_selected));
         $modalInstance.close("redact");
     };
+    $scope.dismiss = $modalInstance.dismiss;
 })
 .controller('RoomInfoController', function($scope, $modalInstance, $filter, matrixService) {
     console.log("Displaying room info.");
