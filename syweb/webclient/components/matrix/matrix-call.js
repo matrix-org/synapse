@@ -82,7 +82,7 @@ angular.module('MatrixCall', [])
         });
     }
 
-    // FIXME: we should prevent any class from being placed or accepted before this has finished
+    // FIXME: we should prevent any calls from being placed or accepted before this has finished
     MatrixCall.getTurnServer();
 
     MatrixCall.CALL_TIMEOUT = 60000;
