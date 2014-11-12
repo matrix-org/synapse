@@ -203,7 +203,7 @@
                         
                         <span ng-show='msg.content.msgtype === "m.text"' 
                               class="message"
-                              ng-class="containsBingWord(msg.content.body) && msg.user_id != state.user_id ? msg.echo_msg_state + ' messageBing' : msg.echo_msg_state"
+                              ng-class="containsBingWord(msg) && msg.user_id != state.user_id ? msg.echo_msg_state + ' messageBing' : msg.echo_msg_state"
                               ng-bind-html="(msg.content.msgtype === 'm.text' && msg.type === 'm.room.message' && msg.content.format === 'org.matrix.custom.html') ? 
                                                                                         (msg.content.formatted_body | unsanitizedLinky) :
                                              (msg.content.msgtype === 'm.text' && msg.type === 'm.room.message') ? (msg.content.body | linky:'_blank') : '' "/>

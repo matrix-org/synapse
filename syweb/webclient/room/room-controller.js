@@ -22,14 +22,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
     var THUMBNAIL_SIZE = 320;
     
     // .html needs this
-    $scope.containsBingWord = function(content) {
-        return notificationService.containsBingWord(
-            matrixService.config().user_id,
-            matrixService.config().display_name,
-            matrixService.config().bingWords,
-            content
-        );
-    };
+    $scope.containsBingWord = eventHandlerService.eventContainsBingWord;
 
     // Room ids. Computed and resolved in onInit
     $scope.room_id = undefined;
@@ -46,12 +39,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         messages_visibility: "hidden", // In order to avoid flickering when scrolling down the message table at the page opening, delay the message table display
     };
     $scope.members = {};
-    $scope.autoCompleting = false;
-    $scope.autoCompleteIndex = 0;    
-    $scope.autoCompleteOriginal = "";
 
     $scope.imageURLToSend = "";
-    $scope.userIDToInvite = "";
     
 
     // vars and functions for updating the name
@@ -162,7 +151,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
 
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
         if (isLive && event.room_id === $scope.room_id) {
-            
             scrollToBottom();
         }
     });
@@ -841,19 +829,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
             }
         );
     }; 
-    
-    $scope.inviteUser = function() {
-        
-        matrixService.invite($scope.room_id, $scope.userIDToInvite).then(
-            function() {
-                console.log("Invited.");
-                $scope.feedback = "Invite successfully sent to " + $scope.userIDToInvite;
-                $scope.userIDToInvite = "";
-            },
-            function(reason) {
-                $scope.feedback = "Failure: " + reason.data.error;
-            });
-    };
 
     $scope.leaveRoom = function() {
         
@@ -1091,6 +1066,21 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
 })
 .controller('RoomInfoController', function($scope, $modalInstance, $filter, matrixService) {
     console.log("Displaying room info.");
+    
+    $scope.userIDToInvite = "";
+    
+    $scope.inviteUser = function() {
+        
+        matrixService.invite($scope.room_id, $scope.userIDToInvite).then(
+            function() {
+                console.log("Invited.");
+                $scope.feedback = "Invite successfully sent to " + $scope.userIDToInvite;
+                $scope.userIDToInvite = "";
+            },
+            function(reason) {
+                $scope.feedback = "Failure: " + reason.data.error;
+            });
+    };
 
     $scope.submit = function(event) {
         if (event.content) {
