@@ -17,8 +17,8 @@
 'use strict';
 
 angular.module('RecentsController', ['matrixService', 'matrixFilter'])
-.controller('RecentsController', ['$rootScope', '$scope', 'eventHandlerService', 'modelService', 
-                               function($rootScope, $scope, eventHandlerService, modelService) {
+.controller('RecentsController', ['$rootScope', '$scope', 'eventHandlerService', 'modelService', 'recentsService',
+                               function($rootScope, $scope, eventHandlerService, modelService, recentsService) {
 
     // Expose the service to the view
     $scope.eventHandlerService = eventHandlerService;
@@ -31,8 +31,11 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter'])
             // room_id: <number>
         };
     }
-
-    // $rootScope.recentsSelectedRoomID is used in the html, and is set by room-controller.
+    
+    $scope.recentsSelectedRoomID = recentsService.getSelectedRoomId();
+    $scope.$on(recentsService.BROADCAST_SELECTED_ROOM_ID, function(ngEvent, room_id) {
+        $scope.recentsSelectedRoomID = room_id;
+    });
     
     
     $scope.selectRoom = function(room) {
@@ -43,12 +46,12 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter'])
     };
     
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
-        if (isLive && event.room_id !== $rootScope.recentsSelectedRoomID) {
+        if (isLive && event.room_id !== $scope.recentsSelectedRoomID) {
             if (!$rootScope.unreadMessages[event.room_id]) {
                 $rootScope.unreadMessages[event.room_id] = 0;
             }
             $rootScope.unreadMessages[event.room_id] += 1;
-            console.log("sel="+$rootScope.recentsSelectedRoomID+" unread:"+JSON.stringify($rootScope.unreadMessages, undefined, 2));
+            console.log("sel="+$scope.recentsSelectedRoomID+" unread:"+JSON.stringify($rootScope.unreadMessages, undefined, 2));
         }
     });
 

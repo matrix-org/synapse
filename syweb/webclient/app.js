@@ -31,6 +31,7 @@ var matrixWebClient = angular.module('matrixWebClient', [
     'eventStreamService',
     'eventHandlerService',
     'notificationService',
+    'recentsService',
     'modelService',
     'infinite-scroll',
     'ui.bootstrap',
