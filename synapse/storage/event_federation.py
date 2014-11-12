@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 
 class EventFederationStore(SQLBaseStore):
+    """ Responsible for storing and serving up the various graphs associated
+    with an event. Including the main event graph and the auth chains for an
+    event.
+
+    Also has methods for getting the front (latest) and back (oldest) edges
+    of the event graphs. These are used to generate the parents for new events
+    and backfilling from another server respectively.
+    """
 
     def get_auth_chain(self, event_id):
         return self.runInteraction(
@@ -205,6 +213,8 @@ class EventFederationStore(SQLBaseStore):
         return results
 
     def get_min_depth(self, room_id):
+        """ For hte given room, get the minimum depth we have seen for it.
+        """
         return self.runInteraction(
             "get_min_depth",
             self._get_min_depth_interaction,
@@ -240,6 +250,10 @@ class EventFederationStore(SQLBaseStore):
 
     def _handle_prev_events(self, txn, outlier, event_id, prev_events,
                             room_id):
+        """
+        For the given event, update the event edges table and forward and
+        backward extremities tables.
+        """
         for e_id, _ in prev_events:
             # TODO (erikj): This could be done as a bulk insert
             self._simple_insert_txn(
@@ -267,8 +281,8 @@ class EventFederationStore(SQLBaseStore):
                     }
                 )
 
-            # We only insert as a forward extremity the new pdu if there are
-            # no other pdus that reference it as a prev pdu
+            # We only insert as a forward extremity the new event if there are
+            # no other events that reference it as a prev event
             query = (
                 "INSERT OR IGNORE INTO %(table)s (event_id, room_id) "
                 "SELECT ?, ? WHERE NOT EXISTS ("
@@ -284,7 +298,7 @@ class EventFederationStore(SQLBaseStore):
 
             txn.execute(query, (event_id, room_id, event_id))
 
-            # Insert all the prev_pdus as a backwards thing, they'll get
+            # Insert all the prev_events as a backwards thing, they'll get
             # deleted in a second if they're incorrect anyway.
             for e_id, _ in prev_events:
                 # TODO (erikj): This could be done as a bulk insert
@@ -299,7 +313,7 @@ class EventFederationStore(SQLBaseStore):
                 )
 
             # Also delete from the backwards extremities table all ones that
-            # reference pdus that we have already seen
+            # reference events that we have already seen
             query = (
                 "DELETE FROM event_backward_extremities WHERE EXISTS ("
                 "SELECT 1 FROM events "
@@ -311,17 +325,14 @@ class EventFederationStore(SQLBaseStore):
             txn.execute(query)
 
     def get_backfill_events(self, room_id, event_list, limit):
-        """Get a list of Events for a given topic that occured before (and
-        including) the pdus in pdu_list. Return a list of max size `limit`.
+        """Get a list of Events for a given topic that occurred before (and
+        including) the events in event_list. Return a list of max size `limit`
 
         Args:
             txn
             room_id (str)
             event_list (list)
             limit (int)
-
-        Return:
-            list: A list of PduTuples
         """
         return self.runInteraction(
             "get_backfill_events",
@@ -334,7 +345,6 @@ class EventFederationStore(SQLBaseStore):
             room_id, repr(event_list), limit
         )
 
-        # We seed the pdu_results with the things from the pdu_list.
         event_results = event_list
 
         front = event_list
@@ -373,5 +383,4 @@ class EventFederationStore(SQLBaseStore):
             front = new_front
             event_results += new_front
 
-        # We also want to update the `prev_pdus` attributes before returning.
         return self._get_events_txn(txn, event_results)
