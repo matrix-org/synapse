@@ -54,10 +54,17 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
                 $scope.public_rooms = response.data.chunk;
                 for (var i = 0; i < $scope.public_rooms.length; i++) {
                     var room = $scope.public_rooms[i];
-
-                    // Add room_alias & room_display_name members
-                    angular.extend(room, modelService.getRoomAliasAndDisplayName(room));
                     
+                    if (room.aliases && room.aliases.length > 0) {
+                        room.room_display_name = room.aliases[0];
+                        room.room_alias = room.aliases[0];
+                    }
+                    else if (room.name) {
+                        room.room_display_name = room.name;
+                    }
+                    else {
+                        room.room_display_name = room.room_id;
+                    }
                 }
             }
         );

@@ -179,43 +179,6 @@ angular.module('modelService', [])
             return room.current_room_state.members[user_id];
         },
         
-        /**
-         * Get the room_alias & room_display_name which are computed from data 
-         * already retrieved from the server.
-         * @param {Room object} room one element of the array returned by the response
-         *  of rooms() and publicRooms()
-         * @returns {Object} {room_alias: "...", room_display_name: "..."}
-         */
-        getRoomAliasAndDisplayName: function(room) {
-            var result = {
-                room_alias: undefined,
-                room_display_name: undefined
-            };
-            var alias = this.getRoomIdToAliasMapping(room.room_id);
-            if (alias) {
-                // use the existing alias from storage
-                result.room_alias = alias;
-                result.room_display_name = alias;
-            }
-            // XXX: this only lets us learn aliases from our local HS - we should
-            // make the client stop returning this if we can trust m.room.aliases state events
-            else if (room.aliases && room.aliases[0]) {
-                // save the mapping
-                // TODO: select the smarter alias from the array
-                this.createRoomIdToAliasMapping(room.room_id, room.aliases[0]);
-                result.room_display_name = room.aliases[0];
-                result.room_alias = room.aliases[0];
-            }
-            else if (room.membership === "invite" && "inviter" in room) {
-                result.room_display_name = room.inviter + "'s room";
-            }
-            else {
-                // last resort use the room id
-                result.room_display_name = room.room_id;
-            }
-            return result;
-        },
-        
         createRoomIdToAliasMapping: function(roomId, alias) {
             setRoomIdToAliasMapping(roomId, alias);
         },
