@@ -26,34 +26,22 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter'])
     // retrieve all rooms and expose them
     $scope.rooms = modelService.getRooms();
     
-    if (!$rootScope.unreadMessages) {
-        $rootScope.unreadMessages = {
-            // room_id: <number>
-        };
-    }
-    
+    // track the selected room ID: the html will use this
     $scope.recentsSelectedRoomID = recentsService.getSelectedRoomId();
     $scope.$on(recentsService.BROADCAST_SELECTED_ROOM_ID, function(ngEvent, room_id) {
         $scope.recentsSelectedRoomID = room_id;
     });
     
+    // track the list of unread messages: the html will use this
+    $scope.unreadMessages = recentsService.getUnreadMessages();
+    $scope.$on(recentsService.BROADCAST_UNREAD_MESSAGES, function(ngEvent, room_id, unreadCount) {
+        $scope.unreadMessages = recentsService.getUnreadMessages();
+    });
     
     $scope.selectRoom = function(room) {
-        if ($rootScope.unreadMessages[room.room_id]) {
-            $rootScope.unreadMessages[room.room_id] = 0;
-        }
+        recentsService.markAsRead(room.room_id);
         $rootScope.goToPage('room/' + (room.room_alias ? room.room_alias : room.room_id) );
     };
-    
-    $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
-        if (isLive && event.room_id !== $scope.recentsSelectedRoomID) {
-            if (!$rootScope.unreadMessages[event.room_id]) {
-                $rootScope.unreadMessages[event.room_id] = 0;
-            }
-            $rootScope.unreadMessages[event.room_id] += 1;
-            console.log("sel="+$scope.recentsSelectedRoomID+" unread:"+JSON.stringify($rootScope.unreadMessages, undefined, 2));
-        }
-    });
 
 }]);
 
