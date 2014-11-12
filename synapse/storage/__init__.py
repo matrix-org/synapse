@@ -279,13 +279,14 @@ class DataStore(RoomMemberStore, RoomStore,
             )
 
         if hasattr(event, "signatures"):
-            signatures = event.signatures.get(event.origin, {})
-
-            for key_id, signature_base64 in signatures.items():
-                signature_bytes = decode_base64(signature_base64)
-                self._store_event_origin_signature_txn(
-                    txn, event.event_id, event.origin, key_id, signature_bytes,
-                )
+            logger.debug("sigs: %s", event.signatures)
+            for name, sigs in event.signatures.items():
+                for key_id, signature_base64 in sigs.items():
+                    signature_bytes = decode_base64(signature_base64)
+                    self._store_event_signature_txn(
+                        txn, event.event_id, name, key_id,
+                        signature_bytes,
+                    )
 
         for prev_event_id, prev_hashes in event.prev_events:
             for alg, hash_base64 in prev_hashes.items():

@@ -37,15 +37,15 @@ CREATE INDEX IF NOT EXISTS event_reference_hashes_id ON event_reference_hashes (
 );
 
 
-CREATE TABLE IF NOT EXISTS event_origin_signatures (
+CREATE TABLE IF NOT EXISTS event_signatures (
     event_id TEXT,
-    origin TEXT,
+    signature_name TEXT,
     key_id TEXT,
     signature BLOB,
     CONSTRAINT uniqueness UNIQUE (event_id, key_id)
 );
 
-CREATE INDEX IF NOT EXISTS event_origin_signatures_id ON event_origin_signatures (
+CREATE INDEX IF NOT EXISTS event_signatures_id ON event_signatures (
     event_id
 );
 
