@@ -36,6 +36,7 @@ class Auth(object):
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
+        self.state = hs.get_state_handler()
 
     def check(self, event, raises=False):
         """ Checks if this event is correctly authed.
@@ -90,7 +91,7 @@ class Auth(object):
             )
             logger.info("Denying! %s", event)
             if raises:
-                raise e
+                raise
 
         return False
 
@@ -109,9 +110,21 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def check_host_in_room(self, room_id, host):
-        joined_hosts = yield self.store.get_joined_hosts_for_room(room_id)
+        curr_state = yield self.state.get_current_state(room_id)
 
-        defer.returnValue(host in joined_hosts)
+        for event in curr_state:
+            if event.type == RoomMemberEvent.TYPE:
+                try:
+                    if self.hs.parse_userid(event.state_key).domain != host:
+                        continue
+                except:
+                    logger.warn("state_key not user_id: %s", event.state_key)
+                    continue
+
+                if event.content["membership"] == Membership.JOIN:
+                    defer.returnValue(True)
+
+        defer.returnValue(False)
 
     def check_event_sender_in_room(self, event):
         key = (RoomMemberEvent.TYPE, event.user_id, )

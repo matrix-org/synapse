@@ -70,7 +70,8 @@ class StateStore(SQLBaseStore):
                 values={
                     "room_id": event.room_id,
                     "event_id": event.event_id,
-                }
+                },
+                or_ignore=True,
             )
 
             for state in event.state_events.values():
@@ -83,7 +84,8 @@ class StateStore(SQLBaseStore):
                         "type": state.type,
                         "state_key": state.state_key,
                         "event_id": state.event_id,
-                    }
+                    },
+                    or_ignore=True,
                 )
 
         self._simple_insert_txn(
@@ -92,5 +94,6 @@ class StateStore(SQLBaseStore):
             values={
                 "state_group": state_group,
                 "event_id": event.event_id,
-            }
+            },
+            or_replace=True,
         )

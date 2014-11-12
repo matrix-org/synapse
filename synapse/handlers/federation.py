@@ -229,12 +229,6 @@ class FederationHandler(BaseHandler):
     @log_function
     @defer.inlineCallbacks
     def do_invite_join(self, target_host, room_id, joinee, content, snapshot):
-        hosts = yield self.store.get_joined_hosts_for_room(room_id)
-        if self.hs.hostname in hosts:
-            # We are already in the room.
-            logger.debug("We're already in the room apparently")
-            defer.returnValue(False)
-
         pdu = yield self.replication_layer.make_join(
             target_host,
             room_id,
@@ -268,7 +262,7 @@ class FederationHandler(BaseHandler):
 
             logger.debug("do_invite_join state: %s", state)
 
-            is_new_state = yield self.state_handler.annotate_event_with_state(
+            yield self.state_handler.annotate_event_with_state(
                 event,
                 old_state=state
             )
@@ -296,13 +290,13 @@ class FederationHandler(BaseHandler):
                 yield self.store.persist_event(
                     e,
                     backfilled=False,
-                    is_new_state=False
+                    is_new_state=True
                 )
 
             yield self.store.persist_event(
                 event,
                 backfilled=False,
-                is_new_state=is_new_state
+                is_new_state=True
             )
         finally:
             room_queue = self.room_queues[room_id]

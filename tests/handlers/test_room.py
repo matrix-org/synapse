@@ -44,7 +44,6 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             ]),
             datastore=NonCallableMock(spec_set=[
                 "persist_event",
-                "get_joined_hosts_for_room",
                 "get_room_member",
                 "get_room",
                 "store_room",
@@ -58,9 +57,14 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "profile_handler",
                 "federation_handler",
             ]),
-            auth=NonCallableMock(spec_set=["check", "add_auth_events"]),
+            auth=NonCallableMock(spec_set=[
+                "check",
+                "add_auth_events",
+                "check_host_in_room",
+            ]),
             state_handler=NonCallableMock(spec_set=[
                 "annotate_event_with_state",
+                "get_current_state",
             ]),
             config=self.mock_config,
         )
@@ -76,6 +80,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.notifier = hs.get_notifier()
         self.state_handler = hs.get_state_handler()
         self.distributor = hs.get_distributor()
+        self.auth = hs.get_auth()
         self.hs = hs
 
         self.handlers.federation_handler = self.federation
@@ -108,11 +113,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             content=content,
         )
 
-        joined = ["red", "green"]
-
-        self.datastore.get_joined_hosts_for_room.return_value = (
-            defer.succeed(joined)
-        )
+        self.auth.check_host_in_room.return_value = defer.succeed(True)
 
         store_id = "store_id_fooo"
         self.datastore.persist_event.return_value = defer.succeed(store_id)
@@ -164,12 +165,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             room_id=room_id,
         )
 
-        joined = ["red", "green"]
-
-        def get_joined(*args):
-            return defer.succeed(joined)
-
-        self.datastore.get_joined_hosts_for_room.side_effect = get_joined
+        self.auth.check_host_in_room.return_value = defer.succeed(True)
 
         store_id = "store_id_fooo"
         self.datastore.persist_event.return_value = defer.succeed(store_id)

@@ -267,8 +267,6 @@ class ReplicationLayer(object):
         transaction = Transaction(**transaction_data)
 
         pdus = [Pdu(outlier=True, **p) for p in transaction.pdus]
-        for pdu in pdus:
-            yield self._handle_new_pdu(destination, pdu)
 
         defer.returnValue(pdus)
 
@@ -452,15 +450,12 @@ class ReplicationLayer(object):
         )
 
         logger.debug("Got content: %s", content)
+
         state = [Pdu(outlier=True, **p) for p in content.get("state", [])]
-        for pdu in state:
-            yield self._handle_new_pdu(destination, pdu)
 
         auth_chain = [
             Pdu(outlier=True, **p) for p in content.get("auth_chain", [])
         ]
-        for pdu in auth_chain:
-            yield self._handle_new_pdu(destination, pdu)
 
         defer.returnValue(state)
 

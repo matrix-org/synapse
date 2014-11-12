@@ -24,6 +24,7 @@ from synapse.api.events.room import (
     RoomTopicEvent, RoomNameEvent, RoomJoinRulesEvent,
 )
 from synapse.util import stringutils
+from synapse.util.async import run_on_reactor
 from ._base import BaseHandler
 
 import logging
@@ -432,9 +433,12 @@ class RoomMemberHandler(BaseHandler):
         # that we are allowed to join when we decide whether or not we
         # need to do the invite/join dance.
 
-        hosts = yield self.store.get_joined_hosts_for_room(room_id)
+        is_host_in_room = yield self.auth.check_host_in_room(
+            event.room_id,
+            self.hs.hostname
+        )
 
-        if self.hs.hostname in hosts:
+        if is_host_in_room:
             should_do_dance = False
         elif room_host:
             should_do_dance = True
@@ -517,6 +521,8 @@ class RoomMemberHandler(BaseHandler):
     @defer.inlineCallbacks
     def _do_local_membership_update(self, event, membership, snapshot,
                                     do_auth):
+        yield run_on_reactor()
+
         # If we're inviting someone, then we should also send it to that
         # HS.
         target_user_id = event.state_key

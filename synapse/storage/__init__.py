@@ -186,6 +186,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 "events",
                 vals,
                 or_replace=(not outlier),
+                or_ignore=bool(outlier),
             )
         except:
             logger.warn(
@@ -217,7 +218,12 @@ class DataStore(RoomMemberStore, RoomStore,
             if hasattr(event, "replaces_state"):
                 vals["prev_state"] = event.replaces_state
 
-            self._simple_insert_txn(txn, "state_events", vals)
+            self._simple_insert_txn(
+                txn,
+                "state_events",
+                vals,
+                or_replace=True,
+            )
 
             self._simple_insert_txn(
                 txn,
@@ -227,7 +233,8 @@ class DataStore(RoomMemberStore, RoomStore,
                     "room_id": event.room_id,
                     "type": event.type,
                     "state_key": event.state_key,
-                }
+                },
+                or_replace=True,
             )
 
             for e_id, h in event.prev_state:
@@ -252,7 +259,8 @@ class DataStore(RoomMemberStore, RoomStore,
                         "room_id": event.room_id,
                         "type": event.type,
                         "state_key": event.state_key,
-                    }
+                    },
+                    or_replace=True,
                 )
 
                 for prev_state_id, _ in event.prev_state:
