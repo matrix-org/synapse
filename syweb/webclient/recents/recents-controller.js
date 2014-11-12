@@ -25,10 +25,32 @@ angular.module('RecentsController', ['matrixService', 'matrixFilter'])
     
     // retrieve all rooms and expose them
     $scope.rooms = modelService.getRooms();
+    
+    if (!$rootScope.unreadMessages) {
+        $rootScope.unreadMessages = {
+            // room_id: <number>
+        };
+    }
 
-    // $rootScope of the parent where the recents component is included can override this value
-    // in order to highlight a specific room in the list
-    $rootScope.recentsSelectedRoomID;
+    // $rootScope.recentsSelectedRoomID is used in the html, and is set by room-controller.
+    
+    
+    $scope.selectRoom = function(room) {
+        if ($rootScope.unreadMessages[room.room_id]) {
+            $rootScope.unreadMessages[room.room_id] = 0;
+        }
+        $rootScope.goToPage('room/' + (room.room_alias ? room.room_alias : room.room_id) );
+    };
+    
+    $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
+        if (isLive && event.room_id !== $rootScope.recentsSelectedRoomID) {
+            if (!$rootScope.unreadMessages[event.room_id]) {
+                $rootScope.unreadMessages[event.room_id] = 0;
+            }
+            $rootScope.unreadMessages[event.room_id] += 1;
+            console.log("sel="+$rootScope.recentsSelectedRoomID+" unread:"+JSON.stringify($rootScope.unreadMessages, undefined, 2));
+        }
+    });
 
 }]);
 

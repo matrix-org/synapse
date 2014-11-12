@@ -804,7 +804,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         console.log("onInit3");
 
         // Make recents highlight the current room
-        $scope.recentsSelectedRoomID = $scope.room_id;
+        $rootScope.recentsSelectedRoomID = $scope.room_id;
 
         // Init the history for this room
         history.init();

@@ -1,9 +1,9 @@
 <div ng-controller="RecentsController">
     <table class="recentsTable">
         <tbody ng-repeat="(index, room) in rooms | orderRecents" 
-               ng-click="goToPage('room/' + (room.room_alias ? room.room_alias : room.room_id) )" 
-               class="recentsRoom" 
-               ng-class="{'recentsRoomSelected': (room.room_id === recentsSelectedRoomID)}">                                           
+               ng-click="selectRoom(room)" 
+               class="recentsRoom"
+               ng-class="{'recentsRoomSelected': (room.room_id === recentsSelectedRoomID), 'recentsRoomUnread': (unreadMessages[room.room_id])}">
             <tr>
                 <td ng-class="room.current_room_state.state('m.room.join_rules').content.join_rule == 'public' ? 'recentsRoomName recentsPublicRoom' : 'recentsRoomName'">
                     {{ room.room_id | mRoomName }}
