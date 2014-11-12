@@ -17,8 +17,8 @@ limitations under the License.
 'use strict';
 
 angular.module('HomeController', ['matrixService', 'eventHandlerService', 'RecentsController'])
-.controller('HomeController', ['$scope', '$location', 'matrixService', 'eventHandlerService', 
-                               function($scope, $location, matrixService, eventHandlerService) {
+.controller('HomeController', ['$scope', '$location', 'matrixService', 'eventHandlerService', 'modelService',
+                               function($scope, $location, matrixService, eventHandlerService, modelService) {
 
     $scope.config = matrixService.config();
     $scope.public_rooms = [];
@@ -56,7 +56,7 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
                     var room = $scope.public_rooms[i];
 
                     // Add room_alias & room_display_name members
-                    angular.extend(room, matrixService.getRoomAliasAndDisplayName(room));
+                    angular.extend(room, modelService.getRoomAliasAndDisplayName(room));
                     
                 }
             }
@@ -75,7 +75,7 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
                 // This room has been created. Refresh the rooms list
                 console.log("Created room " + response.data.room_alias + " with id: "+
                 response.data.room_id);
-                matrixService.createRoomIdToAliasMapping(
+                modelService.createRoomIdToAliasMapping(
                     response.data.room_id, response.data.room_alias);
             },
             function(error) {

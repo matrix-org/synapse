@@ -92,7 +92,7 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
     };
 
     var handleRoomAliases = function(event, isLiveEvent) {
-        matrixService.createRoomIdToAliasMapping(event.room_id, event.content.aliases[0]);
+        modelService.createRoomIdToAliasMapping(event.room_id, event.content.aliases[0]);
     };
     
     var displayNotification = function(event) {

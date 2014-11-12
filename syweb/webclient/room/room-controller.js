@@ -490,7 +490,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
                                 // with or without port as is appropriate and append it at this point
                             }
                             
-                            var room_id = matrixService.getAliasToRoomIdMapping(room_alias);
+                            var room_id = modelService.getAliasToRoomIdMapping(room_alias);
                             console.log("joining " + room_alias + " id=" + room_id);
                             if ($scope.room) { // TODO actually check that you = join
                                 // don't send a join event for a room you're already in.
@@ -677,7 +677,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         if (room_id_or_alias && '!' === room_id_or_alias[0]) {
             // Yes. We can go on right now
             $scope.room_id = room_id_or_alias;
-            $scope.room_alias = matrixService.getRoomIdToAliasMapping($scope.room_id);
+            $scope.room_alias = modelService.getRoomIdToAliasMapping($scope.room_id);
             onInit2();
         }
         else {

@@ -28,7 +28,7 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
 
         // If there is an alias, use it
         // TODO: only one alias is managed for now
-        var alias = matrixService.getRoomIdToAliasMapping(room_id);
+        var alias = modelService.getRoomIdToAliasMapping(room_id);
         var room = modelService.getRoom(room_id).current_room_state;
         
         var room_name_event = room.state("m.room.name");

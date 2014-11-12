@@ -8,10 +8,6 @@ describe('mRoomName filter', function() {
     
     // mocked services which return the test values above.
     var matrixService = {
-        getRoomIdToAliasMapping: function(room_id) {
-            return testAlias;
-        },
-        
         config: function() {
             return {
                 user_id: testUserId
@@ -33,7 +29,11 @@ describe('mRoomName filter', function() {
             return {
                 current_room_state: testRoomState
             };
-        }
+        },
+        
+        getRoomIdToAliasMapping: function(room_id) {
+            return testAlias;
+        },
     };
     
     beforeEach(function() {
