@@ -898,7 +898,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         call.onError = $rootScope.onCallError;
         call.onHangup = $rootScope.onCallHangup;
         // remote video element is used for playing audio in voice calls
-        call.remoteVideoElement = angular.element('#remoteVideo')[0];
+        call.remoteVideoSelector = angular.element('#remoteVideo')[0];
         call.placeVoiceCall();
         $rootScope.currentCall = call;
     };
