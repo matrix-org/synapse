@@ -96,8 +96,9 @@ describe('RecentsService', function() {
         recentsService.markAsRead(testEvent.room_id);
         
         unread[testEvent.room_id] = 0;
+        bing[testEvent.room_id] = undefined;
         expect(recentsService.getUnreadMessages()).toEqual(unread);
-        expect(recentsService.getUnreadBingMessages()).toEqual({});
+        expect(recentsService.getUnreadBingMessages()).toEqual(bing);
     }));
     
     it('should not add messages as unread if they are not live.', inject(
