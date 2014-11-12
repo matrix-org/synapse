@@ -40,6 +40,8 @@ class FederationHandler(BaseHandler):
         of the home server (including auth and state conflict resoultion)
         b) converting events that were produced by local clients that may need
         to be sent to remote home servers.
+        c) doing the necessary dances to invite remote users and join remote
+        rooms.
     """
 
     def __init__(self, hs):
@@ -102,6 +104,8 @@ class FederationHandler(BaseHandler):
 
         logger.debug("Got event: %s", event.event_id)
 
+        # If we are currently in the process of joining this room, then we
+        # queue up events for later processing.
         if event.room_id in self.room_queues:
             self.room_queues[event.room_id].append(pdu)
             return
@@ -187,6 +191,8 @@ class FederationHandler(BaseHandler):
     @log_function
     @defer.inlineCallbacks
     def backfill(self, dest, room_id, limit):
+        """ Trigger a backfill request to `dest` for the given `room_id`
+        """
         extremities = yield self.store.get_oldest_events_in_room(room_id)
 
         pdus = yield self.replication_layer.backfill(
@@ -212,6 +218,10 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def send_invite(self, target_host, event):
+        """ Sends the invite to the remote server for signing.
+
+        Invites must be signed by the invitee's server before distribution.
+        """
         pdu = yield self.replication_layer.send_invite(
             destination=target_host,
             context=event.room_id,
@@ -229,6 +239,17 @@ class FederationHandler(BaseHandler):
     @log_function
     @defer.inlineCallbacks
     def do_invite_join(self, target_host, room_id, joinee, content, snapshot):
+        """ Attempts to join the `joinee` to the room `room_id` via the
+        server `target_host`.
+
+        This first triggers a /make_join/ request that returns a partial
+        event that we can fill out and sign. This is then sent to the
+        remote server via /send_join/ which responds with the state at that
+        event and the auth_chains.
+
+        We suspend processing of any received events from this room until we
+        have finished processing the join.
+        """
         pdu = yield self.replication_layer.make_join(
             target_host,
             room_id,
@@ -313,6 +334,10 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     @log_function
     def on_make_join_request(self, context, user_id):
+        """ We've received a /make_join/ request, so we create a partial
+        join event for the room and return that. We don *not* persist or
+        process it until the other server has signed it and sent it back.
+        """
         event = self.event_factory.create_event(
             etype=RoomMemberEvent.TYPE,
             content={"membership": Membership.JOIN},
@@ -335,6 +360,9 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     @log_function
     def on_send_join_request(self, origin, pdu):
+        """ We have received a join event for a room. Fully process it and
+        respond with the current state and auth chains.
+        """
         event = self.pdu_codec.event_from_pdu(pdu)
 
         event.outlier = False
@@ -403,6 +431,10 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def on_invite_request(self, origin, pdu):
+        """ We've got an invite event. Process and persist it. Sign it.
+
+        Respond with the now signed event.
+        """
         event = self.pdu_codec.event_from_pdu(pdu)
 
         event.outlier = True
