@@ -131,17 +131,20 @@ header files for python C extensions.
 
 Installing prerequisites on Ubuntu::
 
-    $ sudo apt-get install build-essential python2.7-dev libffi-dev
+    $ sudo apt-get install build-essential python2.7-dev libffi-dev \
+                           python-pip python-setuptools
 
 Installing prerequisites on Mac OS X::
 
     $ xcode-select --install
 
-Synapse uses NaCl (http://nacl.cr.yp.to/) for encryption and digital
-signatures. Unfortunately PyNACL currently has a few issues
+Synapse uses NaCl (http://nacl.cr.yp.to/) for encryption and digital signatures.
+Unfortunately PyNACL currently has a few issues
 (https://github.com/pyca/pynacl/issues/53) and
 (https://github.com/pyca/pynacl/issues/79) that mean it may not install
-correctly. To fix try re-installing from PyPI or directly from (https://github.com/pyca/pynacl)::
+correctly, causing all tests to fail with errors about missing "sodium.h". To
+fix try re-installing from PyPI or directly from
+(https://github.com/pyca/pynacl)::
 
     $ # Install from PyPI
     $ pip install --user --upgrade --force pynacl
@@ -158,8 +161,18 @@ To install the synapse homeserver run::
 This installs synapse, along with the libraries it uses, into
 ``$HOME/.local/lib/``.
 
+To actually run your new homeserver, <FIXME: WHAT DIRECTORY DO I RUN FROM? WHERE
+DO MY CONFIG FILES AND LOGS LIVE? ISN'T THERE A STANDARD LOCATION IF INSTALLING
+INTO ?>, ``synctl start`` and follow the instructions.
+
 Homeserver Development
 ======================
+
+To check out a homeserver for development, clone the git repo into a working
+directory of your choice:
+
+    $ git clone https://github.com/matrix-org/synapse.git
+    $ cd synapse
 
 The homeserver has a number of external dependencies, that are easiest
 to install by making setup.py do so, in --user mode::
