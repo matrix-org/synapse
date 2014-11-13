@@ -638,7 +638,7 @@ textarea, input {
     color: #ccc;
     height: 13px;
     margin-top: 4px;
-*/    transition-property: opacity;
+    transition-property: opacity;
     transition-duration: 0.3s;
 }
 
