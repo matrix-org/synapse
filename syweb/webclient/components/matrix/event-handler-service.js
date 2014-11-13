@@ -110,7 +110,33 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
     
     var displayNotification = function(event) {
         if (window.Notification && event.user_id != matrixService.config().user_id) {
-            var shouldBing = containsBingWord(event);
+            var member = modelService.getMember(event.room_id, event.user_id);
+            var displayname = getUserDisplayName(event.room_id, event.user_id);
+            var message;
+            var shouldBing = false;
+            
+            if (event.type === "m.room.message") {
+                shouldBing = containsBingWord(event);
+                message = event.content.body;
+                if (event.content.msgtype === "m.emote") {
+                    message = "* " + displayname + " " + message;
+                }
+                else if (event.content.msgtype === "m.image") {
+                    message = displayname + " sent an image.";
+                }
+            }
+            else if (event.type == "m.room.member") {
+                // Notify when another user joins only
+                if (event.state_key !== matrixService.config().user_id  && "join" === event.content.membership) {
+                    member = modelService.getMember(event.room_id, event.state_key);
+                    displayname = getUserDisplayName(event.room_id, event.state_key);
+                    message = displayname + " joined";
+                    shouldBing = true;
+                }
+                else {
+                    return;
+                }
+            }
 
             // Ideally we would notify only when the window is hidden (i.e. document.hidden = true).
             //
@@ -133,17 +159,7 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
             
             if (shouldBing && isIdle) {
                 console.log("Displaying notification for "+JSON.stringify(event));
-                var member = modelService.getMember(event.room_id, event.user_id);
-                var displayname = getUserDisplayName(event.room_id, event.user_id);
 
-                var message = event.content.body;
-                if (event.content.msgtype === "m.emote") {
-                    message = "* " + displayname + " " + message;
-                }
-                else if (event.content.msgtype === "m.image") {
-                    message = displayname + " sent an image.";
-                }
-                
                 var roomTitle = $filter("mRoomName")(event.room_id);
                 
                 notificationService.showNotification(
@@ -240,6 +256,10 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
         // list. This has to be done after room state is updated.
         if (memberChanges) {
             room.addMessageEvent(event, !isLiveEvent);
+            
+            if (memberChanges === "membership" && isLiveEvent) {
+                displayNotification(event);
+            }
         }
         
         

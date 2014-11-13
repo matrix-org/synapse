@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'angular-peity'])
-.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'notificationService', 'modelService', 'recentsService', 'commandsService',
-                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, notificationService, modelService, recentsService, commandsService) {
+.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'modelService', 'recentsService', 'commandsService',
+                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, modelService, recentsService, commandsService) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -185,25 +185,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
             else {
                 scrollToBottom();
                 updateMemberList(event); 
-
-                // Notify when a user joins
-                if ((document.hidden  || matrixService.presence.unavailable === mPresence.getState())
-                        && event.state_key !== $scope.state.user_id  && "join" === event.membership) {
-                    var userName = event.content.displayname;
-                    if (!userName) {
-                        userName = event.state_key;
-                    }
-                    notificationService.showNotification(
-                        userName +
-                        " (" + $filter("mRoomName")(event.room_id) + ")",
-                        userName + " joined",
-                        event.content.avatar_url ? event.content.avatar_url : undefined,
-                        function() {
-                            console.log("notification.onclick() room=" + event.room_id);
-                            $rootScope.goToPage('room/' + event.room_id); 
-                        }
-                    );
-                }
             }
         }
     });
