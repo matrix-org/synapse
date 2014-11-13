@@ -161,9 +161,11 @@ To install the synapse homeserver run::
 This installs synapse, along with the libraries it uses, into
 ``$HOME/.local/lib/``.
 
-To actually run your new homeserver, <FIXME: WHAT DIRECTORY DO I RUN FROM? WHERE
-DO MY CONFIG FILES AND LOGS LIVE? ISN'T THERE A STANDARD LOCATION IF INSTALLING
-INTO ?>, ``synctl start`` and follow the instructions.
+To actually run your new homeserver, pick a working directory for Synapse to run (e.g. ``~/.synapse``), and::
+
+    $ mkdir ~/.synapse
+    $ cd ~/.synapse
+    $ synctl start
 
 Homeserver Development
 ======================
