@@ -95,14 +95,22 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
         modelService.createRoomIdToAliasMapping(event.room_id, event.content.aliases[0]);
     };
     
+    var containsBingWord = function(event) {
+        if (!event.content || !event.content.body) {
+            return false;
+        }
+    
+        return notificationService.containsBingWord(
+            matrixService.config().user_id,
+            matrixService.config().display_name,
+            matrixService.config().bingWords,
+            event.content.body
+        );
+    };
+    
     var displayNotification = function(event) {
         if (window.Notification && event.user_id != matrixService.config().user_id) {
-            var shouldBing = notificationService.containsBingWord(
-                matrixService.config().user_id,
-                matrixService.config().display_name,
-                matrixService.config().bingWords,
-                event.content.body
-            );
+            var shouldBing = containsBingWord(event);
 
             // Ideally we would notify only when the window is hidden (i.e. document.hidden = true).
             //
@@ -527,6 +535,10 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
 
         resetRoomMessages: function(room_id) {
             resetRoomMessages(room_id);
+        },
+        
+        eventContainsBingWord: function(event) {
+            return containsBingWord(event);
         },
         
         /**

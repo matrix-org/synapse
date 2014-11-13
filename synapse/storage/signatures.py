@@ -103,24 +103,30 @@ class SignatureStore(SQLBaseStore):
             or_ignore=True,
         )
 
-
-    def _get_event_origin_signatures_txn(self, txn, event_id):
+    def _get_event_signatures_txn(self, txn, event_id):
         """Get all the signatures for a given PDU.
         Args:
             txn (cursor):
             event_id (str): Id for the Event.
         Returns:
-            A dict of key_id -> signature_bytes.
+            A dict of sig name -> dict(key_id -> signature_bytes)
         """
         query = (
-            "SELECT key_id, signature"
-            " FROM event_origin_signatures"
+            "SELECT signature_name, key_id, signature"
+            " FROM event_signatures"
             " WHERE event_id = ? "
         )
         txn.execute(query, (event_id, ))
-        return dict(txn.fetchall())
+        rows = txn.fetchall()
 
-    def _store_event_origin_signature_txn(self, txn, event_id, origin, key_id,
+        res = {}
+
+        for name, key, sig in rows:
+            res.setdefault(name, {})[key] = sig
+
+        return res
+
+    def _store_event_signature_txn(self, txn, event_id, signature_name, key_id,
                                           signature_bytes):
         """Store a signature from the origin server for a PDU.
         Args:
@@ -132,10 +138,10 @@ class SignatureStore(SQLBaseStore):
         """
         self._simple_insert_txn(
             txn,
-            "event_origin_signatures",
+            "event_signatures",
             {
                 "event_id": event_id,
-                "origin": origin,
+                "signature_name": signature_name,
                 "key_id": key_id,
                 "signature": buffer(signature_bytes),
             },

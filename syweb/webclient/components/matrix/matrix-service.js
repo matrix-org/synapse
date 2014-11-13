@@ -23,7 +23,7 @@ This serves to isolate the caller from changes to the underlying url paths, as
 well as attach common params (e.g. access_token) to requests.
 */
 angular.module('matrixService', [])
-.factory('matrixService', ['$http', '$q', '$rootScope', function($http, $q, $rootScope) {
+.factory('matrixService', ['$http', '$q', function($http, $q) {
         
    /* 
     * Permanent storage of user information

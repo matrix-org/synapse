@@ -15,21 +15,14 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'angular-peity'])
-.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'notificationService', 'modelService',
-                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, notificationService, modelService) {
+.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'notificationService', 'modelService', 'recentsService',
+                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, notificationService, modelService, recentsService) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
     
     // .html needs this
-    $scope.containsBingWord = function(content) {
-        return notificationService.containsBingWord(
-            matrixService.config().user_id,
-            matrixService.config().display_name,
-            matrixService.config().bingWords,
-            content
-        );
-    };
+    $scope.containsBingWord = eventHandlerService.eventContainsBingWord;
 
     // Room ids. Computed and resolved in onInit
     $scope.room_id = undefined;
@@ -46,12 +39,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         messages_visibility: "hidden", // In order to avoid flickering when scrolling down the message table at the page opening, delay the message table display
     };
     $scope.members = {};
-    $scope.autoCompleting = false;
-    $scope.autoCompleteIndex = 0;    
-    $scope.autoCompleteOriginal = "";
 
     $scope.imageURLToSend = "";
-    $scope.userIDToInvite = "";
     
 
     // vars and functions for updating the name
@@ -162,7 +151,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
 
     $scope.$on(eventHandlerService.MSG_EVENT, function(ngEvent, event, isLive) {
         if (isLive && event.room_id === $scope.room_id) {
-            
             scrollToBottom();
         }
     });
@@ -804,7 +792,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         console.log("onInit3");
 
         // Make recents highlight the current room
-        $scope.recentsSelectedRoomID = $scope.room_id;
+        recentsService.setSelectedRoomId($scope.room_id);
 
         // Init the history for this room
         history.init();
@@ -841,19 +829,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
             }
         );
     }; 
-    
-    $scope.inviteUser = function() {
-        
-        matrixService.invite($scope.room_id, $scope.userIDToInvite).then(
-            function() {
-                console.log("Invited.");
-                $scope.feedback = "Invite successfully sent to " + $scope.userIDToInvite;
-                $scope.userIDToInvite = "";
-            },
-            function(reason) {
-                $scope.feedback = "Failure: " + reason.data.error;
-            });
-    };
 
     $scope.leaveRoom = function() {
         
@@ -923,7 +898,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         call.onError = $rootScope.onCallError;
         call.onHangup = $rootScope.onCallHangup;
         // remote video element is used for playing audio in voice calls
-        call.remoteVideoElement = angular.element('#remoteVideo')[0];
+        call.remoteVideoSelector = angular.element('#remoteVideo')[0];
         call.placeVoiceCall();
         $rootScope.currentCall = call;
     };
@@ -1091,6 +1066,21 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
 })
 .controller('RoomInfoController', function($scope, $modalInstance, $filter, matrixService) {
     console.log("Displaying room info.");
+    
+    $scope.userIDToInvite = "";
+    
+    $scope.inviteUser = function() {
+        
+        matrixService.invite($scope.room_id, $scope.userIDToInvite).then(
+            function() {
+                console.log("Invited.");
+                $scope.feedback = "Invite successfully sent to " + $scope.userIDToInvite;
+                $scope.userIDToInvite = "";
+            },
+            function(reason) {
+                $scope.feedback = "Failure: " + reason.data.error;
+            });
+    };
 
     $scope.submit = function(event) {
         if (event.content) {

@@ -812,6 +812,14 @@ textarea, input {
     background-color: #eee;
 }
 
+.recentsRoomUnread {
+    background-color: #fee;
+}
+
+.recentsRoomBing {
+    background-color: #eef;
+}
+
 .recentsRoomName {
     font-size: 16px;
     padding-top: 7px;

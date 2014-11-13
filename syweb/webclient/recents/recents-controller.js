@@ -17,18 +17,37 @@
 'use strict';
 
 angular.module('RecentsController', ['matrixService', 'matrixFilter'])
-.controller('RecentsController', ['$rootScope', '$scope', 'eventHandlerService', 'modelService', 
-                               function($rootScope, $scope, eventHandlerService, modelService) {
+.controller('RecentsController', ['$rootScope', '$scope', 'eventHandlerService', 'modelService', 'recentsService',
+                               function($rootScope, $scope, eventHandlerService, modelService, recentsService) {
 
     // Expose the service to the view
     $scope.eventHandlerService = eventHandlerService;
     
     // retrieve all rooms and expose them
     $scope.rooms = modelService.getRooms();
-
-    // $rootScope of the parent where the recents component is included can override this value
-    // in order to highlight a specific room in the list
-    $rootScope.recentsSelectedRoomID;
+    
+    // track the selected room ID: the html will use this
+    $scope.recentsSelectedRoomID = recentsService.getSelectedRoomId();
+    $scope.$on(recentsService.BROADCAST_SELECTED_ROOM_ID, function(ngEvent, room_id) {
+        $scope.recentsSelectedRoomID = room_id;
+    });
+    
+    // track the list of unread messages: the html will use this
+    $scope.unreadMessages = recentsService.getUnreadMessages();
+    $scope.$on(recentsService.BROADCAST_UNREAD_MESSAGES, function(ngEvent, room_id, unreadCount) {
+        $scope.unreadMessages = recentsService.getUnreadMessages();
+    });
+    
+    // track the list of unread BING messages: the html will use this
+    $scope.unreadBings = recentsService.getUnreadBingMessages();
+    $scope.$on(recentsService.BROADCAST_UNREAD_BING_MESSAGES, function(ngEvent, room_id, event) {
+        $scope.unreadBings = recentsService.getUnreadBingMessages();
+    });
+    
+    $scope.selectRoom = function(room) {
+        recentsService.markAsRead(room.room_id);
+        $rootScope.goToPage('room/' + (room.room_alias ? room.room_alias : room.room_id) );
+    };
 
 }]);
 

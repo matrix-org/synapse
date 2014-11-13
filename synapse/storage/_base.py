@@ -470,12 +470,15 @@ class SQLBaseStore(object):
         select_event_sql = "SELECT * FROM events WHERE event_id = ?"
 
         for i, ev in enumerate(events):
-            signatures = self._get_event_origin_signatures_txn(
+            signatures = self._get_event_signatures_txn(
                 txn, ev.event_id,
             )
 
             ev.signatures = {
-                k: encode_base64(v) for k, v in signatures.items()
+                n: {
+                    k: encode_base64(v) for k, v in s.items()
+                }
+                for n, s in signatures.items()
             }
 
             prevs = self._get_prev_events_and_state(txn, ev.event_id)
