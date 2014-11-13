@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'angular-peity'])
-.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'notificationService', 'modelService', 'recentsService',
-                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, notificationService, modelService, recentsService) {
+.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'notificationService', 'modelService', 'recentsService', 'commandsService',
+                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, notificationService, modelService, recentsService, commandsService) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -435,172 +435,18 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         // Store the command in the history
         history.push(input);
 
-        var promise;
-        var cmd;
-        var args;
+        var promise = commandsService.processInput($scope.room_id, input);
         var echo = false;
+        var isEmote = input.indexOf("/me ") === 0;
         
-        // Check for IRC style commands first
-        // trim any trailing whitespace, as it can confuse the parser for IRC-style commands
-        input = input.replace(/\s+$/, "");
-        
-        if (input[0] === "/" && input[1] !== "/") {
-            var bits = input.match(/^(\S+?)( +(.*))?$/);
-            cmd = bits[1];
-            args = bits[3];
-            
-            console.log("cmd: " + cmd + ", args: " + args);
-            
-            switch (cmd) {
-                case "/me":
-                    promise = matrixService.sendEmoteMessage($scope.room_id, args);
-                    echo = true;
-                    break;
-                    
-                case "/nick":
-                    // Change user display name
-                    if (args) {
-                        promise = matrixService.setDisplayName(args);                     
-                    }
-                    else {
-                        $scope.feedback = "Usage: /nick <display_name>";
-                    }
-                    break;
-
-                case "/join":
-                    // Join a room
-                    if (args) {
-                        var matches = args.match(/^(\S+)$/);
-                        if (matches) {
-                            var room_alias = matches[1];
-                            if (room_alias.indexOf(':') == -1) {
-                                // FIXME: actually track the :domain style name of our homeserver
-                                // with or without port as is appropriate and append it at this point
-                            }
-                            
-                            var room_id = modelService.getAliasToRoomIdMapping(room_alias);
-                            console.log("joining " + room_alias + " id=" + room_id);
-                            if ($scope.room) { // TODO actually check that you = join
-                                // don't send a join event for a room you're already in.
-                                $location.url("room/" + room_alias);
-                            }
-                            else {
-                                promise = matrixService.joinAlias(room_alias).then(
-                                    function(response) {
-                                        // TODO: factor out the common housekeeping whenever we try to join a room or alias
-                                        matrixService.roomState(response.room_id).then(
-                                            function(response) {
-                                                eventHandlerService.handleEvents(response.data, false, true);
-                                            },
-                                            function(error) {
-                                                $scope.feedback = "Failed to get room state for: " + response.room_id;
-                                            }
-                                        );                                        
-                                        $location.url("room/" + room_alias);
-                                    },
-                                    function(error) {
-                                        $scope.feedback = "Can't join room: " + JSON.stringify(error.data);
-                                    }
-                                );
-                            }
-                        }
-                    }
-                    else {
-                        $scope.feedback = "Usage: /join <room_alias>";
-                    }
-                    break;
-                    
-                case "/kick":
-                    // Kick a user from the room with an optional reason
-                    if (args) {
-                        var matches = args.match(/^(\S+?)( +(.*))?$/);
-                        if (matches) {
-                            promise = matrixService.kick($scope.room_id, matches[1], matches[3]);
-                        }
-                    }
-
-                    if (!promise) {
-                        $scope.feedback = "Usage: /kick <userId> [<reason>]";
-                    }
-                    break;
-
-                case "/ban":
-                    // Ban a user from the room with an optional reason
-                    if (args) {
-                        var matches = args.match(/^(\S+?)( +(.*))?$/);
-                        if (matches) {
-                            promise = matrixService.ban($scope.room_id, matches[1], matches[3]);
-                        }
-                    }
-                    
-                    if (!promise) {
-                        $scope.feedback = "Usage: /ban <userId> [<reason>]";
-                    }
-                    break;
-
-                case "/unban":
-                    // Unban a user from the room
-                    if (args) {
-                        var matches = args.match(/^(\S+)$/);
-                        if (matches) {
-                            // Reset the user membership to "leave" to unban him
-                            promise = matrixService.unban($scope.room_id, matches[1]);
-                        }
-                    }
-                    
-                    if (!promise) {
-                        $scope.feedback = "Usage: /unban <userId>";
-                    }
-                    break;
-                    
-                case "/op":
-                    // Define the power level of a user
-                    if (args) {
-                        var matches = args.match(/^(\S+?)( +(\d+))?$/);
-                        var powerLevel = 50; // default power level for op
-                        if (matches) {
-                            var user_id = matches[1];
-                            if (matches.length === 4 && undefined !== matches[3]) {
-                                powerLevel = parseInt(matches[3]);
-                            }
-                            if (powerLevel !== NaN) {
-                                var powerLevelEvent = $scope.room.current_room_state.state("m.room.power_levels");
-                                promise = matrixService.setUserPowerLevel($scope.room_id, user_id, powerLevel, powerLevelEvent);
-                            }
-                        }
-                    }
-                    
-                    if (!promise) {
-                        $scope.feedback = "Usage: /op <userId> [<power level>]";
-                    }
-                    break;
-                    
-                case "/deop":
-                    // Reset the power level of a user
-                    if (args) {
-                        var matches = args.match(/^(\S+)$/);
-                        if (matches) {
-                            var powerLevelEvent = $scope.room.current_room_state.state("m.room.power_levels");
-                            promise = matrixService.setUserPowerLevel($scope.room_id, args, undefined, powerLevelEvent);
-                        }
-                    }
-                    
-                    if (!promise) {
-                        $scope.feedback = "Usage: /deop <userId>";
-                    }
-                    break;
-                
-                default:
-                    $scope.feedback = ("Unrecognised IRC-style command: " + cmd);
-                    break;
-            }
-        }
-        
-        // By default send this as a message unless it's an IRC-style command
-        if (!promise && !cmd) {
-            // Make the request
-            promise = matrixService.sendTextMessage($scope.room_id, input);
+        if (!promise) { // not a non-echoable command
             echo = true;
+            if (isEmote) {
+                promise = matrixService.sendEmoteMessage($scope.room_id, input.substring(4));
+            }
+            else {
+                promise = matrixService.sendTextMessage($scope.room_id, input);
+            }
         }
         
         if (echo) {
@@ -608,8 +454,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
             // To do so, create a minimalist fake text message event and add it to the in-memory list of room messages
             var echoMessage = {
                 content: {
-                    body: (cmd === "/me" ? args : input),
-                    msgtype: (cmd === "/me" ? "m.emote" : "m.text"),
+                    body: (isEmote ? input.substring(4) : input),
+                    msgtype: (isEmote ? "m.emote" : "m.text"),
                 },
                 origin_server_ts: new Date().getTime(), // fake a timestamp
                 room_id: $scope.room_id,
@@ -642,7 +488,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
                     }         
                 },
                 function(error) {
-                    $scope.feedback = "Request failed: " + error.data.error;
+                    $scope.feedback = error.data.error;
 
                     if (echoMessage) {
                         // Mark the message as unsent for the rest of the page life
