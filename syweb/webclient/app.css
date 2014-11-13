@@ -489,7 +489,7 @@ textarea, input {
 #usersTableWrapper {
     float: right;
     clear: right;
-    width: 100px;
+    width: 101px;
     height: 100%;
     overflow-y: auto;
 }
