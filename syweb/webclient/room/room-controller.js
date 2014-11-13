@@ -435,9 +435,13 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         // Store the command in the history
         history.push(input);
 
-        var promise = commandsService.processInput($scope.room_id, input);
-        var echo = false;
         var isEmote = input.indexOf("/me ") === 0;
+        var promise;
+        if (!isEmote) {
+            promise = commandsService.processInput($scope.room_id, input);
+        }
+        var echo = false;
+        
         
         if (!promise) { // not a non-echoable command
             echo = true;
