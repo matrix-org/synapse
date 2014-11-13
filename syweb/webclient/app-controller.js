@@ -21,18 +21,20 @@ limitations under the License.
 'use strict';
 
 angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'eventStreamService'])
-.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', '$timeout', '$animate', 'matrixService', 'mPresence', 'eventStreamService', 'eventHandlerService', 'matrixPhoneService', 'modelService',
-                               function($scope, $location, $rootScope, $timeout, $animate, matrixService, mPresence, eventStreamService, eventHandlerService, matrixPhoneService, modelService) {
+.controller('MatrixWebClientController', ['$scope', '$location', '$rootScope', '$timeout', 'matrixService', 'mPresence', 'eventStreamService', 'eventHandlerService', 'matrixPhoneService', 'modelService',
+                               function($scope, $location, $rootScope, $timeout, matrixService, mPresence, eventStreamService, eventHandlerService, matrixPhoneService, modelService) {
          
     // Check current URL to avoid to display the logout button on the login page
     $scope.location = $location.path();
 
+/*
     // disable nganimate for the local and remote video elements because ngAnimate appears
     // to be buggy and leaves animation classes on the video elements causing them to show
     // when they should not (their animations are pure CSS3)
     $animate.enabled(false, angular.element('#localVideo'));
     $animate.enabled(false, angular.element('#remoteVideo'));
-    
+*/
+  
     // Update the location state when the ng location changed
     $rootScope.$on('$routeChangeSuccess', function (event, current, previous) {
         $scope.location = $location.path();
