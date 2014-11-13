@@ -144,19 +144,106 @@ angular.module('RoomController')
         });
     };
 }])
+// A directive which stores text sent into it and restores it via up/down arrows
 .directive('commandHistory', [ function() {
-    return function (scope, element, attrs) {
-        element.bind("keydown", function (event) {
-            var keycodePressed = event.which;
-            var UP_ARROW = 38;
-            var DOWN_ARROW = 40;
-            if (keycodePressed === UP_ARROW) {
-                scope.history.goUp(event);
+    var BROADCAST_NEW_HISTORY_ITEM = "commandHistory:BROADCAST_NEW_HISTORY_ITEM(item)";
+
+    // Manage history of typed messages
+    // History is saved in sessionStorage so that it survives when the user
+    // navigates through the rooms and when it refreshes the page
+    var history = {
+        // The list of typed messages. Index 0 is the more recents
+        data: [],
+
+        // The position in the history currently displayed
+        position: -1,
+        
+        element: undefined,
+        roomId: undefined,
+
+        // The message the user has started to type before going into the history
+        typingMessage: undefined,
+
+        // Init/load data for the current room
+        init: function(element, roomId) {
+            this.roomId = roomId;
+            this.element = element;
+            var data = sessionStorage.getItem("history_" + this.roomId);
+            if (data) {
+                this.data = JSON.parse(data);
             }
-            else if (keycodePressed === DOWN_ARROW) {
-                scope.history.goDown(event);
-            } 
-        });
+        },
+
+        // Store a message in the history
+        push: function(message) {
+            this.data.unshift(message);
+
+            // Update the session storage
+            sessionStorage.setItem("history_" + this.roomId, JSON.stringify(this.data));
+
+            // Reset history position
+            this.position = -1;
+            this.typingMessage = undefined;
+        },
+
+        // Move in the history
+        go: function(offset) {
+
+            if (-1 === this.position) {
+                // User starts to go to into the history, save the current line
+                this.typingMessage = this.element.val();
+            }
+            else {
+                // If the user modified this line in history, keep the change
+                this.data[this.position] = this.element.val();
+            }
+
+            // Bounds the new position to valid data
+            var newPosition = this.position + offset;
+            newPosition = Math.max(-1, newPosition);
+            newPosition = Math.min(newPosition, this.data.length - 1);
+            this.position = newPosition;
+
+            if (-1 !== this.position) {
+                // Show the message from the history
+                this.element.val(this.data[this.position]);
+            }
+            else if (undefined !== this.typingMessage) {
+                // Go back to the message the user started to type
+                this.element.val(this.typingMessage);
+            }
+        }
+    };
+
+    return {
+        restrict: "AE",
+        scope: {
+            roomId: "=commandHistory"
+        },
+        link: function (scope, element, attrs) {
+            element.bind("keydown", function (event) {
+                var keycodePressed = event.which;
+                var UP_ARROW = 38;
+                var DOWN_ARROW = 40;
+                if (scope.roomId) {
+                    if (keycodePressed === UP_ARROW) {
+                        history.go(1);
+                        event.preventDefault();
+                    }
+                    else if (keycodePressed === DOWN_ARROW) {
+                        history.go(-1);
+                        event.preventDefault();
+                    }
+                }
+            });
+            
+            scope.$on(BROADCAST_NEW_HISTORY_ITEM, function(ngEvent, item) {
+                history.push(item);
+            });
+            
+            history.init(element, scope.roomId);
+        },
+        
     }
 }])
 

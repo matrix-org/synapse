@@ -251,7 +251,7 @@
             <button id="attachButton" m-file-input="imageFileToSend" class="extraControls" ng-disabled="state.permission_denied"></button>
             <textarea id="mainInput" rows="1" ng-enter="send()"
                       ng-disabled="state.permission_denied"
-                      ng-focus="true" autocomplete="off" tab-complete command-history/>
+                      ng-focus="true" autocomplete="off" tab-complete command-history="room_id"/>
             {{ feedback }}
             <div ng-show="state.stream_failure">
                 {{ state.stream_failure.data.error || "Connection failure" }}

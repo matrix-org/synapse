@@ -414,7 +414,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         scrollToBottom(true);
 
         // Store the command in the history
-        history.push(input);
+        $rootScope.$broadcast("commandHistory:BROADCAST_NEW_HISTORY_ITEM(item)",
+                              input);
 
         var isEmote = input.indexOf("/me ") === 0;
         var promise;
@@ -625,9 +626,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         // Make recents highlight the current room
         recentsService.setSelectedRoomId($scope.room_id);
 
-        // Init the history for this room
-        history.init();
-
         // Get the up-to-date the current member list
         matrixService.getMemberList($scope.room_id).then(
             function(response) {
@@ -744,84 +742,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         call.remoteVideoSelector = '#remoteVideo';
         call.placeVideoCall();
         $rootScope.currentCall = call;
-    };
-
-    // Manage history of typed messages
-    // History is saved in sessionStoratge so that it survives when the user
-    // navigates through the rooms and when it refreshes the page
-    var history = {
-        // The list of typed messages. Index 0 is the more recents
-        data: [],
-
-        // The position in the history currently displayed
-        position: -1,
-
-        // The message the user has started to type before going into the history
-        typingMessage: undefined,
-
-        // Init/load data for the current room
-        init: function() {
-            var data = sessionStorage.getItem("history_" + $scope.room_id);
-            if (data) {
-                this.data = JSON.parse(data);
-            }
-        },
-
-        // Store a message in the history
-        push: function(message) {
-            this.data.unshift(message);
-
-            // Update the session storage
-            sessionStorage.setItem("history_" + $scope.room_id, JSON.stringify(this.data));
-
-            // Reset history position
-            this.position = -1;
-            this.typingMessage = undefined;
-        },
-
-        // Move in the history
-        go: function(offset) {
-
-            if (-1 === this.position) {
-                // User starts to go to into the history, save the current line
-                this.typingMessage = $('#mainInput').val();
-            }
-            else {
-                // If the user modified this line in history, keep the change
-                this.data[this.position] = $('#mainInput').val();
-            }
-
-            // Bounds the new position to valid data
-            var newPosition = this.position + offset;
-            newPosition = Math.max(-1, newPosition);
-            newPosition = Math.min(newPosition, this.data.length - 1);
-            this.position = newPosition;
-
-            if (-1 !== this.position) {
-                // Show the message from the history
-                $('#mainInput').val(this.data[this.position]);
-            }
-            else if (undefined !== this.typingMessage) {
-                // Go back to the message the user started to type
-                $('#mainInput').val(this.typingMessage);
-            }
-        }
-    };
-
-    // Make history singleton methods available from HTML
-    $scope.history = {
-        goUp: function($event) {
-            if ($scope.room_id) {
-                history.go(1);
-            }
-            $event.preventDefault();
-        },
-        goDown: function($event) {
-            if ($scope.room_id) {
-                history.go(-1);
-            }
-            $event.preventDefault();
-        }
     };
 
     $scope.openJson = function(content) {
