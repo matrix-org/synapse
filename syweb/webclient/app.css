@@ -77,18 +77,6 @@ textarea, input {
     -webkit-filter: hue-rotate(-90deg);
 }
 
-#callEndedIcon {
-    transition:all linear 0.5s;
-}
-
-#callEndedIcon {
-    transform: rotateZ(45deg);
-}
-
-#callEndedIcon.ng-hide {
-    transform: rotateZ(0deg);
-}
-
 #callPeerImage {
     width: 32px;
     height: 32px;
