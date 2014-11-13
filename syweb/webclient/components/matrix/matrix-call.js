@@ -112,7 +112,7 @@ angular.module('MatrixCall', [])
         } else {
             var iceServers = [];
             // https://github.com/EricssonResearch/openwebrtc/issues/85
-            if (MatrixCall.turnServer /*&& !this.isOpenWebRTC()*/) {
+            if (MatrixCall.turnServer && !this.isOpenWebRTC()) {
                 if (MatrixCall.turnServer.uris) {
                     iceServers.push({
                         'urls': MatrixCall.turnServer.uris,

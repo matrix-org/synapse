@@ -16,7 +16,6 @@
     <script src="js/angular.js"></script>
     <script src="js/angular-route.min.js"></script>
     <script src="js/angular-sanitize.min.js"></script>
-    <script src="js/angular-animate.min.js"></script>
     <script src="js/jquery.peity.min.js"></script>
     <script src="js/angular-peity.js"></script>
     <script type='text/javascript' src="js/ui-bootstrap-tpls-0.11.2.js"></script>
@@ -66,8 +65,7 @@
         <div id="headerContent" ng-hide="'/login' == location || '/register' == location">
             <div id="callBar" ng-show="currentCall">
                 <img id="callPeerImage" ng-show="currentCall.userProfile.avatar_url" ngSrc="{{ currentCall.userProfile.avatar_url }}" />
-                <img class="callIcon" src="img/green_phone.png" ng-show="currentCall.state != 'ended'" />
-                <img class="callIcon" id="callEndedIcon" src="img/red_phone.png" ng-show="currentCall.state == 'ended'" />
+                <img class="callIcon" src="img/green_phone.png" ng-show="!!currentCall" ng-class="currentCall.state" />
                 <div id="callPeerNameAndState">
                     <span id="callPeerName">{{ currentCall.userProfile.displayname }}</span>
                     <br />

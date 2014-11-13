@@ -66,6 +66,15 @@ textarea, input {
     margin-left: 4px;
     margin-right: 4px;
     margin-top: 8px;
+    transition: transform linear 0.5s;
+    transition: -webkit-transform linear 0.5s;
+}
+
+.callIcon.ended {
+    transform: rotateZ(45deg);
+    -webkit-transform: rotateZ(45deg);
+    filter: hue-rotate(-90deg);
+    -webkit-filter: hue-rotate(-90deg);
 }
 
 #callEndedIcon {
