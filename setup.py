@@ -55,6 +55,7 @@ setup(
     long_description=read("README.rst"),
     entry_points="""
     [console_scripts]
+    synctl=synapse.app.synctl:main
     synapse-homeserver=synapse.app.homeserver:run
     """
 )
