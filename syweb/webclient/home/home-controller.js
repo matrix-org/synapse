@@ -17,8 +17,8 @@ limitations under the License.
 'use strict';
 
 angular.module('HomeController', ['matrixService', 'eventHandlerService', 'RecentsController'])
-.controller('HomeController', ['$scope', '$location', 'matrixService', 'eventHandlerService', 'modelService',
-                               function($scope, $location, matrixService, eventHandlerService, modelService) {
+.controller('HomeController', ['$scope', '$location', 'matrixService', 'eventHandlerService', 'modelService', 'recentsService',
+                               function($scope, $location, matrixService, eventHandlerService, modelService, recentsService) {
 
     $scope.config = matrixService.config();
     $scope.public_rooms = [];
@@ -46,6 +46,8 @@ angular.module('HomeController', ['matrixService', 'eventHandlerService', 'Recen
     $scope.newChat = {
         user: ""
     };
+    
+    recentsService.setSelectedRoomId(undefined);
 
     var refresh = function() {
         
