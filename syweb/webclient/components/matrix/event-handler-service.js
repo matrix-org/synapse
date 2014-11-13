@@ -106,7 +106,7 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
     var displayNotification = function(event) {
         if (window.Notification && event.user_id != matrixService.config().user_id) {
             var member = modelService.getMember(event.room_id, event.user_id);
-            var displayname = getUserDisplayName(event.room_id, event.user_id);
+            var displayname = $filter("mUserDisplayName")(event.user_id, event.room_id);
             var message;
             var shouldBing = false;
             
@@ -124,7 +124,7 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
                 // Notify when another user joins only
                 if (event.state_key !== matrixService.config().user_id  && "join" === event.content.membership) {
                     member = modelService.getMember(event.room_id, event.state_key);
-                    displayname = getUserDisplayName(event.room_id, event.state_key);
+                    displayname = $filter("mUserDisplayName")(event.state_key, event.room_id);
                     message = displayname + " joined";
                     shouldBing = true;
                 }
@@ -263,6 +263,7 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
     };
     
     var handlePresence = function(event, isLiveEvent) {
+        // presence is always current, so clobber.
         modelService.setUser(event);
         $rootScope.$broadcast(PRESENCE_EVENT, event, isLiveEvent);
     };
@@ -317,62 +318,6 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
             console.log("Redacted an event.");
         }
     }
-
-    /**
-     * Return the display name of an user acccording to data already downloaded
-     * @param {String} room_id the room id
-     * @param {String} user_id the id of the user
-     * @param {boolean} wrap whether to insert whitespace into the userid (if displayname not available) to help it wrap
-     * @returns {String} the user displayname or user_id if not available
-     */
-    var getUserDisplayName = function(room_id, user_id, wrap) {
-        var displayName;
-
-        // Get the user display name from the member list of the room
-        var member = modelService.getMember(room_id, user_id);
-        if (member) {
-            member = member.event;
-        }
-        if (member && member.content.displayname) { // Do not consider null displayname
-            displayName = member.content.displayname;
-
-            // Disambiguate users who have the same displayname in the room
-            if (user_id !== matrixService.config().user_id) {
-                var room = modelService.getRoom(room_id);
-
-                for (var member_id in room.current_room_state.members) {
-                    if (room.current_room_state.members.hasOwnProperty(member_id) && member_id !== user_id) {
-                        var member2 = room.current_room_state.members[member_id].event;
-                        if (member2.content.displayname && member2.content.displayname === displayName) {
-                            displayName = displayName + " (" + user_id + ")";
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        // The user may not have joined the room yet. So try to resolve display name from presence data
-        // Note: This data may not be available
-        if (undefined === displayName) {
-            var usr = modelService.getUser(user_id);
-            if (usr) {
-                displayName = usr.event.content.displayname;
-            }
-        }
-
-        if (undefined === displayName) {
-            // By default, use the user ID
-            if (wrap && user_id.indexOf(':') >= 0) {
-                displayName = user_id.substr(0, user_id.indexOf(':')) + " " + user_id.substr(user_id.indexOf(':'));
-            }
-            else {
-                displayName = user_id;
-            }
-        }
-        
-        return displayName;
-    };
 
     return {
         ROOM_CREATE_EVENT: ROOM_CREATE_EVENT,
@@ -620,17 +565,6 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
                 }
             }
             return powerLevel;
-        },
-        
-        /**
-         * Return the display name of an user acccording to data already downloaded
-         * @param {String} room_id the room id
-         * @param {String} user_id the id of the user
-         * @param {boolean} wrap whether to insert whitespace into the userid (if displayname not available) to help it wrap
-         * @returns {String} the user displayname or user_id if not available
-         */
-        getUserDisplayName: function(room_id, user_id, wrap) {
-            return getUserDisplayName(room_id, user_id, wrap);
         }
     };
 }]);

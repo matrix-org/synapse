@@ -21,8 +21,8 @@ angular.module('matrixFilter', [])
 // Compute the room name according to information we have
 // TODO: It would be nice if this was stateless and had no dependencies. That would
 //       make the business logic here a lot easier to see.
-.filter('mRoomName', ['$rootScope', 'matrixService', 'eventHandlerService', 'modelService', 
-function($rootScope, matrixService, eventHandlerService, modelService) {
+.filter('mRoomName', ['$rootScope', 'matrixService', 'modelService', 'mUserDisplayNameFilter',
+function($rootScope, matrixService, modelService, mUserDisplayNameFilter) {
     return function(room_id) {
         var roomName;
 
@@ -55,7 +55,7 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
 
                     var member = room.members[i].event;
                     if (member.state_key !== user_id) {
-                        roomName = eventHandlerService.getUserDisplayName(room_id, member.state_key);
+                        roomName = mUserDisplayNameFilter(member.state_key, room_id);
                         if (!roomName) {
                             roomName = member.state_key;
                         }
@@ -72,20 +72,20 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
                     // be a self chat.
                     if (room.members[otherUserId].event.content.membership === "invite") {
                         // someone invited us, use the right ID.
-                        roomName = eventHandlerService.getUserDisplayName(room_id, room.members[otherUserId].event.user_id);
+                        roomName = mUserDisplayNameFilter(room.members[otherUserId].event.user_id, room_id);
                         if (!roomName) {
                             roomName = room.members[otherUserId].event.user_id;
                         }
                     }
                     else {
-                        roomName = eventHandlerService.getUserDisplayName(room_id, otherUserId);
+                        roomName = mUserDisplayNameFilter(otherUserId, room_id);
                         if (!roomName) {
                             roomName = user_id;
                         }
                     }
                 }
                 else { // it isn't us, so use their name if we know it.
-                    roomName = eventHandlerService.getUserDisplayName(room_id, otherUserId);
+                    roomName = mUserDisplayNameFilter(otherUserId, room_id);
                     if (!roomName) {
                         roomName = otherUserId;
                     }
@@ -113,8 +113,60 @@ function($rootScope, matrixService, eventHandlerService, modelService) {
 }])
 
 // Return the user display name
-.filter('mUserDisplayName', ['eventHandlerService', function(eventHandlerService) {
+.filter('mUserDisplayName', ['modelService', 'matrixService', function(modelService, matrixService) {
+    /**
+     * Return the display name of an user acccording to data already downloaded
+     * @param {String} user_id the id of the user
+     * @param {String} room_id the room id
+     * @param {boolean} wrap whether to insert whitespace into the userid (if displayname not available) to help it wrap
+     * @returns {String} A suitable display name for the user.
+     */
     return function(user_id, room_id, wrap) {
-        return eventHandlerService.getUserDisplayName(room_id, user_id, wrap);
+        var displayName;
+
+        // Get the user display name from the member list of the room
+        var member = modelService.getMember(room_id, user_id);
+        if (member) {
+            member = member.event;
+        }
+        if (member && member.content.displayname) { // Do not consider null displayname
+            displayName = member.content.displayname;
+
+            // Disambiguate users who have the same displayname in the room
+            if (user_id !== matrixService.config().user_id) {
+                var room = modelService.getRoom(room_id);
+
+                for (var member_id in room.current_room_state.members) {
+                    if (room.current_room_state.members.hasOwnProperty(member_id) && member_id !== user_id) {
+                        var member2 = room.current_room_state.members[member_id].event;
+                        if (member2.content.displayname && member2.content.displayname === displayName) {
+                            displayName = displayName + " (" + user_id + ")";
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // The user may not have joined the room yet. So try to resolve display name from presence data
+        // Note: This data may not be available
+        if (undefined === displayName) {
+            var usr = modelService.getUser(user_id);
+            if (usr) {
+                displayName = usr.event.content.displayname;
+            }
+        }
+
+        if (undefined === displayName) {
+            // By default, use the user ID
+            if (wrap && user_id.indexOf(':') >= 0) {
+                displayName = user_id.substr(0, user_id.indexOf(':')) + " " + user_id.substr(user_id.indexOf(':'));
+            }
+            else {
+                displayName = user_id;
+            }
+        }
+        
+        return displayName;
     };
 }]);
