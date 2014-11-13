@@ -153,6 +153,10 @@ angular.module('modelService', [])
         // roomid: <Room>
     };
     
+    var users = {
+        // user_id: <User>
+    };
+    
     console.log("Models inited.");
     
     return {
@@ -194,6 +198,16 @@ angular.module('modelService', [])
             //console.log("looking for roomId for " + alias + "; found: " + roomId);
             return roomId;
         },
+        
+        getUser: function(user_id) {
+            return users[user_id];
+        },
+        
+        setUser: function(event) {
+            var usr = new User();
+            usr.event = event;
+            users[event.content.user_id] = usr;
+        }
     
     };
 }]);

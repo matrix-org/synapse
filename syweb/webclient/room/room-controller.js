@@ -310,8 +310,9 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
             }
             $scope.members[target_user_id] = chunk;   
 
-            if (target_user_id in $rootScope.presence) {
-                updatePresence($rootScope.presence[target_user_id]);
+            var usr = modelService.getUser(target_user_id);
+            if (usr) {
+                updatePresence(usr.event);
             }
         }
         else {

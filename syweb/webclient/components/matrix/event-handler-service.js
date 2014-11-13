@@ -43,15 +43,10 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
     // of the app, given we never try to reap memory yet)
     var eventMap = {};
 
-    // TODO: Remove this and replace with modelService.User objects.
-    $rootScope.presence = {};
-
     var initialSyncDeferred;
 
     var reset = function() {
         initialSyncDeferred = $q.defer();
-        
-        $rootScope.presence = {};
 
         eventMap = {};
     };
@@ -268,7 +263,7 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
     };
     
     var handlePresence = function(event, isLiveEvent) {
-        $rootScope.presence[event.content.user_id] = event;
+        modelService.setUser(event);
         $rootScope.$broadcast(PRESENCE_EVENT, event, isLiveEvent);
     };
     
@@ -332,7 +327,6 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
      */
     var getUserDisplayName = function(room_id, user_id, wrap) {
         var displayName;
-        // XXX: this is getting called *way* too often - at least once per every room member per every digest...
 
         // Get the user display name from the member list of the room
         var member = modelService.getMember(room_id, user_id);
@@ -360,8 +354,11 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
 
         // The user may not have joined the room yet. So try to resolve display name from presence data
         // Note: This data may not be available
-        if (undefined === displayName && user_id in $rootScope.presence) {
-            displayName = $rootScope.presence[user_id].content.displayname;
+        if (undefined === displayName) {
+            var usr = modelService.getUser(user_id);
+            if (usr) {
+                displayName = usr.event.content.displayname;
+            }
         }
 
         if (undefined === displayName) {
@@ -373,8 +370,6 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
                 displayName = user_id;
             }
         }
-        
-        //console.log("getUserDisplayName(" + room_id + ", " + user_id + ", " + wrap +") = " + displayName);
         
         return displayName;
     };
