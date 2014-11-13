@@ -122,11 +122,10 @@ class Edu(JsonEncodedObject):
         "edu_type",
     ]
 
-#    TODO: SYN-103: Remove "origin" and "destination" keys.
-#    internal_keys = [
-#        "origin",
-#        "destination",
-#    ]
+    internal_keys = [
+        "origin",
+        "destination",
+    ]
 
 
 class Transaction(JsonEncodedObject):
