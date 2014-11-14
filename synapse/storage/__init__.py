@@ -132,8 +132,8 @@ class DataStore(RoomMemberStore, RoomStore,
         if not events_dict:
             defer.returnValue(None)
 
-        event = self._parse_event_from_row(events_dict)
-        defer.returnValue(event)
+        event = yield self._parse_events([events_dict])
+        defer.returnValue(event[0])
 
     @log_function
     def _persist_event_txn(self, txn, event, backfilled, stream_ordering=None,

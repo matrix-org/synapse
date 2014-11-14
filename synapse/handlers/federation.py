@@ -139,9 +139,10 @@ class FederationHandler(BaseHandler):
                 affected=event.event_id,
             )
 
-        if not check_event_content_hash(pdu):
+        if not check_event_content_hash(event):
             logger.warn(
-                "Event content has been tampered, redacting %s", event.event_id
+                "Event content has been tampered, redacting %s, %s",
+                event.event_id, encode_canonical_json(event.get_full_dict())
             )
             event = redacted_event
 

@@ -41,7 +41,7 @@ class FeedbackStore(SQLBaseStore):
 
         defer.returnValue(
             [
-                self._parse_event_from_row(r)
+                (yield self._parse_events(r))
                 for r in rows
             ]
         )

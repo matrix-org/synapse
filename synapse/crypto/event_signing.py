@@ -16,6 +16,7 @@
 
 
 from synapse.api.events.utils import prune_event
+from synapse.federation.units import Pdu
 from syutil.jsonutil import encode_canonical_json
 from syutil.base64util import encode_base64, decode_base64
 from syutil.crypto.jsonsign import sign_json
@@ -58,6 +59,8 @@ def _compute_content_hash(event, hash_algorithm):
     event_json.pop("unsigned", None)
     event_json.pop("signatures", None)
     event_json.pop("hashes", None)
+    event_json.pop("outlier", None)
+    event_json.pop("destinations", None)
     event_json_bytes = encode_canonical_json(event_json)
     return hash_algorithm(event_json_bytes)
 
@@ -75,7 +78,13 @@ def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
 
 def compute_event_signature(event, signature_name, signing_key):
     tmp_event = prune_event(event)
-    redact_json = tmp_event.get_full_dict()
+    tmp_event.origin = event.origin
+    tmp_event.origin_server_ts = event.origin_server_ts
+    d = tmp_event.get_full_dict()
+    kwargs = dict(event.unrecognized_keys)
+    kwargs.update({k: v for k, v in d.items()})
+    tmp_pdu = Pdu(**kwargs)
+    redact_json = tmp_pdu.get_dict()
     redact_json.pop("signatures", None)
     redact_json.pop("age_ts", None)
     redact_json.pop("unsigned", None)
