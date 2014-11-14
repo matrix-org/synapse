@@ -492,3 +492,144 @@ describe('orderMembersList filter', function() {
         ]);
     });
 });
+describe('mUserDisplayName filter', function() {
+    var filter, mUserDisplayName;
+    
+    var roomId = "!weufhewifu:matrix.org";
+    
+    // test state values (f.e. test)
+    var testUser_displayname, testUser_user_id;
+    var testSelf_displayname, testSelf_user_id;
+    var testRoomState;
+    
+    // mocked services which return the test values above.
+    var matrixService = {
+        config: function() {
+            return {
+                user_id: testSelf_user_id
+            };
+        }
+    };
+    
+    var modelService = {
+        getRoom: function(room_id) {
+            return {
+                current_room_state: testRoomState
+            };
+        },
+        
+        getUser: function(user_id) {
+            return {
+                event: {
+                    content: {
+                        displayname: testUser_displayname
+                    },
+                    event_id: "wfiuhwf@matrix.org",
+                    user_id: testUser_user_id
+                }
+            };
+        },
+        
+        getMember: function(room_id, user_id) {
+            return testRoomState.members[user_id];
+        }
+    };
+    
+    beforeEach(function() {
+        // inject mocked dependencies
+        module(function ($provide) {
+            $provide.value('matrixService', matrixService);
+            $provide.value('modelService', modelService);
+        });
+        
+        module('matrixFilter');
+    });
+    
+    
+    beforeEach(inject(function($filter) {
+        filter = $filter;
+        mUserDisplayName = filter("mUserDisplayName");
+        
+        // purge the previous test values
+        testSelf_displayname = "Me"; 
+        testSelf_user_id = "@me:matrix.org";
+        testUser_displayname = undefined; 
+        testUser_user_id = undefined;
+        
+        // mock up a stub room state
+        testRoomState = {
+            s:{}, // internal; stores the state events
+            state: function(type, key) {
+                // accessor used by filter
+                return key ? this.s[type+key] : this.s[type];
+            },
+            members: {}, // struct used by filter
+            
+            // test helper methods
+            setMember: function(user_id, displayname, membership, inviter_user_id) {
+                if (!inviter_user_id) {
+                    inviter_user_id = user_id;
+                }
+                if (!membership) {
+                    membership = "join";
+                }
+                this.s["m.room.member" + user_id] = {
+                    event: {
+                        content: {
+                            displayname: displayname,
+                            membership: membership
+                        },
+                        state_key: user_id,
+                        user_id: inviter_user_id 
+                    }
+                };
+                this.members[user_id] = this.s["m.room.member" + user_id];
+            }
+        };
+    }));
+    
+    it("should show the display name of a user in a room if they have set one.", function() {
+        testUser_displayname = "Tom Scott";
+        testUser_user_id = "@tymnhk:matrix.org";
+        testRoomState.setMember(testUser_user_id, testUser_displayname);
+        testRoomState.setMember(testSelf_user_id, testSelf_displayname);
+        var output = mUserDisplayName(testUser_user_id, roomId);
+        expect(output).toEqual(testUser_displayname);
+    });
+    
+    it("should show the user_id of a user in a room if they have no display name.", function() {
+        testUser_user_id = "@mike:matrix.org";
+        testRoomState.setMember(testUser_user_id, testUser_displayname);
+        testRoomState.setMember(testSelf_user_id, testSelf_displayname);
+        var output = mUserDisplayName(testUser_user_id, roomId);
+        expect(output).toEqual(testUser_user_id);
+    });
+    
+    it("should still show the displayname of a user in a room if they are not a member of the room but there exists a User entry for them.", function() {
+        testUser_user_id = "@alice:matrix.org";
+        testUser_displayname = "Alice M";
+        testRoomState.setMember(testSelf_user_id, testSelf_displayname);
+        var output = mUserDisplayName(testUser_user_id, roomId);
+        expect(output).toEqual(testUser_displayname);
+    });
+    
+    it("should disambiguate users with the same displayname with their user id.", function() {
+        testUser_displayname = "Reimu";
+        testSelf_displayname = "Reimu";
+        testUser_user_id = "@reimu:matrix.org";
+        testSelf_user_id = "@xreimux:matrix.org";
+        testRoomState.setMember(testUser_user_id, testUser_displayname);
+        testRoomState.setMember(testSelf_user_id, testSelf_displayname);
+        var output = mUserDisplayName(testUser_user_id, roomId);
+        expect(output).toEqual(testUser_displayname + " (" + testUser_user_id + ")");
+    });
+    
+    it("should wrap user IDs after the : if the wrap flag is set.", function() {
+        testUser_user_id = "@mike:matrix.org";
+        testRoomState.setMember(testUser_user_id, testUser_displayname);
+        testRoomState.setMember(testSelf_user_id, testSelf_displayname);
+        var output = mUserDisplayName(testUser_user_id, roomId, true);
+        expect(output).toEqual("@mike :matrix.org");
+    });
+});
+
