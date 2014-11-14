@@ -118,7 +118,8 @@ angular.module('modelService', [])
         },
         
         storeStateEvent: function storeState(event) {
-            this.state_events[event.type + event.state_key] = event;
+            var keyIndex = event.state_key === undefined ? event.type : event.type + event.state_key;
+            this.state_events[keyIndex] = event;
             if (event.type === "m.room.member") {
                 var userId = event.state_key;
                 var rm = new RoomMember();
@@ -262,6 +263,27 @@ angular.module('modelService', [])
                     rm.user = usr;
                 }
             }
+        },
+        
+        /**
+         * Return the power level of an user in a particular room
+         * @param {String} room_id the room id
+         * @param {String} user_id the user id
+         * @returns {Number}
+         */
+        getUserPowerLevel: function(room_id, user_id) {
+            var powerLevel = 0;
+            var room = this.getRoom(room_id).current_room_state;
+            if (room.state("m.room.power_levels")) {
+                if (user_id in room.state("m.room.power_levels").content) {
+                    powerLevel = room.state("m.room.power_levels").content[user_id];
+                }
+                else {
+                    // Use the room default user power
+                    powerLevel = room.state("m.room.power_levels").content["default"];
+                }
+            }
+            return powerLevel;
         }
     
     };

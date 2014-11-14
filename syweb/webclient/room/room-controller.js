@@ -405,7 +405,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
                 
                 // The room members is available in the data fetched by initialSync
                 if ($scope.room) {
-
                     var messages = $scope.room.events;
 
                     if (0 === messages.length
@@ -578,7 +577,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         
         // scope this so the template can check power levels and enable/disable
         // buttons
-        $scope.pow = eventHandlerService.getUserPowerLevel;
+        $scope.pow = modelService.getUserPowerLevel;
 
         var modalInstance = $modal.open({
             templateUrl: 'eventInfoTemplate.html',
