@@ -49,11 +49,14 @@ angular.module('matrixWebClient')
 
         filtered.sort(function (a, b) {
             // Sort members on their last_active absolute time
+            a = a.user;
+            b = b.user;
+            
             var aLastActiveTS = 0, bLastActiveTS = 0;
-            if (undefined !== a.last_active_ago) {
+            if (a && undefined !== a.last_active_ago) {
                 aLastActiveTS = a.last_updated - a.last_active_ago;
             }
-            if (undefined !== b.last_active_ago) {
+            if (b && undefined !== b.last_active_ago) {
                 bLastActiveTS = b.last_updated - b.last_active_ago;
             }
             if (aLastActiveTS || bLastActiveTS) {
@@ -68,8 +71,8 @@ angular.module('matrixWebClient')
                     online: 4,
                     free_for_chat: 3
                 };
-                var aPresence = (a.presence in presenceLevels) ? presenceLevels[a.presence] : 0;
-                var bPresence = (b.presence in presenceLevels) ? presenceLevels[b.presence] : 0;
+                var aPresence = (a && a.event && a.event.content.presence in presenceLevels) ? presenceLevels[a.event.content.presence] : 0;
+                var bPresence = (b && b.event && b.event.content.presence in presenceLevels) ? presenceLevels[b.event.content.presence] : 0;
                 return bPresence - aPresence;
             }
         });

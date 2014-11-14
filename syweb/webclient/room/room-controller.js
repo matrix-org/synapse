@@ -38,7 +38,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         waiting_for_joined_event: false,  // true when the join request is pending. Back to false once the corresponding m.room.member event is received
         messages_visibility: "hidden", // In order to avoid flickering when scrolling down the message table at the page opening, delay the message table display
     };
-    $scope.members = {};
 
     $scope.imageURLToSend = "";
     
@@ -156,14 +155,16 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
     });
     
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
-        if (isLive && event.room_id === $scope.room_id) {
+        // if there is a live event affecting us
+        if (isLive && event.room_id === $scope.room_id && event.state_key === $scope.state.user_id) {
             if ($scope.state.waiting_for_joined_event) {
                 // The user has successfully joined the room, we can getting data for this room
                 $scope.state.waiting_for_joined_event = false;
                 onInit3();
             }
-            else if (event.state_key === $scope.state.user_id && "invite" !== event.membership && "join" !== event.membership) {    
-                if ("ban" === event.membership) {
+            // if someone else changed our state..
+            else if (event.user_id !== $scope.state.user_id && "invite" !== event.content.membership && "join" !== event.content.membership) {    
+                if ("ban" === event.content.membership) {
                     $scope.state.permission_denied = "You have been banned by " + mUserDisplayNameFilter(event.user_id);
                 }
                 else {
@@ -172,19 +173,12 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
             }
             else {
                 scrollToBottom();
-                updateMemberList(event); 
             }
-        }
-    });
-    
-    $scope.$on(eventHandlerService.PRESENCE_EVENT, function(ngEvent, event, isLive) {
-        if (isLive) {
-            updatePresence(event);
         }
     });
 
     $scope.memberCount = function() {
-        return Object.keys($scope.members).length;
+        return Object.keys($scope.room.now.members).length;
     };
     
     $scope.paginateMore = function() {
@@ -257,98 +251,11 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
             }
         );
     };
-
-    var updateMemberList = function(chunk) {
-        if (chunk.room_id != $scope.room_id) return;
-
-
-        // set target_user_id to keep things clear
-        var target_user_id = chunk.state_key;
-
-        var isNewMember = !(target_user_id in $scope.members);
-        if (isNewMember) {
-            
-            // Ignore banned and kicked (leave) people
-            if ("ban" === chunk.membership || "leave" === chunk.membership) {
-                return;
-            }
-        
-            // FIXME: why are we copying these fields around inside chunk?
-            if ("presence" in chunk.content) {
-                chunk.presence = chunk.content.presence;
-            }
-            if ("last_active_ago" in chunk.content) {
-                chunk.last_active_ago = chunk.content.last_active_ago;
-                $scope.now = new Date().getTime();
-                chunk.last_updated = $scope.now;
-            }
-            if ("displayname" in chunk.content) {
-                chunk.displayname = chunk.content.displayname;
-            }
-            if ("avatar_url" in chunk.content) {
-                chunk.avatar_url = chunk.content.avatar_url;
-            }
-            $scope.members[target_user_id] = chunk;   
-
-            var usr = modelService.getUser(target_user_id);
-            if (usr) {
-                updatePresence(usr.event);
-            }
-        }
-        else {
-            // selectively update membership and presence else it will nuke the picture and displayname too :/
-            
-            // Remove banned and kicked (leave) people
-            if ("ban" === chunk.membership || "leave" === chunk.membership) {
-                delete $scope.members[target_user_id];
-                return;
-            }
-            
-            var member = $scope.members[target_user_id];
-            member.membership = chunk.content.membership;
-            if ("presence" in chunk.content) {
-                member.presence = chunk.content.presence;
-            }
-            if ("last_active_ago" in chunk.content) {
-                member.last_active_ago = chunk.content.last_active_ago;
-                $scope.now = new Date().getTime();
-                member.last_updated = $scope.now;
-            }
-        }
-    };
     
-    var updateMemberListPresenceAge = function() {
+    var updatePresenceTimes = function() {
         $scope.now = new Date().getTime();
         // TODO: don't bother polling every 5s if we know none of our counters are younger than 1 minute
-        $timeout(updateMemberListPresenceAge, 5 * 1000);
-    };
-
-    var updatePresence = function(chunk) {
-        if (!(chunk.content.user_id in $scope.members)) {
-            console.log("updatePresence: Unknown member for chunk " + JSON.stringify(chunk));
-            return;
-        }
-        var member = $scope.members[chunk.content.user_id];
-
-        // XXX: why not just pass the chunk straight through?
-        if ("presence" in chunk.content) {
-            member.presence = chunk.content.presence;
-        }
-
-        if ("last_active_ago" in chunk.content) {
-            member.last_active_ago = chunk.content.last_active_ago;
-            $scope.now = new Date().getTime();
-            member.last_updated = $scope.now;
-        }
-
-        // this may also contain a new display name or avatar url, so check.
-        if ("displayname" in chunk.content) {
-            member.displayname = chunk.content.displayname;
-        }
-
-        if ("avatar_url" in chunk.content) {
-            member.avatar_url = chunk.content.avatar_url;
-        }
+        $timeout(updatePresenceTimes, 5 * 1000);
     };
 
     $scope.send = function() {
@@ -486,9 +393,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
     
     var onInit2 = function() {
         console.log("onInit2");
-        // =============================
         $scope.room = modelService.getRoom($scope.room_id);
-        // =============================
         
         // Scroll down as soon as possible so that we point to the last message
         // if it already exists in memory
@@ -516,14 +421,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
                     }
 
                     var members = $scope.room.current_room_state.members;
-
-                    // Update the member list
-                    for (var i in members) {
-                        if (!members.hasOwnProperty(i)) continue;
-
-                        var member = members[i].event;
-                        updateMemberList(member);
-                    }
 
                     // Check if the user has already join the room
                     if ($scope.state.user_id in members) {
@@ -572,35 +469,21 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
 
         // Make recents highlight the current room
         recentsService.setSelectedRoomId($scope.room_id);
+        
+        updatePresenceTimes();
 
-        // Get the up-to-date the current member list
-        matrixService.getMemberList($scope.room_id).then(
-            function(response) {
-                for (var i = 0; i < response.data.chunk.length; i++) {
-                    var chunk = response.data.chunk[i];
-                    updateMemberList(chunk);
-                }
+        // Allow pagination
+        $scope.state.can_paginate = true;
 
-                // Arm list timing update timer
-                updateMemberListPresenceAge();
-
-                // Allow pagination
-                $scope.state.can_paginate = true;
-
-                // Do a first pagination only if it is required
-                // FIXME: Should be no more require when initialSync/{room_id} will be available
-                if ($scope.state.first_pagination) {
-                    paginate(MESSAGES_PER_PAGINATION);
-                }
-                else {
-                    // There are already messages, go to the last message
-                    scrollToBottom(true);
-                }
-            },
-            function(error) {
-                $scope.feedback = "Failed get member list: " + error.data.error;
-            }
-        );
+        // Do a first pagination only if it is required
+        // FIXME: Should be no more require when initialSync/{room_id} will be available
+        if ($scope.state.first_pagination) {
+            paginate(MESSAGES_PER_PAGINATION);
+        }
+        else {
+            // There are already messages, go to the last message
+            scrollToBottom(true);
+        }
     }; 
 
     $scope.leaveRoom = function() {

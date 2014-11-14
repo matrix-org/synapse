@@ -181,6 +181,7 @@ angular.module('modelService', [])
     /***** User Object *****/
     var User = function User() {
         this.event = {}; // the m.presence event representing the User.
+        this.last_updated = 0; // used with last_active_ago to work out last seen times
     };
     
     // rooms are stored here when they come in.
@@ -241,7 +242,18 @@ angular.module('modelService', [])
         setUser: function(event) {
             var usr = new User();
             usr.event = event;
-            users[event.content.user_id] = usr;
+            
+            // migrate old data but clobber matching keys
+            if (users[event.content.user_id] && users[event.content.user_id].event) {
+                angular.extend(users[event.content.user_id].event, event);
+                usr = users[event.content.user_id];
+            }
+            else {
+                users[event.content.user_id] = usr;
+            }
+            
+            usr.last_updated = new Date().getTime();
+            
             // update room members
             var roomMembers = userIdToRoomMember[event.content.user_id];
             if (roomMembers) {

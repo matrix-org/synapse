@@ -126,12 +126,12 @@
     </div>
     
     <div id="usersTableWrapper" ng-hide="state.permission_denied">
-        <div ng-repeat="member in members | orderMembersList" class="userAvatar">
+        <div ng-repeat="member in room.now.members | orderMembersList" class="userAvatar">
             <div class="userAvatarFrame" ng-class="(room.now.members[member.id].user.event.content.presence === 'online' ? 'online' : (room.now.members[member.id].user.event.content.presence === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">
                 <img class="userAvatarImage mouse-pointer" 
                      ng-click="$parent.goToUserPage(member.id)"
-                     ng-src="{{member.avatar_url || 'img/default-profile.png'}}" 
-                     alt="{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
+                     ng-src="{{room.now.members[member.id].user.event.content.avatar_url || 'img/default-profile.png'}}" 
+                     alt="{{ room.now.members[member.id].user.event.content.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
                      title="{{ member.id }} - power: {{ room.now.members[member.id].power_level }}"
                      width="80" height="80"/>
                 <!-- <div class="userPowerLevel" ng-style="{'width': member.powerLevelNorm +'%'}"></div> -->
@@ -139,7 +139,7 @@
             <div class="userName">
                 <pie-chart ng-show="room.now.members[member.id].power_level_norm" data="[ (room.now.members[member.id].power_level_norm + 0), (100 - room.now.members[member.id].power_level_norm) ]"></pie-chart>
                 {{ member.id | mUserDisplayName:room_id:true }}
-                <span ng-show="member.last_active_ago" style="color: #aaa">({{ member.last_active_ago + (now - member.last_updated) | duration }})</span>
+                <span ng-show="room.now.members[member.id].user.event.content.last_active_ago" style="color: #aaa">({{ room.now.members[member.id].user.event.content.last_active_ago + (now - room.now.members[member.id].user.last_updated) | duration }})</span>
             </div>
         </div>
     </div>
@@ -161,21 +161,21 @@
                 </td>
                 <td class="avatar">
                     <!-- msg.__room_member.avatar_url is just backwards compat, and can be removed in the future. -->
-                    <img class="avatarImage" ng-src="{{ msg.__room_member.cnt.avatar_url || msg.__room_member.avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
+                    <img class="avatarImage" ng-src="{{ msg.__room_member.cnt.avatar_url || msg.__room_member.content.avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
                          ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
                 <td class="msg" ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">
                     <div class="bubble" ng-dblclick="openJson(msg)">
                         <span ng-if="'join' === msg.content.membership && msg.changedKey === 'membership'">
-                            {{ msg.content.displayname || members[msg.state_key].displayname || msg.state_key }} joined
+                            {{ msg.content.displayname || room.now.members[msg.state_key].user.event.content.displayname || msg.state_key }} joined
                         </span>
                         <span ng-if="'leave' === msg.content.membership && msg.changedKey === 'membership'">
                             <span ng-if="msg.user_id === msg.state_key">
                                 <!-- FIXME: This seems like a synapse bug that the 'leave' content doesn't give the displayname... -->
-                                {{ msg.__room_member.cnt.displayname || members[msg.state_key].displayname || msg.state_key }} left
+                                {{ msg.__room_member.cnt.displayname || room.now.members[msg.state_key].user.event.content.displayname || msg.state_key }} left
                             </span>
                             <span ng-if="msg.user_id !== msg.state_key && msg.prev_content">
-                                {{ msg.content.displayname || members[msg.user_id].displayname || msg.user_id }}
+                                {{ msg.content.displayname || room.now.members[msg.user_id].user.event.content.displayname || msg.user_id }}
                                 {{ {"invite": "kicked", "join": "kicked", "ban": "unbanned"}[msg.prev_content.membership] }}
                                 {{ msg.__target_room_member.content.displayname || msg.state_key }}
                                 <span ng-if="'join' === msg.prev_content.membership && msg.content.reason">
@@ -198,7 +198,7 @@
                         
                         <span ng-show='msg.content.msgtype === "m.emote"'
                               ng-class="msg.echo_msg_state"
-                              ng-bind-html="'* ' + (members[msg.user_id].displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"
+                              ng-bind-html="'* ' + (msg.__room_member.cnt.displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"
                               />
                         
                         <span ng-show='msg.content.msgtype === "m.text"' 
@@ -222,17 +222,17 @@
                         </div>
 
                         <span ng-if="'m.room.topic' === msg.type">
-                            {{ members[msg.user_id].displayname || msg.user_id }} changed the topic to: {{ msg.content.topic }}
+                            {{ msg.__room_member.cnt.displayname || msg.user_id }} changed the topic to: {{ msg.content.topic }}
                         </span>
 
                         <span ng-if="'m.room.name' === msg.type">
-                            {{ members[msg.user_id].displayname || msg.user_id }} changed the room name to: {{ msg.content.name }}
+                            {{ msg.__room_member.cnt.displayname || msg.user_id }} changed the room name to: {{ msg.content.name }}
                         </span>
 
                     </div>
                 </td>
                 <td class="rightBlock">
-                    <img class="avatarImage" ng-src="{{ members[msg.user_id].avatar_url || 'img/default-profile.png' }}" width="32" height="32"
+                    <img class="avatarImage" ng-src="{{ room.now.members[msg.user_id].user.event.content.avatar_url || 'img/default-profile.png' }}" width="32" height="32"
                          ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id !== state.user_id"/>
                 </td>
             </tr>

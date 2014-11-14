@@ -299,47 +299,71 @@ describe('orderMembersList filter', function() {
     it("should sort a single entry", function() {
         var output = orderMembersList({
             "@a:example.com": {
-                last_active_ago: 50,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 50,
+                    last_updated: 1415266943964
+                }
             }
         });
         expect(output).toEqual([{
                 id: "@a:example.com",
-                last_active_ago: 50,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 50,
+                    last_updated: 1415266943964
+                }
         }]);
     });
     
     it("should sort by taking last_active_ago into account", function() {
         var output = orderMembersList({
             "@a:example.com": {
-                last_active_ago: 1000,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943964
+                }
             },
             "@b:example.com": {
-                last_active_ago: 50,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 50,
+                    last_updated: 1415266943964
+                }
             },
             "@c:example.com": {
-                last_active_ago: 99999,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 99999,
+                    last_updated: 1415266943964
+                }
             }
         });
         expect(output).toEqual([
             {
                 id: "@b:example.com",
-                last_active_ago: 50,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 50,
+                    last_updated: 1415266943964
+                }
             },
             {
                 id: "@a:example.com",
-                last_active_ago: 1000,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943964
+                }
             },
             {
                 id: "@c:example.com",
-                last_active_ago: 99999,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 99999,
+                    last_updated: 1415266943964
+                }
             },
         ]);
     });
@@ -347,33 +371,51 @@ describe('orderMembersList filter', function() {
     it("should sort by taking last_updated into account", function() {
         var output = orderMembersList({
             "@a:example.com": {
-                last_active_ago: 1000,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943964
+                }
             },
             "@b:example.com": {
-                last_active_ago: 1000,
-                last_updated: 1415266900000
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266900000
+                }
             },
             "@c:example.com": {
-                last_active_ago: 1000,
-                last_updated: 1415266943000
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943000
+                }
             }
         });
         expect(output).toEqual([
             {
                 id: "@a:example.com",
-                last_active_ago: 1000,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943964
+                }
             },
             {
                 id: "@c:example.com",
-                last_active_ago: 1000,
-                last_updated: 1415266943000
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943000
+                }
             },
             {
                 id: "@b:example.com",
-                last_active_ago: 1000,
-                last_updated: 1415266900000
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266900000
+                }
             },
         ]);
     });
@@ -382,33 +424,51 @@ describe('orderMembersList filter', function() {
     function() {
         var output = orderMembersList({
             "@a:example.com": {
-                last_active_ago: 1000,
-                last_updated: 1415266943000
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943000
+                }
             },
             "@b:example.com": {
-                last_active_ago: 100000,
-                last_updated: 1415266943900
+                user: {
+                    event: {},
+                    last_active_ago: 100000,
+                    last_updated: 1415266943900
+                }
             },
             "@c:example.com": {
-                last_active_ago: 1000,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943964
+                }
             }
         });
         expect(output).toEqual([
             {
                 id: "@c:example.com",
-                last_active_ago: 1000,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943964
+                }
             },
             {
                 id: "@a:example.com",
-                last_active_ago: 1000,
-                last_updated: 1415266943000
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943000
+                }
             },
             {
                 id: "@b:example.com",
-                last_active_ago: 100000,
-                last_updated: 1415266943900
+                user: {
+                    event: {},
+                    last_active_ago: 100000,
+                    last_updated: 1415266943900
+                }
             },
         ]);
     });
@@ -419,33 +479,51 @@ describe('orderMembersList filter', function() {
         // single undefined entry
         var output = orderMembersList({
             "@a:example.com": {
-                last_active_ago: 1000,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943964
+                }
             },
             "@b:example.com": {
-                last_active_ago: 100000,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 100000,
+                    last_updated: 1415266943964
+                }
             },
             "@c:example.com": {
-                last_active_ago: undefined,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: undefined,
+                    last_updated: 1415266943964
+                }
             }
         });
         expect(output).toEqual([
             {
                 id: "@a:example.com",
-                last_active_ago: 1000,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 1000,
+                    last_updated: 1415266943964
+                }
             },
             {
                 id: "@b:example.com",
-                last_active_ago: 100000,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: 100000,
+                    last_updated: 1415266943964
+                }
             },
             {
                 id: "@c:example.com",
-                last_active_ago: undefined,
-                last_updated: 1415266943964
+                user: {
+                    event: {},
+                    last_active_ago: undefined,
+                    last_updated: 1415266943964
+                }
             },
         ]);
     });
@@ -455,39 +533,75 @@ describe('orderMembersList filter', function() {
         // single undefined entry
         var output = orderMembersList({
             "@a:example.com": {
-                last_active_ago: undefined,
-                last_updated: 1415266943964,
-                presence: "unavailable"
+                user: {
+                    event: {
+                        content: {
+                            presence: "unavailable"
+                        }
+                    },
+                    last_active_ago: undefined,
+                    last_updated: 1415266943964
+                }
             },
             "@b:example.com": {
-                last_active_ago: undefined,
-                last_updated: 1415266943964,
-                presence: "online"
+                user: {
+                    event: {
+                        content: {
+                            presence: "online"
+                        }
+                    },
+                    last_active_ago: undefined,
+                    last_updated: 1415266943964,
+                }
             },
             "@c:example.com": {
-                last_active_ago: undefined,
-                last_updated: 1415266943964,
-                presence: "offline"
+                user: {
+                    event: {
+                        content: {
+                            presence: "offline"
+                        }
+                    },
+                    last_active_ago: undefined,
+                    last_updated: 1415266943964
+                }
             }
         });
         expect(output).toEqual([
             {
                 id: "@b:example.com",
-                last_active_ago: undefined,
-                last_updated: 1415266943964,
-                presence: "online"
+                user: {
+                    event: {
+                        content: {
+                            presence: "online"
+                        }
+                    },
+                    last_active_ago: undefined,
+                    last_updated: 1415266943964
+                }
             },
             {
                 id: "@a:example.com",
-                last_active_ago: undefined,
-                last_updated: 1415266943964,
-                presence: "unavailable"
+                user: {
+                    event: {
+                        content: {
+                            presence: "unavailable"
+                        }
+                    },
+                    last_active_ago: undefined,
+                    last_updated: 1415266943964
+                }
             },
             {
                 id: "@c:example.com",
-                last_active_ago: undefined,
-                last_updated: 1415266943964,
-                presence: "offline"
+                user: {
+                    event: {
+                        content: {
+                            presence: "offline"
+                        }
+                    },
+                    last_active_ago: undefined,
+                    last_updated: 1415266943964
+                }
             },
         ]);
     });
