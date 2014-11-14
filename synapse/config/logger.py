@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from ._base import Config
-
+from synapse.util.logcontext import LoggingContextFilter
 from twisted.python.log import PythonLoggingObserver
 import logging
 import logging.config
@@ -46,7 +46,8 @@ class LoggingConfig(Config):
 
     def setup_logging(self):
         log_format = (
-            '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
+            "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
+            " - %(message)s"
         )
         if self.log_config is None:
 
@@ -54,13 +55,20 @@ class LoggingConfig(Config):
             if self.verbosity:
                 level = logging.DEBUG
 
-               # FIXME: we need a logging.WARN for a -q quiet option
+            # FIXME: we need a logging.WARN for a -q quiet option
+            logger = logging.getLogger('')
+            logger.setLevel(level)
+            formatter = logging.Formatter(log_format)
+            if self.log_file:
+                handler = logging.FileHandler(self.log_file)
+            else:
+                handler = logging.StreamHandler()
+            handler.setFormatter(formatter)
 
-            logging.basicConfig(
-                level=level,
-                filename=self.log_file,
-                format=log_format
-            )
+            handler.addFilter(LoggingContextFilter(request=""))
+
+            logger.addHandler(handler)
+            logger.info("Test")
         else:
             logging.config.fileConfig(self.log_config)
 
