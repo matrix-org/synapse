@@ -36,6 +36,11 @@ angular.module('modelService', [])
         aliasToRoomId[alias] = roomId;
     };
     
+    // user > room member lookups
+    var userIdToRoomMember = {
+        // user_id: [RoomMember, RoomMember, ...]
+    };
+    
     /***** Room Object *****/
     var Room = function Room(room_id) {
         this.room_id = room_id;
@@ -115,9 +120,17 @@ angular.module('modelService', [])
         storeStateEvent: function storeState(event) {
             this.state_events[event.type + event.state_key] = event;
             if (event.type === "m.room.member") {
+                var userId = event.state_key;
                 var rm = new RoomMember();
                 rm.event = event;
-                this.members[event.state_key] = rm;
+                rm.user = users[userId];
+                this.members[userId] = rm;
+                
+                // add to lookup so new m.presence events update the user
+                if (!userIdToRoomMember[userId]) {
+                    userIdToRoomMember[userId] = [];
+                }
+                userIdToRoomMember[userId].push(rm);
             }
             else if (event.type === "m.room.aliases") {
                 setRoomIdToAliasMapping(event.room_id, event.content.aliases[0]);
@@ -229,6 +242,14 @@ angular.module('modelService', [])
             var usr = new User();
             usr.event = event;
             users[event.content.user_id] = usr;
+            // update room members
+            var roomMembers = userIdToRoomMember[event.content.user_id];
+            if (roomMembers) {
+                for (var i=0; i<roomMembers.length; i++) {
+                    var rm = roomMembers[i];
+                    rm.user = usr;
+                }
+            }
         }
     
     };

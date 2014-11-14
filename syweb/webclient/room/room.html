@@ -127,7 +127,7 @@
     
     <div id="usersTableWrapper" ng-hide="state.permission_denied">
         <div ng-repeat="member in members | orderMembersList" class="userAvatar">
-            <div class="userAvatarFrame" ng-class="(member.presence === 'online' ? 'online' : (member.presence === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">
+            <div class="userAvatarFrame" ng-class="(room.now.members[member.id].user.event.content.presence === 'online' ? 'online' : (room.now.members[member.id].user.event.content.presence === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">
                 <img class="userAvatarImage mouse-pointer" 
                      ng-click="$parent.goToUserPage(member.id)"
                      ng-src="{{member.avatar_url || 'img/default-profile.png'}}" 
