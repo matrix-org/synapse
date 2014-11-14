@@ -17,13 +17,17 @@
 
 from ._base import BaseHandler
 
-from synapse.api.errors import AuthError, FederationError
+from synapse.api.events.utils import prune_event
+from synapse.api.errors import AuthError, FederationError, SynapseError
 from synapse.api.events.room import RoomMemberEvent
 from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
 from synapse.federation.pdu_codec import PduCodec
 from synapse.util.async import run_on_reactor
-from synapse.crypto.event_signing import compute_event_signature
+from synapse.crypto.event_signing import (
+    compute_event_signature, check_event_content_hash
+)
+from syutil.jsonutil import encode_canonical_json
 
 from twisted.internet import defer
 
@@ -59,6 +63,7 @@ class FederationHandler(BaseHandler):
         self.state_handler = hs.get_state_handler()
         # self.auth_handler = gs.get_auth_handler()
         self.server_name = hs.hostname
+        self.keyring = hs.get_keyring()
 
         self.lock_manager = hs.get_room_lock_manager()
 
@@ -111,6 +116,34 @@ class FederationHandler(BaseHandler):
             return
 
         logger.debug("Processing event: %s", event.event_id)
+
+        redacted_event = prune_event(event)
+        redacted_event.origin = pdu.origin
+        redacted_event.origin_server_ts = pdu.origin_server_ts
+        redacted_pdu = self.pdu_codec.pdu_from_event(redacted_event)
+
+        redacted_pdu_json = redacted_pdu.get_dict()
+        try:
+            yield self.keyring.verify_json_for_server(
+                event.origin, redacted_pdu_json
+            )
+        except SynapseError as e:
+            logger.warn("Signature check failed for %s redacted to %s",
+                encode_canonical_json(pdu.get_dict()),
+                encode_canonical_json(redacted_pdu_json),
+            )
+            raise FederationError(
+                "ERROR",
+                e.code,
+                e.msg,
+                affected=event.event_id,
+            )
+
+        if not check_event_content_hash(pdu):
+            logger.warn(
+                "Event content has been tampered, redacting %s", event.event_id
+            )
+            event = redacted_event
 
         if state:
             state = [self.pdu_codec.event_from_pdu(p) for p in state]

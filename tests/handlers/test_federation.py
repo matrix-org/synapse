@@ -23,7 +23,7 @@ from synapse.handlers.federation import FederationHandler
 from synapse.server import HomeServer
 from synapse.federation.units import Pdu
 
-from mock import NonCallableMock, ANY
+from mock import NonCallableMock, ANY, Mock
 
 from ..utils import MockKey
 
@@ -62,6 +62,7 @@ class FederationTestCase(unittest.TestCase):
             config=self.mock_config,
             auth=self.auth,
             state_handler=self.state_handler,
+            keyring=Mock(),
         )
 
         self.datastore = hs.get_datastore()
@@ -80,6 +81,7 @@ class FederationTestCase(unittest.TestCase):
             origin_server_ts=0,
             event_id="$a:b",
             origin="b",
+            hashes={"sha256":"PvbCLWrTBxnBsSO7/cJ76072ySTCgI/XGadESRAe02M"},
         )
 
         self.datastore.persist_event.return_value = defer.succeed(None)

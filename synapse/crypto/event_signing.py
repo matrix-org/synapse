@@ -19,6 +19,7 @@ from synapse.api.events.utils import prune_event
 from syutil.jsonutil import encode_canonical_json
 from syutil.base64util import encode_base64, decode_base64
 from syutil.crypto.jsonsign import sign_json
+from synapse.api.errors import SynapseError, Codes
 
 import hashlib
 import logging
@@ -29,15 +30,24 @@ logger = logging.getLogger(__name__)
 def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     """Check whether the hash for this PDU matches the contents"""
     computed_hash = _compute_content_hash(event, hash_algorithm)
+    logging.debug("Expecting hash: %s", encode_base64(computed_hash.digest()))
     if computed_hash.name not in event.hashes:
-        raise Exception("Algorithm %s not in hashes %s" % (
-            computed_hash.name, list(event.hashes)
-        ))
+        raise SynapseError(
+            400,
+            "Algorithm %s not in hashes %s" % (
+                computed_hash.name, list(event.hashes),
+            ),
+            Codes.UNAUTHORIZED,
+        )
     message_hash_base64 = event.hashes[computed_hash.name]
     try:
         message_hash_bytes = decode_base64(message_hash_base64)
     except:
-        raise Exception("Invalid base64: %s" % (message_hash_base64,))
+        raise SynapseError(
+            400,
+            "Invalid base64: %s" % (message_hash_base64,),
+            Codes.UNAUTHORIZED,
+        )
     return message_hash_bytes == computed_hash.digest()
 
 
