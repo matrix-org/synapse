@@ -1,4 +1,4 @@
-xdescribe('mRoomName filter', function() {
+describe('mRoomName filter', function() {
     var filter, mRoomName, mUserDisplayName;
     
     var roomId = "!weufhewifu:matrix.org";
@@ -29,27 +29,33 @@ xdescribe('mRoomName filter', function() {
     
     beforeEach(function() {
         // inject mocked dependencies
-        module(function ($provide, $filterProvider) {
+        module(function ($provide) {
             $provide.value('matrixService', matrixService);
             $provide.value('modelService', modelService);
-            $provide.value('mUserDisplayNameFilter', function(a,b){return "boo";});
         });
         
         module('matrixFilter');
+        
+        // angular resolves dependencies with the same name via a 'last wins'
+        // rule, hence we need to have this mock filter impl AFTER module('matrixFilter')
+        // so it clobbers the actual mUserDisplayName implementation.
+        module(function ($filterProvider) {
+            // provide a fake filter
+            $filterProvider.register('mUserDisplayName', function() {
+                return function(user_id, room_id) {
+                    if (user_id === testUserId) {
+                        return testDisplayName;
+                    }
+                    return testOtherDisplayName;
+                };
+            });
+        });
     });
+    
     
     beforeEach(inject(function($filter) {
         filter = $filter;
         mRoomName = filter("mRoomName");
-        
-        // provide a fake filter
-        
-        spyOn($filter, "mUserDisplayName").and.callFake(function(user_id, room_id) {
-            if (user_id === testUserId) {
-                return testDisplayName;
-            }
-            return testOtherDisplayName;
-        });
         
         // purge the previous test values
         testUserId = undefined;
