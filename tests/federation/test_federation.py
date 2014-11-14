@@ -23,7 +23,7 @@ from ..utils import MockHttpResource, MockClock, MockKey
 
 from synapse.server import HomeServer
 from synapse.federation import initialize_http_replication
-from synapse.federation.units import Pdu
+from synapse.api.events import SynapseEvent
 
 
 def make_pdu(prev_pdus=[], **kwargs):
@@ -40,7 +40,7 @@ def make_pdu(prev_pdus=[], **kwargs):
     }
     pdu_fields.update(kwargs)
 
-    return Pdu(prev_pdus=prev_pdus, **pdu_fields)
+    return SynapseEvent(prev_pdus=prev_pdus, **pdu_fields)
 
 
 class FederationTestCase(unittest.TestCase):
@@ -169,7 +169,7 @@ class FederationTestCase(unittest.TestCase):
             (200, "OK")
         )
 
-        pdu = Pdu(
+        pdu = SynapseEvent(
             event_id="abc123def456",
             origin="red",
             room_id="my-context",
@@ -189,7 +189,7 @@ class FederationTestCase(unittest.TestCase):
                 "origin_server_ts": 1000000,
                 "origin": "test",
                 "pdus": [
-                    pdu.get_dict(),
+                    pdu.get_pdu_json(),
                 ],
                 'pdu_failures': [],
             },

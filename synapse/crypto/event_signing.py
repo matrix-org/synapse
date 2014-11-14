@@ -16,7 +16,6 @@
 
 
 from synapse.api.events.utils import prune_event
-from synapse.federation.units import Pdu
 from syutil.jsonutil import encode_canonical_json
 from syutil.base64util import encode_base64, decode_base64
 from syutil.crypto.jsonsign import sign_json
@@ -53,8 +52,7 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
 
 
 def _compute_content_hash(event, hash_algorithm):
-    event_json = event.get_full_dict()
-    # TODO: We need to sign the JSON that is going out via fedaration.
+    event_json = event.get_pdu_json()
     event_json.pop("age_ts", None)
     event_json.pop("unsigned", None)
     event_json.pop("signatures", None)
@@ -67,7 +65,7 @@ def _compute_content_hash(event, hash_algorithm):
 
 def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
     tmp_event = prune_event(event)
-    event_json = tmp_event.get_dict()
+    event_json = tmp_event.get_pdu_json()
     event_json.pop("signatures", None)
     event_json.pop("age_ts", None)
     event_json.pop("unsigned", None)
@@ -78,14 +76,7 @@ def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
 
 def compute_event_signature(event, signature_name, signing_key):
     tmp_event = prune_event(event)
-    tmp_event.origin = event.origin
-    tmp_event.origin_server_ts = event.origin_server_ts
-    d = tmp_event.get_full_dict()
-    kwargs = dict(event.unrecognized_keys)
-    kwargs.update({k: v for k, v in d.items()})
-    tmp_pdu = Pdu(**kwargs)
-    redact_json = tmp_pdu.get_dict()
-    redact_json.pop("signatures", None)
+    redact_json = tmp_event.get_pdu_json()
     redact_json.pop("age_ts", None)
     redact_json.pop("unsigned", None)
     logger.debug("Signing event: %s", redact_json)

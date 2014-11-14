@@ -19,9 +19,10 @@ from tests import unittest
 from synapse.api.events.room import (
     MessageEvent,
 )
+
+from synapse.api.events import SynapseEvent
 from synapse.handlers.federation import FederationHandler
 from synapse.server import HomeServer
-from synapse.federation.units import Pdu
 
 from mock import NonCallableMock, ANY, Mock
 
@@ -74,7 +75,7 @@ class FederationTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_msg(self):
-        pdu = Pdu(
+        pdu = SynapseEvent(
             type=MessageEvent.TYPE,
             room_id="foo",
             content={"msgtype": u"fooo"},

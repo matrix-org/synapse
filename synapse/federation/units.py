@@ -25,83 +25,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class Pdu(JsonEncodedObject):
-    """ A Pdu represents a piece of data sent from a server and is associated
-    with a context.
-
-    A Pdu can be classified as "state". For a given context, we can efficiently
-    retrieve all state pdu's that haven't been clobbered. Clobbering is done
-    via a unique constraint on the tuple (context, type, state_key). A pdu
-    is a state pdu if `is_state` is True.
-
-    Example pdu::
-
-        {
-            "event_id": "$78c:example.com",
-            "origin_server_ts": 1404835423000,
-            "origin": "bar",
-            "prev_ids": [
-                ["23b", "foo"],
-                ["56a", "bar"],
-            ],
-            "content": { ... },
-        }
-
-    """
-
-    valid_keys = [
-        "event_id",
-        "room_id",
-        "origin",
-        "origin_server_ts",
-        "type",
-        "destinations",
-        "prev_events",
-        "depth",
-        "content",
-        "hashes",
-        "user_id",
-        "auth_events",
-        "signatures",  # Below this are keys valid only for State Pdus.
-        "state_key",
-        "prev_state",
-    ]
-
-    internal_keys = [
-        "destinations",
-        "transaction_id",
-        "outlier",
-    ]
-
-    required_keys = [
-        "event_id",
-        "room_id",
-        "origin",
-        "origin_server_ts",
-        "type",
-        "content",
-    ]
-
-    # TODO: We need to make this properly load content rather than
-    # just leaving it as a dict. (OR DO WE?!)
-
-    def __init__(self, destinations=[], prev_events=[],
-                 outlier=False, hashes={}, signatures={}, **kwargs):
-        super(Pdu, self).__init__(
-            destinations=destinations,
-            prev_events=prev_events,
-            outlier=outlier,
-            hashes=hashes,
-            signatures=signatures,
-            **kwargs
-        )
-
-    def __str__(self):
-        return "(%s, %s)" % (self.__class__.__name__, repr(self.__dict__))
-
-    def __repr__(self):
-        return "<%s, %s>" % (self.__class__.__name__, repr(self.__dict__))
-
 
 class Edu(JsonEncodedObject):
     """ An Edu represents a piece of data sent from one homeserver to another.
@@ -202,6 +125,6 @@ class Transaction(JsonEncodedObject):
         for p in pdus:
             p.transaction_id = kwargs["transaction_id"]
 
-        kwargs["pdus"] = [p.get_dict() for p in pdus]
+        kwargs["pdus"] = [p.get_pdu_json() for p in pdus]
 
         return Transaction(**kwargs)
