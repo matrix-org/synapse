@@ -53,7 +53,7 @@ To get up and running:
   config file: ``./synctl start`` will give you instructions on how to do this.
   For this purpose, you can use 'localhost' or your hostname as a server name.
   Once you've done so, running ``./synctl start`` again will start your private
-  home sserver. You will find a webclient running at http://localhost:8008.
+  home server. You will find a webclient running at http://localhost:8008.
   Please use a recent Chrome or Firefox for now (or Safari if you don't need
   VoIP support).
 
@@ -122,44 +122,64 @@ Thanks for trying Matrix!
 
 [2] End-to-end encryption is currently in development
 
-
 Homeserver Installation
 =======================
 
-First, the dependencies need to be installed.  Start by installing
-'python2.7-dev' and the various tools of the compiler toolchain.
+Synapse is written in python but some of the libraries is uses are written in
+C. So before we can install synapse itself we need a working C compiler and the
+header files for python C extensions.
 
 Installing prerequisites on Ubuntu::
 
-    $ sudo apt-get install build-essential python2.7-dev libffi-dev
+    $ sudo apt-get install build-essential python2.7-dev libffi-dev \
+                           python-pip python-setuptools
 
 Installing prerequisites on Mac OS X::
 
     $ xcode-select --install
 
+Synapse uses NaCl (http://nacl.cr.yp.to/) for encryption and digital signatures.
+Unfortunately PyNACL currently has a few issues
+(https://github.com/pyca/pynacl/issues/53) and
+(https://github.com/pyca/pynacl/issues/79) that mean it may not install
+correctly, causing all tests to fail with errors about missing "sodium.h". To
+fix try re-installing from PyPI or directly from
+(https://github.com/pyca/pynacl)::
+
+    $ # Install from PyPI
+    $ pip install --user --upgrade --force pynacl
+    $ # Install from github
+    $ pip install --user https://github.com/pyca/pynacl/tarball/master
+
+On OSX, if you encounter ``clang: error: unknown argument: '-mno-fused-madd'``
+you will need to ``export CFLAGS=-Qunused-arguments``.
+
+To install the synapse homeserver run::
+
+    $ pip install --user --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+
+This installs synapse, along with the libraries it uses, into
+``$HOME/.local/lib/``.
+
+To actually run your new homeserver, pick a working directory for Synapse to run (e.g. ``~/.synapse``), and::
+
+    $ mkdir ~/.synapse
+    $ cd ~/.synapse
+    $ synctl start
+
+Homeserver Development
+======================
+
+To check out a homeserver for development, clone the git repo into a working
+directory of your choice:
+
+    $ git clone https://github.com/matrix-org/synapse.git
+    $ cd synapse
+
 The homeserver has a number of external dependencies, that are easiest
 to install by making setup.py do so, in --user mode::
 
     $ python setup.py develop --user
-
-You'll need a version of setuptools new enough to know about git, so you
-may need to also run::
-
-    $ sudo apt-get install python-pip
-    $ sudo pip install --upgrade setuptools
-
-If you don't have access to github, then you may need to install ``syutil``
-manually by checking it out and running ``python setup.py develop --user`` on
-it too.
-
-If you get errors about ``sodium.h`` being missing, you may also need to
-manually install a newer PyNaCl via pip as setuptools installs an old one. Or
-you can check PyNaCl out of git directly (https://github.com/pyca/pynacl) and
-installing it. Installing PyNaCl using pip may also work (remember to remove
-any other versions installed by setuputils in, for example, ~/.local/lib).
-
-On OSX, if you encounter ``clang: error: unknown argument: '-mno-fused-madd'``
-you will need to ``export CFLAGS=-Qunused-arguments``.
 
 This will run a process of downloading and installing into your
 user's .local/lib directory all of the required dependencies that are
@@ -204,11 +224,11 @@ IDs:
 For the first form, simply pass the required hostname (of the machine) as the
 --host parameter::
 
-    $ python synapse/app/homeserver.py \
+    $ python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
         --config-path homeserver.config \
         --generate-config
-    $ python synapse/app/homeserver.py --config-path homeserver.config
+    $ python -m synapse.app.homeserver --config-path homeserver.config
 
 Alternatively, you can run synapse via synctl - running ``synctl start`` to
 generate a homeserver.yaml config file, where you can then edit server-name to
@@ -226,12 +246,12 @@ record would then look something like::
 At this point, you should then run the homeserver with the hostname of this
 SRV record, as that is the name other machines will expect it to have::
 
-    $ python synapse/app/homeserver.py \
+    $ python -m synapse.app.homeserver \
         --server-name YOURDOMAIN \
         --bind-port 8448 \
         --config-path homeserver.config \
         --generate-config
-    $ python synapse/app/homeserver.py --config-path homeserver.config
+    $ python -m synapse.app.homeserver --config-path homeserver.config
 
 
 You may additionally want to pass one or more "-v" options, in order to

@@ -74,7 +74,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_select_one_1col(self):
         self.mock_txn.rowcount = 1
-        self.mock_txn.fetchone.return_value = ("Value",)
+        self.mock_txn.fetchall.return_value = [("Value",)]
 
         value = yield self.datastore._simple_select_one_onecol(
                 table="tablename",

@@ -23,11 +23,14 @@ from synapse.api.constants import Membership
 
 from synapse.server import HomeServer
 
+from tests import unittest
+
 # python imports
 import json
 import urllib
+import types
 
-from ..utils import MockHttpResource, MemoryDataStore
+from ..utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
@@ -44,24 +47,21 @@ class RoomPermissionsTestCase(RestTestCase):
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
-        state_handler = Mock(spec=["handle_new_event"])
-        state_handler.handle_new_event.return_value = True
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
 
-        persistence_service = Mock(spec=["get_latest_pdus_in_context"])
-        persistence_service.get_latest_pdus_in_context.return_value = []
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
 
         hs = HomeServer(
             "red",
-            db_pool=None,
+            db_pool=db_pool,
             http_client=None,
-            datastore=MemoryDataStore(),
             replication_layer=Mock(),
-            state_handler=state_handler,
-            persistence_service=persistence_service,
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -75,6 +75,10 @@ class RoomPermissionsTestCase(RestTestCase):
                 "device_id": None,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
+
+        def _insert_client_ip(*args, **kwargs):
+            return defer.succeed(None)
+        hs.get_datastore().insert_client_ip = _insert_client_ip
 
         self.auth_user_id = self.rmcreator_id
 
@@ -147,38 +151,55 @@ class RoomPermissionsTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_send_message(self):
         msg_content = '{"msgtype":"m.text","body":"hello"}'
-        send_msg_path = ("/rooms/%s/send/m.room.message/mid1" %
-                        (self.created_rmid))
+        send_msg_path = (
+            "/rooms/%s/send/m.room.message/mid1" % (self.created_rmid,)
+        )
 
         # send message in uncreated room, expect 403
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT",
-                           "/rooms/%s/send/m.room.message/mid2" %
-                           (self.uncreated_rmid), msg_content)
+            "PUT",
+            "/rooms/%s/send/m.room.message/mid2" % (self.uncreated_rmid,),
+            msg_content
+        )
         self.assertEquals(403, code, msg=str(response))
 
         # send message in created room not joined (no state), expect 403
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT", send_msg_path, msg_content)
+            "PUT",
+            send_msg_path,
+            msg_content
+        )
         self.assertEquals(403, code, msg=str(response))
 
         # send message in created room and invited, expect 403
-        yield self.invite(room=self.created_rmid, src=self.rmcreator_id,
-                          targ=self.user_id)
+        yield self.invite(
+            room=self.created_rmid,
+            src=self.rmcreator_id,
+            targ=self.user_id
+        )
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT", send_msg_path, msg_content)
+            "PUT",
+            send_msg_path,
+            msg_content
+        )
         self.assertEquals(403, code, msg=str(response))
 
         # send message in created room and joined, expect 200
         yield self.join(room=self.created_rmid, user=self.user_id)
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT", send_msg_path, msg_content)
+            "PUT",
+            send_msg_path,
+            msg_content
+        )
         self.assertEquals(200, code, msg=str(response))
 
         # send message in created room and left, expect 403
         yield self.leave(room=self.created_rmid, user=self.user_id)
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT", send_msg_path, msg_content)
+            "PUT",
+            send_msg_path,
+            msg_content
+        )
         self.assertEquals(403, code, msg=str(response))
 
     @defer.inlineCallbacks
@@ -209,15 +230,20 @@ class RoomPermissionsTestCase(RestTestCase):
                            "PUT", topic_path, topic_content)
         self.assertEquals(403, code, msg=str(response))
 
-        # get topic in created PRIVATE room and invited, expect 200 (or 404)
+        # get topic in created PRIVATE room and invited, expect 403
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
-        self.assertEquals(404, code, msg=str(response))
+        self.assertEquals(403, code, msg=str(response))
 
         # set/get topic in created PRIVATE room and joined, expect 200
         yield self.join(room=self.created_rmid, user=self.user_id)
+
+        # Only room ops can set topic by default
+        self.auth_user_id = self.rmcreator_id
         (code, response) = yield self.mock_resource.trigger(
                            "PUT", topic_path, topic_content)
         self.assertEquals(200, code, msg=str(response))
+        self.auth_user_id = self.user_id
+
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
         self.assertEquals(200, code, msg=str(response))
         self.assert_dict(json.loads(topic_content), response)
@@ -230,10 +256,10 @@ class RoomPermissionsTestCase(RestTestCase):
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
         self.assertEquals(403, code, msg=str(response))
 
-        # get topic in PUBLIC room, not joined, expect 200 (or 404)
+        # get topic in PUBLIC room, not joined, expect 403
         (code, response) = yield self.mock_resource.trigger_get(
                            "/rooms/%s/state/m.room.topic" % self.created_public_rmid)
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(403, code, msg=str(response))
 
         # set topic in PUBLIC room, not joined, expect 403
         (code, response) = yield self.mock_resource.trigger(
@@ -300,12 +326,12 @@ class RoomPermissionsTestCase(RestTestCase):
     def test_membership_public_room_perms(self):
         room = self.created_public_rmid
         # get membership of self, get membership of other, public room + invite
-        # expect all 200s - public rooms, you can see who is in them.
+        # expect 403
         yield self.invite(room=room, src=self.rmcreator_id,
                           targ=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
-            room=room, expect_code=200)
+            room=room, expect_code=403)
 
         # get membership of self, get membership of other, public room + joined
         # expect all 200s
@@ -315,11 +341,11 @@ class RoomPermissionsTestCase(RestTestCase):
             room=room, expect_code=200)
 
         # get membership of self, get membership of other, public room + left
-        # expect all 200s - public rooms, you can always see who is in them.
+        # expect 403.
         yield self.leave(room=room, user=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
-            room=room, expect_code=200)
+            room=room, expect_code=403)
 
     @defer.inlineCallbacks
     def test_invited_permissions(self):
@@ -381,45 +407,55 @@ class RoomPermissionsTestCase(RestTestCase):
         # set [invite/join/left] of self, set [invite/join/left] of other,
         # expect all 403s
         for usr in [self.user_id, self.rmcreator_id]:
-            yield self.change_membership(room=room, src=self.user_id,
-                                     targ=usr,
-                                     membership=Membership.INVITE,
-                                     expect_code=403)
-            yield self.change_membership(room=room, src=self.user_id,
-                                     targ=usr,
-                                     membership=Membership.JOIN,
-                                     expect_code=403)
-            yield self.change_membership(room=room, src=self.user_id,
-                                     targ=usr,
-                                     membership=Membership.LEAVE,
-                                     expect_code=403)
+            yield self.change_membership(
+                room=room,
+                src=self.user_id,
+                targ=usr,
+                membership=Membership.INVITE,
+                expect_code=403
+            )
+
+            yield self.change_membership(
+                room=room,
+                src=self.user_id,
+                targ=usr,
+                membership=Membership.JOIN,
+                expect_code=403
+            )
+
+        # It is always valid to LEAVE if you've already left (currently.)
+        yield self.change_membership(
+            room=room,
+            src=self.user_id,
+            targ=self.rmcreator_id,
+            membership=Membership.LEAVE,
+            expect_code=403
+        )
 
 
 class RoomsMemberListTestCase(RestTestCase):
     """ Tests /rooms/$room_id/members/list REST events."""
     user_id = "@sid1:red"
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
-        state_handler = Mock(spec=["handle_new_event"])
-        state_handler.handle_new_event.return_value = True
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
 
-        persistence_service = Mock(spec=["get_latest_pdus_in_context"])
-        persistence_service.get_latest_pdus_in_context.return_value = []
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
 
         hs = HomeServer(
             "red",
-            db_pool=None,
+            db_pool=db_pool,
             http_client=None,
-            datastore=MemoryDataStore(),
             replication_layer=Mock(),
-            state_handler=state_handler,
-            persistence_service=persistence_service,
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -435,6 +471,10 @@ class RoomsMemberListTestCase(RestTestCase):
                 "device_id": None,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
+
+        def _insert_client_ip(*args, **kwargs):
+            return defer.succeed(None)
+        hs.get_datastore().insert_client_ip = _insert_client_ip
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 
@@ -487,28 +527,26 @@ class RoomsCreateTestCase(RestTestCase):
     """ Tests /rooms and /rooms/$room_id REST events. """
     user_id = "@sid1:red"
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
 
-        state_handler = Mock(spec=["handle_new_event"])
-        state_handler.handle_new_event.return_value = True
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
 
-        persistence_service = Mock(spec=["get_latest_pdus_in_context"])
-        persistence_service.get_latest_pdus_in_context.return_value = []
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
 
         hs = HomeServer(
             "red",
-            db_pool=None,
+            db_pool=db_pool,
             http_client=None,
-            datastore=MemoryDataStore(),
             replication_layer=Mock(),
-            state_handler=state_handler,
-            persistence_service=persistence_service,
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -522,6 +560,10 @@ class RoomsCreateTestCase(RestTestCase):
                 "device_id": None,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
+
+        def _insert_client_ip(*args, **kwargs):
+            return defer.succeed(None)
+        hs.get_datastore().insert_client_ip = _insert_client_ip
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 
@@ -592,24 +634,21 @@ class RoomTopicTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
 
-        state_handler = Mock(spec=["handle_new_event"])
-        state_handler.handle_new_event.return_value = True
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
 
-        persistence_service = Mock(spec=["get_latest_pdus_in_context"])
-        persistence_service.get_latest_pdus_in_context.return_value = []
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
 
         hs = HomeServer(
             "red",
-            db_pool=None,
+            db_pool=db_pool,
             http_client=None,
-            datastore=MemoryDataStore(),
             replication_layer=Mock(),
-            state_handler=state_handler,
-            persistence_service=persistence_service,
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -622,13 +661,18 @@ class RoomTopicTestCase(RestTestCase):
                 "admin": False,
                 "device_id": None,
             }
+
         hs.get_auth().get_user_by_token = _get_user_by_token
+
+        def _insert_client_ip(*args, **kwargs):
+            return defer.succeed(None)
+        hs.get_datastore().insert_client_ip = _insert_client_ip
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 
         # create the room
         self.room_id = yield self.create_room_as(self.user_id)
-        self.path = "/rooms/%s/state/m.room.topic" % self.room_id
+        self.path = "/rooms/%s/state/m.room.topic" % (self.room_id,)
 
     def tearDown(self):
         pass
@@ -706,24 +750,21 @@ class RoomMemberStateTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
 
-        state_handler = Mock(spec=["handle_new_event"])
-        state_handler.handle_new_event.return_value = True
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
 
-        persistence_service = Mock(spec=["get_latest_pdus_in_context"])
-        persistence_service.get_latest_pdus_in_context.return_value = []
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
 
         hs = HomeServer(
             "red",
-            db_pool=None,
+            db_pool=db_pool,
             http_client=None,
-            datastore=MemoryDataStore(),
             replication_layer=Mock(),
-            state_handler=state_handler,
-            persistence_service=persistence_service,
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -736,12 +777,11 @@ class RoomMemberStateTestCase(RestTestCase):
                 "admin": False,
                 "device_id": None,
             }
-            return {
-                "user": hs.parse_userid(self.auth_user_id),
-                "admin": False,
-                "device_id": None,
-            }
         hs.get_auth().get_user_by_token = _get_user_by_token
+
+        def _insert_client_ip(*args, **kwargs):
+            return defer.succeed(None)
+        hs.get_datastore().insert_client_ip = _insert_client_ip
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 
@@ -847,24 +887,21 @@ class RoomMessagesTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
 
-        state_handler = Mock(spec=["handle_new_event"])
-        state_handler.handle_new_event.return_value = True
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
 
-        persistence_service = Mock(spec=["get_latest_pdus_in_context"])
-        persistence_service.get_latest_pdus_in_context.return_value = []
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
 
         hs = HomeServer(
             "red",
-            db_pool=None,
+            db_pool=db_pool,
             http_client=None,
-            datastore=MemoryDataStore(),
             replication_layer=Mock(),
-            state_handler=state_handler,
-            persistence_service=persistence_service,
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=NonCallableMock(),
+            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -878,6 +915,10 @@ class RoomMessagesTestCase(RestTestCase):
                 "device_id": None,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
+
+        def _insert_client_ip(*args, **kwargs):
+            return defer.succeed(None)
+        hs.get_datastore().insert_client_ip = _insert_client_ip
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 

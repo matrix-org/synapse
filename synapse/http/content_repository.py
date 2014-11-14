@@ -129,6 +129,14 @@ class ContentRepoResource(resource.Resource):
             logger.info("Sending file %s", file_path)
             f = open(file_path, 'rb')
             request.setHeader('Content-Type', content_type)
+
+            # cache for at least a day.
+            # XXX: we might want to turn this off for data we don't want to recommend
+            # caching as it's sensitive or private - or at least select private.
+            # don't bother setting Expires as all our matrix clients are smart enough to
+            # be happy with Cache-Control (right?)
+            request.setHeader('Cache-Control', 'public,max-age=86400,s-maxage=86400')
+            
             d = FileSender().beginFileTransfer(f, request)
 
             # after the file has been sent, clean up and finish the request

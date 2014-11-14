@@ -14,6 +14,8 @@
 # limitations under the License.
 
 from synapse.api.events import SynapseEvent
+from synapse.api.events.validator import EventValidator
+from synapse.api.errors import SynapseError
 
 from tests import unittest
 
@@ -21,7 +23,7 @@ from tests import unittest
 class SynapseTemplateCheckTestCase(unittest.TestCase):
 
     def setUp(self):
-        pass
+        self.validator = EventValidator(None)
 
     def tearDown(self):
         pass
@@ -38,22 +40,28 @@ class SynapseTemplateCheckTestCase(unittest.TestCase):
         }
 
         event = MockSynapseEvent(template)
-        self.assertTrue(event.check_json(content, raises=False))
+        event.content = content
+        self.assertTrue(self.validator.validate(event))
 
         content = {
             "person": {"name": "bob"},
             "friends": ["jill"],
             "enemies": ["mike"]
         }
-        event = MockSynapseEvent(template)
-        self.assertTrue(event.check_json(content, raises=False))
+        event.content = content
+        self.assertTrue(self.validator.validate(event))
 
         content = {
             "person": {"name": "bob"},
             # missing friends
             "enemies": ["mike", "jill"]
         }
-        self.assertFalse(event.check_json(content, raises=False))
+        event.content = content
+        self.assertRaises(
+            SynapseError,
+            self.validator.validate,
+            event
+        )
 
     def test_lists(self):
         template = {
@@ -67,13 +75,19 @@ class SynapseTemplateCheckTestCase(unittest.TestCase):
         }
 
         event = MockSynapseEvent(template)
-        self.assertFalse(event.check_json(content, raises=False))
+        event.content = content
+        self.assertRaises(
+            SynapseError,
+            self.validator.validate,
+            event
+        )
 
         content = {
             "person": {"name": "bob"},
             "friends": [{"name": "jill"}, {"name": "mike"}]
         }
-        self.assertTrue(event.check_json(content, raises=False))
+        event.content = content
+        self.assertTrue(self.validator.validate(event))
 
     def test_nested_lists(self):
         template = {
@@ -103,7 +117,12 @@ class SynapseTemplateCheckTestCase(unittest.TestCase):
         }
 
         event = MockSynapseEvent(template)
-        self.assertFalse(event.check_json(content, raises=False))
+        event.content = content
+        self.assertRaises(
+            SynapseError,
+            self.validator.validate,
+            event
+        )
 
         content = {
             "results": {
@@ -117,7 +136,8 @@ class SynapseTemplateCheckTestCase(unittest.TestCase):
                 ]
             }
         }
-        self.assertTrue(event.check_json(content, raises=False))
+        event.content = content
+        self.assertTrue(self.validator.validate(event))
 
     def test_nested_keys(self):
         template = {
@@ -145,7 +165,8 @@ class SynapseTemplateCheckTestCase(unittest.TestCase):
             }
         }
 
-        self.assertTrue(event.check_json(content, raises=False))
+        event.content = content
+        self.assertTrue(self.validator.validate(event))
 
         content = {
             "person": {
@@ -159,7 +180,12 @@ class SynapseTemplateCheckTestCase(unittest.TestCase):
             }
         }
 
-        self.assertFalse(event.check_json(content, raises=False))
+        event.content = content
+        self.assertRaises(
+            SynapseError,
+            self.validator.validate,
+            event
+        )
 
         content = {
             "person": {
@@ -173,7 +199,12 @@ class SynapseTemplateCheckTestCase(unittest.TestCase):
             }
         }
 
-        self.assertFalse(event.check_json(content, raises=False))
+        event.content = content
+        self.assertRaises(
+            SynapseError,
+            self.validator.validate,
+            event
+        )
 
 
 class MockSynapseEvent(SynapseEvent):

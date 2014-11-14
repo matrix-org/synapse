@@ -24,3 +24,9 @@ def sleep(seconds):
     reactor.callLater(seconds, d.callback, seconds)
     with PreserveLoggingContext():
         yield d
+
+def run_on_reactor():
+    """ This will cause the rest of the function to be invoked upon the next
+    iteration of the main loop
+    """
+    return sleep(0)

@@ -17,13 +17,15 @@
 
 from ._base import BaseHandler
 
-from synapse.api.events.room import InviteJoinEvent, RoomMemberEvent
+from synapse.api.errors import AuthError, FederationError
+from synapse.api.events.room import RoomMemberEvent
 from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
 from synapse.federation.pdu_codec import PduCodec
-from synapse.api.errors import SynapseError
+from synapse.util.async import run_on_reactor
+from synapse.crypto.event_signing import compute_event_signature
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 
 import logging
 
@@ -38,6 +40,8 @@ class FederationHandler(BaseHandler):
         of the home server (including auth and state conflict resoultion)
         b) converting events that were produced by local clients that may need
         to be sent to remote home servers.
+        c) doing the necessary dances to invite remote users and join remote
+        rooms.
     """
 
     def __init__(self, hs):
@@ -62,6 +66,9 @@ class FederationHandler(BaseHandler):
 
         self.pdu_codec = PduCodec(hs)
 
+        # When joining a room we need to queue any events for that room up
+        self.room_queues = {}
+
     @log_function
     @defer.inlineCallbacks
     def handle_new_event(self, event, snapshot):
@@ -78,6 +85,8 @@ class FederationHandler(BaseHandler):
             processing.
         """
 
+        yield run_on_reactor()
+
         pdu = self.pdu_codec.pdu_from_event(event)
 
         if not hasattr(pdu, "destinations") or not pdu.destinations:
@@ -87,97 +96,90 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def on_receive_pdu(self, pdu, backfilled):
+    def on_receive_pdu(self, pdu, backfilled, state=None):
         """ Called by the ReplicationLayer when we have a new pdu. We need to
-        do auth checks and put it throught the StateHandler.
+        do auth checks and put it through the StateHandler.
         """
         event = self.pdu_codec.event_from_pdu(pdu)
 
         logger.debug("Got event: %s", event.event_id)
 
-        with (yield self.lock_manager.lock(pdu.context)):
-            if event.is_state and not backfilled:
-                is_new_state = yield self.state_handler.handle_new_state(
-                    pdu
-                )
-            else:
-                is_new_state = False
+        # If we are currently in the process of joining this room, then we
+        # queue up events for later processing.
+        if event.room_id in self.room_queues:
+            self.room_queues[event.room_id].append(pdu)
+            return
+
+        logger.debug("Processing event: %s", event.event_id)
+
+        if state:
+            state = [self.pdu_codec.event_from_pdu(p) for p in state]
+
+        is_new_state = yield self.state_handler.annotate_event_with_state(
+            event,
+            old_state=state
+        )
+
+        logger.debug("Event: %s", event)
+
+        try:
+            self.auth.check(event, raises=True)
+        except AuthError as e:
+            raise FederationError(
+                "ERROR",
+                e.code,
+                e.msg,
+                affected=event.event_id,
+            )
+
+        is_new_state = is_new_state and not backfilled
+
         # TODO: Implement something in federation that allows us to
         # respond to PDU.
 
-        target_is_mine = False
-        if hasattr(event, "target_host"):
-            target_is_mine = event.target_host == self.hs.hostname
+        yield self.store.persist_event(
+            event,
+            backfilled,
+            is_new_state=is_new_state
+        )
 
-        if event.type == InviteJoinEvent.TYPE:
-            if not target_is_mine:
-                logger.debug("Ignoring invite/join event %s", event)
-                return
+        room = yield self.store.get_room(event.room_id)
 
-            # If we receive an invite/join event then we need to join the
-            # sender to the given room.
-            # TODO: We should probably auth this or some such
-            content = event.content
-            content.update({"membership": Membership.JOIN})
-            new_event = self.event_factory.create_event(
-                etype=RoomMemberEvent.TYPE,
-                state_key=event.user_id,
-                room_id=event.room_id,
-                user_id=event.user_id,
-                membership=Membership.JOIN,
-                content=content
-            )
-
-            yield self.hs.get_handlers().room_member_handler.change_membership(
-                new_event,
-                do_auth=False,
-            )
-
-        else:
-            with (yield self.room_lock.lock(event.room_id)):
-                yield self.store.persist_event(
-                    event,
-                    backfilled,
-                    is_new_state=is_new_state
+        if not room:
+            # Huh, let's try and get the current state
+            try:
+                yield self.replication_layer.get_state_for_context(
+                    event.origin, event.room_id, event.event_id,
                 )
 
-            room = yield self.store.get_room(event.room_id)
-
-            if not room:
-                # Huh, let's try and get the current state
-                try:
-                    yield self.replication_layer.get_state_for_context(
-                        event.origin, event.room_id
-                    )
-
-                    hosts = yield self.store.get_joined_hosts_for_room(
-                        event.room_id
-                    )
-                    if self.hs.hostname in hosts:
-                        try:
-                            yield self.store.store_room(
-                                room_id=event.room_id,
-                                room_creator_user_id="",
-                                is_public=False,
-                            )
-                        except:
-                            pass
-                except:
-                    logger.exception(
-                        "Failed to get current state for room %s",
-                        event.room_id
-                    )
-
-            if not backfilled:
-                extra_users = []
-                if event.type == RoomMemberEvent.TYPE:
-                    target_user_id = event.state_key
-                    target_user = self.hs.parse_userid(target_user_id)
-                    extra_users.append(target_user)
-
-                yield self.notifier.on_new_room_event(
-                    event, extra_users=extra_users
+                hosts = yield self.store.get_joined_hosts_for_room(
+                    event.room_id
                 )
+                if self.hs.hostname in hosts:
+                    try:
+                        yield self.store.store_room(
+                            room_id=event.room_id,
+                            room_creator_user_id="",
+                            is_public=False,
+                        )
+                    except:
+                        pass
+            except:
+                logger.exception(
+                    "Failed to get current state for room %s",
+                    event.room_id
+                )
+
+        if not backfilled:
+            extra_users = []
+            if event.type == RoomMemberEvent.TYPE:
+                target_user_id = event.state_key
+                target_user = self.hs.parse_userid(target_user_id)
+                extra_users.append(target_user)
+
+            yield self.notifier.on_new_room_event(
+                event, extra_users=extra_users
+            )
 
         if event.type == RoomMemberEvent.TYPE:
             if event.membership == Membership.JOIN:
@@ -189,79 +191,366 @@ class FederationHandler(BaseHandler):
     @log_function
     @defer.inlineCallbacks
     def backfill(self, dest, room_id, limit):
-        pdus = yield self.replication_layer.backfill(dest, room_id, limit)
+        """ Trigger a backfill request to `dest` for the given `room_id`
+        """
+        extremities = yield self.store.get_oldest_events_in_room(room_id)
+
+        pdus = yield self.replication_layer.backfill(
+            dest,
+            room_id,
+            limit,
+            extremities=extremities,
+        )
 
         events = []
 
         for pdu in pdus:
             event = self.pdu_codec.event_from_pdu(pdu)
+
+            # FIXME (erikj): Not sure this actually works :/
+            yield self.state_handler.annotate_event_with_state(event)
+
             events.append(event)
+
             yield self.store.persist_event(event, backfilled=True)
 
         defer.returnValue(events)
 
+    @defer.inlineCallbacks
+    def send_invite(self, target_host, event):
+        """ Sends the invite to the remote server for signing.
+
+        Invites must be signed by the invitee's server before distribution.
+        """
+        pdu = yield self.replication_layer.send_invite(
+            destination=target_host,
+            context=event.room_id,
+            event_id=event.event_id,
+            pdu=self.pdu_codec.pdu_from_event(event)
+        )
+
+        defer.returnValue(self.pdu_codec.event_from_pdu(pdu))
+
+    @defer.inlineCallbacks
+    def on_event_auth(self, event_id):
+        auth = yield self.store.get_auth_chain(event_id)
+        defer.returnValue([self.pdu_codec.pdu_from_event(e) for e in auth])
+
     @log_function
     @defer.inlineCallbacks
     def do_invite_join(self, target_host, room_id, joinee, content, snapshot):
+        """ Attempts to join the `joinee` to the room `room_id` via the
+        server `target_host`.
 
-        hosts = yield self.store.get_joined_hosts_for_room(room_id)
-        if self.hs.hostname in hosts:
-            # We are already in the room.
-            logger.debug("We're already in the room apparently")
-            defer.returnValue(False)
+        This first triggers a /make_join/ request that returns a partial
+        event that we can fill out and sign. This is then sent to the
+        remote server via /send_join/ which responds with the state at that
+        event and the auth_chains.
 
-        # First get current state to see if we are already joined.
-        try:
-            yield self.replication_layer.get_state_for_context(
-                target_host, room_id
-            )
-
-            hosts = yield self.store.get_joined_hosts_for_room(room_id)
-            if self.hs.hostname in hosts:
-                # Oh, we were actually in the room already.
-                logger.debug("We're already in the room apparently")
-                defer.returnValue(False)
-        except Exception:
-            logger.exception("Failed to get current state")
-
-        new_event = self.event_factory.create_event(
-            etype=InviteJoinEvent.TYPE,
-            target_host=target_host,
-            room_id=room_id,
-            user_id=joinee,
-            content=content
+        We suspend processing of any received events from this room until we
+        have finished processing the join.
+        """
+        pdu = yield self.replication_layer.make_join(
+            target_host,
+            room_id,
+            joinee
         )
 
-        new_event.destinations = [target_host]
+        logger.debug("Got response to make_join: %s", pdu)
 
-        snapshot.fill_out_prev_events(new_event)
-        yield self.handle_new_event(new_event, snapshot)
+        event = self.pdu_codec.event_from_pdu(pdu)
 
-        # TODO (erikj): Time out here.
-        d = defer.Deferred()
-        self.waiting_for_join_list.setdefault((joinee, room_id), []).append(d)
-        reactor.callLater(10, d.cancel)
+        # We should assert some things.
+        assert(event.type == RoomMemberEvent.TYPE)
+        assert(event.user_id == joinee)
+        assert(event.state_key == joinee)
+        assert(event.room_id == room_id)
+
+        event.outlier = False
+
+        self.room_queues[room_id] = []
 
         try:
-            yield d
-        except defer.CancelledError:
-            raise SynapseError(500, "Unable to join remote room")
+            event.event_id = self.event_factory.create_event_id()
+            event.content = content
 
-        try:
-            yield self.store.store_room(
-                room_id=room_id,
-                room_creator_user_id="",
-                is_public=False
+            state = yield self.replication_layer.send_join(
+                target_host,
+                self.pdu_codec.pdu_from_event(event)
             )
-        except:
-            pass
 
+            state = [self.pdu_codec.event_from_pdu(p) for p in state]
+
+            logger.debug("do_invite_join state: %s", state)
+
+            yield self.state_handler.annotate_event_with_state(
+                event,
+                old_state=state
+            )
+
+            logger.debug("do_invite_join event: %s", event)
+
+            try:
+                yield self.store.store_room(
+                    room_id=room_id,
+                    room_creator_user_id="",
+                    is_public=False
+                )
+            except:
+                # FIXME
+                pass
+
+            for e in state:
+                # FIXME: Auth these.
+                e.outlier = True
+
+                yield self.state_handler.annotate_event_with_state(
+                    e,
+                )
+
+                yield self.store.persist_event(
+                    e,
+                    backfilled=False,
+                    is_new_state=True
+                )
+
+            yield self.store.persist_event(
+                event,
+                backfilled=False,
+                is_new_state=True
+            )
+        finally:
+            room_queue = self.room_queues[room_id]
+            del self.room_queues[room_id]
+
+            for p in room_queue:
+                try:
+                    yield self.on_receive_pdu(p, backfilled=False)
+                except:
+                    pass
 
         defer.returnValue(True)
 
+    @defer.inlineCallbacks
+    @log_function
+    def on_make_join_request(self, context, user_id):
+        """ We've received a /make_join/ request, so we create a partial
+        join event for the room and return that. We don *not* persist or
+        process it until the other server has signed it and sent it back.
+        """
+        event = self.event_factory.create_event(
+            etype=RoomMemberEvent.TYPE,
+            content={"membership": Membership.JOIN},
+            room_id=context,
+            user_id=user_id,
+            state_key=user_id,
+        )
+
+        snapshot = yield self.store.snapshot_room(event)
+        snapshot.fill_out_prev_events(event)
+
+        yield self.state_handler.annotate_event_with_state(event)
+        yield self.auth.add_auth_events(event)
+        self.auth.check(event, raises=True)
+
+        pdu = self.pdu_codec.pdu_from_event(event)
+
+        defer.returnValue(pdu)
+
+    @defer.inlineCallbacks
+    @log_function
+    def on_send_join_request(self, origin, pdu):
+        """ We have received a join event for a room. Fully process it and
+        respond with the current state and auth chains.
+        """
+        event = self.pdu_codec.event_from_pdu(pdu)
+
+        event.outlier = False
+
+        is_new_state = yield self.state_handler.annotate_event_with_state(event)
+        self.auth.check(event, raises=True)
+
+        # FIXME (erikj):  All this is duplicated above :(
+
+        yield self.store.persist_event(
+            event,
+            backfilled=False,
+            is_new_state=is_new_state
+        )
+
+        extra_users = []
+        if event.type == RoomMemberEvent.TYPE:
+            target_user_id = event.state_key
+            target_user = self.hs.parse_userid(target_user_id)
+            extra_users.append(target_user)
+
+        yield self.notifier.on_new_room_event(
+            event, extra_users=extra_users
+        )
+
+        if event.type == RoomMemberEvent.TYPE:
+            if event.membership == Membership.JOIN:
+                user = self.hs.parse_userid(event.state_key)
+                self.distributor.fire(
+                    "user_joined_room", user=user, room_id=event.room_id
+                )
+
+        new_pdu = self.pdu_codec.pdu_from_event(event)
+
+        destinations = set()
+
+        for k, s in event.state_events.items():
+            try:
+                if k[0] == RoomMemberEvent.TYPE:
+                    if s.content["membership"] == Membership.JOIN:
+                        destinations.add(
+                            self.hs.parse_userid(s.state_key).domain
+                        )
+            except:
+                logger.warn(
+                    "Failed to get destination from event %s", s.event_id
+                )
+
+        new_pdu.destinations = list(destinations)
+
+        yield self.replication_layer.send_pdu(new_pdu)
+
+        auth_chain = yield self.store.get_auth_chain(event.event_id)
+        pdu_auth_chain = [
+            self.pdu_codec.pdu_from_event(e)
+            for e in auth_chain
+        ]
+
+        defer.returnValue({
+            "state": [
+                self.pdu_codec.pdu_from_event(e)
+                for e in event.state_events.values()
+            ],
+            "auth_chain": pdu_auth_chain,
+        })
+
+    @defer.inlineCallbacks
+    def on_invite_request(self, origin, pdu):
+        """ We've got an invite event. Process and persist it. Sign it.
+
+        Respond with the now signed event.
+        """
+        event = self.pdu_codec.event_from_pdu(pdu)
+
+        event.outlier = True
+
+        event.signatures.update(
+            compute_event_signature(
+                event,
+                self.hs.hostname,
+                self.hs.config.signing_key[0]
+            )
+        )
+
+        yield self.state_handler.annotate_event_with_state(event)
+
+        yield self.store.persist_event(
+            event,
+            backfilled=False,
+        )
+
+        target_user = self.hs.parse_userid(event.state_key)
+        yield self.notifier.on_new_room_event(
+            event, extra_users=[target_user],
+        )
+
+        defer.returnValue(self.pdu_codec.pdu_from_event(event))
+
+    @defer.inlineCallbacks
+    def get_state_for_pdu(self, origin, room_id, event_id):
+        yield run_on_reactor()
+
+        in_room = yield self.auth.check_host_in_room(room_id, origin)
+        if not in_room:
+            raise AuthError(403, "Host not in room.")
+
+        state_groups = yield self.store.get_state_groups(
+            [event_id]
+        )
+
+        if state_groups:
+            _, state = state_groups.items().pop()
+            results = {
+                (e.type, e.state_key): e for e in state
+            }
+
+            event = yield self.store.get_event(event_id)
+            if hasattr(event, "state_key"):
+                # Get previous state
+                if hasattr(event, "replaces_state") and event.replaces_state:
+                    prev_event = yield self.store.get_event(
+                        event.replaces_state
+                    )
+                    results[(event.type, event.state_key)] = prev_event
+                else:
+                    del results[(event.type, event.state_key)]
+
+            defer.returnValue(
+                [
+                    self.pdu_codec.pdu_from_event(s)
+                    for s in results.values()
+                ]
+            )
+        else:
+            defer.returnValue([])
+
+    @defer.inlineCallbacks
+    @log_function
+    def on_backfill_request(self, origin, context, pdu_list, limit):
+        in_room = yield self.auth.check_host_in_room(context, origin)
+        if not in_room:
+            raise AuthError(403, "Host not in room.")
+
+        events = yield self.store.get_backfill_events(
+            context,
+            pdu_list,
+            limit
+        )
+
+        defer.returnValue([
+            self.pdu_codec.pdu_from_event(e)
+            for e in events
+        ])
+
+    @defer.inlineCallbacks
+    @log_function
+    def get_persisted_pdu(self, origin, event_id):
+        """ Get a PDU from the database with given origin and id.
+
+        Returns:
+            Deferred: Results in a `Pdu`.
+        """
+        event = yield self.store.get_event(
+            event_id,
+            allow_none=True,
+        )
+
+        if event:
+            in_room = yield self.auth.check_host_in_room(
+                event.room_id,
+                origin
+            )
+            if not in_room:
+                raise AuthError(403, "Host not in room.")
+
+            defer.returnValue(self.pdu_codec.pdu_from_event(event))
+        else:
+            defer.returnValue(None)
+
+    @log_function
+    def get_min_depth_for_context(self, context):
+        return self.store.get_min_depth(context)
 
     @log_function
     def _on_user_joined(self, user, room_id):
-        waiters = self.waiting_for_join_list.get((user.to_string(), room_id), [])
+        waiters = self.waiting_for_join_list.get(
+            (user.to_string(), room_id),
+            []
+        )
         while waiters:
             waiters.pop().callback(None)

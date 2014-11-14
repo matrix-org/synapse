@@ -28,7 +28,7 @@ def read(fname):
 setup(
     name="SynapseHomeServer",
     version="0.0.1",
-    packages=find_packages(exclude=["tests"]),
+    packages=find_packages(exclude=["tests", "tests.*"]),
     description="Reference Synapse Home Server",
     install_requires=[
         "syutil==0.0.2",
@@ -43,6 +43,7 @@ setup(
     ],
     dependency_links=[
         "https://github.com/matrix-org/syutil/tarball/v0.0.2#egg=syutil-0.0.2",
+        "https://github.com/pyca/pynacl/tarball/52dbe2dc33f1#egg=pynacl-0.3.0",
     ],
     setup_requires=[
         "setuptools_trial",
@@ -54,6 +55,7 @@ setup(
     long_description=read("README.rst"),
     entry_points="""
     [console_scripts]
-    synapse-homeserver=synapse.app.homeserver:main
+    synctl=synapse.app.synctl:main
+    synapse-homeserver=synapse.app.homeserver:run
     """
 )

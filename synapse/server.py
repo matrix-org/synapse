@@ -22,13 +22,14 @@
 from synapse.federation import initialize_http_replication
 from synapse.api.events import serialize_event
 from synapse.api.events.factory import EventFactory
+from synapse.api.events.validator import EventValidator
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
 from synapse.rest import RestServletFactory
 from synapse.state import StateHandler
 from synapse.storage import DataStore
-from synapse.types import UserID, RoomAlias, RoomID
+from synapse.types import UserID, RoomAlias, RoomID, EventID
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.lockutils import LockManager
@@ -80,6 +81,7 @@ class BaseHomeServer(object):
         'event_sources',
         'ratelimiter',
         'keyring',
+        'event_validator',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -142,6 +144,11 @@ class BaseHomeServer(object):
         """Parse the string given by 's' as a Room ID and return a RoomID
         object."""
         return RoomID.from_string(s, hs=self)
+
+    def parse_eventid(self, s):
+        """Parse the string given by 's' as a Event ID and return a EventID
+        object."""
+        return EventID.from_string(s, hs=self)
 
     def serialize_event(self, e):
         return serialize_event(self, e)
@@ -217,6 +224,9 @@ class HomeServer(BaseHomeServer):
 
     def build_keyring(self):
         return Keyring(self)
+
+    def build_event_validator(self):
+        return EventValidator(self)
 
     def register_servlets(self):
         """ Register all servlets associated with this HomeServer.

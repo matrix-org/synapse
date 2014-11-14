@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore, Table
-from .pdu import PdusTable
 
 from collections import namedtuple
 
@@ -42,6 +41,7 @@ class TransactionStore(SQLBaseStore):
         """
 
         return self.runInteraction(
+            "get_received_txn_response",
             self._get_received_txn_response, transaction_id, origin
         )
 
@@ -73,6 +73,7 @@ class TransactionStore(SQLBaseStore):
         """
 
         return self.runInteraction(
+            "set_received_txn_response",
             self._set_received_txn_response,
             transaction_id, origin, code, response_dict
         )
@@ -88,7 +89,7 @@ class TransactionStore(SQLBaseStore):
         txn.execute(query, (code, response_json, transaction_id, origin))
 
     def prep_send_transaction(self, transaction_id, destination,
-                              origin_server_ts, pdu_list):
+                              origin_server_ts):
         """Persists an outgoing transaction and calculates the values for the
         previous transaction id list.
 
@@ -99,19 +100,19 @@ class TransactionStore(SQLBaseStore):
             transaction_id (str)
             destination (str)
             origin_server_ts (int)
-            pdu_list (list)
 
         Returns:
             list: A list of previous transaction ids.
         """
 
         return self.runInteraction(
+            "prep_send_transaction",
             self._prep_send_transaction,
-            transaction_id, destination, origin_server_ts, pdu_list
+            transaction_id, destination, origin_server_ts
         )
 
     def _prep_send_transaction(self, txn, transaction_id, destination,
-                               origin_server_ts, pdu_list):
+                               origin_server_ts):
 
         # First we find out what the prev_txs should be.
         # Since we know that we are only sending one transaction at a time,
@@ -139,15 +140,15 @@ class TransactionStore(SQLBaseStore):
 
         # Update the tx id -> pdu id mapping
 
-        values = [
-            (transaction_id, destination, pdu[0], pdu[1])
-            for pdu in pdu_list
-        ]
-
-        logger.debug("Inserting: %s", repr(values))
-
-        query = TransactionsToPduTable.insert_statement()
-        txn.executemany(query, values)
+        # values = [
+        #     (transaction_id, destination, pdu[0], pdu[1])
+        #     for pdu in pdu_list
+        # ]
+        #
+        # logger.debug("Inserting: %s", repr(values))
+        #
+        # query = TransactionsToPduTable.insert_statement()
+        # txn.executemany(query, values)
 
         return prev_txns
 
@@ -161,6 +162,7 @@ class TransactionStore(SQLBaseStore):
             response_json (str)
         """
         return self.runInteraction(
+            "delivered_txn",
             self._delivered_txn,
             transaction_id, destination, code, response_dict
         )
@@ -186,6 +188,7 @@ class TransactionStore(SQLBaseStore):
             list: A list of `ReceivedTransactionsTable.EntryType`
         """
         return self.runInteraction(
+            "get_transactions_after",
             self._get_transactions_after, transaction_id, destination
         )
 
@@ -201,49 +204,6 @@ class TransactionStore(SQLBaseStore):
         txn.execute(query, (destination, transaction_id, destination))
 
         return ReceivedTransactionsTable.decode_results(txn.fetchall())
-
-    def get_pdus_after_transaction(self, transaction_id, destination):
-        """For a given local transaction_id that we sent to a given destination
-        home server, return a list of PDUs that were sent to that destination
-        after it.
-
-        Args:
-            txn
-            transaction_id (str)
-            destination (str)
-
-        Returns
-            list: A list of PduTuple
-        """
-        return self.runInteraction(
-            self._get_pdus_after_transaction,
-            transaction_id, destination
-        )
-
-    def _get_pdus_after_transaction(self, txn, transaction_id, destination):
-
-        # Query that first get's all transaction_ids with an id greater than
-        # the one given from the `sent_transactions` table. Then JOIN on this
-        # from the `tx->pdu` table to get a list of (pdu_id, origin) that
-        # specify the pdus that were sent in those transactions.
-        query = (
-            "SELECT pdu_id, pdu_origin FROM %(tx_pdu)s as tp "
-            "INNER JOIN %(sent_tx)s as st "
-            "ON tp.transaction_id = st.transaction_id "
-            "AND tp.destination = st.destination "
-            "WHERE st.id > ("
-            "SELECT id FROM %(sent_tx)s "
-            "WHERE transaction_id = ? AND destination = ?"
-        ) % {
-            "tx_pdu": TransactionsToPduTable.table_name,
-            "sent_tx": SentTransactions.table_name,
-        }
-
-        txn.execute(query, (transaction_id, destination))
-
-        pdus = PdusTable.decode_results(txn.fetchall())
-
-        return self._get_pdu_tuples(txn, pdus)
 
 
 class ReceivedTransactionsTable(Table):

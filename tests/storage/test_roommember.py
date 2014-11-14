@@ -51,16 +51,24 @@ class RoomMemberStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def inject_room_member(self, room, user, membership):
         # Have to create a join event using the eventfactory
+        event = self.event_factory.create_event(
+            etype=RoomMemberEvent.TYPE,
+            user_id=user.to_string(),
+            state_key=user.to_string(),
+            room_id=room.to_string(),
+            membership=membership,
+            content={"membership": membership},
+            depth=1,
+            prev_events=[],
+        )
+
+        event.state_events = None
+        event.hashes = {}
+        event.prev_state = {}
+        event.auth_events = {}
+
         yield self.store.persist_event(
-            self.event_factory.create_event(
-                etype=RoomMemberEvent.TYPE,
-                user_id=user.to_string(),
-                state_key=user.to_string(),
-                room_id=room.to_string(),
-                membership=membership,
-                content={"membership": membership},
-                depth=1,
-            )
+            event
         )
 
     @defer.inlineCallbacks
