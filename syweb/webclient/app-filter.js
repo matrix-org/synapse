@@ -26,6 +26,9 @@ angular.module('matrixWebClient')
         var h = parseInt(t / (60 * 60)) % 24;
         var d = parseInt(t / (60 * 60 * 24));
         if (t < 60) {
+            if (t < 0) {
+                return "0s";
+            }
             return s + "s";
         }
         if (t < 60 * 60) {

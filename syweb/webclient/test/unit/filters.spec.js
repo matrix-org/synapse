@@ -285,6 +285,11 @@ describe('duration filter', function() {
         var output = durationFilter(1000*60*60*2 + 1000*60*35);
         expect(output).toEqual("2h");
     });
+    
+    it("should represent -ve numbers as '0s'", function() {
+        var output = durationFilter(-2000);
+        expect(output).toEqual("0s");
+    });
 });
 
 describe('orderMembersList filter', function() {
