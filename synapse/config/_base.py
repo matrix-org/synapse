@@ -36,7 +36,10 @@ class Config(object):
         if file_path is None:
             raise ConfigError(
                 "Missing config for %s."
-                " You must specify a config file. You can do this with the -c or --config-path option."
+                " You must specify a path for the config file. You can "
+                "do this with the -c or --config-path option. "
+                "Adding --generate-config along with --server-name "
+                "<server name> will generate a config file at the given path."
                 % (config_name,)
             )
         if not os.path.exists(file_path):
