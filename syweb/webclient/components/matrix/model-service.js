@@ -41,6 +41,7 @@ angular.module('modelService', [])
         this.room_id = room_id;
         this.old_room_state = new RoomState();
         this.current_room_state = new RoomState();
+        this.now = this.current_room_state; // makes html access shorter
         this.events = []; // events which can be displayed on the UI. TODO move?
     };
     Room.prototype = {
@@ -125,7 +126,7 @@ angular.module('modelService', [])
                 // normalise power levels: find the max first.
                 var maxPowerLevel = 0;
                 for (var user_id in event.content) {
-                    if (!event.content.hasOwnProperty(user_id)) continue;
+                    if (!event.content.hasOwnProperty(user_id) || user_id === "hsob_ts") continue; // XXX hsob_ts on some old rooms :(
                     maxPowerLevel = Math.max(maxPowerLevel, event.content[user_id]);
                 }
                 // set power level f.e room member

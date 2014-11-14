@@ -132,12 +132,12 @@
                      ng-click="$parent.goToUserPage(member.id)"
                      ng-src="{{member.avatar_url || 'img/default-profile.png'}}" 
                      alt="{{ member.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
-                     title="{{ member.id }} - power: {{ member.powerLevel }}"
+                     title="{{ member.id }} - power: {{ room.now.members[member.id].power_level }}"
                      width="80" height="80"/>
                 <!-- <div class="userPowerLevel" ng-style="{'width': member.powerLevelNorm +'%'}"></div> -->
             </div>
             <div class="userName">
-                <pie-chart ng-show="member.powerLevelNorm" data="[ (member.powerLevelNorm + 0), (100 - member.powerLevelNorm) ]"></pie-chart>
+                <pie-chart ng-show="room.now.members[member.id].power_level_norm" data="[ (room.now.members[member.id].power_level_norm + 0), (100 - room.now.members[member.id].power_level_norm) ]"></pie-chart>
                 {{ member.id | mUserDisplayName:room_id:true }}
                 <span ng-show="member.last_active_ago" style="color: #aaa">({{ member.last_active_ago + (now - member.last_updated) | duration }})</span>
             </div>

@@ -182,14 +182,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
             updatePresence(event);
         }
     });
-    
-    $scope.$on(eventHandlerService.POWERLEVEL_EVENT, function(ngEvent, event, isLive) {
-        if (isLive && event.room_id === $scope.room_id) {
-            for (var user_id in event.content) {
-                updateUserPowerLevel(user_id);
-            }
-        }
-    });
 
     $scope.memberCount = function() {
         return Object.keys($scope.members).length;
@@ -356,40 +348,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
 
         if ("avatar_url" in chunk.content) {
             member.avatar_url = chunk.content.avatar_url;
-        }
-    };
-
-    var updateUserPowerLevel = function(user_id) {
-        var member = $scope.members[user_id];
-        if (member) {
-            member.powerLevel = eventHandlerService.getUserPowerLevel($scope.room_id, user_id);
-            
-            normaliseMembersPowerLevels();
-        }
-    };
-
-    // Normalise users power levels so that the user with the higher power level
-    // will have a bar covering 100% of the width of his avatar
-    var normaliseMembersPowerLevels = function() {
-        // Find the max power level
-        var maxPowerLevel = 0;
-        for (var i in $scope.members) {
-            if (!$scope.members.hasOwnProperty(i)) continue;
-
-            var member = $scope.members[i];
-            if (member.powerLevel) {
-                maxPowerLevel = Math.max(maxPowerLevel, member.powerLevel);
-            }
-        }
-
-        // Normalized them on a 0..100% scale to be use in css width
-        if (maxPowerLevel) {
-            for (var i in $scope.members) {
-                if (!$scope.members.hasOwnProperty(i)) continue;
-
-                var member = $scope.members[i];
-                member.powerLevelNorm = (member.powerLevel * 100) / maxPowerLevel;
-            }
         }
     };
 
@@ -621,9 +579,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
                 for (var i = 0; i < response.data.chunk.length; i++) {
                     var chunk = response.data.chunk[i];
                     updateMemberList(chunk);
-
-                    // Add his power level
-                    updateUserPowerLevel(chunk.user_id);
                 }
 
                 // Arm list timing update timer
