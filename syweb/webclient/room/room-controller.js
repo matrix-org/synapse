@@ -339,25 +339,24 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         }
     };
 
+    // Tries to find a suitable room ID for this room.
     $scope.onInit = function() {
         console.log("onInit");
 
-        // Does the room ID provided in the URL?
+        // Try to find out the room ID to load.
         var room_id_or_alias;
-        if ($routeParams.room_id_or_alias) {
+        if ($routeParams.room_id_or_alias) { // provided in the url
             room_id_or_alias = decodeURIComponent($routeParams.room_id_or_alias);
         }
 
         if (room_id_or_alias && '!' === room_id_or_alias[0]) {
-            // Yes. We can go on right now
+            // it's a room ID since they start with !
             $scope.room_id = room_id_or_alias;
             $scope.room_alias = modelService.getRoomIdToAliasMapping($scope.room_id);
             onInit2();
         }
         else {
-            // No. The URL contains the room alias. Get this alias.
-            if (room_id_or_alias) {
-                // The room alias was passed urlencoded, use it as is
+            if (room_id_or_alias && '#' === room_id_or_alias[0]) {
                 $scope.room_alias = room_id_or_alias;
             }
             else  {
@@ -392,7 +391,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
     };
     
     var onInit2 = function() {
-        console.log("onInit2");
         $scope.room = modelService.getRoom($scope.room_id);
         
         // Scroll down as soon as possible so that we point to the last message
@@ -402,7 +400,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
         // Make sure the initialSync has been before going further
         eventHandlerService.waitForInitialSyncCompletion().then(
             function() {
-                
+                console.log("initialSync is complete.");
                 var needsToJoin = true;
                 
                 // The room members is available in the data fetched by initialSync

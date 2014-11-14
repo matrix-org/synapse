@@ -188,7 +188,9 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
         
         if (event.user_id !== matrixService.config().user_id) {
             room.addMessageEvent(event, !isLiveEvent);
-            displayNotification(event);
+            if (isLiveEvent) {
+                displayNotification(event);
+            }
         }
         else {
             // we may have locally echoed this, so we should replace the event
