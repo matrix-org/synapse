@@ -124,6 +124,10 @@ angular.module('eventStreamService', [])
     };
     
     return {
+        // expose these values for testing
+        SERVER_TIMEOUT: SERVER_TIMEOUT_MS,
+        CLIENT_TIMEOUT: CLIENT_TIMEOUT_MS,
+    
         // resume the stream from whereever it last got up to. Typically used
         // when the page is opened.
         resume: function() {
