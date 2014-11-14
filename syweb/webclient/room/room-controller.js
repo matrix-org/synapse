@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'angular-peity'])
-.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'modelService', 'recentsService', 'commandsService',
-                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, modelService, recentsService, commandsService) {
+.controller('RoomController', ['$modal', '$filter', '$scope', '$timeout', '$routeParams', '$location', '$rootScope', 'matrixService', 'mPresence', 'eventHandlerService', 'mFileUpload', 'matrixPhoneService', 'MatrixCall', 'modelService', 'recentsService', 'commandsService', 'mUserDisplayNameFilter',
+                               function($modal, $filter, $scope, $timeout, $routeParams, $location, $rootScope, matrixService, mPresence, eventHandlerService, mFileUpload, matrixPhoneService, MatrixCall, modelService, recentsService, commandsService, mUserDisplayNameFilter) {
    'use strict';
     var MESSAGES_PER_PAGINATION = 30;
     var THUMBNAIL_SIZE = 320;
@@ -162,24 +162,12 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
                 $scope.state.waiting_for_joined_event = false;
                 onInit3();
             }
-            else if (event.state_key === $scope.state.user_id && "invite" !== event.membership && "join" !== event.membership) {
-                var user;
-                        
-                if ($scope.members[event.user_id]) {
-                    user = $scope.members[event.user_id].displayname;
-                }
-                if (user) {
-                    user = user + " (" + event.user_id + ")";
-                }
-                else {
-                    user = event.user_id;
-                }
-                 
+            else if (event.state_key === $scope.state.user_id && "invite" !== event.membership && "join" !== event.membership) {    
                 if ("ban" === event.membership) {
-                    $scope.state.permission_denied = "You have been banned by " + user;
+                    $scope.state.permission_denied = "You have been banned by " + mUserDisplayNameFilter(event.user_id);
                 }
                 else {
-                    $scope.state.permission_denied = "You have been kicked by " + user;
+                    $scope.state.permission_denied = "You have been kicked by " + mUserDisplayNameFilter(event.user_id);
                 }  
             }
             else {

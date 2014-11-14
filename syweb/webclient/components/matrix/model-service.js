@@ -121,6 +121,25 @@ angular.module('modelService', [])
             else if (event.type === "m.room.aliases") {
                 setRoomIdToAliasMapping(event.room_id, event.content.aliases[0]);
             }
+            else if (event.type === "m.room.power_levels") {
+                // normalise power levels: find the max first.
+                var maxPowerLevel = 0;
+                for (var user_id in event.content) {
+                    if (!event.content.hasOwnProperty(user_id)) continue;
+                    maxPowerLevel = Math.max(maxPowerLevel, event.content[user_id]);
+                }
+                // set power level f.e room member
+                var defaultPowerLevel = event.content.default === undefined ? 0 : event.content.default;
+                for (var user_id in this.members) {
+                    if (!this.members.hasOwnProperty(user_id)) continue;
+                    var rm = this.members[user_id];
+                    if (!rm) {
+                        continue;
+                    }
+                    rm.power_level = event.content[user_id] === undefined ? defaultPowerLevel : event.content[user_id];
+                    rm.power_level_norm = (rm.power_level * 100) / maxPowerLevel;
+                }
+            }
         },
         
         storeStateEvents: function storeState(events) {
@@ -140,6 +159,8 @@ angular.module('modelService', [])
     /***** Room Member Object *****/
     var RoomMember = function RoomMember() {
         this.event = {}; // the m.room.member event representing the RoomMember.
+        this.power_level_norm = 0;
+        this.power_level = 0;
         this.user = undefined; // the User
     };
     
