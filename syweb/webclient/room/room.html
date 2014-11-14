@@ -127,19 +127,19 @@
     
     <div id="usersTableWrapper" ng-hide="state.permission_denied">
         <div ng-repeat="member in room.now.members | orderMembersList" class="userAvatar">
-            <div class="userAvatarFrame" ng-class="(room.now.members[member.id].user.event.content.presence === 'online' ? 'online' : (room.now.members[member.id].user.event.content.presence === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.membership == 'invite' ? 'invited' : '')">
+            <div class="userAvatarFrame" ng-class="(member.user.event.content.presence === 'online' ? 'online' : (member.user.event.content.presence === 'unavailable' ? 'unavailable' : '')) + ' ' + (member.event.content.membership == 'invite' ? 'invited' : '')">
                 <img class="userAvatarImage mouse-pointer" 
                      ng-click="$parent.goToUserPage(member.id)"
-                     ng-src="{{room.now.members[member.id].user.event.content.avatar_url || 'img/default-profile.png'}}" 
-                     alt="{{ room.now.members[member.id].user.event.content.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
-                     title="{{ member.id }} - power: {{ room.now.members[member.id].power_level }}"
+                     ng-src="{{member.user.event.content.avatar_url || 'img/default-profile.png'}}" 
+                     alt="{{ member.user.event.content.displayname || member.id.substr(0, member.id.indexOf(':')) }}"
+                     title="{{ member.id }} - power: {{ member.power_level }}"
                      width="80" height="80"/>
                 <!-- <div class="userPowerLevel" ng-style="{'width': member.powerLevelNorm +'%'}"></div> -->
             </div>
             <div class="userName">
-                <pie-chart ng-show="room.now.members[member.id].power_level_norm" data="[ (room.now.members[member.id].power_level_norm + 0), (100 - room.now.members[member.id].power_level_norm) ]"></pie-chart>
+                <pie-chart ng-show="member.power_level_norm" data="[ (member.power_level_norm + 0), (100 - member.power_level_norm) ]"></pie-chart>
                 {{ member.id | mUserDisplayName:room_id:true }}
-                <span ng-show="room.now.members[member.id].user.event.content.last_active_ago" style="color: #aaa">({{ room.now.members[member.id].user.event.content.last_active_ago + (now - room.now.members[member.id].user.last_updated) | duration }})</span>
+                <span ng-show="member.user.event.content.last_active_ago" style="color: #aaa">({{ member.user.event.content.last_active_ago + (now - member.user.last_updated) | duration }})</span>
             </div>
         </div>
     </div>
