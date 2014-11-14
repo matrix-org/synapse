@@ -17,6 +17,7 @@
 'use strict';
 
 angular.module('RoomController')
+// XXX FIXME : This has tight coupling with $scope.room.now.members
 .directive('tabComplete', ['$timeout', function ($timeout) {
     return function (scope, element, attrs) {
         element.bind("keydown keypress", function (event) {
@@ -80,16 +81,16 @@ angular.module('RoomController')
                     var expansion;
                     
                     // FIXME: could do better than linear search here
-                    angular.forEach(scope.members, function(item, name) {
-                        if (item.displayname && searchIndex < targetIndex) {
-                            if (item.displayname.toLowerCase().indexOf(search[1].toLowerCase()) === 0) {
-                                expansion = item.displayname;
+                    angular.forEach(scope.room.now.members, function(item, name) {
+                        if (item.event.content.displayname && searchIndex < targetIndex) {
+                            if (item.event.content.displayname.toLowerCase().indexOf(search[1].toLowerCase()) === 0) {
+                                expansion = item.event.content.displayname;
                                 searchIndex++;
                             }
                         }
                     });
                     if (searchIndex < targetIndex) { // then search raw mxids
-                        angular.forEach(scope.members, function(item, name) {
+                        angular.forEach(scope.room.now.members, function(item, name) {
                             if (searchIndex < targetIndex) {
                                 // === 1 because mxids are @username
                                 if (name.toLowerCase().indexOf(search[1].toLowerCase()) === 1) {
