@@ -160,8 +160,10 @@
                     <div class="sender" ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"> {{ msg.__room_member.cnt.displayname || msg.user_id | mUserDisplayName:room_id:true }}</div>
                 </td>
                 <td class="avatar">
-                    <!-- msg.__room_member.avatar_url is just backwards compat, and can be removed in the future. -->
-                    <img class="avatarImage" ng-src="{{ msg.__room_member.cnt.avatar_url || msg.__room_member.content.avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
+                    <!--  room.now.members[msg.user_id].user.event.content.avatar_url is just backwards compat, and can be removed in the future. Synapse didn't used to
+                          send m.room.member updates when avatar urls changed, so the image which should be visible here just going off room state isn't visible. We fix
+                          this by reading off the m.presence url -->
+                    <img class="avatarImage" ng-src="{{ msg.__room_member.cnt.avatar_url || msg.__room_member.content.avatar_url || room.now.members[msg.user_id].user.event.content.avatar_url || 'img/default-profile.png' }}" width="32" height="32" title="{{msg.user_id}}"
                          ng-hide="room.events[$index - 1].user_id === msg.user_id || msg.user_id === state.user_id"/>
                 </td>
                 <td class="msg" ng-class="(!msg.content.membership && ('m.room.topic' !== msg.type && 'm.room.name' !== msg.type))? (msg.content.msgtype === 'm.emote' ? 'emote text' : 'text') : 'membership text'">

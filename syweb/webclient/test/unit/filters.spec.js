@@ -300,8 +300,11 @@ describe('orderMembersList filter', function() {
         var output = orderMembersList({
             "@a:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 50,
+                    event: {
+                        content: {
+                            last_active_ago: 50
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             }
@@ -309,8 +312,11 @@ describe('orderMembersList filter', function() {
         expect(output).toEqual([{
                 id: "@a:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 50,
+                    event: {
+                        content: {
+                            last_active_ago: 50
+                        }
+                    },
                     last_updated: 1415266943964
                 }
         }]);
@@ -320,22 +326,31 @@ describe('orderMembersList filter', function() {
         var output = orderMembersList({
             "@a:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
             "@b:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 50,
+                    event: {
+                        content: {
+                            last_active_ago: 50
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
             "@c:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 99999,
+                    event: {
+                        content: {
+                            last_active_ago: 99999
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             }
@@ -344,24 +359,33 @@ describe('orderMembersList filter', function() {
             {
                 id: "@b:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 50,
+                    event: {
+                        content: {
+                            last_active_ago: 50
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
             {
                 id: "@a:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
             {
                 id: "@c:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 99999,
+                    event: {
+                        content: {
+                            last_active_ago: 99999
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
@@ -372,22 +396,31 @@ describe('orderMembersList filter', function() {
         var output = orderMembersList({
             "@a:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
             "@b:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266900000
                 }
             },
             "@c:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943000
                 }
             }
@@ -396,24 +429,33 @@ describe('orderMembersList filter', function() {
             {
                 id: "@a:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
             {
                 id: "@c:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943000
                 }
             },
             {
                 id: "@b:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266900000
                 }
             },
@@ -425,22 +467,31 @@ describe('orderMembersList filter', function() {
         var output = orderMembersList({
             "@a:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943000
                 }
             },
             "@b:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 100000,
+                    event: {
+                        content: {
+                            last_active_ago: 100000
+                        }
+                    },
                     last_updated: 1415266943900
                 }
             },
             "@c:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             }
@@ -449,24 +500,33 @@ describe('orderMembersList filter', function() {
             {
                 id: "@c:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
             {
                 id: "@a:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943000
                 }
             },
             {
                 id: "@b:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 100000,
+                    event: {
+                        content: {
+                            last_active_ago: 100000
+                        }
+                    },
                     last_updated: 1415266943900
                 }
             },
@@ -480,22 +540,26 @@ describe('orderMembersList filter', function() {
         var output = orderMembersList({
             "@a:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
             "@b:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: 100000,
+                    event: {
+                        content: {
+                            last_active_ago: 100000
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
             "@c:example.com": {
                 user: {
-                    event: {},
-                    last_active_ago: undefined,
                     last_updated: 1415266943964
                 }
             }
@@ -504,24 +568,28 @@ describe('orderMembersList filter', function() {
             {
                 id: "@a:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 1000,
+                    event: {
+                        content: {
+                            last_active_ago: 1000
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
             {
                 id: "@b:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: 100000,
+                    event: {
+                        content: {
+                            last_active_ago: 100000
+                        }
+                    },
                     last_updated: 1415266943964
                 }
             },
             {
                 id: "@c:example.com",
                 user: {
-                    event: {},
-                    last_active_ago: undefined,
                     last_updated: 1415266943964
                 }
             },
@@ -536,10 +604,10 @@ describe('orderMembersList filter', function() {
                 user: {
                     event: {
                         content: {
-                            presence: "unavailable"
+                            presence: "unavailable",
+                            last_active_ago: undefined
                         }
                     },
-                    last_active_ago: undefined,
                     last_updated: 1415266943964
                 }
             },
@@ -547,10 +615,10 @@ describe('orderMembersList filter', function() {
                 user: {
                     event: {
                         content: {
-                            presence: "online"
+                            presence: "online",
+                            last_active_ago: undefined
                         }
                     },
-                    last_active_ago: undefined,
                     last_updated: 1415266943964,
                 }
             },
@@ -558,10 +626,10 @@ describe('orderMembersList filter', function() {
                 user: {
                     event: {
                         content: {
-                            presence: "offline"
+                            presence: "offline",
+                            last_active_ago: undefined
                         }
                     },
-                    last_active_ago: undefined,
                     last_updated: 1415266943964
                 }
             }
@@ -572,10 +640,10 @@ describe('orderMembersList filter', function() {
                 user: {
                     event: {
                         content: {
-                            presence: "online"
+                            presence: "online",
+                            last_active_ago: undefined
                         }
                     },
-                    last_active_ago: undefined,
                     last_updated: 1415266943964
                 }
             },
@@ -584,10 +652,10 @@ describe('orderMembersList filter', function() {
                 user: {
                     event: {
                         content: {
-                            presence: "unavailable"
+                            presence: "unavailable",
+                            last_active_ago: undefined
                         }
                     },
-                    last_active_ago: undefined,
                     last_updated: 1415266943964
                 }
             },
@@ -596,10 +664,10 @@ describe('orderMembersList filter', function() {
                 user: {
                     event: {
                         content: {
-                            presence: "offline"
+                            presence: "offline",
+                            last_active_ago: undefined
                         }
                     },
-                    last_active_ago: undefined,
                     last_updated: 1415266943964
                 }
             },

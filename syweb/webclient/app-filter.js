@@ -53,11 +53,11 @@ angular.module('matrixWebClient')
             b = b.user;
             
             var aLastActiveTS = 0, bLastActiveTS = 0;
-            if (a && undefined !== a.last_active_ago) {
-                aLastActiveTS = a.last_updated - a.last_active_ago;
+            if (a && a.event && a.event.content && a.event.content.last_active_ago !== undefined) {
+                aLastActiveTS = a.last_updated - a.event.content.last_active_ago;
             }
-            if (b && undefined !== b.last_active_ago) {
-                bLastActiveTS = b.last_updated - b.last_active_ago;
+            if (b && b.event && b.event.content && b.event.content.last_active_ago !== undefined) {
+                bLastActiveTS = b.last_updated - b.event.content.last_active_ago;
             }
             if (aLastActiveTS || bLastActiveTS) {
                 return bLastActiveTS - aLastActiveTS;
