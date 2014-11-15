@@ -84,7 +84,7 @@
                                 </div>
 
                                 <div ng-switch-default>
-                                    {{ lastMsg.content }}
+                                    {{ lastMsg.content.body | linky:'_blank' }}
                                 </div>
                             </div>
                         </div>

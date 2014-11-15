@@ -198,30 +198,44 @@
                             {{ msg.user_id }} changed their display name from {{ msg.prev_content.displayname }} to {{ msg.content.displayname }}
                         </span>
                         
-                        <span ng-show='msg.content.msgtype === "m.emote"'
-                              ng-class="msg.echo_msg_state"
-                              ng-bind-html="'* ' + (msg.__room_member.cnt.displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"
-                              />
-                        
-                        <span ng-show='msg.content.msgtype === "m.text"' 
-                              class="message"
-                              ng-class="containsBingWord(msg) && msg.user_id != state.user_id ? msg.echo_msg_state + ' messageBing' : msg.echo_msg_state"
-                              ng-bind-html="(msg.content.msgtype === 'm.text' && msg.type === 'm.room.message' && msg.content.format === 'org.matrix.custom.html') ? 
-                                                                                        (msg.content.formatted_body | unsanitizedLinky) :
-                                             (msg.content.msgtype === 'm.text' && msg.type === 'm.room.message') ? (msg.content.body | linky:'_blank') : '' "/>
+                        <span ng-show='msg.type === "m.room.message"' ng-switch='msg.content.msgtype'>
+                            <span ng-switch-when="m.emote"
+                                  ng-class="containsBingWord(msg) && msg.user_id != state.user_id ? msg.echo_msg_state + ' messageBing' : msg.echo_msg_state"
+                                  ng-bind-html="'* ' + (msg.__room_member.cnt.displayname || msg.user_id) + ' ' + msg.content.body | linky:'_blank'"
+                                  />
+
+                            <span ng-switch-when="m.text"
+                                  class="message"
+                                  ng-class="containsBingWord(msg) && msg.user_id != state.user_id ? msg.echo_msg_state + ' messageBing' : msg.echo_msg_state"
+                                  ng-bind-html="(msg.content.format === 'org.matrix.custom.html') ? (msg.content.formatted_body | unsanitizedLinky) : (msg.content.body | linky:'_blank') "/>
+
+                             <div ng-switch-when="m.image">
+                                 <div ng-hide='msg.content.thumbnail_url' ng-style="msg.content.body.h && { 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
+                                     <img class="image" ng-src="{{ msg.content.url }}"/>
+                                 </div>
+                                 <div ng-show='msg.content.thumbnail_url' ng-style="{ 'height' : msg.content.thumbnail_info.h }">
+                                     <img class="image mouse-pointer" ng-src="{{ msg.content.thumbnail_url }}"
+                                          ng-click="$parent.$parent.fullScreenImageURL = msg.content.url; $event.stopPropagation();"/>
+                                 </div>
+                             </div>
+
+                            <span ng-switch-when="m.file" ng-class="msg.echo_msg_state">
+                                <a href="{{ msg.content.url}}" target="_blank">{{ msg.content.body }}</a>
+                                <div ng-show='msg.content.thumbnail_url' ng-style="{ 'height' : msg.content.thumbnail_info.h }">
+                                    <a href="{{ msg.content.url}}" target="_blank">
+                                        <img class="image mouse-pointer" ng-src="{{ msg.content.thumbnail_url }}"/>
+                                    </a>
+                                </div>
+                            </span>
+                                
+                            <span ng-switch-default
+                                ng-class="containsBingWord(msg) && msg.user_id != state.user_id ? msg.echo_msg_state + ' messageBing' : msg.echo_msg_state"
+                                ng-bind-html="msg.content.body | linky:'_blank'"
+                                />
+                        </span>
 
                         <span ng-show='msg.type === "m.call.invite" && msg.user_id == state.user_id'>Outgoing Call{{ isWebRTCSupported() ? '' : ' (But your browser does not support VoIP)' }}</span>
                         <span ng-show='msg.type === "m.call.invite" && msg.user_id != state.user_id'>Incoming Call{{ isWebRTCSupported() ? '' : ' (But your browser does not support VoIP)' }}</span>
-
-                        <div ng-show='msg.content.msgtype === "m.image"'>
-                            <div ng-hide='msg.content.thumbnail_url' ng-style="msg.content.body.h && { 'height' : (msg.content.body.h < 320) ? msg.content.body.h : 320}">
-                                <img class="image" ng-src="{{ msg.content.url }}"/>
-                            </div>
-                            <div ng-show='msg.content.thumbnail_url' ng-style="{ 'height' : msg.content.thumbnail_info.h }">
-                                <img class="image mouse-pointer" ng-src="{{ msg.content.thumbnail_url }}"
-                                     ng-click="$parent.fullScreenImageURL = msg.content.url; $event.stopPropagation();"/>
-                            </div>
-                        </div>
 
                         <span ng-if="'m.room.topic' === msg.type">
                             {{ msg.__room_member.cnt.displayname || msg.user_id }} changed the topic to: {{ msg.content.topic }}
@@ -250,7 +264,7 @@
 
     <div id="controlPanel">
         <div id="controls">
-            <button id="attachButton" m-file-input="imageFileToSend" class="extraControls" ng-disabled="state.permission_denied"></button>
+            <button id="attachButton" m-file-input="fileToSend" class="extraControls" ng-disabled="state.permission_denied"></button>
             <textarea id="mainInput" rows="1" ng-enter="send()"
                       ng-disabled="state.permission_denied"
                       ng-focus="true" autocomplete="off" tab-complete command-history="room_id"/>

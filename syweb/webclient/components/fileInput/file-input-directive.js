@@ -25,7 +25,8 @@ angular.module('mFileInput', [])
     return {
         restrict: 'A',
         transclude: 'true',
-        template: '<div ng-transclude></div><input ng-hide="true" type="file" accept="image/*"/>',
+        // FIXME: add back in accept="image/*" when needed - e.g. for avatars
+        template: '<div ng-transclude></div><input ng-hide="true" type="file"/>',
         scope: {
             selectedFile: '=mFileInput'
         },
