@@ -47,11 +47,11 @@ angular.module('mFileUpload', ['matrixService', 'mUtilities'])
     };
     
     /*
-     * Upload an filmessagee plus generate a thumbnail of it (if possible) and upload it so that
-     * we will have all information to fulfill an image message request data.
+     * Upload an file plus generate a thumbnail of it (if possible) and upload it so that
+     * we will have all information to fulfill an file/image message request
      * @param {File} file the file to send
      * @param {Integer} thumbnailSize the max side size of the thumbnail to create
-     * @returns {promise} A promise that will be resolved by a image message object
+     * @returns {promise} A promise that will be resolved by a message object
      *   ready to be send with the Matrix API
      */
     this.uploadFileAndThumbnail = function(file, thumbnailSize) {
