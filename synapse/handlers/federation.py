@@ -140,9 +140,6 @@ class FederationHandler(BaseHandler):
             )
             event = redacted_event
 
-        if state:
-            state = [p for p in state]
-
         is_new_state = yield self.state_handler.annotate_event_with_state(
             event,
             old_state=state
@@ -306,8 +303,6 @@ class FederationHandler(BaseHandler):
                 target_host,
                 event
             )
-
-            state = [p for p in state]
 
             logger.debug("do_invite_join state: %s", state)
 
