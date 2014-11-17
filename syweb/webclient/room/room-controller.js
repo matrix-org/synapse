@@ -26,7 +26,6 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
 
     // Room ids. Computed and resolved in onInit
     $scope.room_id = undefined;
-    $scope.room_alias = undefined;
 
     $scope.state = {
         user_id: matrixService.config().user_id,
@@ -157,13 +156,8 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
     $scope.$on(eventHandlerService.MEMBER_EVENT, function(ngEvent, event, isLive) {
         // if there is a live event affecting us
         if (isLive && event.room_id === $scope.room_id && event.state_key === $scope.state.user_id) {
-            if ($scope.state.waiting_for_joined_event) {
-                // The user has successfully joined the room, we can getting data for this room
-                $scope.state.waiting_for_joined_event = false;
-                onInit3();
-            }
             // if someone else changed our state..
-            else if (event.user_id !== $scope.state.user_id && "invite" !== event.content.membership && "join" !== event.content.membership) {    
+            if (event.user_id !== $scope.state.user_id && "invite" !== event.content.membership && "join" !== event.content.membership) {    
                 if ("ban" === event.content.membership) {
                     $scope.state.permission_denied = "You have been banned by " + mUserDisplayNameFilter(event.user_id);
                 }
@@ -343,145 +337,56 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
     $scope.onInit = function() {
         console.log("onInit");
 
-        // Try to find out the room ID to load.
+        // Extract the room identifier being loaded
         var room_id_or_alias;
         if ($routeParams.room_id_or_alias) { // provided in the url
             room_id_or_alias = decodeURIComponent($routeParams.room_id_or_alias);
         }
+        
+        eventHandlerService.joinRoom(room_id_or_alias).then(function(roomId) {
+            $scope.room_id = roomId;
+            $scope.room = modelService.getRoom($scope.room_id);
+            
+            var messages = $scope.room.events;
 
-        if (room_id_or_alias && '!' === room_id_or_alias[0]) {
-            // it's a room ID since they start with !
-            $scope.room_id = room_id_or_alias;
-            $scope.room_alias = modelService.getRoomIdToAliasMapping($scope.room_id);
-            onInit2();
-        }
-        else {
-            if (room_id_or_alias && '#' === room_id_or_alias[0]) {
-                $scope.room_alias = room_id_or_alias;
+            if (0 === messages.length
+            || (1 === messages.length && "m.room.member" === messages[0].type && "invite" === messages[0].content.membership && $scope.state.user_id === messages[0].state_key)) {
+                // If we just joined a room, we won't have this history from initial sync, so we should try to paginate it anyway    
+                $scope.state.first_pagination = true;
             }
-            else  {
-                // Else get the room alias by hand from the URL
-                // ie: extract #public:localhost:8080 from http://127.0.0.1:8000/#/room/#public:localhost:8080
-                if (3 === location.hash.split("#").length) {
-                    $scope.room_alias = "#" + location.hash.split("#")[2];
-                }
-                else {
-                    // In case of issue, go to the default page
-                    console.log("Error: cannot extract room alias");
-                    $location.url("/");
-                    return;
-                }
+            else {
+                // There is no need to do a 1st pagination (initialSync provided enough to fill a page)
+                $scope.state.first_pagination = false;
             }
             
-            // Need a room ID required in Matrix API requests
-            console.log("Resolving alias: " + $scope.room_alias);
-            matrixService.resolveRoomAlias($scope.room_alias).then(function(response) {
-                $scope.room_id = response.data.room_id;
-                console.log("   -> Room ID: " + $scope.room_id);
+            // Make recents highlight the current room
+            recentsService.setSelectedRoomId($scope.room_id);
+            
+            updatePresenceTimes();
 
-                // Now, we can go on
-                onInit2();
-            },
-            function () {
-                // In case of issue, go to the default page
-                console.log("Error: cannot resolve room alias");
-                $location.url("/");
-            });
-        }
-    };
-    
-    var onInit2 = function() {
-        $scope.room = modelService.getRoom($scope.room_id);
-        
-        // Scroll down as soon as possible so that we point to the last message
-        // if it already exists in memory
-        scrollToBottom(true);
+            // Allow pagination
+            $scope.state.can_paginate = true;
 
-        // Make sure the initialSync has been before going further
-        eventHandlerService.waitForInitialSyncCompletion().then(
-            function() {
-                console.log("initialSync is complete.");
-                var needsToJoin = true;
-                
-                // The room members is available in the data fetched by initialSync
-                if ($scope.room) {
-                    var messages = $scope.room.events;
-
-                    if (0 === messages.length
-                    || (1 === messages.length && "m.room.member" === messages[0].type && "invite" === messages[0].content.membership && $scope.state.user_id === messages[0].state_key)) {
-                        // If we just joined a room, we won't have this history from initial sync, so we should try to paginate it anyway    
-                        $scope.state.first_pagination = true;
-                    }
-                    else {
-                        // There is no need to do a 1st pagination (initialSync provided enough to fill a page)
-                        $scope.state.first_pagination = false;
-                    }
-
-                    var members = $scope.room.current_room_state.members;
-
-                    // Check if the user has already join the room
-                    if ($scope.state.user_id in members) {
-                        if ("join" === members[$scope.state.user_id].event.content.membership) {
-                            needsToJoin = false;
-                        }
-                    }
-                }
-                
-                // Do we to join the room before starting?
-                if (needsToJoin) {
-                    $scope.state.waiting_for_joined_event = true;
-                    matrixService.join($scope.room_id).then(
-                        function() {
-                            // TODO: factor out the common housekeeping whenever we try to join a room or alias
-                            matrixService.roomState($scope.room_id).then(
-                                function(response) {
-                                    eventHandlerService.handleEvents(response.data, false, true);
-                                },
-                                function(error) {
-                                    console.error("Failed to get room state for: " + $scope.room_id);
-                                }
-                            );                                        
-                            
-                            // onInit3 will be called once the joined m.room.member event is received from the events stream
-                            // This avoids to get the joined information twice in parallel:
-                            //    - one from the events stream
-                            //    - one from the pagination because the pagination window covers this event ts
-                            console.log("Joined room "+$scope.room_id);
-                        },
-                        function(reason) {
-                            console.log("Can't join room: " + JSON.stringify(reason));
-                            // FIXME: what if it wasn't a perms problem?
-                            $scope.state.permission_denied = "You do not have permission to join this room";
-                        });
-                }
-                else {
-                    onInit3();
-                }
+            // Do a first pagination only if it is required (e.g. we've JUST joined a room and have no messages to display.)
+            // FIXME: Should be no more require when initialSync/{room_id} will be available
+            if ($scope.state.first_pagination) {
+                paginate(MESSAGES_PER_PAGINATION);
             }
-        );
-    };
-
-    var onInit3 = function() {
-        console.log("onInit3");
-
-        // Make recents highlight the current room
-        recentsService.setSelectedRoomId($scope.room_id);
-        
-        updatePresenceTimes();
-
-        // Allow pagination
-        $scope.state.can_paginate = true;
-
-        // Do a first pagination only if it is required
-        // FIXME: Should be no more require when initialSync/{room_id} will be available
-        if ($scope.state.first_pagination) {
-            paginate(MESSAGES_PER_PAGINATION);
-        }
-        else {
-            // There are already messages, go to the last message
+            
+            // Scroll down as soon as possible so that we point to the last message
+            // if it already exists in memory
             scrollToBottom(true);
-        }
-    }; 
+        },
+        function(err) {
+            if (err.data.errcode === "M_FORBIDDEN") {
+                $scope.state.permission_denied = "You do not have permission to join this room";
+            }
+            else {
+                console.log("Error: cannot join room: "+JSON.stringify(err));
+                $location.url("/");
+            }
+        });
+    };
 
     $scope.leaveRoom = function() {
         

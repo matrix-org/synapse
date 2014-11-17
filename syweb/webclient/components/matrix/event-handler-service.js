@@ -50,11 +50,6 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
         eventMap = {};
     };
     reset();
-
-    var resetRoomMessages = function(room_id) {
-        var room = modelService.getRoom(room_id);
-        room.events = [];
-    };
     
     // Generic method to handle events data
     var handleRoomStateEvent = function(event, isLiveEvent, addToRoomMessages) {
@@ -318,7 +313,30 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
 
             console.log("Redacted an event.");
         }
-    }
+    };
+    
+    // resolves a room ID or alias, returning a deferred.
+    var resolveRoomIdentifier = function(roomIdOrAlias) {
+        var defer = $q.defer();
+        if ('#' === roomIdOrAlias[0]) {
+            matrixService.resolveRoomAlias(roomIdOrAlias).then(function(response) {
+                defer.resolve(response.data.room_id);
+                console.log("resolveRoomIdentifier: "+roomIdOrAlias+" -> " + response.data.room_id);
+            },
+            function(err) {
+                console.error("resolveRoomIdentifier: lookup failed. "+JSON.stringify(err.data));
+                defer.reject(err.data);
+            });
+        }
+        else if ('!' === roomIdOrAlias[0]) {
+            defer.resolve(roomIdOrAlias);
+        }
+        else {
+            console.error("resolveRoomIdentifier: Unknown roomIdOrAlias => "+roomIdOrAlias);
+            defer.reject("Bad room identifier: "+roomIdOrAlias);
+        }
+        return defer.promise;
+    };
 
     return {
         ROOM_CREATE_EVENT: ROOM_CREATE_EVENT,
@@ -337,7 +355,6 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
         },
     
         handleEvent: function(event, isLiveEvent, isStateEvent) {
-
             // Avoid duplicated events
             // Needed for rooms where initialSync has not been done. 
             // In this case, we do not know where to start pagination. So, it starts from the END
@@ -488,14 +505,48 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
 
             initialSyncDeferred.resolve(response);
         },
+        
+        // joins a room and handles the requests which need to be done e.g. getting room state
+        joinRoom: function(roomIdOrAlias) {
+            var defer = $q.defer();
+            var eventHandlerService = this;
+            
+            var errorFunc = function(error) {
+                console.error("joinRoom: " + JSON.stringify(error));
+                defer.reject(error);
+            };
+            
+            resolveRoomIdentifier(roomIdOrAlias).then(function(roomId) {
+                // check if you are joined already
+                eventHandlerService.waitForInitialSyncCompletion().then(function() {
+                    var members = modelService.getRoom(roomId).current_room_state.members;
+                    var me = matrixService.config().user_id;
+                    if (me in members) {
+                        if ("join" === members[me].event.content.membership) {
+                            console.log("joinRoom: Already joined room "+roomId);
+                            defer.resolve(roomId);
+                            return;
+                        }
+                    }
+                    // join the room and get current room state
+                    matrixService.join(roomId).then(function() {
+                        matrixService.roomState(roomId).then(function(response) {
+                            var room = modelService.getRoom(roomId);
+                            room.current_room_state.storeStateEvents(response.data);
+                            room.old_room_state.storeStateEvents(response.data);
+                            console.log("joinRoom: Joined room "+roomId);
+                            defer.resolve(roomId);
+                        }, errorFunc);
+                    }, errorFunc);
+                }, errorFunc);
+            }, errorFunc);
+            
+            return defer.promise;
+        },
 
         // Returns a promise that resolves when the initialSync request has been processed
         waitForInitialSyncCompletion: function() {
             return initialSyncDeferred.promise;
-        },
-
-        resetRoomMessages: function(room_id) {
-            resetRoomMessages(room_id);
         },
         
         eventContainsBingWord: function(event) {
