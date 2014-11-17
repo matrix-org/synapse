@@ -40,7 +40,7 @@ angular.module('RecentsController')
                 }
                 // Count users here
                 // TODO: Compute it directly in eventHandlerService
-                room.recent.numUsersInRoom = eventHandlerService.getUsersCountInRoom(room_id);
+                room.recent.numUsersInRoom = modelService.getUserCountInRoom(room_id);
 
                 filtered.push(room);
             }

@@ -523,29 +523,8 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
             }
 
             return lastMessage;
-        },
-        
-        /**
-         * Compute the room users number, ie the number of members who has joined the room.
-         * @param {String} room_id the room id
-         * @returns {undefined | Number} the room users number if available
-         */
-        getUsersCountInRoom: function(room_id) {
-            var memberCount;
-
-            var room = modelService.getRoom(room_id);
-            memberCount = 0;
-            for (var i in room.current_room_state.members) {
-                if (!room.current_room_state.members.hasOwnProperty(i)) continue;
-
-                var member = room.current_room_state.members[i].event;
-
-                if ("join" === member.content.membership) {
-                    memberCount = memberCount + 1;
-                }
-            }
-
-            return memberCount;
         }
+        
+        
     };
 }]);

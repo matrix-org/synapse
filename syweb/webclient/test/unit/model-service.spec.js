@@ -193,4 +193,38 @@ describe('ModelService', function() {
 
         
     }));
+    
+    it('should be able to get the number of joined users in a room', inject(
+    function(modelService) {
+        var roomId = "!foo:matrix.org";
+        // set mocked data
+        var room = modelService.getRoom(roomId);
+        room.current_room_state.storeStateEvent({
+            content: { membership: "join" },
+            user_id: "@adam:matrix.org",
+            state_key: "@adam:matrix.org",
+            type: "m.room.member"
+        });
+        room.current_room_state.storeStateEvent({
+            content: { membership: "invite" },
+            user_id: "@adam:matrix.org",
+            state_key: "@beth:matrix.org",
+            type: "m.room.member"
+        });
+        room.current_room_state.storeStateEvent({
+            content: { membership: "join" },
+            user_id: "@charlie:matrix.org",
+            state_key: "@charlie:matrix.org",
+            type: "m.room.member"
+        });
+        room.current_room_state.storeStateEvent({
+            content: { membership: "leave" },
+            user_id: "@danice:matrix.org",
+            state_key: "@danice:matrix.org",
+            type: "m.room.member"
+        });
+        
+        var num = modelService.getUserCountInRoom(roomId);
+        expect(num).toEqual(2);
+    }));
 });
