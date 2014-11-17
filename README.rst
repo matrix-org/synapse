@@ -129,7 +129,7 @@ Synapse is written in python but some of the libraries is uses are written in
 C. So before we can install synapse itself we need a working C compiler and the
 header files for python C extensions.
 
-Installing prerequisites on Ubuntu::
+Installing prerequisites on Ubuntu or Debian::
 
     $ sudo apt-get install build-essential python2.7-dev libffi-dev \
                            python-pip python-setuptools
@@ -137,8 +137,44 @@ Installing prerequisites on Ubuntu::
 Installing prerequisites on Mac OS X::
 
     $ xcode-select --install
+    
+To install the synapse homeserver run::
 
-Synapse uses NaCl (http://nacl.cr.yp.to/) for encryption and digital signatures.
+    $ pip install --user --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+
+This installs synapse, along with the libraries it uses, into
+``$HOME/.local/lib/``.
+
+Troubleshooting
+---------------
+
+Synapse requires pip 1.7 or later, so if your OS provides too old a version and 
+you get errors about `error: no such option: --process-dependency-links` you may 
+need to manually upgrade it::
+
+    $ sudo pip install --upgrade pip
+    
+If pip crashes mid-installation for reason (e.g. lost terminal), pip may
+refuse to run until you remove the temporary installation directory it
+created. To reset the installation::
+
+    $ rm -rf /tmp/pip_install_matrix
+
+Running Your Homeserver
+=======================
+
+To actually run your new homeserver, pick a working directory for Synapse to run (e.g. ``~/.synapse``), and::
+
+    $ mkdir ~/.synapse
+    $ cd ~/.synapse
+    $ ~/.local/bin/synctl start
+
+Troubleshooting
+---------------
+
+If synapse fails with `missing "sodium.h"` crypto errors, you may need 
+to manually upgrade PyNaCL, as synapse uses NaCl (http://nacl.cr.yp.to/) for 
+encryption and digital signatures.
 Unfortunately PyNACL currently has a few issues
 (https://github.com/pyca/pynacl/issues/53) and
 (https://github.com/pyca/pynacl/issues/79) that mean it may not install
@@ -151,21 +187,6 @@ fix try re-installing from PyPI or directly from
     $ # Install from github
     $ pip install --user https://github.com/pyca/pynacl/tarball/master
 
-On OSX, if you encounter ``clang: error: unknown argument: '-mno-fused-madd'``
-you will need to ``export CFLAGS=-Qunused-arguments``.
-
-To install the synapse homeserver run::
-
-    $ pip install --user --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
-
-This installs synapse, along with the libraries it uses, into
-``$HOME/.local/lib/``.
-
-To actually run your new homeserver, pick a working directory for Synapse to run (e.g. ``~/.synapse``), and::
-
-    $ mkdir ~/.synapse
-    $ cd ~/.synapse
-    $ synctl start
 
 Homeserver Development
 ======================
