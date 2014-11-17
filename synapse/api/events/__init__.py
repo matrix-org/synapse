@@ -117,6 +117,12 @@ class SynapseEvent(JsonEncodedObject):
         """
         raise NotImplementedError("get_content_template not implemented.")
 
+    def get_pdu_json(self):
+        pdu_json = self.get_full_dict()
+        pdu_json.pop("destination", None)
+        pdu_json.pop("outlier", None)
+        return pdu_json
+
 
 class SynapseStateEvent(SynapseEvent):
 

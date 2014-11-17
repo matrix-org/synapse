@@ -19,7 +19,7 @@ a given transport.
 
 from twisted.internet import defer
 
-from .units import Transaction, Pdu, Edu
+from .units import Transaction, Edu
 
 from .persistence import TransactionActions
 
@@ -71,6 +71,8 @@ class ReplicationLayer(object):
         self._order = 0
 
         self._clock = hs.get_clock()
+
+        self.event_factory = hs.get_event_factory()
 
     def set_handler(self, handler):
         """Sets the handler that the replication layer will use to communicate
@@ -203,7 +205,10 @@ class ReplicationLayer(object):
 
         transaction = Transaction(**transaction_data)
 
-        pdus = [Pdu(outlier=False, **p) for p in transaction.pdus]
+        pdus = [
+            self.event_from_pdu_json(p, outlier=False)
+            for p in transaction.pdus
+        ]
         for pdu in pdus:
             yield self._handle_new_pdu(dest, pdu, backfilled=True)
 
@@ -235,7 +240,10 @@ class ReplicationLayer(object):
 
         transaction = Transaction(**transaction_data)
 
-        pdu_list = [Pdu(outlier=outlier, **p) for p in transaction.pdus]
+        pdu_list = [
+            self.event_from_pdu_json(p, outlier=outlier)
+            for p in transaction.pdus
+        ]
 
         pdu = None
         if pdu_list:
@@ -265,8 +273,10 @@ class ReplicationLayer(object):
         )
 
         transaction = Transaction(**transaction_data)
-
-        pdus = [Pdu(outlier=True, **p) for p in transaction.pdus]
+        pdus = [
+            self.event_from_pdu_json(p, outlier=True)
+            for p in transaction.pdus
+        ]
 
         defer.returnValue(pdus)
 
@@ -293,7 +303,9 @@ class ReplicationLayer(object):
                 p["age_ts"] = int(self._clock.time_msec()) - int(p["age"])
                 del p["age"]
 
-        pdu_list = [Pdu(**p) for p in transaction.pdus]
+        pdu_list = [
+            self.event_from_pdu_json(p) for p in transaction.pdus
+        ]
 
         logger.debug("[%s] Got transaction", transaction.transaction_id)
 
@@ -388,30 +400,30 @@ class ReplicationLayer(object):
     def on_make_join_request(self, context, user_id):
         pdu = yield self.handler.on_make_join_request(context, user_id)
         defer.returnValue({
-            "event": pdu.get_dict(),
+            "event": pdu.get_pdu_json(),
         })
 
     @defer.inlineCallbacks
     def on_invite_request(self, origin, content):
-        pdu = Pdu(**content)
+        pdu = self.event_from_pdu_json(content)
         ret_pdu = yield self.handler.on_invite_request(origin, pdu)
         defer.returnValue(
             (
                 200,
                 {
-                    "event": ret_pdu.get_dict(),
+                    "event": ret_pdu.get_pdu_json(),
                 }
             )
         )
 
     @defer.inlineCallbacks
     def on_send_join_request(self, origin, content):
-        pdu = Pdu(**content)
+        pdu = self.event_from_pdu_json(content)
         res_pdus = yield self.handler.on_send_join_request(origin, pdu)
 
         defer.returnValue((200, {
-            "state": [p.get_dict() for p in res_pdus["state"]],
-            "auth_chain": [p.get_dict() for p in res_pdus["auth_chain"]],
+            "state": [p.get_pdu_json() for p in res_pdus["state"]],
+            "auth_chain": [p.get_pdu_json() for p in res_pdus["auth_chain"]],
         }))
 
     @defer.inlineCallbacks
@@ -421,7 +433,7 @@ class ReplicationLayer(object):
             (
                 200,
                 {
-                    "auth_chain": [a.get_dict() for a in auth_pdus],
+                    "auth_chain": [a.get_pdu_json() for a in auth_pdus],
                 }
             )
         )
@@ -438,7 +450,7 @@ class ReplicationLayer(object):
 
         logger.debug("Got response to make_join: %s", pdu_dict)
 
-        defer.returnValue(Pdu(**pdu_dict))
+        defer.returnValue(self.event_from_pdu_json(pdu_dict))
 
     @defer.inlineCallbacks
     def send_join(self, destination, pdu):
@@ -446,12 +458,15 @@ class ReplicationLayer(object):
             destination,
             pdu.room_id,
             pdu.event_id,
-            pdu.get_dict(),
+            pdu.get_pdu_json(),
         )
 
         logger.debug("Got content: %s", content)
 
-        state = [Pdu(outlier=True, **p) for p in content.get("state", [])]
+        state = [
+            self.event_from_pdu_json(p, outlier=True)
+            for p in content.get("state", [])
+        ]
 
         # FIXME: We probably want to do something with the auth_chain given
         # to us
@@ -468,14 +483,14 @@ class ReplicationLayer(object):
             destination=destination,
             context=context,
             event_id=event_id,
-            content=pdu.get_dict(),
+            content=pdu.get_pdu_json(),
         )
 
         pdu_dict = content["event"]
 
         logger.debug("Got response to send_invite: %s", pdu_dict)
 
-        defer.returnValue(Pdu(**pdu_dict))
+        defer.returnValue(self.event_from_pdu_json(pdu_dict))
 
     @log_function
     def _get_persisted_pdu(self, origin, event_id):
@@ -490,7 +505,7 @@ class ReplicationLayer(object):
         """Returns a new Transaction containing the given PDUs suitable for
         transmission.
         """
-        pdus = [p.get_dict() for p in pdu_list]
+        pdus = [p.get_pdu_json() for p in pdu_list]
         time_now = self._clock.time_msec()
         for p in pdus:
             if "age_ts" in p:
@@ -562,6 +577,14 @@ class ReplicationLayer(object):
 
     def __str__(self):
         return "<ReplicationLayer(%s)>" % self.server_name
+
+    def event_from_pdu_json(self, pdu_json, outlier=False):
+        #TODO: Check we have all the PDU keys here
+        pdu_json.setdefault("hashes", {})
+        pdu_json.setdefault("signatures", {})
+        return self.event_factory.create_event(
+            pdu_json["type"], outlier=outlier, **pdu_json
+        )
 
 
 class _TransactionQueue(object):

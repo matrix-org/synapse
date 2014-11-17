@@ -492,6 +492,14 @@ class SQLBaseStore(object):
                 for n, s in signatures.items()
             }
 
+            hashes = self._get_event_content_hashes_txn(
+                txn, ev.event_id,
+            )
+
+            ev.hashes = {
+                k: encode_base64(v) for k, v in hashes.items()
+            }
+
             prevs = self._get_prev_events_and_state(txn, ev.event_id)
 
             ev.prev_events = [

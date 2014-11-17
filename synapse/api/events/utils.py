@@ -42,6 +42,8 @@ def prune_event(event):
         "prev_events",
         "prev_state",
         "auth_events",
+        "origin",
+        "origin_server_ts",
     ]
 
     new_content = {}
