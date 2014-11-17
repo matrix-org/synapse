@@ -54,6 +54,7 @@ setup(
         "mock"
     ],
     include_package_data=True,
+    zip_safe=False,
     long_description=read("README.rst"),
     entry_points="""
     [console_scripts]
