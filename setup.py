@@ -26,12 +26,13 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
-    name="SynapseHomeServer",
-    version="0.0.1",
+    name="synapse",
+    version=read("VERSION"),
     packages=find_packages(exclude=["tests", "tests.*"]),
     description="Reference Synapse Home Server",
     install_requires=[
         "syutil==0.0.2",
+        "syweb==0.0.1",
         "Twisted>=14.0.0",
         "service_identity>=1.0.0",
         "pyopenssl>=0.14",
@@ -44,6 +45,7 @@ setup(
     dependency_links=[
         "https://github.com/matrix-org/syutil/tarball/v0.0.2#egg=syutil-0.0.2",
         "https://github.com/pyca/pynacl/tarball/52dbe2dc33f1#egg=pynacl-0.3.0",
+        "https://github.com/matrix-org/matrix-angular-sdk/tarball/master/#egg=syweb-0.0.1",
     ],
     setup_requires=[
         "setuptools_trial",
