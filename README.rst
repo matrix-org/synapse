@@ -4,9 +4,9 @@ Introduction
 Matrix is an ambitious new ecosystem for open federated Instant Messaging and
 VoIP.  The basics you need to know to get up and running are:
 
-- Chatrooms are distributed and do not exist on any single server.  Rooms
-  can be found using aliases like ``#matrix:matrix.org`` or
-  ``#test:localhost:8008`` or they can be ephemeral.
+- Everything in Matrix happens in a room.  Rooms are distributed and do not
+  exist on any single server.  Rooms can be located using convenience aliases 
+  like ``#matrix:matrix.org`` or ``#test:localhost:8008``.
 
 - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
   you will normally refer to yourself and others using a 3PID: email
@@ -17,56 +17,12 @@ The overall architecture is::
       client <----> homeserver <=====================> homeserver <----> client
              https://somewhere.org/_matrix      https://elsewhere.net/_matrix
 
-WARNING
-=======
+``#matrix:matrix.org`` is the official support room for Matrix, and can be
+accessed by the web client at http://matrix.org/alpha or via an IRC bridge at
+irc://irc.freenode.net/matrix.
 
-**Synapse is currently in a state of rapid development, and not all features
-are yet functional. Critically, some security features are still in
-development, which means Synapse can *not* be considered secure or reliable at
-this point.**  For instance:
-
-- **SSL Certificates used by server-server federation are not yet validated.**
-- **Room permissions are not yet enforced on traffic received via federation.**
-- **Homeservers do not yet cryptographically sign their events to avoid
-  tampering**
-- Default configuration provides open signup to the service from the internet
-
-Despite this, we believe Synapse is more than useful as a way for experimenting
-and exploring Synapse, and the missing features will land shortly. **Until
-then, please do *NOT* use Synapse for any remotely important or secure
-communication.**
-
-
-Quick Start
-===========
-
-System requirements:
-- POSIX-compliant system (tested on Linux & OSX)
-- Python 2.7
-
-To get up and running:
-
-- To simply play with an **existing** homeserver you can
-  just go straight to http://matrix.org/alpha.
-
-- To run your own **private** homeserver on localhost:8008, generate a basic
-  config file: ``./synctl start`` will give you instructions on how to do this.
-  For this purpose, you can use 'localhost' or your hostname as a server name.
-  Once you've done so, running ``./synctl start`` again will start your private
-  home server. You will find a webclient running at http://localhost:8008.
-  Please use a recent Chrome or Firefox for now (or Safari if you don't need
-  VoIP support).
-
-- To run a **public** homeserver and let it exchange messages with other
-  homeservers and participate in the global Matrix federation, you must expose
-  port 8448 to the internet and edit homeserver.yaml to specify server_name
-  (the public DNS entry for this server) and then run ``synctl start``. If you
-  changed the server_name, you may need to move the old database
-  (homeserver.db) out of the way first. Then come join ``#matrix:matrix.org``
-  and say hi! :)
-
-For more detailed setup instructions, please see further down this document.
-
+Synapse is currently in rapid development, but as of version 0.5 we believe it 
+is sufficiently stable to be run as an internet-facing service for real usage!
 
 About Matrix
 ============
@@ -76,10 +32,10 @@ which handle:
 
 - Creating and managing fully distributed chat rooms with no
   single points of control or failure
-- Eventually-consistent cryptographically secure[1] synchronisation of room
+- Eventually-consistent cryptographically secure synchronisation of room
   state across a global open network of federated servers and services
 - Sending and receiving extensible messages in a room with (optional)
-  end-to-end encryption[2]
+  end-to-end encryption[1]
 - Inviting, joining, leaving, kicking, banning room members
 - Managing user accounts (registration, login, logout)
 - Using 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
@@ -111,19 +67,25 @@ Synapse ships with two basic demo Matrix clients: webclient (a basic group chat
 web client demo implemented in AngularJS) and cmdclient (a basic Python
 command line utility which lets you easily see what the JSON APIs are up to).
 
-We'd like to invite you to take a look at the Matrix spec, try to run a
-homeserver, and join the existing Matrix chatrooms already out there,
-experiment with the APIs and the demo clients, and let us know your thoughts at
-https://github.com/matrix-org/synapse/issues or at matrix@matrix.org.
+Meanwhile, iOS and Android SDKs and clients are currently in development and available from:
 
-Thanks for trying Matrix!
+ * https://github.com/matrix-org/matrix-ios-sdk
+ * https://github.com/matrix-org/matrix-android-sdk
 
-[1] Cryptographic signing of messages isn't turned on yet
+We'd like to invite you to join #matrix:matrix.org (via http://matrix.org/alpha), run a homeserver, take a look at the Matrix spec at
+http://matrix.org/docs/spec, experiment with the APIs and the demo
+clients, and report any bugs via http://matrix.org/jira.
 
-[2] End-to-end encryption is currently in development
+Thanks for using Matrix!
+
+[1] End-to-end encryption is currently in development
 
 Homeserver Installation
 =======================
+
+System requirements:
+- POSIX-compliant system (tested on Linux & OSX)
+- Python 2.7
 
 Synapse is written in python but some of the libraries is uses are written in
 C. So before we can install synapse itself we need a working C compiler and the
@@ -143,7 +105,7 @@ To install the synapse homeserver run::
     $ pip install --user --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
 
 This installs synapse, along with the libraries it uses, into
-``$HOME/.local/lib/``.
+``$HOME/.local/lib/`` on Linux or ``$HOME/Library/Python/2.7/lib/`` on OSX.
 
 Troubleshooting Installation
 ----------------------------
@@ -163,18 +125,23 @@ created. To reset the installation::
 Running Your Homeserver
 =======================
 
-To actually run your new homeserver, pick a working directory for Synapse to run (e.g. ``~/.synapse``), and::
+To actually run your new homeserver, pick a working directory for Synapse to run 
+(e.g. ``~/.synapse``), and::
 
     $ mkdir ~/.synapse
     $ cd ~/.synapse
+    
+    $ # on Linux
     $ ~/.local/bin/synctl start
+    
+    $ # on OSX
+    $ ~/Library/Python/2.7/bin/synctl start
 
 Troubleshooting Running
 -----------------------
 
 If ``synctl`` fails with ``pkg_resources.DistributionNotFound`` errors you may 
-need a newer version of setuptools than that provided by your OS, and then 
-reinstall::
+need a newer version of setuptools than that provided by your OS.
 
     $ sudo pip install setuptools --upgrade
 
@@ -227,8 +194,8 @@ This should end with a 'PASSED' result::
 Upgrading an existing homeserver
 ================================
 
-Before upgrading an existing homeserver to a new version, please refer to
-UPGRADE.rst for any additional instructions.
+IMPORTANT: Before upgrading an existing homeserver to a new version, please
+refer to UPGRADE.rst for any additional instructions.
 
 
 Setting up Federation
@@ -257,10 +224,7 @@ For the first form, simply pass the required hostname (of the machine) as the
         --generate-config
     $ python -m synapse.app.homeserver --config-path homeserver.config
 
-Alternatively, you can run synapse via synctl - running ``synctl start`` to
-generate a homeserver.yaml config file, where you can then edit server-name to
-specify machine.my.domain.name, and then set the actual server running again
-with synctl start.
+Alternatively, you can run ``synctl start`` to guide you through the process.
 
 For the second form, first create your SRV record and publish it in DNS. This
 needs to be named _matrix._tcp.YOURDOMAIN, and point at at least one hostname
@@ -297,6 +261,8 @@ private federation (``localhost:8080``, ``localhost:8081`` and
 http://localhost:8080. Simply run::
 
     $ demo/start.sh
+    
+This is mainly useful just for development purposes.
 
 Running The Demo Web Client
 ===========================
@@ -355,13 +321,14 @@ time.
 Where's the spec?!
 ==================
 
-For now, please go spelunking in the ``docs/`` directory to find out.
+The source of the matrix spec lives at https://github.com/matrix-org/matrix-doc.  
+A recent HTML snapshot of this lives at http://matrix.org/docs/spec
 
 
 Building Internal API Documentation
 ===================================
 
-Before building internal API documentation install spinx and
+Before building internal API documentation install sphinx and
 sphinxcontrib-napoleon::
 
     $ pip install sphinx
