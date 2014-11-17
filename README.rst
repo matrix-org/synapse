@@ -121,6 +121,13 @@ refuse to run until you remove the temporary installation directory it
 created. To reset the installation::
 
     $ rm -rf /tmp/pip_install_matrix
+    
+pip seems to leak *lots* of memory during installation.  For instance, a Linux 
+host with 512MB of RAM may run out of memory whilst installing Twisted.  If this 
+happens, you will have to individually install the dependencies which are 
+failing, e.g.:
+
+    $ pip install --user twisted
 
 Running Your Homeserver
 =======================
