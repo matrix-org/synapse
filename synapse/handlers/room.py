@@ -111,15 +111,6 @@ class RoomCreationHandler(BaseHandler):
             user, room_id, is_public=is_public
         )
 
-        if room_alias:
-            directory_handler = self.hs.get_handlers().directory_handler
-            yield directory_handler.create_association(
-                user_id=user_id,
-                room_id=room_id,
-                room_alias=room_alias,
-                servers=[self.hs.hostname],
-            )
-
         @defer.inlineCallbacks
         def handle_event(event):
             snapshot = yield self.store.snapshot_room(event)
@@ -184,9 +175,18 @@ class RoomCreationHandler(BaseHandler):
             join_event,
             do_auth=False
         )
+
         result = {"room_id": room_id}
+
         if room_alias:
             result["room_alias"] = room_alias.to_string()
+            directory_handler = self.hs.get_handlers().directory_handler
+            yield directory_handler.create_association(
+                user_id=user_id,
+                room_id=room_id,
+                room_alias=room_alias,
+                servers=[self.hs.hostname],
+            )
 
         defer.returnValue(result)
 
