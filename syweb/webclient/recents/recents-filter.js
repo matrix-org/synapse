@@ -17,7 +17,7 @@
 'use strict';
 
 angular.module('RecentsController')
-.filter('orderRecents', ["matrixService", "eventHandlerService", "modelService", function(matrixService, eventHandlerService, modelService) {
+.filter('orderRecents', ["matrixService", "modelService", function(matrixService, modelService) {
     return function(rooms) {
         var user_id = matrixService.config().user_id;
 
@@ -39,7 +39,7 @@ angular.module('RecentsController')
                     room.recent.inviter = member.user_id;
                 }
                 // Count users here
-                // TODO: Compute it directly in eventHandlerService
+                // TODO: Compute it directly in modelService
                 room.recent.numUsersInRoom = modelService.getUserCountInRoom(room_id);
 
                 filtered.push(room);
@@ -54,8 +54,8 @@ angular.module('RecentsController')
         // The room with the latest message at first
         filtered.sort(function (roomA, roomB) {
 
-            var lastMsgRoomA = eventHandlerService.getLastMessage(roomA.room_id, true);
-            var lastMsgRoomB = eventHandlerService.getLastMessage(roomB.room_id, true);
+            var lastMsgRoomA = modelService.getLastMessage(roomA.room_id, true);
+            var lastMsgRoomB = modelService.getLastMessage(roomB.room_id, true);
 
             // Invite message does not have a body message nor ts
             // Puth them at the top of the list

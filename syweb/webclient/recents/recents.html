@@ -16,7 +16,7 @@
                 <td class="recentsRoomSummaryTS">
                     <!-- Use a temp var as alias to the last room message.
                          Declaring it in this way ensures the data-binding -->
-                    {{ lastMsg = eventHandlerService.getLastMessage(room.room_id, true);"" }}
+                    {{ lastMsg = modelService.getLastMessage(room.room_id, true);"" }}
 
                     {{ (lastMsg.origin_server_ts) | date:'MMM d HH:mm' }}
                     

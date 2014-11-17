@@ -501,30 +501,7 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
         
         eventContainsBingWord: function(event) {
             return containsBingWord(event);
-        },
-        
-        /**
-         * Return the last message event of a room
-         * @param {String} room_id the room id
-         * @param {Boolean} filterFake true to not take into account fake messages
-         * @returns {undefined | Event} the last message event if available
-         */
-        getLastMessage: function(room_id, filterEcho) {
-            var lastMessage;
-
-            var events = modelService.getRoom(room_id).events;
-            for (var i = events.length - 1; i >= 0; i--) {
-                var message = events[i];
-
-                if (!filterEcho || undefined === message.echo_msg_state) {
-                    lastMessage = message;
-                    break;
-                }
-            }
-
-            return lastMessage;
         }
-        
         
     };
 }]);

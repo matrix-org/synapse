@@ -17,11 +17,11 @@
 'use strict';
 
 angular.module('RecentsController', ['matrixService', 'matrixFilter'])
-.controller('RecentsController', ['$rootScope', '$scope', 'eventHandlerService', 'modelService', 'recentsService',
-                               function($rootScope, $scope, eventHandlerService, modelService, recentsService) {
+.controller('RecentsController', ['$rootScope', '$scope', 'modelService', 'recentsService',
+                               function($rootScope, $scope, modelService, recentsService) {
 
     // Expose the service to the view
-    $scope.eventHandlerService = eventHandlerService;
+    $scope.modelService = modelService;
     
     // retrieve all rooms and expose them
     $scope.rooms = modelService.getRooms();
