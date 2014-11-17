@@ -20,7 +20,7 @@ angular.module('RegisterController', ['matrixService'])
     'use strict';
     
     var config = window.webClientConfig;
-    var useCaptcha = true;
+    var useCaptcha = false; // default to no captcha to make it easier to get a homeserver up and running...
     if (config !== undefined) {
         useCaptcha = config.useCaptcha;
     }
@@ -167,16 +167,10 @@ angular.module('RegisterController', ['matrixService'])
 	
 	var setupCaptcha = function() {
 	    console.log("Setting up ReCaptcha")
-        var config = window.webClientConfig;
-        var public_key = undefined;
-        if (config === undefined) {
-            console.error("Couldn't find webClientConfig. Cannot get public key for captcha.");
-        }
-        else {
-            public_key = webClientConfig.recaptcha_public_key;
-            if (public_key === undefined) {
-                console.error("No public key defined for captcha!")
-            }
+        var public_key = window.webClientConfig.recaptcha_public_key;
+        if (public_key === undefined) {
+            console.error("No public key defined for captcha!")
+            return;
         }
 	    Recaptcha.create(public_key,
 	    "regcaptcha",

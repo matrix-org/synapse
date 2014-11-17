@@ -284,6 +284,52 @@ angular.module('modelService', [])
                 }
             }
             return powerLevel;
+        },
+        
+        /**
+         * Compute the room users number, ie the number of members who has joined the room.
+         * @param {String} room_id the room id
+         * @returns {undefined | Number} the room users number if available
+         */
+        getUserCountInRoom: function(room_id) {
+            var memberCount;
+
+            var room = this.getRoom(room_id);
+            memberCount = 0;
+            for (var i in room.current_room_state.members) {
+                if (!room.current_room_state.members.hasOwnProperty(i)) continue;
+
+                var member = room.current_room_state.members[i].event;
+
+                if ("join" === member.content.membership) {
+                    memberCount = memberCount + 1;
+                }
+            }
+
+            return memberCount;
+        },
+        
+        /**
+         * Return the last message event of a room
+         * @param {String} room_id the room id
+         * @param {Boolean} filterFake true to not take into account fake messages
+         * @returns {undefined | Event} the last message event if available
+         */
+        getLastMessage: function(room_id, filterEcho) {
+            var lastMessage;
+
+            var events = this.getRoom(room_id).events;
+            for (var i = events.length - 1; i >= 0; i--) {
+                var message = events[i];
+
+                // TODO: define a better marker than echo_msg_state
+                if (!filterEcho || undefined === message.echo_msg_state) {
+                    lastMessage = message;
+                    break;
+                }
+            }
+
+            return lastMessage;
         }
     
     };

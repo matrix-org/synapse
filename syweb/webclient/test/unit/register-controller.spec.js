@@ -5,7 +5,7 @@ describe("RegisterController ", function() {
     var avatarUrl = "avatar.url";
     
     window.webClientConfig = {
-        useCapatcha: false
+        useCaptcha: false
     };
     
     // test vars

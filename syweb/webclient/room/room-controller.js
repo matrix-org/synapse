@@ -495,6 +495,7 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
             });
     };
 
+    // used to send an image based on just a URL, rather than uploading one
     $scope.sendImage = function(url, body) {
         scrollToBottom(true);
         
@@ -507,23 +508,23 @@ angular.module('RoomController', ['ngSanitize', 'matrixFilter', 'mFileInput', 'a
             });
     };
     
-    $scope.imageFileToSend;
-    $scope.$watch("imageFileToSend", function(newValue, oldValue) {
-        if ($scope.imageFileToSend) {
-            // Upload this image with its thumbnail to Internet
-            mFileUpload.uploadImageAndThumbnail($scope.imageFileToSend, THUMBNAIL_SIZE).then(
-                function(imageMessage) {
-                    // imageMessage is complete message structure, send it as is
-                    matrixService.sendMessage($scope.room_id, undefined, imageMessage).then(
+    $scope.fileToSend;
+    $scope.$watch("fileToSend", function(newValue, oldValue) {
+        if ($scope.fileToSend) {
+            // Upload this file
+            mFileUpload.uploadFileAndThumbnail($scope.fileToSend, THUMBNAIL_SIZE).then(
+                function(fileMessage) {
+                    // fileMessage is complete message structure, send it as is
+                    matrixService.sendMessage($scope.room_id, undefined, fileMessage).then(
                         function() {
-                            console.log("Image message sent");
+                            console.log("File message sent");
                         },
                         function(error) {
-                            $scope.feedback = "Failed to send image message: " + error.data.error;
+                            $scope.feedback = "Failed to send file message: " + error.data.error;
                         });
                 },
                 function(error) {
-                    $scope.feedback = "Can't upload image";
+                    $scope.feedback = "Can't upload file";
                 }
             );
         }

@@ -699,7 +699,7 @@ textarea, input {
     vertical-align: middle;
 */
     display: inline-block;
-    max-width: 90%;
+    max-width: 80%;
     padding-left: 1em;
     padding-right: 1em;
     padding-top: 2px;
@@ -721,6 +721,7 @@ textarea, input {
     text-align: right;
 }
 
+/*
 .text.emote .bubble,
 .text.membership .bubble,
 .mine .text.emote .bubble,
@@ -729,6 +730,7 @@ textarea, input {
     background-color: transparent ! important;    
     border: 0px ! important;
 }
+*/
 
 .mine .text .bubble {
 /*
