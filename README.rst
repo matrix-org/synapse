@@ -145,12 +145,12 @@ To install the synapse homeserver run::
 This installs synapse, along with the libraries it uses, into
 ``$HOME/.local/lib/``.
 
-Troubleshooting
----------------
+Troubleshooting Installation
+----------------------------
 
 Synapse requires pip 1.7 or later, so if your OS provides too old a version and 
-you get errors about `error: no such option: --process-dependency-links` you may 
-need to manually upgrade it::
+you get errors about ``error: no such option: --process-dependency-links`` you 
+may need to manually upgrade it::
 
     $ sudo pip install --upgrade pip
     
@@ -169,10 +169,16 @@ To actually run your new homeserver, pick a working directory for Synapse to run
     $ cd ~/.synapse
     $ ~/.local/bin/synctl start
 
-Troubleshooting
----------------
+Troubleshooting Running
+-----------------------
 
-If synapse fails with `missing "sodium.h"` crypto errors, you may need 
+If ``synctl`` fails with ``pkg_resources.DistributionNotFound`` errors you may 
+need a newer version of setuptools than that provided by your OS, and then 
+reinstall::
+
+    $ sudo pip install setuptools --upgrade
+
+If synapse fails with ``missing "sodium.h"`` crypto errors, you may need 
 to manually upgrade PyNaCL, as synapse uses NaCl (http://nacl.cr.yp.to/) for 
 encryption and digital signatures.
 Unfortunately PyNACL currently has a few issues
