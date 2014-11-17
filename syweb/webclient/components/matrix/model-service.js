@@ -29,17 +29,37 @@ angular.module('modelService', [])
 .factory('modelService', ['matrixService', function(matrixService) {
 
     // alias / id lookups
-    var roomIdToAlias = {};
-    var aliasToRoomId = {};
+    var roomIdToAlias, aliasToRoomId;
     var setRoomIdToAliasMapping = function(roomId, alias) {
         roomIdToAlias[roomId] = alias;
         aliasToRoomId[alias] = roomId;
     };
     
     // user > room member lookups
-    var userIdToRoomMember = {
-        // user_id: [RoomMember, RoomMember, ...]
+    var userIdToRoomMember;
+    
+    // main store
+    var rooms, users;
+    
+    var init = function() {
+        roomIdToAlias = {};
+        aliasToRoomId = {};
+        userIdToRoomMember = {
+            // user_id: [RoomMember, RoomMember, ...]
+        };
+        
+        // rooms are stored here when they come in.
+        rooms = {
+            // roomid: <Room>
+        };
+        
+        users = {
+            // user_id: <User>
+        };
+        console.log("Models inited.");
     };
+    
+    init();
     
     /***** Room Object *****/
     var Room = function Room(room_id) {
@@ -185,17 +205,6 @@ angular.module('modelService', [])
         this.last_updated = 0; // used with last_active_ago to work out last seen times
     };
     
-    // rooms are stored here when they come in.
-    var rooms = {
-        // roomid: <Room>
-    };
-    
-    var users = {
-        // user_id: <User>
-    };
-    
-    console.log("Models inited.");
-    
     return {
     
         getRoom: function(roomId) {
@@ -330,6 +339,10 @@ angular.module('modelService', [])
             }
 
             return lastMessage;
+        },
+        
+        clearRooms: function() {
+            init();
         }
     
     };

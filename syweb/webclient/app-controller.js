@@ -85,6 +85,7 @@ angular.module('MatrixWebClientController', ['matrixService', 'mPresence', 'even
         matrixService.saveConfig();
 
         // Reset cached data
+        modelService.clearRooms();
         eventHandlerService.reset();
 
         // And go to the login page

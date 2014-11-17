@@ -47,7 +47,6 @@ function(matrixService, $rootScope, $q, $timeout, $filter, mPresence, notificati
 
     var reset = function() {
         initialSyncDeferred = $q.defer();
-
         eventMap = {};
     };
     reset();
