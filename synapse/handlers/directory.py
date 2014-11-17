@@ -147,10 +147,8 @@ class DirectoryHandler(BaseHandler):
             content={"aliases": aliases},
         )
 
-        snapshot = yield self.store.snapshot_room(
-            room_id=room_id,
-            user_id=user_id,
-        )
+        snapshot = yield self.store.snapshot_room(event)
 
-        yield self.state_handler.handle_new_event(event, snapshot)
-        yield self._on_new_room_event(event, snapshot, extra_users=[user_id])
+        yield self._on_new_room_event(
+            event, snapshot, extra_users=[user_id], suppress_auth=True
+        )

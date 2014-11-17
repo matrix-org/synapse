@@ -16,10 +16,12 @@
 from synapse.api.events.room import (
     RoomTopicEvent, MessageEvent, RoomMemberEvent, FeedbackEvent,
     InviteJoinEvent, RoomConfigEvent, RoomNameEvent, GenericEvent,
-    RoomPowerLevelsEvent, RoomJoinRulesEvent, RoomOpsPowerLevelsEvent,
-    RoomCreateEvent, RoomAddStateLevelEvent, RoomSendEventLevelEvent,
+    RoomPowerLevelsEvent, RoomJoinRulesEvent,
+    RoomCreateEvent,
     RoomRedactionEvent,
 )
+
+from synapse.types import EventID
 
 from synapse.util.stringutils import random_string
 
@@ -37,9 +39,6 @@ class EventFactory(object):
         RoomPowerLevelsEvent,
         RoomJoinRulesEvent,
         RoomCreateEvent,
-        RoomAddStateLevelEvent,
-        RoomSendEventLevelEvent,
-        RoomOpsPowerLevelsEvent,
         RoomRedactionEvent,
     ]
 
@@ -51,12 +50,26 @@ class EventFactory(object):
         self.clock = hs.get_clock()
         self.hs = hs
 
+        self.event_id_count = 0
+
+    def create_event_id(self):
+        i = str(self.event_id_count)
+        self.event_id_count += 1
+
+        local_part = str(int(self.clock.time())) + i + random_string(5)
+
+        e_id = EventID.create_local(local_part, self.hs)
+
+        return e_id.to_string()
+
     def create_event(self, etype=None, **kwargs):
         kwargs["type"] = etype
         if "event_id" not in kwargs:
-            kwargs["event_id"] = "%s@%s" % (
-                random_string(10), self.hs.hostname
-            )
+            kwargs["event_id"] = self.create_event_id()
+            kwargs["origin"] = self.hs.hostname
+        else:
+            ev_id = self.hs.parse_eventid(kwargs["event_id"])
+            kwargs["origin"] = ev_id.domain
 
         if "origin_server_ts" not in kwargs:
             kwargs["origin_server_ts"] = int(self.clock.time_msec())

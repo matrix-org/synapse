@@ -23,6 +23,7 @@ from twisted.web.http_headers import Headers
 
 from synapse.http.endpoint import matrix_endpoint
 from synapse.util.async import sleep
+from synapse.util.logcontext import PreserveLoggingContext
 
 from syutil.jsonutil import encode_canonical_json
 
@@ -108,16 +109,17 @@ class BaseHttpClient(object):
                 producer = body_callback(method, url_bytes, headers_dict)
 
             try:
-                response = yield self.agent.request(
-                    destination,
-                    endpoint,
-                    method,
-                    path_bytes,
-                    param_bytes,
-                    query_bytes,
-                    Headers(headers_dict),
-                    producer
-                )
+                with PreserveLoggingContext():
+                    response = yield self.agent.request(
+                        destination,
+                        endpoint,
+                        method,
+                        path_bytes,
+                        param_bytes,
+                        query_bytes,
+                        Headers(headers_dict),
+                        producer
+                    )
 
                 logger.debug("Got response to %s", method)
                 break

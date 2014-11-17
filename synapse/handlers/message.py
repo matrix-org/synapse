@@ -16,7 +16,6 @@
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
-from synapse.api.events.room import RoomTopicEvent
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
 from ._base import BaseHandler
@@ -24,7 +23,6 @@ from ._base import BaseHandler
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 
 class MessageHandler(BaseHandler):
@@ -59,7 +57,8 @@ class MessageHandler(BaseHandler):
 #            user_id=sender_id
 #        )
 
-        # TODO (erikj): Once we work out the correct c-s api we need to think on how to do this.
+        # TODO (erikj): Once we work out the correct c-s api we need to think
+        # on how to do this.
 
         defer.returnValue(None)
 
@@ -81,12 +80,11 @@ class MessageHandler(BaseHandler):
         user = self.hs.parse_userid(event.user_id)
         assert user.is_mine, "User must be our own: %s" % (user,)
 
-        snapshot = yield self.store.snapshot_room(event.room_id, event.user_id)
+        snapshot = yield self.store.snapshot_room(event)
 
-        if not suppress_auth:
-            yield self.auth.check(event, snapshot, raises=True)
-
-        yield self._on_new_room_event(event, snapshot)
+        yield self._on_new_room_event(
+            event, snapshot, suppress_auth=suppress_auth
+        )
 
         self.hs.get_handlers().presence_handler.bump_presence_active_time(
             user
@@ -111,7 +109,9 @@ class MessageHandler(BaseHandler):
         data_source = self.hs.get_event_sources().sources["room"]
 
         if not pagin_config.from_token:
-            pagin_config.from_token = yield self.hs.get_event_sources().get_current_token()
+            pagin_config.from_token = (
+                yield self.hs.get_event_sources().get_current_token()
+            )
 
         user = self.hs.parse_userid(user_id)
 
@@ -142,66 +142,27 @@ class MessageHandler(BaseHandler):
             SynapseError if something went wrong.
         """
 
-        snapshot = yield self.store.snapshot_room(
-            event.room_id,
-            event.user_id,
-            state_type=event.type,
-            state_key=event.state_key,
-        )
-
-        yield self.auth.check(event, snapshot, raises=True)
-
-        yield self.state_handler.handle_new_event(event, snapshot)
+        snapshot = yield self.store.snapshot_room(event)
 
         yield self._on_new_room_event(event, snapshot)
 
     @defer.inlineCallbacks
     def get_room_data(self, user_id=None, room_id=None,
-                      event_type=None, state_key="",
-                      public_room_rules=[],
-                      private_room_rules=["join"]):
+                      event_type=None, state_key=""):
         """ Get data from a room.
 
         Args:
             event : The room path event
-            public_room_rules : A list of membership states the user can be in,
-            in order to read this data IN A PUBLIC ROOM. An empty list means
-            'any state'.
-            private_room_rules : A list of membership states the user can be
-            in, in order to read this data IN A PRIVATE ROOM. An empty list
-            means 'any state'.
         Returns:
             The path data content.
         Raises:
             SynapseError if something went wrong.
         """
-        if event_type == RoomTopicEvent.TYPE:
-            # anyone invited/joined can read the topic
-            private_room_rules = ["invite", "join"]
+        have_joined = yield self.auth.check_joined_room(room_id, user_id)
+        if not have_joined:
+            raise RoomError(403, "User not in room.")
 
-        # does this room exist
-        room = yield self.store.get_room(room_id)
-        if not room:
-            raise RoomError(403, "Room does not exist.")
-
-        # does this user exist in this room
-        member = yield self.store.get_room_member(
-            room_id=room_id,
-            user_id="" if not user_id else user_id)
-
-        member_state = member.membership if member else None
-
-        if room.is_public and public_room_rules:
-            # make sure the user meets public room rules
-            if member_state not in public_room_rules:
-                raise RoomError(403, "Member does not meet public room rules.")
-        elif not room.is_public and private_room_rules:
-            # make sure the user meets private room rules
-            if member_state not in private_room_rules:
-                raise RoomError(
-                    403, "Member does not meet private room rules.")
-
-        data = yield self.store.get_current_state(
+        data = yield self.state_handler.get_current_state(
             room_id, event_type, state_key
         )
         defer.returnValue(data)
@@ -219,9 +180,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def send_feedback(self, event):
-        snapshot = yield self.store.snapshot_room(event.room_id, event.user_id)
-
-        yield self.auth.check(event, snapshot, raises=True)
+        snapshot = yield self.store.snapshot_room(event)
 
         # store message in db
         yield self._on_new_room_event(event, snapshot)
@@ -239,7 +198,7 @@ class MessageHandler(BaseHandler):
         yield self.auth.check_joined_room(room_id, user_id)
 
         # TODO: This is duplicating logic from snapshot_all_rooms
-        current_state = yield self.store.get_current_state(room_id)
+        current_state = yield self.state_handler.get_current_state(room_id)
         defer.returnValue([self.hs.serialize_event(c) for c in current_state])
 
     @defer.inlineCallbacks
@@ -289,8 +248,10 @@ class MessageHandler(BaseHandler):
             d = {
                 "room_id": event.room_id,
                 "membership": event.membership,
-                "visibility": ("public" if event.room_id in
-                              public_room_ids else "private"),
+                "visibility": (
+                    "public" if event.room_id in public_room_ids
+                    else "private"
+                ),
             }
 
             if event.membership == Membership.INVITE:
@@ -316,10 +277,12 @@ class MessageHandler(BaseHandler):
                     "end": end_token.to_string(),
                 }
 
-                current_state = yield self.store.get_current_state(
+                current_state = yield self.state_handler.get_current_state(
                     event.room_id
                 )
-                d["state"] = [self.hs.serialize_event(c) for c in current_state]
+                d["state"] = [
+                    self.hs.serialize_event(c) for c in current_state
+                ]
             except:
                 logger.exception("Failed to get snapshot")
 

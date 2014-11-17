@@ -20,125 +20,10 @@ server protocol.
 from synapse.util.jsonobject import JsonEncodedObject
 
 import logging
-import json
-import copy
 
 
 logger = logging.getLogger(__name__)
 
-
-class Pdu(JsonEncodedObject):
-    """ A Pdu represents a piece of data sent from a server and is associated
-    with a context.
-
-    A Pdu can be classified as "state". For a given context, we can efficiently
-    retrieve all state pdu's that haven't been clobbered. Clobbering is done
-    via a unique constraint on the tuple (context, pdu_type, state_key). A pdu
-    is a state pdu if `is_state` is True.
-
-    Example pdu::
-
-        {
-            "pdu_id": "78c",
-            "origin_server_ts": 1404835423000,
-            "origin": "bar",
-            "prev_ids": [
-                ["23b", "foo"],
-                ["56a", "bar"],
-            ],
-            "content": { ... },
-        }
-
-    """
-
-    valid_keys = [
-        "pdu_id",
-        "context",
-        "origin",
-        "origin_server_ts",
-        "pdu_type",
-        "destinations",
-        "transaction_id",
-        "prev_pdus",
-        "depth",
-        "content",
-        "outlier",
-        "is_state",  # Below this are keys valid only for State Pdus.
-        "state_key",
-        "power_level",
-        "prev_state_id",
-        "prev_state_origin",
-        "required_power_level",
-        "user_id",
-    ]
-
-    internal_keys = [
-        "destinations",
-        "transaction_id",
-        "outlier",
-    ]
-
-    required_keys = [
-        "pdu_id",
-        "context",
-        "origin",
-        "origin_server_ts",
-        "pdu_type",
-        "content",
-    ]
-
-    # TODO: We need to make this properly load content rather than
-    # just leaving it as a dict. (OR DO WE?!)
-
-    def __init__(self, destinations=[], is_state=False, prev_pdus=[],
-                 outlier=False, **kwargs):
-        if is_state:
-            for required_key in ["state_key"]:
-                if required_key not in kwargs:
-                    raise RuntimeError("Key %s is required" % required_key)
-
-        super(Pdu, self).__init__(
-            destinations=destinations,
-            is_state=is_state,
-            prev_pdus=prev_pdus,
-            outlier=outlier,
-            **kwargs
-        )
-
-    @classmethod
-    def from_pdu_tuple(cls, pdu_tuple):
-        """ Converts a PduTuple to a Pdu
-
-        Args:
-            pdu_tuple (synapse.persistence.transactions.PduTuple): The tuple to
-                convert
-
-        Returns:
-            Pdu
-        """
-        if pdu_tuple:
-            d = copy.copy(pdu_tuple.pdu_entry._asdict())
-            d["origin_server_ts"] = d.pop("ts")
-
-            d["content"] = json.loads(d["content_json"])
-            del d["content_json"]
-
-            args = {f: d[f] for f in cls.valid_keys if f in d}
-            if "unrecognized_keys" in d and d["unrecognized_keys"]:
-                args.update(json.loads(d["unrecognized_keys"]))
-
-            return Pdu(
-                prev_pdus=pdu_tuple.prev_pdu_list,
-                **args
-            )
-        else:
-            return None
-
-    def __str__(self):
-        return "(%s, %s)" % (self.__class__.__name__, repr(self.__dict__))
-
-    def __repr__(self):
-        return "<%s, %s>" % (self.__class__.__name__, repr(self.__dict__))
 
 
 class Edu(JsonEncodedObject):
@@ -160,11 +45,10 @@ class Edu(JsonEncodedObject):
         "edu_type",
     ]
 
-#    TODO: SYN-103: Remove "origin" and "destination" keys.
-#    internal_keys = [
-#        "origin",
-#        "destination",
-#    ]
+    internal_keys = [
+        "origin",
+        "destination",
+    ]
 
 
 class Transaction(JsonEncodedObject):
@@ -193,6 +77,7 @@ class Transaction(JsonEncodedObject):
         "edus",
         "transaction_id",
         "destination",
+        "pdu_failures",
     ]
 
     internal_keys = [
@@ -229,7 +114,9 @@ class Transaction(JsonEncodedObject):
         transaction_id and origin_server_ts keys.
         """
         if "origin_server_ts" not in kwargs:
-            raise KeyError("Require 'origin_server_ts' to construct a Transaction")
+            raise KeyError(
+                "Require 'origin_server_ts' to construct a Transaction"
+            )
         if "transaction_id" not in kwargs:
             raise KeyError(
                 "Require 'transaction_id' to construct a Transaction"
@@ -238,9 +125,6 @@ class Transaction(JsonEncodedObject):
         for p in pdus:
             p.transaction_id = kwargs["transaction_id"]
 
-        kwargs["pdus"] = [p.get_dict() for p in pdus]
+        kwargs["pdus"] = [p.get_pdu_json() for p in pdus]
 
         return Transaction(**kwargs)
-
-
-

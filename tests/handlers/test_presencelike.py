@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 from mock import Mock, call, ANY
 
-from ..utils import MockClock
+from ..utils import MockClock, MockKey
 
 from synapse.server import HomeServer
 from synapse.api.constants import PresenceState
@@ -57,6 +57,9 @@ class PresenceAndProfileHandlers(object):
 class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
     def setUp(self):
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
                 clock=MockClock(),
                 db_pool=None,
@@ -72,6 +75,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 resource_for_federation=Mock(),
                 http_client=None,
                 replication_layer=MockReplication(),
+                config=self.mock_config,
             )
         hs.handlers = PresenceAndProfileHandlers(hs)
 

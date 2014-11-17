@@ -24,7 +24,7 @@ from synapse.server import HomeServer
 from synapse.handlers.profile import ProfileHandler
 from synapse.api.constants import Membership
 
-from tests.utils import SQLiteMemoryDbPool
+from tests.utils import SQLiteMemoryDbPool, MockKey
 
 
 class ProfileHandlers(object):
@@ -49,12 +49,16 @@ class ProfileTestCase(unittest.TestCase):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
 
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer("test",
                 db_pool=db_pool,
                 http_client=None,
                 handlers=None,
                 resource_for_federation=Mock(),
                 replication_layer=self.mock_federation,
+                config=self.mock_config,
             )
         hs.handlers = ProfileHandlers(hs)
 
