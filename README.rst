@@ -223,7 +223,7 @@ IDs:
    domain name.
 
 For the first form, simply pass the required hostname (of the machine) as the
---host parameter::
+--server-name parameter::
 
     $ python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
@@ -239,7 +239,9 @@ and port where the server is running.  (At the current time synapse does not
 support clustering multiple servers into a single logical homeserver).  The DNS
 record would then look something like::
 
+    $ dig -t srv _matrix._tcp.machine.my.domaine.name
     _matrix._tcp    IN      SRV     10 0 8448 machine.my.domain.name.
+
 
 At this point, you should then run the homeserver with the hostname of this
 SRV record, as that is the name other machines will expect it to have::
