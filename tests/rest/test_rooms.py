@@ -1050,6 +1050,10 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         self.assertTrue("m.room.create" in state)
 
+        self.assertTrue("messages" in response)
+        self.assertTrue("chunk" in response["messages"])
+        self.assertTrue("end" in response["messages"])
+
 #        (code, response) = yield self.mock_resource.trigger("GET", path, None)
 #        self.assertEquals(200, code, msg=str(response))
 #        self.assert_dict(json.loads(content), response)

@@ -308,10 +308,29 @@ class MessageHandler(BaseHandler):
             room_id=room_id
         ))
 
+        now_token = yield self.hs.get_event_sources().get_current_token()
+
+        limit = pagin_config.limit if pagin_config else None
+        if limit is None:
+            limit = 10
+
+        messages, token = yield self.store.get_recent_events_for_room(
+            room_id,
+            limit=limit,
+            end_token=now_token.room_key,
+        )
+
+        start_token = now_token.copy_and_replace("room_key", token[0])
+        end_token = now_token.copy_and_replace("room_key", token[1])
+
         defer.returnValue({
             "membership": member_event.membership,
             "room_id": room_id,
-            #"messages": messages,
+            "messages": {
+                "chunk": [self.hs.serialize_event(m) for m in messages],
+                "start": start_token.to_string(),
+                "end": end_token.to_string(),
+            },
             "state": state,
             #"presence": presence
         })
