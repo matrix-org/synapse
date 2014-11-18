@@ -260,7 +260,13 @@ class MatrixHttpClient(BaseHttpClient):
         """
         logger.debug("get_json args: %s", args)
 
-        query_bytes = urllib.urlencode(args, True)
+        encoded_args = {}
+        for k, vs in args.items():
+            if isinstance(vs, basestring):
+                vs = [vs]
+            encoded_args[k] = [v.encode("UTF-8") for v in vs]
+
+        query_bytes = urllib.urlencode(encoded_args, True)
         logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
 
         def body_callback(method, url_bytes, headers_dict):
