@@ -180,9 +180,9 @@ class PresenceHandler(BaseHandler):
             state["presence"] = state.pop("state")
 
             if target_user in self._user_cachemap:
-                state["last_active"] = (
-                    self._user_cachemap[target_user].get_state()["last_active"]
-                )
+                cached_state = self._user_cachemap[target_user].get_state()
+                if "last_active" in cached_state:
+                    state["last_active"] = cached_state["last_active"]
         else:
             # TODO(paul): Have remote server send us permissions set
             state = self._get_or_offline_usercache(target_user).get_state()
