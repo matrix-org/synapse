@@ -339,7 +339,7 @@ class MessageHandler(BaseHandler):
                     as_event=True,
                 )
                 presence.append(member_presence)
-            except Exception as e:
+            except Exception:
                 logger.exception("Failed to get member presence of %r",
                     m.user_id
                 )
