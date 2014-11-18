@@ -428,7 +428,8 @@ class TransportLayer(object):
             self._with_authentication(
                 lambda origin, content, query, query_type:
                 handler.on_query_request(
-                    query_type, {k: v[0] for k, v in query.items()}
+                    query_type,
+                    {k: v[0].decode("utf-8") for k, v in query.items()}
                 )
             )
         )
