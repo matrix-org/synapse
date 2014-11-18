@@ -120,15 +120,23 @@ class RoomCreationHandler(BaseHandler):
             user, room_id, is_public=is_public
         )
 
+        room_member_handler = self.hs.get_handlers().room_member_handler
+
         @defer.inlineCallbacks
         def handle_event(event):
             snapshot = yield self.store.snapshot_room(event)
 
             logger.debug("Event: %s", event)
 
-            yield self._on_new_room_event(
-                event, snapshot, extra_users=[user], suppress_auth=True
-            )
+            if event.type == RoomMemberEvent.TYPE:
+                yield room_member_handler.change_membership(
+                    event,
+                    do_auth=False
+                )
+            else:
+                yield self._on_new_room_event(
+                    event, snapshot, extra_users=[user], suppress_auth=True
+                )
 
         for event in creation_events:
             yield handle_event(event)
@@ -155,16 +163,6 @@ class RoomCreationHandler(BaseHandler):
 
             yield handle_event(topic_event)
 
-        content = {"membership": Membership.JOIN}
-        join_event = self.event_factory.create_event(
-            etype=RoomMemberEvent.TYPE,
-            state_key=user_id,
-            room_id=room_id,
-            user_id=user_id,
-            membership=Membership.JOIN,
-            content=content
-        )
-
         content = {"membership": Membership.INVITE}
         for invitee in invite_list:
             invite_event = self.event_factory.create_event(
@@ -174,16 +172,7 @@ class RoomCreationHandler(BaseHandler):
                 user_id=user_id,
                 content=content
             )
-
-            yield self.hs.get_handlers().room_member_handler.change_membership(
-                invite_event,
-                do_auth=False
-            )
-
-        yield self.hs.get_handlers().room_member_handler.change_membership(
-            join_event,
-            do_auth=False
-        )
+            yield handle_event(invite_event)
 
         result = {"room_id": room_id}
 
@@ -194,9 +183,11 @@ class RoomCreationHandler(BaseHandler):
         defer.returnValue(result)
 
     def _create_events_for_new_room(self, creator, room_id, is_public=False):
+        creator_id = creator.to_string()
+
         event_keys = {
             "room_id": room_id,
-            "user_id": creator.to_string(),
+            "user_id": creator_id,
         }
 
         def create(etype, **content):
@@ -210,6 +201,16 @@ class RoomCreationHandler(BaseHandler):
             etype=RoomCreateEvent.TYPE,
             creator=creator.to_string(),
         )
+
+        join_event = self.event_factory.create_event(
+            etype=RoomMemberEvent.TYPE,
+            state_key=creator_id,
+            content={
+                "membership": Membership.JOIN,
+            },
+            **event_keys
+        )
+
 
         power_levels_event = self.event_factory.create_event(
             etype=RoomPowerLevelsEvent.TYPE,
@@ -239,6 +240,7 @@ class RoomCreationHandler(BaseHandler):
 
         return [
             creation_event,
+            join_event,
             power_levels_event,
             join_rules_event,
         ]

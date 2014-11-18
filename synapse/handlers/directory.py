@@ -21,8 +21,6 @@ from synapse.api.errors import SynapseError
 from synapse.api.events.room import RoomAliasesEvent
 
 import logging
-import sqlite3
-
 
 logger = logging.getLogger(__name__)
 

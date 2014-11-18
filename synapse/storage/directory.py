@@ -14,9 +14,14 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
+
+from synapse.api.errors import SynapseError
+
 from twisted.internet import defer
 
 from collections import namedtuple
+
+import sqlite3
 
 
 RoomAliasMapping = namedtuple(
