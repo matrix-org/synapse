@@ -117,10 +117,21 @@ class SynapseEvent(JsonEncodedObject):
         """
         raise NotImplementedError("get_content_template not implemented.")
 
-    def get_pdu_json(self):
+    def get_pdu_json(self, time_now=None):
         pdu_json = self.get_full_dict()
         pdu_json.pop("destination", None)
         pdu_json.pop("outlier", None)
+        pdu_json.pop("replaces_state", None)
+        pdu_json.pop("redacted", None)
+        state_hash = pdu_json.pop("state_hash", None)
+        if state_hash is not None:
+            pdu_json.setdefault("unsigned", {})["state_hash"] = state_hash
+        content = pdu_json.get("content", {})
+        content.pop("prev", None)
+        if time_now is not None and "age_ts" in pdu_json:
+            age = time_now - pdu_json["age_ts"]
+            pdu_json.setdefault("unsigned", {})["age"] = int(age)
+            del pdu_json["age_ts"]
         return pdu_json
 
 

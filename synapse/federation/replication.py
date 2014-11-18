@@ -399,19 +399,21 @@ class ReplicationLayer(object):
     @defer.inlineCallbacks
     def on_make_join_request(self, context, user_id):
         pdu = yield self.handler.on_make_join_request(context, user_id)
+        time_now = self._clock.time_msec()
         defer.returnValue({
-            "event": pdu.get_pdu_json(),
+            "event": pdu.get_pdu_json(time_now),
         })
 
     @defer.inlineCallbacks
     def on_invite_request(self, origin, content):
         pdu = self.event_from_pdu_json(content)
         ret_pdu = yield self.handler.on_invite_request(origin, pdu)
+        time_now = self._clock.time_msec()
         defer.returnValue(
             (
                 200,
                 {
-                    "event": ret_pdu.get_pdu_json(),
+                    "event": ret_pdu.get_pdu_json(time_now),
                 }
             )
         )
@@ -420,20 +422,21 @@ class ReplicationLayer(object):
     def on_send_join_request(self, origin, content):
         pdu = self.event_from_pdu_json(content)
         res_pdus = yield self.handler.on_send_join_request(origin, pdu)
-
+        time_now = self._clock.time_msec()
         defer.returnValue((200, {
-            "state": [p.get_pdu_json() for p in res_pdus["state"]],
-            "auth_chain": [p.get_pdu_json() for p in res_pdus["auth_chain"]],
+            "state": [p.get_pdu_json(time_now) for p in res_pdus["state"]],
+            "auth_chain": [p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]],
         }))
 
     @defer.inlineCallbacks
     def on_event_auth(self, origin, context, event_id):
+        time_now = self._clock.time_msec()
         auth_pdus = yield self.handler.on_event_auth(event_id)
         defer.returnValue(
             (
                 200,
                 {
-                    "auth_chain": [a.get_pdu_json() for a in auth_pdus],
+                    "auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus],
                 }
             )
         )
@@ -454,11 +457,12 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     def send_join(self, destination, pdu):
+        time_now  = self._clock.time_msec()
         _, content = yield self.transport_layer.send_join(
             destination,
             pdu.room_id,
             pdu.event_id,
-            pdu.get_pdu_json(),
+            pdu.get_pdu_json(time_now),
         )
 
         logger.debug("Got content: %s", content)
@@ -479,11 +483,12 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     def send_invite(self, destination, context, event_id, pdu):
+        time_now = self._clock.time_msec()
         code, content = yield self.transport_layer.send_invite(
             destination=destination,
             context=context,
             event_id=event_id,
-            content=pdu.get_pdu_json(),
+            content=pdu.get_pdu_json(time_now),
         )
 
         pdu_dict = content["event"]
@@ -505,13 +510,8 @@ class ReplicationLayer(object):
         """Returns a new Transaction containing the given PDUs suitable for
         transmission.
         """
-        pdus = [p.get_pdu_json() for p in pdu_list]
         time_now = self._clock.time_msec()
-        for p in pdus:
-            if "age_ts" in p:
-                age = time_now - p["age_ts"]
-                p.setdefault("unsigned", {})["age"] = int(age)
-                del p["age_ts"]
+        pdus = [p.get_pdu_json(time_now) for p in pdu_list]
         return Transaction(
             origin=self.server_name,
             pdus=pdus,
@@ -582,6 +582,9 @@ class ReplicationLayer(object):
         #TODO: Check we have all the PDU keys here
         pdu_json.setdefault("hashes", {})
         pdu_json.setdefault("signatures", {})
+        state_hash = pdu_json.get("unsigned", {}).pop("state_hash", None)
+        if state_hash is not None:
+            pdu_json["state_hash"] = state_hash
         return self.event_factory.create_event(
             pdu_json["type"], outlier=outlier, **pdu_json
         )
