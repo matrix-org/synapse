@@ -75,13 +75,18 @@ class DirectoryStore(SQLBaseStore):
         Returns:
             Deferred
         """
-        yield self._simple_insert(
-            "room_aliases",
-            {
-                "room_alias": room_alias.to_string(),
-                "room_id": room_id,
-            },
-        )
+        try:
+            yield self._simple_insert(
+                "room_aliases",
+                {
+                    "room_alias": room_alias.to_string(),
+                    "room_id": room_id,
+                },
+            )
+        except sqlite3.IntegrityError:
+            raise SynapseError(
+                409, "Room alias %s already exists" % room_alias.to_string()
+            )
 
         for server in servers:
             # TODO(erikj): Fix this to bulk insert
