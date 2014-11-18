@@ -16,8 +16,17 @@
 
 from twisted.internet import defer, reactor
 
+from .logcontext import PreserveLoggingContext
 
+@defer.inlineCallbacks
 def sleep(seconds):
     d = defer.Deferred()
     reactor.callLater(seconds, d.callback, seconds)
-    return d
+    with PreserveLoggingContext():
+        yield d
+
+def run_on_reactor():
+    """ This will cause the rest of the function to be invoked upon the next
+    iteration of the main loop
+    """
+    return sleep(0)

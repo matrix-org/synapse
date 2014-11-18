@@ -78,6 +78,11 @@ class DomainSpecificString(
         """Create a structure on the local domain"""
         return cls(localpart=localpart, domain=hs.hostname, is_mine=True)
 
+    @classmethod
+    def create(cls, localpart, domain, hs):
+        is_mine = domain == hs.hostname
+        return cls(localpart=localpart, domain=domain, is_mine=is_mine)
+
 
 class UserID(DomainSpecificString):
     """Structure representing a user ID."""
@@ -92,6 +97,11 @@ class RoomAlias(DomainSpecificString):
 class RoomID(DomainSpecificString):
     """Structure representing a room id. """
     SIGIL = "!"
+
+
+class EventID(DomainSpecificString):
+    """Structure representing an event id. """
+    SIGIL = "$"
 
 
 class StreamToken(

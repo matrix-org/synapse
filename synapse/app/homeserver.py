@@ -33,6 +33,7 @@ from synapse.api.urls import (
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
+from synapse.util.logcontext import LoggingContext
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
@@ -42,6 +43,7 @@ import os
 import re
 import sys
 import sqlite3
+import syweb
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +60,9 @@ class SynapseHomeServer(HomeServer):
         return JsonResource()
 
     def build_resource_for_web_client(self):
-        return File("webclient")  # TODO configurable?
+        syweb_path = os.path.dirname(syweb.__file__)
+        webclient_path = os.path.join(syweb_path, "webclient")
+        return File(webclient_path)  # TODO configurable?
 
     def build_resource_for_content_repo(self):
         return ContentRepoResource(
@@ -180,15 +184,7 @@ class SynapseHomeServer(HomeServer):
             logger.info("Synapse now listening on port %d", unsecure_port)
 
 
-def setup():
-    config = HomeServerConfig.load_config(
-        "Synapse Homeserver",
-        sys.argv[1:],
-        generate_section="Homeserver"
-    )
-
-    config.setup_logging()
-
+def setup(config, run_http=True):
     logger.info("Server hostname: %s", config.server_name)
 
     if re.search(":[0-9]+$", config.server_name):
@@ -208,12 +204,13 @@ def setup():
         content_addr=config.content_addr,
     )
 
-    hs.register_servlets()
+    if run_http:
+        hs.register_servlets()
 
-    hs.create_resource_tree(
-        web_client=config.webclient,
-        redirect_root_to_web_client=True,
-    )
+        hs.create_resource_tree(
+            web_client=config.webclient,
+            redirect_root_to_web_client=True,
+        )
 
     db_name = hs.get_db_name()
 
@@ -233,14 +230,24 @@ def setup():
         f.namespace['hs'] = hs
         reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
 
-    hs.start_listening(config.bind_port, config.unsecure_port)
+    if run_http:
+        bind_port = config.bind_port
+        if config.no_tls:
+            bind_port = None
+        hs.start_listening(bind_port, config.unsecure_port)
 
+    hs.config = config
+
+    return hs
+
+
+def run(config):
     if config.daemonize:
         print config.pid_file
         daemon = Daemonize(
             app="synapse-homeserver",
             pid=config.pid_file,
-            action=reactor.run,
+            action=run,
             auto_close_fds=False,
             verbose=True,
             logger=logger,
@@ -251,5 +258,25 @@ def setup():
         reactor.run()
 
 
+def main(args, run_http=True):
+    with LoggingContext("main"):
+        config = HomeServerConfig.load_config(
+            "Synapse Homeserver",
+            args,
+            generate_section="Homeserver"
+        )
+
+        config.setup_logging()
+
+        hs = setup(config, run_http=run_http)
+
+        def r():
+            run(config)
+        hs.run = r
+
+        return hs
+
+
 if __name__ == '__main__':
-    setup()
+    hs = main(sys.argv[1:])
+    hs.run()

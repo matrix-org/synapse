@@ -154,27 +154,6 @@ class RoomPowerLevelsEvent(SynapseStateEvent):
         return {}
 
 
-class RoomAddStateLevelEvent(SynapseStateEvent):
-    TYPE = "m.room.add_state_level"
-
-    def get_content_template(self):
-        return {}
-
-
-class RoomSendEventLevelEvent(SynapseStateEvent):
-    TYPE = "m.room.send_event_level"
-
-    def get_content_template(self):
-        return {}
-
-
-class RoomOpsPowerLevelsEvent(SynapseStateEvent):
-    TYPE = "m.room.ops_levels"
-
-    def get_content_template(self):
-        return {}
-
-
 class RoomAliasesEvent(SynapseStateEvent):
     TYPE = "m.room.aliases"
 

@@ -70,9 +70,11 @@ class ClientDirectoryServer(RestServlet):
         dir_handler = self.handlers.directory_handler
 
         try:
+            user_id = user.to_string()
             yield dir_handler.create_association(
-                user.to_string(), room_alias, room_id, servers
+                user_id, room_alias, room_id, servers
             )
+            yield dir_handler.send_room_alias_update_event(user_id, room_id)
         except SynapseError as e:
             raise e
         except:

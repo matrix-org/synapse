@@ -15,21 +15,36 @@
 
 from .room import (
     RoomMemberEvent, RoomJoinRulesEvent, RoomPowerLevelsEvent,
-    RoomAddStateLevelEvent, RoomSendEventLevelEvent, RoomOpsPowerLevelsEvent,
     RoomAliasesEvent, RoomCreateEvent,
 )
 
+
 def prune_event(event):
-    """ Prunes the given event of all keys we don't know about or think could
-    potentially be dodgy.
+    """ Returns a pruned version of the given event, which removes all keys we
+    don't know about or think could potentially be dodgy.
 
     This is used when we "redact" an event. We want to remove all fields that
     the user has specified, but we do want to keep necessary information like
     type, state_key etc.
     """
+    event_type = event.type
 
-    # Remove all extraneous fields.
-    event.unrecognized_keys = {}
+    allowed_keys = [
+        "event_id",
+        "user_id",
+        "room_id",
+        "hashes",
+        "signatures",
+        "content",
+        "type",
+        "state_key",
+        "depth",
+        "prev_events",
+        "prev_state",
+        "auth_events",
+        "origin",
+        "origin_server_ts",
+    ]
 
     new_content = {}
 
@@ -38,27 +53,33 @@ def prune_event(event):
             if field in event.content:
                 new_content[field] = event.content[field]
 
-    if event.type == RoomMemberEvent.TYPE:
+    if event_type == RoomMemberEvent.TYPE:
         add_fields("membership")
-    elif event.type == RoomCreateEvent.TYPE:
+    elif event_type == RoomCreateEvent.TYPE:
         add_fields("creator")
-    elif event.type == RoomJoinRulesEvent.TYPE:
+    elif event_type == RoomJoinRulesEvent.TYPE:
         add_fields("join_rule")
-    elif event.type == RoomPowerLevelsEvent.TYPE:
-        # TODO: Actually check these are valid user_ids etc.
-        add_fields("default")
-        for k, v in event.content.items():
-            if k.startswith("@") and isinstance(v, (int, long)):
-                new_content[k] = v
-    elif event.type == RoomAddStateLevelEvent.TYPE:
-        add_fields("level")
-    elif event.type == RoomSendEventLevelEvent.TYPE:
-        add_fields("level")
-    elif event.type == RoomOpsPowerLevelsEvent.TYPE:
-        add_fields("kick_level", "ban_level", "redact_level")
-    elif event.type == RoomAliasesEvent.TYPE:
+    elif event_type == RoomPowerLevelsEvent.TYPE:
+        add_fields(
+            "users",
+            "users_default",
+            "events",
+            "events_default",
+            "events_default",
+            "state_default",
+            "ban",
+            "kick",
+            "redact",
+        )
+    elif event_type == RoomAliasesEvent.TYPE:
         add_fields("aliases")
 
-    event.content = new_content
+    allowed_fields = {
+        k: v
+        for k, v in event.get_full_dict().items()
+        if k in allowed_keys
+    }
 
-    return event
+    allowed_fields["content"] = new_content
+
+    return type(event)(**allowed_fields)

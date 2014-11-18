@@ -1,6 +1,7 @@
 *.pyc
 .*.swp
 
+.DS_Store
 _trial_temp/
 logs/
 dbs/
@@ -11,6 +12,14 @@ docs/build/
 
 cmdclient_config.json
 homeserver*.db
+homeserver*.log
+homeserver*.pid
+homeserver*.yaml
+
+*.signing.key
+*.tls.crt
+*.tls.dh
+*.tls.key
 
 .coverage
 htmlcov
@@ -24,7 +33,8 @@ graph/*.svg
 graph/*.png
 graph/*.dot
 
-webclient/config.js
-webclient/test/environment-protractor.js
+**/webclient/config.js
+**/webclient/test/coverage/
+**/webclient/test/environment-protractor.js
 
 uploads

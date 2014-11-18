@@ -21,8 +21,6 @@ These actions are mostly only used by the :py:mod:`.replication` module.
 
 from twisted.internet import defer
 
-from .units import Pdu
-
 from synapse.util.logutils import log_function
 
 import json
@@ -30,76 +28,6 @@ import logging
 
 
 logger = logging.getLogger(__name__)
-
-
-class PduActions(object):
-    """ Defines persistence actions that relate to handling PDUs.
-    """
-
-    def __init__(self, datastore):
-        self.store = datastore
-
-    @log_function
-    def mark_as_processed(self, pdu):
-        """ Persist the fact that we have fully processed the given `Pdu`
-
-        Returns:
-            Deferred
-        """
-        return self.store.mark_pdu_as_processed(pdu.pdu_id, pdu.origin)
-
-    @defer.inlineCallbacks
-    @log_function
-    def after_transaction(self, transaction_id, destination, origin):
-        """ Returns all `Pdu`s that we sent to the given remote home server
-        after a given transaction id.
-
-        Returns:
-            Deferred: Results in a list of `Pdu`s
-        """
-        results = yield self.store.get_pdus_after_transaction(
-            transaction_id,
-            destination
-        )
-
-        defer.returnValue([Pdu.from_pdu_tuple(p) for p in results])
-
-    @defer.inlineCallbacks
-    @log_function
-    def get_all_pdus_from_context(self, context):
-        results = yield self.store.get_all_pdus_from_context(context)
-        defer.returnValue([Pdu.from_pdu_tuple(p) for p in results])
-
-    @defer.inlineCallbacks
-    @log_function
-    def backfill(self, context, pdu_list, limit):
-        """ For a given list of PDU id and origins return the proceeding
-        `limit` `Pdu`s in the given `context`.
-
-        Returns:
-            Deferred: Results in a list of `Pdu`s.
-        """
-        results = yield self.store.get_backfill(
-            context, pdu_list, limit
-        )
-
-        defer.returnValue([Pdu.from_pdu_tuple(p) for p in results])
-
-    @log_function
-    def is_new(self, pdu):
-        """ When we receive a `Pdu` from a remote home server, we want to
-        figure out whether it is `new`, i.e. it is not some historic PDU that
-        we haven't seen simply because we haven't backfilled back that far.
-
-        Returns:
-            Deferred: Results in a `bool`
-        """
-        return self.store.is_pdu_new(
-            pdu_id=pdu.pdu_id,
-            origin=pdu.origin,
-            context=pdu.context,
-            depth=pdu.depth
-        )
 
 
 class TransactionActions(object):
@@ -158,7 +86,6 @@ class TransactionActions(object):
             transaction.transaction_id,
             transaction.destination,
             transaction.origin_server_ts,
-            [(p["pdu_id"], p["origin"]) for p in transaction.pdus]
         )
 
     @log_function

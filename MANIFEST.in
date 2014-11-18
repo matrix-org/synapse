@@ -1,3 +1,4 @@
 recursive-include docs *
 recursive-include tests *.py
-recursive-include synapse/persistence/schema *.sql
+recursive-include synapse/storage/schema *.sql
+recursive-include syweb/webclient *

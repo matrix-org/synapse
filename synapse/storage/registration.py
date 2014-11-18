@@ -62,8 +62,10 @@ class RegistrationStore(SQLBaseStore):
         Raises:
             StoreError if the user_id could not be registered.
         """
-        yield self.runInteraction(self._register, user_id, token,
-                                           password_hash)
+        yield self.runInteraction(
+            "register",
+            self._register, user_id, token, password_hash
+        )
 
     def _register(self, txn, user_id, token, password_hash):
         now = int(self.clock.time())
@@ -100,16 +102,21 @@ class RegistrationStore(SQLBaseStore):
             StoreError if no user was found.
         """
         return self.runInteraction(
+            "get_user_by_token",
             self._query_for_auth,
             token
         )
 
+    @defer.inlineCallbacks
     def is_server_admin(self, user):
-        return self._simple_select_one_onecol(
+        res = yield self._simple_select_one_onecol(
             table="users",
             keyvalues={"name": user.to_string()},
             retcol="admin",
+            allow_none=True,
         )
+
+        defer.returnValue(res if res else False)
 
     def _query_for_auth(self, txn, token):
         sql = (

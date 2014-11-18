@@ -21,8 +21,6 @@ from synapse.api.errors import SynapseError
 from synapse.api.events.room import RoomAliasesEvent
 
 import logging
-import sqlite3
-
 
 logger = logging.getLogger(__name__)
 
@@ -56,17 +54,11 @@ class DirectoryHandler(BaseHandler):
         if not servers:
             raise SynapseError(400, "Failed to get server list")
 
-        try:
-            yield self.store.create_room_alias_association(
-                room_alias,
-                room_id,
-                servers
-            )
-        except sqlite3.IntegrityError:
-            defer.returnValue("Already exists")
-
-        # TODO: Send the room event.
-        yield self._update_room_alias_events(user_id, room_id)
+        yield self.store.create_room_alias_association(
+            room_alias,
+            room_id,
+            servers
+        )
 
     @defer.inlineCallbacks
     def delete_association(self, user_id, room_alias):
@@ -136,7 +128,7 @@ class DirectoryHandler(BaseHandler):
         })
 
     @defer.inlineCallbacks
-    def _update_room_alias_events(self, user_id, room_id):
+    def send_room_alias_update_event(self, user_id, room_id):
         aliases = yield self.store.get_aliases_for_room(room_id)
 
         event = self.event_factory.create_event(
@@ -147,10 +139,8 @@ class DirectoryHandler(BaseHandler):
             content={"aliases": aliases},
         )
 
-        snapshot = yield self.store.snapshot_room(
-            room_id=room_id,
-            user_id=user_id,
-        )
+        snapshot = yield self.store.snapshot_room(event)
 
-        yield self.state_handler.handle_new_event(event, snapshot)
-        yield self._on_new_room_event(event, snapshot, extra_users=[user_id])
+        yield self._on_new_room_event(
+            event, snapshot, extra_users=[user_id], suppress_auth=True
+        )
