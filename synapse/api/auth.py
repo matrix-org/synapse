@@ -271,7 +271,8 @@ class Auth(object):
         else:
             key = (RoomCreateEvent.TYPE, "", )
             create_event = event.old_state_events.get(key)
-            if create_event.content["creator"] == user_id:
+            if (create_event is not None and
+                create_event.content["creator"] == user_id):
                 return 100
 
         return level
