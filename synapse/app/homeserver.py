@@ -184,15 +184,7 @@ class SynapseHomeServer(HomeServer):
             logger.info("Synapse now listening on port %d", unsecure_port)
 
 
-def setup():
-    config = HomeServerConfig.load_config(
-        "Synapse Homeserver",
-        sys.argv[1:],
-        generate_section="Homeserver"
-    )
-
-    config.setup_logging()
-
+def setup(config, run_http=True):
     logger.info("Server hostname: %s", config.server_name)
 
     if re.search(":[0-9]+$", config.server_name):
@@ -212,12 +204,13 @@ def setup():
         content_addr=config.content_addr,
     )
 
-    hs.register_servlets()
+    if run_http:
+        hs.register_servlets()
 
-    hs.create_resource_tree(
-        web_client=config.webclient,
-        redirect_root_to_web_client=True,
-    )
+        hs.create_resource_tree(
+            web_client=config.webclient,
+            redirect_root_to_web_client=True,
+        )
 
     db_name = hs.get_db_name()
 
@@ -237,11 +230,18 @@ def setup():
         f.namespace['hs'] = hs
         reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
 
-    bind_port = config.bind_port
-    if config.no_tls:
-        bind_port = None
-    hs.start_listening(bind_port, config.unsecure_port)
+    if run_http:
+        bind_port = config.bind_port
+        if config.no_tls:
+            bind_port = None
+        hs.start_listening(bind_port, config.unsecure_port)
 
+    hs.config = config
+
+    return hs
+
+
+def run(config):
     if config.daemonize:
         print config.pid_file
         daemon = Daemonize(
@@ -257,13 +257,26 @@ def setup():
     else:
         reactor.run()
 
-def run():
-    with LoggingContext("run"):
-        reactor.run()
 
-def main():
+def main(args, run_http=True):
     with LoggingContext("main"):
-        setup()
+        config = HomeServerConfig.load_config(
+            "Synapse Homeserver",
+            args,
+            generate_section="Homeserver"
+        )
+
+        config.setup_logging()
+
+        hs = setup(config, run_http=run_http)
+
+        def r():
+            run(config)
+        hs.run = r
+
+        return hs
+
 
 if __name__ == '__main__':
-    main()
+    hs = main(sys.argv[1:])
+    hs.run()

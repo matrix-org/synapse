@@ -56,8 +56,8 @@ def main():
     elif action == "stop":
         stop()
     elif action == "restart":
-        start()
         stop()
+        start()
     else:
         sys.stderr.write("Usage: %s [start|stop|restart]\n" % (sys.argv[0],))
         sys.exit(1)

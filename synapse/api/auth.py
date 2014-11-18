@@ -21,7 +21,7 @@ from synapse.api.constants import Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.api.events.room import (
     RoomMemberEvent, RoomPowerLevelsEvent, RoomRedactionEvent,
-    RoomJoinRulesEvent, RoomCreateEvent,
+    RoomJoinRulesEvent, RoomCreateEvent, RoomAliasesEvent,
 )
 from synapse.util.logutils import log_function
 from syutil.base64util import encode_base64
@@ -61,6 +61,10 @@ class Auth(object):
 
                 if event.type == RoomCreateEvent.TYPE:
                     # FIXME
+                    return True
+
+                # FIXME: Temp hack
+                if event.type == RoomAliasesEvent.TYPE:
                     return True
 
                 if event.type == RoomMemberEvent.TYPE:
@@ -144,6 +148,17 @@ class Auth(object):
 
     @log_function
     def is_membership_change_allowed(self, event):
+        membership = event.content["membership"]
+
+        # Check if this is the room creator joining:
+        if len(event.prev_events) == 1 and Membership.JOIN == membership:
+            # Get room creation event:
+            key = (RoomCreateEvent.TYPE, "", )
+            create = event.old_state_events.get(key)
+            if event.prev_events[0][0] == create.event_id:
+                if create.content["creator"] == event.state_key:
+                    return True
+
         target_user_id = event.state_key
 
         # get info about the caller
@@ -158,8 +173,6 @@ class Auth(object):
         target = event.old_state_events.get(key)
 
         target_in_room = target and target.membership == Membership.JOIN
-
-        membership = event.content["membership"]
 
         key = (RoomJoinRulesEvent.TYPE, "", )
         join_rule_event = event.old_state_events.get(key)
@@ -255,6 +268,12 @@ class Auth(object):
             level = power_level_event.content.get("users", {}).get(user_id)
             if not level:
                 level = power_level_event.content.get("users_default", 0)
+        else:
+            key = (RoomCreateEvent.TYPE, "", )
+            create_event = event.old_state_events.get(key)
+            if (create_event is not None and
+                create_event.content["creator"] == user_id):
+                return 100
 
         return level
 
