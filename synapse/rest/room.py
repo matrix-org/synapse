@@ -362,11 +362,13 @@ class RoomInitialSyncRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         user = yield self.auth.get_user_by_req(request)
-        events = yield self.handlers.message_handler.room_initial_sync(
+        pagination_config = PaginationConfig.from_request(request)
+        content = yield self.handlers.message_handler.room_initial_sync(
             room_id=room_id,
             user_id=user.to_string(),
+            pagin_config=pagination_config,
         )
-        defer.returnValue((200, events))
+        defer.returnValue((200, content))
 
 
 class RoomTriggerBackfill(RestServlet):
