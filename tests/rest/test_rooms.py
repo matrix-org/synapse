@@ -1026,6 +1026,12 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 
+        # Since I'm getting my own presence I need to exist as far as presence
+        # is concerned.
+        hs.get_handlers().presence_handler.registered_user(
+            hs.parse_userid(self.user_id)
+        )
+
         # create the room
         self.room_id = yield self.create_room_as(self.user_id)
 
@@ -1053,6 +1059,14 @@ class RoomInitialSyncTestCase(RestTestCase):
         self.assertTrue("messages" in response)
         self.assertTrue("chunk" in response["messages"])
         self.assertTrue("end" in response["messages"])
+
+        self.assertTrue("presence" in response)
+
+        presence_by_user = {e["content"]["user_id"]: e
+            for e in response["presence"]
+        }
+        self.assertTrue(self.user_id in presence_by_user)
+        self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
 
 #        (code, response) = yield self.mock_resource.trigger("GET", path, None)
 #        self.assertEquals(200, code, msg=str(response))
