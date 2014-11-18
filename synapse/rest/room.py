@@ -362,7 +362,7 @@ class RoomInitialSyncRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         user = yield self.auth.get_user_by_req(request)
-        events = yield self.handlers.message_handler.snapshot_room(
+        events = yield self.handlers.message_handler.room_initial_sync(
             room_id=room_id,
             user_id=user.to_string(),
         )

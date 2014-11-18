@@ -295,7 +295,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def snapshot_room(self, user_id, room_id, pagin_config=None,
+    def room_initial_sync(self, user_id, room_id, pagin_config=None,
                       feedback=False):
         yield self.auth.check_joined_room(room_id, user_id)
 
