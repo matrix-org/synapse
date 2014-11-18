@@ -253,6 +253,9 @@ class StreamStore(SQLBaseStore):
         if rows:
             topo = rows[-1]["topological_ordering"]
             toke = rows[-1]["stream_ordering"]
+            if direction == 'b':
+                topo -= 1
+                toke -= 1
             next_token = "t%s-%s" % (topo, toke)
         else:
             # TODO (erikj): We should work out what to do here instead.
