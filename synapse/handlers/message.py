@@ -293,3 +293,65 @@ class MessageHandler(BaseHandler):
         }
 
         defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def room_initial_sync(self, user_id, room_id, pagin_config=None,
+                      feedback=False):
+        yield self.auth.check_joined_room(room_id, user_id)
+
+        # TODO(paul): I wish I was called with user objects not user_id
+        #   strings...
+        auth_user = self.hs.parse_userid(user_id)
+
+        # TODO: These concurrently
+        state_tuples = yield self.store.get_current_state(room_id)
+        state = [self.hs.serialize_event(x) for x in state_tuples]
+
+        member_event = (yield self.store.get_room_member(
+            user_id=user_id,
+            room_id=room_id
+        ))
+
+        now_token = yield self.hs.get_event_sources().get_current_token()
+
+        limit = pagin_config.limit if pagin_config else None
+        if limit is None:
+            limit = 10
+
+        messages, token = yield self.store.get_recent_events_for_room(
+            room_id,
+            limit=limit,
+            end_token=now_token.room_key,
+        )
+
+        start_token = now_token.copy_and_replace("room_key", token[0])
+        end_token = now_token.copy_and_replace("room_key", token[1])
+
+        room_members = yield self.store.get_room_members(room_id)
+
+        presence_handler = self.hs.get_handlers().presence_handler
+        presence = []
+        for m in room_members:
+            try:
+                member_presence = yield presence_handler.get_state(
+                    target_user=self.hs.parse_userid(m.user_id),
+                    auth_user=auth_user,
+                    as_event=True,
+                )
+                presence.append(member_presence)
+            except Exception as e:
+                logger.exception("Failed to get member presence of %r",
+                    m.user_id
+                )
+
+        defer.returnValue({
+            "membership": member_event.membership,
+            "room_id": room_id,
+            "messages": {
+                "chunk": [self.hs.serialize_event(m) for m in messages],
+                "start": start_token.to_string(),
+                "end": end_token.to_string(),
+            },
+            "state": state,
+            "presence": presence
+        })

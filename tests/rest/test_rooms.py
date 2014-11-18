@@ -981,6 +981,93 @@ class RoomMessagesTestCase(RestTestCase):
         (code, response) = yield self.mock_resource.trigger("PUT", path, content)
         self.assertEquals(200, code, msg=str(response))
 
+
+class RoomInitialSyncTestCase(RestTestCase):
+    """ Tests /rooms/$room_id/initialSync. """
+    user_id = "@sid1:red"
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
+        self.auth_user_id = self.user_id
+
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+
+        hs = HomeServer(
+            "red",
+            db_pool=db_pool,
+            http_client=None,
+            replication_layer=Mock(),
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=self.mock_config,
+        )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
+
+        hs.get_handlers().federation_handler = Mock()
+
+        def _get_user_by_token(token=None):
+            return {
+                "user": hs.parse_userid(self.auth_user_id),
+                "admin": False,
+                "device_id": None,
+            }
+        hs.get_auth().get_user_by_token = _get_user_by_token
+
+        def _insert_client_ip(*args, **kwargs):
+            return defer.succeed(None)
+        hs.get_datastore().insert_client_ip = _insert_client_ip
+
+        synapse.rest.room.register_servlets(hs, self.mock_resource)
+
+        # Since I'm getting my own presence I need to exist as far as presence
+        # is concerned.
+        hs.get_handlers().presence_handler.registered_user(
+            hs.parse_userid(self.user_id)
+        )
+
+        # create the room
+        self.room_id = yield self.create_room_as(self.user_id)
+
+    @defer.inlineCallbacks
+    def test_initial_sync(self):
+        (code, response) = yield self.mock_resource.trigger_get(
+                "/rooms/%s/initialSync" % self.room_id)
+        self.assertEquals(200, code)
+
+        self.assertEquals(self.room_id, response["room_id"])
+        self.assertEquals("join", response["membership"])
+
+        # Room state is easier to assert on if we unpack it into a dict
+        state = {}
+        for event in response["state"]:
+            if "state_key" not in event:
+                continue
+            t = event["type"]
+            if t not in state:
+                state[t] = []
+            state[t].append(event)
+
+        self.assertTrue("m.room.create" in state)
+
+        self.assertTrue("messages" in response)
+        self.assertTrue("chunk" in response["messages"])
+        self.assertTrue("end" in response["messages"])
+
+        self.assertTrue("presence" in response)
+
+        presence_by_user = {e["content"]["user_id"]: e
+            for e in response["presence"]
+        }
+        self.assertTrue(self.user_id in presence_by_user)
+        self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
+
 #        (code, response) = yield self.mock_resource.trigger("GET", path, None)
 #        self.assertEquals(200, code, msg=str(response))
 #        self.assert_dict(json.loads(content), response)

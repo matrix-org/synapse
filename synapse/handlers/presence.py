@@ -165,7 +165,7 @@ class PresenceHandler(BaseHandler):
         defer.returnValue(False)
 
     @defer.inlineCallbacks
-    def get_state(self, target_user, auth_user):
+    def get_state(self, target_user, auth_user, as_event=False):
         if target_user.is_mine:
             visible = yield self.is_presence_visible(
                 observer_user=auth_user,
@@ -180,9 +180,9 @@ class PresenceHandler(BaseHandler):
             state["presence"] = state.pop("state")
 
             if target_user in self._user_cachemap:
-                state["last_active"] = (
-                    self._user_cachemap[target_user].get_state()["last_active"]
-                )
+                cached_state = self._user_cachemap[target_user].get_state()
+                if "last_active" in cached_state:
+                    state["last_active"] = cached_state["last_active"]
         else:
             # TODO(paul): Have remote server send us permissions set
             state = self._get_or_offline_usercache(target_user).get_state()
@@ -191,7 +191,20 @@ class PresenceHandler(BaseHandler):
             state["last_active_ago"] = int(
                 self.clock.time_msec() - state.pop("last_active")
             )
-        defer.returnValue(state)
+
+        if as_event:
+            content = state
+
+            content["user_id"] = target_user.to_string()
+
+            if "last_active" in content:
+                content["last_active_ago"] = int(
+                    self._clock.time_msec() - content.pop("last_active")
+                )
+
+            defer.returnValue({"type": "m.presence", "content": content})
+        else:
+            defer.returnValue(state)
 
     @defer.inlineCallbacks
     @log_function
