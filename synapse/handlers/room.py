@@ -131,7 +131,7 @@ class RoomCreationHandler(BaseHandler):
             if event.type == RoomMemberEvent.TYPE:
                 yield room_member_handler.change_membership(
                     event,
-                    do_auth=False
+                    do_auth=True
                 )
             else:
                 yield self._on_new_room_event(
