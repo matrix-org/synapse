@@ -364,7 +364,7 @@ class RoomInitialSyncRestServlet(RestServlet):
         user = yield self.auth.get_user_by_req(request)
         pagination_config = PaginationConfig.from_request(request)
         content = yield self.handlers.message_handler.room_initial_sync(
-            room_id=room_id,
+            room_id=urllib.unquote(room_id),
             user_id=user.to_string(),
             pagin_config=pagination_config,
         )
