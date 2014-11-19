@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from synapse.push import Pusher, PusherConfigException
-from synapse.http.client import
 
 import logging
 
