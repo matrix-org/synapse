@@ -40,7 +40,4 @@ for port in 8080 8081 8082; do
 
 done
 
-echo "Starting webclient on port 8000..."
-python "demo/webserver.py" -p 8000 -P "$DIR/webserver.pid" "syweb/webclient"
-
 cd "$CWD"
