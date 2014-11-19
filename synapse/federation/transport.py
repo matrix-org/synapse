@@ -143,7 +143,7 @@ class TransportLayer(object):
 
         args = {
             "v": event_tuples,
-            "limit": limit,
+            "limit": [str(limit)],
         }
 
         return self._do_request_for_transaction(
