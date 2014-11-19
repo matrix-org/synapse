@@ -1,6 +1,12 @@
 Upgrading to v0.5.0
 ===================
 
+The webclient has been split out into a seperate repository/pacakage in this
+release. Before you restart your homeserver you will need to pull in the
+webclient package by running::
+
+  python setup.py develop --user
+
 This release completely changes the database schema and so requires upgrading
 it before starting the new version of the homeserver.
 
