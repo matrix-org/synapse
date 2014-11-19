@@ -840,7 +840,6 @@ class RoomMemberStateTestCase(RestTestCase):
 
         expected_response = {
             "membership": Membership.JOIN,
-            "prev": Membership.JOIN,
         }
         self.assertEquals(expected_response, response)
 
