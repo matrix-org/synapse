@@ -446,6 +446,26 @@ class Auth(object):
                 "user_level (%d) < send_level (%d)" % (user_level, send_level)
             )
 
+        # Check state_key
+        if hasattr(event, "state_key"):
+            if not event.state_key.startswith("_"):
+                if event.state_key.startswith("@"):
+                    if event.state_key != event.user_id:
+                        raise AuthError(
+                            403,
+                            "You are not allowed to set others state"
+                        )
+                    else:
+                        sender_domain = self.hs.parse_userid(
+                            event.user_id
+                        ).domain
+
+                        if sender_domain != event.state_key:
+                            raise AuthError(
+                                403,
+                                "You are not allowed to set others state"
+                            )
+
         return True
 
     def _check_redaction(self, event):
