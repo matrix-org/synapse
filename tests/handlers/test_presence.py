@@ -1200,7 +1200,10 @@ class PresencePollingTestCase(unittest.TestCase):
                 path=ANY,
                 data=_expect_edu("remote", "m.presence",
                     content={
-                        "push": [ {"user_id": "@clementine:test" }],
+                        "push": [ {
+                            "user_id": "@clementine:test",
+                            "presence": OFFLINE,
+                        }],
                     },
                 ),
                 json_data_callback=ANY,
@@ -1229,7 +1232,10 @@ class PresencePollingTestCase(unittest.TestCase):
                 path=ANY,
                 data=_expect_edu("remote", "m.presence",
                     content={
-                        "push": [ {"user_id": "@fig:test" }],
+                        "push": [ {
+                            "user_id": "@fig:test",
+                            "presence": OFFLINE,
+                        }],
                     },
                 ),
                 json_data_callback=ANY,

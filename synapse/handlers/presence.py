@@ -139,9 +139,7 @@ class PresenceHandler(BaseHandler):
         if user in self._user_cachemap:
             return self._user_cachemap[user]
         else:
-            statuscache = UserPresenceCache()
-            statuscache.update({"presence": PresenceState.OFFLINE}, user)
-            return statuscache
+            return UserPresenceCache()
 
     def registered_user(self, user):
         self.store.create_presence(user.localpart)
@@ -873,7 +871,7 @@ class UserPresenceCache(object):
     Includes the update timestamp.
     """
     def __init__(self):
-        self.state = {}
+        self.state = {"presence": PresenceState.OFFLINE}
         self.serial = None
 
     def update(self, state, serial):
