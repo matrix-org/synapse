@@ -18,7 +18,7 @@ rooms the home server was a member of and room alias mappings.
 If you would like to keep your history, please take a copy of your database
 file and ask for help in #matrix:matrix.org. The upgrade process is,
 unfortunately, non trivial and requires human intervention to resolve any
-resutling conflicts during the upgrade process.
+resulting conflicts during the upgrade process.
 
 Before running the command the homeserver should be first completely 
 shutdown. To run it, simply specify the location of the database, e.g.:
