@@ -364,9 +364,6 @@ class RoomMemberHandler(BaseHandler):
             target_user_id, event.room_id
         )
 
-        if prev_state:
-            event.content["prev"] = prev_state.membership
-
         room_id = event.room_id
 
         # If we're trying to join a room then we have to do this differently
