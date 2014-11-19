@@ -202,7 +202,6 @@ class ProfileHandler(BaseHandler):
 
             content = {
                 "membership": j.content["membership"],
-                "prev": j.content["membership"],
             }
 
             yield self.distributor.fire(
