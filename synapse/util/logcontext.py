@@ -18,6 +18,9 @@ class LoggingContext(object):
 
         __slots__ = []
 
+        def __str__(self):
+            return "sentinel"
+
         def copy_to(self, record):
             pass
 
@@ -102,6 +105,7 @@ class PreserveLoggingContext(object):
     def __enter__(self):
         """Captures the current logging context"""
         self.current_context = LoggingContext.current_context()
+        LoggingContext.thread_local.current_context = LoggingContext.sentinel
 
     def __exit__(self, type, value, traceback):
         """Restores the current logging context"""
