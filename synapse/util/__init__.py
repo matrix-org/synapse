@@ -38,7 +38,7 @@ class Clock(object):
     def call_later(self, delay, callback):
         current_context = LoggingContext.current_context()
         def wrapped_callback():
-            current_context.thread_local.current_context = current_context
+            LoggingContext.thread_local.current_context = current_context
             callback()
         return reactor.callLater(delay, wrapped_callback)
 
