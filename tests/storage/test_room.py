@@ -127,7 +127,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_room_name(self):
+    def STALE_test_room_name(self):
         name = u"A-Room-Name"
 
         yield self.inject_room_event(
@@ -150,7 +150,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_room_name(self):
+    def STALE_test_room_topic(self):
         topic = u"A place for things"
 
         yield self.inject_room_event(

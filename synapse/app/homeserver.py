@@ -33,6 +33,7 @@ from synapse.api.urls import (
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
+from synapse.util.logcontext import LoggingContext
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
@@ -42,6 +43,7 @@ import os
 import re
 import sys
 import sqlite3
+import syweb
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +60,9 @@ class SynapseHomeServer(HomeServer):
         return JsonResource()
 
     def build_resource_for_web_client(self):
-        return File("webclient")  # TODO configurable?
+        syweb_path = os.path.dirname(syweb.__file__)
+        webclient_path = os.path.join(syweb_path, "webclient")
+        return File(webclient_path)  # TODO configurable?
 
     def build_resource_for_content_repo(self):
         return ContentRepoResource(
@@ -233,14 +237,17 @@ def setup():
         f.namespace['hs'] = hs
         reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
 
-    hs.start_listening(config.bind_port, config.unsecure_port)
+    bind_port = config.bind_port
+    if config.no_tls:
+        bind_port = None
+    hs.start_listening(bind_port, config.unsecure_port)
 
     if config.daemonize:
         print config.pid_file
         daemon = Daemonize(
             app="synapse-homeserver",
             pid=config.pid_file,
-            action=reactor.run,
+            action=run,
             auto_close_fds=False,
             verbose=True,
             logger=logger,
@@ -250,6 +257,13 @@ def setup():
     else:
         reactor.run()
 
+def run():
+    with LoggingContext("run"):
+        reactor.run()
+
+def main():
+    with LoggingContext("main"):
+        setup()
 
 if __name__ == '__main__':
-    setup()
+    main()

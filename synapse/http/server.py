@@ -20,6 +20,7 @@ from syutil.jsonutil import (
 from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException
 )
+from synapse.util.logcontext import LoggingContext
 
 from twisted.internet import defer, reactor
 from twisted.web import server, resource
@@ -88,8 +89,18 @@ class JsonResource(HttpServer, resource.Resource):
     def render(self, request):
         """ This get's called by twisted every time someone sends us a request.
         """
-        self._async_render(request)
+        self._async_render_with_logging_context(request)
         return server.NOT_DONE_YET
+
+    _request_id = 0
+
+    @defer.inlineCallbacks
+    def _async_render_with_logging_context(self, request):
+        request_id = "%s-%s" % (request.method, JsonResource._request_id)
+        JsonResource._request_id += 1
+        with LoggingContext(request_id) as request_context:
+            request_context.request = request_id
+            yield self._async_render(request)
 
     @defer.inlineCallbacks
     def _async_render(self, request):

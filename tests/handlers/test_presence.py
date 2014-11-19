@@ -44,13 +44,11 @@ def _expect_edu(destination, edu_type, content, origin="test"):
         "pdus": [],
         "edus": [
             {
-                # TODO: SYN-103: Remove "origin" and "destination" keys.
-                "origin": origin,
-                "destination": destination,
                 "edu_type": edu_type,
                 "content": content,
             }
         ],
+        "pdu_failures": [],
     }
 
 def _make_edu_json(origin, edu_type, content):
@@ -1202,7 +1200,10 @@ class PresencePollingTestCase(unittest.TestCase):
                 path=ANY,
                 data=_expect_edu("remote", "m.presence",
                     content={
-                        "push": [ {"user_id": "@clementine:test" }],
+                        "push": [ {
+                            "user_id": "@clementine:test",
+                            "presence": OFFLINE,
+                        }],
                     },
                 ),
                 json_data_callback=ANY,
@@ -1231,7 +1232,10 @@ class PresencePollingTestCase(unittest.TestCase):
                 path=ANY,
                 data=_expect_edu("remote", "m.presence",
                     content={
-                        "push": [ {"user_id": "@fig:test" }],
+                        "push": [ {
+                            "user_id": "@fig:test",
+                            "presence": OFFLINE,
+                        }],
                     },
                 ),
                 json_data_callback=ANY,

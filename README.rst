@@ -4,9 +4,9 @@ Introduction
 Matrix is an ambitious new ecosystem for open federated Instant Messaging and
 VoIP.  The basics you need to know to get up and running are:
 
-- Chatrooms are distributed and do not exist on any single server.  Rooms
-  can be found using aliases like ``#matrix:matrix.org`` or
-  ``#test:localhost:8008`` or they can be ephemeral.
+- Everything in Matrix happens in a room.  Rooms are distributed and do not
+  exist on any single server.  Rooms can be located using convenience aliases 
+  like ``#matrix:matrix.org`` or ``#test:localhost:8008``.
 
 - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
   you will normally refer to yourself and others using a 3PID: email
@@ -17,56 +17,12 @@ The overall architecture is::
       client <----> homeserver <=====================> homeserver <----> client
              https://somewhere.org/_matrix      https://elsewhere.net/_matrix
 
-WARNING
-=======
+``#matrix:matrix.org`` is the official support room for Matrix, and can be
+accessed by the web client at http://matrix.org/alpha or via an IRC bridge at
+irc://irc.freenode.net/matrix.
 
-**Synapse is currently in a state of rapid development, and not all features
-are yet functional. Critically, some security features are still in
-development, which means Synapse can *not* be considered secure or reliable at
-this point.**  For instance:
-
-- **SSL Certificates used by server-server federation are not yet validated.**
-- **Room permissions are not yet enforced on traffic received via federation.**
-- **Homeservers do not yet cryptographically sign their events to avoid
-  tampering**
-- Default configuration provides open signup to the service from the internet
-
-Despite this, we believe Synapse is more than useful as a way for experimenting
-and exploring Synapse, and the missing features will land shortly. **Until
-then, please do *NOT* use Synapse for any remotely important or secure
-communication.**
-
-
-Quick Start
-===========
-
-System requirements:
-- POSIX-compliant system (tested on Linux & OSX)
-- Python 2.7
-
-To get up and running:
-
-- To simply play with an **existing** homeserver you can
-  just go straight to http://matrix.org/alpha.
-
-- To run your own **private** homeserver on localhost:8008, generate a basic
-  config file: ``./synctl start`` will give you instructions on how to do this.
-  For this purpose, you can use 'localhost' or your hostname as a server name.
-  Once you've done so, running ``./synctl start`` again will start your private
-  home sserver. You will find a webclient running at http://localhost:8008.
-  Please use a recent Chrome or Firefox for now (or Safari if you don't need
-  VoIP support).
-
-- To run a **public** homeserver and let it exchange messages with other
-  homeservers and participate in the global Matrix federation, you must expose
-  port 8448 to the internet and edit homeserver.yaml to specify server_name
-  (the public DNS entry for this server) and then run ``synctl start``. If you
-  changed the server_name, you may need to move the old database
-  (homeserver.db) out of the way first. Then come join ``#matrix:matrix.org``
-  and say hi! :)
-
-For more detailed setup instructions, please see further down this document.
-
+Synapse is currently in rapid development, but as of version 0.5 we believe it 
+is sufficiently stable to be run as an internet-facing service for real usage!
 
 About Matrix
 ============
@@ -76,10 +32,10 @@ which handle:
 
 - Creating and managing fully distributed chat rooms with no
   single points of control or failure
-- Eventually-consistent cryptographically secure[1] synchronisation of room
+- Eventually-consistent cryptographically secure synchronisation of room
   state across a global open network of federated servers and services
 - Sending and receiving extensible messages in a room with (optional)
-  end-to-end encryption[2]
+  end-to-end encryption[1]
 - Inviting, joining, leaving, kicking, banning room members
 - Managing user accounts (registration, login, logout)
 - Using 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
@@ -111,55 +67,120 @@ Synapse ships with two basic demo Matrix clients: webclient (a basic group chat
 web client demo implemented in AngularJS) and cmdclient (a basic Python
 command line utility which lets you easily see what the JSON APIs are up to).
 
-We'd like to invite you to take a look at the Matrix spec, try to run a
-homeserver, and join the existing Matrix chatrooms already out there,
-experiment with the APIs and the demo clients, and let us know your thoughts at
-https://github.com/matrix-org/synapse/issues or at matrix@matrix.org.
+Meanwhile, iOS and Android SDKs and clients are currently in development and available from:
 
-Thanks for trying Matrix!
+ * https://github.com/matrix-org/matrix-ios-sdk
+ * https://github.com/matrix-org/matrix-android-sdk
 
-[1] Cryptographic signing of messages isn't turned on yet
+We'd like to invite you to join #matrix:matrix.org (via http://matrix.org/alpha), run a homeserver, take a look at the Matrix spec at
+http://matrix.org/docs/spec, experiment with the APIs and the demo
+clients, and report any bugs via http://matrix.org/jira.
 
-[2] End-to-end encryption is currently in development
+Thanks for using Matrix!
 
+[1] End-to-end encryption is currently in development
 
 Homeserver Installation
 =======================
 
-First, the dependencies need to be installed.  Start by installing
-'python2.7-dev' and the various tools of the compiler toolchain.
+System requirements:
+- POSIX-compliant system (tested on Linux & OSX)
+- Python 2.7
 
-Installing prerequisites on Ubuntu::
+Synapse is written in python but some of the libraries is uses are written in
+C. So before we can install synapse itself we need a working C compiler and the
+header files for python C extensions.
 
-    $ sudo apt-get install build-essential python2.7-dev libffi-dev
+Installing prerequisites on Ubuntu or Debian::
+
+    $ sudo apt-get install build-essential python2.7-dev libffi-dev \
+                           python-pip python-setuptools
 
 Installing prerequisites on Mac OS X::
 
     $ xcode-select --install
+    
+To install the synapse homeserver run::
+
+    $ pip install --user --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+
+This installs synapse, along with the libraries it uses, into
+``$HOME/.local/lib/`` on Linux or ``$HOME/Library/Python/2.7/lib/`` on OSX.
+
+Troubleshooting Installation
+----------------------------
+
+Synapse requires pip 1.7 or later, so if your OS provides too old a version and 
+you get errors about ``error: no such option: --process-dependency-links`` you 
+may need to manually upgrade it::
+
+    $ sudo pip install --upgrade pip
+    
+If pip crashes mid-installation for reason (e.g. lost terminal), pip may
+refuse to run until you remove the temporary installation directory it
+created. To reset the installation::
+
+    $ rm -rf /tmp/pip_install_matrix
+    
+pip seems to leak *lots* of memory during installation.  For instance, a Linux 
+host with 512MB of RAM may run out of memory whilst installing Twisted.  If this 
+happens, you will have to individually install the dependencies which are 
+failing, e.g.:
+
+    $ pip install --user twisted
+
+Running Your Homeserver
+=======================
+
+To actually run your new homeserver, pick a working directory for Synapse to run 
+(e.g. ``~/.synapse``), and::
+
+    $ mkdir ~/.synapse
+    $ cd ~/.synapse
+    
+    $ # on Linux
+    $ ~/.local/bin/synctl start
+    
+    $ # on OSX
+    $ ~/Library/Python/2.7/bin/synctl start
+
+Troubleshooting Running
+-----------------------
+
+If ``synctl`` fails with ``pkg_resources.DistributionNotFound`` errors you may 
+need a newer version of setuptools than that provided by your OS.
+
+    $ sudo pip install setuptools --upgrade
+
+If synapse fails with ``missing "sodium.h"`` crypto errors, you may need 
+to manually upgrade PyNaCL, as synapse uses NaCl (http://nacl.cr.yp.to/) for 
+encryption and digital signatures.
+Unfortunately PyNACL currently has a few issues
+(https://github.com/pyca/pynacl/issues/53) and
+(https://github.com/pyca/pynacl/issues/79) that mean it may not install
+correctly, causing all tests to fail with errors about missing "sodium.h". To
+fix try re-installing from PyPI or directly from
+(https://github.com/pyca/pynacl)::
+
+    $ # Install from PyPI
+    $ pip install --user --upgrade --force pynacl
+    $ # Install from github
+    $ pip install --user https://github.com/pyca/pynacl/tarball/master
+
+
+Homeserver Development
+======================
+
+To check out a homeserver for development, clone the git repo into a working
+directory of your choice:
+
+    $ git clone https://github.com/matrix-org/synapse.git
+    $ cd synapse
 
 The homeserver has a number of external dependencies, that are easiest
 to install by making setup.py do so, in --user mode::
 
     $ python setup.py develop --user
-
-You'll need a version of setuptools new enough to know about git, so you
-may need to also run::
-
-    $ sudo apt-get install python-pip
-    $ sudo pip install --upgrade setuptools
-
-If you don't have access to github, then you may need to install ``syutil``
-manually by checking it out and running ``python setup.py develop --user`` on
-it too.
-
-If you get errors about ``sodium.h`` being missing, you may also need to
-manually install a newer PyNaCl via pip as setuptools installs an old one. Or
-you can check PyNaCl out of git directly (https://github.com/pyca/pynacl) and
-installing it. Installing PyNaCl using pip may also work (remember to remove
-any other versions installed by setuputils in, for example, ~/.local/lib).
-
-On OSX, if you encounter ``clang: error: unknown argument: '-mno-fused-madd'``
-you will need to ``export CFLAGS=-Qunused-arguments``.
 
 This will run a process of downloading and installing into your
 user's .local/lib directory all of the required dependencies that are
@@ -180,8 +201,8 @@ This should end with a 'PASSED' result::
 Upgrading an existing homeserver
 ================================
 
-Before upgrading an existing homeserver to a new version, please refer to
-UPGRADE.rst for any additional instructions.
+IMPORTANT: Before upgrading an existing homeserver to a new version, please
+refer to UPGRADE.rst for any additional instructions.
 
 
 Setting up Federation
@@ -202,18 +223,15 @@ IDs:
    domain name.
 
 For the first form, simply pass the required hostname (of the machine) as the
---host parameter::
+--server-name parameter::
 
-    $ python synapse/app/homeserver.py \
+    $ python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
         --config-path homeserver.config \
         --generate-config
-    $ python synapse/app/homeserver.py --config-path homeserver.config
+    $ python -m synapse.app.homeserver --config-path homeserver.config
 
-Alternatively, you can run synapse via synctl - running ``synctl start`` to
-generate a homeserver.yaml config file, where you can then edit server-name to
-specify machine.my.domain.name, and then set the actual server running again
-with synctl start.
+Alternatively, you can run ``synctl start`` to guide you through the process.
 
 For the second form, first create your SRV record and publish it in DNS. This
 needs to be named _matrix._tcp.YOURDOMAIN, and point at at least one hostname
@@ -221,17 +239,19 @@ and port where the server is running.  (At the current time synapse does not
 support clustering multiple servers into a single logical homeserver).  The DNS
 record would then look something like::
 
+    $ dig -t srv _matrix._tcp.machine.my.domaine.name
     _matrix._tcp    IN      SRV     10 0 8448 machine.my.domain.name.
+
 
 At this point, you should then run the homeserver with the hostname of this
 SRV record, as that is the name other machines will expect it to have::
 
-    $ python synapse/app/homeserver.py \
+    $ python -m synapse.app.homeserver \
         --server-name YOURDOMAIN \
         --bind-port 8448 \
         --config-path homeserver.config \
         --generate-config
-    $ python synapse/app/homeserver.py --config-path homeserver.config
+    $ python -m synapse.app.homeserver --config-path homeserver.config
 
 
 You may additionally want to pass one or more "-v" options, in order to
@@ -250,6 +270,8 @@ private federation (``localhost:8080``, ``localhost:8081`` and
 http://localhost:8080. Simply run::
 
     $ demo/start.sh
+    
+This is mainly useful just for development purposes.
 
 Running The Demo Web Client
 ===========================
@@ -308,13 +330,14 @@ time.
 Where's the spec?!
 ==================
 
-For now, please go spelunking in the ``docs/`` directory to find out.
+The source of the matrix spec lives at https://github.com/matrix-org/matrix-doc.  
+A recent HTML snapshot of this lives at http://matrix.org/docs/spec
 
 
 Building Internal API Documentation
 ===================================
 
-Before building internal API documentation install spinx and
+Before building internal API documentation install sphinx and
 sphinxcontrib-napoleon::
 
     $ pip install sphinx

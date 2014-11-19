@@ -18,6 +18,7 @@ from twisted.web.http import HTTPClient
 from twisted.internet.protocol import Factory
 from twisted.internet import defer, reactor
 from synapse.http.endpoint import matrix_endpoint
+from synapse.util.logcontext import PreserveLoggingContext
 import json
 import logging
 
@@ -36,10 +37,11 @@ def fetch_server_key(server_name, ssl_context_factory):
 
     for i in range(5):
         try:
-            protocol = yield endpoint.connect(factory)
-            server_response, server_certificate = yield protocol.remote_key
-            defer.returnValue((server_response, server_certificate))
-            return
+            with PreserveLoggingContext():
+                protocol = yield endpoint.connect(factory)
+                server_response, server_certificate = yield protocol.remote_key
+                defer.returnValue((server_response, server_certificate))
+                return
         except Exception as e:
             logger.exception(e)
     raise IOError("Cannot get key for %s" % server_name)

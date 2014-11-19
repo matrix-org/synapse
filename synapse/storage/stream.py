@@ -177,10 +177,9 @@ class StreamStore(SQLBaseStore):
 
         sql = (
             "SELECT *, (%(redacted)s) AS redacted FROM events AS e WHERE "
-            "((room_id IN (%(current)s)) OR "
+            "(e.outlier = 0 AND (room_id IN (%(current)s)) OR "
             "(event_id IN (%(invites)s))) "
             "AND e.stream_ordering > ? AND e.stream_ordering <= ? "
-            "AND e.outlier = 0 "
             "ORDER BY stream_ordering ASC LIMIT %(limit)d "
         ) % {
             "redacted": del_sql,
@@ -254,6 +253,9 @@ class StreamStore(SQLBaseStore):
         if rows:
             topo = rows[-1]["topological_ordering"]
             toke = rows[-1]["stream_ordering"]
+            if direction == 'b':
+                topo -= 1
+                toke -= 1
             next_token = "t%s-%s" % (topo, toke)
         else:
             # TODO (erikj): We should work out what to do here instead.
@@ -309,7 +311,10 @@ class StreamStore(SQLBaseStore):
         defer.returnValue(ret)
 
     def get_room_events_max_id(self):
-        return self.runInteraction(self._get_room_events_max_id_txn)
+        return self.runInteraction(
+            "get_room_events_max_id",
+            self._get_room_events_max_id_txn
+        )
 
     def _get_room_events_max_id_txn(self, txn):
         txn.execute(

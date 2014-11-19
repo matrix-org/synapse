@@ -17,7 +17,6 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
 from synapse.api.constants import Membership
-from synapse.api.events.room import RoomMemberEvent
 
 from ._base import BaseHandler
 
@@ -153,10 +152,13 @@ class ProfileHandler(BaseHandler):
         if not user.is_mine:
             defer.returnValue(None)
 
-        (displayname, avatar_url) = yield defer.gatherResults([
-            self.store.get_profile_displayname(user.localpart),
-            self.store.get_profile_avatar_url(user.localpart),
-        ])
+        (displayname, avatar_url) = yield defer.gatherResults(
+            [
+                self.store.get_profile_displayname(user.localpart),
+                self.store.get_profile_avatar_url(user.localpart),
+            ],
+            consumeErrors=True
+        )
 
         state["displayname"] = displayname
         state["avatar_url"] = avatar_url
@@ -196,14 +198,10 @@ class ProfileHandler(BaseHandler):
         )
 
         for j in joins:
-            snapshot = yield self.store.snapshot_room(
-                j.room_id, j.state_key, RoomMemberEvent.TYPE,
-                j.state_key
-            )
+            snapshot = yield self.store.snapshot_room(j)
 
             content = {
                 "membership": j.content["membership"],
-                "prev": j.content["membership"],
             }
 
             yield self.distributor.fire(
@@ -218,5 +216,6 @@ class ProfileHandler(BaseHandler):
                 user_id=j.state_key,
             )
 
-            yield self.state_handler.handle_new_event(new_event, snapshot)
-            yield self._on_new_room_event(new_event, snapshot)
+            yield self._on_new_room_event(
+                new_event, snapshot, suppress_auth=True
+            )

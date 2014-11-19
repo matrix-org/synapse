@@ -21,9 +21,8 @@ from mock import Mock
 
 from synapse.server import HomeServer
 from synapse.handlers.directory import DirectoryHandler
-from synapse.storage.directory import RoomAliasMapping
 
-from tests.utils import SQLiteMemoryDbPool
+from tests.utils import SQLiteMemoryDbPool, MockKey
 
 
 class DirectoryHandlers(object):
@@ -41,6 +40,7 @@ class DirectoryTestCase(unittest.TestCase):
         ])
 
         self.query_handlers = {}
+
         def register_query_handler(query_type, handler):
             self.query_handlers[query_type] = handler
         self.mock_federation.register_query_handler = register_query_handler
@@ -48,11 +48,16 @@ class DirectoryTestCase(unittest.TestCase):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
 
-        hs = HomeServer("test",
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
+
+        hs = HomeServer(
+            "test",
             db_pool=db_pool,
             http_client=None,
             resource_for_federation=Mock(),
             replication_layer=self.mock_federation,
+            config=self.mock_config,
         )
         hs.handlers = DirectoryHandlers(hs)
 

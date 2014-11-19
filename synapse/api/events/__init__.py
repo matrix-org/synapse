@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.api.errors import SynapseError, Codes
 from synapse.util.jsonobject import JsonEncodedObject
 
 
@@ -56,22 +55,26 @@ class SynapseEvent(JsonEncodedObject):
         "user_id",  # sender/initiator
         "content",  # HTTP body, JSON
         "state_key",
-        "required_power_level",
         "age_ts",
         "prev_content",
-        "prev_state",
+        "replaces_state",
         "redacted_because",
+        "origin_server_ts",
     ]
 
     internal_keys = [
         "is_state",
-        "prev_events",
         "depth",
         "destinations",
         "origin",
         "outlier",
-        "power_level",
         "redacted",
+        "prev_events",
+        "hashes",
+        "signatures",
+        "prev_state",
+        "auth_events",
+        "state_hash",
     ]
 
     required_keys = [
@@ -82,8 +85,8 @@ class SynapseEvent(JsonEncodedObject):
 
     def __init__(self, raises=True, **kwargs):
         super(SynapseEvent, self).__init__(**kwargs)
-        if "content" in kwargs:
-            self.check_json(self.content, raises=raises)
+        # if "content" in kwargs:
+        #     self.check_json(self.content, raises=raises)
 
     def get_content_template(self):
         """ Retrieve the JSON template for this event as a dict.
@@ -114,65 +117,24 @@ class SynapseEvent(JsonEncodedObject):
         """
         raise NotImplementedError("get_content_template not implemented.")
 
-    def check_json(self, content, raises=True):
-        """Checks the given JSON content abides by the rules of the template.
-
-        Args:
-            content : A JSON object to check.
-            raises: True to raise a SynapseError if the check fails.
-        Returns:
-            True if the content passes the template. Returns False if the check
-            fails and raises=False.
-        Raises:
-            SynapseError if the check fails and raises=True.
-        """
-        # recursively call to inspect each layer
-        err_msg = self._check_json(content, self.get_content_template())
-        if err_msg:
-            if raises:
-                raise SynapseError(400, err_msg, Codes.BAD_JSON)
-            else:
-                return False
-        else:
-            return True
-
-    def _check_json(self, content, template):
-        """Check content and template matches.
-
-        If the template is a dict, each key in the dict will be validated with
-        the content, else it will just compare the types of content and
-        template. This basic type check is required because this function will
-        be recursively called and could be called with just strs or ints.
-
-        Args:
-            content: The content to validate.
-            template: The validation template.
-        Returns:
-            str: An error message if the validation fails, else None.
-        """
-        if type(content) != type(template):
-            return "Mismatched types: %s" % template
-
-        if type(template) == dict:
-            for key in template:
-                if key not in content:
-                    return "Missing %s key" % key
-
-                if type(content[key]) != type(template[key]):
-                    return "Key %s is of the wrong type (got %s, want %s)" % (
-                        key, type(content[key]), type(template[key]))
-
-                if type(content[key]) == dict:
-                    # we must go deeper
-                    msg = self._check_json(content[key], template[key])
-                    if msg:
-                        return msg
-                elif type(content[key]) == list:
-                    # make sure each item type in content matches the template
-                    for entry in content[key]:
-                        msg = self._check_json(entry, template[key][0])
-                        if msg:
-                            return msg
+    def get_pdu_json(self, time_now=None):
+        pdu_json = self.get_full_dict()
+        pdu_json.pop("destinations", None)
+        pdu_json.pop("outlier", None)
+        pdu_json.pop("replaces_state", None)
+        pdu_json.pop("redacted", None)
+        state_hash = pdu_json.pop("state_hash", None)
+        if state_hash is not None:
+            pdu_json.setdefault("unsigned", {})["state_hash"] = state_hash
+        content = pdu_json.get("content", {})
+        content.pop("prev", None)
+        if time_now is not None and "age_ts" in pdu_json:
+            age = time_now - pdu_json["age_ts"]
+            pdu_json.setdefault("unsigned", {})["age"] = int(age)
+            del pdu_json["age_ts"]
+        user_id = pdu_json.pop("user_id")
+        pdu_json["sender"] = user_id
+        return pdu_json
 
 
 class SynapseStateEvent(SynapseEvent):

@@ -20,6 +20,12 @@ from synapse.api.errors import SynapseError
 from synapse.streams.config import PaginationConfig
 from synapse.rest.base import RestServlet, client_path_pattern
 
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
 
 class EventStreamRestServlet(RestServlet):
     PATTERN = client_path_pattern("/events$")
@@ -29,18 +35,22 @@ class EventStreamRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request):
         auth_user = yield self.auth.get_user_by_req(request)
+        try:
+            handler = self.handlers.event_stream_handler
+            pagin_config = PaginationConfig.from_request(request)
+            timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS
+            if "timeout" in request.args:
+                try:
+                    timeout = int(request.args["timeout"][0])
+                except ValueError:
+                    raise SynapseError(400, "timeout must be in milliseconds.")
 
-        handler = self.handlers.event_stream_handler
-        pagin_config = PaginationConfig.from_request(request)
-        timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS
-        if "timeout" in request.args:
-            try:
-                timeout = int(request.args["timeout"][0])
-            except ValueError:
-                raise SynapseError(400, "timeout must be in milliseconds.")
-
-        chunk = yield handler.get_stream(auth_user.to_string(), pagin_config,
-                                         timeout=timeout)
+            chunk = yield handler.get_stream(
+                auth_user.to_string(), pagin_config, timeout=timeout
+            )
+        except:
+            logger.exception("Event stream failed")
+            raise
 
         defer.returnValue((200, chunk))
 

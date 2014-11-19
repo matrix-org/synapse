@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.util.logcontext import LoggingContext
 
 from twisted.internet import reactor
 
@@ -35,7 +36,11 @@ class Clock(object):
         return self.time() * 1000
 
     def call_later(self, delay, callback):
-        return reactor.callLater(delay, callback)
+        current_context = LoggingContext.current_context()
+        def wrapped_callback():
+            LoggingContext.thread_local.current_context = current_context
+            callback()
+        return reactor.callLater(delay, wrapped_callback)
 
     def cancel_call_later(self, timer):
         timer.cancel()

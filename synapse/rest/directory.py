@@ -36,7 +36,9 @@ class ClientDirectoryServer(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_alias):
-        room_alias = self.hs.parse_roomalias(urllib.unquote(room_alias))
+        room_alias = self.hs.parse_roomalias(
+            urllib.unquote(room_alias).decode("utf-8")
+        )
 
         dir_handler = self.handlers.directory_handler
         res = yield dir_handler.get_association(room_alias)
@@ -54,7 +56,9 @@ class ClientDirectoryServer(RestServlet):
 
         logger.debug("Got content: %s", content)
 
-        room_alias = self.hs.parse_roomalias(urllib.unquote(room_alias))
+        room_alias = self.hs.parse_roomalias(
+            urllib.unquote(room_alias).decode("utf-8")
+        )
 
         logger.debug("Got room name: %s", room_alias.to_string())
 
@@ -70,9 +74,11 @@ class ClientDirectoryServer(RestServlet):
         dir_handler = self.handlers.directory_handler
 
         try:
+            user_id = user.to_string()
             yield dir_handler.create_association(
-                user.to_string(), room_alias, room_id, servers
+                user_id, room_alias, room_id, servers
             )
+            yield dir_handler.send_room_alias_update_event(user_id, room_id)
         except SynapseError as e:
             raise e
         except:
@@ -91,7 +97,9 @@ class ClientDirectoryServer(RestServlet):
 
         dir_handler = self.handlers.directory_handler
 
-        room_alias = self.hs.parse_roomalias(urllib.unquote(room_alias))
+        room_alias = self.hs.parse_roomalias(
+            urllib.unquote(room_alias).decode("utf-8")
+        )
 
         yield dir_handler.delete_association(
             user.to_string(), room_alias

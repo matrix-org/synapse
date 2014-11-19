@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 
+from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.logutils import log_function
 
 from ._base import BaseHandler
@@ -66,9 +67,10 @@ class EventStreamHandler(BaseHandler):
             rm_handler = self.hs.get_handlers().room_member_handler
             room_ids = yield rm_handler.get_rooms_for_user(auth_user)
 
-            events, tokens = yield self.notifier.get_events_for(
-                auth_user, room_ids, pagin_config, timeout
-            )
+            with PreserveLoggingContext():
+                events, tokens = yield self.notifier.get_events_for(
+                    auth_user, room_ids, pagin_config, timeout
+                )
 
             chunks = [self.hs.serialize_event(e) for e in events]
 
