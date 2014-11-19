@@ -582,6 +582,9 @@ class ReplicationLayer(object):
         #TODO: Check we have all the PDU keys here
         pdu_json.setdefault("hashes", {})
         pdu_json.setdefault("signatures", {})
+        sender = pdu_json.pop("sender", None)
+        if sender is not None:
+            pdu_json["user_id"] = sender
         state_hash = pdu_json.get("unsigned", {}).pop("state_hash", None)
         if state_hash is not None:
             pdu_json["state_hash"] = state_hash

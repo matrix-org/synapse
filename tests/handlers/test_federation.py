@@ -81,8 +81,9 @@ class FederationTestCase(unittest.TestCase):
             content={"msgtype": u"fooo"},
             origin_server_ts=0,
             event_id="$a:b",
+            user_id="@a:b",
             origin="b",
-            hashes={"sha256":"PvbCLWrTBxnBsSO7/cJ76072ySTCgI/XGadESRAe02M"},
+            hashes={"sha256":"AcLrgtUIqqwaGoHhrEvYG1YLDIsVPYJdSRGhkp3jJp8"},
         )
 
         self.datastore.persist_event.return_value = defer.succeed(None)

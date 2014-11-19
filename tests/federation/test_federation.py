@@ -100,6 +100,7 @@ class FederationTestCase(unittest.TestCase):
                 make_pdu(
                     event_id="the-pdu-id",
                     origin="red",
+                    user_id="@a:red",
                     room_id="my-context",
                     type="m.topic",
                     origin_server_ts=123456789000,
@@ -145,6 +146,7 @@ class FederationTestCase(unittest.TestCase):
                 make_pdu(
                     event_id="abc123def456",
                     origin="red",
+                    user_id="@a:red",
                     room_id="my-context",
                     type="m.text",
                     origin_server_ts=123456789001,
@@ -172,6 +174,7 @@ class FederationTestCase(unittest.TestCase):
         pdu = SynapseEvent(
             event_id="abc123def456",
             origin="red",
+            user_id="@a:red",
             room_id="my-context",
             type="m.text",
             origin_server_ts=123456789001,

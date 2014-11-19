@@ -119,7 +119,7 @@ class SynapseEvent(JsonEncodedObject):
 
     def get_pdu_json(self, time_now=None):
         pdu_json = self.get_full_dict()
-        pdu_json.pop("destination", None)
+        pdu_json.pop("destinations", None)
         pdu_json.pop("outlier", None)
         pdu_json.pop("replaces_state", None)
         pdu_json.pop("redacted", None)
@@ -132,6 +132,8 @@ class SynapseEvent(JsonEncodedObject):
             age = time_now - pdu_json["age_ts"]
             pdu_json.setdefault("unsigned", {})["age"] = int(age)
             del pdu_json["age_ts"]
+        user_id = pdu_json.pop("user_id")
+        pdu_json["sender"] = user_id
         return pdu_json
 
 
