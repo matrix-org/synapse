@@ -128,7 +128,7 @@ class DirectoryHandler(BaseHandler):
                 "servers": result.servers,
             })
         else:
-            raise SynapseError(404, "Room alias \"%s\" not found", room_alias)
+            raise SynapseError(404, "Room alias \"%s\" not found" % (room_alias,))
 
 
     @defer.inlineCallbacks
