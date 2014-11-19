@@ -122,10 +122,14 @@ class DirectoryHandler(BaseHandler):
             room_alias
         )
 
-        defer.returnValue({
-            "room_id": result.room_id,
-            "servers": result.servers,
-        })
+        if result is not None:
+            defer.returnValue({
+                "room_id": result.room_id,
+                "servers": result.servers,
+            })
+        else:
+            raise SynapseError(404, "Room alias \"%s\" not found", room_alias)
+
 
     @defer.inlineCallbacks
     def send_room_alias_update_event(self, user_id, room_id):
