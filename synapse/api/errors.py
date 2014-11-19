@@ -32,6 +32,7 @@ class Codes(object):
     LIMIT_EXCEEDED = "M_LIMIT_EXCEEDED"
     CAPTCHA_NEEDED = "M_CAPTCHA_NEEDED"
     CAPTCHA_INVALID = "M_CAPTCHA_INVALID"
+    MISSING_PARAM = "M_MISSING_PARAM"
 
 
 class CodeMessageException(Exception):

@@ -36,6 +36,7 @@ from synapse.util.lockutils import LockManager
 from synapse.streams.events import EventSources
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.crypto.keyring import Keyring
+from synapse.push.pusherpool import PusherPool
 
 
 class BaseHomeServer(object):
@@ -82,6 +83,7 @@ class BaseHomeServer(object):
         'ratelimiter',
         'keyring',
         'event_validator',
+        'pusherpool'
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -227,6 +229,9 @@ class HomeServer(BaseHomeServer):
 
     def build_event_validator(self):
         return EventValidator(self)
+
+    def build_pusherpool(self):
+        return PusherPool(self)
 
     def register_servlets(self):
         """ Register all servlets associated with this HomeServer.

@@ -33,6 +33,7 @@ from .stream import StreamStore
 from .transactions import TransactionStore
 from .keys import KeyStore
 from .event_federation import EventFederationStore
+from .pusher import PusherStore
 
 from .state import StateStore
 from .signatures import SignatureStore
@@ -62,12 +63,13 @@ SCHEMAS = [
     "state",
     "event_edges",
     "event_signatures",
+    "pusher"
 ]
 
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 class _RollbackButIsFineException(Exception):
@@ -81,7 +83,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, TransactionStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
-                EventFederationStore, ):
+                EventFederationStore, PusherStore, ):
 
     def __init__(self, hs):
         super(DataStore, self).__init__(hs)

@@ -16,7 +16,7 @@
 
 from . import (
     room, events, register, login, profile, presence, initial_sync, directory,
-    voip, admin,
+    voip, admin, pusher,
 )
 
 
@@ -45,3 +45,4 @@ class RestServletFactory(object):
         directory.register_servlets(hs, client_resource)
         voip.register_servlets(hs, client_resource)
         admin.register_servlets(hs, client_resource)
+        pusher.register_servlets(hs, client_resource)
