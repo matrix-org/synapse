@@ -17,6 +17,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
 from synapse.api.constants import Membership
+from synapse.util.logcontext import PreserveLoggingContext
 
 from ._base import BaseHandler
 
@@ -46,7 +47,7 @@ class ProfileHandler(BaseHandler):
         )
 
     def registered_user(self, user):
-        self.store.create_profile(user.localpart)
+        return self.store.create_profile(user.localpart)
 
     @defer.inlineCallbacks
     def get_displayname(self, target_user):
@@ -152,13 +153,14 @@ class ProfileHandler(BaseHandler):
         if not user.is_mine:
             defer.returnValue(None)
 
-        (displayname, avatar_url) = yield defer.gatherResults(
-            [
-                self.store.get_profile_displayname(user.localpart),
-                self.store.get_profile_avatar_url(user.localpart),
-            ],
-            consumeErrors=True
-        )
+        with PreserveLoggingContext():
+            (displayname, avatar_url) = yield defer.gatherResults(
+                [
+                    self.store.get_profile_displayname(user.localpart),
+                    self.store.get_profile_avatar_url(user.localpart),
+                ],
+                consumeErrors=True
+            )
 
         state["displayname"] = displayname
         state["avatar_url"] = avatar_url

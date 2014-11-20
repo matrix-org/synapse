@@ -209,7 +209,7 @@ class FederationHandler(BaseHandler):
         if event.type == RoomMemberEvent.TYPE:
             if event.membership == Membership.JOIN:
                 user = self.hs.parse_userid(event.state_key)
-                self.distributor.fire(
+                yield self.distributor.fire(
                     "user_joined_room", user=user, room_id=event.room_id
                 )
 
@@ -414,7 +414,7 @@ class FederationHandler(BaseHandler):
         if event.type == RoomMemberEvent.TYPE:
             if event.membership == Membership.JOIN:
                 user = self.hs.parse_userid(event.state_key)
-                self.distributor.fire(
+                yield self.distributor.fire(
                     "user_joined_room", user=user, room_id=event.room_id
                 )
 

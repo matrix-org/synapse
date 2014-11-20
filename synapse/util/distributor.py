@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.util.logcontext import PreserveLoggingContext
+
 from twisted.internet import defer
 
 import logging
@@ -91,6 +93,7 @@ class Signal(object):
         Each observer callable may return a Deferred."""
         self.observers.append(observer)
 
+    @defer.inlineCallbacks
     def fire(self, *args, **kwargs):
         """Invokes every callable in the observer list, passing in the args and
         kwargs. Exceptions thrown by observers are logged but ignored. It is
@@ -98,22 +101,24 @@ class Signal(object):
 
         Returns a Deferred that will complete when all the observers have
         completed."""
-        deferreds = []
-        for observer in self.observers:
-            d = defer.maybeDeferred(observer, *args, **kwargs)
+        with PreserveLoggingContext():
+            deferreds = []
+            for observer in self.observers:
+                d = defer.maybeDeferred(observer, *args, **kwargs)
 
-            def eb(failure):
-                logger.warning(
-                    "%s signal observer %s failed: %r",
-                    self.name, observer, failure,
-                    exc_info=(
-                        failure.type,
-                        failure.value,
-                        failure.getTracebackObject()))
-                if not self.suppress_failures:
-                    raise failure
-            deferreds.append(d.addErrback(eb))
+                def eb(failure):
+                    logger.warning(
+                        "%s signal observer %s failed: %r",
+                        self.name, observer, failure,
+                        exc_info=(
+                            failure.type,
+                            failure.value,
+                            failure.getTracebackObject()))
+                    if not self.suppress_failures:
+                        raise failure
+                deferreds.append(d.addErrback(eb))
 
-        return defer.DeferredList(
-            deferreds, fireOnOneErrback=not self.suppress_failures
-        )
+            result = yield defer.DeferredList(
+                deferreds, fireOnOneErrback=not self.suppress_failures
+            )
+        defer.returnValue(result)

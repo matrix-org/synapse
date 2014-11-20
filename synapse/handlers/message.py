@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.api.constants import Membership
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
+from synapse.util.logcontext import PreserveLoggingContext
 from ._base import BaseHandler
 
 import logging
@@ -86,9 +87,10 @@ class MessageHandler(BaseHandler):
             event, snapshot, suppress_auth=suppress_auth
         )
 
-        self.hs.get_handlers().presence_handler.bump_presence_active_time(
-            user
-        )
+        with PreserveLoggingContext():
+            self.hs.get_handlers().presence_handler.bump_presence_active_time(
+                user
+            )
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,

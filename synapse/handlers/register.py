@@ -69,7 +69,7 @@ class RegistrationHandler(BaseHandler):
                 password_hash=password_hash
             )
 
-            self.distributor.fire("registered_user", user)
+            yield self.distributor.fire("registered_user", user)
         else:
             # autogen a random user ID
             attempts = 0

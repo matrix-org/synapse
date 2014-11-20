@@ -177,8 +177,8 @@ class RoomMemberStore(SQLBaseStore):
         return self._get_members_query(clause, vals)
 
     def _get_members_query(self, where_clause, where_values):
-        return self._db_pool.runInteraction(
-            self._get_members_query_txn,
+        return self.runInteraction(
+            "get_members_query", self._get_members_query_txn,
             where_clause, where_values
         )
 

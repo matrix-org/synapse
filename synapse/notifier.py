@@ -17,6 +17,7 @@ from twisted.internet import defer
 
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.async import run_on_reactor
 
 import logging
 
@@ -96,6 +97,7 @@ class Notifier(object):
         listening to the room, and any listeners for the users in the
         `extra_users` param.
         """
+        yield run_on_reactor()
         room_id = event.room_id
 
         room_source = self.event_sources.sources["room"]
@@ -143,6 +145,7 @@ class Notifier(object):
 
         Will wake up all listeners for the given users and rooms.
         """
+        yield run_on_reactor()
         presence_source = self.event_sources.sources["presence"]
 
         listeners = set()

@@ -24,6 +24,7 @@ from .units import Transaction, Edu
 from .persistence import TransactionActions
 
 from synapse.util.logutils import log_function
+from synapse.util.logcontext import PreserveLoggingContext
 
 import logging
 
@@ -319,19 +320,20 @@ class ReplicationLayer(object):
 
         logger.debug("[%s] Transacition is new", transaction.transaction_id)
 
-        dl = []
-        for pdu in pdu_list:
-            dl.append(self._handle_new_pdu(transaction.origin, pdu))
+        with PreserveLoggingContext():
+            dl = []
+            for pdu in pdu_list:
+                dl.append(self._handle_new_pdu(transaction.origin, pdu))
 
-        if hasattr(transaction, "edus"):
-            for edu in [Edu(**x) for x in transaction.edus]:
-                self.received_edu(
-                    transaction.origin,
-                    edu.edu_type,
-                    edu.content
-                )
+            if hasattr(transaction, "edus"):
+                for edu in [Edu(**x) for x in transaction.edus]:
+                    self.received_edu(
+                        transaction.origin,
+                        edu.edu_type,
+                        edu.content
+                    )
 
-        results = yield defer.DeferredList(dl)
+            results = yield defer.DeferredList(dl)
 
         ret = []
         for r in results:
@@ -649,7 +651,8 @@ class _TransactionQueue(object):
                 (pdu, deferred, order)
             )
 
-            self._attempt_new_transaction(destination)
+            with PreserveLoggingContext():
+                self._attempt_new_transaction(destination)
 
             deferreds.append(deferred)
 
@@ -669,7 +672,9 @@ class _TransactionQueue(object):
                 deferred.errback(failure)
             else:
                 logger.exception("Failed to send edu", failure)
-        self._attempt_new_transaction(destination).addErrback(eb)
+
+        with PreserveLoggingContext():
+            self._attempt_new_transaction(destination).addErrback(eb)
 
         return deferred
 
