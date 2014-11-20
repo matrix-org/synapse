@@ -243,7 +243,7 @@ class MessageHandler(BaseHandler):
         public_room_ids = [r["room_id"] for r in public_rooms]
 
         limit = pagin_config.limit
-        if not limit:
+        if limit is None:
             limit = 10
 
         for event in room_list:
