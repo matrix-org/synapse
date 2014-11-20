@@ -32,14 +32,15 @@ logger = logging.getLogger(__name__)
 
 class SimpleHttpClient(object):
     """
-    A simple, no-frills HTTP client with methods that wrap up common ways of using HTTP in Matrix
+    A simple, no-frills HTTP client with methods that wrap up common ways of
+    using HTTP in Matrix
     """
     def __init__(self, hs):
         self.hs = hs
         # The default context factory in Twisted 14.0.0 (which we require) is
-        # BrowserLikePolicyForHTTPS which will do regular cert validation 'like a browser'
+        # BrowserLikePolicyForHTTPS which will do regular cert validation
+        # 'like a browser'
         self.agent = Agent(reactor)
-
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}):

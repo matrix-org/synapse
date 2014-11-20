@@ -23,7 +23,6 @@ import synapse.util.emailutils as emailutils
 
 import bcrypt
 import logging
-import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +100,9 @@ class LoginHandler(BaseHandler):
         data = yield httpCli.get_json(
             # TODO FIXME This should be configurable.
             # XXX: ID servers need to use HTTPS
-            "http://%s%s" % ("matrix.org:8090", "/_matrix/identity/api/v1/lookup"),
+            "http://%s%s" % (
+                "matrix.org:8090", "/_matrix/identity/api/v1/lookup"
+            ),
             {
                 'medium': 'email',
                 'address': email

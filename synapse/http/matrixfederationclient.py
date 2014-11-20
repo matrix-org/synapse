@@ -62,8 +62,8 @@ class MatrixFederationHttpAgent(_AgentBase):
 
 
 class MatrixFederationHttpClient(object):
-    """HTTP client used to talk to other homeservers over the federation protocol.
-    Send client certificates and signs requests.
+    """HTTP client used to talk to other homeservers over the federation
+    protocol. Send client certificates and signs requests.
 
     Attributes:
         agent (twisted.web.client.Agent): The twisted Agent used to send the

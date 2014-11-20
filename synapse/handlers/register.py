@@ -168,7 +168,10 @@ class RegistrationHandler(BaseHandler):
             defer.returnValue(None)
         data = yield httpCli.get_json(
             # XXX: This should be HTTPS
-            "http://%s%s" % (creds['idServer'], "/_matrix/identity/api/v1/3pid/getValidated3pid"),
+            "http://%s%s" % (
+                creds['idServer'],
+                "/_matrix/identity/api/v1/3pid/getValidated3pid"
+            ),
             {'sid': creds['sid'], 'clientSecret': creds['clientSecret']}
         )
 
@@ -183,7 +186,9 @@ class RegistrationHandler(BaseHandler):
         httpCli = SimpleHttpClient(self.hs)
         data = yield httpCli.post_urlencoded_get_json(
             # XXX: Change when ID servers are all HTTPS
-            "http://%s%s" % (creds['idServer'], "/_matrix/identity/api/v1/3pid/bind"),
+            "http://%s%s" % (
+                creds['idServer'], "/_matrix/identity/api/v1/3pid/bind"
+            ),
             {
                 'sid': creds['sid'],
                 'clientSecret': creds['clientSecret'],

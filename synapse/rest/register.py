@@ -261,7 +261,9 @@ class RegisterRestServlet(RestServlet):
         )
 
         if session[LoginType.EMAIL_IDENTITY]:
-            logger.debug("Binding emails %s to %s" % (session["threepidCreds"], user_id))
+            logger.debug("Binding emails %s to %s" % (
+                session["threepidCreds"], user_id)
+            )
             yield handler.bind_emails(user_id, session["threepidCreds"])
 
         result = {
