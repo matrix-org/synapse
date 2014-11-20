@@ -26,7 +26,7 @@ from twisted.web.server import Site
 from synapse.http.server import JsonResource, RootRedirect
 from synapse.http.content_repository import ContentRepoResource
 from synapse.http.server_key_resource import LocalKey
-from synapse.http.client import MatrixHttpClient
+from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
     SERVER_KEY_PREFIX,
@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 class SynapseHomeServer(HomeServer):
 
     def build_http_client(self):
-        return MatrixHttpClient(self)
+        return MatrixFederationHttpClient(self)
 
     def build_resource_for_client(self):
         return JsonResource()

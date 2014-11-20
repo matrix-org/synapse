@@ -22,7 +22,7 @@ from synapse.api.errors import (
 )
 from ._base import BaseHandler
 import synapse.util.stringutils as stringutils
-from synapse.http.client import IdentityServerHttpClient
+from synapse.http.client import SimpleHttpClient
 from synapse.http.client import CaptchaServerHttpClient
 
 import base64
@@ -133,7 +133,7 @@ class RegistrationHandler(BaseHandler):
 
             if not threepid:
                 raise RegistrationError(400, "Couldn't validate 3pid")
-            logger.info("got threepid medium %s address %s",
+            logger.info("got threepid with medium '%s' and address '%s'",
                         threepid['medium'], threepid['address'])
 
     @defer.inlineCallbacks
@@ -159,7 +159,7 @@ class RegistrationHandler(BaseHandler):
     def _threepid_from_creds(self, creds):
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
-        httpCli = IdentityServerHttpClient(self.hs)
+        httpCli = SimpleHttpClient(self.hs)
         # XXX: make this configurable!
         trustedIdServers = ['matrix.org:8090']
         if not creds['idServer'] in trustedIdServers:
@@ -167,8 +167,8 @@ class RegistrationHandler(BaseHandler):
                         'credentials', creds['idServer'])
             defer.returnValue(None)
         data = yield httpCli.get_json(
-            creds['idServer'],
-            "/_matrix/identity/api/v1/3pid/getValidated3pid",
+            # XXX: This should be HTTPS
+            "http://%s%s" % (creds['idServer'], "/_matrix/identity/api/v1/3pid/getValidated3pid"),
             {'sid': creds['sid'], 'clientSecret': creds['clientSecret']}
         )
 
@@ -178,16 +178,19 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _bind_threepid(self, creds, mxid):
-        httpCli = IdentityServerHttpClient(self.hs)
+        yield
+        logger.debug("binding threepid")
+        httpCli = SimpleHttpClient(self.hs)
         data = yield httpCli.post_urlencoded_get_json(
-            creds['idServer'],
-            "/_matrix/identity/api/v1/3pid/bind",
+            # XXX: Change when ID servers are all HTTPS
+            "http://%s%s" % (creds['idServer'], "/_matrix/identity/api/v1/3pid/bind"),
             {
                 'sid': creds['sid'],
                 'clientSecret': creds['clientSecret'],
                 'mxid': mxid,
             }
         )
+        logger.debug("bound threepid")
         defer.returnValue(data)
 
     @defer.inlineCallbacks
@@ -215,10 +218,7 @@ class RegistrationHandler(BaseHandler):
         # each request
         client = CaptchaServerHttpClient(self.hs)
         data = yield client.post_urlencoded_get_raw(
-            "www.google.com:80",
-            "/recaptcha/api/verify",
-            # twisted dislikes google's response, no content length.
-            accept_partial=True,
+            "http://www.google.com:80/recaptcha/api/verify",
             args={
                 'privatekey': private_key,
                 'remoteip': ip_addr,
