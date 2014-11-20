@@ -154,15 +154,80 @@ class BaseHttpClient(object):
         defer.returnValue(response)
 
 
-class MatrixHttpClient(BaseHttpClient):
-    """ Wrapper around the twisted HTTP client api. Implements
+class SimpleHttpClient(BaseHttpClient):
+    """
+    A simple, no-frills HTTP client with methods that wrap up common ways of using HTTP in Matrix
+    """
+    def _getEndpoint(self, reactor, destination):
+        return matrix_endpoint(reactor, destination, timeout=10)
+
+    @defer.inlineCallbacks
+    def post_urlencoded_get_json(self, destination, path, args={}):
+        logger.debug("post_urlencoded_get_json args: %s", args)
+        query_bytes = urllib.urlencode(args, True)
+
+        def body_callback(method, url_bytes, headers_dict):
+            return FileBodyProducer(StringIO(query_bytes))
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "POST",
+            path.encode("ascii"),
+            body_callback=body_callback,
+            headers_dict={
+                "Content-Type": ["application/x-www-form-urlencoded"]
+            }
+        )
+
+        body = yield readBody(response)
+
+        defer.returnValue(json.loads(body))
+
+    @defer.inlineCallbacks
+    def get_json(self, destination, path, args={}, retry_on_dns_fail=True):
+        """ Get's some json from the given host and path
+
+        Args:
+            destination (str): The remote server to send the HTTP request to.
+            path (str): The HTTP path.
+            args (dict): A dictionary used to create query strings, defaults to
+                None.
+                **Note**: The value of each key is assumed to be an iterable
+                and *not* a string.
+
+        Returns:
+            Deferred: Succeeds when we get *any* HTTP response.
+
+            The result of the deferred is a tuple of `(code, response)`,
+            where `response` is a dict representing the decoded JSON body.
+        """
+        logger.debug("get_json args: %s", args)
+
+        query_bytes = urllib.urlencode(args, True)
+        logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "GET",
+            path.encode("ascii"),
+            query_bytes=query_bytes,
+            retry_on_dns_fail=retry_on_dns_fail,
+            body_callback=None
+        )
+
+        body = yield readBody(response)
+
+        defer.returnValue(json.loads(body))
+
+
+class MatrixFederationHttpClient(BaseHttpClient):
+    """HTTP client used to talk to other homeservers over the federation protocol.
+    Send client certificates and signs requests.
 
     Attributes:
         agent (twisted.web.client.Agent): The twisted Agent used to send the
             requests.
     """
-
-    RETRY_DNS_LOOKUP_FAILURES = "__retry_dns"
 
     def __init__(self, hs):
         self.signing_key = hs.config.signing_key[0]
@@ -293,83 +358,17 @@ class MatrixHttpClient(BaseHttpClient):
         )
 
 
-class IdentityServerHttpClient(BaseHttpClient):
-    """Separate HTTP client for talking to the Identity servers since they
-    don't use SRV records and talk x-www-form-urlencoded rather than JSON.
-    """
-    def _getEndpoint(self, reactor, destination):
-        #TODO: This should be talking TLS
-        return matrix_endpoint(reactor, destination, timeout=10)
-
-    @defer.inlineCallbacks
-    def post_urlencoded_get_json(self, destination, path, args={}):
-        logger.debug("post_urlencoded_get_json args: %s", args)
-        query_bytes = urllib.urlencode(args, True)
-
-        def body_callback(method, url_bytes, headers_dict):
-            return FileBodyProducer(StringIO(query_bytes))
-
-        response = yield self._create_request(
-            destination.encode("ascii"),
-            "POST",
-            path.encode("ascii"),
-            body_callback=body_callback,
-            headers_dict={
-                "Content-Type": ["application/x-www-form-urlencoded"]
-            }
-        )
-
-        body = yield readBody(response)
-
-        defer.returnValue(json.loads(body))
-
-    @defer.inlineCallbacks
-    def get_json(self, destination, path, args={}, retry_on_dns_fail=True):
-        """ Get's some json from the given host homeserver and path
-
-        Args:
-            destination (str): The remote server to send the HTTP request
-                to.
-            path (str): The HTTP path.
-            args (dict): A dictionary used to create query strings, defaults to
-                None.
-                **Note**: The value of each key is assumed to be an iterable
-                and *not* a string.
-
-        Returns:
-            Deferred: Succeeds when we get *any* HTTP response.
-
-            The result of the deferred is a tuple of `(code, response)`,
-            where `response` is a dict representing the decoded JSON body.
-        """
-        logger.debug("get_json args: %s", args)
-
-        query_bytes = urllib.urlencode(args, True)
-        logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
-
-        response = yield self._create_request(
-            destination.encode("ascii"),
-            "GET",
-            path.encode("ascii"),
-            query_bytes=query_bytes,
-            retry_on_dns_fail=retry_on_dns_fail,
-            body_callback=None
-        )
-
-        body = yield readBody(response)
-
-        defer.returnValue(json.loads(body))
-
-
 class CaptchaServerHttpClient(BaseHttpClient):
-    """Separate HTTP client for talking to google's captcha servers"""
+    """
+    Separate HTTP client for talking to google's captcha servers
+    Only slightly special because accepts partial download responses
+    """
 
     def _getEndpoint(self, reactor, destination):
         return matrix_endpoint(reactor, destination, timeout=10)
 
     @defer.inlineCallbacks
-    def post_urlencoded_get_raw(self, destination, path, accept_partial=False,
-                                args={}):
+    def post_urlencoded_get_raw(self, destination, path, args={}):
         query_bytes = urllib.urlencode(args, True)
 
         def body_callback(method, url_bytes, headers_dict):
@@ -389,10 +388,7 @@ class CaptchaServerHttpClient(BaseHttpClient):
             body = yield readBody(response)
             defer.returnValue(body)
         except PartialDownloadError as e:
-            if accept_partial:
-                defer.returnValue(e.response)
-            else:
-                raise e
+            defer.returnValue(e.response)
 
 
 def _print_ex(e):
