@@ -361,7 +361,7 @@ class IdentityServerHttpClient(BaseHttpClient):
         defer.returnValue(json.loads(body))
 
 
-class CaptchaServerHttpClient(MatrixHttpClient):
+class CaptchaServerHttpClient(BaseHttpClient):
     """Separate HTTP client for talking to google's captcha servers"""
 
     def _getEndpoint(self, reactor, destination):
