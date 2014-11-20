@@ -22,7 +22,7 @@ from synapse.api.errors import (
 )
 from ._base import BaseHandler
 import synapse.util.stringutils as stringutils
-from synapse.http.client import IdentityServerHttpClient
+from synapse.http.client import SimpleHttpClient
 from synapse.http.client import CaptchaServerHttpClient
 
 import base64
@@ -159,7 +159,7 @@ class RegistrationHandler(BaseHandler):
     def _threepid_from_creds(self, creds):
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
-        httpCli = IdentityServerHttpClient(self.hs)
+        httpCli = SimpleHttpClient(self.hs)
         # XXX: make this configurable!
         trustedIdServers = ['matrix.org:8090']
         if not creds['idServer'] in trustedIdServers:
@@ -178,7 +178,7 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _bind_threepid(self, creds, mxid):
-        httpCli = IdentityServerHttpClient(self.hs)
+        httpCli = SimpleHttpClient(self.hs)
         data = yield httpCli.post_urlencoded_get_json(
             creds['idServer'],
             "/_matrix/identity/api/v1/3pid/bind",
@@ -217,8 +217,6 @@ class RegistrationHandler(BaseHandler):
         data = yield client.post_urlencoded_get_raw(
             "www.google.com:80",
             "/recaptcha/api/verify",
-            # twisted dislikes google's response, no content length.
-            accept_partial=True,
             args={
                 'privatekey': private_key,
                 'remoteip': ip_addr,
