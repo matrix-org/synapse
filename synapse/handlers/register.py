@@ -133,7 +133,7 @@ class RegistrationHandler(BaseHandler):
 
             if not threepid:
                 raise RegistrationError(400, "Couldn't validate 3pid")
-            logger.info("got threepid medium %s address %s",
+            logger.info("got threepid with medium '%s' and address '%s'",
                         threepid['medium'], threepid['address'])
 
     @defer.inlineCallbacks
@@ -167,8 +167,8 @@ class RegistrationHandler(BaseHandler):
                         'credentials', creds['idServer'])
             defer.returnValue(None)
         data = yield httpCli.get_json(
-            creds['idServer'],
-            "/_matrix/identity/api/v1/3pid/getValidated3pid",
+            # XXX: This should be HTTPS
+            "http://%s%s" % (creds['idServer'], "/_matrix/identity/api/v1/3pid/getValidated3pid"),
             {'sid': creds['sid'], 'clientSecret': creds['clientSecret']}
         )
 
@@ -178,16 +178,19 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _bind_threepid(self, creds, mxid):
+        yield
+        logger.debug("binding threepid")
         httpCli = SimpleHttpClient(self.hs)
         data = yield httpCli.post_urlencoded_get_json(
-            creds['idServer'],
-            "/_matrix/identity/api/v1/3pid/bind",
+            # XXX: Change when ID servers are all HTTPS
+            "http://%s%s" % (creds['idServer'], "/_matrix/identity/api/v1/3pid/bind"),
             {
                 'sid': creds['sid'],
                 'clientSecret': creds['clientSecret'],
                 'mxid': mxid,
             }
         )
+        logger.debug("bound threepid")
         defer.returnValue(data)
 
     @defer.inlineCallbacks
@@ -215,8 +218,7 @@ class RegistrationHandler(BaseHandler):
         # each request
         client = CaptchaServerHttpClient(self.hs)
         data = yield client.post_urlencoded_get_raw(
-            "www.google.com:80",
-            "/recaptcha/api/verify",
+            "http://www.google.com:80/recaptcha/api/verify",
             args={
                 'privatekey': private_key,
                 'remoteip': ip_addr,
