@@ -83,6 +83,8 @@ class SynapseEvent(JsonEncodedObject):
         "content",
     ]
 
+    outlier = False
+
     def __init__(self, raises=True, **kwargs):
         super(SynapseEvent, self).__init__(**kwargs)
         # if "content" in kwargs:

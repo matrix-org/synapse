@@ -57,7 +57,7 @@ class LoggingTransaction(object):
             if args and args[0]:
                 values = args[0]
                 sql_logger.debug(
-                    "[SQL values] {%s} " + ", ".join(("<%s>",) * len(values)),
+                    "[SQL values] {%s} " + ", ".join(("<%r>",) * len(values)),
                     self.name,
                     *values
                 )

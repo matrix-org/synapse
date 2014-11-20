@@ -1,6 +1,8 @@
 import threading
 import logging
 
+logger = logging.getLogger(__name__)
+
 
 class LoggingContext(object):
     """Additional context for log formatting. Contexts are scoped within a
@@ -53,7 +55,7 @@ class LoggingContext(object):
             None to avoid suppressing any exeptions that were thrown.
         """
         if self.thread_local.current_context is not self:
-            logging.error(
+            logger.error(
                 "Current logging context %s is not the expected context %s",
                 self.thread_local.current_context,
                 self
