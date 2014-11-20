@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     """Check whether the hash for this PDU matches the contents"""
     computed_hash = _compute_content_hash(event, hash_algorithm)
-    logging.debug("Expecting hash: %s", encode_base64(computed_hash.digest()))
+    logger.debug("Expecting hash: %s", encode_base64(computed_hash.digest()))
     if computed_hash.name not in event.hashes:
         raise SynapseError(
             400,

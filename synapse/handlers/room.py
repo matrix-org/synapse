@@ -178,7 +178,9 @@ class RoomCreationHandler(BaseHandler):
 
         if room_alias:
             result["room_alias"] = room_alias.to_string()
-            directory_handler.send_room_alias_update_event(user_id, room_id)
+            yield directory_handler.send_room_alias_update_event(
+                user_id, room_id
+            )
 
         defer.returnValue(result)
 
@@ -210,7 +212,6 @@ class RoomCreationHandler(BaseHandler):
             },
             **event_keys
         )
-
 
         power_levels_event = self.event_factory.create_event(
             etype=RoomPowerLevelsEvent.TYPE,
@@ -480,7 +481,7 @@ class RoomMemberHandler(BaseHandler):
             )
 
         user = self.hs.parse_userid(event.user_id)
-        self.distributor.fire(
+        yield self.distributor.fire(
             "user_joined_room", user=user, room_id=room_id
         )
 

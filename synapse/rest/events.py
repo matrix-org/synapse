@@ -26,7 +26,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-
 class EventStreamRestServlet(RestServlet):
     PATTERN = client_path_pattern("/events$")
 

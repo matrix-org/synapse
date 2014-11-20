@@ -138,8 +138,7 @@ class JsonResource(HttpServer, resource.Resource):
             )
         except CodeMessageException as e:
             if isinstance(e, SynapseError):
-                logger.error("%s SynapseError: %s - %s", request, e.code,
-                             e.msg)
+                logger.info("%s SynapseError: %s - %s", request, e.code, e.msg)
             else:
                 logger.exception(e)
             self._send_response(

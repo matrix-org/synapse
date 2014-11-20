@@ -24,6 +24,7 @@ from .units import Transaction, Edu
 from .persistence import TransactionActions
 
 from synapse.util.logutils import log_function
+from synapse.util.logcontext import PreserveLoggingContext
 
 import logging
 
@@ -319,19 +320,20 @@ class ReplicationLayer(object):
 
         logger.debug("[%s] Transacition is new", transaction.transaction_id)
 
-        dl = []
-        for pdu in pdu_list:
-            dl.append(self._handle_new_pdu(transaction.origin, pdu))
+        with PreserveLoggingContext():
+            dl = []
+            for pdu in pdu_list:
+                dl.append(self._handle_new_pdu(transaction.origin, pdu))
 
-        if hasattr(transaction, "edus"):
-            for edu in [Edu(**x) for x in transaction.edus]:
-                self.received_edu(
-                    transaction.origin,
-                    edu.edu_type,
-                    edu.content
-                )
+            if hasattr(transaction, "edus"):
+                for edu in [Edu(**x) for x in transaction.edus]:
+                    self.received_edu(
+                        transaction.origin,
+                        edu.edu_type,
+                        edu.content
+                    )
 
-        results = yield defer.DeferredList(dl)
+            results = yield defer.DeferredList(dl)
 
         ret = []
         for r in results:
@@ -425,7 +427,9 @@ class ReplicationLayer(object):
         time_now = self._clock.time_msec()
         defer.returnValue((200, {
             "state": [p.get_pdu_json(time_now) for p in res_pdus["state"]],
-            "auth_chain": [p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]],
+            "auth_chain": [
+                p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]
+            ],
         }))
 
     @defer.inlineCallbacks
@@ -436,7 +440,9 @@ class ReplicationLayer(object):
             (
                 200,
                 {
-                    "auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus],
+                    "auth_chain": [
+                        a.get_pdu_json(time_now) for a in auth_pdus
+                    ],
                 }
             )
         )
@@ -457,7 +463,7 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     def send_join(self, destination, pdu):
-        time_now  = self._clock.time_msec()
+        time_now = self._clock.time_msec()
         _, content = yield self.transport_layer.send_join(
             destination,
             pdu.room_id,
@@ -649,7 +655,8 @@ class _TransactionQueue(object):
                 (pdu, deferred, order)
             )
 
-            self._attempt_new_transaction(destination)
+            with PreserveLoggingContext():
+                self._attempt_new_transaction(destination)
 
             deferreds.append(deferred)
 
@@ -669,7 +676,9 @@ class _TransactionQueue(object):
                 deferred.errback(failure)
             else:
                 logger.exception("Failed to send edu", failure)
-        self._attempt_new_transaction(destination).addErrback(eb)
+
+        with PreserveLoggingContext():
+            self._attempt_new_transaction(destination).addErrback(eb)
 
         return deferred
 

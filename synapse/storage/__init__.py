@@ -508,7 +508,7 @@ def prepare_database(db_conn):
                 "new for the server to understand"
             )
         elif user_version < SCHEMA_VERSION:
-            logging.info(
+            logger.info(
                 "Upgrading database from version %d",
                 user_version
             )

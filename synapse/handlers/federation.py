@@ -122,7 +122,8 @@ class FederationHandler(BaseHandler):
                 event.origin, redacted_pdu_json
             )
         except SynapseError as e:
-            logger.warn("Signature check failed for %s redacted to %s",
+            logger.warn(
+                "Signature check failed for %s redacted to %s",
                 encode_canonical_json(pdu.get_pdu_json()),
                 encode_canonical_json(redacted_pdu_json),
             )
@@ -209,7 +210,7 @@ class FederationHandler(BaseHandler):
         if event.type == RoomMemberEvent.TYPE:
             if event.membership == Membership.JOIN:
                 user = self.hs.parse_userid(event.state_key)
-                self.distributor.fire(
+                yield self.distributor.fire(
                     "user_joined_room", user=user, room_id=event.room_id
                 )
 
@@ -390,7 +391,8 @@ class FederationHandler(BaseHandler):
 
         event.outlier = False
 
-        is_new_state = yield self.state_handler.annotate_event_with_state(event)
+        state_handler = self.state_handler
+        is_new_state = yield state_handler.annotate_event_with_state(event)
         self.auth.check(event, raises=True)
 
         # FIXME (erikj):  All this is duplicated above :(
@@ -414,7 +416,7 @@ class FederationHandler(BaseHandler):
         if event.type == RoomMemberEvent.TYPE:
             if event.membership == Membership.JOIN:
                 user = self.hs.parse_userid(event.state_key)
-                self.distributor.fire(
+                yield self.distributor.fire(
                     "user_joined_room", user=user, room_id=event.room_id
                 )
 

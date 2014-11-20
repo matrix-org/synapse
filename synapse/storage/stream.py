@@ -213,8 +213,8 @@ class StreamStore(SQLBaseStore):
         # Tokens really represent positions between elements, but we use
         # the convention of pointing to the event before the gap. Hence
         # we have a bit of asymmetry when it comes to equalities.
-        from_comp = '<=' if direction =='b' else '>'
-        to_comp = '>' if direction =='b' else '<='
+        from_comp = '<=' if direction == 'b' else '>'
+        to_comp = '>' if direction == 'b' else '<='
         order = "DESC" if direction == 'b' else "ASC"
 
         args = [room_id]
@@ -235,9 +235,10 @@ class StreamStore(SQLBaseStore):
         )
 
         sql = (
-            "SELECT *, (%(redacted)s) AS redacted FROM events "
-            "WHERE outlier = 0 AND room_id = ? AND %(bounds)s "
-            "ORDER BY topological_ordering %(order)s, stream_ordering %(order)s %(limit)s "
+            "SELECT *, (%(redacted)s) AS redacted FROM events"
+            " WHERE outlier = 0 AND room_id = ? AND %(bounds)s"
+            " ORDER BY topological_ordering %(order)s,"
+            " stream_ordering %(order)s %(limit)s"
         ) % {
             "redacted": del_sql,
             "bounds": bounds,

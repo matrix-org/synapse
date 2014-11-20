@@ -75,7 +75,9 @@ class RegistrationStore(SQLBaseStore):
                         "VALUES (?,?,?)",
                         [user_id, password_hash, now])
         except IntegrityError:
-            raise StoreError(400, "User ID already taken.", errcode=Codes.USER_IN_USE)
+            raise StoreError(
+                400, "User ID already taken.", errcode=Codes.USER_IN_USE
+            )
 
         # it's possible for this to get a conflict, but only for a single user
         # since tokens are namespaced based on their user ID
@@ -83,8 +85,8 @@ class RegistrationStore(SQLBaseStore):
                     "VALUES (?,?)", [txn.lastrowid, token])
 
     def get_user_by_id(self, user_id):
-        query = ("SELECT users.name, users.password_hash FROM users "
-                "WHERE users.name = ?")
+        query = ("SELECT users.name, users.password_hash FROM users"
+                 " WHERE users.name = ?")
         return self._execute(
             self.cursor_to_dict,
             query, user_id
@@ -120,10 +122,10 @@ class RegistrationStore(SQLBaseStore):
 
     def _query_for_auth(self, txn, token):
         sql = (
-            "SELECT users.name, users.admin, access_tokens.device_id "
-            "FROM users "
-            "INNER JOIN access_tokens on users.id = access_tokens.user_id "
-            "WHERE token = ?"
+            "SELECT users.name, users.admin, access_tokens.device_id"
+            " FROM users"
+            " INNER JOIN access_tokens on users.id = access_tokens.user_id"
+            " WHERE token = ?"
         )
 
         cursor = txn.execute(sql, (token,))

@@ -116,7 +116,7 @@ class SynapseHomeServer(HomeServer):
         # extra resources to existing nodes. See self._resource_id for the key.
         resource_mappings = {}
         for (full_path, resource) in desired_tree:
-            logging.info("Attaching %s to path %s", resource, full_path)
+            logger.info("Attaching %s to path %s", resource, full_path)
             last_resource = self.root_resource
             for path_seg in full_path.split('/')[1:-1]:
                 if not path_seg in last_resource.listNames():
@@ -221,12 +221,12 @@ def setup():
 
     db_name = hs.get_db_name()
 
-    logging.info("Preparing database: %s...", db_name)
+    logger.info("Preparing database: %s...", db_name)
 
     with sqlite3.connect(db_name) as db_conn:
         prepare_database(db_conn)
 
-    logging.info("Database prepared in %s.", db_name)
+    logger.info("Database prepared in %s.", db_name)
 
     hs.get_db_pool()
 
@@ -257,13 +257,16 @@ def setup():
     else:
         reactor.run()
 
+
 def run():
     with LoggingContext("run"):
         reactor.run()
 
+
 def main():
     with LoggingContext("main"):
         setup()
+
 
 if __name__ == '__main__':
     main()
