@@ -27,8 +27,8 @@ import random
 logger = logging.getLogger(__name__)
 
 
-def matrix_endpoint(reactor, destination, ssl_context_factory=None,
-                    timeout=None):
+def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
+                               timeout=None):
     """Construct an endpoint for the given matrix destination.
 
     Args:

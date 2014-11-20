@@ -17,7 +17,7 @@
 from twisted.web.http import HTTPClient
 from twisted.internet.protocol import Factory
 from twisted.internet import defer, reactor
-from synapse.http.endpoint import matrix_endpoint
+from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util.logcontext import PreserveLoggingContext
 import json
 import logging
@@ -31,7 +31,7 @@ def fetch_server_key(server_name, ssl_context_factory):
     """Fetch the keys for a remote server."""
 
     factory = SynapseKeyClientFactory()
-    endpoint = matrix_endpoint(
+    endpoint = matrix_federation_endpoint(
         reactor, server_name, ssl_context_factory, timeout=30
     )
 
@@ -48,7 +48,7 @@ def fetch_server_key(server_name, ssl_context_factory):
 
 
 class SynapseKeyClientError(Exception):
-    """The key wasn't retireved from the remote server."""
+    """The key wasn't retrieved from the remote server."""
     pass
 
 
