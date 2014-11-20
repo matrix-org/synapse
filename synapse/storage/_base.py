@@ -57,7 +57,7 @@ class LoggingTransaction(object):
             if args and args[0]:
                 values = args[0]
                 sql_logger.debug(
-                    "[SQL values] {%s} " + ", ".join(("<%s>",) * len(values)),
+                    "[SQL values] {%s} " + ", ".join(("<%r>",) * len(values)),
                     self.name,
                     *values
                 )
@@ -91,6 +91,7 @@ class SQLBaseStore(object):
     def runInteraction(self, desc, func, *args, **kwargs):
         """Wraps the .runInteraction() method on the underlying db_pool."""
         current_context = LoggingContext.current_context()
+
         def inner_func(txn, *args, **kwargs):
             with LoggingContext("runInteraction") as context:
                 current_context.copy_to(context)
@@ -115,7 +116,6 @@ class SQLBaseStore(object):
                         "[TXN END] {%s} %f",
                         name, end - start
                     )
-
         with PreserveLoggingContext():
             result = yield self._db_pool.runInteraction(
                 inner_func, *args, **kwargs

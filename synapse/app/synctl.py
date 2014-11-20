@@ -21,11 +21,12 @@ import signal
 
 SYNAPSE = ["python", "-m", "synapse.app.homeserver"]
 
-CONFIGFILE="homeserver.yaml"
-PIDFILE="homeserver.pid"
+CONFIGFILE = "homeserver.yaml"
+PIDFILE = "homeserver.pid"
 
-GREEN="\x1b[1;32m"
-NORMAL="\x1b[m"
+GREEN = "\x1b[1;32m"
+NORMAL = "\x1b[m"
+
 
 def start():
     if not os.path.exists(CONFIGFILE):
@@ -43,11 +44,13 @@ def start():
     subprocess.check_call(args)
     print GREEN + "started" + NORMAL
 
+
 def stop():
     if os.path.exists(PIDFILE):
         pid = int(open(PIDFILE).read())
         os.kill(pid, signal.SIGTERM)
         print GREEN + "stopped" + NORMAL
+
 
 def main():
     action = sys.argv[1] if sys.argv[1:] else "usage"
@@ -62,5 +65,6 @@ def main():
         sys.stderr.write("Usage: %s [start|stop|restart]\n" % (sys.argv[0],))
         sys.exit(1)
 
-if __name__=='__main__':
+
+if __name__ == "__main__":
     main()

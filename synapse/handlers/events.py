@@ -56,7 +56,7 @@ class EventStreamHandler(BaseHandler):
                     self.clock.cancel_call_later(
                         self._stop_timer_per_user.pop(auth_user))
                 else:
-                    self.distributor.fire(
+                    yield self.distributor.fire(
                         "started_user_eventstream", auth_user
                     )
             self._streams_per_user[auth_user] += 1
@@ -65,8 +65,10 @@ class EventStreamHandler(BaseHandler):
                 pagin_config.from_token = None
 
             rm_handler = self.hs.get_handlers().room_member_handler
+            logger.debug("BETA")
             room_ids = yield rm_handler.get_rooms_for_user(auth_user)
 
+            logger.debug("ALPHA")
             with PreserveLoggingContext():
                 events, tokens = yield self.notifier.get_events_for(
                     auth_user, room_ids, pagin_config, timeout
@@ -93,7 +95,7 @@ class EventStreamHandler(BaseHandler):
                     logger.debug(
                         "_later stopped_user_eventstream %s", auth_user
                     )
-                    self.distributor.fire(
+                    yield self.distributor.fire(
                         "stopped_user_eventstream", auth_user
                     )
                     del self._stop_timer_per_user[auth_user]

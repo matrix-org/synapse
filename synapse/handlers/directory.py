@@ -128,8 +128,9 @@ class DirectoryHandler(BaseHandler):
                 "servers": result.servers,
             })
         else:
-            raise SynapseError(404, "Room alias \"%s\" not found" % (room_alias,))
-
+            raise SynapseError(
+                404, "Room alias \"%s\" not found" % (room_alias,)
+            )
 
     @defer.inlineCallbacks
     def send_room_alias_update_event(self, user_id, room_id):
