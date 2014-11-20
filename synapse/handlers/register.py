@@ -217,8 +217,6 @@ class RegistrationHandler(BaseHandler):
         data = yield client.post_urlencoded_get_raw(
             "www.google.com:80",
             "/recaptcha/api/verify",
-            # twisted dislikes google's response, no content length.
-            accept_partial=True,
             args={
                 'privatekey': private_key,
                 'remoteip': ip_addr,
