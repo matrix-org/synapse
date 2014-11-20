@@ -1,3 +1,27 @@
+Changes in synapse 0.5.0 (2014-11-19)
+=====================================
+This release includes changes to the federation protocol and client-server API
+that is not backwards compatible.
+
+This release also changes the internal database schemas and so requires servers to
+drop their current history. See UPGRADES.rst for details.
+
+Homeserver:
+ * Add authentication and authorization to the federation protocol. Events are
+   now signed by their originating homeservers.
+ * Implement the new authorization model for rooms.
+ * Split out web client into a seperate repository: matrix-angular-sdk.
+ * Change the structure of PDUs.
+ * Fix bug where user could not join rooms via an alias containing 4-byte
+   UTF-8 characters.
+ * Merge concept of PDUs and Events internally.
+ * Improve logging by adding request ids to log lines.
+ * Implement a very basic room initial sync API.
+ * Implement the new invite/join federation APIs.
+
+Webclient:
+ * The webclient has been moved to a seperate repository.
+
 Changes in synapse 0.4.2 (2014-10-31)
 =====================================
 
