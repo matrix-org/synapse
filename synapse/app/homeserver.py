@@ -257,13 +257,16 @@ def setup():
     else:
         reactor.run()
 
+
 def run():
     with LoggingContext("run"):
         reactor.run()
 
+
 def main():
     with LoggingContext("main"):
         setup()
+
 
 if __name__ == '__main__':
     main()

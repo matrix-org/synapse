@@ -427,7 +427,9 @@ class ReplicationLayer(object):
         time_now = self._clock.time_msec()
         defer.returnValue((200, {
             "state": [p.get_pdu_json(time_now) for p in res_pdus["state"]],
-            "auth_chain": [p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]],
+            "auth_chain": [
+                p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]
+            ],
         }))
 
     @defer.inlineCallbacks
@@ -438,7 +440,9 @@ class ReplicationLayer(object):
             (
                 200,
                 {
-                    "auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus],
+                    "auth_chain": [
+                        a.get_pdu_json(time_now) for a in auth_pdus
+                    ],
                 }
             )
         )
@@ -459,7 +463,7 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     def send_join(self, destination, pdu):
-        time_now  = self._clock.time_msec()
+        time_now = self._clock.time_msec()
         _, content = yield self.transport_layer.send_join(
             destination,
             pdu.room_id,

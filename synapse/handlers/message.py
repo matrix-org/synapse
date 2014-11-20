@@ -298,7 +298,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def room_initial_sync(self, user_id, room_id, pagin_config=None,
-                      feedback=False):
+                          feedback=False):
         yield self.auth.check_joined_room(room_id, user_id)
 
         # TODO(paul): I wish I was called with user objects not user_id
@@ -342,8 +342,8 @@ class MessageHandler(BaseHandler):
                 )
                 presence.append(member_presence)
             except Exception:
-                logger.exception("Failed to get member presence of %r",
-                    m.user_id
+                logger.exception(
+                    "Failed to get member presence of %r", m.user_id
                 )
 
         defer.returnValue({

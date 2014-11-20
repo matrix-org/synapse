@@ -214,6 +214,7 @@ class Notifier(object):
             timeout,
             deferred,
         )
+
         def _timeout_listener():
             # TODO (erikj): We should probably set to_token to the current
             # max rather than reusing from_token.

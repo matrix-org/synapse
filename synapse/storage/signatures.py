@@ -36,7 +36,7 @@ class SignatureStore(SQLBaseStore):
         return dict(txn.fetchall())
 
     def _store_event_content_hash_txn(self, txn, event_id, algorithm,
-                                    hash_bytes):
+                                      hash_bytes):
         """Store a hash for a Event
         Args:
             txn (cursor):
@@ -84,7 +84,7 @@ class SignatureStore(SQLBaseStore):
         return dict(txn.fetchall())
 
     def _store_event_reference_hash_txn(self, txn, event_id, algorithm,
-                                      hash_bytes):
+                                        hash_bytes):
         """Store a hash for a PDU
         Args:
             txn (cursor):
@@ -127,7 +127,7 @@ class SignatureStore(SQLBaseStore):
         return res
 
     def _store_event_signature_txn(self, txn, event_id, signature_name, key_id,
-                                          signature_bytes):
+                                   signature_bytes):
         """Store a signature from the origin server for a PDU.
         Args:
             txn (cursor):
@@ -169,7 +169,7 @@ class SignatureStore(SQLBaseStore):
         return results
 
     def _store_prev_event_hash_txn(self, txn, event_id, prev_event_id,
-                                 algorithm, hash_bytes):
+                                   algorithm, hash_bytes):
         self._simple_insert_txn(
             txn,
             "event_edge_hashes",
