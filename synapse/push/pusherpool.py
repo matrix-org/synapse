@@ -45,7 +45,9 @@ class PusherPool:
             "device_display_name": device_display_name,
             "pushkey": pushkey,
             "data": data,
-            "last_token": None
+            "last_token": None,
+            "last_success": None,
+            "failing_since": None
         })
         self._add_pusher_to_store(user_name, kind, app, app_display_name, device_display_name, pushkey, data)
 
@@ -69,7 +71,9 @@ class PusherPool:
                                device_display_name=pusherdict['device_display_name'],
                                pushkey=pusherdict['pushkey'],
                                data=pusherdict['data'],
-                               last_token=pusherdict['last_token']
+                               last_token=pusherdict['last_token'],
+                               last_success=pusherdict['last_success'],
+                               failing_since=pusherdict['failing_since']
                                )
         else:
             raise PusherConfigException("Unknown pusher type '%s' for user %s" %

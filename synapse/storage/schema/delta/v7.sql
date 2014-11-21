@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS pushers (
   pushkey blob NOT NULL,
   data text,
   last_token TEXT,
+  last_success BIGINT,
+  failing_since BIGINT,
   FOREIGN KEY(user_name) REFERENCES users(name),
   UNIQUE (user_name, pushkey)
 );

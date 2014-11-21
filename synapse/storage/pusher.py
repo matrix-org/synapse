@@ -29,7 +29,8 @@ class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_all_pushers_after_id(self, min_id):
         sql = (
-            "SELECT id, user_name, kind, app, app_display_name, device_display_name, pushkey, data, last_token "
+            "SELECT id, user_name, kind, app, app_display_name, device_display_name, pushkey, data, "
+            "last_token, last_success, failing_since "
             "FROM pushers "
             "WHERE id > ?"
         )
@@ -46,8 +47,9 @@ class PusherStore(SQLBaseStore):
                 "device_display_name": r[5],
                 "pushkey": r[6],
                 "data": r[7],
-                "last_token": r[8]
-
+                "last_token": r[8],
+                "last_success": r[9],
+                "failing_since": r[10]
             }
             for r in rows
         ]
@@ -79,6 +81,20 @@ class PusherStore(SQLBaseStore):
                                       {'last_token': last_token}
         )
 
+    @defer.inlineCallbacks
+    def update_pusher_last_token_and_success(self, user_name, pushkey, last_token, last_success):
+        yield self._simple_update_one(PushersTable.table_name,
+                                      {'user_name': user_name, 'pushkey': pushkey},
+                                      {'last_token': last_token, 'last_success': last_success}
+        )
+
+    @defer.inlineCallbacks
+    def update_pusher_failing_since(self, user_name, pushkey, failing_since):
+        yield self._simple_update_one(PushersTable.table_name,
+                                      {'user_name': user_name, 'pushkey': pushkey},
+                                      {'failing_since': failing_since}
+        )
+
 
 class PushersTable(Table):
     table_name = "pushers"
@@ -92,7 +108,9 @@ class PushersTable(Table):
         "device_display_name",
         "pushkey",
         "data",
-        "last_token"
+        "last_token",
+        "last_success",
+        "failing_since"
     ]
 
     EntryType = collections.namedtuple("PusherEntry", fields)
