@@ -542,6 +542,21 @@ class ReplicationLayer(object):
 
         state = None
 
+        # We need to make sure we have all the auth events.
+        for e_id, _ in pdu.auth_events:
+            exists = yield self._get_persisted_pdu(
+                origin,
+                e_id,
+                do_auth=False
+            )
+
+            if not exists:
+                yield self.get_pdu(
+                    origin,
+                    event_id=e_id,
+                )
+                logger.debug("Processed pdu %s", e_id)
+
         # Get missing pdus if necessary.
         if not pdu.outlier:
             # We only backfill backwards to the min depth.
