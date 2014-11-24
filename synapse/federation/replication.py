@@ -504,13 +504,15 @@ class ReplicationLayer(object):
         defer.returnValue(self.event_from_pdu_json(pdu_dict))
 
     @log_function
-    def _get_persisted_pdu(self, origin, event_id):
+    def _get_persisted_pdu(self, origin, event_id, do_auth=True):
         """ Get a PDU from the database with given origin and id.
 
         Returns:
             Deferred: Results in a `Pdu`.
         """
-        return self.handler.get_persisted_pdu(origin, event_id)
+        return self.handler.get_persisted_pdu(
+            origin, event_id, do_auth=do_auth
+        )
 
     def _transaction_from_pdus(self, pdu_list):
         """Returns a new Transaction containing the given PDUs suitable for
@@ -529,7 +531,9 @@ class ReplicationLayer(object):
     @log_function
     def _handle_new_pdu(self, origin, pdu, backfilled=False):
         # We reprocess pdus when we have seen them only as outliers
-        existing = yield self._get_persisted_pdu(origin, pdu.event_id)
+        existing = yield self._get_persisted_pdu(
+            origin, pdu.event_id, do_auth=False
+        )
 
         if existing and (not existing.outlier or pdu.outlier):
             logger.debug("Already seen pdu %s", pdu.event_id)
@@ -547,7 +551,11 @@ class ReplicationLayer(object):
 
             if min_depth and pdu.depth > min_depth:
                 for event_id, hashes in pdu.prev_events:
-                    exists = yield self._get_persisted_pdu(origin, event_id)
+                    exists = yield self._get_persisted_pdu(
+                        origin,
+                        event_id,
+                        do_auth=False
+                    )
 
                     if not exists:
                         logger.debug("Requesting pdu %s", event_id)

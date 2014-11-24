@@ -529,7 +529,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def get_persisted_pdu(self, origin, event_id):
+    def get_persisted_pdu(self, origin, event_id, do_auth=True):
         """ Get a PDU from the database with given origin and id.
 
         Returns:
@@ -541,12 +541,13 @@ class FederationHandler(BaseHandler):
         )
 
         if event:
-            in_room = yield self.auth.check_host_in_room(
-                event.room_id,
-                origin
-            )
-            if not in_room:
-                raise AuthError(403, "Host not in room.")
+            if do_auth:
+                in_room = yield self.auth.check_host_in_room(
+                    event.room_id,
+                    origin
+                )
+                if not in_room:
+                    raise AuthError(403, "Host not in room.")
 
             defer.returnValue(event)
         else:
