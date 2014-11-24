@@ -554,6 +554,7 @@ class ReplicationLayer(object):
                 yield self.get_pdu(
                     origin,
                     event_id=e_id,
+                    outlier=True,
                 )
                 logger.debug("Processed pdu %s", e_id)
 
