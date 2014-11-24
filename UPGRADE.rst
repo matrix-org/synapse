@@ -1,3 +1,12 @@
+Upgrading to v0.5.1
+===================
+
+Depending on precisely when you installed v0.5.0 you may have ended up with
+a stale release of the reference matrix webclient installed as a python module.
+To uninstall it and ensure you are depending on the latest module, please run::
+
+    $ pip uninstall syweb
+
 Upgrading to v0.5.0
 ===================
 
