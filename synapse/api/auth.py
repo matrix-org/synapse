@@ -155,7 +155,7 @@ class Auth(object):
             # Get room creation event:
             key = (RoomCreateEvent.TYPE, "", )
             create = event.old_state_events.get(key)
-            if event.prev_events[0][0] == create.event_id:
+            if create and event.prev_events[0][0] == create.event_id:
                 if create.content["creator"] == event.state_key:
                     return True
 
