@@ -55,11 +55,14 @@ class LoggingContext(object):
             None to avoid suppressing any exeptions that were thrown.
         """
         if self.thread_local.current_context is not self:
-            logger.error(
-                "Current logging context %s is not the expected context %s",
-                self.thread_local.current_context,
-                self
-            )
+            if self.thread_local.current_context is self.sentinel:
+                logger.debug("Expected logging context %s has been lost", self)
+            else:
+                logger.warn(
+                    "Current logging context %s is not expected context %s",
+                    self.thread_local.current_context,
+                    self
+                )
         self.thread_local.current_context = self.parent_context
         self.parent_context = None
 
