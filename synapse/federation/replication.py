@@ -481,11 +481,17 @@ class ReplicationLayer(object):
         # FIXME: We probably want to do something with the auth_chain given
         # to us
 
-        # auth_chain = [
-        #    Pdu(outlier=True, **p) for p in content.get("auth_chain", [])
-        # ]
+        auth_chain = [
+            self.event_from_pdu_json(p, outlier=True)
+            for p in content.get("auth_chain", [])
+        ]
 
-        defer.returnValue(state)
+        auth_chain.sort(key=lambda e: e.depth)
+
+        defer.returnValue({
+            "state": state,
+            "auth_chain": auth_chain,
+        })
 
     @defer.inlineCallbacks
     def send_invite(self, destination, context, event_id, pdu):
@@ -551,12 +557,26 @@ class ReplicationLayer(object):
             )
 
             if not exists:
-                yield self.get_pdu(
-                    origin,
-                    event_id=e_id,
-                    outlier=True,
-                )
-                logger.debug("Processed pdu %s", e_id)
+                try:
+                    logger.debug(
+                        "Getting missing auth event %s from %s",
+                        e_id,
+                        origin,
+                    )
+
+                    yield self.get_pdu(
+                        origin,
+                        event_id=e_id,
+                        outlier=True,
+                    )
+
+                    logger.debug("Processed pdu %s", e_id)
+                except:
+                    logger.warn(
+                        "Failed to get auth event %s from %s",
+                        e_id,
+                        origin
+                    )
 
         # Get missing pdus if necessary.
         if not pdu.outlier:
@@ -578,7 +598,7 @@ class ReplicationLayer(object):
 
                         try:
                             yield self.get_pdu(
-                                pdu.origin,
+                                origin,
                                 event_id=event_id,
                             )
                             logger.debug("Processed pdu %s", event_id)

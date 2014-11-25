@@ -125,6 +125,7 @@ class SynapseEvent(JsonEncodedObject):
         pdu_json.pop("outlier", None)
         pdu_json.pop("replaces_state", None)
         pdu_json.pop("redacted", None)
+        pdu_json.pop("prev_content", None)
         state_hash = pdu_json.pop("state_hash", None)
         if state_hash is not None:
             pdu_json.setdefault("unsigned", {})["state_hash"] = state_hash

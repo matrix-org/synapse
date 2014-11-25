@@ -38,79 +38,66 @@ class Auth(object):
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
 
-    def check(self, event, raises=False):
+    def check(self, event, auth_events):
         """ Checks if this event is correctly authed.
 
         Returns:
             True if the auth checks pass.
-        Raises:
-            AuthError if there was a problem authorising this event. This will
-            be raised only if raises=True.
         """
         try:
-            if hasattr(event, "room_id"):
-                if event.old_state_events is None:
-                    # Oh, we don't know what the state of the room was, so we
-                    # are trusting that this is allowed (at least for now)
-                    logger.warn("Trusting event: %s", event.event_id)
-                    return True
-
-                if hasattr(event, "outlier") and event.outlier is True:
-                    # TODO (erikj): Auth for outliers is done differently.
-                    return True
-
-                if event.type == RoomCreateEvent.TYPE:
-                    # FIXME
-                    return True
-
-                # FIXME: Temp hack
-                if event.type == RoomAliasesEvent.TYPE:
-                    return True
-
-                if event.type == RoomMemberEvent.TYPE:
-                    allowed = self.is_membership_change_allowed(event)
-                    if allowed:
-                        logger.debug("Allowing! %s", event)
-                    else:
-                        logger.debug("Denying! %s", event)
-                    return allowed
-
-                self.check_event_sender_in_room(event)
-                self._can_send_event(event)
-
-                if event.type == RoomPowerLevelsEvent.TYPE:
-                    self._check_power_levels(event)
-
-                if event.type == RoomRedactionEvent.TYPE:
-                    self._check_redaction(event)
-
-                logger.debug("Allowing! %s", event)
+            if not hasattr(event, "room_id"):
+                raise AuthError(500, "Event has no room_id: %s" % event)
+            if auth_events is None:
+                # Oh, we don't know what the state of the room was, so we
+                # are trusting that this is allowed (at least for now)
+                logger.warn("Trusting event: %s", event.event_id)
                 return True
-            else:
-                raise AuthError(500, "Unknown event: %s" % event)
+
+            if event.type == RoomCreateEvent.TYPE:
+                # FIXME
+                return True
+
+            # FIXME: Temp hack
+            if event.type == RoomAliasesEvent.TYPE:
+                return True
+
+            if event.type == RoomMemberEvent.TYPE:
+                allowed = self.is_membership_change_allowed(
+                    event, auth_events
+                )
+                if allowed:
+                    logger.debug("Allowing! %s", event)
+                else:
+                    logger.debug("Denying! %s", event)
+                return allowed
+
+            self.check_event_sender_in_room(event, auth_events)
+            self._can_send_event(event, auth_events)
+
+            if event.type == RoomPowerLevelsEvent.TYPE:
+                self._check_power_levels(event, auth_events)
+
+            if event.type == RoomRedactionEvent.TYPE:
+                self._check_redaction(event, auth_events)
+
+            logger.debug("Allowing! %s", event)
         except AuthError as e:
             logger.info(
                 "Event auth check failed on event %s with msg: %s",
                 event, e.msg
             )
             logger.info("Denying! %s", event)
-            if raises:
-                raise
-
-        return False
+            raise
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id):
-        try:
-            member = yield self.store.get_room_member(
-                room_id=room_id,
-                user_id=user_id
-            )
-            self._check_joined_room(member, user_id, room_id)
-            defer.returnValue(member)
-        except AttributeError:
-            pass
-        defer.returnValue(None)
+        member = yield self.state.get_current_state(
+            room_id=room_id,
+            event_type=RoomMemberEvent.TYPE,
+            state_key=user_id
+        )
+        self._check_joined_room(member, user_id, room_id)
+        defer.returnValue(member)
 
     @defer.inlineCallbacks
     def check_host_in_room(self, room_id, host):
@@ -130,9 +117,9 @@ class Auth(object):
 
         defer.returnValue(False)
 
-    def check_event_sender_in_room(self, event):
+    def check_event_sender_in_room(self, event, auth_events):
         key = (RoomMemberEvent.TYPE, event.user_id, )
-        member_event = event.state_events.get(key)
+        member_event = auth_events.get(key)
 
         return self._check_joined_room(
             member_event,
@@ -147,14 +134,14 @@ class Auth(object):
             ))
 
     @log_function
-    def is_membership_change_allowed(self, event):
+    def is_membership_change_allowed(self, event, auth_events):
         membership = event.content["membership"]
 
         # Check if this is the room creator joining:
         if len(event.prev_events) == 1 and Membership.JOIN == membership:
             # Get room creation event:
             key = (RoomCreateEvent.TYPE, "", )
-            create = event.old_state_events.get(key)
+            create = auth_events.get(key)
             if create and event.prev_events[0][0] == create.event_id:
                 if create.content["creator"] == event.state_key:
                     return True
@@ -163,19 +150,19 @@ class Auth(object):
 
         # get info about the caller
         key = (RoomMemberEvent.TYPE, event.user_id, )
-        caller = event.old_state_events.get(key)
+        caller = auth_events.get(key)
 
         caller_in_room = caller and caller.membership == Membership.JOIN
         caller_invited = caller and caller.membership == Membership.INVITE
 
         # get info about the target
         key = (RoomMemberEvent.TYPE, target_user_id, )
-        target = event.old_state_events.get(key)
+        target = auth_events.get(key)
 
         target_in_room = target and target.membership == Membership.JOIN
 
         key = (RoomJoinRulesEvent.TYPE, "", )
-        join_rule_event = event.old_state_events.get(key)
+        join_rule_event = auth_events.get(key)
         if join_rule_event:
             join_rule = join_rule_event.content.get(
                 "join_rule", JoinRules.INVITE
@@ -186,11 +173,13 @@ class Auth(object):
         user_level = self._get_power_level_from_event_state(
             event,
             event.user_id,
+            auth_events,
         )
 
         ban_level, kick_level, redact_level = (
             self._get_ops_level_from_event_state(
-                event
+                event,
+                auth_events,
             )
         )
 
@@ -260,9 +249,9 @@ class Auth(object):
 
         return True
 
-    def _get_power_level_from_event_state(self, event, user_id):
+    def _get_power_level_from_event_state(self, event, user_id, auth_events):
         key = (RoomPowerLevelsEvent.TYPE, "", )
-        power_level_event = event.old_state_events.get(key)
+        power_level_event = auth_events.get(key)
         level = None
         if power_level_event:
             level = power_level_event.content.get("users", {}).get(user_id)
@@ -270,16 +259,16 @@ class Auth(object):
                 level = power_level_event.content.get("users_default", 0)
         else:
             key = (RoomCreateEvent.TYPE, "", )
-            create_event = event.old_state_events.get(key)
+            create_event = auth_events.get(key)
             if (create_event is not None and
                     create_event.content["creator"] == user_id):
                 return 100
 
         return level
 
-    def _get_ops_level_from_event_state(self, event):
+    def _get_ops_level_from_event_state(self, event, auth_events):
         key = (RoomPowerLevelsEvent.TYPE, "", )
-        power_level_event = event.old_state_events.get(key)
+        power_level_event = auth_events.get(key)
 
         if power_level_event:
             return (
@@ -375,6 +364,11 @@ class Auth(object):
         key = (RoomMemberEvent.TYPE, event.user_id, )
         member_event = event.old_state_events.get(key)
 
+        key = (RoomCreateEvent.TYPE, "", )
+        create_event = event.old_state_events.get(key)
+        if create_event:
+            auth_events.append(create_event.event_id)
+
         if join_rule_event:
             join_rule = join_rule_event.content.get("join_rule")
             is_public = join_rule == JoinRules.PUBLIC if join_rule else False
@@ -406,9 +400,9 @@ class Auth(object):
         event.auth_events = zip(auth_events, hashes)
 
     @log_function
-    def _can_send_event(self, event):
+    def _can_send_event(self, event, auth_events):
         key = (RoomPowerLevelsEvent.TYPE, "", )
-        send_level_event = event.old_state_events.get(key)
+        send_level_event = auth_events.get(key)
         send_level = None
         if send_level_event:
             send_level = send_level_event.content.get("events", {}).get(
@@ -432,6 +426,7 @@ class Auth(object):
         user_level = self._get_power_level_from_event_state(
             event,
             event.user_id,
+            auth_events,
         )
 
         if user_level:
@@ -468,14 +463,16 @@ class Auth(object):
 
         return True
 
-    def _check_redaction(self, event):
+    def _check_redaction(self, event, auth_events):
         user_level = self._get_power_level_from_event_state(
             event,
             event.user_id,
+            auth_events,
         )
 
         _, _, redact_level = self._get_ops_level_from_event_state(
-            event
+            event,
+            auth_events,
         )
 
         if user_level < redact_level:
@@ -484,7 +481,7 @@ class Auth(object):
                 "You don't have permission to redact events"
             )
 
-    def _check_power_levels(self, event):
+    def _check_power_levels(self, event, auth_events):
         user_list = event.content.get("users", {})
         # Validate users
         for k, v in user_list.items():
@@ -499,7 +496,7 @@ class Auth(object):
                 raise SynapseError(400, "Not a valid power level: %s" % (v,))
 
         key = (event.type, event.state_key, )
-        current_state = event.old_state_events.get(key)
+        current_state = auth_events.get(key)
 
         if not current_state:
             return
@@ -507,6 +504,7 @@ class Auth(object):
         user_level = self._get_power_level_from_event_state(
             event,
             event.user_id,
+            auth_events,
         )
 
         # Check other levels:

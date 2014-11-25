@@ -306,7 +306,7 @@ class MessageHandler(BaseHandler):
         auth_user = self.hs.parse_userid(user_id)
 
         # TODO: These concurrently
-        state_tuples = yield self.store.get_current_state(room_id)
+        state_tuples = yield self.state_handler.get_current_state(room_id)
         state = [self.hs.serialize_event(x) for x in state_tuples]
 
         member_event = (yield self.store.get_room_member(
