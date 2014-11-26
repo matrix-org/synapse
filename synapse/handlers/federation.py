@@ -144,11 +144,24 @@ class FederationHandler(BaseHandler):
 
         logger.debug("Event: %s", event)
 
+        # FIXME (erikj): Awful hack to make the case where we are not currently
+        # in the room work
+        current_state = None
+        if state:
+            is_in_room = yield self.auth.check_host_in_room(
+                event.room_id,
+                self.server_name
+            )
+            if not is_in_room:
+                logger.debug("Got event for room we're not in.")
+                current_state = state
+
         try:
             yield self._handle_new_event(
                 event,
                 state=state,
-                backfilled=backfilled
+                backfilled=backfilled,
+                current_state=current_state,
             )
         except AuthError as e:
             raise FederationError(
@@ -161,29 +174,11 @@ class FederationHandler(BaseHandler):
         room = yield self.store.get_room(event.room_id)
 
         if not room:
-            # Huh, let's try and get the current state
-            try:
-                yield self.replication_layer.get_state_for_context(
-                    event.origin, event.room_id, event.event_id,
-                )
-
-                hosts = yield self.store.get_joined_hosts_for_room(
-                    event.room_id
-                )
-                if self.hs.hostname in hosts:
-                    try:
-                        yield self.store.store_room(
-                            room_id=event.room_id,
-                            room_creator_user_id="",
-                            is_public=False,
-                        )
-                    except:
-                        pass
-            except:
-                logger.exception(
-                    "Failed to get current state for room %s",
-                    event.room_id
-                )
+            yield self.store.store_room(
+                room_id=event.room_id,
+                room_creator_user_id="",
+                is_public=False,
+            )
 
         if not backfilled:
             extra_users = []
@@ -243,6 +238,8 @@ class FederationHandler(BaseHandler):
             event_id=event.event_id,
             pdu=event
         )
+
+
 
         defer.returnValue(pdu)
 
@@ -327,13 +324,23 @@ class FederationHandler(BaseHandler):
             for e in auth_chain:
                 e.outlier = True
                 yield self._handle_new_event(e)
+                yield self.notifier.on_new_room_event(
+                    e, extra_users=[joinee]
+                )
 
             for e in state:
                 # FIXME: Auth these.
                 e.outlier = True
                 yield self._handle_new_event(e)
+                yield self.notifier.on_new_room_event(
+                    e, extra_users=[joinee]
+                )
 
-            yield self._handle_new_event(event, state=state)
+            yield self._handle_new_event(
+                event,
+                state=state,
+                current_state=state
+            )
 
             yield self.notifier.on_new_room_event(
                 event, extra_users=[joinee]
@@ -554,7 +561,12 @@ class FederationHandler(BaseHandler):
             waiters.pop().callback(None)
 
     @defer.inlineCallbacks
-    def _handle_new_event(self, event, state=None, backfilled=False):
+    def _handle_new_event(self, event, state=None, backfilled=False,
+                          current_state=None):
+        if state:
+            for s in state:
+                yield self._handle_new_event(s)
+
         is_new_state = yield self.state_handler.annotate_event_with_state(
             event,
             old_state=state
@@ -594,7 +606,10 @@ class FederationHandler(BaseHandler):
                 )
 
                 if not e:
-                    raise AuthError(403, "Can't find auth event.")
+                    raise AuthError(
+                        403,
+                        "Can't find auth event %s." % (e_id, )
+                    )
 
                 auth_events[(e.type, e.state_key)] = e
 
@@ -603,5 +618,6 @@ class FederationHandler(BaseHandler):
         yield self.store.persist_event(
             event,
             backfilled=backfilled,
-            is_new_state=(is_new_state and not backfilled)
+            is_new_state=(is_new_state and not backfilled),
+            current_state=current_state,
         )

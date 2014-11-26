@@ -559,7 +559,7 @@ class ReplicationLayer(object):
             if not exists:
                 try:
                     logger.debug(
-                        "Getting missing auth event %s from %s",
+                        "_handle_new_pdu fetch missing auth event %s from %s",
                         e_id,
                         origin,
                     )
@@ -585,6 +585,11 @@ class ReplicationLayer(object):
                 pdu.room_id
             )
 
+            logger.debug(
+                "_handle_new_pdu min_depth for %s: %d",
+                pdu.room_id, min_depth
+            )
+
             if min_depth and pdu.depth > min_depth:
                 for event_id, hashes in pdu.prev_events:
                     exists = yield self._get_persisted_pdu(
@@ -594,7 +599,10 @@ class ReplicationLayer(object):
                     )
 
                     if not exists:
-                        logger.debug("Requesting pdu %s", event_id)
+                        logger.debug(
+                            "_handle_new_pdu requesting pdu %s",
+                            event_id
+                        )
 
                         try:
                             yield self.get_pdu(
@@ -608,6 +616,10 @@ class ReplicationLayer(object):
             else:
                 # We need to get the state at this event, since we have reached
                 # a backward extremity edge.
+                logger.debug(
+                    "_handle_new_pdu getting state for %s",
+                    pdu.room_id
+                )
                 state = yield self.get_state_for_context(
                     origin, pdu.room_id, pdu.event_id,
                 )
