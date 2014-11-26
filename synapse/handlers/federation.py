@@ -18,7 +18,9 @@
 from ._base import BaseHandler
 
 from synapse.api.events.utils import prune_event
-from synapse.api.errors import AuthError, FederationError, SynapseError
+from synapse.api.errors import (
+    AuthError, FederationError, SynapseError, StoreError,
+)
 from synapse.api.events.room import RoomMemberEvent
 from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
@@ -174,11 +176,14 @@ class FederationHandler(BaseHandler):
         room = yield self.store.get_room(event.room_id)
 
         if not room:
-            yield self.store.store_room(
-                room_id=event.room_id,
-                room_creator_user_id="",
-                is_public=False,
-            )
+            try:
+                yield self.store.store_room(
+                    room_id=event.room_id,
+                    room_creator_user_id="",
+                    is_public=False,
+                )
+            except StoreError:
+                logger.exception("Failed to store room.")
 
         if not backfilled:
             extra_users = []
