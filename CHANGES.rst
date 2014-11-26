@@ -1,3 +1,11 @@
+Changes in synapse 0.5.1 (2014-11-26)
+=====================================
+See UPGRADES.rst for specific instructions on how to upgrade.
+
+ * Fix bug where we served up an Event that did not match its signatures.
+ * Fix regression where we no longer correctly handled the case where a
+   homeserver receives an event for a room it doesn't recognise (but is in.)
+
 Changes in synapse 0.5.0 (2014-11-19)
 =====================================
 This release includes changes to the federation protocol and client-server API
