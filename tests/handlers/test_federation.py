@@ -98,7 +98,7 @@ class FederationTestCase(unittest.TestCase):
         yield self.handlers.federation_handler.on_receive_pdu(pdu, False)
 
         self.datastore.persist_event.assert_called_once_with(
-            ANY, is_new_state=False, backfilled=False
+            ANY, is_new_state=False, backfilled=False, current_state=None
         )
 
         self.state_handler.annotate_event_with_state.assert_called_once_with(
