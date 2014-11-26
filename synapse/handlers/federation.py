@@ -21,7 +21,7 @@ from synapse.api.events.utils import prune_event
 from synapse.api.errors import (
     AuthError, FederationError, SynapseError, StoreError,
 )
-from synapse.api.events.room import RoomMemberEvent
+from synapse.api.events.room import RoomMemberEvent, RoomCreateEvent
 from synapse.api.constants import Membership
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
@@ -617,6 +617,12 @@ class FederationHandler(BaseHandler):
                     )
 
                 auth_events[(e.type, e.state_key)] = e
+
+            if event.type == RoomMemberEvent.TYPE and not event.auth_events:
+                if len(event.prev_events) == 1:
+                    c = yield self.store.get_event(event.prev_events[0][0])
+                    if c.type == RoomCreateEvent.TYPE:
+                        auth_events[(c.type, c.state_key)] = c
 
         self.auth.check(event, auth_events=auth_events)
 
