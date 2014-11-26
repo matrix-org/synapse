@@ -1,7 +1,7 @@
 Changes in synapse 0.5.2 (2014-11-26)
 =====================================
 
-Fix major bug that caused rooms to disspear from peoples initial sync.
+Fix major bug that caused rooms to disappear from peoples initial sync.
 
 Changes in synapse 0.5.1 (2014-11-26)
 =====================================
