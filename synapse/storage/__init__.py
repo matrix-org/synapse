@@ -209,7 +209,10 @@ class DataStore(RoomMemberStore, RoomStore,
         self._store_state_groups_txn(txn, event)
 
         if current_state:
-            txn.execute("DELETE FROM current_state_events")
+            txn.execute(
+                "DELETE FROM current_state_events WHERE room_id = ?",
+                (event.room_id,)
+            )
 
             for s in current_state:
                 self._simple_insert_txn(
