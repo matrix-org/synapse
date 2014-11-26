@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.api.constants import Membership
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
+from synapse.util.logcontext import PreserveLoggingContext
 from ._base import BaseHandler
 
 import logging
@@ -86,9 +87,10 @@ class MessageHandler(BaseHandler):
             event, snapshot, suppress_auth=suppress_auth
         )
 
-        self.hs.get_handlers().presence_handler.bump_presence_active_time(
-            user
-        )
+        with PreserveLoggingContext():
+            self.hs.get_handlers().presence_handler.bump_presence_active_time(
+                user
+            )
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
@@ -241,7 +243,7 @@ class MessageHandler(BaseHandler):
         public_room_ids = [r["room_id"] for r in public_rooms]
 
         limit = pagin_config.limit
-        if not limit:
+        if limit is None:
             limit = 10
 
         for event in room_list:
@@ -296,7 +298,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def room_initial_sync(self, user_id, room_id, pagin_config=None,
-                      feedback=False):
+                          feedback=False):
         yield self.auth.check_joined_room(room_id, user_id)
 
         # TODO(paul): I wish I was called with user objects not user_id
@@ -304,7 +306,7 @@ class MessageHandler(BaseHandler):
         auth_user = self.hs.parse_userid(user_id)
 
         # TODO: These concurrently
-        state_tuples = yield self.store.get_current_state(room_id)
+        state_tuples = yield self.state_handler.get_current_state(room_id)
         state = [self.hs.serialize_event(x) for x in state_tuples]
 
         member_event = (yield self.store.get_room_member(
@@ -340,8 +342,8 @@ class MessageHandler(BaseHandler):
                 )
                 presence.append(member_presence)
             except Exception:
-                logger.exception("Failed to get member presence of %r",
-                    m.user_id
+                logger.exception(
+                    "Failed to get member presence of %r", m.user_id
                 )
 
         defer.returnValue({

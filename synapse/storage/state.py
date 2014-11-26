@@ -87,7 +87,7 @@ class StateStore(SQLBaseStore):
         )
 
     def _store_state_groups_txn(self, txn, event):
-        if not event.state_events:
+        if event.state_events is None:
             return
 
         state_group = event.state_group

@@ -57,7 +57,7 @@ class LoggingTransaction(object):
             if args and args[0]:
                 values = args[0]
                 sql_logger.debug(
-                    "[SQL values] {%s} " + ", ".join(("<%s>",) * len(values)),
+                    "[SQL values] {%s} " + ", ".join(("<%r>",) * len(values)),
                     self.name,
                     *values
                 )
@@ -91,6 +91,7 @@ class SQLBaseStore(object):
     def runInteraction(self, desc, func, *args, **kwargs):
         """Wraps the .runInteraction() method on the underlying db_pool."""
         current_context = LoggingContext.current_context()
+
         def inner_func(txn, *args, **kwargs):
             with LoggingContext("runInteraction") as context:
                 current_context.copy_to(context)
@@ -115,7 +116,6 @@ class SQLBaseStore(object):
                         "[TXN END] {%s} %f",
                         name, end - start
                     )
-
         with PreserveLoggingContext():
             result = yield self._db_pool.runInteraction(
                 inner_func, *args, **kwargs
@@ -246,7 +246,10 @@ class SQLBaseStore(object):
                 raise StoreError(404, "No row found")
 
     def _simple_select_onecol_txn(self, txn, table, keyvalues, retcol):
-        sql = "SELECT %(retcol)s FROM %(table)s WHERE %(where)s" % {
+        sql = (
+            "SELECT %(retcol)s FROM %(table)s WHERE %(where)s "
+            "ORDER BY rowid asc"
+        ) % {
             "retcol": retcol,
             "table": table,
             "where": " AND ".join("%s = ?" % k for k in keyvalues.keys()),
@@ -299,7 +302,7 @@ class SQLBaseStore(object):
             keyvalues : dict of column names and values to select the rows with
             retcols : list of strings giving the names of the columns to return
         """
-        sql = "SELECT %s FROM %s WHERE %s" % (
+        sql = "SELECT %s FROM %s WHERE %s ORDER BY rowid asc" % (
             ", ".join(retcols),
             table,
             " AND ".join("%s = ?" % (k, ) for k in keyvalues)
@@ -334,7 +337,7 @@ class SQLBaseStore(object):
                                  retcols=None, allow_none=False):
         """ Combined SELECT then UPDATE."""
         if retcols:
-            select_sql = "SELECT %s FROM %s WHERE %s" % (
+            select_sql = "SELECT %s FROM %s WHERE %s ORDER BY rowid asc" % (
                 ", ".join(retcols),
                 table,
                 " AND ".join("%s = ?" % (k) for k in keyvalues)
@@ -461,7 +464,7 @@ class SQLBaseStore(object):
     def _get_events_txn(self, txn, event_ids):
         # FIXME (erikj): This should be batched?
 
-        sql = "SELECT * FROM events WHERE event_id = ?"
+        sql = "SELECT * FROM events WHERE event_id = ? ORDER BY rowid asc"
 
         event_rows = []
         for e_id in event_ids:
@@ -478,7 +481,9 @@ class SQLBaseStore(object):
     def _parse_events_txn(self, txn, rows):
         events = [self._parse_event_from_row(r) for r in rows]
 
-        select_event_sql = "SELECT * FROM events WHERE event_id = ?"
+        select_event_sql = (
+            "SELECT * FROM events WHERE event_id = ? ORDER BY rowid asc"
+        )
 
         for i, ev in enumerate(events):
             signatures = self._get_event_signatures_txn(

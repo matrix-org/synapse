@@ -135,7 +135,7 @@ class Keyring(object):
 
         time_now_ms = self.clock.time_msec()
 
-        self.store.store_server_certificate(
+        yield self.store.store_server_certificate(
             server_name,
             server_name,
             time_now_ms,
@@ -143,7 +143,7 @@ class Keyring(object):
         )
 
         for key_id, key in verify_keys.items():
-            self.store.store_server_verify_key(
+            yield self.store.store_server_verify_key(
                 server_name, server_name, time_now_ms, key
             )
 

@@ -120,7 +120,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         self.datastore.get_room_member.return_value = defer.succeed(None)
 
-        event.state_events = {
+        event.old_state_events = {
             (RoomMemberEvent.TYPE, "@alice:green"): self._create_member(
                 user_id="@alice:green",
                 room_id=room_id,
@@ -129,8 +129,10 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 user_id="@bob:red",
                 room_id=room_id,
             ),
-            (RoomMemberEvent.TYPE, target_user_id): event,
         }
+
+        event.state_events = event.old_state_events
+        event.state_events[(RoomMemberEvent.TYPE, target_user_id)] = event
 
         # Actual invocation
         yield self.room_member_handler.change_membership(event)
@@ -186,6 +188,16 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             ),
             (RoomMemberEvent.TYPE, user_id): event,
         }
+
+        event.old_state_events = {
+            (RoomMemberEvent.TYPE, "@alice:green"): self._create_member(
+                user_id="@alice:green",
+                room_id=room_id,
+            ),
+        }
+
+        event.state_events = event.old_state_events
+        event.state_events[(RoomMemberEvent.TYPE, user_id)] = event
 
         # Actual invocation
         yield self.room_member_handler.change_membership(event)

@@ -78,7 +78,7 @@ class BaseHandler(object):
 
         if not suppress_auth:
             logger.debug("Authing...")
-            self.auth.check(event, raises=True)
+            self.auth.check(event, auth_events=event.old_state_events)
             logger.debug("Authed")
         else:
             logger.debug("Suppressed auth.")
@@ -112,7 +112,7 @@ class BaseHandler(object):
 
         event.destinations = list(destinations)
 
-        self.notifier.on_new_room_event(event, extra_users=extra_users)
+        yield self.notifier.on_new_room_event(event, extra_users=extra_users)
 
         federation_handler = self.hs.get_handlers().federation_handler
         yield federation_handler.handle_new_event(event, snapshot)

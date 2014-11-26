@@ -17,7 +17,7 @@
 from twisted.internet import defer
 from ._base import BaseHandler
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, Codes, CodeMessageException
 from synapse.api.events.room import RoomAliasesEvent
 
 import logging
@@ -84,22 +84,32 @@ class DirectoryHandler(BaseHandler):
                 room_id = result.room_id
                 servers = result.servers
         else:
-            result = yield self.federation.make_query(
-                destination=room_alias.domain,
-                query_type="directory",
-                args={
-                    "room_alias": room_alias.to_string(),
-                },
-                retry_on_dns_fail=False,
-            )
+            try:
+                result = yield self.federation.make_query(
+                    destination=room_alias.domain,
+                    query_type="directory",
+                    args={
+                        "room_alias": room_alias.to_string(),
+                    },
+                    retry_on_dns_fail=False,
+                )
+            except CodeMessageException as e:
+                logging.warn("Error retrieving alias")
+                if e.code == 404:
+                    result = None
+                else:
+                    raise
 
             if result and "room_id" in result and "servers" in result:
                 room_id = result["room_id"]
                 servers = result["servers"]
 
         if not room_id:
-            defer.returnValue({})
-            return
+            raise SynapseError(
+                404,
+                "Room alias %r not found" % (room_alias.to_string(),),
+                Codes.NOT_FOUND
+            )
 
         extra_servers = yield self.store.get_joined_hosts_for_room(room_id)
         servers = list(set(extra_servers) | set(servers))
@@ -128,8 +138,11 @@ class DirectoryHandler(BaseHandler):
                 "servers": result.servers,
             })
         else:
-            raise SynapseError(404, "Room alias \"%s\" not found", room_alias)
-
+            raise SynapseError(
+                404,
+                "Room alias %r not found" % (room_alias.to_string(),),
+                Codes.NOT_FOUND
+            )
 
     @defer.inlineCallbacks
     def send_room_alias_update_event(self, user_id, room_id):

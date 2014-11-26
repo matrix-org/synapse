@@ -117,8 +117,6 @@ class PresenceListRestServlet(RestServlet):
             logger.exception("JSON parse error")
             raise SynapseError(400, "Unable to parse content")
 
-        deferreds = []
-
         if "invite" in content:
             for u in content["invite"]:
                 if not isinstance(u, basestring):
@@ -126,8 +124,9 @@ class PresenceListRestServlet(RestServlet):
                 if len(u) == 0:
                     continue
                 invited_user = self.hs.parse_userid(u)
-                deferreds.append(self.handlers.presence_handler.send_invite(
-                    observer_user=user, observed_user=invited_user))
+                yield self.handlers.presence_handler.send_invite(
+                    observer_user=user, observed_user=invited_user
+                )
 
         if "drop" in content:
             for u in content["drop"]:
@@ -136,10 +135,9 @@ class PresenceListRestServlet(RestServlet):
                 if len(u) == 0:
                     continue
                 dropped_user = self.hs.parse_userid(u)
-                deferreds.append(self.handlers.presence_handler.drop(
-                    observer_user=user, observed_user=dropped_user))
-
-        yield defer.DeferredList(deferreds)
+                yield self.handlers.presence_handler.drop(
+                    observer_user=user, observed_user=dropped_user
+                )
 
         defer.returnValue((200, {}))
 

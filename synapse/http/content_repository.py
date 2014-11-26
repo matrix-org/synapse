@@ -131,12 +131,14 @@ class ContentRepoResource(resource.Resource):
             request.setHeader('Content-Type', content_type)
 
             # cache for at least a day.
-            # XXX: we might want to turn this off for data we don't want to recommend
-            # caching as it's sensitive or private - or at least select private.
-            # don't bother setting Expires as all our matrix clients are smart enough to
-            # be happy with Cache-Control (right?)
-            request.setHeader('Cache-Control', 'public,max-age=86400,s-maxage=86400')
-            
+            # XXX: we might want to turn this off for data we don't want to
+            # recommend caching as it's sensitive or private - or at least
+            # select private. don't bother setting Expires as all our matrix
+            # clients are smart enough to be happy with Cache-Control (right?)
+            request.setHeader(
+                "Cache-Control", "public,max-age=86400,s-maxage=86400"
+            )
+
             d = FileSender().beginFileTransfer(f, request)
 
             # after the file has been sent, clean up and finish the request
@@ -179,7 +181,7 @@ class ContentRepoResource(resource.Resource):
 
             fname = yield self.map_request_to_name(request)
 
-            # TODO I have a suspcious feeling this is just going to block
+            # TODO I have a suspicious feeling this is just going to block
             with open(fname, "wb") as f:
                 f.write(request.content.read())
 
@@ -188,7 +190,7 @@ class ContentRepoResource(resource.Resource):
             # FIXME: we can't assume what the repo's public mounted path is
             # ...plus self-signed SSL won't work to remote clients anyway
             # ...and we can't assume that it's SSL anyway, as we might want to
-            # server it via the non-SSL listener...
+            # serve it via the non-SSL listener...
             url = "%s/_matrix/content/%s" % (
                 self.external_addr, file_name
             )

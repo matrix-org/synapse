@@ -222,6 +222,7 @@ class RegisterRestServlet(RestServlet):
 
         threepidCreds = register_json['threepidCreds']
         handler = self.handlers.registration_handler
+        logger.debug("Registering email. threepidcreds: %s" % (threepidCreds))
         yield handler.register_email(threepidCreds)
         session["threepidCreds"] = threepidCreds  # store creds for next stage
         session[LoginType.EMAIL_IDENTITY] = True  # mark email as done
@@ -232,6 +233,7 @@ class RegisterRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def _do_password(self, request, register_json, session):
+        yield
         if (self.hs.config.enable_registration_captcha and
                 not session[LoginType.RECAPTCHA]):
             # captcha should've been done by this stage!
@@ -259,6 +261,9 @@ class RegisterRestServlet(RestServlet):
         )
 
         if session[LoginType.EMAIL_IDENTITY]:
+            logger.debug("Binding emails %s to %s" % (
+                session["threepidCreds"], user_id)
+            )
             yield handler.bind_emails(user_id, session["threepidCreds"])
 
         result = {

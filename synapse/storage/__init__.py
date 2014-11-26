@@ -67,7 +67,7 @@ SCHEMAS = [
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 class _RollbackButIsFineException(Exception):
@@ -93,7 +93,8 @@ class DataStore(RoomMemberStore, RoomStore,
 
     @defer.inlineCallbacks
     @log_function
-    def persist_event(self, event, backfilled=False, is_new_state=True):
+    def persist_event(self, event, backfilled=False, is_new_state=True,
+                      current_state=None):
         stream_ordering = None
         if backfilled:
             if not self.min_token_deferred.called:
@@ -109,6 +110,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 backfilled=backfilled,
                 stream_ordering=stream_ordering,
                 is_new_state=is_new_state,
+                current_state=current_state,
             )
         except _RollbackButIsFineException:
             pass
@@ -137,7 +139,7 @@ class DataStore(RoomMemberStore, RoomStore,
 
     @log_function
     def _persist_event_txn(self, txn, event, backfilled, stream_ordering=None,
-                           is_new_state=True):
+                           is_new_state=True, current_state=None):
         if event.type == RoomMemberEvent.TYPE:
             self._store_room_member_txn(txn, event)
         elif event.type == FeedbackEvent.TYPE:
@@ -206,8 +208,24 @@ class DataStore(RoomMemberStore, RoomStore,
 
         self._store_state_groups_txn(txn, event)
 
+        if current_state:
+            txn.execute("DELETE FROM current_state_events")
+
+            for s in current_state:
+                self._simple_insert_txn(
+                    txn,
+                    "current_state_events",
+                    {
+                        "event_id": s.event_id,
+                        "room_id": s.room_id,
+                        "type": s.type,
+                        "state_key": s.state_key,
+                    },
+                    or_replace=True,
+                )
+
         is_state = hasattr(event, "state_key") and event.state_key is not None
-        if is_new_state and is_state:
+        if is_state:
             vals = {
                 "event_id": event.event_id,
                 "room_id": event.room_id,
@@ -225,17 +243,18 @@ class DataStore(RoomMemberStore, RoomStore,
                 or_replace=True,
             )
 
-            self._simple_insert_txn(
-                txn,
-                "current_state_events",
-                {
-                    "event_id": event.event_id,
-                    "room_id": event.room_id,
-                    "type": event.type,
-                    "state_key": event.state_key,
-                },
-                or_replace=True,
-            )
+            if is_new_state:
+                self._simple_insert_txn(
+                    txn,
+                    "current_state_events",
+                    {
+                        "event_id": event.event_id,
+                        "room_id": event.room_id,
+                        "type": event.type,
+                        "state_key": event.state_key,
+                    },
+                    or_replace=True,
+                )
 
             for e_id, h in event.prev_state:
                 self._simple_insert_txn(
@@ -312,7 +331,12 @@ class DataStore(RoomMemberStore, RoomStore,
             txn, event.event_id, ref_alg, ref_hash_bytes
         )
 
-        self._update_min_depth_for_room_txn(txn, event.room_id, event.depth)
+        if not outlier:
+            self._update_min_depth_for_room_txn(
+                txn,
+                event.room_id,
+                event.depth
+            )
 
     def _store_redaction(self, txn, event):
         txn.execute(
@@ -508,7 +532,7 @@ def prepare_database(db_conn):
                 "new for the server to understand"
             )
         elif user_version < SCHEMA_VERSION:
-            logging.info(
+            logger.info(
                 "Upgrading database from version %d",
                 user_version
             )

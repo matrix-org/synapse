@@ -27,7 +27,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-OpsLevel = collections.namedtuple("OpsLevel", ("ban_level", "kick_level", "redact_level"))
+OpsLevel = collections.namedtuple("OpsLevel", (
+    "ban_level", "kick_level", "redact_level")
+)
 
 
 class RoomStore(SQLBaseStore):

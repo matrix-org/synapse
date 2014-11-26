@@ -19,6 +19,7 @@ from synapse.api.errors import SynapseError, AuthError
 from synapse.api.constants import PresenceState
 
 from synapse.util.logutils import log_function
+from synapse.util.logcontext import PreserveLoggingContext
 
 from ._base import BaseHandler
 
@@ -142,7 +143,7 @@ class PresenceHandler(BaseHandler):
             return UserPresenceCache()
 
     def registered_user(self, user):
-        self.store.create_presence(user.localpart)
+        return self.store.create_presence(user.localpart)
 
     @defer.inlineCallbacks
     def is_presence_visible(self, observer_user, observed_user):
@@ -241,14 +242,12 @@ class PresenceHandler(BaseHandler):
         was_level = self.STATE_LEVELS[statuscache.get_state()["presence"]]
         now_level = self.STATE_LEVELS[state["presence"]]
 
-        yield defer.DeferredList([
-            self.store.set_presence_state(
-                target_user.localpart, state_to_store
-            ),
-            self.distributor.fire(
-                "collect_presencelike_data", target_user, state
-            ),
-        ])
+        yield self.store.set_presence_state(
+            target_user.localpart, state_to_store
+        )
+        yield self.distributor.fire(
+            "collect_presencelike_data", target_user, state
+        )
 
         if now_level > was_level:
             state["last_active"] = self.clock.time_msec()
@@ -256,14 +255,15 @@ class PresenceHandler(BaseHandler):
         now_online = state["presence"] != PresenceState.OFFLINE
         was_polling = target_user in self._user_cachemap
 
-        if now_online and not was_polling:
-            self.start_polling_presence(target_user, state=state)
-        elif not now_online and was_polling:
-            self.stop_polling_presence(target_user)
+        with PreserveLoggingContext():
+            if now_online and not was_polling:
+                self.start_polling_presence(target_user, state=state)
+            elif not now_online and was_polling:
+                self.stop_polling_presence(target_user)
 
-        # TODO(paul): perform a presence push as part of start/stop poll so
-        #   we don't have to do this all the time
-        self.changed_presencelike_data(target_user, state)
+            # TODO(paul): perform a presence push as part of start/stop poll so
+            #   we don't have to do this all the time
+            self.changed_presencelike_data(target_user, state)
 
     def bump_presence_active_time(self, user, now=None):
         if now is None:
@@ -277,7 +277,7 @@ class PresenceHandler(BaseHandler):
         self._user_cachemap_latest_serial += 1
         statuscache.update(state, serial=self._user_cachemap_latest_serial)
 
-        self.push_presence(user, statuscache=statuscache)
+        return self.push_presence(user, statuscache=statuscache)
 
     @log_function
     def started_user_eventstream(self, user):
@@ -381,8 +381,10 @@ class PresenceHandler(BaseHandler):
         yield self.store.set_presence_list_accepted(
             observer_user.localpart, observed_user.to_string()
         )
-
-        self.start_polling_presence(observer_user, target_user=observed_user)
+        with PreserveLoggingContext():
+            self.start_polling_presence(
+                observer_user, target_user=observed_user
+            )
 
     @defer.inlineCallbacks
     def deny_presence(self, observed_user, observer_user):
@@ -401,7 +403,10 @@ class PresenceHandler(BaseHandler):
             observer_user.localpart, observed_user.to_string()
         )
 
-        self.stop_polling_presence(observer_user, target_user=observed_user)
+        with PreserveLoggingContext():
+            self.stop_polling_presence(
+                observer_user, target_user=observed_user
+            )
 
     @defer.inlineCallbacks
     def get_presence_list(self, observer_user, accepted=None):
@@ -710,7 +715,8 @@ class PresenceHandler(BaseHandler):
                 if not self._remote_sendmap[user]:
                     del self._remote_sendmap[user]
 
-        yield defer.DeferredList(deferreds)
+        with PreserveLoggingContext():
+            yield defer.DeferredList(deferreds)
 
     @defer.inlineCallbacks
     def push_update_to_local_and_remote(self, observed_user, statuscache,

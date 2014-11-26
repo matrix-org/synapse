@@ -17,13 +17,12 @@ from twisted.internet import defer
 
 from ._base import BaseHandler
 from synapse.api.errors import LoginError, Codes
-from synapse.http.client import IdentityServerHttpClient
+from synapse.http.client import SimpleHttpClient
 from synapse.util.emailutils import EmailException
 import synapse.util.emailutils as emailutils
 
 import bcrypt
 import logging
-import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -97,10 +96,16 @@ class LoginHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _query_email(self, email):
-        httpCli = IdentityServerHttpClient(self.hs)
+        httpCli = SimpleHttpClient(self.hs)
         data = yield httpCli.get_json(
-            'matrix.org:8090',  # TODO FIXME This should be configurable.
-            "/_matrix/identity/api/v1/lookup?medium=email&address=" +
-            "%s" % urllib.quote(email)
+            # TODO FIXME This should be configurable.
+            # XXX: ID servers need to use HTTPS
+            "http://%s%s" % (
+                "matrix.org:8090", "/_matrix/identity/api/v1/lookup"
+            ),
+            {
+                'medium': 'email',
+                'address': email
+            }
         )
         defer.returnValue(data)

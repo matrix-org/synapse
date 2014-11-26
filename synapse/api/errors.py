@@ -17,6 +17,8 @@
 
 import logging
 
+logger = logging.getLogger(__name__)
+
 
 class Codes(object):
     UNAUTHORIZED = "M_UNAUTHORIZED"
@@ -38,7 +40,7 @@ class CodeMessageException(Exception):
     """An exception with integer code and message string attributes."""
 
     def __init__(self, code, msg):
-        logging.error("%s: %s, %s", type(self).__name__, code, msg)
+        logger.info("%s: %s, %s", type(self).__name__, code, msg)
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
         self.code = code
         self.msg = msg
@@ -140,7 +142,8 @@ def cs_exception(exception):
     if isinstance(exception, CodeMessageException):
         return exception.error_dict()
     else:
-        logging.error("Unknown exception type: %s", type(exception))
+        logger.error("Unknown exception type: %s", type(exception))
+        return {}
 
 
 def cs_error(msg, code=Codes.UNKNOWN, **kwargs):

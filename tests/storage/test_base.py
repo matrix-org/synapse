@@ -84,7 +84,8 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.assertEquals("Value", value)
         self.mock_txn.execute.assert_called_with(
-                "SELECT retcol FROM tablename WHERE keycol = ?",
+                "SELECT retcol FROM tablename WHERE keycol = ? "
+                "ORDER BY rowid asc",
                 ["TheKey"]
         )
 
@@ -101,7 +102,8 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.assertEquals({"colA": 1, "colB": 2, "colC": 3}, ret)
         self.mock_txn.execute.assert_called_with(
-                "SELECT colA, colB, colC FROM tablename WHERE keycol = ?",
+                "SELECT colA, colB, colC FROM tablename WHERE keycol = ? "
+                "ORDER BY rowid asc",
                 ["TheKey"]
         )
 
@@ -135,7 +137,8 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.assertEquals([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
         self.mock_txn.execute.assert_called_with(
-                "SELECT colA FROM tablename WHERE keycol = ?",
+                "SELECT colA FROM tablename WHERE keycol = ? "
+                "ORDER BY rowid asc",
                 ["A set"]
         )
 
@@ -184,7 +187,8 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.assertEquals({"columname": "Old Value"}, ret)
         self.mock_txn.execute.assert_has_calls([
-                call('SELECT columname FROM tablename WHERE keycol = ?',
+                call('SELECT columname FROM tablename WHERE keycol = ? '
+                     'ORDER BY rowid asc',
                     ['TheKey']),
                 call("UPDATE tablename SET columname = ? WHERE keycol = ?",
                     ["New Value", "TheKey"])
