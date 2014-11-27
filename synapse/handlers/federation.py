@@ -112,7 +112,7 @@ class FederationHandler(BaseHandler):
         # If we are currently in the process of joining this room, then we
         # queue up events for later processing.
         if event.room_id in self.room_queues:
-            self.room_queues[event.room_id].append(pdu)
+            self.room_queues[event.room_id].append((pdu, origin))
             return
 
         logger.debug("Processing event: %s", event.event_id)
@@ -401,9 +401,9 @@ class FederationHandler(BaseHandler):
             room_queue = self.room_queues[room_id]
             del self.room_queues[room_id]
 
-            for p in room_queue:
+            for p, origin in room_queue:
                 try:
-                    self.on_receive_pdu(p, backfilled=False)
+                    self.on_receive_pdu(origin, p, backfilled=False)
                 except:
                     logger.exception("Couldn't handle pdu")
 
