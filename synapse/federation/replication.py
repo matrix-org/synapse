@@ -283,6 +283,22 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     @log_function
+    def get_event_auth(self, destination, context, event_id):
+        res = yield self.transport_layer.get_event_auth(
+            destination, context, event_id,
+        )
+
+        auth_chain = [
+            self.event_from_pdu_json(p, outlier=True)
+            for p in res["auth_chain"]
+        ]
+
+        auth_chain.sort(key=lambda e: e.depth)
+
+        defer.returnValue(auth_chain)
+
+    @defer.inlineCallbacks
+    @log_function
     def on_backfill_request(self, origin, context, versions, limit):
         pdus = yield self.handler.on_backfill_request(
             origin, context, versions, limit
@@ -549,34 +565,34 @@ class ReplicationLayer(object):
         state = None
 
         # We need to make sure we have all the auth events.
-        for e_id, _ in pdu.auth_events:
-            exists = yield self._get_persisted_pdu(
-                origin,
-                e_id,
-                do_auth=False
-            )
-
-            if not exists:
-                try:
-                    logger.debug(
-                        "_handle_new_pdu fetch missing auth event %s from %s",
-                        e_id,
-                        origin,
-                    )
-
-                    yield self.get_pdu(
-                        origin,
-                        event_id=e_id,
-                        outlier=True,
-                    )
-
-                    logger.debug("Processed pdu %s", e_id)
-                except:
-                    logger.warn(
-                        "Failed to get auth event %s from %s",
-                        e_id,
-                        origin
-                    )
+        # for e_id, _ in pdu.auth_events:
+        #     exists = yield self._get_persisted_pdu(
+        #         origin,
+        #         e_id,
+        #         do_auth=False
+        #     )
+        #
+        #     if not exists:
+        #         try:
+        #             logger.debug(
+        #                 "_handle_new_pdu fetch missing auth event %s from %s",
+        #                 e_id,
+        #                 origin,
+        #             )
+        #
+        #             yield self.get_pdu(
+        #                 origin,
+        #                 event_id=e_id,
+        #                 outlier=True,
+        #             )
+        #
+        #             logger.debug("Processed pdu %s", e_id)
+        #         except:
+        #             logger.warn(
+        #                 "Failed to get auth event %s from %s",
+        #                 e_id,
+        #                 origin
+        #             )
 
         # Get missing pdus if necessary.
         if not pdu.outlier:
@@ -626,6 +642,7 @@ class ReplicationLayer(object):
 
         if not backfilled:
             ret = yield self.handler.on_receive_pdu(
+                origin,
                 pdu,
                 backfilled=backfilled,
                 state=state,

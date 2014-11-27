@@ -101,7 +101,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def on_receive_pdu(self, pdu, backfilled, state=None):
+    def on_receive_pdu(self, origin, pdu, backfilled, state=None):
         """ Called by the ReplicationLayer when we have a new pdu. We need to
         do auth checks and put it through the StateHandler.
         """
@@ -149,14 +149,47 @@ class FederationHandler(BaseHandler):
         # FIXME (erikj): Awful hack to make the case where we are not currently
         # in the room work
         current_state = None
-        if state:
-            is_in_room = yield self.auth.check_host_in_room(
-                event.room_id,
-                self.server_name
+        is_in_room = yield self.auth.check_host_in_room(
+            event.room_id,
+            self.server_name
+        )
+        if not is_in_room:
+            logger.debug("Got event for room we're not in.")
+
+            replication_layer = self.replication_layer
+            auth_chain = yield replication_layer.get_event_auth(
+                origin,
+                context=event.room_id,
+                event_id=event.event_id,
             )
-            if not is_in_room:
-                logger.debug("Got event for room we're not in.")
-                current_state = state
+
+            current_state = yield replication_layer.get_state_for_context(
+                origin,
+                context=event.room_id,
+                event_id=event.event_id,
+            )
+
+            for e in auth_chain:
+                e.outlier = True
+                try:
+                    yield self._handle_new_event(e)
+                    yield self.notifier.on_new_room_event(e)
+                except:
+                    logger.exception(
+                        "Failed to parse auth event %s",
+                        e.event_id,
+                    )
+
+            for e in current_state:
+                e.outlier = True
+                try:
+                    yield self._handle_new_event(e)
+                    yield self.notifier.on_new_room_event(e)
+                except:
+                    logger.exception(
+                        "Failed to parse state event %s",
+                        e.event_id,
+                    )
 
         try:
             yield self._handle_new_event(
@@ -328,18 +361,30 @@ class FederationHandler(BaseHandler):
 
             for e in auth_chain:
                 e.outlier = True
-                yield self._handle_new_event(e)
-                yield self.notifier.on_new_room_event(
-                    e, extra_users=[joinee]
-                )
+                try:
+                    yield self._handle_new_event(e)
+                    yield self.notifier.on_new_room_event(
+                        e, extra_users=[joinee]
+                    )
+                except:
+                    logger.exception(
+                        "Failed to parse auth event %s",
+                        e.event_id,
+                    )
 
             for e in state:
                 # FIXME: Auth these.
                 e.outlier = True
-                yield self._handle_new_event(e)
-                yield self.notifier.on_new_room_event(
-                    e, extra_users=[joinee]
-                )
+                try:
+                    yield self._handle_new_event(e)
+                    yield self.notifier.on_new_room_event(
+                        e, extra_users=[joinee]
+                    )
+                except:
+                    logger.exception(
+                        "Failed to parse state event %s",
+                        e.event_id,
+                    )
 
             yield self._handle_new_event(
                 event,
