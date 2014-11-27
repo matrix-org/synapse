@@ -1,3 +1,11 @@
+Changes in synapse 0.5.3 (2014-11-27)
+=====================================
+
+ * Fix bug that caused joining a remote room to fail if a single event was not
+   signed correctly.
+ * Fix bug which caused servers to continuously try and fetch events from other
+   servers.
+
 Changes in synapse 0.5.2 (2014-11-26)
 =====================================
 
