@@ -153,7 +153,7 @@ class FederationHandler(BaseHandler):
             event.room_id,
             self.server_name
         )
-        if not is_in_room:
+        if not is_in_room and not event.outlier:
             logger.debug("Got event for room we're not in.")
 
             replication_layer = self.replication_layer
@@ -163,28 +163,30 @@ class FederationHandler(BaseHandler):
                 event_id=event.event_id,
             )
 
-            current_state = yield replication_layer.get_state_for_context(
-                origin,
-                context=event.room_id,
-                event_id=event.event_id,
-            )
-
             for e in auth_chain:
                 e.outlier = True
                 try:
-                    yield self._handle_new_event(e)
-                    yield self.notifier.on_new_room_event(e)
+                    yield self._handle_new_event(e, fetch_missing=False)
                 except:
                     logger.exception(
                         "Failed to parse auth event %s",
                         e.event_id,
                     )
 
-            for e in current_state:
+            if not state:
+                state = yield replication_layer.get_state_for_context(
+                    origin,
+                    context=event.room_id,
+                    event_id=event.event_id,
+                )
+
+            current_state = state
+
+        if state:
+            for e in state:
                 e.outlier = True
                 try:
                     yield self._handle_new_event(e)
-                    yield self.notifier.on_new_room_event(e)
                 except:
                     logger.exception(
                         "Failed to parse state event %s",
@@ -284,6 +286,16 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def on_event_auth(self, event_id):
         auth = yield self.store.get_auth_chain(event_id)
+
+        for event in auth:
+            event.signatures.update(
+                compute_event_signature(
+                    event,
+                    self.hs.hostname,
+                    self.hs.config.signing_key[0]
+                )
+            )
+
         defer.returnValue([e for e in auth])
 
     @log_function
@@ -343,6 +355,7 @@ class FederationHandler(BaseHandler):
 
             state = ret["state"]
             auth_chain = ret["auth_chain"]
+            auth_chain.sort(key=lambda e: e.depth)
 
             logger.debug("do_invite_join auth_chain: %s", auth_chain)
             logger.debug("do_invite_join state: %s", state)
@@ -362,10 +375,7 @@ class FederationHandler(BaseHandler):
             for e in auth_chain:
                 e.outlier = True
                 try:
-                    yield self._handle_new_event(e)
-                    yield self.notifier.on_new_room_event(
-                        e, extra_users=[joinee]
-                    )
+                    yield self._handle_new_event(e, fetch_missing=False)
                 except:
                     logger.exception(
                         "Failed to parse auth event %s",
@@ -376,9 +386,9 @@ class FederationHandler(BaseHandler):
                 # FIXME: Auth these.
                 e.outlier = True
                 try:
-                    yield self._handle_new_event(e)
-                    yield self.notifier.on_new_room_event(
-                        e, extra_users=[joinee]
+                    yield self._handle_new_event(
+                        e,
+                        fetch_missing=True
                     )
                 except:
                     logger.exception(
@@ -389,7 +399,7 @@ class FederationHandler(BaseHandler):
             yield self._handle_new_event(
                 event,
                 state=state,
-                current_state=state
+                current_state=state,
             )
 
             yield self.notifier.on_new_room_event(
@@ -552,7 +562,17 @@ class FederationHandler(BaseHandler):
                 else:
                     del results[(event.type, event.state_key)]
 
-            defer.returnValue(results.values())
+            res = results.values()
+            for event in res:
+                event.signatures.update(
+                    compute_event_signature(
+                        event,
+                        self.hs.hostname,
+                        self.hs.config.signing_key[0]
+                    )
+                )
+
+            defer.returnValue(res)
         else:
             defer.returnValue([])
 
@@ -623,11 +643,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _handle_new_event(self, event, state=None, backfilled=False,
-                          current_state=None):
-        if state:
-            for s in state:
-                yield self._handle_new_event(s)
-
+                          current_state=None, fetch_missing=True):
         is_new_state = yield self.state_handler.annotate_event_with_state(
             event,
             old_state=state
@@ -667,10 +683,21 @@ class FederationHandler(BaseHandler):
                 )
 
                 if not e:
-                    raise AuthError(
-                        403,
-                        "Can't find auth event %s." % (e_id, )
+                    e = yield self.replication_layer.get_pdu(
+                        event.origin, e_id, outlier=True
                     )
+
+                    if e and fetch_missing:
+                        try:
+                            yield self.on_receive_pdu(event.origin, e, False)
+                        except:
+                            logger.exception(
+                                "Failed to parse auth event %s",
+                                e_id,
+                            )
+
+                if not e:
+                    logger.warn("Can't find auth event %s.", e_id)
 
                 auth_events[(e.type, e.state_key)] = e
 
