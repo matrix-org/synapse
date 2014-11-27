@@ -540,6 +540,17 @@ class FederationHandler(BaseHandler):
         )
 
         if event:
+            # FIXME: This is a temporary work around where we occasionally
+            # return events slightly differently than when they were
+            # originally signed
+            event.signatures.update(
+                compute_event_signature(
+                    event,
+                    self.hs.hostname,
+                    self.hs.config.signing_key[0]
+                )
+            )
+
             if do_auth:
                 in_room = yield self.auth.check_host_in_room(
                     event.room_id,
