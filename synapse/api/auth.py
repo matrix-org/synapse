@@ -202,7 +202,10 @@ class Auth(object):
 
             # Invites are valid iff caller is in the room and target isn't.
             if not caller_in_room:  # caller isn't joined
-                raise AuthError(403, "You are not in room %s." % event.room_id)
+                raise AuthError(
+                    403,
+                    "%s not in room %s." % (event.user_id, event.room_id,)
+                )
             elif target_in_room:  # the target is already in the room.
                 raise AuthError(403, "%s is already in the room." %
                                      target_user_id)
@@ -225,7 +228,10 @@ class Auth(object):
             # TODO (erikj): Implement kicks.
 
             if not caller_in_room:  # trying to leave a room you aren't joined
-                raise AuthError(403, "You are not in room %s." % event.room_id)
+                raise AuthError(
+                    403,
+                    "%s not in room %s." % (target_user_id, event.room_id,)
+                )
             elif target_user_id != event.user_id:
                 if kick_level:
                     kick_level = int(kick_level)

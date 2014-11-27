@@ -53,8 +53,12 @@ class EventStreamHandler(BaseHandler):
             if auth_user not in self._streams_per_user:
                 self._streams_per_user[auth_user] = 0
                 if auth_user in self._stop_timer_per_user:
-                    self.clock.cancel_call_later(
-                        self._stop_timer_per_user.pop(auth_user))
+                    try:
+                        self.clock.cancel_call_later(
+                            self._stop_timer_per_user.pop(auth_user)
+                        )
+                    except:
+                        logger.exception("Failed to cancel event timer")
                 else:
                     yield self.distributor.fire(
                         "started_user_eventstream", auth_user
@@ -95,10 +99,12 @@ class EventStreamHandler(BaseHandler):
                     logger.debug(
                         "_later stopped_user_eventstream %s", auth_user
                     )
+
+                    self._stop_timer_per_user.pop(auth_user, None)
+
                     yield self.distributor.fire(
                         "stopped_user_eventstream", auth_user
                     )
-                    del self._stop_timer_per_user[auth_user]
 
                 logger.debug("Scheduling _later: for %s", auth_user)
                 self._stop_timer_per_user[auth_user] = (

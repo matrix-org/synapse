@@ -283,7 +283,7 @@ class StreamStore(SQLBaseStore):
 
         sql = (
             "SELECT *, (%(redacted)s) AS redacted FROM events "
-            "WHERE room_id = ? AND stream_ordering <= ? "
+            "WHERE room_id = ? AND stream_ordering <= ? AND outlier = 0 "
             "ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ? "
         ) % {
             "redacted": del_sql,
