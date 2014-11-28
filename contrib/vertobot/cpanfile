@@ -1,6 +1,6 @@
 requires 'parent', 0;
 requires 'Future', '>= 0.29';
-requires 'Net::Async::Matrix', '>= 0.11';
+requires 'Net::Async::Matrix', '>= 0.11_002';
 requires 'Net::Async::Matrix::Utils';
 requires 'Net::Async::WebSocket::Protocol', 0;
 requires 'Data::UUID', 0;

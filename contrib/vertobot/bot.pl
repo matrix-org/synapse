@@ -6,7 +6,7 @@ use 5.010; # //
 use IO::Socket::SSL qw(SSL_VERIFY_NONE);
 use IO::Async::Loop;
 use Net::Async::WebSocket::Client;
-use Net::Async::Matrix 0.11;
+use Net::Async::Matrix 0.11_002;
 use JSON;
 use YAML;
 use Data::UUID;
@@ -148,10 +148,15 @@ sub on_unknown_event
         }
     }
     elsif ($event->{type} eq 'm.call.hangup') {
-        send_verto_json_request("verto.bye", {
-            "dialogParams" => \%dp,
-            "sessid" => $bridgestate->{$room_id}->{sessid},
-        })->get;
+        if ($bridgestate->{$room_id}->{matrix_callid} eq $event->{content}->{call_id}) {
+            send_verto_json_request("verto.bye", {
+                "dialogParams" => \%dp,
+                "sessid" => $bridgestate->{$room_id}->{sessid},
+            })->get;
+        }
+        else {
+            warn "Ignoring unrecognised callid: ".$event->{content}->{call_id};
+        }
     }
     else {
         warn "Unhandled event: $event->{type}";
@@ -253,27 +258,33 @@ exit 0;
     {
         my $json = JSON->new->decode( $_[0] );
         if ($json->{method}) {
-            if ($json->{method} eq 'verto.answer') {
+            if (($json->{method} eq 'verto.answer' && $json->{params}->{sdp}) ||
+                $json->{method} eq 'verto.media') {
                                 
                 my $room_id = $roomid_by_callid->{$json->{params}->{callID}};
                 my $room = $bot_matrix_rooms{$room_id};
 
-                # HACK HACK HACK HACK
-                $room->_do_POST_json( "/send/m.call.answer", {
-                    call_id => $bridgestate->{$room_id}->{matrix_callid},
-                    version => 0,
-                    answer  => {
-                        sdp => $json->{params}->{sdp},
-                        type => "answer",
-                    },
-                })->then( sub {
-                    send_verto_json_response( {
-                        method => "verto.answer",
-                    }, $json->{id});
-                })->get;
+                if ($json->{params}->{sdp}) {
+                    # HACK HACK HACK HACK
+                    $room->_do_POST_json( "/send/m.call.answer", {
+                        call_id => $bridgestate->{$room_id}->{matrix_callid},
+                        version => 0,
+                        answer  => {
+                            sdp => $json->{params}->{sdp},
+                            type => "answer",
+                        },
+                    })->then( sub {
+                        send_verto_json_response( {
+                            method => $json->{method},
+                        }, $json->{id});
+                    })->get;
+                }
             }
             else {
                 warn ("[Verto] unhandled method: " . $json->{method});
+                send_verto_json_response( {
+                    method => $json->{method},
+                }, $json->{id});
             }
         }
         elsif ($json->{result}) {
