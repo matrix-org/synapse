@@ -62,6 +62,8 @@ my $bot_verto = Net::Async::WebSocket::Client->new(
 );
 $loop->add( $bot_verto );
 
+my $sessid = lc new Data::UUID->create_str();
+
 my $bot_matrix = Net::Async::Matrix->new(
     %MATRIX_CONFIG,
     on_log => sub { warn "log: @_\n" },
@@ -79,20 +81,18 @@ my $bot_matrix = Net::Async::Matrix->new(
         $bot_matrix_rooms{$room->room_id} = $room;
         
         # log in to verto on behalf of this room
-        my $sessid = lc new Data::UUID->create_str();
         $bridgestate->{$room->room_id}->{sessid} = $sessid;
          
         $room->configure(
             on_message => \&on_room_message,
         );
         
-        Future->wait_all(
-            send_verto_json_request("login", {
+        my $f = send_verto_json_request("login", {
                 'login' => $CONFIG{'verto-dialog-params'}{'login'},
                 'passwd' => $CONFIG{'verto-config'}{'passwd'},
                 'sessid' => $sessid,
-            }),
-        )->get;
+            });
+        $matrix->adopt_future($f);
         
         # we deliberately don't paginate the room, as we only care about
         # new calls
@@ -133,11 +133,12 @@ sub on_unknown_event
             # XXX: collate using the right m= line - for now assume audio call
             $offer =~ s/(a=rtcp.*[\r\n]+)/$1$candidate_block/;
             
-            send_verto_json_request("verto.invite", {
+            my $f = send_verto_json_request("verto.invite", {
                 "sdp" => $offer,
                 "dialogParams" => \%dp,
                 "sessid" => $bridgestate->{$room_id}->{sessid},
-            })->get;
+            });
+            $matrix->adopt_future($f);
         }
         else {
             # ignore them, as no trickle ICE, although we might as well
@@ -149,10 +150,11 @@ sub on_unknown_event
     }
     elsif ($event->{type} eq 'm.call.hangup') {
         if ($bridgestate->{$room_id}->{matrix_callid} eq $event->{content}->{call_id}) {
-            send_verto_json_request("verto.bye", {
+            my $f = send_verto_json_request("verto.bye", {
                 "dialogParams" => \%dp,
                 "sessid" => $bridgestate->{$room_id}->{sessid},
-            })->get;
+            });
+            $matrix->adopt_future($f);
         }
         else {
             warn "Ignoring unrecognised callid: ".$event->{content}->{call_id};
