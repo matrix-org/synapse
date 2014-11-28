@@ -93,7 +93,7 @@ notes C-D-E/4 #0# =:: C-D-E-F/4 =|=");
         // log2(2) = 1  # 2 beats == half = h
         // log2(1) = 0
 
-        return Math.ceil(Math.log2(fraction));
+        return Math.floor(Math.log2(fraction));
     },
     
     renderChord: function(duration, rest) {
