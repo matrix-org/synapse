@@ -11,7 +11,6 @@ use JSON;
 use YAML;
 use Data::UUID;
 use Getopt::Long;
-use Digest::SHA qw( hmac_sha1_base64 );
 use Data::Dumper;
 
 binmode STDOUT, ":encoding(UTF-8)";

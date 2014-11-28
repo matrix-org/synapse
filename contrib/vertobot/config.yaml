@@ -8,10 +8,6 @@ matrix-bot:
   user_id: '@vertobot:matrix.org'
   password: ''
 
-# Extra registration params required for creating new "ghost" users
-matrix-register:
-  captcha_bypass_secret: ''
-
 verto-bot:
   host: webrtc.freeswitch.org
   service: 8081
