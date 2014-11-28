@@ -1,0 +1,207 @@
+# JSON is shown in *reverse* chronological order.
+# Send v. Receive is implicit.
+
+{
+    "jsonrpc": "2.0",
+    "id": 7,
+    "result": {
+        "callID": "12795aa6-2a8d-84ee-ce63-2e82ffe825ef",
+        "message": "CALL ENDED",
+        "causeCode": 16,
+        "cause": "NORMAL_CLEARING",
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    }
+}
+
+{
+    "jsonrpc": "2.0",
+    "method": "verto.bye",
+    "params": {
+        "dialogParams": {
+            "useVideo": false,
+            "useStereo": true,
+            "tag": "webcam",
+            "login": "1008@webrtc.freeswitch.org",
+            "destination_number": "9664",
+            "caller_id_name": "FreeSWITCH User",
+            "caller_id_number": "1008",
+            "callID": "12795aa6-2a8d-84ee-ce63-2e82ffe825ef",
+            "remote_caller_id_name": "Outbound Call",
+            "remote_caller_id_number": "9664"
+        },
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    },
+    "id": 7
+}
+
+{
+    "jsonrpc": "2.0",
+    "id": 6,
+    "result": {
+        "callID": "12795aa6-2a8d-84ee-ce63-2e82ffe825ef",
+        "action": "toggleHold",
+        "holdState": "active",
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    }
+}
+
+{
+    "jsonrpc": "2.0",
+    "method": "verto.modify",
+    "params": {
+        "action": "toggleHold",
+        "dialogParams": {
+            "useVideo": false,
+            "useStereo": true,
+            "tag": "webcam",
+            "login": "1008@webrtc.freeswitch.org",
+            "destination_number": "9664",
+            "caller_id_name": "FreeSWITCH User",
+            "caller_id_number": "1008",
+            "callID": "12795aa6-2a8d-84ee-ce63-2e82ffe825ef",
+            "remote_caller_id_name": "Outbound Call",
+            "remote_caller_id_number": "9664"
+        },
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    },
+    "id": 6
+}
+
+{
+    "jsonrpc": "2.0",
+    "id": 5,
+    "result": {
+        "callID": "12795aa6-2a8d-84ee-ce63-2e82ffe825ef",
+        "action": "toggleHold",
+        "holdState": "held",
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    }
+}
+
+{
+    "jsonrpc": "2.0",
+    "method": "verto.modify",
+    "params": {
+        "action": "toggleHold",
+        "dialogParams": {
+            "useVideo": false,
+            "useStereo": true,
+            "tag": "webcam",
+            "login": "1008@webrtc.freeswitch.org",
+            "destination_number": "9664",
+            "caller_id_name": "FreeSWITCH User",
+            "caller_id_number": "1008",
+            "callID": "12795aa6-2a8d-84ee-ce63-2e82ffe825ef",
+            "remote_caller_id_name": "Outbound Call",
+            "remote_caller_id_number": "9664"
+        },
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    },
+    "id": 5
+}
+
+{
+    "jsonrpc": "2.0",
+    "id": 349819,
+    "result": {
+        "method": "verto.answer"
+    }
+}
+
+{
+    "jsonrpc": "2.0",
+    "id": 349819,
+    "method": "verto.answer",
+    "params": {
+        "callID": "12795aa6-2a8d-84ee-ce63-2e82ffe825ef",
+        "sdp": "v=0\no=FreeSWITCH 1417101432 1417101433 IN IP4 209.105.235.10\ns=FreeSWITCH\nc=IN IP4 209.105.235.10\nt=0 0\na=msid-semantic: WMS jA3rmwLVwUq1iE6TYEYHeLk2YTUlh1Vq\nm=audio 30134 RTP/SAVPF 111 126\na=rtpmap:111 opus/48000/2\na=fmtp:111 minptime=10; stereo=1\na=rtpmap:126 telephone-event/8000\na=silenceSupp:off - - - -\na=ptime:20\na=sendrecv\na=fingerprint:sha-256 F8:72:18:E9:72:89:99:22:5B:F8:B6:C6:C6:0D:C5:9B:B2:FB:BC:CA:8D:AB:13:8A:66:E1:37:38:A0:16:AA:41\na=rtcp-mux\na=rtcp:30134 IN IP4 209.105.235.10\na=ssrc:210967934 cname:rOIEajpw4FocakWY\na=ssrc:210967934 msid:jA3rmwLVwUq1iE6TYEYHeLk2YTUlh1Vq a0\na=ssrc:210967934 mslabel:jA3rmwLVwUq1iE6TYEYHeLk2YTUlh1Vq\na=ssrc:210967934 label:jA3rmwLVwUq1iE6TYEYHeLk2YTUlh1Vqa0\na=ice-ufrag:OKwTmGLapwmxn7OF\na=ice-pwd:MmaMwq8rVmtWxfLbQ7U2Ew3T\na=candidate:2372654928 1 udp 659136 209.105.235.10 30134 typ host generation 0\n"
+    }
+}
+
+{
+    "jsonrpc": "2.0",
+    "id": 4,
+    "result": {
+        "message": "CALL CREATED",
+        "callID": "12795aa6-2a8d-84ee-ce63-2e82ffe825ef",
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    }
+}
+
+{
+    "jsonrpc": "2.0",
+    "method": "verto.invite",
+    "params": {
+        "sdp": "v=0\r\no=- 1381685806032722557 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE audio\r\na=msid-semantic: WMS 6OOMyGAyJakjwaOOBtV7WcBCCuIW6PpuXsNg\r\nm=audio 63088 RTP/SAVPF 111 103 104 0 8 106 105 13 126\r\nc=IN IP4 81.138.8.249\r\na=rtcp:63088 IN IP4 81.138.8.249\r\na=candidate:460398169 1 udp 2122260223 10.10.79.10 49945 typ host generation 0\r\na=candidate:460398169 2 udp 2122260223 10.10.79.10 49945 typ host generation 0\r\na=candidate:3460887983 1 udp 2122194687 192.168.1.64 63088 typ host generation 0\r\na=candidate:3460887983 2 udp 2122194687 192.168.1.64 63088 typ host generation 0\r\na=candidate:945327227 1 udp 1685987071 81.138.8.249 63088 typ srflx raddr 192.168.1.64 rport 63088 generation 0\r\na=candidate:945327227 2 udp 1685987071 81.138.8.249 63088 typ srflx raddr 192.168.1.64 rport 63088 generation 0\r\na=candidate:1441981097 1 tcp 1518280447 10.10.79.10 0 typ host tcptype active generation 0\r\na=candidate:1441981097 2 tcp 1518280447 10.10.79.10 0 typ host tcptype active generation 0\r\na=candidate:2160789855 1 tcp 1518214911 192.168.1.64 0 typ host tcptype active generation 0\r\na=candidate:2160789855 2 tcp 1518214911 192.168.1.64 0 typ host tcptype active generation 0\r\na=ice-ufrag:cP4qeRhn0LpcpA88\r\na=ice-pwd:fREmgSkXsDLGUUH1bwfrBQhW\r\na=ice-options:google-ice\r\na=fingerprint:sha-256 AF:35:64:1B:62:8A:EF:27:AE:2B:88:2E:FE:78:29:0B:08:DA:64:6C:DE:02:57:E3:EE:B1:D7:86:B8:36:8F:B0\r\na=setup:actpass\r\na=mid:audio\r\na=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level\r\na=extmap:3 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time\r\na=sendrecv\r\na=rtcp-mux\r\na=rtpmap:111 opus/48000/2\r\na=fmtp:111 minptime=10; stereo=1\r\na=rtpmap:103 ISAC/16000\r\na=rtpmap:104 ISAC/32000\r\na=rtpmap:0 PCMU/8000\r\na=rtpmap:8 PCMA/8000\r\na=rtpmap:106 CN/32000\r\na=rtpmap:105 CN/16000\r\na=rtpmap:13 CN/8000\r\na=rtpmap:126 telephone-event/8000\r\na=maxptime:60\r\na=ssrc:558827154 cname:vdKHBNqa17t2gmE3\r\na=ssrc:558827154 msid:6OOMyGAyJakjwaOOBtV7WcBCCuIW6PpuXsNg bf1303fb-9833-4d7d-b9e4-b32cfe04acc3\r\na=ssrc:558827154 mslabel:6OOMyGAyJakjwaOOBtV7WcBCCuIW6PpuXsNg\r\na=ssrc:558827154 label:bf1303fb-9833-4d7d-b9e4-b32cfe04acc3\r\n",
+        "dialogParams": {
+            "useVideo": false,
+            "useStereo": true,
+            "tag": "webcam",
+            "login": "1008@webrtc.freeswitch.org",
+            "destination_number": "9664",
+            "caller_id_name": "FreeSWITCH User",
+            "caller_id_number": "1008",
+            "callID": "12795aa6-2a8d-84ee-ce63-2e82ffe825ef",
+            "remote_caller_id_name": "Outbound Call",
+            "remote_caller_id_number": "9664"
+        },
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    },
+    "id": 4
+}
+
+{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "result": {
+        "message": "logged in",
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    }
+}
+
+{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "error": {
+        "code": -32000,
+        "message": "Authentication Required"
+    }
+}
+
+{
+    "jsonrpc": "2.0",
+    "method": "login",
+    "params": {
+        "login": "1008@webrtc.freeswitch.org",
+        "passwd": "1234",
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    },
+    "id": 3
+}
+
+{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "error": {
+        "code": -32000,
+        "message": "Authentication Required"
+    }
+}
+
+{
+    "jsonrpc": "2.0",
+    "method": "login",
+    "params": {
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    },
+    "id": 1
+}
+
+{
+    "jsonrpc": "2.0",
+    "method": "login",
+    "params": {
+        "sessid": "03a11060-3e14-23b6-c620-51b892c52983"
+    },
+    "id": 2
+}
