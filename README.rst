@@ -129,6 +129,9 @@ failing, e.g.::
 
     $ pip install --user twisted
 
+On OSX, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
+will need to export CFLAGS=-Qunused-arguments.
+
 Running Your Homeserver
 =======================
 
