@@ -155,6 +155,25 @@ class DataStore(RoomMemberStore, RoomStore,
         if hasattr(event, "outlier"):
             outlier = event.outlier
 
+        event_dict = {
+            k: v
+            for k, v in event.get_full_dict().items()
+            if k not in [
+                "redacted",
+                "redacted_because",
+            ]
+        }
+
+        self._simple_insert_txn(
+            txn,
+            table="event_json",
+            values={
+                "event_id": event.event_id,
+                "json": json.dumps(event_dict, separators=(',', ':')),
+            },
+            or_replace=True,
+        )
+
         vals = {
             "topological_ordering": event.depth,
             "event_id": event.event_id,

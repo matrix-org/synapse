@@ -479,66 +479,30 @@ class SQLBaseStore(object):
         )
 
     def _parse_events_txn(self, txn, rows):
-        events = [self._parse_event_from_row(r) for r in rows]
+        event_ids = [r["event_id"] for r in rows]
 
-        select_event_sql = (
-            "SELECT * FROM events WHERE event_id = ? ORDER BY rowid asc"
-        )
-
-        for i, ev in enumerate(events):
-            signatures = self._get_event_signatures_txn(
-                txn, ev.event_id,
+        events = []
+        for event_id in event_ids:
+            js = self._simple_select_one_onecol_txn(
+                txn,
+                table="event_json",
+                keyvalues={"event_id": event_id},
+                retcol="json",
+                allow_none=True,
             )
 
-            ev.signatures = {
-                n: {
-                    k: encode_base64(v) for k, v in s.items()
-                }
-                for n, s in signatures.items()
-            }
+            if not js:
+                # FIXME (erikj): What should we actually do here?
+                continue
 
-            hashes = self._get_event_content_hashes_txn(
-                txn, ev.event_id,
+            d = json.loads(js)
+
+            ev = self.event_factory.create_event(
+                etype=d["type"],
+                **d
             )
 
-            ev.hashes = {
-                k: encode_base64(v) for k, v in hashes.items()
-            }
-
-            prevs = self._get_prev_events_and_state(txn, ev.event_id)
-
-            ev.prev_events = [
-                (e_id, h)
-                for e_id, h, is_state in prevs
-                if is_state == 0
-            ]
-
-            ev.auth_events = self._get_auth_events(txn, ev.event_id)
-
-            if hasattr(ev, "state_key"):
-                ev.prev_state = [
-                    (e_id, h)
-                    for e_id, h, is_state in prevs
-                    if is_state == 1
-                ]
-
-                if hasattr(ev, "replaces_state"):
-                    # Load previous state_content.
-                    # FIXME (erikj): Handle multiple prev_states.
-                    cursor = txn.execute(
-                        select_event_sql,
-                        (ev.replaces_state,)
-                    )
-                    prevs = self.cursor_to_dict(cursor)
-                    if prevs:
-                        prev = self._parse_event_from_row(prevs[0])
-                        ev.prev_content = prev.content
-
-            if not hasattr(ev, "redacted"):
-                logger.debug("Doesn't have redacted key: %s", ev)
-                ev.redacted = self._has_been_redacted_txn(txn, ev)
-
-            if ev.redacted:
+            if hasattr(ev, "redacted") and ev.redacted:
                 # Get the redaction event.
                 select_event_sql = "SELECT * FROM events WHERE event_id = ?"
                 txn.execute(select_event_sql, (ev.redacted,))
@@ -549,8 +513,9 @@ class SQLBaseStore(object):
 
                 if del_evs:
                     ev = prune_event(ev)
-                    events[i] = ev
                     ev.redacted_because = del_evs[0]
+
+            events.append(ev)
 
         return events
 
