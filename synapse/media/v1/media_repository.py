@@ -13,27 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import respond_with_json_bytes
+from .upload_resource import UploadResource
+from .filepath import MediaFilePaths
 
-from synapse.util.stringutils import random_string
-from synapse.api.errors import (
-    cs_exception, SynapseError, CodeMessageException, Codes, cs_error
-)
+from twisted.web.resource import Resource
 
-from twisted.protocols.basic import FileSender
-from twisted.web import server, resource
-from twisted.internet import defer
-
-import base64
-import json
 import logging
-import os
-import re
 
 logger = logging.getLogger(__name__)
 
 
-class MediaRepository():
+class MediaRepositoryResource(Resource):
     """Profiles file uploading and downloading.
 
     Uploads are POSTed to a resource which returns a token which is used to GET
@@ -68,5 +58,6 @@ class MediaRepository():
     """
 
     def __init__(self, hs):
-        filepaths = MediaFilePaths
-
+        Resource.__init__(self)
+        filepaths = MediaFilePaths(hs.config.media_store_path)
+        self.putChild("upload", UploadResource(hs, filepaths))

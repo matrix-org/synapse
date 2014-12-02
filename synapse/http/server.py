@@ -201,9 +201,9 @@ class RootRedirect(resource.Resource):
 def respond_with_json(request, code, json_object, send_cors=False,
                       response_code_message=None, pretty_print=False):
     if not pretty_print:
-        json_bytes = encode_pretty_printed_json(response_json_object)
+        json_bytes = encode_pretty_printed_json(json_object)
     else:
-        json_bytes = encode_canonical_json(response_json_object)
+        json_bytes = encode_canonical_json(json_object)
 
     return respond_with_json_bytes(request, code, json_bytes, send_cors,
                                    response_code_message=response_code_message)

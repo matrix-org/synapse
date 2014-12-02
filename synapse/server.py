@@ -78,6 +78,7 @@ class BaseHomeServer(object):
         'resource_for_web_client',
         'resource_for_content_repo',
         'resource_for_server_key',
+        'resource_for_media_repository',
         'event_sources',
         'ratelimiter',
         'keyring',

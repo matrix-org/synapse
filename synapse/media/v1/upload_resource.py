@@ -23,6 +23,8 @@ from synapse.api.errors import (
 from twisted.web import server, resource
 from twisted.internet import defer
 
+import os
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,8 +33,9 @@ class UploadResource(resource.Resource):
 
     def __init__(self, hs, filepaths):
         self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
         self.store = hs.get_datastore()
-        self.max_upload_size = hs.config.max_upload_size()
+        self.max_upload_size = hs.config.max_upload_size
         self.filepaths = filepaths
 
     def render_POST(self, request):
@@ -45,10 +48,8 @@ class UploadResource(resource.Resource):
 
     @defer.inlineCallbacks
     def _async_render_POST(self, request):
-
-        auth_user = yield self.auth.get_user_by_req(request)
-
         try:
+            auth_user = yield self.auth.get_user_by_req(request)
             # TODO: The checks here are a bit late. The content will have
             # already been uploaded to a tmp file at this point
             content_length = request.getHeader("Content-Length")
@@ -62,7 +63,7 @@ class UploadResource(resource.Resource):
                     code=413,
                 )
 
-            headers = request.requestHeaders()
+            headers = request.requestHeaders
 
             if headers.hasHeader("Content-Type"):
                 media_type = headers.getRawHeaders("Content-Type")[0]
@@ -78,7 +79,8 @@ class UploadResource(resource.Resource):
 
             media_id = random_string(24)
 
-            fname = self.filepaths.local_media_file_path(media_id)
+            fname = self.filepaths.local_media_filepath(media_id)
+            os.makedirs(os.path.dirname(fname))
 
             # This shouldn't block for very long because the content will have
             # already been uploaded at this point.

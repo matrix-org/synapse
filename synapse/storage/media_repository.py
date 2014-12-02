@@ -20,10 +20,15 @@ class MediaRepositoryStore(SQLBaseStore):
     """Persistence for attachments and avatars"""
 
     def get_local_media(self, media_id):
+        """Get the metadata for a local piece of media
+        Returns:
+            None if the media_id doesn't exist.
+        """
         return self._simple_select_one(
             "local_media_repository",
             {"media_id": media_id},
             ("media_type", "media_length", "upload_name", "created_ts"),
+            True,
         )
 
     def store_local_media(self, media_id, media_type, time_now_ms, upload_name,
@@ -36,7 +41,7 @@ class MediaRepositoryStore(SQLBaseStore):
                 "created_ts": time_now_ms,
                 "upload_name": upload_name,
                 "media_length": media_length,
-                "user_id": user_id,
+                "user_id": user_id.to_string(),
             }
         )
 
