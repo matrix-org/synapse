@@ -78,7 +78,7 @@ class MediaRepositoryStore(SQLBaseStore):
 
     def store_cached_remote_media(self, origin, media_id, media_type,
                                   media_length, time_now_ms, upload_name,
-                                  filesytem_id):
+                                  filesystem_id):
         return self._simple_insert(
             "remote_media_cache",
             {
@@ -102,7 +102,6 @@ class MediaRepositoryStore(SQLBaseStore):
                 "filesystem_id"
             )
         )
-
 
     def store_remote_media_thumbnail(self, origin, media_id, thumbnail_width,
                                      thumbnail_height, thumbnail_type,

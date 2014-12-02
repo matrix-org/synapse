@@ -29,6 +29,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class UploadResource(resource.Resource):
 
     def __init__(self, hs, filepaths):

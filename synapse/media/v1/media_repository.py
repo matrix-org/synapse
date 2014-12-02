@@ -49,7 +49,8 @@ class MediaRepositoryResource(Resource):
 
     Clients can get thumbnails by supplying a desired width and height::
 
-        => GET /_matrix/media/v1/thumbnail/<media-id>?width=<w>&height=<h> HTTP/1.1
+        => GET /_matrix/media/v1
+                /thumbnail/<media-id>?width=<w>&height=<h> HTTP/1.1
 
         <= HTTP/1.1 200 OK
            Content-Type: image/jpeg or image/png
