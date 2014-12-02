@@ -41,6 +41,7 @@ setup(
         "pynacl",
         "daemonize",
         "py-bcrypt",
+        "frozendict>=0.4",
     ],
     dependency_links=[
         "https://github.com/matrix-org/syutil/tarball/v0.0.2#egg=syutil-0.0.2",
