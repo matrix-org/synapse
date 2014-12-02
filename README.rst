@@ -94,7 +94,8 @@ header files for python C extensions.
 Installing prerequisites on Ubuntu or Debian::
 
     $ sudo apt-get install build-essential python2.7-dev libffi-dev \
-                           python-pip python-setuptools sqlite3
+                           python-pip python-setuptools sqlite3 \
+                           libssl-dev
 
 Installing prerequisites on Mac OS X::
 
