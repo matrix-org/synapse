@@ -1,3 +1,10 @@
+Changes in synapse 0.5.3c (2014-12-02)
+======================================
+
+ * Change the default value for the `content_addr` option to use the HTTP
+   listener, as by default the HTTPS listener will be using a self-signed
+   certificate.
+
 Changes in synapse 0.5.3 (2014-11-27)
 =====================================
 
