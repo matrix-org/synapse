@@ -79,7 +79,7 @@ class MessageHandler(BaseHandler):
         self.ratelimit(event.user_id)
         # TODO(paul): Why does 'event' not have a 'user' object?
         user = self.hs.parse_userid(event.user_id)
-        assert user.is_mine, "User must be our own: %s" % (user,)
+        assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
         snapshot = yield self.store.snapshot_room(event)
 

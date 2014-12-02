@@ -51,7 +51,7 @@ class ProfileHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_displayname(self, target_user):
-        if target_user.is_mine:
+        if self.hs.is_mine(target_user):
             displayname = yield self.store.get_profile_displayname(
                 target_user.localpart
             )
@@ -81,7 +81,7 @@ class ProfileHandler(BaseHandler):
     def set_displayname(self, target_user, auth_user, new_displayname):
         """target_user is the user whose displayname is to be changed;
         auth_user is the user attempting to make this change."""
-        if not target_user.is_mine:
+        if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         if target_user != auth_user:
@@ -101,7 +101,7 @@ class ProfileHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_avatar_url(self, target_user):
-        if target_user.is_mine:
+        if self.hs.is_mine(target_user):
             avatar_url = yield self.store.get_profile_avatar_url(
                 target_user.localpart
             )
@@ -130,7 +130,7 @@ class ProfileHandler(BaseHandler):
     def set_avatar_url(self, target_user, auth_user, new_avatar_url):
         """target_user is the user whose avatar_url is to be changed;
         auth_user is the user attempting to make this change."""
-        if not target_user.is_mine:
+        if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         if target_user != auth_user:
@@ -150,7 +150,7 @@ class ProfileHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def collect_presencelike_data(self, user, state):
-        if not user.is_mine:
+        if not self.hs.is_mine(user):
             defer.returnValue(None)
 
         with PreserveLoggingContext():
@@ -170,7 +170,7 @@ class ProfileHandler(BaseHandler):
     @defer.inlineCallbacks
     def on_profile_query(self, args):
         user = self.hs.parse_userid(args["user_id"])
-        if not user.is_mine:
+        if not self.hs.is_mine(user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         just_field = args.get("field", None)
@@ -191,7 +191,7 @@ class ProfileHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _update_join_states(self, user):
-        if not user.is_mine:
+        if not self.hs.is_mine(user):
             return
 
         joins = yield self.store.get_rooms_for_user_where_membership_is(

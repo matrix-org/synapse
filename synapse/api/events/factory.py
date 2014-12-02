@@ -58,7 +58,7 @@ class EventFactory(object):
 
         local_part = str(int(self.clock.time())) + i + random_string(5)
 
-        e_id = EventID.create_local(local_part, self.hs)
+        e_id = EventID.create(local_part, self.hs.hostname)
 
         return e_id.to_string()
 

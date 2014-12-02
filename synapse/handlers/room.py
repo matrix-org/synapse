@@ -52,9 +52,9 @@ class RoomCreationHandler(BaseHandler):
         self.ratelimit(user_id)
 
         if "room_alias_name" in config:
-            room_alias = RoomAlias.create_local(
+            room_alias = RoomAlias.create(
                 config["room_alias_name"],
-                self.hs
+                self.hs.hostname,
             )
             mapping = yield self.store.get_association_from_room_alias(
                 room_alias
@@ -77,7 +77,7 @@ class RoomCreationHandler(BaseHandler):
         if room_id:
             # Ensure room_id is the correct type
             room_id_obj = RoomID.from_string(room_id, self.hs)
-            if not room_id_obj.is_mine:
+            if not self.hs.is_mine(room_id_obj):
                 raise SynapseError(400, "Room id must be local")
 
             yield self.store.store_room(
@@ -93,7 +93,10 @@ class RoomCreationHandler(BaseHandler):
             while attempts < 5:
                 try:
                     random_string = stringutils.random_string(18)
-                    gen_room_id = RoomID.create_local(random_string, self.hs)
+                    gen_room_id = RoomID.create(
+                        random_string,
+                        self.hs.hostname,
+                    )
                     yield self.store.store_room(
                         room_id=gen_room_id.to_string(),
                         room_creator_user_id=user_id,
@@ -287,7 +290,7 @@ class RoomMemberHandler(BaseHandler):
             if ignore_user is not None and member == ignore_user:
                 continue
 
-            if member.is_mine:
+            if self.hs.is_mine(member):
                 if localusers is not None:
                     localusers.add(member)
             else:
@@ -457,7 +460,7 @@ class RoomMemberHandler(BaseHandler):
                     prev_state.user_id, self.hs
                 )
 
-                should_do_dance = not inviter.is_mine and not room
+                should_do_dance = not self.hs.is_mine(inviter) and not room
                 room_host = inviter.domain
             else:
                 should_do_dance = False
@@ -504,7 +507,7 @@ class RoomMemberHandler(BaseHandler):
                 prev_state.sender, self.hs
             )
 
-            is_remote_invite_join = not inviter.is_mine and not room
+            is_remote_invite_join = not self.hs.is_mine(inviter) and not room
             room_host = inviter.domain
         else:
             is_remote_invite_join = False
@@ -530,7 +533,7 @@ class RoomMemberHandler(BaseHandler):
         # HS.
         target_user_id = event.state_key
         target_user = self.hs.parse_userid(target_user_id)
-        if membership == Membership.INVITE and not target_user.is_mine:
+        if membership == Membership.INVITE and not self.hs.is_mine(target_user):
             do_invite_host = target_user.domain
         else:
             do_invite_host = None

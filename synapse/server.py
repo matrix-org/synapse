@@ -133,22 +133,22 @@ class BaseHomeServer(object):
     def parse_userid(self, s):
         """Parse the string given by 's' as a User ID and return a UserID
         object."""
-        return UserID.from_string(s, hs=self)
+        return UserID.from_string(s)
 
     def parse_roomalias(self, s):
         """Parse the string given by 's' as a Room Alias and return a RoomAlias
         object."""
-        return RoomAlias.from_string(s, hs=self)
+        return RoomAlias.from_string(s)
 
     def parse_roomid(self, s):
         """Parse the string given by 's' as a Room ID and return a RoomID
         object."""
-        return RoomID.from_string(s, hs=self)
+        return RoomID.from_string(s)
 
     def parse_eventid(self, s):
         """Parse the string given by 's' as a Event ID and return a EventID
         object."""
-        return EventID.from_string(s, hs=self)
+        return EventID.from_string(s)
 
     def serialize_event(self, e):
         return serialize_event(self, e)
@@ -164,6 +164,9 @@ class BaseHomeServer(object):
                 )[0]
 
         return ip_addr
+
+    def is_mine(self, domain_specific_string):
+        return domain_specific_string.domain == self.hostname
 
 # Build magic accessors for every dependency
 for depname in BaseHomeServer.DEPENDENCIES:

@@ -40,7 +40,7 @@ class DirectoryHandler(BaseHandler):
 
         # TODO(erikj): Do auth.
 
-        if not room_alias.is_mine:
+        if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
             # TODO(erikj): Change this.
 
@@ -64,7 +64,7 @@ class DirectoryHandler(BaseHandler):
     def delete_association(self, user_id, room_alias):
         # TODO Check if server admin
 
-        if not room_alias.is_mine:
+        if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
         room_id = yield self.store.delete_room_alias(room_alias)
@@ -75,7 +75,7 @@ class DirectoryHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_association(self, room_alias):
         room_id = None
-        if room_alias.is_mine:
+        if self.hs.is_mine(room_alias):
             result = yield self.store.get_association_from_room_alias(
                 room_alias
             )
@@ -123,7 +123,7 @@ class DirectoryHandler(BaseHandler):
     @defer.inlineCallbacks
     def on_directory_query(self, args):
         room_alias = self.hs.parse_roomalias(args["room_alias"])
-        if not room_alias.is_mine:
+        if not self.hs.is_mine(room_alias):
             raise SynapseError(
                 400, "Room Alias is not hosted on this Home Server"
             )

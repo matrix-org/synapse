@@ -83,7 +83,7 @@ class PresenceListRestServlet(RestServlet):
         user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
-        if not user.is_mine:
+        if not self.hs.is_mine(user):
             raise SynapseError(400, "User not hosted on this Home Server")
 
         if auth_user != user:
@@ -104,7 +104,7 @@ class PresenceListRestServlet(RestServlet):
         user_id = urllib.unquote(user_id)
         user = self.hs.parse_userid(user_id)
 
-        if not user.is_mine:
+        if not self.hs.is_mine(user):
             raise SynapseError(400, "User not hosted on this Home Server")
 
         if auth_user != user:
