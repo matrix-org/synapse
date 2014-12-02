@@ -69,8 +69,8 @@ command line utility which lets you easily see what the JSON APIs are up to).
 
 Meanwhile, iOS and Android SDKs and clients are currently in development and available from:
 
- * https://github.com/matrix-org/matrix-ios-sdk
- * https://github.com/matrix-org/matrix-android-sdk
+- https://github.com/matrix-org/matrix-ios-sdk
+- https://github.com/matrix-org/matrix-android-sdk
 
 We'd like to invite you to join #matrix:matrix.org (via http://matrix.org/alpha), run a homeserver, take a look at the Matrix spec at
 http://matrix.org/docs/spec, experiment with the APIs and the demo
@@ -94,7 +94,8 @@ header files for python C extensions.
 Installing prerequisites on Ubuntu or Debian::
 
     $ sudo apt-get install build-essential python2.7-dev libffi-dev \
-                           python-pip python-setuptools
+                           python-pip python-setuptools sqlite3 \
+                           libssl-dev
 
 Installing prerequisites on Mac OS X::
 
@@ -125,9 +126,12 @@ created. To reset the installation::
 pip seems to leak *lots* of memory during installation.  For instance, a Linux 
 host with 512MB of RAM may run out of memory whilst installing Twisted.  If this 
 happens, you will have to individually install the dependencies which are 
-failing, e.g.:
+failing, e.g.::
 
     $ pip install --user twisted
+
+On OSX, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
+will need to export CFLAGS=-Qunused-arguments.
 
 Running Your Homeserver
 =======================
@@ -148,7 +152,7 @@ Troubleshooting Running
 -----------------------
 
 If ``synctl`` fails with ``pkg_resources.DistributionNotFound`` errors you may 
-need a newer version of setuptools than that provided by your OS.
+need a newer version of setuptools than that provided by your OS.::
 
     $ sudo pip install setuptools --upgrade
 
@@ -172,7 +176,7 @@ Homeserver Development
 ======================
 
 To check out a homeserver for development, clone the git repo into a working
-directory of your choice:
+directory of your choice::
 
     $ git clone https://github.com/matrix-org/synapse.git
     $ cd synapse

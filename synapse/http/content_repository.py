@@ -181,7 +181,7 @@ class ContentRepoResource(resource.Resource):
 
             fname = yield self.map_request_to_name(request)
 
-            # TODO I have a suspcious feeling this is just going to block
+            # TODO I have a suspicious feeling this is just going to block
             with open(fname, "wb") as f:
                 f.write(request.content.read())
 
@@ -190,7 +190,7 @@ class ContentRepoResource(resource.Resource):
             # FIXME: we can't assume what the repo's public mounted path is
             # ...plus self-signed SSL won't work to remote clients anyway
             # ...and we can't assume that it's SSL anyway, as we might want to
-            # server it via the non-SSL listener...
+            # serve it via the non-SSL listener...
             url = "%s/_matrix/content/%s" % (
                 self.external_addr, file_name
             )

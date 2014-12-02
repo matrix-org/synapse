@@ -23,7 +23,7 @@ def get_targets(server_name):
         for srv in answers:
             yield (srv.target, srv.port)
     except dns.resolver.NXDOMAIN:
-        yield (server_name, 8480)
+        yield (server_name, 8448)
 
 def get_server_keys(server_name, target, port):
     url = "https://%s:%i/_matrix/key/v1" % (target, port)

@@ -28,11 +28,11 @@ class SourcePaginationConfig(object):
     specific event source."""
 
     def __init__(self, from_key=None, to_key=None, direction='f',
-                 limit=0):
+                 limit=None):
         self.from_key = from_key
         self.to_key = to_key
         self.direction = 'f' if direction == 'f' else 'b'
-        self.limit = int(limit)
+        self.limit = int(limit) if limit is not None else None
 
 
 class PaginationConfig(object):
@@ -40,11 +40,11 @@ class PaginationConfig(object):
     """A configuration object which stores pagination parameters."""
 
     def __init__(self, from_token=None, to_token=None, direction='f',
-                 limit=0):
+                 limit=None):
         self.from_token = from_token
         self.to_token = to_token
         self.direction = 'f' if direction == 'f' else 'b'
-        self.limit = int(limit)
+        self.limit = int(limit) if limit is not None else None
 
     @classmethod
     def from_request(cls, request, raise_invalid_params=True):
@@ -80,8 +80,8 @@ class PaginationConfig(object):
         except:
             raise SynapseError(400, "'to' paramater is invalid")
 
-        limit = get_param("limit", "0")
-        if not limit.isdigit():
+        limit = get_param("limit", None)
+        if limit is not None and not limit.isdigit():
             raise SynapseError(400, "'limit' parameter must be an integer.")
 
         try:

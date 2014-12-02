@@ -42,6 +42,7 @@ class FederationTestCase(unittest.TestCase):
 
         self.auth = NonCallableMock(spec_set=[
             "check",
+            "check_host_in_room",
         ])
 
         self.hostname = "test"
@@ -83,20 +84,25 @@ class FederationTestCase(unittest.TestCase):
             event_id="$a:b",
             user_id="@a:b",
             origin="b",
+            auth_events=[],
             hashes={"sha256":"AcLrgtUIqqwaGoHhrEvYG1YLDIsVPYJdSRGhkp3jJp8"},
         )
 
         self.datastore.persist_event.return_value = defer.succeed(None)
         self.datastore.get_room.return_value = defer.succeed(True)
+        self.auth.check_host_in_room.return_value = defer.succeed(True)
 
-        self.state_handler.annotate_event_with_state.return_value = (
-            defer.succeed(False)
+        def annotate(ev, old_state=None):
+            ev.old_state_events = []
+            return defer.succeed(False)
+        self.state_handler.annotate_event_with_state.side_effect = annotate
+
+        yield self.handlers.federation_handler.on_receive_pdu(
+            "fo", pdu, False
         )
 
-        yield self.handlers.federation_handler.on_receive_pdu(pdu, False)
-
         self.datastore.persist_event.assert_called_once_with(
-            ANY, False, is_new_state=False
+            ANY, is_new_state=False, backfilled=False, current_state=None
         )
 
         self.state_handler.annotate_event_with_state.assert_called_once_with(
@@ -104,7 +110,7 @@ class FederationTestCase(unittest.TestCase):
             old_state=None,
         )
 
-        self.auth.check.assert_called_once_with(ANY, raises=True)
+        self.auth.check.assert_called_once_with(ANY, auth_events={})
 
         self.notifier.on_new_room_event.assert_called_once_with(
             ANY,

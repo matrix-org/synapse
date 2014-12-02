@@ -243,7 +243,7 @@ class MessageHandler(BaseHandler):
         public_room_ids = [r["room_id"] for r in public_rooms]
 
         limit = pagin_config.limit
-        if not limit:
+        if limit is None:
             limit = 10
 
         for event in room_list:
@@ -306,7 +306,7 @@ class MessageHandler(BaseHandler):
         auth_user = self.hs.parse_userid(user_id)
 
         # TODO: These concurrently
-        state_tuples = yield self.store.get_current_state(room_id)
+        state_tuples = yield self.state_handler.get_current_state(room_id)
         state = [self.hs.serialize_event(x) for x in state_tuples]
 
         member_event = (yield self.store.get_room_member(
