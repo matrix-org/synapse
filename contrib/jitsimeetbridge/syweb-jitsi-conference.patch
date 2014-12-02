@@ -1,0 +1,188 @@
+diff --git a/syweb/webclient/app/components/matrix/matrix-call.js b/syweb/webclient/app/components/matrix/matrix-call.js
+index 9fbfff0..dc68077 100644
+--- a/syweb/webclient/app/components/matrix/matrix-call.js
++++ b/syweb/webclient/app/components/matrix/matrix-call.js
+@@ -16,6 +16,45 @@ limitations under the License.
+ 
+ 'use strict';
+ 
++
++function sendKeyframe(pc) {
++    console.log('sendkeyframe', pc.iceConnectionState);
++    if (pc.iceConnectionState !== 'connected') return; // safe...
++    pc.setRemoteDescription(
++        pc.remoteDescription,
++        function () {
++            pc.createAnswer(
++                function (modifiedAnswer) {
++                    pc.setLocalDescription(
++                        modifiedAnswer,
++                        function () {
++                            // noop
++                        },
++                        function (error) {
++                            console.log('triggerKeyframe setLocalDescription failed', error);
++                            messageHandler.showError();
++                        }
++                    );
++                },
++                function (error) {
++                    console.log('triggerKeyframe createAnswer failed', error);
++                    messageHandler.showError();
++                }
++            );
++        },
++        function (error) {
++            console.log('triggerKeyframe setRemoteDescription failed', error);
++            messageHandler.showError();
++        }
++    );
++} 
++
++
++
++
++
++
++
+ var forAllVideoTracksOnStream = function(s, f) {
+     var tracks = s.getVideoTracks();
+     for (var i = 0; i < tracks.length; i++) {
+@@ -83,7 +122,7 @@ angular.module('MatrixCall', [])
+     }
+ 
+     // FIXME: we should prevent any calls from being placed or accepted before this has finished
+-    MatrixCall.getTurnServer();
++    //MatrixCall.getTurnServer();
+ 
+     MatrixCall.CALL_TIMEOUT = 60000;
+     MatrixCall.FALLBACK_STUN_SERVER = 'stun:stun.l.google.com:19302';
+@@ -132,6 +171,22 @@ angular.module('MatrixCall', [])
+         pc.onsignalingstatechange = function() { self.onSignallingStateChanged(); };
+         pc.onicecandidate = function(c) { self.gotLocalIceCandidate(c); };
+         pc.onaddstream = function(s) { self.onAddStream(s); };
++
++        var datachan = pc.createDataChannel('RTCDataChannel', {
++            reliable: false
++        });
++        console.log("data chan: "+datachan);
++        datachan.onopen = function() {
++            console.log("data channel open");
++        };
++        datachan.onmessage = function() {
++            console.log("data channel message");
++        };
++        pc.ondatachannel = function(event) {
++            console.log("have data channel");
++            event.channel.binaryType = 'blob';
++        };
++
+         return pc;
+     }
+ 
+@@ -200,6 +255,12 @@ angular.module('MatrixCall', [])
+         }, this.msg.lifetime - event.age);
+     };
+ 
++    MatrixCall.prototype.receivedInvite = function(event) {
++        console.log("Got second invite for call "+this.call_id);
++        this.peerConn.setRemoteDescription(new RTCSessionDescription(this.msg.offer), this.onSetRemoteDescriptionSuccess, this.onSetRemoteDescriptionError);
++    };
++    
++
+     // perverse as it may seem, sometimes we want to instantiate a call with a hangup message
+     // (because when getting the state of the room on load, events come in reverse order and
+     // we want to remember that a call has been hung up)
+@@ -349,7 +410,7 @@ angular.module('MatrixCall', [])
+             'mandatory': {
+                 'OfferToReceiveAudio': true,
+                 'OfferToReceiveVideo': this.type == 'video'
+-            },
++            }
+         };
+         this.peerConn.createAnswer(function(d) { self.createdAnswer(d); }, function(e) {}, constraints);
+         // This can't be in an apply() because it's called by a predecessor call under glare conditions :(
+@@ -359,8 +420,20 @@ angular.module('MatrixCall', [])
+     MatrixCall.prototype.gotLocalIceCandidate = function(event) {
+         if (event.candidate) {
+             console.log("Got local ICE "+event.candidate.sdpMid+" candidate: "+event.candidate.candidate);
+-            this.sendCandidate(event.candidate);
+-        }
++            //this.sendCandidate(event.candidate);
++        } else {
++            console.log("have all candidates, sending answer");
++            var content = {
++                version: 0,
++                call_id: this.call_id,
++                answer: this.peerConn.localDescription
++            };
++            this.sendEventWithRetry('m.call.answer', content);
++            var self = this;
++            $rootScope.$apply(function() {
++                self.state = 'connecting';
++            });
++	}
+     }
+ 
+     MatrixCall.prototype.gotRemoteIceCandidate = function(cand) {
+@@ -418,15 +491,6 @@ angular.module('MatrixCall', [])
+         console.log("Created answer: "+description);
+         var self = this;
+         this.peerConn.setLocalDescription(description, function() {
+-            var content = {
+-                version: 0,
+-                call_id: self.call_id,
+-                answer: self.peerConn.localDescription
+-            };
+-            self.sendEventWithRetry('m.call.answer', content);
+-            $rootScope.$apply(function() {
+-                self.state = 'connecting';
+-            });
+         }, function() { console.log("Error setting local description!"); } );
+     };
+ 
+@@ -448,6 +512,9 @@ angular.module('MatrixCall', [])
+             $rootScope.$apply(function() {
+                 self.state = 'connected';
+                 self.didConnect = true;
++		/*$timeout(function() {
++                    sendKeyframe(self.peerConn);
++                }, 1000);*/
+             });
+         } else if (this.peerConn.iceConnectionState == 'failed') {
+             this.hangup('ice_failed');
+@@ -518,6 +585,7 @@ angular.module('MatrixCall', [])
+ 
+     MatrixCall.prototype.onRemoteStreamEnded = function(event) {
+         console.log("Remote stream ended");
++        return;
+         var self = this;
+         $rootScope.$apply(function() {
+             self.state = 'ended';
+diff --git a/syweb/webclient/app/components/matrix/matrix-phone-service.js b/syweb/webclient/app/components/matrix/matrix-phone-service.js
+index 55dbbf5..272fa27 100644
+--- a/syweb/webclient/app/components/matrix/matrix-phone-service.js
++++ b/syweb/webclient/app/components/matrix/matrix-phone-service.js
+@@ -48,6 +48,13 @@ angular.module('matrixPhoneService', [])
+                 return;
+             }
+ 
++            // do we already have an entry for this call ID?
++            var existingEntry = matrixPhoneService.allCalls[msg.call_id];
++            if (existingEntry) {
++                 existingEntry.receivedInvite(msg);
++                 return;
++            }
++
+             var call = undefined;
+             if (!isLive) {
+                 // if this event wasn't live then this call may already be over
+@@ -108,7 +115,7 @@ angular.module('matrixPhoneService', [])
+                     call.hangup();
+                 }
+             } else {
+-                $rootScope.$broadcast(matrixPhoneService.INCOMING_CALL_EVENT, call);
++                 $rootScope.$broadcast(matrixPhoneService.INCOMING_CALL_EVENT, call);
+             }
+         } else if (event.type == 'm.call.answer') {
+             var call = matrixPhoneService.allCalls[msg.call_id];
