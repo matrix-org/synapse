@@ -853,7 +853,10 @@ class _TransactionQueue(object):
 
                 # Ensures we don't continue until all callbacks on that
                 # deferred have fired
-                yield deferred
+                try:
+                    yield deferred
+                except:
+                    pass
 
             logger.debug("TX [%s] Yielded to callbacks", destination)
 
@@ -865,7 +868,8 @@ class _TransactionQueue(object):
             logger.exception(e)
 
             for deferred in deferreds:
-                deferred.errback(e)
+                if not deferred.called:
+                    deferred.errback(e)
 
         finally:
             # We want to be *very* sure we delete this after we stop processing
