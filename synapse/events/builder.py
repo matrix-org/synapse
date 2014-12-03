@@ -13,32 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import Event
+from . import EventBase, FrozenEvent
 
 from synapse.types import EventID
 
 from synapse.util.stringutils import random_string
 
 
-class EventBuilder(object):
+class EventBuilder(EventBase):
     def __init__(self, key_values={}):
-        self._event_dict = dict(key_values)
-        self._metadata = {}
-
-    def update_event_key(self, key, value):
-        self._event_dict[key] = value
+        super(FrozenEvent, self).__init__(
+            key_values,
+        )
 
     def update_event_keys(self, other_dict):
         self._event_dict.update(other_dict)
 
-    def update_internal_key(self, key, value):
-        self._metadata[key] = value
-
     def build(self):
-        return Event(
-            self._event_dict,
-            self._metadata,
-        )
+        return FrozenEvent.from_event(self)
 
 
 class EventBuilderFactory(object):

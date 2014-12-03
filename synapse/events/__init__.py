@@ -16,6 +16,21 @@
 from frozendict import frozendict
 
 
+def _freeze(o):
+    if isinstance(o, dict):
+        return frozendict({k: _freeze(v) for k,v in o.items()})
+
+    if isinstance(o, basestring):
+        return o
+
+    try:
+        return tuple([_freeze(i) for i in o])
+    except TypeError:
+        pass
+
+    return o
+
+
 class _EventInternalMetadata(object):
     def __init__(self, internal_metadata_dict):
         self.__dict__ = internal_metadata_dict
@@ -24,78 +39,47 @@ class _EventInternalMetadata(object):
         return dict(self.__dict__)
 
 
-class Event(object):
-    def __init__(self, event_dict, internal_metadata_dict={}):
-        self._signatures = event_dict.get("signatures", {})
-        self._unsigned = event_dict.get("unsigned", {})
+def _event_dict_property(key):
+        def getter(self):
+            return self._event_dict[key]
 
-        self._original = {
-            k: v
-            for k, v in event_dict.items()
-            if k not in ["signatures", "unsigned"]
-        }
+        def setter(self, v):
+            self._event_dict[key] = v
 
-        self._event_dict = frozendict(self._original)
+        def delete(self):
+            del self._event_dict[key]
+
+        return property(
+            getter,
+            setter,
+            delete,
+        )
+
+
+class EventBase(object):
+    def __init__(self, event_dict, signatures={}, unsigned={},
+                 internal_metadata_dict={}):
+        self.signatures = signatures
+        self.unsigned = unsigned
+
+        self._event_dict = event_dict
 
         self.internal_metadata = _EventInternalMetadata(
             internal_metadata_dict
         )
 
-    @property
-    def auth_events(self):
-        return self._event_dict["auth_events"]
-
-    @property
-    def content(self):
-        return self._event_dict["content"]
-
-    @property
-    def event_id(self):
-        return self._event_dict["event_id"]
-
-    @property
-    def hashes(self):
-        return self._event_dict["hashes"]
-
-    @property
-    def origin(self):
-        return self._event_dict["origin"]
-
-    @property
-    def prev_events(self):
-        return self._event_dict["prev_events"]
-
-    @property
-    def prev_state(self):
-        return self._event_dict["prev_state"]
-
-    @property
-    def room_id(self):
-        return self._event_dict["room_id"]
-
-    @property
-    def signatures(self):
-        return self._signatures
-
-    @property
-    def state_key(self):
-        return self._event_dict["state_key"]
-
-    @property
-    def type(self):
-        return self._event_dict["type"]
-
-    @property
-    def unsigned(self):
-        return self._unsigned
-
-    @property
-    def user_id(self):
-        return self._event_dict["sender"]
-
-    @property
-    def sender(self):
-        return self._event_dict["sender"]
+    auth_events = _event_dict_property("auth_events")
+    content = _event_dict_property("content")
+    event_id = _event_dict_property("event_id")
+    hashes = _event_dict_property("hashes")
+    origin = _event_dict_property("origin")
+    prev_events = _event_dict_property("prev_events")
+    prev_state = _event_dict_property("prev_state")
+    room_id = _event_dict_property("room_id")
+    sender = _event_dict_property("sender")
+    state_key = _event_dict_property("state_key")
+    type = _event_dict_property("type")
+    user_id = _event_dict_property("sender")
 
     def get_dict(self):
         d = dict(self._original)
@@ -118,3 +102,32 @@ class Event(object):
             del pdu_json["unsigned"]["age_ts"]
 
         return pdu_json
+
+    def __set__(self, instance, value):
+        raise AttributeError("Unrecognized attribute %s" % (instance,))
+
+
+class FrozenEvent(EventBase):
+    def __init__(self, event_dict, signatures={}, unsigned={}):
+        event_dict = dict(event_dict)
+
+        signatures.update(event_dict.pop("signatures", {}))
+        unsigned.update(event_dict.pop("unsigned", {}))
+
+        frozen_dict = _freeze(event_dict)
+
+        super(FrozenEvent, self).__init__(
+            frozen_dict,
+            signatures=signatures,
+            unsigned=unsigned
+        )
+
+    @staticmethod
+    def from_event(event):
+        e = FrozenEvent(
+            event.event_dict()
+        )
+
+        e.internal_metadata = event.internal_metadata
+
+        return e

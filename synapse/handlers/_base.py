@@ -21,6 +21,8 @@ from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.events.room import RoomMemberEvent
 from synapse.api.constants import Membership
 
+from synapse.events.snapshot import EventSnapshot, EventContext
+
 import logging
 
 
@@ -55,6 +57,55 @@ class BaseHandler(object):
             raise LimitExceededError(
                 retry_after_ms=int(1000*(time_allowed - time_now)),
             )
+
+    @defer.inlineCallbacks
+    def _handle_new_client_event(self, builder):
+        latest_ret = yield self.store.get_latest_events_in_room(
+            builder.room_id,
+        )
+
+        depth = max([d for _, _, d in latest_ret])
+        prev_events = [(e, h) for e, h, _ in latest_ret]
+
+        group, curr_state = yield self.state_handler.resolve_state_groups(
+            [e for e, _ in prev_events]
+        )
+
+        snapshot = EventSnapshot(
+            prev_events=prev_events,
+            depth=depth,
+            current_state=curr_state,
+            current_state_group=group,
+        )
+
+        builder.prev_events = prev_events
+        builder.depth = depth
+
+        auth_events = yield self.auth.get_event_auth(builder, curr_state)
+
+        builder.update_event_key("auth_events", auth_events)
+
+        add_hashes_and_signatures(
+            builder, self.server_name, self.signing_key
+        )
+
+        event = builder.build()
+
+        auth_ids = zip(*auth_events)[0]
+        curr_auth_events = {
+            k: v
+            for k, v in curr_state
+            if v.event_id in auth_ids
+        }
+
+        context = EventContext(
+            current_state=curr_state,
+            auth_events=curr_auth_events,
+        )
+
+        self.auth.check(event, auth_events=context.auth_events)
+
+
 
     @defer.inlineCallbacks
     def _on_new_room_event(self, event, snapshot, extra_destinations=[],

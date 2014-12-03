@@ -351,7 +351,7 @@ class Auth(object):
         return self.store.is_server_admin(user)
 
     @defer.inlineCallbacks
-    def add_auth_events(self, event):
+    def get_auth_events(self, event, current_state):
         if event.type == RoomCreateEvent.TYPE:
             event.auth_events = []
             return
@@ -359,19 +359,19 @@ class Auth(object):
         auth_events = []
 
         key = (RoomPowerLevelsEvent.TYPE, "", )
-        power_level_event = event.old_state_events.get(key)
+        power_level_event = current_state.get(key)
 
         if power_level_event:
             auth_events.append(power_level_event.event_id)
 
         key = (RoomJoinRulesEvent.TYPE, "", )
-        join_rule_event = event.old_state_events.get(key)
+        join_rule_event = current_state.get(key)
 
         key = (RoomMemberEvent.TYPE, event.user_id, )
-        member_event = event.old_state_events.get(key)
+        member_event = current_state.get(key)
 
         key = (RoomCreateEvent.TYPE, "", )
-        create_event = event.old_state_events.get(key)
+        create_event = current_state.get(key)
         if create_event:
             auth_events.append(create_event.event_id)
 
@@ -403,7 +403,8 @@ class Auth(object):
             }
             for h in hashes
         ]
-        event.auth_events = zip(auth_events, hashes)
+
+        defer.returnValue(zip(auth_events, hashes))
 
     @log_function
     def _can_send_event(self, event, auth_events):
