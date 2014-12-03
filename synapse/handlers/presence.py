@@ -659,10 +659,6 @@ class PresenceHandler(BaseHandler):
             if room_ids:
                 logger.debug(" | %d interested room IDs %r", len(room_ids), room_ids)
 
-            if not observers and not room_ids:
-                logger.debug(" | no interested observers or room IDs")
-                continue
-
             state = dict(push)
             del state["user_id"]
 
@@ -682,6 +678,10 @@ class PresenceHandler(BaseHandler):
 
             self._user_cachemap_latest_serial += 1
             statuscache.update(state, serial=self._user_cachemap_latest_serial)
+
+            if not observers and not room_ids:
+                logger.debug(" | no interested observers or room IDs")
+                continue
 
             self.push_update_to_clients(
                 observed_user=user,
