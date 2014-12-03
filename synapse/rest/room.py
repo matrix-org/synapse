@@ -327,7 +327,9 @@ class RoomMessageListRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         user = yield self.auth.get_user_by_req(request)
-        pagination_config = PaginationConfig.from_request(request)
+        pagination_config = PaginationConfig.from_request(request,
+            default_limit=10,
+        )
         with_feedback = "feedback" in request.args
         handler = self.handlers.message_handler
         msgs = yield handler.get_messages(

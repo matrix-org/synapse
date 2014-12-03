@@ -522,7 +522,11 @@ class RoomMemberHandler(BaseHandler):
             user_id=user.to_string(), membership_list=membership_list
         )
 
-        defer.returnValue([r.room_id for r in rooms])
+        # For some reason the list of events contains duplicates
+        # TODO(paul): work out why because I really don't think it should
+        room_ids = set(r.room_id for r in rooms)
+
+        defer.returnValue(room_ids)
 
     @defer.inlineCallbacks
     def _do_local_membership_update(self, event, membership, snapshot,

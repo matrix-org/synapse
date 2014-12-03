@@ -651,11 +651,16 @@ class PresenceHandler(BaseHandler):
             logger.debug("Incoming presence update from %s", user)
 
             observers = set(self._remote_recvmap.get(user, set()))
+            if observers:
+                logger.debug(" | %d interested local observers %r", len(observers), observers)
 
             rm_handler = self.homeserver.get_handlers().room_member_handler
             room_ids = yield rm_handler.get_rooms_for_user(user)
+            if room_ids:
+                logger.debug(" | %d interested room IDs %r", len(room_ids), room_ids)
 
             if not observers and not room_ids:
+                logger.debug(" | no interested observers or room IDs")
                 continue
 
             state = dict(push)

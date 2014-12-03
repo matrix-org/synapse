@@ -35,8 +35,11 @@ class ServerConfig(Config):
         if not args.content_addr:
             host = args.server_name
             if ':' not in host:
-                host = "%s:%d" % (host, args.bind_port)
-            args.content_addr = "https://%s" % (host,)
+                host = "%s:%d" % (host, args.unsecure_port)
+            else:
+                host = host.split(':')[0]
+                host = "%s:%d" % (host, args.unsecure_port)
+            args.content_addr = "http://%s" % (host,)
 
         self.content_addr = args.content_addr
 
