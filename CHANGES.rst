@@ -1,3 +1,11 @@
+Changes in synapse 0.5.4 (2014-12-03)
+=====================================
+
+ * Fix presence bug where some rooms did not display presence updates for
+   remote users.
+ * Do not log SQL timing log lines when started with "-v"
+ * Fix potential memory leak.
+
 Changes in synapse 0.5.3c (2014-12-02)
 ======================================
 
