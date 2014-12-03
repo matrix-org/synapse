@@ -34,13 +34,17 @@ class PusherPool:
     def start(self):
         self._pushers_added()
 
-    def add_pusher(self, user_name, kind, app, app_display_name, device_display_name, pushkey, data):
-        # we try to create the pusher just to validate the config: it will then get pulled out of the database,
-        # recreated, added and started: this means we have only one code path adding pushers.
+    def add_pusher(self, user_name, kind, app_id, app_instance_id,
+                   app_display_name, device_display_name, pushkey, data):
+        # we try to create the pusher just to validate the config: it
+        # will then get pulled out of the database,
+        # recreated, added and started: this means we have only one
+        # code path adding pushers.
         self._create_pusher({
             "user_name": user_name,
             "kind": kind,
-            "app": app,
+            "app_id": app_id,
+            "app_instance_id": app_instance_id,
             "app_display_name": app_display_name,
             "device_display_name": device_display_name,
             "pushkey": pushkey,
@@ -49,42 +53,55 @@ class PusherPool:
             "last_success": None,
             "failing_since": None
         })
-        self._add_pusher_to_store(user_name, kind, app, app_display_name, device_display_name, pushkey, data)
+        self._add_pusher_to_store(user_name, kind, app_id, app_instance_id,
+                                  app_display_name, device_display_name,
+                                  pushkey, data)
 
     @defer.inlineCallbacks
-    def _add_pusher_to_store(self, user_name, kind, app, app_display_name, device_display_name, pushkey, data):
-        yield self.store.add_pusher(user_name=user_name,
-                                 kind=kind,
-                                 app=app,
-                                 app_display_name=app_display_name,
-                                 device_display_name=device_display_name,
-                                 pushkey=pushkey,
-                                 data=json.dumps(data))
+    def _add_pusher_to_store(self, user_name, kind, app_id, app_instance_id,
+                             app_display_name, device_display_name,
+                             pushkey, data):
+        yield self.store.add_pusher(
+            user_name=user_name,
+            kind=kind,
+            app_id=app_id,
+            app_instance_id=app_instance_id,
+            app_display_name=app_display_name,
+            device_display_name=device_display_name,
+            pushkey=pushkey,
+            data=json.dumps(data)
+        )
         self._pushers_added()
 
     def _create_pusher(self, pusherdict):
         if pusherdict['kind'] == 'http':
-            return HttpPusher(self.hs,
-                               user_name=pusherdict['user_name'],
-                               app=pusherdict['app'],
-                               app_display_name=pusherdict['app_display_name'],
-                               device_display_name=pusherdict['device_display_name'],
-                               pushkey=pusherdict['pushkey'],
-                               data=pusherdict['data'],
-                               last_token=pusherdict['last_token'],
-                               last_success=pusherdict['last_success'],
-                               failing_since=pusherdict['failing_since']
-                               )
+            return HttpPusher(
+                self.hs,
+                user_name=pusherdict['user_name'],
+                app_id=pusherdict['app_id'],
+                app_instance_id=pusherdict['app_instance_id'],
+                app_display_name=pusherdict['app_display_name'],
+                device_display_name=pusherdict['device_display_name'],
+                pushkey=pusherdict['pushkey'],
+                data=pusherdict['data'],
+                last_token=pusherdict['last_token'],
+                last_success=pusherdict['last_success'],
+                failing_since=pusherdict['failing_since']
+            )
         else:
-            raise PusherConfigException("Unknown pusher type '%s' for user %s" %
-                                        (pusherdict['kind'], pusherdict['user_name']))
+            raise PusherConfigException(
+                "Unknown pusher type '%s' for user %s" %
+                (pusherdict['kind'], pusherdict['user_name'])
+            )
 
     @defer.inlineCallbacks
     def _pushers_added(self):
-        pushers = yield self.store.get_all_pushers_after_id(self.last_pusher_started)
+        pushers = yield self.store.get_all_pushers_after_id(
+            self.last_pusher_started
+        )
         for p in pushers:
             p['data'] = json.loads(p['data'])
-        if (len(pushers)):
+        if len(pushers):
             self.last_pusher_started = pushers[-1]['id']
 
         self._start_pushers(pushers)
