@@ -378,6 +378,7 @@ class RoomMemberHandler(BaseHandler):
         else:
             # This is not a JOIN, so we can handle it normally.
 
+            # FIXME: This isn't idempotency.
             if prev_state and prev_state.membership == event.membership:
                 # double same action, treat this event as a NOOP.
                 defer.returnValue({})

@@ -15,11 +15,11 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import LimitExceededError
+from synapse.api.errors import LimitExceededError, SynapseError
 from synapse.util.async import run_on_reactor
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.events.room import RoomMemberEvent
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, EventTypes
 
 from synapse.events.snapshot import EventSnapshot, EventContext
 
@@ -59,7 +59,7 @@ class BaseHandler(object):
             )
 
     @defer.inlineCallbacks
-    def _handle_new_client_event(self, builder):
+    def _create_new_client_event(self, builder):
         latest_ret = yield self.store.get_latest_events_in_room(
             builder.room_id,
         )
@@ -67,16 +67,27 @@ class BaseHandler(object):
         depth = max([d for _, _, d in latest_ret])
         prev_events = [(e, h) for e, h, _ in latest_ret]
 
-        group, curr_state = yield self.state_handler.resolve_state_groups(
-            [e for e, _ in prev_events]
-        )
+        state_handler = self.state_handler
+        if builder.is_state():
+            ret = yield state_handler.resolve_state_groups(
+                [e for e, _ in prev_events],
+                event_type=builder.event_type,
+                state_key=builder.state_key,
+            )
 
-        snapshot = EventSnapshot(
-            prev_events=prev_events,
-            depth=depth,
-            current_state=curr_state,
-            current_state_group=group,
-        )
+            group, curr_state, prev_state = ret
+
+            prev_state = yield self.store.add_event_hashes(
+                prev_state
+            )
+
+            builder.prev_state = prev_state
+        else:
+            group, curr_state, _ = yield state_handler.resolve_state_groups(
+                [e for e, _ in prev_events],
+            )
+
+        builder.internal_metadata.state_group = group
 
         builder.prev_events = prev_events
         builder.depth = depth
@@ -103,9 +114,39 @@ class BaseHandler(object):
             auth_events=curr_auth_events,
         )
 
+        defer.returnValue(
+            (event, context,)
+        )
+
+    @defer.inlineCallbacks
+    def _handle_new_client_event(self, event, context):
+        # We now need to go and hit out to wherever we need to hit out to.
+
         self.auth.check(event, auth_events=context.auth_events)
 
+        yield self.store.persist_event(event)
 
+        destinations = set()
+        for k, s in context.current_state.items():
+            try:
+                if k[0] == EventTypes.Member:
+                    if s.content["membership"] == Membership.JOIN:
+                        destinations.add(
+                            self.hs.parse_userid(s.state_key).domain
+                        )
+            except SynapseError:
+                logger.warn(
+                    "Failed to get destination from event %s", s.event_id
+                )
+
+        yield self.notifier.on_new_room_event(event)
+
+        federation_handler = self.hs.get_handlers().federation_handler
+        yield federation_handler.handle_new_event(
+            event,
+            None,
+            destinations=destinations,
+        )
 
     @defer.inlineCallbacks
     def _on_new_room_event(self, event, snapshot, extra_destinations=[],

@@ -76,7 +76,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def handle_new_event(self, event, snapshot):
+    def handle_new_event(self, event, snapshot, destinations):
         """ Takes in an event from the client to server side, that has already
         been authed and handled by the state module, and sends it to any
         remote home servers that may be interested.
@@ -92,12 +92,7 @@ class FederationHandler(BaseHandler):
 
         yield run_on_reactor()
 
-        pdu = event
-
-        if not hasattr(pdu, "destinations") or not pdu.destinations:
-            pdu.destinations = []
-
-        yield self.replication_layer.send_pdu(pdu)
+        yield self.replication_layer.send_pdu(event, destinations)
 
     @log_function
     @defer.inlineCallbacks

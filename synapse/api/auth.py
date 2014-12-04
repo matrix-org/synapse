@@ -393,18 +393,11 @@ class Auth(object):
             if member_event.content["membership"] == Membership.JOIN:
                 auth_events.append(member_event.event_id)
 
-        hashes = yield self.store.get_event_reference_hashes(
+        auth_events = yield self.store.add_event_hashes(
             auth_events
         )
-        hashes = [
-            {
-                k: encode_base64(v) for k, v in h.items()
-                if k == "sha256"
-            }
-            for h in hashes
-        ]
 
-        defer.returnValue(zip(auth_events, hashes))
+        defer.returnValue(auth_events)
 
     @log_function
     def _can_send_event(self, event, auth_events):

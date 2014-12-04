@@ -81,6 +81,9 @@ class EventBase(object):
     type = _event_dict_property("type")
     user_id = _event_dict_property("sender")
 
+    def is_state(self):
+        return hasattr(self, "state_key")
+
     def get_dict(self):
         d = dict(self._original)
         d.update({

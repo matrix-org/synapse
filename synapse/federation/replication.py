@@ -112,7 +112,7 @@ class ReplicationLayer(object):
         self.query_handlers[query_type] = handler
 
     @log_function
-    def send_pdu(self, pdu):
+    def send_pdu(self, pdu, destinations):
         """Informs the replication layer about a new PDU generated within the
         home server that should be transmitted to others.
 
@@ -131,7 +131,7 @@ class ReplicationLayer(object):
         logger.debug("[%s] transaction_layer.enqueue_pdu... ", pdu.event_id)
 
         # TODO, add errback, etc.
-        self._transaction_queue.enqueue_pdu(pdu, order)
+        self._transaction_queue.enqueue_pdu(pdu, destinations, order)
 
         logger.debug(
             "[%s] transaction_layer.enqueue_pdu... done",
@@ -705,15 +705,13 @@ class _TransactionQueue(object):
 
     @defer.inlineCallbacks
     @log_function
-    def enqueue_pdu(self, pdu, order):
+    def enqueue_pdu(self, pdu, destinations, order):
         # We loop through all destinations to see whether we already have
         # a transaction in progress. If we do, stick it in the pending_pdus
         # table and we'll get back to it later.
 
-        destinations = set([
-            d for d in pdu.destinations
-            if d != self.server_name
-        ])
+        destinations = set(destinations)
+        destinations.remove(self.server_name)
 
         logger.debug("Sending to: %s", str(destinations))
 
