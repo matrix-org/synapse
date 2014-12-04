@@ -22,9 +22,12 @@ from synapse.util.stringutils import random_string
 
 class EventBuilder(EventBase):
     def __init__(self, key_values={}):
-        super(FrozenEvent, self).__init__(
+        super(EventBuilder, self).__init__(
             key_values,
         )
+
+    def update_event_key(self, key, value):
+        self._event_dict[key] = value
 
     def update_event_keys(self, other_dict):
         self._event_dict.update(other_dict)

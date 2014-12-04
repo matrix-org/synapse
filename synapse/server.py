@@ -36,6 +36,7 @@ from synapse.util.lockutils import LockManager
 from synapse.streams.events import EventSources
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.crypto.keyring import Keyring
+from synapse.events.builder import EventBuilderFactory
 
 
 class BaseHomeServer(object):
@@ -82,6 +83,7 @@ class BaseHomeServer(object):
         'ratelimiter',
         'keyring',
         'event_validator',
+        'event_builder_factory',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -230,6 +232,12 @@ class HomeServer(BaseHomeServer):
 
     def build_event_validator(self):
         return EventValidator(self)
+
+    def build_event_builder_factory(self):
+        return EventBuilderFactory(
+            clock=self.get_clock(),
+            hostname=self.hostname,
+        )
 
     def register_servlets(self):
         """ Register all servlets associated with this HomeServer.

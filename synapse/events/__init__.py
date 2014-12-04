@@ -85,10 +85,10 @@ class EventBase(object):
         return hasattr(self, "state_key")
 
     def get_dict(self):
-        d = dict(self._original)
+        d = dict(self._event_dict)
         d.update({
-            "signatures": self._signatures,
-            "unsigned": self._unsigned,
+            "signatures": self.signatures,
+            "unsigned": self.unsigned,
         })
 
         return d
@@ -128,7 +128,7 @@ class FrozenEvent(EventBase):
     @staticmethod
     def from_event(event):
         e = FrozenEvent(
-            event.event_dict()
+            event.get_pdu_json()
         )
 
         e.internal_metadata = event.internal_metadata

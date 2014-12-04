@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from _base import SQLBaseStore
 
 from syutil.base64util import encode_base64
@@ -69,8 +71,9 @@ class SignatureStore(SQLBaseStore):
             f
         )
 
+    @defer.inlineCallbacks
     def add_event_hashes(self, event_ids):
-        hashes = yield self.store.get_event_reference_hashes(
+        hashes = yield self.get_event_reference_hashes(
             event_ids
         )
         hashes = [

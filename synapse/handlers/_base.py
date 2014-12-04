@@ -46,6 +46,8 @@ class BaseHandler(object):
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
 
+        self.event_builder_factory = hs.get_event_builder_factory()
+
     def ratelimit(self, user_id):
         time_now = self.clock.time()
         allowed, time_allowed = self.ratelimiter.send_message(
@@ -92,7 +94,7 @@ class BaseHandler(object):
         builder.prev_events = prev_events
         builder.depth = depth
 
-        auth_events = yield self.auth.get_event_auth(builder, curr_state)
+        auth_events = yield self.auth.get_auth_events(builder, curr_state)
 
         builder.update_event_key("auth_events", auth_events)
 
@@ -105,7 +107,7 @@ class BaseHandler(object):
         auth_ids = zip(*auth_events)[0]
         curr_auth_events = {
             k: v
-            for k, v in curr_state
+            for k, v in curr_state.items()
             if v.event_id in auth_ids
         }
 
@@ -119,14 +121,16 @@ class BaseHandler(object):
         )
 
     @defer.inlineCallbacks
-    def _handle_new_client_event(self, event, context):
+    def handle_new_client_event(self, event, context, extra_destinations=[],
+                                extra_users=[], suppress_auth=False):
         # We now need to go and hit out to wherever we need to hit out to.
 
-        self.auth.check(event, auth_events=context.auth_events)
+        if not suppress_auth:
+            self.auth.check(event, auth_events=context.auth_events)
 
         yield self.store.persist_event(event)
 
-        destinations = set()
+        destinations = set(extra_destinations)
         for k, s in context.current_state.items():
             try:
                 if k[0] == EventTypes.Member:
@@ -139,7 +143,7 @@ class BaseHandler(object):
                     "Failed to get destination from event %s", s.event_id
                 )
 
-        yield self.notifier.on_new_room_event(event)
+        yield self.notifier.on_new_room_event(event, extra_users=extra_users)
 
         federation_handler = self.hs.get_handlers().federation_handler
         yield federation_handler.handle_new_event(

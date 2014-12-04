@@ -148,16 +148,12 @@ class DirectoryHandler(BaseHandler):
     def send_room_alias_update_event(self, user_id, room_id):
         aliases = yield self.store.get_aliases_for_room(room_id)
 
-        event = self.event_factory.create_event(
-            etype=RoomAliasesEvent.TYPE,
-            state_key=self.hs.hostname,
-            room_id=room_id,
-            user_id=user_id,
-            content={"aliases": aliases},
-        )
+        msg_handler = self.hs.get_handlers().message_handler
+        yield msg_handler.handle_event({
+            "type": RoomAliasesEvent.TYPE,
+            "state_key": self.hs.hostname,
+            "room_id": room_id,
+            "sender": user_id,
+            "content": {"aliases": aliases},
+        })
 
-        snapshot = yield self.store.snapshot_room(event)
-
-        yield self._on_new_room_event(
-            event, snapshot, extra_users=[user_id], suppress_auth=True
-        )

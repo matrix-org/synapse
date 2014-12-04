@@ -421,16 +421,17 @@ class FederationHandler(BaseHandler):
         join event for the room and return that. We don *not* persist or
         process it until the other server has signed it and sent it back.
         """
-        event = self.event_factory.create_event(
-            etype=RoomMemberEvent.TYPE,
-            content={"membership": Membership.JOIN},
-            room_id=context,
-            user_id=user_id,
-            state_key=user_id,
-        )
+        builder = self.event_builder_factory.new({
+            "type": RoomMemberEvent.TYPE,
+            "content": {"membership": Membership.JOIN},
+            "room_id": context,
+            "sender": user_id,
+            "state_key": user_id,
+        })
 
-        snapshot = yield self.store.snapshot_room(event)
-        snapshot.fill_out_prev_events(event)
+        event, context = yield self._create_new_client_event(
+            builder=builder,
+        )
 
         yield self.state_handler.annotate_event_with_state(event)
         yield self.auth.add_auth_events(event)

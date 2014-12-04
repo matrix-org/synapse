@@ -74,6 +74,7 @@ class ReplicationLayer(object):
         self._clock = hs.get_clock()
 
         self.event_factory = hs.get_event_factory()
+        self.event_builder_factory = hs.get_event_builder_factory()
 
     def set_handler(self, handler):
         """Sets the handler that the replication layer will use to communicate
@@ -658,18 +659,13 @@ class ReplicationLayer(object):
         return "<ReplicationLayer(%s)>" % self.server_name
 
     def event_from_pdu_json(self, pdu_json, outlier=False):
-        #TODO: Check we have all the PDU keys here
-        pdu_json.setdefault("hashes", {})
-        pdu_json.setdefault("signatures", {})
-        sender = pdu_json.pop("sender", None)
-        if sender is not None:
-            pdu_json["user_id"] = sender
-        state_hash = pdu_json.get("unsigned", {}).pop("state_hash", None)
-        if state_hash is not None:
-            pdu_json["state_hash"] = state_hash
-        return self.event_factory.create_event(
-            pdu_json["type"], outlier=outlier, **pdu_json
+        builder = self.event_builder_factory.new(
+            pdu_json
         )
+
+        builder.internal_metadata = outlier
+
+        return builder.build()
 
 
 class _TransactionQueue(object):

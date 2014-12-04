@@ -117,10 +117,10 @@ class RoomStateEventRestServlet(RestServlet):
                                   self.on_PUT_no_state_key)
 
     def on_GET_no_state_key(self, request, room_id, event_type):
-        return self.on_GET(request, room_id, event_type, "")
+        return self.on_GET(request, room_id, event_type, None)
 
     def on_PUT_no_state_key(self, request, room_id, event_type):
-        return self.on_PUT(request, room_id, event_type, "")
+        return self.on_PUT(request, room_id, event_type, None)
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_type, state_key):
@@ -147,28 +147,18 @@ class RoomStateEventRestServlet(RestServlet):
 
         content = _parse_json(request)
 
-        event = self.event_factory.create_event(
-            etype=event_type,  # already urldecoded
-            content=content,
-            room_id=urllib.unquote(room_id),
-            user_id=user.to_string(),
-            state_key=urllib.unquote(state_key)
-            )
+        msg_handler = self.handlers.message_handler
+        yield msg_handler.handle_event(
+            {
+                "type": event_type,
+                "content": content,
+                "room_id": room_id,
+                "sender": user.to_string(),
+                "state_key": urllib.unquote(state_key),
+            }
+        )
 
-        self.validator.validate(event)
-
-        if event_type == RoomMemberEvent.TYPE:
-            # membership events are special
-            handler = self.handlers.room_member_handler
-            yield handler.change_membership(event)
-            defer.returnValue((200, {}))
-        else:
-            # store random bits of state
-            msg_handler = self.handlers.message_handler
-            yield msg_handler.store_room_data(
-                event=event
-            )
-            defer.returnValue((200, {}))
+        defer.returnValue((200, {}))
 
 
 # TODO: Needs unit testing for generic events + feedback
@@ -184,17 +174,15 @@ class RoomSendEventRestServlet(RestServlet):
         user = yield self.auth.get_user_by_req(request)
         content = _parse_json(request)
 
-        event = self.event_factory.create_event(
-            etype=urllib.unquote(event_type),
-            room_id=urllib.unquote(room_id),
-            user_id=user.to_string(),
-            content=content
-        )
-
-        self.validator.validate(event)
-
         msg_handler = self.handlers.message_handler
-        yield msg_handler.send_message(event)
+        event = yield msg_handler.handle_event(
+            {
+                "type": urllib.unquote(event_type),
+                "content": content,
+                "room_id": urllib.unquote(room_id),
+                "sender": user.to_string(),
+            }
+        )
 
         defer.returnValue((200, {"event_id": event.event_id}))
 
@@ -251,18 +239,17 @@ class JoinRoomAliasServlet(RestServlet):
             ret_dict = yield handler.join_room_alias(user, identifier)
             defer.returnValue((200, ret_dict))
         else:  # room id
-            event = self.event_factory.create_event(
-                etype=RoomMemberEvent.TYPE,
-                content={"membership": Membership.JOIN},
-                room_id=urllib.unquote(identifier.to_string()),
-                user_id=user.to_string(),
-                state_key=user.to_string()
+            msg_handler = self.handlers.message_handler
+            yield msg_handler.handle_event(
+                {
+                    "type": RoomMemberEvent.TYPE,
+                    "content": {"membership": Membership.JOIN},
+                    "room_id": urllib.unquote(identifier.to_string()),
+                    "sender": user.to_string(),
+                    "state_key": user.to_string(),
+                }
             )
 
-            self.validator.validate(event)
-
-            handler = self.handlers.room_member_handler
-            yield handler.change_membership(event)
             defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
@@ -414,18 +401,17 @@ class RoomMembershipRestServlet(RestServlet):
             if membership_action == "kick":
                 membership_action = "leave"
 
-        event = self.event_factory.create_event(
-            etype=RoomMemberEvent.TYPE,
-            content={"membership": unicode(membership_action)},
-            room_id=urllib.unquote(room_id),
-            user_id=user.to_string(),
-            state_key=state_key
+        msg_handler = self.handlers.message_handler
+        yield msg_handler.handle_event(
+            {
+                "type": RoomMemberEvent.TYPE,
+                "content": {"membership": unicode(membership_action)},
+                "room_id": urllib.unquote(room_id),
+                "sender": user.to_string(),
+                "state_key": state_key,
+            }
         )
 
-        self.validator.validate(event)
-
-        handler = self.handlers.room_member_handler
-        yield handler.change_membership(event)
         defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
@@ -453,18 +439,16 @@ class RoomRedactEventRestServlet(RestServlet):
         user = yield self.auth.get_user_by_req(request)
         content = _parse_json(request)
 
-        event = self.event_factory.create_event(
-            etype=RoomRedactionEvent.TYPE,
-            room_id=urllib.unquote(room_id),
-            user_id=user.to_string(),
-            content=content,
-            redacts=urllib.unquote(event_id),
-        )
-
-        self.validator.validate(event)
-
         msg_handler = self.handlers.message_handler
-        yield msg_handler.send_message(event)
+        event = yield msg_handler.handle_event(
+            {
+                "type": RoomRedactionEvent.TYPE,
+                "content": content,
+                "room_id": urllib.unquote(room_id),
+                "sender": user.to_string(),
+                "redacts": urllib.unquote(event_id),
+            }
+        )
 
         defer.returnValue((200, {"event_id": event.event_id}))
 

@@ -210,14 +210,11 @@ class ProfileHandler(BaseHandler):
                 "collect_presencelike_data", user, content
             )
 
-            new_event = self.event_factory.create_event(
-                etype=j.type,
-                room_id=j.room_id,
-                state_key=j.state_key,
-                content=content,
-                user_id=j.state_key,
-            )
-
-            yield self._on_new_room_event(
-                new_event, snapshot, suppress_auth=True
-            )
+            msg_handler = self.hs.get_handlers().message_handler
+            yield msg_handler.handle_event({
+                "type": j.type,
+                "room_id": j.room_id,
+                "state_key": j.state_key,
+                "content": content,
+                "sender": j.state_key,
+            })

@@ -63,7 +63,7 @@ class RestServlet(object):
         self.hs = hs
 
         self.handlers = hs.get_handlers()
-        self.event_factory = hs.get_event_factory()
+        self.builder_factory = hs.get_event_builder_factory()
         self.auth = hs.get_auth()
         self.txns = HttpTransactionStore()
 

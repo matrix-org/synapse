@@ -15,7 +15,7 @@
 # limitations under the License.
 
 
-from synapse.api.events.utils import prune_event
+from synapse.events.utils import prune_event
 from syutil.jsonutil import encode_canonical_json
 from syutil.base64util import encode_base64, decode_base64
 from syutil.crypto.jsonsign import sign_json

@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
 from synapse.util.logcontext import PreserveLoggingContext
@@ -132,6 +132,27 @@ class MessageHandler(BaseHandler):
         }
 
         defer.returnValue(chunk)
+
+    @defer.inlineCallbacks
+    def handle_event(self, event_dict):
+        builder = self.event_builder_factory.new(event_dict)
+
+        event, context = yield self._create_new_client_event(
+            builder=builder,
+        )
+
+        # TODO: self.validator.validate(event)
+
+        if event.type == EventTypes.Member:
+            member_handler = self.hs.get_handlers().room_member_handler
+            yield member_handler.change_membership(event, context)
+        else:
+            yield self.handle_new_client_event(
+                event=event,
+                context=context,
+            )
+
+        defer.returnValue(event)
 
     @defer.inlineCallbacks
     def store_room_data(self, event=None):
