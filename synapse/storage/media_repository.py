@@ -22,13 +22,13 @@ class MediaRepositoryStore(SQLBaseStore):
     def get_local_media(self, media_id):
         """Get the metadata for a local piece of media
         Returns:
-            None if the media_id doesn't exist.
+            None if the meia_id doesn't exist.
         """
         return self._simple_select_one(
             "local_media_repository",
             {"media_id": media_id},
             ("media_type", "media_length", "upload_name", "created_ts"),
-            True,
+            allow_none=True,
         )
 
     def store_local_media(self, media_id, media_type, time_now_ms, upload_name,
@@ -73,7 +73,11 @@ class MediaRepositoryStore(SQLBaseStore):
         return self._simple_select_one(
             "remote_media_cache",
             {"media_origin": origin, "media_id": media_id},
-            ("media_type", "media_length", "upload_name", "created_ts"),
+            (
+                "media_type", "media_length", "upload_name", "created_ts",
+                "filesystem_id",
+            ),
+            allow_none=True,
         )
 
     def store_cached_remote_media(self, origin, media_id, media_type,

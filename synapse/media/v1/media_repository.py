@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from .upload_resource import UploadResource
+from .download_resource import DownloadResource
 from .filepath import MediaFilePaths
 
 from twisted.web.resource import Resource
@@ -62,3 +63,4 @@ class MediaRepositoryResource(Resource):
         Resource.__init__(self)
         filepaths = MediaFilePaths(hs.config.media_store_path)
         self.putChild("upload", UploadResource(hs, filepaths))
+        self.putChild("download", DownloadResource(hs, filepaths))

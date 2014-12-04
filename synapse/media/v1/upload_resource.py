@@ -20,7 +20,8 @@ from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException
 )
 
-from twisted.web import server, resource
+from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 
 import os
@@ -30,9 +31,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class UploadResource(resource.Resource):
+class UploadResource(Resource):
+    isLeaf = True
 
     def __init__(self, hs, filepaths):
+        Resource.__init__(self)
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
@@ -41,11 +44,11 @@ class UploadResource(resource.Resource):
 
     def render_POST(self, request):
         self._async_render_POST(request)
-        return server.NOT_DONE_YET
+        return NOT_DONE_YET
 
     def render_OPTIONS(self, request):
         respond_with_json(request, 200, {}, send_cors=True)
-        return server.NOT_DONE_YET
+        return NOT_DONE_YET
 
     @defer.inlineCallbacks
     def _async_render_POST(self, request):
