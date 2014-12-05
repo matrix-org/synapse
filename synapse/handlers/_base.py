@@ -62,6 +62,8 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def _create_new_client_event(self, builder):
+        context = EventContext()
+
         latest_ret = yield self.store.get_latest_events_in_room(
             builder.room_id,
         )
@@ -69,52 +71,32 @@ class BaseHandler(object):
         depth = max([d for _, _, d in latest_ret])
         prev_events = [(e, h) for e, h, _ in latest_ret]
 
+        builder.prev_events = prev_events
+        builder.depth = depth
+
         state_handler = self.state_handler
+        ret = yield state_handler.annotate_context_with_state(
+            builder,
+            context,
+        )
+        group, prev_state = ret
+
         if builder.is_state():
-            ret = yield state_handler.resolve_state_groups(
-                [e for e, _ in prev_events],
-                event_type=builder.event_type,
-                state_key=builder.state_key,
-            )
-
-            group, curr_state, prev_state = ret
-
             prev_state = yield self.store.add_event_hashes(
                 prev_state
             )
 
             builder.prev_state = prev_state
-        else:
-            group, curr_state, _ = yield state_handler.resolve_state_groups(
-                [e for e, _ in prev_events],
-            )
 
         builder.internal_metadata.state_group = group
 
-        builder.prev_events = prev_events
-        builder.depth = depth
-
-        auth_events = yield self.auth.get_auth_events(builder, curr_state)
-
-        builder.update_event_key("auth_events", auth_events)
+        yield self.auth.add_auth_events(builder, context)
 
         add_hashes_and_signatures(
             builder, self.server_name, self.signing_key
         )
 
         event = builder.build()
-
-        auth_ids = zip(*auth_events)[0]
-        curr_auth_events = {
-            k: v
-            for k, v in curr_state.items()
-            if v.event_id in auth_ids
-        }
-
-        context = EventContext(
-            current_state=curr_state,
-            auth_events=curr_auth_events,
-        )
 
         defer.returnValue(
             (event, context,)
@@ -128,7 +110,7 @@ class BaseHandler(object):
         if not suppress_auth:
             self.auth.check(event, auth_events=context.auth_events)
 
-        yield self.store.persist_event(event)
+        yield self.store.persist_event(event, context=context)
 
         destinations = set(extra_destinations)
         for k, s in context.current_state.items():
@@ -152,63 +134,63 @@ class BaseHandler(object):
             destinations=destinations,
         )
 
-    @defer.inlineCallbacks
-    def _on_new_room_event(self, event, snapshot, extra_destinations=[],
-                           extra_users=[], suppress_auth=False,
-                           do_invite_host=None):
-        yield run_on_reactor()
-
-        snapshot.fill_out_prev_events(event)
-
-        yield self.state_handler.annotate_event_with_state(event)
-
-        yield self.auth.add_auth_events(event)
-
-        logger.debug("Signing event...")
-
-        add_hashes_and_signatures(
-            event, self.server_name, self.signing_key
-        )
-
-        logger.debug("Signed event.")
-
-        if not suppress_auth:
-            logger.debug("Authing...")
-            self.auth.check(event, auth_events=event.old_state_events)
-            logger.debug("Authed")
-        else:
-            logger.debug("Suppressed auth.")
-
-        if do_invite_host:
-            federation_handler = self.hs.get_handlers().federation_handler
-            invite_event = yield federation_handler.send_invite(
-                do_invite_host,
-                event
-            )
-
-            # FIXME: We need to check if the remote changed anything else
-            event.signatures = invite_event.signatures
-
-        yield self.store.persist_event(event)
-
-        destinations = set(extra_destinations)
-        # Send a PDU to all hosts who have joined the room.
-
-        for k, s in event.state_events.items():
-            try:
-                if k[0] == RoomMemberEvent.TYPE:
-                    if s.content["membership"] == Membership.JOIN:
-                        destinations.add(
-                            self.hs.parse_userid(s.state_key).domain
-                        )
-            except:
-                logger.warn(
-                    "Failed to get destination from event %s", s.event_id
-                )
-
-        event.destinations = list(destinations)
-
-        yield self.notifier.on_new_room_event(event, extra_users=extra_users)
-
-        federation_handler = self.hs.get_handlers().federation_handler
-        yield federation_handler.handle_new_event(event, snapshot)
+    # @defer.inlineCallbacks
+    # def _on_new_room_event(self, event, snapshot, extra_destinations=[],
+    #                        extra_users=[], suppress_auth=False,
+    #                        do_invite_host=None):
+    #     yield run_on_reactor()
+    #
+    #     snapshot.fill_out_prev_events(event)
+    #
+    #     yield self.state_handler.annotate_event_with_state(event)
+    #
+    #     yield self.auth.add_auth_events(event)
+    #
+    #     logger.debug("Signing event...")
+    #
+    #     add_hashes_and_signatures(
+    #         event, self.server_name, self.signing_key
+    #     )
+    #
+    #     logger.debug("Signed event.")
+    #
+    #     if not suppress_auth:
+    #         logger.debug("Authing...")
+    #         self.auth.check(event, auth_events=event.old_state_events)
+    #         logger.debug("Authed")
+    #     else:
+    #         logger.debug("Suppressed auth.")
+    #
+    #     if do_invite_host:
+    #         federation_handler = self.hs.get_handlers().federation_handler
+    #         invite_event = yield federation_handler.send_invite(
+    #             do_invite_host,
+    #             event
+    #         )
+    #
+    #         # FIXME: We need to check if the remote changed anything else
+    #         event.signatures = invite_event.signatures
+    #
+    #     yield self.store.persist_event(event)
+    #
+    #     destinations = set(extra_destinations)
+    #     # Send a PDU to all hosts who have joined the room.
+    #
+    #     for k, s in event.state_events.items():
+    #         try:
+    #             if k[0] == RoomMemberEvent.TYPE:
+    #                 if s.content["membership"] == Membership.JOIN:
+    #                     destinations.add(
+    #                         self.hs.parse_userid(s.state_key).domain
+    #                     )
+    #         except:
+    #             logger.warn(
+    #                 "Failed to get destination from event %s", s.event_id
+    #             )
+    #
+    #     event.destinations = list(destinations)
+    #
+    #     yield self.notifier.on_new_room_event(event, extra_users=extra_users)
+    #
+    #     federation_handler = self.hs.get_handlers().federation_handler
+    #     yield federation_handler.handle_new_event(event, snapshot)

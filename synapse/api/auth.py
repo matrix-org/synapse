@@ -351,27 +351,27 @@ class Auth(object):
         return self.store.is_server_admin(user)
 
     @defer.inlineCallbacks
-    def get_auth_events(self, event, current_state):
-        if event.type == RoomCreateEvent.TYPE:
-            event.auth_events = []
+    def add_auth_events(self, builder, context):
+        if builder.type == RoomCreateEvent.TYPE:
+            builder.auth_events = []
             return
 
         auth_events = []
 
         key = (RoomPowerLevelsEvent.TYPE, "", )
-        power_level_event = current_state.get(key)
+        power_level_event = context.current_state.get(key)
 
         if power_level_event:
             auth_events.append(power_level_event.event_id)
 
         key = (RoomJoinRulesEvent.TYPE, "", )
-        join_rule_event = current_state.get(key)
+        join_rule_event = context.current_state.get(key)
 
-        key = (RoomMemberEvent.TYPE, event.user_id, )
-        member_event = current_state.get(key)
+        key = (RoomMemberEvent.TYPE, builder.user_id, )
+        member_event = context.current_state.get(key)
 
         key = (RoomCreateEvent.TYPE, "", )
-        create_event = current_state.get(key)
+        create_event = context.current_state.get(key)
         if create_event:
             auth_events.append(create_event.event_id)
 
@@ -381,8 +381,8 @@ class Auth(object):
         else:
             is_public = False
 
-        if event.type == RoomMemberEvent.TYPE:
-            e_type = event.content["membership"]
+        if builder.type == RoomMemberEvent.TYPE:
+            e_type = builder.content["membership"]
             if e_type in [Membership.JOIN, Membership.INVITE]:
                 if join_rule_event:
                     auth_events.append(join_rule_event.event_id)
@@ -393,11 +393,18 @@ class Auth(object):
             if member_event.content["membership"] == Membership.JOIN:
                 auth_events.append(member_event.event_id)
 
-        auth_events = yield self.store.add_event_hashes(
-            auth_events
+        auth_ids = [(a.event_id, h) for a, h in auth_events]
+        auth_events_entries = yield self.store.add_event_hashes(
+            auth_ids
         )
 
-        defer.returnValue(auth_events)
+        builder.auth_events = auth_events_entries
+
+        context.auth_events = {
+            k: v
+            for k, v in context.current_state.items()
+            if v.event_id in auth_ids
+        }
 
     @log_function
     def _can_send_event(self, event, auth_events):

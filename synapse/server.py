@@ -20,7 +20,7 @@
 
 # Imports required for the default HomeServer() implementation
 from synapse.federation import initialize_http_replication
-from synapse.api.events import serialize_event
+from synapse.events.utils import serialize_event
 from synapse.api.events.factory import EventFactory
 from synapse.api.events.validator import EventValidator
 from synapse.notifier import Notifier

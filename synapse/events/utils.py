@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from synapse.api.constants import EventTypes
+from . import EventBase
 
 
 def prune_event(event):
@@ -80,3 +81,18 @@ def prune_event(event):
     allowed_fields["content"] = new_content
 
     return type(event)(allowed_fields)
+
+
+def serialize_event(hs, e):
+    # FIXME(erikj): To handle the case of presence events and the like
+    if not isinstance(e, EventBase):
+        return e
+
+    # Should this strip out None's?
+    d = {k: v for k, v in e.get_dict().items()}
+    if "age_ts" in d["unsigned"]:
+        now = int(hs.get_clock().time_msec())
+        d["unsigned"]["age"] = now - d["unsigned"]["age_ts"]
+        del d["unsigned"]["age_ts"]
+
+    return d

@@ -17,7 +17,8 @@
 
 from ._base import BaseHandler
 
-from synapse.api.events.utils import prune_event
+from synapse.events.snapshot import EventContext
+from synapse.events.utils import prune_event
 from synapse.api.errors import (
     AuthError, FederationError, SynapseError, StoreError,
 )
@@ -416,7 +417,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_make_join_request(self, context, user_id):
+    def on_make_join_request(self, room_id, user_id):
         """ We've received a /make_join/ request, so we create a partial
         join event for the room and return that. We don *not* persist or
         process it until the other server has signed it and sent it back.
@@ -424,7 +425,7 @@ class FederationHandler(BaseHandler):
         builder = self.event_builder_factory.new({
             "type": RoomMemberEvent.TYPE,
             "content": {"membership": Membership.JOIN},
-            "room_id": context,
+            "room_id": room_id,
             "sender": user_id,
             "state_key": user_id,
         })
@@ -433,9 +434,7 @@ class FederationHandler(BaseHandler):
             builder=builder,
         )
 
-        yield self.state_handler.annotate_event_with_state(event)
-        yield self.auth.add_auth_events(event)
-        self.auth.check(event, auth_events=event.old_state_events)
+        self.auth.check(event, auth_events=context.auth_events)
 
         pdu = event
 
@@ -505,7 +504,9 @@ class FederationHandler(BaseHandler):
         """
         event = pdu
 
-        event.outlier = True
+        context = EventContext()
+
+        event.internal_metadata.outlier = True
 
         event.signatures.update(
             compute_event_signature(
@@ -515,10 +516,11 @@ class FederationHandler(BaseHandler):
             )
         )
 
-        yield self.state_handler.annotate_event_with_state(event)
+        yield self.state_handler.annotate_context_with_state(event, context)
 
         yield self.store.persist_event(
             event,
+            context=context,
             backfilled=False,
         )
 
@@ -640,6 +642,7 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _handle_new_event(self, event, state=None, backfilled=False,
                           current_state=None, fetch_missing=True):
+        context = EventContext()
         is_new_state = yield self.state_handler.annotate_event_with_state(
             event,
             old_state=state

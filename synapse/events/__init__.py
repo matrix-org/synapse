@@ -17,14 +17,29 @@ from frozendict import frozendict
 
 
 def _freeze(o):
-    if isinstance(o, dict):
-        return frozendict({k: _freeze(v) for k,v in o.items()})
+    if isinstance(o, dict) or isinstance(o, frozendict):
+        return frozendict({k: _freeze(v) for k, v in o.items()})
 
     if isinstance(o, basestring):
         return o
 
     try:
         return tuple([_freeze(i) for i in o])
+    except TypeError:
+        pass
+
+    return o
+
+
+def _unfreeze(o):
+    if isinstance(o, frozendict) or isinstance(o, dict):
+        return dict({k: _unfreeze(v) for k, v in o.items()})
+
+    if isinstance(o, basestring):
+        return o
+
+    try:
+        return [_unfreeze(i) for i in o]
     except TypeError:
         pass
 
@@ -69,6 +84,7 @@ class EventBase(object):
         )
 
     auth_events = _event_dict_property("auth_events")
+    depth = _event_dict_property("depth")
     content = _event_dict_property("content")
     event_id = _event_dict_property("event_id")
     hashes = _event_dict_property("hashes")
@@ -80,6 +96,10 @@ class EventBase(object):
     state_key = _event_dict_property("state_key")
     type = _event_dict_property("type")
     user_id = _event_dict_property("sender")
+
+    @property
+    def membership(self):
+        return self.content["membership"]
 
     def is_state(self):
         return hasattr(self, "state_key")
@@ -134,3 +154,14 @@ class FrozenEvent(EventBase):
         e.internal_metadata = event.internal_metadata
 
         return e
+
+    def get_dict(self):
+        # We need to unfreeze what we return
+
+        d = _unfreeze(self._event_dict)
+        d.update({
+            "signatures": self.signatures,
+            "unsigned": self.unsigned,
+        })
+
+        return d

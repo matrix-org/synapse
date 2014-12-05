@@ -15,7 +15,8 @@
 import logging
 
 from synapse.api.errors import StoreError
-from synapse.api.events.utils import prune_event
+from synapse.events import FrozenEvent
+from synapse.events.utils import prune_event
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext, LoggingContext
 from syutil.base64util import encode_base64
@@ -497,10 +498,7 @@ class SQLBaseStore(object):
 
             d = json.loads(js)
 
-            ev = self.event_factory.create_event(
-                etype=d["type"],
-                **d
-            )
+            ev = FrozenEvent(d)
 
             if hasattr(ev, "redacted") and ev.redacted:
                 # Get the redaction event.
