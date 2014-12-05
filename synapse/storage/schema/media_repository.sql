@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS local_media_repository_thumbnails (
     thumbnail_width INTEGER, -- The width of the thumbnail in pixels.
     thumbnail_height INTEGER, -- The height of the thumbnail in pixels.
     thumbnail_type TEXT, -- The MIME-type of the thumbnail.
+    thumbnail_method TEXT, -- The method used to make the thumbnail.
     thumbnail_length INTEGER, -- The length of the thumbnail in bytes.
     CONSTRAINT uniqueness UNIQUE (
         media_id, thumbnail_width, thumbnail_height, thumbnail_type
@@ -53,12 +54,13 @@ CREATE TABLE IF NOT EXISTS remote_media_cache_thumbnails (
     media_id TEXT, -- The id used to refer to the media.
     thumbnail_width INTEGER, -- The width of the thumbnail in pixels.
     thumbnail_height INTEGER, -- The height of the thumbnail in pixels.
+    thumbnail_method TEXT, -- The method used to make the thumbnail
     thumbnail_type TEXT, -- The MIME-type of the thumbnail.
     thumbnail_length INTEGER, -- The length of the thumbnail in bytes.
     filesystem_id TEXT, -- The name used to store the media on disk.
     CONSTRAINT uniqueness UNIQUE (
         media_origin, media_id, thumbnail_width, thumbnail_height,
-        thumbnail_type
+        thumbnail_type, thumbnail_type
     )
 );
 

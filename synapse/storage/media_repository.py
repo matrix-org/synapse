@@ -50,20 +50,21 @@ class MediaRepositoryStore(SQLBaseStore):
             "local_media_thumbnails",
             {"media_id": media_id},
             (
-                "thumbnail_width", "thumbnail_height",
+                "thumbnail_width", "thumbnail_height", "thumbnail_method",
                 "thumbnail_type", "thumbnail_length",
             )
         )
 
     def store_local_thumbnail(self, media_id, thumbnail_width,
-                              thumbnail_height, thumbnail_type,
-                              thumbnail_length):
+                              thumbnail_height, thumbnail_method,
+                              thumbnail_type, thumbnail_length):
         return self._simple_insert(
             "local_media_thumbnails",
             {
                 "media_id": media_id,
                 "thumbnail_width": thumbnail_width,
                 "thumbnail_height": thumbnail_height,
+                "thumbnail_method": thumbnail_method,
                 "thumbnail_type": thumbnail_type,
                 "thumbnail_length": thumbnail_length,
             }
@@ -101,15 +102,16 @@ class MediaRepositoryStore(SQLBaseStore):
             "remote_media_cache_thumbnails",
             {"origin": origin, "media_id": media_id},
             (
-                "thumbnail_width", "thumbnail_height",
+                "thumbnail_width", "thumbnail_height", "thumbnail_method"
                 "thumbnail_type", "thumbnail_length",
                 "filesystem_id"
             )
         )
 
     def store_remote_media_thumbnail(self, origin, media_id, thumbnail_width,
-                                     thumbnail_height, thumbnail_type,
-                                     thumbnail_length, filesystem_id):
+                                     thumbnail_height, thumbnail_method,
+                                     thumbnail_type, thumbnail_length,
+                                     filesystem_id):
         return self._simple_insert(
             "remote_media_cache_thumbnails",
             {
@@ -117,6 +119,7 @@ class MediaRepositoryStore(SQLBaseStore):
                 "media_id": media_id,
                 "thumbnail_width": thumbnail_width,
                 "thumbnail_height": thumbnail_height,
+                "thumbnail_method": thumbnail_method,
                 "thumbnail_type": thumbnail_type,
                 "thumbnail_length": thumbnail_length,
                 "filesystem_id": filesystem_id,
