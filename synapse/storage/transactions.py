@@ -230,7 +230,7 @@ class TransactionStore(SQLBaseStore):
         else:
             return None
         
-    def set_destination_retry_timings(self, destination):
+    def set_destination_retry_timings(self, destination, retry_last_ts, retry_interval):
         """Sets the current retry timings for a given destination.
         Both timings should be zero if retrying is no longer occuring.
         

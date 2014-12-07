@@ -866,7 +866,7 @@ class _TransactionQueue(object):
                 if code == 200:
                     deferred.callback(None)
                 else:
-                    start_retrying(destination, retry_interval)
+                    self.start_retrying(destination, retry_interval)
                     deferred.errback(RuntimeError("Got status %d" % code))
 
                 # Ensures we don't continue until all callbacks on that
@@ -883,7 +883,7 @@ class _TransactionQueue(object):
             # for this finishing functions deferred.
             logger.exception("TX [%s] Problem in _attempt_transaction: %s", destination, e)
 
-            start_retrying(destination, retry_interval)
+            self.start_retrying(destination, retry_interval)
             
             for deferred in deferreds:
                 if not deferred.called:
@@ -896,13 +896,12 @@ class _TransactionQueue(object):
             # Check to see if there is anything else to send.
             self._attempt_new_transaction(destination)
 
-def start_retrying(destination, retry_interval):
-    # track that this destination is having problems and we should
-    # give it a chance to recover before trying it again
-    if retry_interval:
-        retry_interval *= 2
-    else:
-        retry_interval = 2 # try again at first after 2 seconds
-    self.store.set_destination_retry_timings(destination,
-        int(self._clock.time_msec()), retry_interval)
-    
+    def start_retrying(self, destination, retry_interval):
+        # track that this destination is having problems and we should
+        # give it a chance to recover before trying it again
+        if retry_interval:
+            retry_interval *= 2
+        else:
+            retry_interval = 2 # try again at first after 2 seconds
+        self.store.set_destination_retry_timings(destination,
+            int(self._clock.time_msec()), retry_interval)
