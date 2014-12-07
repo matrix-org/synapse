@@ -155,7 +155,7 @@ class TransportLayer(object):
     @defer.inlineCallbacks
     @log_function
     def send_transaction(self, transaction, json_data_callback=None):
-        """ Sends the given Transaction to it's destination
+        """ Sends the given Transaction to its destination
 
         Args:
             transaction (Transaction)

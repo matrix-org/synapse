@@ -89,7 +89,7 @@ class MatrixFederationHttpClient(object):
             ("", "", path_bytes, param_bytes, query_bytes, "",)
         )
 
-        logger.debug("Sending request to %s: %s %s",
+        logger.info("Sending request to %s: %s %s",
                      destination, method, url_bytes)
 
         logger.debug(
@@ -101,7 +101,10 @@ class MatrixFederationHttpClient(object):
             ]
         )
 
-        retries_left = 5
+        # was 5; for now, let's only try once at the HTTP layer and then
+        # rely on transaction-layer retries for exponential backoff and
+        # getting the message through.
+        retries_left = 0
 
         endpoint = self._getEndpoint(reactor, destination)
 
@@ -131,7 +134,8 @@ class MatrixFederationHttpClient(object):
                                 e)
                     raise SynapseError(400, "Domain specified not found.")
 
-                logger.exception("Got error in _create_request")
+                logger.exception("Sending request failed to %s: %s %s : %s",
+                    destination, method, url_bytes, e)
                 _print_ex(e)
 
                 if retries_left:
@@ -140,15 +144,15 @@ class MatrixFederationHttpClient(object):
                 else:
                     raise
 
+        logger.info("Received response %d %s for %s: %s %s",
+            response.code, response.phrase, destination, method, url_bytes)
+        
         if 200 <= response.code < 300:
             # We need to update the transactions table to say it was sent?
             pass
         else:
             # :'(
             # Update transactions table?
-            logger.error(
-                "Got response %d %s", response.code, response.phrase
-            )
             raise CodeMessageException(
                 response.code, response.phrase
             )
