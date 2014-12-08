@@ -160,13 +160,13 @@ class StateHandler(object):
         group, curr_state, prev_state = ret
 
         context.current_state = curr_state
-        context.state_group = group
+        context.state_group = group if not event.is_state() else None
 
         prev_state = yield self.store.add_event_hashes(
             prev_state
         )
 
-        if hasattr(event, "auth_events") and event.auth_events:
+        if hasattr(event, "auth_events"):
             auth_ids = zip(*event.auth_events)[0]
             context.auth_events = {
                 k: v

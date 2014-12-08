@@ -171,6 +171,7 @@ class RoomCreationHandler(BaseHandler):
         event_keys = {
             "room_id": room_id,
             "sender": creator_id,
+            "state_key": "",
         }
 
         def create(etype, content, **kwargs):
@@ -187,7 +188,6 @@ class RoomCreationHandler(BaseHandler):
         creation_event = create(
             etype=RoomCreateEvent.TYPE,
             content={"creator": creator.to_string()},
-            state_key="",
         )
 
         join_event = create(
@@ -388,7 +388,7 @@ class RoomMemberHandler(BaseHandler):
         host = hosts[0]
 
         content.update({"membership": Membership.JOIN})
-        event, context = yield self.create_new_client_event({
+        builder = self.event_builder_factory.new({
             "type": RoomMemberEvent.TYPE,
             "state_key": joinee.to_string(),
             "room_id": room_id,
@@ -396,6 +396,7 @@ class RoomMemberHandler(BaseHandler):
             "membership": Membership.JOIN,
             "content": content,
         })
+        event, context = yield self._create_new_client_event(builder)
 
         yield self._do_join(event, context, room_host=host, do_auth=True)
 
@@ -442,7 +443,11 @@ class RoomMemberHandler(BaseHandler):
         if should_do_dance:
             handler = self.hs.get_handlers().federation_handler
             have_joined = yield handler.do_invite_join(
-                room_host, room_id, event.user_id, event.content, context
+                room_host,
+                room_id,
+                event.user_id,
+                event.get_dict()["content"],  # FIXME To get a non-frozen dict
+                context
             )
 
         # We want to do the _do_update inside the room lock.

@@ -337,23 +337,29 @@ class FederationHandler(BaseHandler):
 
         self.room_queues[room_id] = []
 
+        builder = self.event_builder_factory.new(
+            event.get_pdu_json()
+        )
+
         try:
-            event.event_id = self.event_factory.create_event_id()
-            event.origin = self.hs.hostname
-            event.content = content
+            builder.event_id = self.event_factory.create_event_id()
+            builder.origin = self.hs.hostname
+            builder.content = content
 
             if not hasattr(event, "signatures"):
-                event.signatures = {}
+                builder.signatures = {}
 
             add_hashes_and_signatures(
-                event,
+                builder,
                 self.hs.hostname,
                 self.hs.config.signing_key[0],
             )
 
+            new_event = builder.build()
+
             ret = yield self.replication_layer.send_join(
                 target_host,
-                event
+                new_event
             )
 
             state = ret["state"]
@@ -363,7 +369,7 @@ class FederationHandler(BaseHandler):
             logger.debug("do_invite_join auth_chain: %s", auth_chain)
             logger.debug("do_invite_join state: %s", state)
 
-            logger.debug("do_invite_join event: %s", event)
+            logger.debug("do_invite_join event: %s", new_event)
 
             try:
                 yield self.store.store_room(
@@ -400,13 +406,13 @@ class FederationHandler(BaseHandler):
                     )
 
             yield self._handle_new_event(
-                event,
+                new_event,
                 state=state,
                 current_state=state,
             )
 
             yield self.notifier.on_new_room_event(
-                event, extra_users=[joinee]
+                new_event, extra_users=[joinee]
             )
 
             logger.debug("Finished joining %s to %s", joinee, room_id)
@@ -457,7 +463,7 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
-        yield self._handle_new_event(event)
+        context = yield self._handle_new_event(event)
 
         extra_users = []
         if event.type == RoomMemberEvent.TYPE:
@@ -480,7 +486,7 @@ class FederationHandler(BaseHandler):
 
         destinations = set()
 
-        for k, s in event.state_events.items():
+        for k, s in context.current_state.items():
             try:
                 if k[0] == RoomMemberEvent.TYPE:
                     if s.content["membership"] == Membership.JOIN:
@@ -492,14 +498,12 @@ class FederationHandler(BaseHandler):
                     "Failed to get destination from event %s", s.event_id
                 )
 
-        new_pdu.destinations = list(destinations)
-
-        yield self.replication_layer.send_pdu(new_pdu)
+        yield self.replication_layer.send_pdu(new_pdu, destinations)
 
         auth_chain = yield self.store.get_auth_chain(event.event_id)
 
         defer.returnValue({
-            "state": event.state_events.values(),
+            "state": context.current_state.values(),
             "auth_chain": auth_chain,
         })
 
@@ -652,6 +656,7 @@ class FederationHandler(BaseHandler):
         context = EventContext()
         yield self.state_handler.annotate_context_with_state(
             event,
+            context,
             old_state=state
         )
 
@@ -664,7 +669,6 @@ class FederationHandler(BaseHandler):
             if e_id not in known_ids:
                 e = yield self.store.get_event(
                     e_id,
-                    context,
                     allow_none=True,
                 )
 
@@ -689,7 +693,10 @@ class FederationHandler(BaseHandler):
 
         yield self.store.persist_event(
             event,
+            context=context,
             backfilled=backfilled,
             is_new_state=(is_new_state and not backfilled),
             current_state=current_state,
         )
+
+        defer.returnValue(context)

@@ -39,7 +39,7 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
             ),
             Codes.UNAUTHORIZED,
         )
-    message_hash_base64 = event.hashes[name.name]
+    message_hash_base64 = event.hashes[name]
     try:
         message_hash_bytes = decode_base64(message_hash_base64)
     except:

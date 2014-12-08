@@ -157,11 +157,4 @@ class FrozenEvent(EventBase):
 
     def get_dict(self):
         # We need to unfreeze what we return
-
-        d = _unfreeze(self._event_dict)
-        d.update({
-            "signatures": self.signatures,
-            "unsigned": self.unsigned,
-        })
-
-        return d
+        return _unfreeze(super(FrozenEvent, self).get_dict())
