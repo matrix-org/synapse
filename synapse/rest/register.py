@@ -21,6 +21,8 @@ from synapse.api.constants import LoginType
 from base import RestServlet, client_path_pattern
 import synapse.util.stringutils as stringutils
 
+from synapse.util.async import run_on_reactor
+
 from hashlib import sha1
 import hmac
 import json
@@ -233,7 +235,7 @@ class RegisterRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def _do_password(self, request, register_json, session):
-        yield
+        yield run_on_reactor()
         if (self.hs.config.enable_registration_captcha and
                 not session[LoginType.RECAPTCHA]):
             # captcha should've been done by this stage!
