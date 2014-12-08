@@ -95,4 +95,6 @@ def serialize_event(hs, e):
         d["unsigned"]["age"] = now - d["unsigned"]["age_ts"]
         del d["unsigned"]["age_ts"]
 
+    d["user_id"] = d.pop("sender", None)
+
     return d

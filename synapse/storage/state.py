@@ -87,10 +87,10 @@ class StateStore(SQLBaseStore):
         )
 
     def _store_state_groups_txn(self, txn, event, context):
-        if context.current_state_events is None:
+        if context.current_state is None:
             return
 
-        state_events = context.current_state_events
+        state_events = context.current_state
 
         if event.is_state():
             state_events[(event.type, event.state_key)] = event
@@ -107,7 +107,7 @@ class StateStore(SQLBaseStore):
                 or_ignore=True,
             )
 
-            for state in context.state_events.values():
+            for state in state_events.values():
                 self._simple_insert_txn(
                     txn,
                     table="state_groups_state",

@@ -558,7 +558,13 @@ class ReplicationLayer(object):
             origin, pdu.event_id, do_auth=False
         )
 
-        if existing and (not existing.outlier or pdu.outlier):
+        already_seen = (
+            existing and (
+                not existing.internal_metadata.outlier
+                or pdu.internal_metadata.outlier
+            )
+        )
+        if already_seen:
             logger.debug("Already seen pdu %s", pdu.event_id)
             defer.returnValue({})
             return
@@ -596,7 +602,7 @@ class ReplicationLayer(object):
         #             )
 
         # Get missing pdus if necessary.
-        if not pdu.outlier:
+        if not pdu.internal_metadata.outlier:
             # We only backfill backwards to the min depth.
             min_depth = yield self.handler.get_min_depth_for_context(
                 pdu.room_id
@@ -663,7 +669,7 @@ class ReplicationLayer(object):
             pdu_json
         )
 
-        builder.internal_metadata = outlier
+        builder.internal_metadata.outlier = outlier
 
         return builder.build()
 

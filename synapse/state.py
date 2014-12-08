@@ -136,7 +136,16 @@ class StateHandler(object):
         defer.returnValue(res[1].values())
 
     @defer.inlineCallbacks
-    def annotate_context_with_state(self, event, context):
+    def annotate_context_with_state(self, event, context, old_state=None):
+        yield run_on_reactor()
+
+        if old_state:
+            context.current_state = {
+                (s.type, s.state_key): s for s in old_state
+            }
+            context.state_group = None
+            defer.returnValue([])
+
         if event.is_state():
             ret = yield self.resolve_state_groups(
                 [e for e, _ in event.prev_events],
@@ -151,6 +160,7 @@ class StateHandler(object):
         group, curr_state, prev_state = ret
 
         context.current_state = curr_state
+        context.state_group = group
 
         prev_state = yield self.store.add_event_hashes(
             prev_state
@@ -164,9 +174,7 @@ class StateHandler(object):
                 if v.event_id in auth_ids
             }
 
-        defer.returnValue(
-            (group, prev_state)
-        )
+        defer.returnValue(prev_state)
 
     @defer.inlineCallbacks
     @log_function

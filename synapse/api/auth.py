@@ -24,6 +24,7 @@ from synapse.api.events.room import (
     RoomJoinRulesEvent, RoomCreateEvent, RoomAliasesEvent,
 )
 from synapse.util.logutils import log_function
+from synapse.util.async import run_on_reactor
 from syutil.base64util import encode_base64
 
 import logging
@@ -352,17 +353,19 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def add_auth_events(self, builder, context):
+        yield run_on_reactor()
+
         if builder.type == RoomCreateEvent.TYPE:
             builder.auth_events = []
             return
 
-        auth_events = []
+        auth_ids = []
 
         key = (RoomPowerLevelsEvent.TYPE, "", )
         power_level_event = context.current_state.get(key)
 
         if power_level_event:
-            auth_events.append(power_level_event.event_id)
+            auth_ids.append(power_level_event.event_id)
 
         key = (RoomJoinRulesEvent.TYPE, "", )
         join_rule_event = context.current_state.get(key)
@@ -373,7 +376,7 @@ class Auth(object):
         key = (RoomCreateEvent.TYPE, "", )
         create_event = context.current_state.get(key)
         if create_event:
-            auth_events.append(create_event.event_id)
+            auth_ids.append(create_event.event_id)
 
         if join_rule_event:
             join_rule = join_rule_event.content.get("join_rule")
@@ -385,15 +388,14 @@ class Auth(object):
             e_type = builder.content["membership"]
             if e_type in [Membership.JOIN, Membership.INVITE]:
                 if join_rule_event:
-                    auth_events.append(join_rule_event.event_id)
+                    auth_ids.append(join_rule_event.event_id)
 
                 if member_event and not is_public:
-                    auth_events.append(member_event.event_id)
+                    auth_ids.append(member_event.event_id)
         elif member_event:
             if member_event.content["membership"] == Membership.JOIN:
-                auth_events.append(member_event.event_id)
+                auth_ids.append(member_event.event_id)
 
-        auth_ids = [(a.event_id, h) for a, h in auth_events]
         auth_events_entries = yield self.store.add_event_hashes(
             auth_ids
         )

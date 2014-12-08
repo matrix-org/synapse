@@ -149,7 +149,7 @@ class FederationHandler(BaseHandler):
             event.room_id,
             self.server_name
         )
-        if not is_in_room and not event.outlier:
+        if not is_in_room and not event.internal_metadata.outlier:
             logger.debug("Got event for room we're not in.")
 
             replication_layer = self.replication_layer
@@ -160,7 +160,7 @@ class FederationHandler(BaseHandler):
             )
 
             for e in auth_chain:
-                e.outlier = True
+                e.internal_metadata.outlier = True
                 try:
                     yield self._handle_new_event(e, fetch_missing=False)
                 except:
@@ -180,7 +180,7 @@ class FederationHandler(BaseHandler):
 
         if state:
             for e in state:
-                e.outlier = True
+                e.internal_metadata.outlier = True
                 try:
                     yield self._handle_new_event(e)
                 except:
@@ -254,11 +254,18 @@ class FederationHandler(BaseHandler):
             event = pdu
 
             # FIXME (erikj): Not sure this actually works :/
-            yield self.state_handler.annotate_event_with_state(event)
+            context = EventContext()
+            yield self.state_handler.annotate_context_with_state(event, context)
 
-            events.append(event)
+            events.append(
+                (event, context)
+            )
 
-            yield self.store.persist_event(event, backfilled=True)
+            yield self.store.persist_event(
+                event,
+                context=context,
+                backfilled=True
+            )
 
         defer.returnValue(events)
 
@@ -326,7 +333,7 @@ class FederationHandler(BaseHandler):
         assert(event.state_key == joinee)
         assert(event.room_id == room_id)
 
-        event.outlier = False
+        event.internal_metadata.outlier = False
 
         self.room_queues[room_id] = []
 
@@ -369,7 +376,7 @@ class FederationHandler(BaseHandler):
                 pass
 
             for e in auth_chain:
-                e.outlier = True
+                e.internal_metadata.outlier = True
                 try:
                     yield self._handle_new_event(e, fetch_missing=False)
                 except:
@@ -380,7 +387,7 @@ class FederationHandler(BaseHandler):
 
             for e in state:
                 # FIXME: Auth these.
-                e.outlier = True
+                e.internal_metadata.outlier = True
                 try:
                     yield self._handle_new_event(
                         e,
@@ -448,7 +455,7 @@ class FederationHandler(BaseHandler):
         """
         event = pdu
 
-        event.outlier = False
+        event.internal_metadata.outlier = False
 
         yield self._handle_new_event(event)
 
@@ -643,70 +650,42 @@ class FederationHandler(BaseHandler):
     def _handle_new_event(self, event, state=None, backfilled=False,
                           current_state=None, fetch_missing=True):
         context = EventContext()
-        is_new_state = yield self.state_handler.annotate_event_with_state(
+        yield self.state_handler.annotate_context_with_state(
             event,
             old_state=state
         )
 
-        if event.old_state_events:
-            known_ids = set(
-                [s.event_id for s in event.old_state_events.values()]
-            )
-            for e_id, _ in event.auth_events:
-                if e_id not in known_ids:
-                    e = yield self.store.get_event(
-                        e_id,
-                        allow_none=True,
-                    )
+        is_new_state = not event.internal_metadata.outlier
 
-                    if not e:
-                        # TODO: Do some conflict res to make sure that we're
-                        # not the ones who are wrong.
-                        logger.info(
-                            "Rejecting %s as %s not in %s",
-                            event.event_id, e_id, known_ids,
-                        )
-                        raise AuthError(403, "Auth events are stale")
-
-            auth_events = event.old_state_events
-        else:
-            # We need to get the auth events from somewhere.
-
-            # TODO: Don't just hit the DBs?
-
-            auth_events = {}
-            for e_id, _ in event.auth_events:
+        known_ids = set(
+            [s.event_id for s in context.auth_events.values()]
+        )
+        for e_id, _ in event.auth_events:
+            if e_id not in known_ids:
                 e = yield self.store.get_event(
                     e_id,
+                    context,
                     allow_none=True,
                 )
 
                 if not e:
-                    e = yield self.replication_layer.get_pdu(
-                        event.origin, e_id, outlier=True
+                    # TODO: Do some conflict res to make sure that we're
+                    # not the ones who are wrong.
+                    logger.info(
+                        "Rejecting %s as %s not in %s",
+                        event.event_id, e_id, known_ids,
                     )
+                    raise AuthError(403, "Auth events are stale")
 
-                    if e and fetch_missing:
-                        try:
-                            yield self.on_receive_pdu(event.origin, e, False)
-                        except:
-                            logger.exception(
-                                "Failed to parse auth event %s",
-                                e_id,
-                            )
+                context.auth_events[(e.type, e.state_key)] = e
 
-                if not e:
-                    logger.warn("Can't find auth event %s.", e_id)
+        if event.type == RoomMemberEvent.TYPE and not event.auth_events:
+            if len(event.prev_events) == 1:
+                c = yield self.store.get_event(event.prev_events[0][0])
+                if c.type == RoomCreateEvent.TYPE:
+                    context.auth_events[(c.type, c.state_key)] = c
 
-                auth_events[(e.type, e.state_key)] = e
-
-            if event.type == RoomMemberEvent.TYPE and not event.auth_events:
-                if len(event.prev_events) == 1:
-                    c = yield self.store.get_event(event.prev_events[0][0])
-                    if c.type == RoomCreateEvent.TYPE:
-                        auth_events[(c.type, c.state_key)] = c
-
-        self.auth.check(event, auth_events=auth_events)
+        self.auth.check(event, auth_events=context.auth_events)
 
         yield self.store.persist_event(
             event,

@@ -62,6 +62,8 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def _create_new_client_event(self, builder):
+        yield run_on_reactor()
+
         context = EventContext()
 
         latest_ret = yield self.store.get_latest_events_in_room(
@@ -79,7 +81,7 @@ class BaseHandler(object):
             builder,
             context,
         )
-        group, prev_state = ret
+        prev_state = ret
 
         if builder.is_state():
             prev_state = yield self.store.add_event_hashes(
@@ -87,8 +89,6 @@ class BaseHandler(object):
             )
 
             builder.prev_state = prev_state
-
-        builder.internal_metadata.state_group = group
 
         yield self.auth.add_auth_events(builder, context)
 
@@ -105,6 +105,8 @@ class BaseHandler(object):
     @defer.inlineCallbacks
     def handle_new_client_event(self, event, context, extra_destinations=[],
                                 extra_users=[], suppress_auth=False):
+        yield run_on_reactor()
+
         # We now need to go and hit out to wherever we need to hit out to.
 
         if not suppress_auth:
