@@ -173,13 +173,14 @@ class RoomCreationHandler(BaseHandler):
             "sender": creator_id,
         }
 
-        def create(etype, content):
+        def create(etype, content, **kwargs):
             e = {
                 "type": etype,
                 "content": content,
             }
 
             e.update(event_keys)
+            e.update(kwargs)
 
             return e
 
@@ -194,7 +195,6 @@ class RoomCreationHandler(BaseHandler):
             content={
                 "membership": Membership.JOIN,
             },
-            **event_keys
         )
 
         power_levels_event = create(

@@ -70,7 +70,11 @@ class BaseHandler(object):
             builder.room_id,
         )
 
-        depth = max([d for _, _, d in latest_ret])
+        if latest_ret:
+            depth = max([d for _, _, d in latest_ret])
+        else:
+            depth = 1
+
         prev_events = [(e, h) for e, h, _ in latest_ret]
 
         builder.prev_events = prev_events
