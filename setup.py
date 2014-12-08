@@ -59,6 +59,6 @@ setup(
     entry_points="""
     [console_scripts]
     synctl=synapse.app.synctl:main
-    synapse-homeserver=synapse.app.homeserver:run
+    synapse-homeserver=synapse.app.homeserver:main
     """
 )
