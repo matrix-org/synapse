@@ -17,6 +17,8 @@ from ._base import SQLBaseStore, Table
 
 from collections import namedtuple
 
+from twisted.internet import defer
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -218,8 +220,8 @@ class TransactionStore(SQLBaseStore):
             None if not retrying
             Otherwise a DestinationsTable.EntryType for the retry scheme
         """
-        if self.destination_retry_cache[destination]:
-            return self.destination_retry_cache[destination]
+        if destination in self.destination_retry_cache:
+            return defer.succeed(self.destination_retry_cache[destination])
         
         return self.runInteraction(
             "get_destination_retry_timings",
@@ -228,11 +230,13 @@ class TransactionStore(SQLBaseStore):
     def _get_destination_retry_timings(cls, txn, destination):
         query = DestinationsTable.select_statement("destination = ?")
         txn.execute(query, (destination,))
-        result = DestinationsTable.decode_single_result(txn.fetchone())
-        if result and result.retry_last_ts > 0:
-            return result
-        else:
-            return None
+        result = txn.fetchall()
+        if result:
+            result = DestinationsTable.decode_single_result(result)
+            if result.retry_last_ts > 0:
+                return result
+            else:
+                return None
         
     def set_destination_retry_timings(self, destination, retry_last_ts, retry_interval):
         """Sets the current retry timings for a given destination.
@@ -257,12 +261,11 @@ class TransactionStore(SQLBaseStore):
 
         query = (
             "INSERT OR REPLACE INTO %s "
-            "(retry_last_ts, retry_interval) "
-            "VALUES (?, ?) "
-            "WHERE destination = ?"
+            "(destination, retry_last_ts, retry_interval) "
+            "VALUES (?, ?, ?) "
         ) % DestinationsTable.table_name
 
-        txn.execute(query, (retry_last_ts, retry_interval, destination))
+        txn.execute(query, (destination, retry_last_ts, retry_interval))
 
     def get_destinations_needing_retry(self):
         """Get all destinations which are due a retry for sending a transaction.
