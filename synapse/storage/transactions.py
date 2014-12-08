@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 class TransactionStore(SQLBaseStore):
     """A collection of queries for handling PDUs.
     """
+    
+    # a write-through cache of DestinationsTable.EntryType indexed by destination string
+    destination_retry_cache = {}
 
     def get_received_txn_response(self, transaction_id, origin):
         """For an incoming transaction from a given origin, check if we have
@@ -213,10 +216,11 @@ class TransactionStore(SQLBaseStore):
         
         Returns:
             None if not retrying
-            tuple: (retry_last_ts, retry_interval)
-                retry_ts: time of last retry attempt in unix epoch ms
-                retry_interval: how long until next retry in ms
+            Otherwise a DestinationsTable.EntryType for the retry scheme
         """
+        if self.destination_retry_cache[destination]:
+            return self.destination_retry_cache[destination]
+        
         return self.runInteraction(
             "get_destination_retry_timings",
             self._get_destination_retry_timings, destination)
@@ -225,7 +229,7 @@ class TransactionStore(SQLBaseStore):
         query = DestinationsTable.select_statement("destination = ?")
         txn.execute(query, (destination,))
         result = DestinationsTable.decode_single_result(txn.fetchone())
-        if result and result[0] > 0:
+        if result and result.retry_last_ts > 0:
             return result
         else:
             return None
@@ -239,6 +243,12 @@ class TransactionStore(SQLBaseStore):
             retry_last_ts (int) - time of last retry attempt in unix epoch ms
             retry_interval (int) - how long until next retry in ms
         """
+        
+        self.destination_retry_cache[destination] = (
+            DestinationsTable.EntryType(destination, retry_last_ts, retry_interval)
+        )
+        
+        # xxx: we could chose to not bother persisting this if our cache things this is a NOOP
         return self.runInteraction(
             "set_destination_retry_timings",
             self._set_destination_retry_timings, destination, retry_last_ts, retry_interval)
@@ -260,6 +270,7 @@ class TransactionStore(SQLBaseStore):
         Returns:
             list: A list of `DestinationsTable.EntryType`
         """
+                
         return self.runInteraction(
             "get_destinations_needing_retry",
             self._get_destinations_needing_retry
