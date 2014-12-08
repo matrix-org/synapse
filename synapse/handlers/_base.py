@@ -88,10 +88,6 @@ class BaseHandler(object):
         prev_state = ret
 
         if builder.is_state():
-            prev_state = yield self.store.add_event_hashes(
-                prev_state
-            )
-
             builder.prev_state = prev_state
 
         yield self.auth.add_auth_events(builder, context)

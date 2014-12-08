@@ -713,7 +713,7 @@ class _TransactionQueue(object):
         # table and we'll get back to it later.
 
         destinations = set(destinations)
-        destinations.remove(self.server_name)
+        destinations.discard(self.server_name)
 
         logger.debug("Sending to: %s", str(destinations))
 

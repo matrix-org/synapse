@@ -149,7 +149,7 @@ class StateHandler(object):
         if event.is_state():
             ret = yield self.resolve_state_groups(
                 [e for e, _ in event.prev_events],
-                event_type=event.event_type,
+                event_type=event.type,
                 state_key=event.state_key,
             )
         else:
@@ -200,7 +200,11 @@ class StateHandler(object):
             prev_state = state.get((event_type, state_key), None)
             if prev_state:
                 prev_state = prev_state.event_id
-            defer.returnValue((name, state, [prev_state]))
+                prev_states = [prev_state]
+            else:
+                prev_states = []
+
+            defer.returnValue((name, state, prev_states))
 
         state = {}
         for group, g_state in state_groups.items():

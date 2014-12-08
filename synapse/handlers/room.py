@@ -187,6 +187,7 @@ class RoomCreationHandler(BaseHandler):
         creation_event = create(
             etype=RoomCreateEvent.TYPE,
             content={"creator": creator.to_string()},
+            state_key="",
         )
 
         join_event = create(
@@ -406,11 +407,6 @@ class RoomMemberHandler(BaseHandler):
         # room_id = RoomID.from_string(event.room_id, self.hs)
         room_id = event.room_id
 
-        # If event doesn't include a display name, add one.
-        yield self.distributor.fire(
-            "collect_presencelike_data", joinee, event.content
-        )
-
         # XXX: We don't do an auth check if we are doing an invite
         # join dance for now, since we're kinda implicitly checking
         # that we are allowed to join when we decide whether or not we
@@ -524,7 +520,6 @@ class RoomMemberHandler(BaseHandler):
             context,
             extra_users=[target_user],
             suppress_auth=(not do_auth),
-            do_invite_host=do_invite_host,
         )
 
 

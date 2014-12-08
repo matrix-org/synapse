@@ -137,6 +137,18 @@ class MessageHandler(BaseHandler):
     def handle_event(self, event_dict):
         builder = self.event_builder_factory.new(event_dict)
 
+
+        if builder.type == EventTypes.Member:
+            membership = builder.content.get("membership", None)
+            if membership == Membership.JOIN:
+                joinee = self.hs.parse_userid(builder.state_key)
+                # If event doesn't include a display name, add one.
+                yield self.distributor.fire(
+                    "collect_presencelike_data",
+                    joinee,
+                    builder.content
+                )
+
         event, context = yield self._create_new_client_event(
             builder=builder,
         )
