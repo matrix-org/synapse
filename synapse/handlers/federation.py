@@ -207,6 +207,12 @@ class FederationHandler(BaseHandler):
                 e.msg,
                 affected=event.event_id,
             )
+            
+        # if we're receiving valid events from an origin,
+        # it's probably a good idea to mark it as not in retry-state
+        # for sending (although this is a bit of a leap)
+        if ((self.store.get_destination_retry_timings(origin))[0]):
+            self.store.set_destination_retry_timings(origin, 0, 0)
 
         room = yield self.store.get_room(event.room_id)
 

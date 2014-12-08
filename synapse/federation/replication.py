@@ -864,6 +864,9 @@ class _TransactionQueue(object):
 
             for deferred in deferreds:
                 if code == 200:
+                    if retry_last_ts:
+                        # this host is alive! reset retry schedule
+                        self.store.set_destination_retry_timings(destination, 0, 0)
                     deferred.callback(None)
                 else:
                     self.start_retrying(destination, retry_interval)
