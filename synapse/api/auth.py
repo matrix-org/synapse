@@ -25,7 +25,6 @@ from synapse.api.events.room import (
 )
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
-from syutil.base64util import encode_base64
 
 import logging
 
