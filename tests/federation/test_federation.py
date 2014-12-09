@@ -25,6 +25,7 @@ from synapse.server import HomeServer
 from synapse.federation import initialize_http_replication
 from synapse.api.events import SynapseEvent
 
+from synapse.storage.transactions import DestinationsTable
 
 def make_pdu(prev_pdus=[], **kwargs):
     """Provide some default fields for making a PduTuple."""
@@ -55,9 +56,13 @@ class FederationTestCase(unittest.TestCase):
             "delivered_txn",
             "get_received_txn_response",
             "set_received_txn_response",
+            "get_destination_retry_timings",
         ])
         self.mock_persistence.get_received_txn_response.return_value = (
             defer.succeed(None)
+        )
+        self.mock_persistence.get_destination_retry_timings.return_value = (
+            defer.succeed(DestinationsTable.EntryType("", 0, 0))
         )
         self.mock_config = Mock()
         self.mock_config.signing_key = [MockKey()]

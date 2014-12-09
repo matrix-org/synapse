@@ -30,7 +30,7 @@ from synapse.api.constants import PresenceState
 from synapse.api.errors import SynapseError
 from synapse.handlers.presence import PresenceHandler, UserPresenceCache
 from synapse.streams.config import SourcePaginationConfig
-
+from synapse.storage.transactions import DestinationsTable
 
 OFFLINE = PresenceState.OFFLINE
 UNAVAILABLE = PresenceState.UNAVAILABLE
@@ -528,6 +528,7 @@ class PresencePushTestCase(unittest.TestCase):
                     "delivered_txn",
                     "get_received_txn_response",
                     "set_received_txn_response",
+                    "get_destination_retry_timings",
                 ]),
                 handlers=None,
                 resource_for_client=Mock(),
@@ -539,6 +540,9 @@ class PresencePushTestCase(unittest.TestCase):
         hs.handlers = JustPresenceHandlers(hs)
 
         self.datastore = hs.get_datastore()
+        self.datastore.get_destination_retry_timings.return_value = (
+            defer.succeed(DestinationsTable.EntryType("", 0, 0))
+        )
 
         def get_received_txn_response(*args):
             return defer.succeed(None)
@@ -1037,6 +1041,7 @@ class PresencePollingTestCase(unittest.TestCase):
                     "delivered_txn",
                     "get_received_txn_response",
                     "set_received_txn_response",
+                    "get_destination_retry_timings",
                 ]),
                 handlers=None,
                 resource_for_client=Mock(),
@@ -1048,6 +1053,9 @@ class PresencePollingTestCase(unittest.TestCase):
         hs.handlers = JustPresenceHandlers(hs)
 
         self.datastore = hs.get_datastore()
+        self.datastore.get_destination_retry_timings.return_value = (
+            defer.succeed(DestinationsTable.EntryType("", 0, 0))
+        )
 
         def get_received_txn_response(*args):
             return defer.succeed(None)
