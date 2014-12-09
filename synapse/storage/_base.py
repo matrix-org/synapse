@@ -461,32 +461,18 @@ class SQLBaseStore(object):
             **d
         )
 
-    def _get_events_txn(self, txn, event_ids):
-        # FIXME (erikj): This should be batched?
-
-        sql = "SELECT * FROM events WHERE event_id = ? ORDER BY rowid asc"
-
-        event_rows = []
-        for e_id in event_ids:
-            c = txn.execute(sql, (e_id,))
-            event_rows.extend(self.cursor_to_dict(c))
-
-        return self._parse_events_txn(txn, event_rows)
-
-    def _parse_events(self, rows):
+    def _get_events(self, event_ids):
         return self.runInteraction(
-            "_parse_events", self._parse_events_txn, rows
+            "_get_events", self._get_events_txn, event_ids
         )
 
-    def _parse_events_txn(self, txn, rows):
-        event_ids = [r["event_id"] for r in rows]
-
+    def _get_events_txn(self, txn, event_ids):
         events = []
-        for event_id in event_ids:
+        for e_id in event_ids:
             js = self._simple_select_one_onecol_txn(
                 txn,
                 table="event_json",
-                keyvalues={"event_id": event_id},
+                keyvalues={"event_id": e_id},
                 retcol="json",
                 allow_none=True,
             )
@@ -515,6 +501,16 @@ class SQLBaseStore(object):
             events.append(ev)
 
         return events
+
+    def _parse_events(self, rows):
+        return self.runInteraction(
+            "_parse_events", self._parse_events_txn, rows
+        )
+
+    def _parse_events_txn(self, txn, rows):
+        event_ids = [r["event_id"] for r in rows]
+
+        return self._get_events_txn(txn, event_ids)
 
     def _has_been_redacted_txn(self, txn, event):
         sql = "SELECT event_id FROM redactions WHERE redacts = ?"
