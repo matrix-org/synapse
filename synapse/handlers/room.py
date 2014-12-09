@@ -429,12 +429,9 @@ class RoomMemberHandler(BaseHandler):
             )
 
             if prev_state and prev_state.membership == Membership.INVITE:
-                room = yield self.store.get_room(room_id)
-                inviter = UserID.from_string(
-                    prev_state.user_id, self.hs
-                )
+                inviter = UserID.from_string(prev_state.user_id)
 
-                should_do_dance = not self.hs.is_mine(inviter) and not room
+                should_do_dance = not self.hs.is_mine(inviter)
                 room_host = inviter.domain
             else:
                 should_do_dance = False
@@ -511,14 +508,7 @@ class RoomMemberHandler(BaseHandler):
                                     do_auth):
         yield run_on_reactor()
 
-        # If we're inviting someone, then we should also send it to that
-        # HS.
-        target_user_id = event.state_key
-        target_user = self.hs.parse_userid(target_user_id)
-        if membership == Membership.INVITE and not self.hs.is_mine(target_user):
-            do_invite_host = target_user.domain
-        else:
-            do_invite_host = None
+        target_user = self.hs.parse_userid(event.state_key)
 
         yield self.handle_new_client_event(
             event,

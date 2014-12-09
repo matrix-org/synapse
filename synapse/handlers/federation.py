@@ -282,8 +282,6 @@ class FederationHandler(BaseHandler):
             pdu=event
         )
 
-
-
         defer.returnValue(pdu)
 
     @defer.inlineCallbacks

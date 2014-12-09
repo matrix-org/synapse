@@ -113,6 +113,20 @@ class BaseHandler(object):
 
         yield self.store.persist_event(event, context=context)
 
+        federation_handler = self.hs.get_handlers().federation_handler
+
+        if event.type == EventTypes.Member:
+            if event.content["membership"] == Membership.INVITE:
+                invitee = self.hs.parse_userid(event.state_key)
+                if not self.hs.is_mine(invitee):
+                    returned_invite = yield federation_handler.send_invite(
+                        invitee.domain,
+                        event,
+                    )
+                    event.signatures.update(
+                        returned_invite.signatures
+                    )
+
         destinations = set(extra_destinations)
         for k, s in context.current_state.items():
             try:
@@ -128,7 +142,6 @@ class BaseHandler(object):
 
         yield self.notifier.on_new_room_event(event, extra_users=extra_users)
 
-        federation_handler = self.hs.get_handlers().federation_handler
         yield federation_handler.handle_new_event(
             event,
             None,
