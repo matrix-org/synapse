@@ -18,10 +18,9 @@ from twisted.internet import defer
 from synapse.api.errors import LimitExceededError, SynapseError
 from synapse.util.async import run_on_reactor
 from synapse.crypto.event_signing import add_hashes_and_signatures
-from synapse.api.events.room import RoomMemberEvent
 from synapse.api.constants import Membership, EventTypes
 
-from synapse.events.snapshot import EventSnapshot, EventContext
+from synapse.events.snapshot import EventContext
 
 import logging
 
