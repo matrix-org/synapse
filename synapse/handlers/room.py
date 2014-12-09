@@ -342,7 +342,7 @@ class RoomMemberHandler(BaseHandler):
         """
         target_user_id = event.state_key
 
-        ## TODO(markjh): get prev state from snapshot.
+        # TODO(markjh): get prev state from snapshot.
         prev_state = yield self.store.get_room_member(
             target_user_id, event.room_id
         )
