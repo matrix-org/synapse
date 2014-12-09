@@ -200,8 +200,6 @@ class ProfileHandler(BaseHandler):
         )
 
         for j in joins:
-            snapshot = yield self.store.snapshot_room(j)
-
             content = {
                 "membership": j.content["membership"],
             }
