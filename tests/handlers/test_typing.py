@@ -51,6 +51,7 @@ class JustTypingNotificationHandlers(object):
     def __init__(self, hs):
         self.typing_notification_handler = TypingNotificationHandler(hs)
 
+
 class TypingNotificationsTestCase(unittest.TestCase):
     """Tests typing notifications to rooms."""
     def setUp(self):
