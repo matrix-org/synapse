@@ -687,7 +687,7 @@ class FederationHandler(BaseHandler):
             event.event_id, event.signatures,
         )
 
-        is_new_state = not event.internal_metadata.outlier
+        is_new_state = not event.internal_metadata.is_outlier()
 
         known_ids = set(
             [s.event_id for s in context.auth_events.values()]

@@ -55,6 +55,9 @@ class _EventInternalMetadata(object):
     def get_dict(self):
         return dict(self.__dict__)
 
+    def is_outlier(self):
+        return hasattr(self, "outlier") and self.outlier
+
 
 def _event_dict_property(key):
         def getter(self):
