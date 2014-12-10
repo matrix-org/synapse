@@ -131,7 +131,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                 if ignore_user is not None and member == ignore_user:
                     continue
 
-                if member.is_mine:
+                if hs.is_mine(member):
                     if localusers is not None:
                         localusers.add(member)
                 else:

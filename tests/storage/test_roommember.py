@@ -21,7 +21,9 @@ from synapse.server import HomeServer
 from synapse.api.constants import Membership
 from synapse.api.events.room import RoomMemberEvent
 
-from tests.utils import SQLiteMemoryDbPool
+from tests.utils import SQLiteMemoryDbPool, MockKey
+
+from mock import Mock
 
 
 class RoomMemberStoreTestCase(unittest.TestCase):
@@ -31,14 +33,22 @@ class RoomMemberStoreTestCase(unittest.TestCase):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
 
-        hs = HomeServer("test",
-            db_pool=db_pool,
-        )
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
 
+        hs = HomeServer(
+            "test",
+            db_pool=db_pool,
+            config=self.mock_config,
+            resource_for_federation=Mock(),
+            http_client=None,
+        )
         # We can't test the RoomMemberStore on its own without the other event
         # storage logic
         self.store = hs.get_datastore()
-        self.event_factory = hs.get_event_factory()
+        self.event_builder_factory = hs.get_event_builder_factory()
+        self.handlers = hs.get_handlers()
+        self.message_handler = self.handlers.message_handler
 
         self.u_alice = hs.parse_userid("@alice:test")
         self.u_bob = hs.parse_userid("@bob:test")
@@ -49,27 +59,22 @@ class RoomMemberStoreTestCase(unittest.TestCase):
         self.room = hs.parse_roomid("!abc123:test")
 
     @defer.inlineCallbacks
-    def inject_room_member(self, room, user, membership):
-        # Have to create a join event using the eventfactory
-        event = self.event_factory.create_event(
-            etype=RoomMemberEvent.TYPE,
-            user_id=user.to_string(),
-            state_key=user.to_string(),
-            room_id=room.to_string(),
-            membership=membership,
-            content={"membership": membership},
-            depth=1,
-            prev_events=[],
+    def inject_room_member(self, room, user, membership, replaces_state=None):
+        builder = self.event_builder_factory.new({
+            "type": RoomMemberEvent.TYPE,
+            "sender": user.to_string(),
+            "state_key": user.to_string(),
+            "room_id": room.to_string(),
+            "content": {"membership": membership},
+        })
+
+        event, context = yield self.message_handler._create_new_client_event(
+            builder
         )
 
-        event.state_events = None
-        event.hashes = {}
-        event.prev_state = {}
-        event.auth_events = {}
+        yield self.store.persist_event(event, context)
 
-        yield self.store.persist_event(
-            event
-        )
+        defer.returnValue(event)
 
     @defer.inlineCallbacks
     def test_one_member(self):
