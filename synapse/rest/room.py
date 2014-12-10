@@ -148,7 +148,7 @@ class RoomStateEventRestServlet(RestServlet):
         content = _parse_json(request)
 
         event = self.event_factory.create_event(
-            etype=urllib.unquote(event_type),
+            etype=event_type,  # already urldecoded
             content=content,
             room_id=urllib.unquote(room_id),
             user_id=user.to_string(),
@@ -327,7 +327,9 @@ class RoomMessageListRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         user = yield self.auth.get_user_by_req(request)
-        pagination_config = PaginationConfig.from_request(request)
+        pagination_config = PaginationConfig.from_request(request,
+            default_limit=10,
+        )
         with_feedback = "feedback" in request.args
         handler = self.handlers.message_handler
         msgs = yield handler.get_messages(

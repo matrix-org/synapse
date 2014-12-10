@@ -1,0 +1,29 @@
+# Generic Matrix connection params
+matrix:
+  server: 'matrix.org'
+  SSL: 1
+
+# Bot-user connection details
+matrix-bot:
+  user_id: '@vertobot:matrix.org'
+  password: ''
+
+verto-bot:
+  host: webrtc.freeswitch.org
+  service: 8081
+  url: "ws://webrtc.freeswitch.org:8081/"
+
+verto-config:
+  passwd: 1234
+  
+verto-dialog-params:
+  useVideo: false
+  useStereo: false
+  tag: "webcam"
+  login: "1008@webrtc.freeswitch.org"
+  destination_number: "9664"
+  caller_id_name: "FreeSWITCH User"
+  caller_id_number: "1008"
+  callID: ""
+  remote_caller_id_name: "Outbound Call"
+  remote_caller_id_number: "9664"

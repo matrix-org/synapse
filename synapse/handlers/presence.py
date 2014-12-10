@@ -651,12 +651,13 @@ class PresenceHandler(BaseHandler):
             logger.debug("Incoming presence update from %s", user)
 
             observers = set(self._remote_recvmap.get(user, set()))
+            if observers:
+                logger.debug(" | %d interested local observers %r", len(observers), observers)
 
             rm_handler = self.homeserver.get_handlers().room_member_handler
             room_ids = yield rm_handler.get_rooms_for_user(user)
-
-            if not observers and not room_ids:
-                continue
+            if room_ids:
+                logger.debug(" | %d interested room IDs %r", len(room_ids), room_ids)
 
             state = dict(push)
             del state["user_id"]
@@ -677,6 +678,10 @@ class PresenceHandler(BaseHandler):
 
             self._user_cachemap_latest_serial += 1
             statuscache.update(state, serial=self._user_cachemap_latest_serial)
+
+            if not observers and not room_ids:
+                logger.debug(" | no interested observers or room IDs")
+                continue
 
             self.push_update_to_clients(
                 observed_user=user,
@@ -799,6 +804,7 @@ class PresenceEventSource(object):
             )
 
     @defer.inlineCallbacks
+    @log_function
     def get_new_events_for_user(self, user, from_key, limit):
         from_key = int(from_key)
 
@@ -811,7 +817,8 @@ class PresenceEventSource(object):
         # TODO(paul): use a DeferredList ? How to limit concurrency.
         for observed_user in cachemap.keys():
             cached = cachemap[observed_user]
-            if not (from_key < cached.serial):
+
+            if cached.serial <= from_key:
                 continue
 
             if (yield self.is_visible(observer_user, observed_user)):

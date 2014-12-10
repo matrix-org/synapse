@@ -218,7 +218,9 @@ class RoomMemberStore(SQLBaseStore):
             "ON m.event_id = c.event_id "
             "WHERE m.membership = 'join' "
             "AND (%(clause)s) "
-            "GROUP BY m.room_id HAVING COUNT(m.room_id) = ?"
+            # TODO(paul): We've got duplicate rows in the database somewhere
+            #   so we have to DISTINCT m.user_id here
+            "GROUP BY m.room_id HAVING COUNT(DISTINCT m.user_id) = ?"
         ) % {"clause": user_list_clause}
 
         args = list(user_id_list)

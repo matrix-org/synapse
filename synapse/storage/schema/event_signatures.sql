@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS event_signatures (
     signature_name TEXT,
     key_id TEXT,
     signature BLOB,
-    CONSTRAINT uniqueness UNIQUE (event_id, key_id)
+    CONSTRAINT uniqueness UNIQUE (event_id, signature_name, key_id)
 );
 
 CREATE INDEX IF NOT EXISTS event_signatures_id ON event_signatures (

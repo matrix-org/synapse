@@ -32,7 +32,7 @@ setup(
     description="Reference Synapse Home Server",
     install_requires=[
         "syutil==0.0.2",
-        "matrix_angular_sdk==0.5.0",
+        "matrix_angular_sdk==0.5.3b",
         "Twisted>=14.0.0",
         "service_identity>=1.0.0",
         "pyopenssl>=0.14",
@@ -45,8 +45,8 @@ setup(
     ],
     dependency_links=[
         "https://github.com/matrix-org/syutil/tarball/v0.0.2#egg=syutil-0.0.2",
-        "https://github.com/pyca/pynacl/tarball/52dbe2dc33f1#egg=pynacl-0.3.0",
-        "https://github.com/matrix-org/matrix-angular-sdk/tarball/v0.5.0/#egg=matrix_angular_sdk-0.5.0",
+        "https://github.com/pyca/pynacl/tarball/d4d3175589b892f6ea7c22f466e0e223853516fa#egg=pynacl-0.3.0",
+        "https://github.com/matrix-org/matrix-angular-sdk/tarball/v0.5.3b/#egg=matrix_angular_sdk-0.5.3b",
     ],
     setup_requires=[
         "setuptools_trial",
@@ -60,6 +60,6 @@ setup(
     entry_points="""
     [console_scripts]
     synctl=synapse.app.synctl:main
-    synapse-homeserver=synapse.app.homeserver:run
+    synapse-homeserver=synapse.app.homeserver:main
     """
 )
