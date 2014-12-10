@@ -137,7 +137,6 @@ class MessageHandler(BaseHandler):
     def handle_event(self, event_dict):
         builder = self.event_builder_factory.new(event_dict)
 
-
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
             if membership == Membership.JOIN:

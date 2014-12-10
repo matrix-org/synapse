@@ -436,19 +436,16 @@ class RoomMemberHandler(BaseHandler):
             else:
                 should_do_dance = False
 
-        have_joined = False
         if should_do_dance:
             handler = self.hs.get_handlers().federation_handler
-            have_joined = yield handler.do_invite_join(
+            yield handler.do_invite_join(
                 room_host,
                 room_id,
                 event.user_id,
                 event.get_dict()["content"],  # FIXME To get a non-frozen dict
                 context
             )
-
-        # We want to do the _do_update inside the room lock.
-        if not have_joined:
+        else:
             logger.debug("Doing normal join")
 
             yield self._do_local_membership_update(

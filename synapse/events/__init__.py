@@ -15,6 +15,8 @@
 
 from frozendict import frozendict
 
+import copy
+
 
 def _freeze(o):
     if isinstance(o, dict) or isinstance(o, frozendict):
@@ -48,7 +50,7 @@ def _unfreeze(o):
 
 class _EventInternalMetadata(object):
     def __init__(self, internal_metadata_dict):
-        self.__dict__ = internal_metadata_dict
+        self.__dict__ = copy.deepcopy(internal_metadata_dict)
 
     def get_dict(self):
         return dict(self.__dict__)
@@ -74,10 +76,10 @@ def _event_dict_property(key):
 class EventBase(object):
     def __init__(self, event_dict, signatures={}, unsigned={},
                  internal_metadata_dict={}):
-        self.signatures = signatures
-        self.unsigned = unsigned
+        self.signatures = copy.deepcopy(signatures)
+        self.unsigned = copy.deepcopy(unsigned)
 
-        self._event_dict = event_dict
+        self._event_dict = copy.deepcopy(event_dict)
 
         self.internal_metadata = _EventInternalMetadata(
             internal_metadata_dict
@@ -131,11 +133,11 @@ class EventBase(object):
 
 
 class FrozenEvent(EventBase):
-    def __init__(self, event_dict, signatures={}, unsigned={}):
-        event_dict = dict(event_dict)
+    def __init__(self, event_dict):
+        event_dict = copy.deepcopy(event_dict)
 
-        signatures.update(event_dict.pop("signatures", {}))
-        unsigned.update(event_dict.pop("unsigned", {}))
+        signatures = copy.deepcopy(event_dict.pop("signatures", {}))
+        unsigned = copy.deepcopy(event_dict.pop("unsigned", {}))
 
         frozen_dict = _freeze(event_dict)
 

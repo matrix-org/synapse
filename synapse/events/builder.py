@@ -54,10 +54,9 @@ class EventBuilderFactory(object):
         return e_id.to_string()
 
     def new(self, key_values={}):
-        if "event_id" not in key_values:
-            key_values["event_id"] = self.create_event_id()
+        key_values["event_id"] = self.create_event_id()
 
-        time_now = self.clock.time_msec()
+        time_now = int(self.clock.time_msec())
 
         key_values.setdefault("origin", self.hostname)
         key_values.setdefault("origin_server_ts", time_now)
@@ -65,5 +64,7 @@ class EventBuilderFactory(object):
         if "unsigned" in key_values:
             age = key_values["unsigned"].pop("age", 0)
             key_values["unsigned"].setdefault("age_ts", time_now - age)
+
+        key_values["signatures"] = {}
 
         return EventBuilder(key_values=key_values,)

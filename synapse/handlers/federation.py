@@ -459,9 +459,21 @@ class FederationHandler(BaseHandler):
         """
         event = pdu
 
+        logger.debug(
+            "on_send_join_request: Got event: %s, signatures: %s",
+            event.event_id,
+            event.signatures,
+        )
+
         event.internal_metadata.outlier = False
 
         context = yield self._handle_new_event(event)
+
+        logger.debug(
+            "on_send_join_request: After _handle_new_event: %s, sigs: %s",
+            event.event_id,
+            event.signatures,
+        )
 
         extra_users = []
         if event.type == RoomMemberEvent.TYPE:
@@ -495,6 +507,12 @@ class FederationHandler(BaseHandler):
                 logger.warn(
                     "Failed to get destination from event %s", s.event_id
                 )
+
+        logger.debug(
+            "on_send_join_request: Sending event: %s, signatures: %s",
+            event.event_id,
+            event.signatures,
+        )
 
         yield self.replication_layer.send_pdu(new_pdu, destinations)
 
@@ -652,10 +670,21 @@ class FederationHandler(BaseHandler):
     def _handle_new_event(self, event, state=None, backfilled=False,
                           current_state=None, fetch_missing=True):
         context = EventContext()
+
+        logger.debug(
+            "_handle_new_event: Before annotate: %s, sigs: %s",
+            event.event_id, event.signatures,
+        )
+
         yield self.state_handler.annotate_context_with_state(
             event,
             context,
             old_state=state
+        )
+
+        logger.debug(
+            "_handle_new_event: Before auth fetch: %s, sigs: %s",
+            event.event_id, event.signatures,
         )
 
         is_new_state = not event.internal_metadata.outlier
@@ -666,20 +695,24 @@ class FederationHandler(BaseHandler):
         for e_id, _ in event.auth_events:
             if e_id not in known_ids:
                 e = yield self.store.get_event(
-                    e_id,
-                    allow_none=True,
+                    e_id, allow_none=True,
                 )
 
                 if not e:
                     # TODO: Do some conflict res to make sure that we're
                     # not the ones who are wrong.
                     logger.info(
-                        "Rejecting %s as %s not in %s",
+                        "Rejecting %s as %s not in db or %s",
                         event.event_id, e_id, known_ids,
                     )
                     raise AuthError(403, "Auth events are stale")
 
                 context.auth_events[(e.type, e.state_key)] = e
+
+        logger.debug(
+            "_handle_new_event: Before hack: %s, sigs: %s",
+            event.event_id, event.signatures,
+        )
 
         if event.type == RoomMemberEvent.TYPE and not event.auth_events:
             if len(event.prev_events) == 1:
@@ -687,7 +720,17 @@ class FederationHandler(BaseHandler):
                 if c.type == RoomCreateEvent.TYPE:
                     context.auth_events[(c.type, c.state_key)] = c
 
+        logger.debug(
+            "_handle_new_event: Before auth check: %s, sigs: %s",
+            event.event_id, event.signatures,
+        )
+
         self.auth.check(event, auth_events=context.auth_events)
+
+        logger.debug(
+            "_handle_new_event: Before persist_event: %s, sigs: %s",
+            event.event_id, event.signatures,
+        )
 
         yield self.store.persist_event(
             event,
@@ -695,6 +738,11 @@ class FederationHandler(BaseHandler):
             backfilled=backfilled,
             is_new_state=(is_new_state and not backfilled),
             current_state=current_state,
+        )
+
+        logger.debug(
+            "_handle_new_event: After persist_event: %s, sigs: %s",
+            event.event_id, event.signatures,
         )
 
         defer.returnValue(context)

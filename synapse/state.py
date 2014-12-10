@@ -144,6 +144,17 @@ class StateHandler(object):
                 (s.type, s.state_key): s for s in old_state
             }
             context.state_group = None
+
+            if hasattr(event, "auth_events") and event.auth_events:
+                auth_ids = zip(*event.auth_events)[0]
+                context.auth_events = {
+                    k: v
+                    for k, v in context.current_state.items()
+                    if v.event_id in auth_ids
+                }
+            else:
+                context.auth_events = {}
+
             defer.returnValue([])
 
         if event.is_state():

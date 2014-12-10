@@ -82,8 +82,9 @@ def compute_event_signature(event, signature_name, signing_key):
     redact_json = tmp_event.get_pdu_json()
     redact_json.pop("age_ts", None)
     redact_json.pop("unsigned", None)
-    logger.debug("Signing event: %s", redact_json)
+    logger.debug("Signing event: %s", encode_canonical_json(redact_json))
     redact_json = sign_json(redact_json, signature_name, signing_key)
+    logger.debug("Signed event: %s", encode_canonical_json(redact_json))
     return redact_json["signatures"]
 
 

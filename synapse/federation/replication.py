@@ -25,6 +25,7 @@ from .persistence import TransactionActions
 
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.events import FrozenEvent
 
 import logging
 
@@ -439,7 +440,9 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     def on_send_join_request(self, origin, content):
+        logger.debug("on_send_join_request: content: %s", content)
         pdu = self.event_from_pdu_json(content)
+        logger.debug("on_send_join_request: pdu sigs: %s", pdu.signatures)
         res_pdus = yield self.handler.on_send_join_request(origin, pdu)
         time_now = self._clock.time_msec()
         defer.returnValue((200, {
@@ -665,13 +668,13 @@ class ReplicationLayer(object):
         return "<ReplicationLayer(%s)>" % self.server_name
 
     def event_from_pdu_json(self, pdu_json, outlier=False):
-        builder = self.event_builder_factory.new(
+        event = FrozenEvent(
             pdu_json
         )
 
-        builder.internal_metadata.outlier = outlier
+        event.internal_metadata.outlier = outlier
 
-        return builder.build()
+        return event
 
 
 class _TransactionQueue(object):
