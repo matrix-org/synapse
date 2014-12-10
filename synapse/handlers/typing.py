@@ -46,6 +46,12 @@ class TypingNotificationHandler(BaseHandler):
         self._member_typing_until = {} # clock time we expect to stop
         self._member_typing_timer = {} # deferreds to manage theabove
 
+        # map room IDs to serial numbers
+        self._room_serials = {}
+        self._latest_room_serial = 0
+        # map room IDs to sets of users currently typing
+        self._room_typing = {}
+
     @defer.inlineCallbacks
     def started_typing(self, target_user, auth_user, room_id, timeout):
         if not target_user.is_mine:
@@ -117,12 +123,11 @@ class TypingNotificationHandler(BaseHandler):
             ignore_user=user
         )
 
-        for u in localusers:
-            self.push_update_to_clients(
+        if localusers:
+            self._push_update_local(
                 room_id=room_id,
-                observer_user=u,
-                observed_user=user,
-                typing=typing,
+                user=user,
+                typing=typing
             )
 
         deferreds = []
@@ -151,18 +156,28 @@ class TypingNotificationHandler(BaseHandler):
             room_id, localusers=localusers
         )
 
-        for u in localusers:
-            self.push_update_to_clients(
+        if localusers:
+            self._push_update_local(
                 room_id=room_id,
-                observer_user=u,
-                observed_user=user,
+                user=user,
                 typing=content["typing"]
             )
 
-    def push_update_to_clients(self, room_id, observer_user, observed_user,
-                               typing):
-        # TODO(paul) steal this from presence.py
-        pass
+    def _push_update_local(self, room_id, user, typing):
+        if room_id not in self._room_serials:
+            self._room_serials[room_id] = 0
+            self._room_typing[room_id] = set()
+
+        room_set = self._room_typing[room_id]
+        if typing:
+            room_set.add(user)
+        elif user in room_set:
+            room_set.remove(user)
+
+        self._latest_room_serial += 1
+        self._room_serials[room_id] = self._latest_room_serial
+
+        self.notifier.on_new_user_event(rooms=[room_id])
 
 
 class TypingNotificationEventSource(object):

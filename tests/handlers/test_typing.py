@@ -65,6 +65,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.mock_config = Mock()
         self.mock_config.signing_key = [MockKey()]
 
+        mock_notifier = Mock(spec=["on_new_user_event"])
+        self.on_new_user_event = mock_notifier.on_new_user_event
+
         hs = HomeServer("test",
                 clock=self.clock,
                 db_pool=None,
@@ -77,6 +80,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                     "get_destination_retry_timings",
                 ]),
                 handlers=None,
+                notifier=mock_notifier,
                 resource_for_client=Mock(),
                 resource_for_federation=self.mock_federation_resource,
                 http_client=self.mock_http_client,
@@ -85,11 +89,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
             )
         hs.handlers = JustTypingNotificationHandlers(hs)
 
-        self.mock_update_client = Mock()
-        self.mock_update_client.return_value = defer.succeed(None)
-
         self.handler = hs.get_handlers().typing_notification_handler
-        self.handler.push_update_to_clients = self.mock_update_client
 
         self.datastore = hs.get_datastore()
         self.datastore.get_destination_retry_timings.return_value = (
@@ -158,11 +158,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
             timeout=20000,
         )
 
-        self.mock_update_client.assert_has_calls([
-            call(observer_user=self.u_banana,
-                observed_user=self.u_apple,
-                room_id=self.room_id,
-                typing=True),
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
         ])
 
     @defer.inlineCallbacks
@@ -209,11 +206,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_update_client.assert_has_calls([
-            call(observer_user=self.u_apple,
-                observed_user=self.u_onion,
-                room_id=self.room_id,
-                typing=True),
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
         ])
 
     @defer.inlineCallbacks
@@ -243,6 +237,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.handler._member_typing_timer[member] = (
             self.clock.call_later(1002, lambda: 0)
         )
+        self.handler._room_typing[self.room_id] = set((self.u_apple,))
 
         yield self.handler.stopped_typing(
             target_user=self.u_apple,
@@ -250,11 +245,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
             room_id=self.room_id,
         )
 
-        self.mock_update_client.assert_has_calls([
-            call(observer_user=self.u_banana,
-                observed_user=self.u_apple,
-                room_id=self.room_id,
-                typing=False),
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
         ])
 
         yield put_json.await_calls()
@@ -270,19 +262,13 @@ class TypingNotificationsTestCase(unittest.TestCase):
             timeout=10000,
         )
 
-        self.mock_update_client.assert_has_calls([
-            call(observer_user=self.u_banana,
-                observed_user=self.u_apple,
-                room_id=self.room_id,
-                typing=True),
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
         ])
-        self.mock_update_client.reset_mock()
+        self.on_new_user_event.reset_mock()
 
         self.clock.advance_time(11)
 
-        self.mock_update_client.assert_has_calls([
-            call(observer_user=self.u_banana,
-                observed_user=self.u_apple,
-                room_id=self.room_id,
-                typing=False),
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
         ])
