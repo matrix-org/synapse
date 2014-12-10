@@ -346,6 +346,8 @@ class FederationHandler(BaseHandler):
             event.get_pdu_json()
         )
 
+        handled_events = set()
+
         try:
             builder.event_id = self.event_factory.create_event_id()
             builder.origin = self.hs.hostname
@@ -370,6 +372,10 @@ class FederationHandler(BaseHandler):
             state = ret["state"]
             auth_chain = ret["auth_chain"]
             auth_chain.sort(key=lambda e: e.depth)
+
+            handled_events.update([s.event_id for s in state])
+            handled_events.update([a.event_id for a in auth_chain])
+            handled_events.add(new_event.event_id)
 
             logger.debug("do_invite_join auth_chain: %s", auth_chain)
             logger.debug("do_invite_join state: %s", state)
@@ -426,6 +432,9 @@ class FederationHandler(BaseHandler):
             del self.room_queues[room_id]
 
             for p, origin in room_queue:
+                if p.event_id in handled_events:
+                    continue
+
                 try:
                     self.on_receive_pdu(origin, p, backfilled=False)
                 except:
