@@ -91,6 +91,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.handler = hs.get_handlers().typing_notification_handler
 
+        self.event_source = hs.get_event_sources().sources["typing"]
+
         self.datastore = hs.get_datastore()
         self.datastore.get_destination_retry_timings.return_value = (
             defer.succeed(DestinationsTable.EntryType("", 0, 0))
@@ -151,6 +153,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
     def test_started_typing_local(self):
         self.room_members = [self.u_apple, self.u_banana]
 
+        self.assertEquals(self.event_source.get_current_key(), 0)
+
         yield self.handler.started_typing(
             target_user=self.u_apple,
             auth_user=self.u_apple,
@@ -161,6 +165,16 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.on_new_user_event.assert_has_calls([
             call(rooms=[self.room_id]),
         ])
+
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "typing": [self.u_apple.to_string()]},
+            ]
+        )
 
     @defer.inlineCallbacks
     def test_started_typing_remote_send(self):
@@ -195,6 +209,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
     def test_started_typing_remote_recv(self):
         self.room_members = [self.u_apple, self.u_onion]
 
+        self.assertEquals(self.event_source.get_current_key(), 0)
+
         yield self.mock_federation_resource.trigger("PUT",
             "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("farm", "m.typing",
@@ -209,6 +225,16 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.on_new_user_event.assert_has_calls([
             call(rooms=[self.room_id]),
         ])
+
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "typing": [self.u_onion.to_string()]},
+            ]
+        )
 
     @defer.inlineCallbacks
     def test_stopped_typing(self):
@@ -239,6 +265,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
         )
         self.handler._room_typing[self.room_id] = set((self.u_apple,))
 
+        self.assertEquals(self.event_source.get_current_key(), 0)
+
         yield self.handler.stopped_typing(
             target_user=self.u_apple,
             auth_user=self.u_apple,
@@ -251,9 +279,21 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         yield put_json.await_calls()
 
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "typing": []},
+            ]
+        )
+
     @defer.inlineCallbacks
     def test_typing_timeout(self):
         self.room_members = [self.u_apple, self.u_banana]
+
+        self.assertEquals(self.event_source.get_current_key(), 0)
 
         yield self.handler.started_typing(
             target_user=self.u_apple,
@@ -267,8 +307,28 @@ class TypingNotificationsTestCase(unittest.TestCase):
         ])
         self.on_new_user_event.reset_mock()
 
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "typing": [self.u_apple.to_string()]},
+            ]
+        )
+
         self.clock.advance_time(11)
 
         self.on_new_user_event.assert_has_calls([
             call(rooms=[self.room_id]),
         ])
+
+        self.assertEquals(self.event_source.get_current_key(), 2)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 1, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "typing": []},
+            ]
+        )
