@@ -70,7 +70,7 @@ class BaseHandler(object):
         )
 
         if latest_ret:
-            depth = max([d for _, _, d in latest_ret])
+            depth = max([d for _, _, d in latest_ret]) + 1
         else:
             depth = 1
 
