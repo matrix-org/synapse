@@ -28,3 +28,25 @@ class MockClockTestCase(unittest.TestCase):
         self.clock.advance_time(20)
 
         self.assertEquals(20, self.clock.time() - start_time)
+
+    def test_later(self):
+        invoked = [0, 0]
+
+        def _cb0():
+            invoked[0] = 1
+        self.clock.call_later(10, _cb0)
+
+        def _cb1():
+            invoked[1] = 1
+        self.clock.call_later(20, _cb1)
+
+        self.assertFalse(invoked[0])
+
+        self.clock.advance_time(15)
+
+        self.assertTrue(invoked[0])
+        self.assertFalse(invoked[1])
+
+        self.clock.advance_time(5)
+
+        self.assertTrue(invoked[1])

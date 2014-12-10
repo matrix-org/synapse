@@ -18,6 +18,8 @@ from synapse.api.errors import cs_error, CodeMessageException, StoreError
 from synapse.api.constants import Membership
 from synapse.storage import prepare_database
 
+from synapse.util.logcontext import LoggingContext
+
 from synapse.api.events.room import (
     RoomMemberEvent, MessageEvent
 )
@@ -134,15 +136,39 @@ class MockKey(object):
 class MockClock(object):
     now = 1000
 
+    def __init__(self):
+        # list of tuples of (absolute_time, callback) in no particular order
+        self.timers = []
+
     def time(self):
         return self.now
 
     def time_msec(self):
         return self.time() * 1000
 
+    def call_later(self, delay, callback):
+        current_context = LoggingContext.current_context()
+
+        def wrapped_callback():
+            LoggingContext.thread_local.current_context = current_context
+            callback()
+        self.timers.append((self.now + delay, wrapped_callback))
+
+    def cancel_call_later(self, timer):
+        raise NotImplementedError("Oopsie")
+
     # For unit testing
     def advance_time(self, secs):
         self.now += secs
+
+        timers = self.timers
+        self.timers = []
+
+        for time, callback in timers:
+            if self.now >= time:
+                callback()
+            else:
+                self.timers.append((time, callback))
 
 
 class SQLiteMemoryDbPool(ConnectionPool, object):
