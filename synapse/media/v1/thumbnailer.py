@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import Image
+import PIL.Image as Image
 from io import BytesIO
 
 
