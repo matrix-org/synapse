@@ -238,9 +238,11 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         # Gut-wrenching
         from synapse.handlers.typing import RoomMember
-        self.handler._member_typing_until[
-            RoomMember(self.room_id, self.u_apple)
-        ] = 1002000
+        member = RoomMember(self.room_id, self.u_apple)
+        self.handler._member_typing_until[member] = 1002000
+        self.handler._member_typing_timer[member] = (
+            self.clock.call_later(1002, lambda: 0)
+        )
 
         yield self.handler.stopped_typing(
             target_user=self.u_apple,
@@ -256,3 +258,31 @@ class TypingNotificationsTestCase(unittest.TestCase):
         ])
 
         yield put_json.await_calls()
+
+    @defer.inlineCallbacks
+    def test_typing_timeout(self):
+        self.room_members = [self.u_apple, self.u_banana]
+
+        yield self.handler.started_typing(
+            target_user=self.u_apple,
+            auth_user=self.u_apple,
+            room_id=self.room_id,
+            timeout=10000,
+        )
+
+        self.mock_update_client.assert_has_calls([
+            call(observer_user=self.u_banana,
+                observed_user=self.u_apple,
+                room_id=self.room_id,
+                typing=True),
+        ])
+        self.mock_update_client.reset_mock()
+
+        self.clock.advance_time(11)
+
+        self.mock_update_client.assert_has_calls([
+            call(observer_user=self.u_banana,
+                observed_user=self.u_apple,
+                room_id=self.room_id,
+                typing=False),
+        ])

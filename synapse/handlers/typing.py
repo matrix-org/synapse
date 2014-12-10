@@ -43,7 +43,8 @@ class TypingNotificationHandler(BaseHandler):
 
         self.federation.register_edu_handler("m.typing", self._recv_edu)
 
-        self._member_typing_until = {}
+        self._member_typing_until = {} # clock time we expect to stop
+        self._member_typing_timer = {} # deferreds to manage theabove
 
     @defer.inlineCallbacks
     def started_typing(self, target_user, auth_user, room_id, timeout):
@@ -58,7 +59,13 @@ class TypingNotificationHandler(BaseHandler):
 
         was_present = member in self._member_typing_until
 
+        if member in self._member_typing_timer:
+            self.clock.cancel_call_later(self._member_typing_timer[member])
+
         self._member_typing_until[member] = until
+        self._member_typing_timer[member] = self.clock.call_later(
+            timeout / 1000, lambda: self._stopped_typing(member)
+        )
 
         if was_present:
             # No point sending another notification
@@ -80,15 +87,24 @@ class TypingNotificationHandler(BaseHandler):
 
         member = RoomMember(room_id=room_id, user=target_user)
 
+        yield self._stopped_typing(member)
+
+    @defer.inlineCallbacks
+    def _stopped_typing(self, member):
         if member not in self._member_typing_until:
             # No point
             defer.returnValue(None)
 
         yield self._push_update(
-            room_id=room_id,
-            user=target_user,
+            room_id=member.room_id,
+            user=member.user,
             typing=False,
         )
+
+        del self._member_typing_until[member]
+
+        self.clock.cancel_call_later(self._member_typing_timer[member])
+        del self._member_typing_timer[member]
 
     @defer.inlineCallbacks
     def _push_update(self, room_id, user, typing):
