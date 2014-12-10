@@ -101,10 +101,9 @@ class MatrixFederationHttpClient(object):
             ]
         )
 
-        # was 5; for now, let's only try once at the HTTP layer and then
-        # rely on transaction-layer retries for exponential backoff and
-        # getting the message through.
-        retries_left = 0
+        # XXX: Would be much nicer to retry only at the transaction-layer
+        # (once we have reliable transactions in place)
+        retries_left = 5
 
         endpoint = self._getEndpoint(reactor, destination)
 
