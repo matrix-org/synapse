@@ -336,7 +336,7 @@ class ReplicationLayer(object):
             defer.returnValue(response)
             return
 
-        logger.debug("[%s] Transacition is new", transaction.transaction_id)
+        logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
         with PreserveLoggingContext():
             dl = []
@@ -690,6 +690,7 @@ class _TransactionQueue(object):
         self.transport_layer = transport_layer
 
         self._clock = hs.get_clock()
+        self.store = hs.get_datastore()
 
         # Is a mapping from destinations -> deferreds. Used to keep track
         # of which destinations have transactions in flight and when they are
@@ -731,8 +732,14 @@ class _TransactionQueue(object):
                 (pdu, deferred, order)
             )
 
+            def eb(failure):
+                if not deferred.called:
+                    deferred.errback(failure)
+                else:
+                    logger.warn("Failed to send pdu", failure)
+
             with PreserveLoggingContext():
-                self._attempt_new_transaction(destination)
+                self._attempt_new_transaction(destination).addErrback(eb)
 
             deferreds.append(deferred)
 
@@ -741,6 +748,9 @@ class _TransactionQueue(object):
     # NO inlineCallbacks
     def enqueue_edu(self, edu):
         destination = edu.destination
+
+        if destination == self.server_name:
+            return
 
         deferred = defer.Deferred()
         self.pending_edus_by_dest.setdefault(destination, []).append(
@@ -751,7 +761,7 @@ class _TransactionQueue(object):
             if not deferred.called:
                 deferred.errback(failure)
             else:
-                logger.exception("Failed to send edu", failure)
+                logger.warn("Failed to send edu", failure)
 
         with PreserveLoggingContext():
             self._attempt_new_transaction(destination).addErrback(eb)
@@ -773,10 +783,33 @@ class _TransactionQueue(object):
     @defer.inlineCallbacks
     @log_function
     def _attempt_new_transaction(self, destination):
+
+        (retry_last_ts, retry_interval) = (0, 0)
+        retry_timings = yield self.store.get_destination_retry_timings(
+            destination
+        )
+        if retry_timings:
+            (retry_last_ts, retry_interval) = (
+                retry_timings.retry_last_ts, retry_timings.retry_interval
+            )
+            if retry_last_ts + retry_interval > int(self._clock.time_msec()):
+                logger.info(
+                    "TX [%s] not ready for retry yet - "
+                    "dropping transaction for now",
+                    destination,
+                )
+                return
+            else:
+                logger.info("TX [%s] is ready for retry", destination)
+
         if destination in self.pending_transactions:
+            # XXX: pending_transactions can get stuck on by a never-ending
+            # request at which point pending_pdus_by_dest just keeps growing.
+            # we need application-layer timeouts of some flavour of these
+            # requests
             return
 
-        #  list of (pending_pdu, deferred, order)
+        # list of (pending_pdu, deferred, order)
         pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
         pending_edus = self.pending_edus_by_dest.pop(destination, [])
         pending_failures = self.pending_failures_by_dest.pop(destination, [])
@@ -784,7 +817,14 @@ class _TransactionQueue(object):
         if not pending_pdus and not pending_edus and not pending_failures:
             return
 
-        logger.debug("TX [%s] Attempting new transaction", destination)
+        logger.debug(
+            "TX [%s] Attempting new transaction "
+            "(pdus: %d, edus: %d, failures: %d)",
+            destination,
+            len(pending_pdus),
+            len(pending_edus),
+            len(pending_failures)
+        )
 
         # Sort based on the order field
         pending_pdus.sort(key=lambda t: t[2])
@@ -817,7 +857,11 @@ class _TransactionQueue(object):
             yield self.transaction_actions.prepare_to_send(transaction)
 
             logger.debug("TX [%s] Persisted transaction", destination)
-            logger.debug("TX [%s] Sending transaction...", destination)
+            logger.info(
+                "TX [%s] Sending transaction [%s]",
+                destination,
+                transaction.transaction_id,
+            )
 
             # Actually send the transaction
 
@@ -838,6 +882,8 @@ class _TransactionQueue(object):
                 transaction, json_data_cb
             )
 
+            logger.info("TX [%s] got %d response", destination, code)
+
             logger.debug("TX [%s] Sent transaction", destination)
             logger.debug("TX [%s] Marking as delivered...", destination)
 
@@ -850,8 +896,14 @@ class _TransactionQueue(object):
 
             for deferred in deferreds:
                 if code == 200:
+                    if retry_last_ts:
+                        # this host is alive! reset retry schedule
+                        yield self.store.set_destination_retry_timings(
+                            destination, 0, 0
+                        )
                     deferred.callback(None)
                 else:
+                    self.set_retrying(destination, retry_interval)
                     deferred.errback(RuntimeError("Got status %d" % code))
 
                 # Ensures we don't continue until all callbacks on that
@@ -864,11 +916,15 @@ class _TransactionQueue(object):
             logger.debug("TX [%s] Yielded to callbacks", destination)
 
         except Exception as e:
-            logger.error("TX Problem in _attempt_transaction")
-
             # We capture this here as there as nothing actually listens
             # for this finishing functions deferred.
-            logger.exception(e)
+            logger.warn(
+                "TX [%s] Problem in _attempt_transaction: %s",
+                destination,
+                e,
+            )
+
+            self.set_retrying(destination, retry_interval)
 
             for deferred in deferreds:
                 if not deferred.called:
@@ -880,3 +936,22 @@ class _TransactionQueue(object):
 
             # Check to see if there is anything else to send.
             self._attempt_new_transaction(destination)
+
+    @defer.inlineCallbacks
+    def set_retrying(self, destination, retry_interval):
+        # track that this destination is having problems and we should
+        # give it a chance to recover before trying it again
+
+        if retry_interval:
+            retry_interval *= 2
+            # plateau at hourly retries for now
+            if retry_interval >= 60 * 60 * 1000:
+                retry_interval = 60 * 60 * 1000
+        else:
+            retry_interval = 2000  # try again at first after 2 seconds
+
+        yield self.store.set_destination_retry_timings(
+            destination,
+            int(self._clock.time_msec()),
+            retry_interval
+        )

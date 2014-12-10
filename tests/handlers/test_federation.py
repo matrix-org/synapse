@@ -53,6 +53,8 @@ class FederationTestCase(unittest.TestCase):
                 "persist_event",
                 "store_room",
                 "get_room",
+                "get_destination_retry_timings",
+                "set_destination_retry_timings",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
