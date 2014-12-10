@@ -152,10 +152,13 @@ class MockClock(object):
         def wrapped_callback():
             LoggingContext.thread_local.current_context = current_context
             callback()
-        self.timers.append((self.now + delay, wrapped_callback))
+
+        t = (self.now + delay, wrapped_callback)
+        self.timers.append(t)
+        return t
 
     def cancel_call_later(self, timer):
-        raise NotImplementedError("Oopsie")
+        self.timers = [t for t in self.timers if t != timer]
 
     # For unit testing
     def advance_time(self, secs):
