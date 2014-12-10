@@ -76,7 +76,7 @@ class RoomCreationHandler(BaseHandler):
 
         if room_id:
             # Ensure room_id is the correct type
-            room_id_obj = RoomID.from_string(room_id, self.hs)
+            room_id_obj = RoomID.from_string(room_id)
             if not self.hs.is_mine(room_id_obj):
                 raise SynapseError(400, "Room id must be local")
 
@@ -476,7 +476,7 @@ class RoomMemberHandler(BaseHandler):
         if prev_state and prev_state.membership == Membership.INVITE:
             room = yield self.store.get_room(room_id)
             inviter = UserID.from_string(
-                prev_state.sender, self.hs
+                prev_state.sender
             )
 
             is_remote_invite_join = not self.hs.is_mine(inviter) and not room
