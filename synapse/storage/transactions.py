@@ -28,7 +28,8 @@ class TransactionStore(SQLBaseStore):
     """A collection of queries for handling PDUs.
     """
     
-    # a write-through cache of DestinationsTable.EntryType indexed by destination string
+    # a write-through cache of DestinationsTable.EntryType indexed by
+    # destination string
     destination_retry_cache = {}
 
     def get_received_txn_response(self, transaction_id, origin):
@@ -238,7 +239,8 @@ class TransactionStore(SQLBaseStore):
             else:
                 return None
         
-    def set_destination_retry_timings(self, destination, retry_last_ts, retry_interval):
+    def set_destination_retry_timings(self, destination,
+                                      retry_last_ts, retry_interval):
         """Sets the current retry timings for a given destination.
         Both timings should be zero if retrying is no longer occuring.
         
@@ -249,15 +251,19 @@ class TransactionStore(SQLBaseStore):
         """
         
         self.destination_retry_cache[destination] = (
-            DestinationsTable.EntryType(destination, retry_last_ts, retry_interval)
+            DestinationsTable.EntryType(destination,
+                                        retry_last_ts, retry_interval)
         )
         
-        # xxx: we could chose to not bother persisting this if our cache things this is a NOOP
+        # XXX: we could chose to not bother persisting this if our cache thinks
+        # this is a NOOP
         return self.runInteraction(
             "set_destination_retry_timings",
-            self._set_destination_retry_timings, destination, retry_last_ts, retry_interval)
+            self._set_destination_retry_timings, destination, 
+            retry_last_ts, retry_interval)
             
-    def _set_destination_retry_timings(cls, txn, destination, retry_last_ts, retry_interval):
+    def _set_destination_retry_timings(cls, txn, destination,
+                                       retry_last_ts, retry_interval):
 
         query = (
             "INSERT OR REPLACE INTO %s "

@@ -90,7 +90,7 @@ class MatrixFederationHttpClient(object):
         )
 
         logger.info("Sending request to %s: %s %s",
-                     destination, method, url_bytes)
+                    destination, method, url_bytes)
 
         logger.debug(
             "Types: %s",
@@ -135,7 +135,7 @@ class MatrixFederationHttpClient(object):
                     raise SynapseError(400, "Domain specified not found.")
 
                 logger.exception("Sending request failed to %s: %s %s : %s",
-                    destination, method, url_bytes, e)
+                                 destination, method, url_bytes, e)
                 _print_ex(e)
 
                 if retries_left:
@@ -145,7 +145,8 @@ class MatrixFederationHttpClient(object):
                     raise
 
         logger.info("Received response %d %s for %s: %s %s",
-            response.code, response.phrase, destination, method, url_bytes)
+                    response.code, response.phrase,
+                    destination, method, url_bytes)
         
         if 200 <= response.code < 300:
             # We need to update the transactions table to say it was sent?

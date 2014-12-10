@@ -778,21 +778,25 @@ class _TransactionQueue(object):
     def _attempt_new_transaction(self, destination):
 
         (retry_last_ts, retry_interval) = (0, 0)
-        retry_timings = yield self.store.get_destination_retry_timings(destination)
+        retry_timings = yield self.store.get_destination_retry_timings(
+            destination
+        )
         if retry_timings:
             (retry_last_ts, retry_interval) = (
                 retry_timings.retry_last_ts, retry_timings.retry_interval
             )
             if retry_last_ts + retry_interval > int(self._clock.time_msec()):
-                logger.info("TX [%s] not ready for retry yet - dropping transaction for now", destination)
+                logger.info("TX [%s] not ready for retry yet - "
+                            "dropping transaction for now", destination)
                 return
             else:
                 logger.info("TX [%s] is ready for retry", destination)
         
         if destination in self.pending_transactions:
-            # XXX: pending_transactions can get stuck on by a never-ending request
-            # at which point pending_pdus_by_dest just keeps growing.
-            # we need application-layer timeouts of some flavour of these requests
+            # XXX: pending_transactions can get stuck on by a never-ending
+            # request at which point pending_pdus_by_dest just keeps growing.
+            # we need application-layer timeouts of some flavour of these
+            # requests
             return
 
         # list of (pending_pdu, deferred, order)
@@ -803,8 +807,10 @@ class _TransactionQueue(object):
         if not pending_pdus and not pending_edus and not pending_failures:
             return
 
-        logger.debug("TX [%s] Attempting new transaction (pdus: %d, edus: %d, failures: %d)",
-            destination, len(pending_pdus), len(pending_edus), len(pending_failures))
+        logger.debug("TX [%s] Attempting new transaction "
+                    "(pdus: %d, edus: %d, failures: %d)",
+            destination,
+            len(pending_pdus), len(pending_edus), len(pending_failures))
 
         # Sort based on the order field
         pending_pdus.sort(key=lambda t: t[2])
@@ -837,7 +843,8 @@ class _TransactionQueue(object):
             yield self.transaction_actions.prepare_to_send(transaction)
 
             logger.debug("TX [%s] Persisted transaction", destination)
-            logger.info("TX [%s] Sending transaction [%s]", destination, transaction.transaction_id)
+            logger.info("TX [%s] Sending transaction [%s]", destination,
+                        transaction.transaction_id)
 
             # Actually send the transaction
 
@@ -874,7 +881,9 @@ class _TransactionQueue(object):
                 if code == 200:
                     if retry_last_ts:
                         # this host is alive! reset retry schedule
-                        yield self.store.set_destination_retry_timings(destination, 0, 0)
+                        yield self.store.set_destination_retry_timings(
+                            destination, 0, 0
+                        )
                     deferred.callback(None)
                 else:
                     self.start_retrying(destination, retry_interval)
@@ -892,7 +901,8 @@ class _TransactionQueue(object):
         except Exception as e:
             # We capture this here as there as nothing actually listens
             # for this finishing functions deferred.
-            logger.exception("TX [%s] Problem in _attempt_transaction: %s", destination, e)
+            logger.exception("TX [%s] Problem in _attempt_transaction: %s",
+                             destination, e)
 
             self.start_retrying(destination, retry_interval)
             
