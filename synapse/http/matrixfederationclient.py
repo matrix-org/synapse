@@ -89,8 +89,8 @@ class MatrixFederationHttpClient(object):
             ("", "", path_bytes, param_bytes, query_bytes, "",)
         )
 
-        logger.debug("Sending request to %s: %s %s",
-                     destination, method, url_bytes)
+        logger.info("Sending request to %s: %s %s",
+                    destination, method, url_bytes)
 
         logger.debug(
             "Types: %s",
@@ -101,6 +101,8 @@ class MatrixFederationHttpClient(object):
             ]
         )
 
+        # XXX: Would be much nicer to retry only at the transaction-layer
+        # (once we have reliable transactions in place)
         retries_left = 5
 
         endpoint = self._getEndpoint(reactor, destination)
@@ -127,11 +129,20 @@ class MatrixFederationHttpClient(object):
                 break
             except Exception as e:
                 if not retry_on_dns_fail and isinstance(e, DNSLookupError):
-                    logger.warn("DNS Lookup failed to %s with %s", destination,
-                                e)
+                    logger.warn(
+                        "DNS Lookup failed to %s with %s",
+                        destination,
+                        e
+                    )
                     raise SynapseError(400, "Domain specified not found.")
 
-                logger.exception("Got error in _create_request")
+                logger.warn(
+                    "Sending request failed to %s: %s %s : %s",
+                    destination,
+                    method,
+                    url_bytes,
+                    e
+                )
                 _print_ex(e)
 
                 if retries_left:
@@ -140,15 +151,21 @@ class MatrixFederationHttpClient(object):
                 else:
                     raise
 
+        logger.info(
+            "Received response %d %s for %s: %s %s",
+            response.code,
+            response.phrase,
+            destination,
+            method,
+            url_bytes
+        )
+
         if 200 <= response.code < 300:
             # We need to update the transactions table to say it was sent?
             pass
         else:
             # :'(
             # Update transactions table?
-            logger.error(
-                "Got response %d %s", response.code, response.phrase
-            )
             raise CodeMessageException(
                 response.code, response.phrase
             )
@@ -284,7 +301,7 @@ def _print_ex(e):
         for ex in e.reasons:
             _print_ex(ex)
     else:
-        logger.exception(e)
+        logger.warn(e)
 
 
 class _JsonProducer(object):

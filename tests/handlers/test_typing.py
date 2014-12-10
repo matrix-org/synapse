@@ -25,6 +25,8 @@ from ..utils import MockHttpResource, MockClock, DeferredMockCallable, MockKey
 from synapse.server import HomeServer
 from synapse.handlers.typing import TypingNotificationHandler
 
+from synapse.storage.transactions import DestinationsTable
+
 
 def _expect_edu(destination, edu_type, content, origin="test"):
     return {
@@ -72,6 +74,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                     "delivered_txn",
                     "get_received_txn_response",
                     "set_received_txn_response",
+                    "get_destination_retry_timings",
                 ]),
                 handlers=None,
                 resource_for_client=Mock(),
@@ -89,6 +92,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.handler.push_update_to_clients = self.mock_update_client
 
         self.datastore = hs.get_datastore()
+        self.datastore.get_destination_retry_timings.return_value = (
+            defer.succeed(DestinationsTable.EntryType("", 0, 0))
+        )
 
         def get_received_txn_response(*args):
             return defer.succeed(None)
