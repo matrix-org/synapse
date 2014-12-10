@@ -160,3 +160,8 @@ class FrozenEvent(EventBase):
     def get_dict(self):
         # We need to unfreeze what we return
         return _unfreeze(super(FrozenEvent, self).get_dict())
+
+    def __str__(self):
+        return "<FrozenEvent event_id='%s', type='%s', state_key='%s'>" % (
+            self.event_id, self.type, self.state_key,
+        )
