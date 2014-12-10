@@ -436,31 +436,6 @@ class SQLBaseStore(object):
 
         return self.runInteraction("_simple_max_id", func)
 
-    def _parse_event_from_row(self, row_dict):
-        d = copy.deepcopy({k: v for k, v in row_dict.items()})
-
-        d.pop("stream_ordering", None)
-        d.pop("topological_ordering", None)
-        d.pop("processed", None)
-        d["origin_server_ts"] = d.pop("ts", 0)
-        replaces_state = d.pop("prev_state", None)
-
-        if replaces_state:
-            d["replaces_state"] = replaces_state
-
-        d.update(json.loads(row_dict["unrecognized_keys"]))
-        d["content"] = json.loads(d["content"])
-        del d["unrecognized_keys"]
-
-        if "age_ts" not in d:
-            # For compatibility
-            d["age_ts"] = d.get("origin_server_ts", 0)
-
-        return self.event_factory.create_event(
-            etype=d["type"],
-            **d
-        )
-
     def _get_events(self, event_ids):
         return self.runInteraction(
             "_get_events", self._get_events_txn, event_ids
