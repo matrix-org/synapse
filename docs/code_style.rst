@@ -22,17 +22,17 @@ Basically, PEP8
   depending on the size and shape of the arguments and what makes more sense to
   the author. In other words, both this::
 
-    print("I am a fish %s", "moo")
+    print("I am a fish %s" % "moo")
 
   and this::
 
-    print("I am a fish %s",
+    print("I am a fish %s" %
           "moo")
 
   and this::
 
     print(
-        "I am a fish %s",
+        "I am a fish %s" %
         "moo"
     )
 
