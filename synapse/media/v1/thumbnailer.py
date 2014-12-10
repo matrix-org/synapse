@@ -13,18 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import PIL.Image
+import Image
+from io import BytesIO
+
 
 class Thumbnailer(object):
 
-    FORMAT_JPEG="JPEG"
-    FORMAT_PNG="PNG"
+    FORMATS = {
+        "image/jpeg": "JPEG",
+        "image/png": "PNG",
+    }
 
     def __init__(self, input_path):
-        self.image = PIL.Image.open(input_path)
+        self.image = Image.open(input_path)
         self.width, self.height = self.image.size
 
-    def size_preserve(self, max_width, max_height):
+    def aspect(self, max_width, max_height):
         """Calculate the largest size that preserves aspect ratio which
         fits within the given rectangle::
 
@@ -42,12 +46,12 @@ class Thumbnailer(object):
         else:
             return ((max_height * self.width) // self.height, max_height)
 
-    def thumbnail_scale(self, output_path, output_format, width, height):
+    def scale(self, output_path, width, height, output_type):
         """Rescales the image to the given dimensions"""
-        output = self.image.resize((width, height), PIL.Image.BILINEAR)
-        output.save(output_path, output_format)
+        scaled = self.image.resize((width, height), Image.BILINEAR)
+        return self.save_image(scaled, output_type, output_path)
 
-    def thumbnail_crop(self, output_path, output_format, width, height):
+    def crop(self, output_path, width, height, output_type):
         """Rescales and crops the image to the given dimensions preserving
         aspect::
             (w_in / h_in) = (w_scaled / h_scaled)
@@ -61,18 +65,25 @@ class Thumbnailer(object):
         if width * self.height > height * self.width:
             scaled_height = (width * self.height) // self.width
             scaled_image = self.image.resize(
-                (width, scaled_height), PIL.Image.BILINEAR
+                (width, scaled_height), Image.BILINEAR
             )
             crop_top = (scaled_height - height) // 2
             crop_bottom = height + crop_top
             cropped = scaled_image.crop((0, crop_top, width, crop_bottom))
-            cropped.save(output_path, output_format)
         else:
             scaled_width = (height * self.width) // self.height
             scaled_image = self.image.resize(
-                (scaled_width, height), PIL.Image.BILINEAR
+                (scaled_width, height), Image.BILINEAR
             )
             crop_left = (scaled_width - width) // 2
             crop_right = width + crop_left
             cropped = scaled_image.crop((crop_left, 0, crop_right, height))
-            cropped.save(output_path, output_format)
+        return self.save_image(cropped, output_type, output_path)
+
+    def save_image(self, output_image, output_type, output_path):
+        output_bytes_io = BytesIO()
+        output_image.save(output_bytes_io, self.FORMATS[output_type])
+        output_bytes = output_bytes_io.getvalue()
+        with open(output_path, "wb") as output_file:
+            output_file.write(output_bytes)
+        return len(output_bytes)

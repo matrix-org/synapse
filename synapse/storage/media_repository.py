@@ -56,8 +56,8 @@ class MediaRepositoryStore(SQLBaseStore):
         )
 
     def store_local_thumbnail(self, media_id, thumbnail_width,
-                              thumbnail_height, thumbnail_method,
-                              thumbnail_type, thumbnail_length):
+                              thumbnail_height, thumbnail_type,
+                              thumbnail_method, thumbnail_length):
         return self._simple_insert(
             "local_media_thumbnails",
             {
@@ -108,10 +108,10 @@ class MediaRepositoryStore(SQLBaseStore):
             )
         )
 
-    def store_remote_media_thumbnail(self, origin, media_id, thumbnail_width,
-                                     thumbnail_height, thumbnail_method,
-                                     thumbnail_type, thumbnail_length,
-                                     filesystem_id):
+    def store_remote_media_thumbnail(self, origin, media_id, filesystem_id,
+                                     thumbnail_width, thumbnail_height,
+                                     thumbnail_type, thumbnail_method,
+                                     thumbnail_length):
         return self._simple_insert(
             "remote_media_cache_thumbnails",
             {

@@ -20,9 +20,10 @@ from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException
 )
 
-from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
+
+from .baseresource import BaseMediaResource
 
 import os
 
@@ -31,17 +32,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class UploadResource(Resource):
-    isLeaf = True
-
-    def __init__(self, hs, filepaths):
-        Resource.__init__(self)
-        self.auth = hs.get_auth()
-        self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
-        self.max_upload_size = hs.config.max_upload_size
-        self.filepaths = filepaths
-
+class UploadResource(BaseMediaResource):
     def render_POST(self, request):
         self._async_render_POST(request)
         return NOT_DONE_YET
@@ -99,6 +90,12 @@ class UploadResource(Resource):
                 media_length=content_length,
                 user_id=auth_user,
             )
+            media_info = {
+                "media_type": media_type,
+                "media_length": content_length,
+            }
+
+            yield self._generate_local_thumbnails(self, media_id, media_info)
 
             respond_with_json(
                 request, 200, {"content_token": media_id}, send_cors=True
