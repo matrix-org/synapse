@@ -37,6 +37,7 @@ class BaseMediaResource(Resource):
 
     def __init__(self, hs, filepaths):
         Resource.__init__(self)
+        self.auth = hs.get_auth()
         self.client = hs.get_http_client()
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
@@ -120,6 +121,12 @@ class BaseMediaResource(Resource):
             send_cors=True
         )
 
+    @staticmethod
+    def _makedirs(filepath):
+        dirname = os.path.dirname(filepath)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
     @defer.inlineCallbacks
     def _download_remote_file(self, server_name, media_id):
         file_id = random_string(24)
@@ -127,13 +134,13 @@ class BaseMediaResource(Resource):
         fname = self.filepaths.remote_media_filepath(
             server_name, file_id
         )
-        os.makedirs(os.path.dirname(fname))
+        self._makedirs(fname)
 
         try:
             with open(fname, "wb") as f:
                 request_path = "/".join((
                     "/_matrix/media/v1/download", server_name, media_id,
-                )),
+                ))
                 length, headers = yield self.client.get_file(
                     server_name, request_path, output_stream=f,
                 )
@@ -147,7 +154,7 @@ class BaseMediaResource(Resource):
                 time_now_ms=self.clock.time_msec(),
                 upload_name=None,
                 media_length=length,
-                file_id=file_id,
+                filesystem_id=file_id,
             )
         except:
             os.remove(fname)
@@ -158,7 +165,7 @@ class BaseMediaResource(Resource):
             "media_length": length,
             "upload_name": None,
             "created_ts": time_now_ms,
-            "file_id": file_id,
+            "filesystem_id": file_id,
         }
 
         yield self._generate_remote_thumbnails(
@@ -215,7 +222,7 @@ class BaseMediaResource(Resource):
         if not requirements:
             return
 
-        input_path = self.filepaths.local_media_path(media_id)
+        input_path = self.filepaths.local_media_filepath(media_id)
         thumbnailer = Thumbnailer(input_path)
         m_width = thumbnailer.width
         m_height = thumbnailer.height
@@ -235,6 +242,7 @@ class BaseMediaResource(Resource):
             t_path = self.filepaths.local_media_thumbnail(
                 media_id, t_width, t_height, t_type, t_method
             )
+            self._makedirs(t_path)
             t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
             yield self.store.store_local_thumbnail(
                 media_id, t_width, t_height, t_type, t_method, t_len
@@ -250,6 +258,7 @@ class BaseMediaResource(Resource):
             t_path = self.filepaths.local_media_thumbnail(
                 media_id, t_width, t_height, t_type, t_method
             )
+            self._makedirs(t_path)
             t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
             yield self.store.store_local_thumbnail(
                 media_id, t_width, t_height, t_type, t_method, t_len
@@ -264,11 +273,11 @@ class BaseMediaResource(Resource):
     def _generate_remote_thumbnails(self, server_name, media_id, media_info):
         media_type = media_info["media_type"]
         file_id = media_info["filesystem_id"]
-        requirements = self._get_requirements(media_type)
+        requirements = self._get_thumbnail_requirements(media_type)
         if not requirements:
             return
 
-        input_path = self.filepaths.remote_media_path(server_name, file_id)
+        input_path = self.filepaths.remote_media_filepath(server_name, file_id)
         thumbnailer = Thumbnailer(input_path)
         m_width = thumbnailer.width
         m_height = thumbnailer.height
@@ -286,9 +295,9 @@ class BaseMediaResource(Resource):
         for t_width, t_height, t_type in scales:
             t_method = "scale"
             t_path = self.filepaths.remote_media_thumbnail(
-                server_name, media_id, file_id,
-                media_id, t_width, t_height, t_type, t_method
+                server_name, file_id, t_width, t_height, t_type, t_method
             )
+            self._makedirs(t_path)
             t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
             yield self.store.store_remote_media_thumbnail(
                 server_name, media_id, file_id,
@@ -303,9 +312,9 @@ class BaseMediaResource(Resource):
                 continue
             t_method = "crop"
             t_path = self.filepaths.remote_media_thumbnail(
-                server_name, media_id, file_id,
-                t_width, t_height, t_type, t_method
+                server_name, file_id, t_width, t_height, t_type, t_method
             )
+            self._makedirs(t_path)
             t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
             yield self.store.store_remote_media_thumbnail(
                 server_name, media_id, file_id,

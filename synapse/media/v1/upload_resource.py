@@ -23,9 +23,7 @@ from synapse.api.errors import (
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 
-from .baseresource import BaseMediaResource
-
-import os
+from .base_resource import BaseMediaResource
 
 import logging
 
@@ -75,7 +73,7 @@ class UploadResource(BaseMediaResource):
             media_id = random_string(24)
 
             fname = self.filepaths.local_media_filepath(media_id)
-            os.makedirs(os.path.dirname(fname))
+            self._makedirs(fname)
 
             # This shouldn't block for very long because the content will have
             # already been uploaded at this point.
@@ -95,7 +93,7 @@ class UploadResource(BaseMediaResource):
                 "media_length": content_length,
             }
 
-            yield self._generate_local_thumbnails(self, media_id, media_info)
+            yield self._generate_local_thumbnails(media_id, media_info)
 
             respond_with_json(
                 request, 200, {"content_token": media_id}, send_cors=True

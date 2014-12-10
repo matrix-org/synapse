@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from .base_media_resource import BaseMediaResource
+from .base_resource import BaseMediaResource
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
@@ -59,26 +59,25 @@ class ThumbnailResource(BaseMediaResource):
             self._respond_404(request)
             return
 
-        thumbnail_infos = yield self.store.get_local_thumbnail(media_id)
+        thumbnail_infos = yield self.store.get_local_media_thumbnails(media_id)
 
         if thumbnail_infos:
             thumbnail_info = self._select_thumbnail(
                 width, height, method, m_type, thumbnail_infos
             )
-            thumbnail_width = thumbnail_info["thumbnail_width"]
-            thumbnail_height = thumbnail_info["thumbnail_height"]
-            thumbnail_type = thumbnail_info["thumbnail_type"]
-            thumbnail_method = thumbnail_info["thumbnail_method"]
+            t_width = thumbnail_info["thumbnail_width"]
+            t_height = thumbnail_info["thumbnail_height"]
+            t_type = thumbnail_info["thumbnail_type"]
+            t_method = thumbnail_info["thumbnail_method"]
 
             file_path = self.filepaths.local_media_thumbnail(
-                media_id, thumbnail_width, thumbnail_height, thumbnail_type,
-                thumbnail_method,
+                media_id, t_width, t_height, t_type, t_method,
             )
-            yield self._respond_with_file(request, thumbnail_type, file_path)
+            yield self._respond_with_file(request, t_type, file_path)
 
         else:
             yield self._respond_default_thumbnail(
-                self, request, media_info, width, height, method, m_type,
+                request, media_info, width, height, method, m_type,
             )
 
     @defer.inlineCallbacks
@@ -103,19 +102,19 @@ class ThumbnailResource(BaseMediaResource):
             thumbnail_info = self._select_thumbnail(
                 width, height, method, m_type, thumbnail_infos
             )
-            thumbnail_width = thumbnail_info["thumbnail_width"]
-            thumbnail_height = thumbnail_info["thumbnail_height"]
-            thumbnail_type = thumbnail_info["thumbnail_type"]
-            thumbnail_method = thumbnail_info["thumbnail_method"]
+            t_width = thumbnail_info["thumbnail_width"]
+            t_height = thumbnail_info["thumbnail_height"]
+            t_type = thumbnail_info["thumbnail_type"]
+            t_method = thumbnail_info["thumbnail_method"]
+            file_id = thumbnail_info["filesystem_id"]
 
             file_path = self.filepaths.remote_media_thumbnail(
-                server_name, media_id, thumbnail_width, thumbnail_height,
-                thumbnail_type, thumbnail_method,
+                server_name, file_id, t_width, t_height, t_type, t_method,
             )
-            yield self._respond_with_file(request, thumbnail_type, file_path)
+            yield self._respond_with_file(request, t_type, file_path)
         else:
             yield self._respond_default_thumbnail(
-                self, request, media_info, width, height, method, m_type,
+                request, media_info, width, height, method, m_type,
             )
 
     @defer.inlineCallbacks
@@ -143,16 +142,15 @@ class ThumbnailResource(BaseMediaResource):
             width, height, "crop", m_type, thumbnail_infos
         )
 
-        thumbnail_width = thumbnail_info["thumbnail_width"]
-        thumbnail_height = thumbnail_info["thumbnail_height"]
-        thumbnail_type = thumbnail_info["thumbnail_type"]
-        thumbnail_method = thumbnail_info["thumbnail_method"]
+        t_width = thumbnail_info["thumbnail_width"]
+        t_height = thumbnail_info["thumbnail_height"]
+        t_type = thumbnail_info["thumbnail_type"]
+        t_method = thumbnail_info["thumbnail_method"]
 
         file_path = self.filepaths.default_thumbnail(
-            top_level_type, sub_type, thumbnail_width, thumbnail_height,
-            thumbnail_type, thumbnail_method,
+            top_level_type, sub_type, t_width, t_height, t_type, t_method,
         )
-        yield self.respond_with_file(request, thumbnail_type, file_path)
+        yield self.respond_with_file(request, t_type, file_path)
 
     def _select_thumbnail(self, desired_width, desired_height, desired_method,
                           desired_type, thumbnail_infos):
@@ -164,7 +162,7 @@ class ThumbnailResource(BaseMediaResource):
             for info in thumbnail_infos:
                 t_w = info["thumbnail_width"]
                 t_h = info["thumbnail_height"]
-                t_method = info["thumnail_method"]
+                t_method = info["thumbnail_method"]
                 if t_method == "scale" or t_method == "crop":
                     aspect_quality = abs(d_w * t_h - d_h * t_w)
                     size_quality = abs((d_w - t_w) * (d_h - t_h))
@@ -180,7 +178,7 @@ class ThumbnailResource(BaseMediaResource):
             for info in thumbnail_infos:
                 t_w = info["thumbnail_width"]
                 t_h = info["thumbnail_height"]
-                t_method = info["thumnail_method"]
+                t_method = info["thumbnail_method"]
                 if t_method == "scale" and (t_w >= d_w or t_h >= d_h):
                     size_quality = abs((d_w - t_w) * (d_h - t_h))
                     type_quality = desired_type != info["thumbnail_type"]

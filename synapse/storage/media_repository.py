@@ -19,6 +19,9 @@ from _base import SQLBaseStore
 class MediaRepositoryStore(SQLBaseStore):
     """Persistence for attachments and avatars"""
 
+    def get_default_thumbnails(self, top_level_type, sub_type):
+        return []
+
     def get_local_media(self, media_id):
         """Get the metadata for a local piece of media
         Returns:
@@ -47,7 +50,7 @@ class MediaRepositoryStore(SQLBaseStore):
 
     def get_local_media_thumbnails(self, media_id):
         return self._simple_select_list(
-            "local_media_thumbnails",
+            "local_media_repository_thumbnails",
             {"media_id": media_id},
             (
                 "thumbnail_width", "thumbnail_height", "thumbnail_method",
@@ -59,7 +62,7 @@ class MediaRepositoryStore(SQLBaseStore):
                               thumbnail_height, thumbnail_type,
                               thumbnail_method, thumbnail_length):
         return self._simple_insert(
-            "local_media_thumbnails",
+            "local_media_repository_thumbnails",
             {
                 "media_id": media_id,
                 "thumbnail_width": thumbnail_width,
@@ -100,11 +103,10 @@ class MediaRepositoryStore(SQLBaseStore):
     def get_remote_media_thumbnails(self, origin, media_id):
         return self._simple_select_list(
             "remote_media_cache_thumbnails",
-            {"origin": origin, "media_id": media_id},
+            {"media_origin": origin, "media_id": media_id},
             (
-                "thumbnail_width", "thumbnail_height", "thumbnail_method"
-                "thumbnail_type", "thumbnail_length",
-                "filesystem_id"
+                "thumbnail_width", "thumbnail_height", "thumbnail_method",
+                "thumbnail_type", "thumbnail_length", "filesystem_id",
             )
         )
 

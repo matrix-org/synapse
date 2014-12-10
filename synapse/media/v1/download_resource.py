@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .base_media_resource import BaseMediaResource
+from .base_resource import BaseMediaResource
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
@@ -52,7 +52,7 @@ class DownloadResource(BaseMediaResource):
         media_type = media_info["media_type"]
         file_path = self.filepaths.local_media_filepath(media_id)
 
-        yield self.respond_with_file(request, media_type, file_path)
+        yield self._respond_with_file(request, media_type, file_path)
 
     @defer.inlineCallbacks
     def _respond_remote_file(self, request, server_name, media_id):
@@ -72,4 +72,4 @@ class DownloadResource(BaseMediaResource):
             server_name, filesystem_id
         )
 
-        yield self.respond_with_file(request, media_type, file_path)
+        yield self._respond_with_file(request, media_type, file_path)
