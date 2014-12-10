@@ -117,10 +117,10 @@ class RoomStateEventRestServlet(RestServlet):
                                   self.on_PUT_no_state_key)
 
     def on_GET_no_state_key(self, request, room_id, event_type):
-        return self.on_GET(request, room_id, event_type, None)
+        return self.on_GET(request, room_id, event_type, "")
 
     def on_PUT_no_state_key(self, request, room_id, event_type):
-        return self.on_PUT(request, room_id, event_type, None)
+        return self.on_PUT(request, room_id, event_type, "")
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_type, state_key):

@@ -94,6 +94,7 @@ class EventBase(object):
     event_id = _event_dict_property("event_id")
     hashes = _event_dict_property("hashes")
     origin = _event_dict_property("origin")
+    origin_server_ts = _event_dict_property("origin_server_ts")
     prev_events = _event_dict_property("prev_events")
     prev_state = _event_dict_property("prev_state")
     room_id = _event_dict_property("room_id")
