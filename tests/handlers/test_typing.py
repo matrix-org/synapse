@@ -167,7 +167,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_started_typing_remote_send(self):
         self.room_members = [self.u_apple, self.u_onion]
-        
+
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
             call("farm",
