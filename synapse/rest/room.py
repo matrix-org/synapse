@@ -147,16 +147,18 @@ class RoomStateEventRestServlet(RestServlet):
 
         content = _parse_json(request)
 
+        event_dict = {
+            "type": event_type,
+            "content": content,
+            "room_id": urllib.unquote(room_id),
+            "sender": user.to_string(),
+        }
+
+        if state_key is not None:
+            event_dict["state_key"] = urllib.unquote(state_key)
+
         msg_handler = self.handlers.message_handler
-        yield msg_handler.handle_event(
-            {
-                "type": event_type,
-                "content": content,
-                "room_id": room_id,
-                "sender": user.to_string(),
-                "state_key": urllib.unquote(state_key),
-            }
-        )
+        yield msg_handler.handle_event(event_dict)
 
         defer.returnValue((200, {}))
 

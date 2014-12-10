@@ -166,21 +166,6 @@ class MessageHandler(BaseHandler):
         defer.returnValue(event)
 
     @defer.inlineCallbacks
-    def store_room_data(self, event=None):
-        """ Stores data for a room.
-
-        Args:
-            event : The room path event
-            stamp_event (bool) : True to stamp event content with server keys.
-        Raises:
-            SynapseError if something went wrong.
-        """
-
-        snapshot = yield self.store.snapshot_room(event)
-
-        yield self._on_new_room_event(event, snapshot)
-
-    @defer.inlineCallbacks
     def get_room_data(self, user_id=None, room_id=None,
                       event_type=None, state_key=""):
         """ Get data from a room.

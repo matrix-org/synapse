@@ -118,6 +118,9 @@ class EventBase(object):
 
         return d
 
+    def get(self, key, default):
+        return self._event_dict.get(key, default)
+
     def get_internal_metadata_dict(self):
         return self.internal_metadata.get_dict()
 
@@ -165,6 +168,9 @@ class FrozenEvent(EventBase):
         return _unfreeze(super(FrozenEvent, self).get_dict())
 
     def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
         return "<FrozenEvent event_id='%s', type='%s', state_key='%s'>" % (
-            self.event_id, self.type, self.state_key,
+            self.event_id, self.type, self.get("state_key", None),
         )

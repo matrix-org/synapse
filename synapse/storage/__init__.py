@@ -39,6 +39,7 @@ from .state import StateStore
 from .signatures import SignatureStore
 
 from syutil.base64util import decode_base64
+from syutil.jsonutil import encode_canonical_json
 
 from synapse.crypto.event_signing import compute_event_reference_hash
 
@@ -162,7 +163,8 @@ class DataStore(RoomMemberStore, RoomStore,
             table="event_json",
             values={
                 "event_id": event.event_id,
-                "json": json.dumps(event_dict, separators=(',', ':')),
+                "room_id": event.room_id,
+                "json": encode_canonical_json(event_dict),
             },
             or_replace=True,
         )
