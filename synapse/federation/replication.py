@@ -334,7 +334,7 @@ class ReplicationLayer(object):
             defer.returnValue(response)
             return
 
-        logger.debug("[%s] Transacition is new", transaction.transaction_id)
+        logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
         with PreserveLoggingContext():
             dl = []
@@ -724,15 +724,19 @@ class _TransactionQueue(object):
         deferreds = []
 
         for destination in destinations:
-            # XXX: why don't we specify an errback for this deferred
-            # like we do for EDUs? --matthew
             deferred = defer.Deferred()
             self.pending_pdus_by_dest.setdefault(destination, []).append(
                 (pdu, deferred, order)
             )
+            
+            def eb(failure):
+                if not deferred.called:
+                    deferred.errback(failure)
+                else:
+                    logger.warn("Failed to send pdu", failure)
 
             with PreserveLoggingContext():
-                self._attempt_new_transaction(destination)
+                self._attempt_new_transaction(destination).addErrback(eb)
 
             deferreds.append(deferred)
 
@@ -754,7 +758,7 @@ class _TransactionQueue(object):
             if not deferred.called:
                 deferred.errback(failure)
             else:
-                logger.exception("Failed to send edu", failure)
+                logger.warn("Failed to send edu", failure)
 
         with PreserveLoggingContext():
             self._attempt_new_transaction(destination).addErrback(eb)
@@ -901,7 +905,7 @@ class _TransactionQueue(object):
         except Exception as e:
             # We capture this here as there as nothing actually listens
             # for this finishing functions deferred.
-            logger.exception("TX [%s] Problem in _attempt_transaction: %s",
+            logger.warn("TX [%s] Problem in _attempt_transaction: %s",
                              destination, e)
 
             self.start_retrying(destination, retry_interval)

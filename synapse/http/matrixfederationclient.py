@@ -134,7 +134,7 @@ class MatrixFederationHttpClient(object):
                                 e)
                     raise SynapseError(400, "Domain specified not found.")
 
-                logger.exception("Sending request failed to %s: %s %s : %s",
+                logger.warn("Sending request failed to %s: %s %s : %s",
                                  destination, method, url_bytes, e)
                 _print_ex(e)
 
@@ -289,7 +289,7 @@ def _print_ex(e):
         for ex in e.reasons:
             _print_ex(ex)
     else:
-        logger.exception(e)
+        logger.warn(e)
 
 
 class _JsonProducer(object):
