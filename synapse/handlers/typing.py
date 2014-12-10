@@ -183,10 +183,16 @@ class TypingNotificationHandler(BaseHandler):
 class TypingNotificationEventSource(object):
     def __init__(self, hs):
         self.hs = hs
-        self.handler = hs.get_handlers().typing_notification_handler
+        self._handler = None
+
+    def handler(self):
+        # Avoid cyclic dependency in handler setup
+        if not self._handler:
+            self._handler = self.hs.get_handlers().typing_notification_handler
+        return self._handler
 
     def _make_event_for(self, room_id):
-        typing = self.handler._room_typing[room_id]
+        typing = self.handler()._room_typing[room_id]
         return {
             "type": "m.typing",
             "room_id": room_id,
@@ -195,7 +201,7 @@ class TypingNotificationEventSource(object):
 
     def get_new_events_for_user(self, user, from_key, limit):
         from_key = int(from_key)
-        handler = self.handler
+        handler = self.handler()
 
         events = []
         for room_id in handler._room_serials:
@@ -208,7 +214,7 @@ class TypingNotificationEventSource(object):
         return (events, handler._latest_room_serial)
 
     def get_current_key(self):
-        return self.handler._latest_room_serial
+        return self.handler()._latest_room_serial
 
     def get_pagination_rows(self, user, pagination_config, key):
         return ([], pagination_config.from_key)
