@@ -15,6 +15,7 @@
 
 from synapse.types import EventID, RoomID, UserID
 from synapse.api.errors import SynapseError
+from synapse.api.constants import EventTypes, Membership
 
 
 class EventValidator(object):
@@ -23,14 +24,19 @@ class EventValidator(object):
         EventID.from_string(event.event_id)
         RoomID.from_string(event.room_id)
 
-        hasattr(event, "auth_events")
-        hasattr(event, "content")
-        hasattr(event, "hashes")
-        hasattr(event, "origin")
-        hasattr(event, "prev_events")
-        hasattr(event, "prev_events")
-        hasattr(event, "sender")
-        hasattr(event, "type")
+        required = [
+            # "auth_events",
+            "content",
+            # "hashes",
+            "origin",
+            # "prev_events",
+            "sender",
+            "type",
+        ]
+
+        for k in required:
+            if not hasattr(event, k):
+                raise SynapseError(400, "Event does not have key %s" % (k,))
 
         # Check that the following keys have string values
         strings = [
@@ -45,6 +51,13 @@ class EventValidator(object):
         for s in strings:
             if not isinstance(getattr(event, s), basestring):
                 raise SynapseError(400, "Not '%s' a string type" % (s,))
+
+        if event.type == EventTypes.Member:
+            if "membership" not in event.content:
+                raise SynapseError(400, "Content has not membership key")
+
+            if event.content["membership"] not in Membership.LIST:
+                raise SynapseError(400, "Invalid membership key")
 
         # Check that the following keys have dictionary values
         # TODO

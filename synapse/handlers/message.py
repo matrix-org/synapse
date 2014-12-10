@@ -19,6 +19,9 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
 from synapse.util.logcontext import PreserveLoggingContext
+
+from synapse.events.validator import EventValidator
+
 from ._base import BaseHandler
 
 import logging
@@ -33,6 +36,7 @@ class MessageHandler(BaseHandler):
         self.hs = hs
         self.clock = hs.get_clock()
         self.event_factory = hs.get_event_factory()
+        self.validator = EventValidator()
 
     @defer.inlineCallbacks
     def get_message(self, msg_id=None, room_id=None, sender_id=None,
@@ -137,6 +141,8 @@ class MessageHandler(BaseHandler):
     def handle_event(self, event_dict):
         builder = self.event_builder_factory.new(event_dict)
 
+        self.validator.validate(builder)
+
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
             if membership == Membership.JOIN:
@@ -151,8 +157,6 @@ class MessageHandler(BaseHandler):
         event, context = yield self._create_new_client_event(
             builder=builder,
         )
-
-        # TODO: self.validator.validate(event)
 
         if event.type == EventTypes.Member:
             member_handler = self.hs.get_handlers().room_member_handler
