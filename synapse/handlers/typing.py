@@ -67,6 +67,10 @@ class TypingNotificationHandler(BaseHandler):
         if target_user != auth_user:
             raise AuthError(400, "Cannot set another user's typing state")
 
+        logger.debug(
+            "%s has started typing in %s", target_user.to_string(), room_id
+        )
+
         until = self.clock.time_msec() + timeout
         member = RoomMember(room_id=room_id, user=target_user)
 
@@ -97,6 +101,10 @@ class TypingNotificationHandler(BaseHandler):
 
         if target_user != auth_user:
             raise AuthError(400, "Cannot set another user's typing state")
+
+        logger.debug(
+            "%s has stopped typing in %s", target_user.to_string(), room_id
+        )
 
         member = RoomMember(room_id=room_id, user=target_user)
 
