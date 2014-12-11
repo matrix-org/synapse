@@ -49,15 +49,24 @@ class MediaRepositoryResource(Resource):
 
            <media>
 
-    Clients can get thumbnails by supplying a desired width and height::
+    Clients can get thumbnails by supplying a desired width and height and
+    thumbnailing method::
 
         => GET /_matrix/media/v1
-                /thumbnail/<media-id>?width=<w>&height=<h> HTTP/1.1
+                /thumbnail/<media-id>?width=<w>&height=<h>&method=<m> HTTP/1.1
 
         <= HTTP/1.1 200 OK
            Content-Type: image/jpeg or image/png
 
            <thumbnail>
+
+    The thumbnail methods are "crop" and "scale". "scale" trys to return an
+    image where either the width or the height is smaller than the requested
+    size. The client should then scale and letterbox the image if it needs to
+    fit within a given rectangle. "crop" trys to return an image where the
+    width and height are close to the requested size and the aspect matches
+    the requested size. The client should scale the image if it needs to fit
+    within a given rectangle.
     """
 
     def __init__(self, hs):
