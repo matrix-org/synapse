@@ -349,7 +349,7 @@ class FederationHandler(BaseHandler):
         handled_events = set()
 
         try:
-            builder.event_id = self.event_factory.create_event_id()
+            builder.event_id = self.event_builder_factory.create_event_id()
             builder.origin = self.hs.hostname
             builder.content = content
 
@@ -593,13 +593,13 @@ class FederationHandler(BaseHandler):
             }
 
             event = yield self.store.get_event(event_id)
-            if hasattr(event, "state_key"):
+            if event and event.is_state():
                 # Get previous state
-                if hasattr(event, "replaces_state") and event.replaces_state:
-                    prev_event = yield self.store.get_event(
-                        event.replaces_state
-                    )
-                    results[(event.type, event.state_key)] = prev_event
+                if "replaces_state" in event.unsigned:
+                    prev_id = event.unsigned["replaces_state"]
+                    if prev_id != event.event_id:
+                        prev_event = yield self.store.get_event(prev_id)
+                        results[(event.type, event.state_key)] = prev_event
                 else:
                     del results[(event.type, event.state_key)]
 

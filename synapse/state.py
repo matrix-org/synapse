@@ -159,7 +159,8 @@ class StateHandler(object):
                 key = (event.type, event.state_key)
                 if key in context.current_state:
                     replaces = context.current_state[key]
-                    event.unsigned["replaces_state"] = replaces.event_id
+                    if replaces.event_id != event.event_id:  # Paranoia check
+                        event.unsigned["replaces_state"] = replaces.event_id
 
             defer.returnValue([])
 

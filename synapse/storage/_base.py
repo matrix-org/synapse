@@ -451,7 +451,8 @@ class SQLBaseStore(object):
 
         return events
 
-    def _get_event_txn(self, txn, event_id, check_redacted=True):
+    def _get_event_txn(self, txn, event_id, check_redacted=True,
+                       get_prev_content=True):
         sql = (
             "SELECT json, r.event_id FROM event_json as e "
             "LEFT JOIN redactions as r ON e.event_id = r.redacts "
@@ -487,10 +488,11 @@ class SQLBaseStore(object):
             if because:
                 ev.unsigned["redacted_because"] = because
 
-        if "replaces_state" in ev.unsigned:
+        if get_prev_content and "replaces_state" in ev.unsigned:
             ev.unsigned["prev_content"] = self._get_event_txn(
                 txn,
                 ev.unsigned["replaces_state"],
+                get_prev_content=False,
             ).get_dict()["content"]
 
         return ev
