@@ -222,14 +222,52 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             user=user, room_id=room_id
         )
 
-    def _create_member(self, user_id, room_id):
+    @defer.inlineCallbacks
+    def test_simple_leave(self):
+        room_id = "!foo:red"
+        user_id = "@bob:red"
+        user = self.hs.parse_userid(user_id)
+
+        event = self._create_member(
+            user_id=user_id,
+            room_id=room_id,
+            membership=Membership.LEAVE,
+        )
+
+        prev_state = NonCallableMock()
+        prev_state.membership = Membership.JOIN
+        prev_state.sender = user_id
+        self.datastore.get_room_member.return_value = defer.succeed(prev_state)
+
+        event.state_events = {
+            (RoomMemberEvent.TYPE, user_id): event,
+        }
+
+        event.old_state_events = {
+            (RoomMemberEvent.TYPE, user_id): self._create_member(
+                user_id=user_id,
+                room_id=room_id,
+            ),
+        }
+
+        leave_signal_observer = Mock()
+        self.distributor.observe("user_left_room", leave_signal_observer)
+
+        # Actual invocation
+        yield self.room_member_handler.change_membership(event)
+
+        leave_signal_observer.assert_called_with(
+            user=user, room_id=room_id
+        )
+
+    def _create_member(self, user_id, room_id, membership=Membership.JOIN):
         return self.hs.get_event_factory().create_event(
             etype=RoomMemberEvent.TYPE,
             user_id=user_id,
             state_key=user_id,
             room_id=room_id,
-            membership=Membership.JOIN,
-            content={"membership": Membership.JOIN},
+            membership=membership,
+            content={"membership": membership},
         )
 
 

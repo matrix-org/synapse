@@ -260,6 +260,7 @@ class RoomMemberHandler(BaseHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("user_joined_room")
+        self.distributor.declare("user_left_room")
 
     @defer.inlineCallbacks
     def get_room_members(self, room_id, membership=Membership.JOIN):
@@ -386,6 +387,12 @@ class RoomMemberHandler(BaseHandler):
                 snapshot=snapshot,
                 do_auth=do_auth,
             )
+
+            if prev_state and prev_state.membership == Membership.JOIN:
+                user = self.hs.parse_userid(event.user_id)
+                self.distributor.fire(
+                    "user_left_room", user=user, room_id=event.room_id
+                )
 
         defer.returnValue({"room_id": room_id})
 
