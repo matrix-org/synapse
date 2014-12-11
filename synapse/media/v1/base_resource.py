@@ -93,7 +93,7 @@ class BaseMediaResource(Resource):
         except:
             raise SynapseError(
                 400,
-                "Missing integer argument %r" % (arg_name),
+                "Missing integer argument %r" % (arg_name,),
                 Codes.UNKNOWN,
             )
 
@@ -107,7 +107,7 @@ class BaseMediaResource(Resource):
         except:
             raise SynapseError(
                 400,
-                "Missing string argument %r" % (arg_name),
+                "Missing string argument %r" % (arg_name,),
                 Codes.UNKNOWN,
             )
 
