@@ -1067,6 +1067,71 @@ class RoomInitialSyncTestCase(RestTestCase):
         self.assertTrue(self.user_id in presence_by_user)
         self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
 
-#        (code, response) = yield self.mock_resource.trigger("GET", path, None)
-#        self.assertEquals(200, code, msg=str(response))
-#        self.assert_dict(json.loads(content), response)
+
+class RoomTypingTestCase(RestTestCase):
+    """ Tests /rooms/$room_id/typing/$user_id REST API. """
+    user_id = "@sid:red"
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
+        self.auth_user_id = self.user_id
+
+        self.mock_config = NonCallableMock()
+        self.mock_config.signing_key = [MockKey()]
+
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+
+        hs = HomeServer(
+            "red",
+            db_pool=db_pool,
+            http_client=None,
+            replication_layer=Mock(),
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ]),
+            config=self.mock_config,
+        )
+        self.hs = hs
+
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
+
+        hs.get_handlers().federation_handler = Mock()
+
+        def _get_user_by_token(token=None):
+            return {
+                "user": hs.parse_userid(self.auth_user_id),
+                "admin": False,
+                "device_id": None,
+            }
+
+        hs.get_auth().get_user_by_token = _get_user_by_token
+
+        def _insert_client_ip(*args, **kwargs):
+            return defer.succeed(None)
+        hs.get_datastore().insert_client_ip = _insert_client_ip
+
+        synapse.rest.room.register_servlets(hs, self.mock_resource)
+
+        self.room_id = yield self.create_room_as(self.user_id)
+
+    def tearDown(self):
+        self.hs.get_handlers().typing_notification_handler.tearDown()
+
+    @defer.inlineCallbacks
+    def test_set_typing(self):
+        (code, _) = yield self.mock_resource.trigger("PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            '{"typing": true, "timeout": 30000}'
+        )
+        self.assertEquals(200, code)
+
+    @defer.inlineCallbacks
+    def test_set_not_typing(self):
+        (code, _) = yield self.mock_resource.trigger("PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            '{"typing": false}'
+        )
+        self.assertEquals(200, code)

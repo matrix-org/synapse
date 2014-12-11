@@ -52,6 +52,13 @@ class TypingNotificationHandler(BaseHandler):
         # map room IDs to sets of users currently typing
         self._room_typing = {}
 
+    def tearDown(self):
+        """Cancels all the pending timers.
+        Normally this shouldn't be needed, but it's required from unit tests
+        to avoid a "Reactor was unclean" warning."""
+        for t in self._member_typing_timer.values():
+            self.clock.cancel_call_later(t)
+
     @defer.inlineCallbacks
     def started_typing(self, target_user, auth_user, room_id, timeout):
         if not target_user.is_mine:
