@@ -487,6 +487,12 @@ class SQLBaseStore(object):
             if because:
                 ev.unsigned["redacted_because"] = because
 
+        if "replaces_state" in ev.unsigned:
+            ev.unsigned["prev_content"] = self._get_event_txn(
+                txn,
+                ev.unsigned["replaces_state"],
+            ).get_dict()["content"]
+
         return ev
 
     def _parse_events(self, rows):

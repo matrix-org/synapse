@@ -58,7 +58,7 @@ class StreamStoreTestCase(unittest.TestCase):
         self.depth = 1
 
     @defer.inlineCallbacks
-    def inject_room_member(self, room, user, membership, replaces_state=None):
+    def inject_room_member(self, room, user, membership):
         self.depth += 1
 
         builder = self.event_builder_factory.new({
@@ -215,7 +215,6 @@ class StreamStoreTestCase(unittest.TestCase):
 
         event2 = yield self.inject_room_member(
             self.room1, self.u_alice, Membership.JOIN,
-            replaces_state=event1.event_id,
         )
 
         end = yield self.store.get_room_events_max_id()
@@ -233,6 +232,6 @@ class StreamStoreTestCase(unittest.TestCase):
         event = results[0]
 
         self.assertTrue(
-            hasattr(event, "prev_content"),
+            "prev_content" in event.unsigned,
             msg="No prev_content key"
         )

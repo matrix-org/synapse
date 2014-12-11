@@ -113,6 +113,14 @@ def serialize_event(hs, e):
         d["redacted_by"] = e.unsigned["redacted_by"]
         del d["unsigned"]["redacted_by"]
 
+    if "replaces_state" in e.unsigned:
+        d["replaces_state"] = e.unsigned["replaces_state"]
+        del d["unsigned"]["replaces_state"]
+
+    if "prev_content" in e.unsigned:
+        d["prev_content"] = e.unsigned["prev_content"]
+        del d["unsigned"]["prev_content"]
+
     del d["auth_events"]
     del d["prev_events"]
     del d["hashes"]
