@@ -45,6 +45,7 @@ class BaseMediaResource(Resource):
         self.max_upload_size = hs.config.max_upload_size
         self.max_image_pixels = hs.config.max_image_pixels
         self.filepaths = filepaths
+        self.downloads = {}
 
     @staticmethod
     def catch_errors(request_handler):
@@ -127,6 +128,28 @@ class BaseMediaResource(Resource):
         dirname = os.path.dirname(filepath)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
+
+    def _get_remote_media(self, server_name, media_id):
+        key = (server_name, media_id)
+        download = self.downloads.get(key)
+        if download is None:
+            download = self._get_remote_media_impl(server_name, media_id)
+            self.downloads[key] = download
+            @download.addBoth
+            def callback(media_info):
+                del self.downloads[key]
+        return download
+
+    @defer.inlineCallbacks
+    def _get_remote_media_impl(self, server_name, media_id):
+        media_info = yield self.store.get_cached_remote_media(
+            server_name, media_id
+        )
+        if not media_info:
+            media_info = yield self._download_remote_file(
+                server_name, media_id
+            )
+        defer.returnValue(media_info)
 
     @defer.inlineCallbacks
     def _download_remote_file(self, server_name, media_id):
@@ -231,7 +254,7 @@ class BaseMediaResource(Resource):
 
         if m_width * m_height >= self.max_image_pixels:
             logger.info(
-                "Image too large to thumbnail %r x %r > %r"
+                "Image too large to thumbnail %r x %r > %r",
                 m_width, m_height, self.max_image_pixels
             )
             return
@@ -294,7 +317,7 @@ class BaseMediaResource(Resource):
 
         if m_width * m_height >= self.max_image_pixels:
             logger.info(
-                "Image too large to thumbnail %r x %r > %r"
+                "Image too large to thumbnail %r x %r > %r",
                 m_width, m_height, self.max_image_pixels
             )
             return

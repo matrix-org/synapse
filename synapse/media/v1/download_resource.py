@@ -56,14 +56,7 @@ class DownloadResource(BaseMediaResource):
 
     @defer.inlineCallbacks
     def _respond_remote_file(self, request, server_name, media_id):
-        media_info = yield self.store.get_cached_remote_media(
-            server_name, media_id
-        )
-
-        if not media_info:
-            media_info = yield self._download_remote_file(
-                server_name, media_id
-            )
+        media_info = yield self._get_remote_media(server_name, media_id)
 
         media_type = media_info["media_type"]
         filesystem_id = media_info["filesystem_id"]

@@ -83,16 +83,9 @@ class ThumbnailResource(BaseMediaResource):
     @defer.inlineCallbacks
     def _respond_remote_thumbnail(self, request, server_name, media_id, width,
                                   height, method, m_type):
-        media_info = yield self.store.get_cached_remote_media(
-            server_name, media_id
-        )
-
-        if not media_info:
-            # TODO: Don't download the whole remote file
-            # We should proxy the thumbnail from the remote server instead.
-            media_info = yield self._download_remote_file(
-                server_name, media_id
-            )
+        # TODO: Don't download the whole remote file
+        # We should proxy the thumbnail from the remote server instead.
+        media_info = yield self._get_remote_media(server_name, media_id)
 
         thumbnail_infos = yield self.store.get_remote_media_thumbnails(
             server_name, media_id,
