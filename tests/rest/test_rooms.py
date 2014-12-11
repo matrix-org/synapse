@@ -1095,6 +1095,8 @@ class RoomTypingTestCase(RestTestCase):
         )
         self.hs = hs
 
+        self.event_source = hs.get_event_sources().sources["typing"]
+
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
 
@@ -1116,6 +1118,8 @@ class RoomTypingTestCase(RestTestCase):
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 
         self.room_id = yield self.create_room_as(self.user_id)
+        # Need another user to make notifications actually work
+        yield self.join(self.room_id, user="@jim:red")
 
     def tearDown(self):
         self.hs.get_handlers().typing_notification_handler.tearDown()
@@ -1127,6 +1131,16 @@ class RoomTypingTestCase(RestTestCase):
             '{"typing": true, "timeout": 30000}'
         )
         self.assertEquals(200, code)
+
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.user_id, 0, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "typing": [self.user_id]},
+            ]
+        )
 
     @defer.inlineCallbacks
     def test_set_not_typing(self):
