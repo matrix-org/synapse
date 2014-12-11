@@ -67,6 +67,8 @@ class TypingNotificationHandler(BaseHandler):
         if target_user != auth_user:
             raise AuthError(400, "Cannot set another user's typing state")
 
+        yield self.auth.check_joined_room(room_id, target_user.to_string())
+
         logger.debug(
             "%s has started typing in %s", target_user.to_string(), room_id
         )
@@ -101,6 +103,8 @@ class TypingNotificationHandler(BaseHandler):
 
         if target_user != auth_user:
             raise AuthError(400, "Cannot set another user's typing state")
+
+        yield self.auth.check_joined_room(room_id, target_user.to_string())
 
         logger.debug(
             "%s has stopped typing in %s", target_user.to_string(), room_id

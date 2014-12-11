@@ -22,6 +22,7 @@ import json
 
 from ..utils import MockHttpResource, MockClock, DeferredMockCallable, MockKey
 
+from synapse.api.errors import AuthError
 from synapse.server import HomeServer
 from synapse.handlers.typing import TypingNotificationHandler
 
@@ -68,7 +69,10 @@ class TypingNotificationsTestCase(unittest.TestCase):
         mock_notifier = Mock(spec=["on_new_user_event"])
         self.on_new_user_event = mock_notifier.on_new_user_event
 
+        self.auth = Mock(spec=[])
+
         hs = HomeServer("test",
+                auth=self.auth,
                 clock=self.clock,
                 db_pool=None,
                 datastore=Mock(spec=[
@@ -141,6 +145,12 @@ class TypingNotificationsTestCase(unittest.TestCase):
                         remotedomains.add(member.domain)
         self.room_member_handler.fetch_room_distributions_into = (
                 fetch_room_distributions_into)
+
+        def check_joined_room(room_id, user_id):
+            if user_id not in [u.to_string() for u in self.room_members]:
+                raise AuthError(401, "User is not in the room")
+
+        self.auth.check_joined_room = check_joined_room
 
         # Some local users to test with
         self.u_apple = hs.parse_userid("@apple:test")
