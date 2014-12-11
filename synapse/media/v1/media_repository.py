@@ -41,7 +41,7 @@ class MediaRepositoryResource(Resource):
 
            { "token": <media-id> }
 
-        => GET /_matrix/media/v1/download/<media-id> HTTP/1.1
+        => GET /_matrix/media/v1/download/<server_name>/<media-id> HTTP/1.1
 
         <= HTTP/1.1 200 OK
            Content-Type: <media-type>
@@ -52,8 +52,8 @@ class MediaRepositoryResource(Resource):
     Clients can get thumbnails by supplying a desired width and height and
     thumbnailing method::
 
-        => GET /_matrix/media/v1
-                /thumbnail/<media-id>?width=<w>&height=<h>&method=<m> HTTP/1.1
+        => GET /_matrix/media/v1/thumbnail/<server_name>
+                /<media-id>?width=<w>&height=<h>&method=<m> HTTP/1.1
 
         <= HTTP/1.1 200 OK
            Content-Type: image/jpeg or image/png
