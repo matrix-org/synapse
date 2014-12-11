@@ -43,6 +43,7 @@ class BaseMediaResource(Resource):
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.max_upload_size = hs.config.max_upload_size
+        self.max_image_pixels = hs.config.max_image_pixels
         self.filepaths = filepaths
 
     @staticmethod
@@ -143,6 +144,7 @@ class BaseMediaResource(Resource):
                 ))
                 length, headers = yield self.client.get_file(
                     server_name, request_path, output_stream=f,
+                    max_size=self.max_upload_size,
                 )
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
@@ -226,6 +228,14 @@ class BaseMediaResource(Resource):
         thumbnailer = Thumbnailer(input_path)
         m_width = thumbnailer.width
         m_height = thumbnailer.height
+
+        if m_width * m_height >= self.max_image_pixels:
+            logger.info(
+                "Image too large to thumbnail %r x %r > %r"
+                m_width, m_height, self.max_image_pixels
+            )
+            return
+
         scales = set()
         crops = set()
         for r_width, r_height, r_method, r_type in requirements:
@@ -281,6 +291,14 @@ class BaseMediaResource(Resource):
         thumbnailer = Thumbnailer(input_path)
         m_width = thumbnailer.width
         m_height = thumbnailer.height
+
+        if m_width * m_height >= self.max_image_pixels:
+            logger.info(
+                "Image too large to thumbnail %r x %r > %r"
+                m_width, m_height, self.max_image_pixels
+            )
+            return
+
         scales = set()
         crops = set()
         for r_width, r_height, r_method, r_type in requirements:
