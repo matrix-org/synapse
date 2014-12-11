@@ -50,11 +50,25 @@ class Config(object):
             )
         return cls.abspath(file_path)
 
+    @staticmethod
+    def ensure_directory(dir_path):
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+        if not os.path.isdir(dir_path):
+            raise ConfigError(
+                "%s is not a directory" % (dir_path,)
+            )
+        return dir_path
+
     @classmethod
     def read_file(cls, file_path, config_name):
         cls.check_file(file_path, config_name)
         with open(file_path) as file_stream:
             return file_stream.read()
+
+    @staticmethod
+    def default_path(name):
+        return os.path.abspath(os.path.join(os.path.curdir, name))
 
     @staticmethod
     def read_config_file(file_path):
