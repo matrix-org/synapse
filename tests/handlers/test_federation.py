@@ -20,7 +20,7 @@ from synapse.api.events.room import (
     MessageEvent,
 )
 
-from synapse.api.events import SynapseEvent
+from synapse.events import FrozenEvent
 from synapse.handlers.federation import FederationHandler
 from synapse.server import HomeServer
 
@@ -37,7 +37,7 @@ class FederationTestCase(unittest.TestCase):
         self.mock_config.signing_key = [MockKey()]
 
         self.state_handler = NonCallableMock(spec_set=[
-            "annotate_event_with_state",
+            "annotate_context_with_state",
         ])
 
         self.auth = NonCallableMock(spec_set=[
@@ -78,36 +78,42 @@ class FederationTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_msg(self):
-        pdu = SynapseEvent(
-            type=MessageEvent.TYPE,
-            room_id="foo",
-            content={"msgtype": u"fooo"},
-            origin_server_ts=0,
-            event_id="$a:b",
-            user_id="@a:b",
-            origin="b",
-            auth_events=[],
-            hashes={"sha256":"AcLrgtUIqqwaGoHhrEvYG1YLDIsVPYJdSRGhkp3jJp8"},
-        )
+        pdu = FrozenEvent({
+            "type": MessageEvent.TYPE,
+            "room_id": "foo",
+            "content": {"msgtype": u"fooo"},
+            "origin_server_ts": 0,
+            "event_id": "$a:b",
+            "user_id":"@a:b",
+            "origin": "b",
+            "auth_events": [],
+            "hashes": {"sha256":"AcLrgtUIqqwaGoHhrEvYG1YLDIsVPYJdSRGhkp3jJp8"},
+        })
 
         self.datastore.persist_event.return_value = defer.succeed(None)
         self.datastore.get_room.return_value = defer.succeed(True)
         self.auth.check_host_in_room.return_value = defer.succeed(True)
 
-        def annotate(ev, old_state=None):
-            ev.old_state_events = []
+        def annotate(ev, context, old_state=None):
+            context.current_state = {}
+            context.auth_events = {}
             return defer.succeed(False)
-        self.state_handler.annotate_event_with_state.side_effect = annotate
+        self.state_handler.annotate_context_with_state.side_effect = annotate
 
         yield self.handlers.federation_handler.on_receive_pdu(
             "fo", pdu, False
         )
 
         self.datastore.persist_event.assert_called_once_with(
-            ANY, is_new_state=False, backfilled=False, current_state=None
+            ANY,
+            is_new_state=True,
+            backfilled=False,
+            current_state=None,
+            context=ANY,
         )
 
-        self.state_handler.annotate_event_with_state.assert_called_once_with(
+        self.state_handler.annotate_context_with_state.assert_called_once_with(
+            ANY,
             ANY,
             old_state=None,
         )
