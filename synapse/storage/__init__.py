@@ -34,6 +34,7 @@ from .stream import StreamStore
 from .transactions import TransactionStore
 from .keys import KeyStore
 from .event_federation import EventFederationStore
+from .media_repository import MediaRepositoryStore
 
 from .state import StateStore
 from .signatures import SignatureStore
@@ -64,6 +65,7 @@ SCHEMAS = [
     "state",
     "event_edges",
     "event_signatures",
+    "media_repository",
 ]
 
 
@@ -83,7 +85,9 @@ class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, TransactionStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
-                EventFederationStore, ):
+                EventFederationStore,
+                MediaRepositoryStore,
+                ):
 
     def __init__(self, hs):
         super(DataStore, self).__init__(hs)

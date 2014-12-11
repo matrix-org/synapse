@@ -20,6 +20,8 @@ class ContentRepositoryConfig(Config):
     def __init__(self, args):
         super(ContentRepositoryConfig, self).__init__(args)
         self.max_upload_size = self.parse_size(args.max_upload_size)
+        self.max_image_pixels = self.parse_size(args.max_image_pixels)
+        self.media_store_path = self.ensure_directory(args.media_store_path)
 
     def parse_size(self, string):
         sizes = {"K": 1024, "M": 1024 * 1024}
@@ -36,4 +38,11 @@ class ContentRepositoryConfig(Config):
         db_group = parser.add_argument_group("content_repository")
         db_group.add_argument(
             "--max-upload-size", default="1M"
+        )
+        db_group.add_argument(
+            "--media-store-path", default=cls.default_path("media_store")
+        )
+        db_group.add_argument(
+            "--max-image-pixels", default="32M",
+            help="Maximum number of pixels that will be thumbnailed"
         )
