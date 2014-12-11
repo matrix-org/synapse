@@ -43,6 +43,8 @@ class TypingNotificationHandler(BaseHandler):
 
         self.federation.register_edu_handler("m.typing", self._recv_edu)
 
+        hs.get_distributor().observe("user_left_room", self.user_left_room)
+
         self._member_typing_until = {} # clock time we expect to stop
         self._member_typing_timer = {} # deferreds to manage theabove
 
@@ -113,6 +115,12 @@ class TypingNotificationHandler(BaseHandler):
         member = RoomMember(room_id=room_id, user=target_user)
 
         yield self._stopped_typing(member)
+
+    @defer.inlineCallbacks
+    def user_left_room(self, user, room_id):
+        if user.is_mine:
+            member = RoomMember(room_id=room_id, user=user)
+            yield self._stopped_typing(member)
 
     @defer.inlineCallbacks
     def _stopped_typing(self, member):
