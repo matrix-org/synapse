@@ -155,6 +155,12 @@ class StateHandler(object):
             else:
                 context.auth_events = {}
 
+            if event.is_state():
+                key = (event.type, event.state_key)
+                if key in context.current_state:
+                    replaces = context.current_state[key]
+                    event.unsigned["replaces_state"] = replaces.event_id
+
             defer.returnValue([])
 
         if event.is_state():
@@ -176,6 +182,12 @@ class StateHandler(object):
         prev_state = yield self.store.add_event_hashes(
             prev_state
         )
+
+        if event.is_state():
+            key = (event.type, event.state_key)
+            if key in context.current_state:
+                replaces = context.current_state[key]
+                event.unsigned["replaces_state"] = replaces.event_id
 
         if hasattr(event, "auth_events") and event.auth_events:
             auth_ids = zip(*event.auth_events)[0]

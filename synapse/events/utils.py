@@ -80,6 +80,11 @@ def prune_event(event):
 
     allowed_fields["content"] = new_content
 
+    allowed_fields["unsigned"] = {}
+
+    if "age_ts" in event.unsigned:
+        allowed_fields["unsigned"]["age_ts"] = event.unsigned["age_ts"]
+
     return type(event)(allowed_fields)
 
 
@@ -96,5 +101,21 @@ def serialize_event(hs, e):
         del d["unsigned"]["age_ts"]
 
     d["user_id"] = d.pop("sender", None)
+
+    if "redacted_because" in e.unsigned:
+        d["redacted_because"] = serialize_event(
+            hs, e.unsigned["redacted_because"]
+        )
+
+        del d["unsigned"]["redacted_because"]
+
+    if "redacted_by" in e.unsigned:
+        d["redacted_by"] = e.unsigned["redacted_by"]
+        del d["unsigned"]["redacted_by"]
+
+    del d["auth_events"]
+    del d["prev_events"]
+    del d["hashes"]
+    del d["signatures"]
 
     return d

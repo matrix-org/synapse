@@ -444,38 +444,50 @@ class SQLBaseStore(object):
     def _get_events_txn(self, txn, event_ids):
         events = []
         for e_id in event_ids:
-            js = self._simple_select_one_onecol_txn(
-                txn,
-                table="event_json",
-                keyvalues={"event_id": e_id},
-                retcol="json",
-                allow_none=True,
-            )
+            ev = self._get_event_txn(txn, e_id)
 
-            if not js:
-                # FIXME (erikj): What should we actually do here?
-                continue
-
-            d = json.loads(js)
-
-            ev = FrozenEvent(d)
-
-            if hasattr(ev, "redacted") and ev.redacted:
-                # Get the redaction event.
-                select_event_sql = "SELECT * FROM events WHERE event_id = ?"
-                txn.execute(select_event_sql, (ev.redacted,))
-
-                del_evs = self._parse_events_txn(
-                    txn, self.cursor_to_dict(txn)
-                )
-
-                if del_evs:
-                    ev = prune_event(ev)
-                    ev.redacted_because = del_evs[0]
-
-            events.append(ev)
+            if ev:
+                events.append(ev)
 
         return events
+
+    def _get_event_txn(self, txn, event_id, check_redacted=True):
+        sql = (
+            "SELECT json, r.event_id FROM event_json as e "
+            "LEFT JOIN redactions as r ON e.event_id = r.redacts "
+            "WHERE e.event_id = ? "
+            "LIMIT 1 "
+        )
+
+        txn.execute(sql, (event_id,))
+
+        res = txn.fetchone()
+
+        if not res:
+            return None
+
+        js, redacted = res
+
+        d = json.loads(js)
+
+        ev = FrozenEvent(d)
+
+        if check_redacted and redacted:
+            ev = prune_event(ev)
+
+            ev.unsigned["redacted_by"] = redacted
+            # Get the redaction event.
+
+            because = self._get_event_txn(
+                txn,
+                redacted,
+                check_redacted=False
+            )
+
+            if because:
+                ev.unsigned["redacted_because"] = because
+
+        return ev
 
     def _parse_events(self, rows):
         return self.runInteraction(

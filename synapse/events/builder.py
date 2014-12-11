@@ -19,11 +19,18 @@ from synapse.types import EventID
 
 from synapse.util.stringutils import random_string
 
+import copy
+
 
 class EventBuilder(EventBase):
     def __init__(self, key_values={}):
+        signatures = copy.deepcopy(key_values.pop("signatures", {}))
+        unsigned = copy.deepcopy(key_values.pop("unsigned", {}))
+
         super(EventBuilder, self).__init__(
             key_values,
+            signatures=signatures,
+            unsigned=unsigned
         )
 
     def update_event_key(self, key, value):
@@ -61,9 +68,9 @@ class EventBuilderFactory(object):
         key_values.setdefault("origin", self.hostname)
         key_values.setdefault("origin_server_ts", time_now)
 
-        if "unsigned" in key_values:
-            age = key_values["unsigned"].pop("age", 0)
-            key_values["unsigned"].setdefault("age_ts", time_now - age)
+        key_values.setdefault("unsigned", {})
+        age = key_values["unsigned"].pop("age", 0)
+        key_values["unsigned"].setdefault("age_ts", time_now - age)
 
         key_values["signatures"] = {}
 

@@ -149,7 +149,7 @@ class RedactionTestCase(unittest.TestCase):
             event,
         )
 
-        self.assertFalse(hasattr(event, "redacted_because"))
+        self.assertFalse("redacted_because" in event.unsigned)
 
         # Redact event
         reason = "Because I said so"
@@ -179,7 +179,7 @@ class RedactionTestCase(unittest.TestCase):
             event,
         )
 
-        self.assertTrue(hasattr(event, "redacted_because"))
+        self.assertTrue("redacted_because" in event.unsigned)
 
         self.assertObjectHasAttributes(
             {
@@ -187,7 +187,7 @@ class RedactionTestCase(unittest.TestCase):
                 "user_id": self.u_alice.to_string(),
                 "content": {"reason": reason},
             },
-            event.redacted_because,
+            event.unsigned["redacted_because"],
         )
 
     @defer.inlineCallbacks
