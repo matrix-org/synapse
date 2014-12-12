@@ -29,7 +29,7 @@ from twisted.enterprise.adbapi import ConnectionPool
 
 from collections import namedtuple
 from mock import patch, Mock
-import json
+import urllib
 import urlparse
 
 from inspect import getcallargs
@@ -103,9 +103,14 @@ class MockHttpResource(HttpServer):
             matcher = pattern.match(path)
             if matcher:
                 try:
+                    args = [
+                        urllib.unquote(u).decode("UTF-8")
+                        for u in matcher.groups()
+                    ]
+
                     (code, response) = yield func(
                         mock_request,
-                        *matcher.groups()
+                        *args
                     )
                     defer.returnValue((code, response))
                 except CodeMessageException as e:

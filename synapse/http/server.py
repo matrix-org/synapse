@@ -124,13 +124,9 @@ class JsonResource(HttpServer, resource.Resource):
                     # returned response. We pass both the request and any
                     # matched groups from the regex to the callback.
 
-                    logger.debug("url things: %r", m.groups())
-
                     args = [
                         urllib.unquote(u).decode("UTF-8") for u in m.groups()
                     ]
-
-                    logger.debug("url things args: %r", args)
 
                     code, response = yield path_entry.callback(
                         request,
