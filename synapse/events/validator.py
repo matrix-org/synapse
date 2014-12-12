@@ -69,3 +69,24 @@ class EventValidator(object):
         self.validate(event)
 
         UserID.from_string(event.sender)
+
+        if event.type == EventTypes.Message:
+            strings = [
+                "body",
+                "msgtype",
+            ]
+
+            self._ensure_strings(event.content, strings)
+
+        elif event.type == EventTypes.Topic:
+            self._ensure_strings(event.content, ["topic"])
+
+        elif event.type == EventTypes.Name:
+            self._ensure_strings(event.content, ["name"])
+
+    def _ensure_strings(self, d, keys):
+        for s in keys:
+            if s not in d:
+                raise SynapseError(400, "'%s' not in content" % (s,))
+            if not isinstance(d[s], basestring):
+                raise SynapseError(400, "Not '%s' a string type" % (s,))

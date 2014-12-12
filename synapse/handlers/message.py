@@ -141,7 +141,7 @@ class MessageHandler(BaseHandler):
     def handle_event(self, event_dict):
         builder = self.event_builder_factory.new(event_dict)
 
-        self.validator.validate(builder)
+        self.validator.validate_new(builder)
 
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
