@@ -503,7 +503,7 @@ class RoomsMemberListTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_get_member_list_mixed_memberships(self):
-        room_creator = "@some_other_guy:blue"
+        room_creator = "@some_other_guy:red"
         room_id = yield self.create_room_as(room_creator)
         room_path = "/rooms/%s/members" % room_id
         yield self.invite(room=room_id, src=room_creator,
