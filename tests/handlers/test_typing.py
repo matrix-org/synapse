@@ -182,7 +182,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
-                 "typing": [self.u_apple.to_string()]},
+                 "content": {
+                     "user_ids": [self.u_apple.to_string()],
+                 }},
             ]
         )
 
@@ -242,7 +244,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
-                 "typing": [self.u_onion.to_string()]},
+                 "content": {
+                     "user_ids": [self.u_onion.to_string()],
+                }},
             ]
         )
 
@@ -295,7 +299,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
-                 "typing": []},
+                 "content": {
+                     "user_ids": [],
+                }},
             ]
         )
 
@@ -323,7 +329,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
-                 "typing": [self.u_apple.to_string()]},
+                 "content": {
+                     "user_ids": [self.u_apple.to_string()],
+                }},
             ]
         )
 
@@ -339,6 +347,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
-                 "typing": []},
+                 "content": {
+                     "user_ids": [],
+                }},
             ]
         )

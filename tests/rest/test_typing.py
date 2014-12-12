@@ -100,7 +100,9 @@ class RoomTypingTestCase(RestTestCase):
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
-                 "typing": [self.user_id]},
+                 "content": {
+                     "user_ids": [self.user_id],
+                }},
             ]
         )
 

@@ -223,7 +223,9 @@ class TypingNotificationEventSource(object):
         return {
             "type": "m.typing",
             "room_id": room_id,
-            "typing": [u.to_string() for u in typing],
+            "content": {
+                "user_ids": [u.to_string() for u in typing],
+            },
         }
 
     def get_new_events_for_user(self, user, from_key, limit):
