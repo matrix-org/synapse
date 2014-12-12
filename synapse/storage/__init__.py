@@ -168,7 +168,7 @@ class DataStore(RoomMemberStore, RoomStore,
             values={
                 "event_id": event.event_id,
                 "room_id": event.room_id,
-                "json": encode_canonical_json(event_dict),
+                "json": encode_canonical_json(event_dict).decode("UTF-8"),
             },
             or_replace=True,
         )
