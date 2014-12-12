@@ -29,6 +29,7 @@ from twisted.web.util import redirectTo
 
 import collections
 import logging
+import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -122,9 +123,18 @@ class JsonResource(HttpServer, resource.Resource):
                     # We found a match! Trigger callback and then return the
                     # returned response. We pass both the request and any
                     # matched groups from the regex to the callback.
+
+                    logger.debug("url things: %r", m.groups())
+
+                    args = [
+                        urllib.unquote(u).decode("UTF-8") for u in m.groups()
+                    ]
+
+                    logger.debug("url things args: %r", args)
+
                     code, response = yield path_entry.callback(
                         request,
-                        *m.groups()
+                        *args
                     )
 
                     self._send_response(request, code, response)

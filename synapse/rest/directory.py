@@ -36,9 +36,7 @@ class ClientDirectoryServer(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_alias):
-        room_alias = self.hs.parse_roomalias(
-            urllib.unquote(room_alias).decode("utf-8")
-        )
+        room_alias = self.hs.parse_roomalias(room_alias)
 
         dir_handler = self.handlers.directory_handler
         res = yield dir_handler.get_association(room_alias)
@@ -56,9 +54,7 @@ class ClientDirectoryServer(RestServlet):
 
         logger.debug("Got content: %s", content)
 
-        room_alias = self.hs.parse_roomalias(
-            urllib.unquote(room_alias).decode("utf-8")
-        )
+        room_alias = self.hs.parse_roomalias(room_alias)
 
         logger.debug("Got room name: %s", room_alias.to_string())
 
@@ -97,9 +93,7 @@ class ClientDirectoryServer(RestServlet):
 
         dir_handler = self.handlers.directory_handler
 
-        room_alias = self.hs.parse_roomalias(
-            urllib.unquote(room_alias).decode("utf-8")
-        )
+        room_alias = self.hs.parse_roomalias(room_alias)
 
         yield dir_handler.delete_association(
             user.to_string(), room_alias
