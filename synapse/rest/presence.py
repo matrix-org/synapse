@@ -22,7 +22,6 @@ from base import RestServlet, client_path_pattern
 
 import json
 import logging
-import urllib
 
 logger = logging.getLogger(__name__)
 

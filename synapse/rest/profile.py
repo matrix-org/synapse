@@ -19,7 +19,6 @@ from twisted.internet import defer
 from base import RestServlet, client_path_pattern
 
 import json
-import urllib
 
 
 class ProfileDisplaynameRestServlet(RestServlet):
