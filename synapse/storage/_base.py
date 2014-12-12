@@ -23,7 +23,6 @@ from synapse.util.logcontext import PreserveLoggingContext, LoggingContext
 from twisted.internet import defer
 
 import collections
-import copy
 import json
 import sys
 import time
