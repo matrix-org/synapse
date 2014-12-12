@@ -61,6 +61,8 @@ class Auth(object):
             if event.type == RoomAliasesEvent.TYPE:
                 return True
 
+            logger.debug("Auth events: %s", auth_events)
+
             if event.type == RoomMemberEvent.TYPE:
                 allowed = self.is_membership_change_allowed(
                     event, auth_events
@@ -389,7 +391,11 @@ class Auth(object):
                 if join_rule_event:
                     auth_ids.append(join_rule_event.event_id)
 
+            if e_type == Membership.JOIN:
                 if member_event and not is_public:
+                    auth_ids.append(member_event.event_id)
+            else:
+                if member_event:
                     auth_ids.append(member_event.event_id)
         elif member_event:
             if member_event.content["membership"] == Membership.JOIN:
