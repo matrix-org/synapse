@@ -44,9 +44,9 @@ class Config(object):
             )
         if not os.path.exists(file_path):
             raise ConfigError(
-                "File % config for %s doesn't exist."
+                "File %s config for %s doesn't exist."
                 " Try running again with --generate-config"
-                % (config_name,)
+                % (file_path, config_name,)
             )
         return cls.abspath(file_path)
 
