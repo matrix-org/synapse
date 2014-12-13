@@ -1,3 +1,9 @@
+Changes in synapse 0.5.4a (2014-12-13)
+======================================
+
+ * Fix bug while generating the error message when a file path specified in
+   the config doesn't exist.
+
 Changes in synapse 0.5.4 (2014-12-03)
 =====================================
 
