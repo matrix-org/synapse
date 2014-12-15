@@ -466,6 +466,37 @@ class RoomRedactEventRestServlet(RestServlet):
         defer.returnValue(response)
 
 
+class RoomTypingRestServlet(RestServlet):
+    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$")
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_id, user_id):
+        auth_user = yield self.auth.get_user_by_req(request)
+
+        room_id = urllib.unquote(room_id)
+        target_user = self.hs.parse_userid(urllib.unquote(user_id))
+
+        content = _parse_json(request)
+
+        typing_handler = self.handlers.typing_notification_handler
+
+        if content["typing"]:
+            yield typing_handler.started_typing(
+                target_user=target_user,
+                auth_user=auth_user,
+                room_id=room_id,
+                timeout=content.get("timeout", 30000),
+            )
+        else:
+            yield typing_handler.stopped_typing(
+                target_user=target_user,
+                auth_user=auth_user,
+                room_id=room_id,
+            )
+
+        defer.returnValue((200, {}))
+
+
 def _parse_json(request):
     try:
         content = json.loads(request.content.read())
@@ -521,3 +552,4 @@ def register_servlets(hs, http_server):
     RoomStateRestServlet(hs).register(http_server)
     RoomInitialSyncRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
+    RoomTypingRestServlet(hs).register(http_server)

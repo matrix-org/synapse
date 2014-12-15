@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class MediaRepositoryResource(Resource):
-    """Profiles file uploading and downloading.
+    """File uploading and downloading.
 
     Uploads are POSTed to a resource which returns a token which is used to GET
     the download::
@@ -39,9 +39,9 @@ class MediaRepositoryResource(Resource):
         <= HTTP/1.1 200 OK
            Content-Type: application/json
 
-           { "token": <media-id> }
+           { "content-uri": "mxc://<server-name>/<media-id>" }
 
-        => GET /_matrix/media/v1/download/<media-id> HTTP/1.1
+        => GET /_matrix/media/v1/download/<server-name>/<media-id> HTTP/1.1
 
         <= HTTP/1.1 200 OK
            Content-Type: <media-type>
@@ -52,8 +52,8 @@ class MediaRepositoryResource(Resource):
     Clients can get thumbnails by supplying a desired width and height and
     thumbnailing method::
 
-        => GET /_matrix/media/v1
-                /thumbnail/<media-id>?width=<w>&height=<h>&method=<m> HTTP/1.1
+        => GET /_matrix/media/v1/thumbnail/<server_name>
+                /<media-id>?width=<w>&height=<h>&method=<m> HTTP/1.1
 
         <= HTTP/1.1 200 OK
            Content-Type: image/jpeg or image/png

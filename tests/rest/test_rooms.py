@@ -1066,7 +1066,3 @@ class RoomInitialSyncTestCase(RestTestCase):
         }
         self.assertTrue(self.user_id in presence_by_user)
         self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
-
-#        (code, response) = yield self.mock_resource.trigger("GET", path, None)
-#        self.assertEquals(200, code, msg=str(response))
-#        self.assert_dict(json.loads(content), response)

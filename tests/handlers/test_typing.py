@@ -22,6 +22,7 @@ import json
 
 from ..utils import MockHttpResource, MockClock, DeferredMockCallable, MockKey
 
+from synapse.api.errors import AuthError
 from synapse.server import HomeServer
 from synapse.handlers.typing import TypingNotificationHandler
 
@@ -65,7 +66,13 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.mock_config = Mock()
         self.mock_config.signing_key = [MockKey()]
 
+        mock_notifier = Mock(spec=["on_new_user_event"])
+        self.on_new_user_event = mock_notifier.on_new_user_event
+
+        self.auth = Mock(spec=[])
+
         hs = HomeServer("test",
+                auth=self.auth,
                 clock=self.clock,
                 db_pool=None,
                 datastore=Mock(spec=[
@@ -77,6 +84,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                     "get_destination_retry_timings",
                 ]),
                 handlers=None,
+                notifier=mock_notifier,
                 resource_for_client=Mock(),
                 resource_for_federation=self.mock_federation_resource,
                 http_client=self.mock_http_client,
@@ -85,11 +93,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
             )
         hs.handlers = JustTypingNotificationHandlers(hs)
 
-        self.mock_update_client = Mock()
-        self.mock_update_client.return_value = defer.succeed(None)
-
         self.handler = hs.get_handlers().typing_notification_handler
-        self.handler.push_update_to_clients = self.mock_update_client
+
+        self.event_source = hs.get_event_sources().sources["typing"]
 
         self.datastore = hs.get_datastore()
         self.datastore.get_destination_retry_timings.return_value = (
@@ -140,6 +146,12 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.room_member_handler.fetch_room_distributions_into = (
                 fetch_room_distributions_into)
 
+        def check_joined_room(room_id, user_id):
+            if user_id not in [u.to_string() for u in self.room_members]:
+                raise AuthError(401, "User is not in the room")
+
+        self.auth.check_joined_room = check_joined_room
+
         # Some local users to test with
         self.u_apple = hs.parse_userid("@apple:test")
         self.u_banana = hs.parse_userid("@banana:test")
@@ -151,6 +163,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
     def test_started_typing_local(self):
         self.room_members = [self.u_apple, self.u_banana]
 
+        self.assertEquals(self.event_source.get_current_key(), 0)
+
         yield self.handler.started_typing(
             target_user=self.u_apple,
             auth_user=self.u_apple,
@@ -158,12 +172,21 @@ class TypingNotificationsTestCase(unittest.TestCase):
             timeout=20000,
         )
 
-        self.mock_update_client.assert_has_calls([
-            call(observer_user=self.u_banana,
-                observed_user=self.u_apple,
-                room_id=self.room_id,
-                typing=True),
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
         ])
+
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "content": {
+                     "user_ids": [self.u_apple.to_string()],
+                 }},
+            ]
+        )
 
     @defer.inlineCallbacks
     def test_started_typing_remote_send(self):
@@ -198,6 +221,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
     def test_started_typing_remote_recv(self):
         self.room_members = [self.u_apple, self.u_onion]
 
+        self.assertEquals(self.event_source.get_current_key(), 0)
+
         yield self.mock_federation_resource.trigger("PUT",
             "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("farm", "m.typing",
@@ -209,12 +234,21 @@ class TypingNotificationsTestCase(unittest.TestCase):
             )
         )
 
-        self.mock_update_client.assert_has_calls([
-            call(observer_user=self.u_apple,
-                observed_user=self.u_onion,
-                room_id=self.room_id,
-                typing=True),
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
         ])
+
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "content": {
+                     "user_ids": [self.u_onion.to_string()],
+                }},
+            ]
+        )
 
     @defer.inlineCallbacks
     def test_stopped_typing(self):
@@ -238,9 +272,14 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         # Gut-wrenching
         from synapse.handlers.typing import RoomMember
-        self.handler._member_typing_until[
-            RoomMember(self.room_id, self.u_apple)
-        ] = 1002000
+        member = RoomMember(self.room_id, self.u_apple)
+        self.handler._member_typing_until[member] = 1002000
+        self.handler._member_typing_timer[member] = (
+            self.clock.call_later(1002, lambda: 0)
+        )
+        self.handler._room_typing[self.room_id] = set((self.u_apple,))
+
+        self.assertEquals(self.event_source.get_current_key(), 0)
 
         yield self.handler.stopped_typing(
             target_user=self.u_apple,
@@ -248,11 +287,68 @@ class TypingNotificationsTestCase(unittest.TestCase):
             room_id=self.room_id,
         )
 
-        self.mock_update_client.assert_has_calls([
-            call(observer_user=self.u_banana,
-                observed_user=self.u_apple,
-                room_id=self.room_id,
-                typing=False),
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
         ])
 
         yield put_json.await_calls()
+
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "content": {
+                     "user_ids": [],
+                }},
+            ]
+        )
+
+    @defer.inlineCallbacks
+    def test_typing_timeout(self):
+        self.room_members = [self.u_apple, self.u_banana]
+
+        self.assertEquals(self.event_source.get_current_key(), 0)
+
+        yield self.handler.started_typing(
+            target_user=self.u_apple,
+            auth_user=self.u_apple,
+            room_id=self.room_id,
+            timeout=10000,
+        )
+
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
+        ])
+        self.on_new_user_event.reset_mock()
+
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "content": {
+                     "user_ids": [self.u_apple.to_string()],
+                }},
+            ]
+        )
+
+        self.clock.advance_time(11)
+
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
+        ])
+
+        self.assertEquals(self.event_source.get_current_key(), 2)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 1, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "content": {
+                     "user_ids": [],
+                }},
+            ]
+        )

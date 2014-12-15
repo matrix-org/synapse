@@ -247,6 +247,60 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         return builder.build()
 
+    @defer.inlineCallbacks
+    def test_simple_leave(self):
+        room_id = "!foo:red"
+        user_id = "@bob:red"
+        user = self.hs.parse_userid(user_id)
+
+        builder = self.hs.get_event_builder_factory().new({
+            "type": RoomMemberEvent.TYPE,
+            "sender": user_id,
+            "state_key": user_id,
+            "room_id": room_id,
+            "content": {"membership": Membership.LEAVE},
+        })
+
+        self.datastore.get_latest_events_in_room.return_value = (
+            defer.succeed([])
+        )
+
+        def annotate(_, ctx):
+            ctx.current_state = {
+                (RoomMemberEvent.TYPE, "@bob:red"): self._create_member(
+                    user_id="@bob:red",
+                    room_id=room_id,
+                    membership=Membership.INVITE
+                ),
+            }
+
+            return defer.succeed(True)
+
+        self.state_handler.annotate_context_with_state.side_effect = annotate
+
+        def add_auth(_, ctx):
+            ctx.auth_events = ctx.current_state[
+                (RoomMemberEvent.TYPE, "@bob:red")
+            ]
+
+            return defer.succeed(True)
+        self.auth.add_auth_events.side_effect = add_auth
+
+        room_handler = self.room_member_handler
+        event, context = yield room_handler._create_new_client_event(
+            builder
+        )
+
+        leave_signal_observer = Mock()
+        self.distributor.observe("user_left_room", leave_signal_observer)
+
+        # Actual invocation
+        yield room_handler.change_membership(event, context)
+
+        leave_signal_observer.assert_called_with(
+            user=user, room_id=room_id
+        )
+
 
 class RoomCreationTest(unittest.TestCase):
 

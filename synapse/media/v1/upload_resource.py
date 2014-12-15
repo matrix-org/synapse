@@ -95,8 +95,10 @@ class UploadResource(BaseMediaResource):
 
             yield self._generate_local_thumbnails(media_id, media_info)
 
+            content_uri = "mxc://%s/%s" % (self.server_name, media_id)
+
             respond_with_json(
-                request, 200, {"content_token": media_id}, send_cors=True
+                request, 200, {"content_uri": content_uri}, send_cors=True
             )
         except CodeMessageException as e:
             logger.exception(e)

@@ -43,7 +43,23 @@ class TypingNotificationHandler(BaseHandler):
 
         self.federation.register_edu_handler("m.typing", self._recv_edu)
 
-        self._member_typing_until = {}
+        hs.get_distributor().observe("user_left_room", self.user_left_room)
+
+        self._member_typing_until = {} # clock time we expect to stop
+        self._member_typing_timer = {} # deferreds to manage theabove
+
+        # map room IDs to serial numbers
+        self._room_serials = {}
+        self._latest_room_serial = 0
+        # map room IDs to sets of users currently typing
+        self._room_typing = {}
+
+    def tearDown(self):
+        """Cancels all the pending timers.
+        Normally this shouldn't be needed, but it's required from unit tests
+        to avoid a "Reactor was unclean" warning."""
+        for t in self._member_typing_timer.values():
+            self.clock.cancel_call_later(t)
 
     @defer.inlineCallbacks
     def started_typing(self, target_user, auth_user, room_id, timeout):
@@ -53,12 +69,24 @@ class TypingNotificationHandler(BaseHandler):
         if target_user != auth_user:
             raise AuthError(400, "Cannot set another user's typing state")
 
+        yield self.auth.check_joined_room(room_id, target_user.to_string())
+
+        logger.debug(
+            "%s has started typing in %s", target_user.to_string(), room_id
+        )
+
         until = self.clock.time_msec() + timeout
         member = RoomMember(room_id=room_id, user=target_user)
 
         was_present = member in self._member_typing_until
 
+        if member in self._member_typing_timer:
+            self.clock.cancel_call_later(self._member_typing_timer[member])
+
         self._member_typing_until[member] = until
+        self._member_typing_timer[member] = self.clock.call_later(
+            timeout / 1000, lambda: self._stopped_typing(member)
+        )
 
         if was_present:
             # No point sending another notification
@@ -78,17 +106,38 @@ class TypingNotificationHandler(BaseHandler):
         if target_user != auth_user:
             raise AuthError(400, "Cannot set another user's typing state")
 
+        yield self.auth.check_joined_room(room_id, target_user.to_string())
+
+        logger.debug(
+            "%s has stopped typing in %s", target_user.to_string(), room_id
+        )
+
         member = RoomMember(room_id=room_id, user=target_user)
 
+        yield self._stopped_typing(member)
+
+    @defer.inlineCallbacks
+    def user_left_room(self, user, room_id):
+        if user.is_mine:
+            member = RoomMember(room_id=room_id, user=user)
+            yield self._stopped_typing(member)
+
+    @defer.inlineCallbacks
+    def _stopped_typing(self, member):
         if member not in self._member_typing_until:
             # No point
             defer.returnValue(None)
 
         yield self._push_update(
-            room_id=room_id,
-            user=target_user,
+            room_id=member.room_id,
+            user=member.user,
             typing=False,
         )
+
+        del self._member_typing_until[member]
+
+        self.clock.cancel_call_later(self._member_typing_timer[member])
+        del self._member_typing_timer[member]
 
     @defer.inlineCallbacks
     def _push_update(self, room_id, user, typing):
@@ -97,16 +146,14 @@ class TypingNotificationHandler(BaseHandler):
 
         rm_handler = self.homeserver.get_handlers().room_member_handler
         yield rm_handler.fetch_room_distributions_into(
-            room_id, localusers=localusers, remotedomains=remotedomains,
-            ignore_user=user
+            room_id, localusers=localusers, remotedomains=remotedomains
         )
 
-        for u in localusers:
-            self.push_update_to_clients(
+        if localusers:
+            self._push_update_local(
                 room_id=room_id,
-                observer_user=u,
-                observed_user=user,
-                typing=typing,
+                user=user,
+                typing=typing
             )
 
         deferreds = []
@@ -135,29 +182,67 @@ class TypingNotificationHandler(BaseHandler):
             room_id, localusers=localusers
         )
 
-        for u in localusers:
-            self.push_update_to_clients(
+        if localusers:
+            self._push_update_local(
                 room_id=room_id,
-                observer_user=u,
-                observed_user=user,
+                user=user,
                 typing=content["typing"]
             )
 
-    def push_update_to_clients(self, room_id, observer_user, observed_user,
-                               typing):
-        # TODO(paul) steal this from presence.py
-        pass
+    def _push_update_local(self, room_id, user, typing):
+        if room_id not in self._room_serials:
+            self._room_serials[room_id] = 0
+            self._room_typing[room_id] = set()
+
+        room_set = self._room_typing[room_id]
+        if typing:
+            room_set.add(user)
+        elif user in room_set:
+            room_set.remove(user)
+
+        self._latest_room_serial += 1
+        self._room_serials[room_id] = self._latest_room_serial
+
+        self.notifier.on_new_user_event(rooms=[room_id])
 
 
 class TypingNotificationEventSource(object):
     def __init__(self, hs):
         self.hs = hs
+        self._handler = None
+
+    def handler(self):
+        # Avoid cyclic dependency in handler setup
+        if not self._handler:
+            self._handler = self.hs.get_handlers().typing_notification_handler
+        return self._handler
+
+    def _make_event_for(self, room_id):
+        typing = self.handler()._room_typing[room_id]
+        return {
+            "type": "m.typing",
+            "room_id": room_id,
+            "content": {
+                "user_ids": [u.to_string() for u in typing],
+            },
+        }
 
     def get_new_events_for_user(self, user, from_key, limit):
-        return ([], from_key)
+        from_key = int(from_key)
+        handler = self.handler()
+
+        events = []
+        for room_id in handler._room_serials:
+            if handler._room_serials[room_id] <= from_key:
+                continue
+
+            # TODO: check if user is in room
+            events.append(self._make_event_for(room_id))
+
+        return (events, handler._latest_room_serial)
 
     def get_current_key(self):
-        return 0
+        return self.handler()._latest_room_serial
 
     def get_pagination_rows(self, user, pagination_config, key):
         return ([], pagination_config.from_key)
