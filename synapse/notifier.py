@@ -146,7 +146,11 @@ class Notifier(object):
         Will wake up all listeners for the given users and rooms.
         """
         yield run_on_reactor()
+
+        # TODO(paul): This is horrible, having to manually list every event
+        # source here individually
         presence_source = self.event_sources.sources["presence"]
+        typing_source = self.event_sources.sources["typing"]
 
         listeners = set()
 
@@ -158,19 +162,33 @@ class Notifier(object):
 
         @defer.inlineCallbacks
         def notify(listener):
-            events, end_key = yield presence_source.get_new_events_for_user(
-                listener.user,
-                listener.from_token.presence_key,
-                listener.limit,
+            presence_events, presence_end_key = (
+                yield presence_source.get_new_events_for_user(
+                    listener.user,
+                    listener.from_token.presence_key,
+                    listener.limit,
+                )
+            )
+            typing_events, typing_end_key = (
+                yield typing_source.get_new_events_for_user(
+                    listener.user,
+                    listener.from_token.typing_key,
+                    listener.limit,
+                )
             )
 
-            if events:
+            if presence_events or typing_events:
                 end_token = listener.from_token.copy_and_replace(
-                    "presence_key", end_key
+                    "presence_key", presence_end_key
+                ).copy_and_replace(
+                    "typing_key", typing_end_key
                 )
 
                 listener.notify(
-                    self, events, listener.from_token, end_token
+                    self,
+                    presence_events + typing_events,
+                    listener.from_token,
+                    end_token
                 )
 
         def eb(failure):
