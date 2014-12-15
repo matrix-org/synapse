@@ -91,7 +91,6 @@ class DataStore(RoomMemberStore, RoomStore,
 
     def __init__(self, hs):
         super(DataStore, self).__init__(hs)
-        self.event_factory = hs.get_event_factory()
         self.hs = hs
 
         self.min_token_deferred = self._get_min_token()

@@ -18,6 +18,9 @@ class dictobj(dict):
     def get_full_dict(self):
         return dict(self)
 
+    def get_pdu_json(self):
+        return dict(self)
+
 
 def main():
     parser = argparse.ArgumentParser()
