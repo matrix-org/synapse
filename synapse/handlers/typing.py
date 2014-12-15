@@ -146,8 +146,7 @@ class TypingNotificationHandler(BaseHandler):
 
         rm_handler = self.homeserver.get_handlers().room_member_handler
         yield rm_handler.fetch_room_distributions_into(
-            room_id, localusers=localusers, remotedomains=remotedomains,
-            ignore_user=user
+            room_id, localusers=localusers, remotedomains=remotedomains
         )
 
         if localusers:
