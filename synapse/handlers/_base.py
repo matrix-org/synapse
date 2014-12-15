@@ -122,10 +122,15 @@ class BaseHandler(object):
             if event.content["membership"] == Membership.INVITE:
                 invitee = self.hs.parse_userid(event.state_key)
                 if not self.hs.is_mine(invitee):
+                    # TODO: Can we add signature from remote server in a nicer
+                    # way? If we have been invited by a remote server, we need
+                    # to get them to sign the event.
                     returned_invite = yield federation_handler.send_invite(
                         invitee.domain,
                         event,
                     )
+
+                    # TODO: Make sure the signatures actually are correct.
                     event.signatures.update(
                         returned_invite.signatures
                     )

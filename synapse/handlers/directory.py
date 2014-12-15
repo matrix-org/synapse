@@ -149,7 +149,7 @@ class DirectoryHandler(BaseHandler):
         aliases = yield self.store.get_aliases_for_room(room_id)
 
         msg_handler = self.hs.get_handlers().message_handler
-        yield msg_handler.handle_event({
+        yield msg_handler.create_and_send_event({
             "type": RoomAliasesEvent.TYPE,
             "state_key": self.hs.hostname,
             "room_id": room_id,

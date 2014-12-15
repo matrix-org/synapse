@@ -369,10 +369,11 @@ class RoomCreationTest(unittest.TestCase):
             config=config,
         )
 
-        self.assertTrue(self.message_handler.handle_event.called)
+        self.assertTrue(self.message_handler.create_and_send_event.called)
 
         event_dicts = [
-            e[0][0] for e in self.message_handler.handle_event.call_args_list
+            e[0][0]
+            for e in self.message_handler.create_and_send_event.call_args_list
         ]
 
         self.assertTrue(len(event_dicts) > 3)

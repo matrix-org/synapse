@@ -126,11 +126,11 @@ class RoomCreationHandler(BaseHandler):
         msg_handler = self.hs.get_handlers().message_handler
 
         for event in creation_events:
-            yield msg_handler.handle_event(event)
+            yield msg_handler.create_and_send_event(event)
 
         if "name" in config:
             name = config["name"]
-            yield msg_handler.handle_event({
+            yield msg_handler.create_and_send_event({
                 "type": RoomNameEvent.TYPE,
                 "room_id": room_id,
                 "sender": user_id,
@@ -139,7 +139,7 @@ class RoomCreationHandler(BaseHandler):
 
         if "topic" in config:
             topic = config["topic"]
-            yield msg_handler.handle_event({
+            yield msg_handler.create_and_send_event({
                 "type": RoomTopicEvent.TYPE,
                 "room_id": room_id,
                 "sender": user_id,
@@ -147,7 +147,7 @@ class RoomCreationHandler(BaseHandler):
             })
 
         for invitee in invite_list:
-            yield msg_handler.handle_event({
+            yield msg_handler.create_and_send_event({
                 "type": RoomMemberEvent.TYPE,
                 "state_key": invitee,
                 "room_id": room_id,

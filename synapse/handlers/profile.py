@@ -209,7 +209,7 @@ class ProfileHandler(BaseHandler):
             )
 
             msg_handler = self.hs.get_handlers().message_handler
-            yield msg_handler.handle_event({
+            yield msg_handler.create_and_send_event({
                 "type": j.type,
                 "room_id": j.room_id,
                 "state_key": j.state_key,

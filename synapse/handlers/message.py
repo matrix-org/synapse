@@ -138,7 +138,19 @@ class MessageHandler(BaseHandler):
         defer.returnValue(chunk)
 
     @defer.inlineCallbacks
-    def handle_event(self, event_dict):
+    def create_and_send_event(self, event_dict):
+        """ Given a dict from a client, create and handle a new event.
+
+        Creates an FrozenEvent object, filling out auth_events, prev_events,
+        etc.
+
+        Adds display names to Join membership events.
+
+        Persists and notifies local clients and federation.
+
+        Args:
+            event_dict (dict): An entire event
+        """
         builder = self.event_builder_factory.new(event_dict)
 
         self.validator.validate_new(builder)

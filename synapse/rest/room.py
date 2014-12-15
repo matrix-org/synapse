@@ -157,7 +157,7 @@ class RoomStateEventRestServlet(RestServlet):
             event_dict["state_key"] = state_key
 
         msg_handler = self.handlers.message_handler
-        yield msg_handler.handle_event(event_dict)
+        yield msg_handler.create_and_send_event(event_dict)
 
         defer.returnValue((200, {}))
 
@@ -176,7 +176,7 @@ class RoomSendEventRestServlet(RestServlet):
         content = _parse_json(request)
 
         msg_handler = self.handlers.message_handler
-        event = yield msg_handler.handle_event(
+        event = yield msg_handler.create_and_send_event(
             {
                 "type": event_type,
                 "content": content,
@@ -237,7 +237,7 @@ class JoinRoomAliasServlet(RestServlet):
             defer.returnValue((200, ret_dict))
         else:  # room id
             msg_handler = self.handlers.message_handler
-            yield msg_handler.handle_event(
+            yield msg_handler.create_and_send_event(
                 {
                     "type": RoomMemberEvent.TYPE,
                     "content": {"membership": Membership.JOIN},
@@ -401,7 +401,7 @@ class RoomMembershipRestServlet(RestServlet):
                 membership_action = "leave"
 
         msg_handler = self.handlers.message_handler
-        yield msg_handler.handle_event(
+        yield msg_handler.create_and_send_event(
             {
                 "type": RoomMemberEvent.TYPE,
                 "content": {"membership": unicode(membership_action)},
@@ -439,7 +439,7 @@ class RoomRedactEventRestServlet(RestServlet):
         content = _parse_json(request)
 
         msg_handler = self.handlers.message_handler
-        event = yield msg_handler.handle_event(
+        event = yield msg_handler.create_and_send_event(
             {
                 "type": RoomRedactionEvent.TYPE,
                 "content": content,
