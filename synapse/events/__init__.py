@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from frozendict import frozendict
-
 from synapse.util.frozenutils import freeze, unfreeze
 
 import copy
