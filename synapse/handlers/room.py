@@ -343,9 +343,9 @@ class RoomMemberHandler(BaseHandler):
         """
         target_user_id = event.state_key
 
-        # TODO(markjh): get prev state from snapshot.
-        prev_state = yield self.store.get_room_member(
-            target_user_id, event.room_id
+        prev_state = context.current_state.get(
+            (RoomMemberEvent.TYPE, target_user_id),
+            None
         )
 
         room_id = event.room_id

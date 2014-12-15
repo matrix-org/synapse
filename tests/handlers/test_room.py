@@ -270,7 +270,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 (RoomMemberEvent.TYPE, "@bob:red"): self._create_member(
                     user_id="@bob:red",
                     room_id=room_id,
-                    membership=Membership.INVITE
+                    membership=Membership.JOIN
                 ),
             }
 
@@ -296,6 +296,17 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         # Actual invocation
         yield room_handler.change_membership(event, context)
+
+        self.federation.handle_new_event.assert_called_once_with(
+            event, None, destinations=set(['red'])
+        )
+
+        self.datastore.persist_event.assert_called_once_with(
+            event, context=context
+        )
+        self.notifier.on_new_room_event.assert_called_once_with(
+            event, extra_users=[user]
+        )
 
         leave_signal_observer.assert_called_with(
             user=user, room_id=room_id
