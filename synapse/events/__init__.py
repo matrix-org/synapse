@@ -15,37 +15,9 @@
 
 from frozendict import frozendict
 
+from synapse.util.frozenutils import freeze, unfreeze
+
 import copy
-
-
-def _freeze(o):
-    if isinstance(o, dict) or isinstance(o, frozendict):
-        return frozendict({k: _freeze(v) for k, v in o.items()})
-
-    if isinstance(o, basestring):
-        return o
-
-    try:
-        return tuple([_freeze(i) for i in o])
-    except TypeError:
-        pass
-
-    return o
-
-
-def _unfreeze(o):
-    if isinstance(o, frozendict) or isinstance(o, dict):
-        return dict({k: _unfreeze(v) for k, v in o.items()})
-
-    if isinstance(o, basestring):
-        return o
-
-    try:
-        return [_unfreeze(i) for i in o]
-    except TypeError:
-        pass
-
-    return o
 
 
 class _EventInternalMetadata(object):
@@ -147,7 +119,7 @@ class FrozenEvent(EventBase):
         signatures = copy.deepcopy(event_dict.pop("signatures", {}))
         unsigned = copy.deepcopy(event_dict.pop("unsigned", {}))
 
-        frozen_dict = _freeze(event_dict)
+        frozen_dict = freeze(event_dict)
 
         super(FrozenEvent, self).__init__(
             frozen_dict,
@@ -167,7 +139,7 @@ class FrozenEvent(EventBase):
 
     def get_dict(self):
         # We need to unfreeze what we return
-        return _unfreeze(super(FrozenEvent, self).get_dict())
+        return unfreeze(super(FrozenEvent, self).get_dict())
 
     def __str__(self):
         return self.__repr__()

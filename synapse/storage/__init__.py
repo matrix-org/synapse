@@ -21,7 +21,6 @@ from synapse.api.events.room import (
 )
 
 from synapse.util.logutils import log_function
-from synapse.util.frozenutils import FrozenEncoder
 
 from .directory import DirectoryStore
 from .feedback import FeedbackStore
@@ -177,7 +176,7 @@ class DataStore(RoomMemberStore, RoomStore,
             "event_id": event.event_id,
             "type": event.type,
             "room_id": event.room_id,
-            "content": json.dumps(event.content, cls=FrozenEncoder),
+            "content": json.dumps(event.get_dict()["content"]),
             "processed": True,
             "outlier": outlier,
             "depth": event.depth,
