@@ -118,7 +118,7 @@ class TypingNotificationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
-        if user.is_mine:
+        if self.hs.is_mine(user):
             member = RoomMember(room_id=room_id, user=user)
             yield self._stopped_typing(member)
 
