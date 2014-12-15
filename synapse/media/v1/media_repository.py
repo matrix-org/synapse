@@ -39,7 +39,7 @@ class MediaRepositoryResource(Resource):
         <= HTTP/1.1 200 OK
            Content-Type: application/json
 
-           { "content-uri": "mxc://<server-name>/<media-id>" }
+           { "content_uri": "mxc://<server-name>/<media-id>" }
 
         => GET /_matrix/media/v1/download/<server-name>/<media-id> HTTP/1.1
 
