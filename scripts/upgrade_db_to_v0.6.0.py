@@ -1,3 +1,5 @@
+
+from synapse.storage import SCHEMA_VERSION, read_schema
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.signatures import SignatureStore
 from synapse.storage.event_federation import EventFederationStore
@@ -186,11 +188,15 @@ def get_key(server_name):
 
 
 def reinsert_events(cursor, server_name, signing_key):
+    print "Running delta: v10"
+
     cursor.executescript(delta_sql)
 
     cursor.execute(
         "SELECT * FROM events ORDER BY rowid ASC"
     )
+
+    print "Getting events..."
 
     rows = store.cursor_to_dict(cursor)
 
@@ -281,7 +287,21 @@ def reinsert_events(cursor, server_name, signing_key):
 def main(database, server_name, signing_key):
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
+
+    # Do other deltas:
+    cursor.execute("PRAGMA user_version")
+    row = cursor.fetchone()
+
+    if row and row[0]:
+        user_version = row[0]
+        # Run every version since after the current version.
+        for v in range(user_version + 1, 10):
+            print "Running delta: %d" % (v,)
+            sql_script = read_schema("delta/v%d" % (v,))
+            cursor.executescript(sql_script)
+
     reinsert_events(cursor, server_name, signing_key)
+
     conn.commit()
 
     print "Success!"
