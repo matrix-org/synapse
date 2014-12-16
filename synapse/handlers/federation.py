@@ -721,6 +721,7 @@ class FederationHandler(BaseHandler):
                         "Rejecting %s as %s not in db or %s",
                         event.event_id, e_id, known_ids,
                     )
+                    # FIXME: How does raising AuthError work with federation?
                     raise AuthError(403, "Auth events are stale")
 
                 context.auth_events[(e.type, e.state_key)] = e
