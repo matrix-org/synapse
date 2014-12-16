@@ -179,6 +179,7 @@ class FederationHandler(BaseHandler):
                     context=event.room_id,
                     event_id=event.event_id,
                 )
+                # FIXME: Get auth chain for these state events
 
             current_state = state
 
