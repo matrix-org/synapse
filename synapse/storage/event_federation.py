@@ -42,13 +42,7 @@ class EventFederationStore(SQLBaseStore):
     def _get_auth_chain_txn(self, txn, event_ids):
         results = self._get_auth_chain_ids_txn(txn, event_ids)
 
-        sql = "SELECT * FROM events WHERE event_id = ?"
-        rows = []
-        for ev_id in results:
-            c = txn.execute(sql, (ev_id,))
-            rows.extend(self.cursor_to_dict(c))
-
-        return self._parse_events_txn(txn, rows)
+        return self._get_events_txn(txn, results)
 
     def get_auth_chain_ids(self, event_ids):
         return self.runInteraction(
