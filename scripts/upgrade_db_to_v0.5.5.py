@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS event_json(
 
 CREATE INDEX IF NOT EXISTS event_json_id ON event_json(event_id);
 CREATE INDEX IF NOT EXISTS event_json_room_id ON event_json(room_id);
+
+PRAGMA user_version = 10;
 """
 
 
