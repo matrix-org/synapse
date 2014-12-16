@@ -1,3 +1,12 @@
+Changes in synapse 0.6.0 (2014-12-16)
+=====================================
+
+ * Add new API for media upload and download that supports thumbnailing.
+ * Implement typing notifications.
+ * Fix bugs where we sent events with invalid signatures due to bugs where
+   we incorrectly persisted events.
+ * Improve performance of database queries involving retrieving events.
+
 Changes in synapse 0.5.4a (2014-12-13)
 ======================================
 

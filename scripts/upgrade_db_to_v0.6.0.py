@@ -284,6 +284,8 @@ def main(database, server_name, signing_key):
     reinsert_events(cursor, server_name, signing_key)
     conn.commit()
 
+    print "Success!"
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
