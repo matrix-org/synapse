@@ -202,7 +202,7 @@ class FederationHandler(BaseHandler):
                 e.msg,
                 affected=event.event_id,
             )
-            
+
         # if we're receiving valid events from an origin,
         # it's probably a good idea to mark it as not in retry-state
         # for sending (although this is a bit of a leap)
@@ -263,9 +263,7 @@ class FederationHandler(BaseHandler):
             context = EventContext()
             yield self.state_handler.annotate_context_with_state(event, context)
 
-            events.append(
-                (event, context)
-            )
+            events.append((event, context))
 
             yield self.store.persist_event(
                 event,
@@ -547,8 +545,6 @@ class FederationHandler(BaseHandler):
         """
         event = pdu
 
-        context = EventContext()
-
         event.internal_metadata.outlier = True
 
         event.signatures.update(
@@ -559,6 +555,7 @@ class FederationHandler(BaseHandler):
             )
         )
 
+        context = EventContext()
         yield self.state_handler.annotate_context_with_state(event, context)
 
         yield self.store.persist_event(
@@ -685,13 +682,13 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _handle_new_event(self, event, state=None, backfilled=False,
                           current_state=None, fetch_missing=True):
-        context = EventContext()
 
         logger.debug(
             "_handle_new_event: Before annotate: %s, sigs: %s",
             event.event_id, event.signatures,
         )
 
+        context = EventContext()
         yield self.state_handler.annotate_context_with_state(
             event,
             context,

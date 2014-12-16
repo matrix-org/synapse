@@ -30,20 +30,20 @@ class _EventInternalMetadata(object):
 
 
 def _event_dict_property(key):
-        def getter(self):
-            return self._event_dict[key]
+    def getter(self):
+        return self._event_dict[key]
 
-        def setter(self, v):
-            self._event_dict[key] = v
+    def setter(self, v):
+        self._event_dict[key] = v
 
-        def delete(self):
-            del self._event_dict[key]
+    def delete(self):
+        del self._event_dict[key]
 
-        return property(
-            getter,
-            setter,
-            delete,
-        )
+    return property(
+        getter,
+        setter,
+        delete,
+    )
 
 
 class EventBase(object):

@@ -61,8 +61,6 @@ class BaseHandler(object):
     def _create_new_client_event(self, builder):
         yield run_on_reactor()
 
-        context = EventContext()
-
         latest_ret = yield self.store.get_latest_events_in_room(
             builder.room_id,
         )
@@ -78,6 +76,8 @@ class BaseHandler(object):
         builder.depth = depth
 
         state_handler = self.state_handler
+
+        context = EventContext()
         ret = yield state_handler.annotate_context_with_state(
             builder,
             context,

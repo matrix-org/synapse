@@ -310,8 +310,8 @@ class RoomMessageListRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         user = yield self.auth.get_user_by_req(request)
-        pagination_config = PaginationConfig.from_request(request,
-            default_limit=10,
+        pagination_config = PaginationConfig.from_request(
+            request, default_limit=10,
         )
         with_feedback = "feedback" in request.args
         handler = self.handlers.message_handler
@@ -466,7 +466,9 @@ class RoomRedactEventRestServlet(RestServlet):
 
 
 class RoomTypingRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$")
+    PATTERN = client_path_pattern(
+        "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$"
+    )
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, user_id):
