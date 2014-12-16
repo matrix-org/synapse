@@ -526,6 +526,14 @@ def read_schema(schema):
         return schema_file.read()
 
 
+class PrepareDatabaseException(Exception):
+    pass
+
+
+class UpgradeDatabaseException(PrepareDatabaseException):
+    pass
+
+
 def prepare_database(db_conn):
     """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
     don't have to worry about overwriting existing content.
@@ -541,6 +549,10 @@ def prepare_database(db_conn):
             raise ValueError(
                 "Cannot use this database as it is too " +
                 "new for the server to understand"
+            )
+        elif user_version < 10:
+            raise UpgradeDatabaseException(
+                "No delta for versions less than 10"
             )
         elif user_version < SCHEMA_VERSION:
             logger.info(
