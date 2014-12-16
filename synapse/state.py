@@ -263,9 +263,10 @@ class StateHandler(object):
         }
 
         if event_type:
-            prev_states = conflicted_state.get(
-                (event_type, state_key), {}
-            ).keys()
+            prev_states_events = conflicted_state.get(
+                (event_type, state_key), []
+            )
+            prev_states = [s.event_id for s in prev_states_events]
         else:
             prev_states = []
 
