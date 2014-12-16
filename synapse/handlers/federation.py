@@ -163,7 +163,7 @@ class FederationHandler(BaseHandler):
                     yield self._handle_new_event(e, fetch_missing=False)
                 except:
                     logger.exception(
-                        "Failed to parse auth event %s",
+                        "Failed to handle auth event %s",
                         e.event_id,
                     )
 
@@ -183,7 +183,7 @@ class FederationHandler(BaseHandler):
                     yield self._handle_new_event(e)
                 except:
                     logger.exception(
-                        "Failed to parse state event %s",
+                        "Failed to handle state event %s",
                         e.event_id,
                     )
 
@@ -394,7 +394,7 @@ class FederationHandler(BaseHandler):
                     yield self._handle_new_event(e, fetch_missing=False)
                 except:
                     logger.exception(
-                        "Failed to parse auth event %s",
+                        "Failed to handle auth event %s",
                         e.event_id,
                     )
 
@@ -408,7 +408,7 @@ class FederationHandler(BaseHandler):
                     )
                 except:
                     logger.exception(
-                        "Failed to parse state event %s",
+                        "Failed to handle state event %s",
                         e.event_id,
                     )
 
@@ -713,7 +713,7 @@ class FederationHandler(BaseHandler):
                         event.event_id, e_id, known_ids,
                     )
                     # FIXME: How does raising AuthError work with federation?
-                    raise AuthError(403, "Auth events are stale")
+                    raise AuthError(403, "Cannot find auth event")
 
                 context.auth_events[(e.type, e.state_key)] = e
 
