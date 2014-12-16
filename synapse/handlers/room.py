@@ -17,12 +17,8 @@
 from twisted.internet import defer
 
 from synapse.types import UserID, RoomAlias, RoomID
-from synapse.api.constants import Membership, JoinRules
+from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import StoreError, SynapseError
-from synapse.api.events.room import (
-    RoomMemberEvent, RoomCreateEvent, RoomPowerLevelsEvent,
-    RoomTopicEvent, RoomNameEvent, RoomJoinRulesEvent,
-)
 from synapse.util import stringutils
 from synapse.util.async import run_on_reactor
 from ._base import BaseHandler
@@ -131,7 +127,7 @@ class RoomCreationHandler(BaseHandler):
         if "name" in config:
             name = config["name"]
             yield msg_handler.create_and_send_event({
-                "type": RoomNameEvent.TYPE,
+                "type": EventTypes.Name,
                 "room_id": room_id,
                 "sender": user_id,
                 "content": {"name": name},
@@ -140,7 +136,7 @@ class RoomCreationHandler(BaseHandler):
         if "topic" in config:
             topic = config["topic"]
             yield msg_handler.create_and_send_event({
-                "type": RoomTopicEvent.TYPE,
+                "type": EventTypes.Topic,
                 "room_id": room_id,
                 "sender": user_id,
                 "content": {"topic": topic},
@@ -148,7 +144,7 @@ class RoomCreationHandler(BaseHandler):
 
         for invitee in invite_list:
             yield msg_handler.create_and_send_event({
-                "type": RoomMemberEvent.TYPE,
+                "type": EventTypes.Member,
                 "state_key": invitee,
                 "room_id": room_id,
                 "user_id": user_id,
@@ -186,12 +182,12 @@ class RoomCreationHandler(BaseHandler):
             return e
 
         creation_event = create(
-            etype=RoomCreateEvent.TYPE,
+            etype=EventTypes.Create,
             content={"creator": creator.to_string()},
         )
 
         join_event = create(
-            etype=RoomMemberEvent.TYPE,
+            etype=EventTypes.Member,
             state_key=creator_id,
             content={
                 "membership": Membership.JOIN,
@@ -199,15 +195,15 @@ class RoomCreationHandler(BaseHandler):
         )
 
         power_levels_event = create(
-            etype=RoomPowerLevelsEvent.TYPE,
+            etype=EventTypes.PowerLevels,
             content={
                 "users": {
                     creator.to_string(): 100,
                 },
                 "users_default": 0,
                 "events": {
-                    RoomNameEvent.TYPE: 100,
-                    RoomPowerLevelsEvent.TYPE: 100,
+                    EventTypes.Name: 100,
+                    EventTypes.PowerLevels: 100,
                 },
                 "events_default": 0,
                 "state_default": 50,
@@ -219,7 +215,7 @@ class RoomCreationHandler(BaseHandler):
 
         join_rule = JoinRules.PUBLIC if is_public else JoinRules.INVITE
         join_rules_event = create(
-            etype=RoomJoinRulesEvent.TYPE,
+            etype=EventTypes.JoinRules,
             content={"join_rule": join_rule},
         )
 
@@ -344,7 +340,7 @@ class RoomMemberHandler(BaseHandler):
         target_user_id = event.state_key
 
         prev_state = context.current_state.get(
-            (RoomMemberEvent.TYPE, target_user_id),
+            (EventTypes.Member, target_user_id),
             None
         )
 
@@ -396,7 +392,7 @@ class RoomMemberHandler(BaseHandler):
 
         content.update({"membership": Membership.JOIN})
         builder = self.event_builder_factory.new({
-            "type": RoomMemberEvent.TYPE,
+            "type": EventTypes.Member,
             "state_key": joinee.to_string(),
             "room_id": room_id,
             "sender": joinee.to_string(),

@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
-from synapse.api.events.room import RoomPowerLevelsEvent
+from synapse.api.constants import EventTypes
 
 from collections import namedtuple
 
@@ -271,7 +271,7 @@ class StateHandler(object):
 
     def _get_power_level_from_event_state(self, event, user_id):
         if hasattr(event, "old_state_events") and event.old_state_events:
-            key = (RoomPowerLevelsEvent.TYPE, "", )
+            key = (EventTypes.PowerLevels, "", )
             power_level_event = event.old_state_events.get(key)
             level = None
             if power_level_event:

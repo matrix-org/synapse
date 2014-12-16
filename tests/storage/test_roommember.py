@@ -18,8 +18,7 @@ from tests import unittest
 from twisted.internet import defer
 
 from synapse.server import HomeServer
-from synapse.api.constants import Membership
-from synapse.api.events.room import RoomMemberEvent
+from synapse.api.constants import EventTypes, Membership
 
 from tests.utils import SQLiteMemoryDbPool, MockKey
 
@@ -61,7 +60,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def inject_room_member(self, room, user, membership, replaces_state=None):
         builder = self.event_builder_factory.new({
-            "type": RoomMemberEvent.TYPE,
+            "type": EventTypes.Member,
             "sender": user.to_string(),
             "state_key": user.to_string(),
             "room_id": room.to_string(),

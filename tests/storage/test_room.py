@@ -18,9 +18,7 @@ from tests import unittest
 from twisted.internet import defer
 
 from synapse.server import HomeServer
-from synapse.api.events.room import (
-    RoomNameEvent, RoomTopicEvent
-)
+from synapse.api.constants import EventTypes
 
 from tests.utils import SQLiteMemoryDbPool
 
@@ -131,7 +129,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
         name = u"A-Room-Name"
 
         yield self.inject_room_event(
-            etype=RoomNameEvent.TYPE,
+            etype=EventTypes.Name,
             name=name,
             content={"name": name},
             depth=1,
@@ -154,7 +152,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
         topic = u"A place for things"
 
         yield self.inject_room_event(
-            etype=RoomTopicEvent.TYPE,
+            etype=EventTypes.Topic,
             topic=topic,
             content={"topic": topic},
             depth=1,

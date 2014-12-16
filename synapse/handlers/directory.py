@@ -18,7 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError, Codes, CodeMessageException
-from synapse.api.events.room import RoomAliasesEvent
+from synapse.api.constants import EventTypes
 
 import logging
 
@@ -150,7 +150,7 @@ class DirectoryHandler(BaseHandler):
 
         msg_handler = self.hs.get_handlers().message_handler
         yield msg_handler.create_and_send_event({
-            "type": RoomAliasesEvent.TYPE,
+            "type": EventTypes.Aliases,
             "state_key": self.hs.hostname,
             "room_id": room_id,
             "sender": user_id,

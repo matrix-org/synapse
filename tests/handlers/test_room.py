@@ -17,9 +17,6 @@
 from twisted.internet import defer
 from tests import unittest
 
-from synapse.api.events.room import (
-    RoomMemberEvent,
-)
 from synapse.api.constants import EventTypes, Membership
 from synapse.handlers.room import RoomMemberHandler, RoomCreationHandler
 from synapse.handlers.profile import ProfileHandler
@@ -102,7 +99,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         content = {"membership": Membership.INVITE}
 
         builder = self.hs.get_event_builder_factory().new({
-            "type": RoomMemberEvent.TYPE,
+            "type": EventTypes.Member,
             "sender": user_id,
             "state_key": target_user_id,
             "room_id": room_id,
@@ -115,11 +112,11 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         def annotate(_, ctx):
             ctx.current_state = {
-                (RoomMemberEvent.TYPE, "@alice:green"): self._create_member(
+                (EventTypes.Member, "@alice:green"): self._create_member(
                     user_id="@alice:green",
                     room_id=room_id,
                 ),
-                (RoomMemberEvent.TYPE, "@bob:red"): self._create_member(
+                (EventTypes.Member, "@bob:red"): self._create_member(
                     user_id="@bob:red",
                     room_id=room_id,
                 ),
@@ -131,7 +128,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         def add_auth(_, ctx):
             ctx.auth_events = ctx.current_state[
-                (RoomMemberEvent.TYPE, "@bob:red")
+                (EventTypes.Member, "@bob:red")
             ]
 
             return defer.succeed(True)
@@ -181,7 +178,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.distributor.observe("user_joined_room", join_signal_observer)
 
         builder = self.hs.get_event_builder_factory().new({
-            "type": RoomMemberEvent.TYPE,
+            "type": EventTypes.Member,
             "sender": user_id,
             "state_key": user_id,
             "room_id": room_id,
@@ -194,7 +191,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         def annotate(_, ctx):
             ctx.current_state = {
-                (RoomMemberEvent.TYPE, "@bob:red"): self._create_member(
+                (EventTypes.Member, "@bob:red"): self._create_member(
                     user_id="@bob:red",
                     room_id=room_id,
                     membership=Membership.INVITE
@@ -207,7 +204,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         def add_auth(_, ctx):
             ctx.auth_events = ctx.current_state[
-                (RoomMemberEvent.TYPE, "@bob:red")
+                (EventTypes.Member, "@bob:red")
             ]
 
             return defer.succeed(True)
@@ -238,7 +235,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
     def _create_member(self, user_id, room_id, membership=Membership.JOIN):
         builder = self.hs.get_event_builder_factory().new({
-            "type": RoomMemberEvent.TYPE,
+            "type": EventTypes.Member,
             "sender": user_id,
             "state_key": user_id,
             "room_id": room_id,
@@ -254,7 +251,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         user = self.hs.parse_userid(user_id)
 
         builder = self.hs.get_event_builder_factory().new({
-            "type": RoomMemberEvent.TYPE,
+            "type": EventTypes.Member,
             "sender": user_id,
             "state_key": user_id,
             "room_id": room_id,
@@ -267,7 +264,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         def annotate(_, ctx):
             ctx.current_state = {
-                (RoomMemberEvent.TYPE, "@bob:red"): self._create_member(
+                (EventTypes.Member, "@bob:red"): self._create_member(
                     user_id="@bob:red",
                     room_id=room_id,
                     membership=Membership.JOIN
@@ -280,7 +277,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         def add_auth(_, ctx):
             ctx.auth_events = ctx.current_state[
-                (RoomMemberEvent.TYPE, "@bob:red")
+                (EventTypes.Member, "@bob:red")
             ]
 
             return defer.succeed(True)

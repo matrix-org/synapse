@@ -21,8 +21,6 @@
 # Imports required for the default HomeServer() implementation
 from synapse.federation import initialize_http_replication
 from synapse.events.utils import serialize_event
-from synapse.api.events.factory import EventFactory
-from synapse.api.events.validator import EventValidator
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
@@ -66,7 +64,6 @@ class BaseHomeServer(object):
         'persistence_service',
         'replication_layer',
         'datastore',
-        'event_factory',
         'handlers',
         'auth',
         'rest_servlet_factory',
@@ -83,7 +80,6 @@ class BaseHomeServer(object):
         'event_sources',
         'ratelimiter',
         'keyring',
-        'event_validator',
         'event_builder_factory',
     ]
 
@@ -198,9 +194,6 @@ class HomeServer(BaseHomeServer):
     def build_datastore(self):
         return DataStore(self)
 
-    def build_event_factory(self):
-        return EventFactory(self)
-
     def build_handlers(self):
         return Handlers(self)
 
@@ -230,9 +223,6 @@ class HomeServer(BaseHomeServer):
 
     def build_keyring(self):
         return Keyring(self)
-
-    def build_event_validator(self):
-        return EventValidator(self)
 
     def build_event_builder_factory(self):
         return EventBuilderFactory(

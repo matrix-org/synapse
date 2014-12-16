@@ -68,6 +68,7 @@ class EventTypes(object):
     PowerLevels = "m.room.power_levels"
     Aliases = "m.room.aliases"
     Redaction = "m.room.redaction"
+    Feedback = "m.room.message.feedback"
 
     # These are used for validation
     Message = "m.room.message"

@@ -19,8 +19,7 @@ from twisted.internet import defer
 from base import RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
 from synapse.streams.config import PaginationConfig
-from synapse.api.events.room import RoomMemberEvent, RoomRedactionEvent
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes, Membership
 
 import json
 import logging
@@ -239,7 +238,7 @@ class JoinRoomAliasServlet(RestServlet):
             msg_handler = self.handlers.message_handler
             yield msg_handler.create_and_send_event(
                 {
-                    "type": RoomMemberEvent.TYPE,
+                    "type": EventTypes.Member,
                     "content": {"membership": Membership.JOIN},
                     "room_id": identifier.to_string(),
                     "sender": user.to_string(),
@@ -403,7 +402,7 @@ class RoomMembershipRestServlet(RestServlet):
         msg_handler = self.handlers.message_handler
         yield msg_handler.create_and_send_event(
             {
-                "type": RoomMemberEvent.TYPE,
+                "type": EventTypes.Member,
                 "content": {"membership": unicode(membership_action)},
                 "room_id": room_id,
                 "sender": user.to_string(),
@@ -441,7 +440,7 @@ class RoomRedactEventRestServlet(RestServlet):
         msg_handler = self.handlers.message_handler
         event = yield msg_handler.create_and_send_event(
             {
-                "type": RoomRedactionEvent.TYPE,
+                "type": EventTypes.Redaction,
                 "content": content,
                 "room_id": room_id,
                 "sender": user.to_string(),

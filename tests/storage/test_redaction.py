@@ -18,10 +18,7 @@ from tests import unittest
 from twisted.internet import defer
 
 from synapse.server import HomeServer
-from synapse.api.constants import Membership
-from synapse.api.events.room import (
-    RoomMemberEvent, MessageEvent, RoomRedactionEvent,
-)
+from synapse.api.constants import EventTypes, Membership
 
 from tests.utils import SQLiteMemoryDbPool, MockKey
 
@@ -64,7 +61,7 @@ class RedactionTestCase(unittest.TestCase):
         content = {"membership": membership}
         content.update(extra_content)
         builder = self.event_builder_factory.new({
-            "type": RoomMemberEvent.TYPE,
+            "type": EventTypes.Member,
             "sender": user.to_string(),
             "state_key": user.to_string(),
             "room_id": room.to_string(),
@@ -84,7 +81,7 @@ class RedactionTestCase(unittest.TestCase):
         self.depth += 1
 
         builder = self.event_builder_factory.new({
-            "type": MessageEvent.TYPE,
+            "type": EventTypes.Message,
             "sender": user.to_string(),
             "state_key": user.to_string(),
             "room_id": room.to_string(),
@@ -102,7 +99,7 @@ class RedactionTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def inject_redaction(self, room, event_id, user, reason):
         builder = self.event_builder_factory.new({
-            "type": RoomRedactionEvent.TYPE,
+            "type": EventTypes.Redaction,
             "sender": user.to_string(),
             "state_key": user.to_string(),
             "room_id": room.to_string(),
@@ -142,7 +139,7 @@ class RedactionTestCase(unittest.TestCase):
 
         self.assertObjectHasAttributes(
             {
-                "type": MessageEvent.TYPE,
+                "type": EventTypes.Message,
                 "user_id": self.u_alice.to_string(),
                 "content": {"body": "t", "msgtype": "message"},
             },
@@ -176,7 +173,7 @@ class RedactionTestCase(unittest.TestCase):
 
         self.assertObjectHasAttributes(
             {
-                "type": MessageEvent.TYPE,
+                "type": EventTypes.Message,
                 "user_id": self.u_alice.to_string(),
                 "content": {},
             },
@@ -185,7 +182,7 @@ class RedactionTestCase(unittest.TestCase):
 
         self.assertObjectHasAttributes(
             {
-                "type": RoomRedactionEvent.TYPE,
+                "type": EventTypes.Redaction,
                 "user_id": self.u_alice.to_string(),
                 "content": {"reason": reason},
             },
@@ -221,7 +218,7 @@ class RedactionTestCase(unittest.TestCase):
 
         self.assertObjectHasAttributes(
             {
-                "type": RoomMemberEvent.TYPE,
+                "type": EventTypes.Member,
                 "user_id": self.u_bob.to_string(),
                 "content": {"membership": Membership.JOIN, "blue": "red"},
             },
@@ -253,7 +250,7 @@ class RedactionTestCase(unittest.TestCase):
 
         self.assertObjectHasAttributes(
             {
-                "type": RoomMemberEvent.TYPE,
+                "type": EventTypes.Member,
                 "user_id": self.u_bob.to_string(),
                 "content": {"membership": Membership.JOIN},
             },
@@ -262,7 +259,7 @@ class RedactionTestCase(unittest.TestCase):
 
         self.assertObjectHasAttributes(
             {
-                "type": RoomRedactionEvent.TYPE,
+                "type": EventTypes.Redaction,
                 "user_id": self.u_alice.to_string(),
                 "content": {"reason": reason},
             },

@@ -22,8 +22,7 @@ from synapse.events.utils import prune_event
 from synapse.api.errors import (
     AuthError, FederationError, SynapseError, StoreError,
 )
-from synapse.api.events.room import RoomMemberEvent, RoomCreateEvent
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes, Membership
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
 from synapse.crypto.event_signing import (
@@ -225,7 +224,7 @@ class FederationHandler(BaseHandler):
 
         if not backfilled:
             extra_users = []
-            if event.type == RoomMemberEvent.TYPE:
+            if event.type == EventTypes.Member:
                 target_user_id = event.state_key
                 target_user = self.hs.parse_userid(target_user_id)
                 extra_users.append(target_user)
@@ -234,7 +233,7 @@ class FederationHandler(BaseHandler):
                 event, extra_users=extra_users
             )
 
-        if event.type == RoomMemberEvent.TYPE:
+        if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
                 user = self.hs.parse_userid(event.state_key)
                 yield self.distributor.fire(
@@ -333,7 +332,8 @@ class FederationHandler(BaseHandler):
         event = pdu
 
         # We should assert some things.
-        assert(event.type == RoomMemberEvent.TYPE)
+        # FIXME: Do this in a nicer way
+        assert(event.type == EventTypes.Member)
         assert(event.user_id == joinee)
         assert(event.state_key == joinee)
         assert(event.room_id == room_id)
@@ -450,7 +450,7 @@ class FederationHandler(BaseHandler):
         process it until the other server has signed it and sent it back.
         """
         builder = self.event_builder_factory.new({
-            "type": RoomMemberEvent.TYPE,
+            "type": EventTypes.Member,
             "content": {"membership": Membership.JOIN},
             "room_id": room_id,
             "sender": user_id,
@@ -492,7 +492,7 @@ class FederationHandler(BaseHandler):
         )
 
         extra_users = []
-        if event.type == RoomMemberEvent.TYPE:
+        if event.type == EventTypes.Member:
             target_user_id = event.state_key
             target_user = self.hs.parse_userid(target_user_id)
             extra_users.append(target_user)
@@ -501,7 +501,7 @@ class FederationHandler(BaseHandler):
             event, extra_users=extra_users
         )
 
-        if event.type == RoomMemberEvent.TYPE:
+        if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.JOIN:
                 user = self.hs.parse_userid(event.state_key)
                 yield self.distributor.fire(
@@ -514,7 +514,7 @@ class FederationHandler(BaseHandler):
 
         for k, s in context.current_state.items():
             try:
-                if k[0] == RoomMemberEvent.TYPE:
+                if k[0] == EventTypes.Member:
                     if s.content["membership"] == Membership.JOIN:
                         destinations.add(
                             self.hs.parse_userid(s.state_key).domain
@@ -731,10 +731,10 @@ class FederationHandler(BaseHandler):
             event.event_id, event.signatures,
         )
 
-        if event.type == RoomMemberEvent.TYPE and not event.auth_events:
+        if event.type == EventTypes.Member and not event.auth_events:
             if len(event.prev_events) == 1:
                 c = yield self.store.get_event(event.prev_events[0][0])
-                if c.type == RoomCreateEvent.TYPE:
+                if c.type == EventTypes.Create:
                     context.auth_events[(c.type, c.state_key)] = c
 
         logger.debug(

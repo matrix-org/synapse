@@ -16,10 +16,7 @@
 from twisted.internet import defer
 from tests import unittest
 
-from synapse.api.events.room import (
-    MessageEvent,
-)
-
+from synapse.api.constants import EventTypes
 from synapse.events import FrozenEvent
 from synapse.handlers.federation import FederationHandler
 from synapse.server import HomeServer
@@ -79,7 +76,7 @@ class FederationTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_msg(self):
         pdu = FrozenEvent({
-            "type": MessageEvent.TYPE,
+            "type": EventTypes.Message,
             "room_id": "foo",
             "content": {"msgtype": u"fooo"},
             "origin_server_ts": 0,

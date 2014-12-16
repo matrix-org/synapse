@@ -15,14 +15,10 @@
 
 from synapse.http.server import HttpServer
 from synapse.api.errors import cs_error, CodeMessageException, StoreError
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes
 from synapse.storage import prepare_database
 
 from synapse.util.logcontext import LoggingContext
-
-from synapse.api.events.room import (
-    RoomMemberEvent, MessageEvent
-)
 
 from twisted.internet import defer, reactor
 from twisted.enterprise.adbapi import ConnectionPool
@@ -276,7 +272,7 @@ class MemoryDataStore(object):
         return defer.succeed([])
 
     def persist_event(self, event):
-        if event.type == RoomMemberEvent.TYPE:
+        if event.type == EventTypes.Member:
             room_id = event.room_id
             user = event.state_key
             membership = event.membership

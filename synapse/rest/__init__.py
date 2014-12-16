@@ -28,7 +28,7 @@ class RestServletFactory(object):
     speaking, they serve as wrappers around events and the handlers that
     process them.
 
-    See synapse.api.events for information on synapse events.
+    See synapse.events for information on synapse events.
     """
 
     def __init__(self, hs):

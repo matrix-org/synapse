@@ -74,7 +74,6 @@ class ReplicationLayer(object):
 
         self._clock = hs.get_clock()
 
-        self.event_factory = hs.get_event_factory()
         self.event_builder_factory = hs.get_event_builder_factory()
 
     def set_handler(self, handler):

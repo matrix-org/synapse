@@ -67,8 +67,6 @@ class RestServlet(object):
         self.auth = hs.get_auth()
         self.txns = HttpTransactionStore()
 
-        self.validator = hs.get_event_validator()
-
     def register(self, http_server):
         """ Register this servlet with the given HTTP server. """
         if hasattr(self, "PATTERN"):
