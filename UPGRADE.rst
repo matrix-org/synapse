@@ -1,6 +1,10 @@
 Upgrading to v0.6.0
 ===================
 
+To pull in new dependencies, run::
+
+    python setup.py develop --user
+
 This update includes a change to the database schema. To upgrade you first need
 to upgrade the database by running::
 
