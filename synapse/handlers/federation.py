@@ -173,6 +173,7 @@ class FederationHandler(BaseHandler):
                     context=event.room_id,
                     event_id=event.event_id,
                 )
+                # FIXME: Get auth chain for these state events
 
             current_state = state
 
@@ -288,7 +289,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def on_event_auth(self, event_id):
-        auth = yield self.store.get_auth_chain(event_id)
+        auth = yield self.store.get_auth_chain([event_id])
 
         for event in auth:
             event.signatures.update(
@@ -528,7 +529,10 @@ class FederationHandler(BaseHandler):
 
         yield self.replication_layer.send_pdu(new_pdu, destinations)
 
-        auth_chain = yield self.store.get_auth_chain(event.event_id)
+        state_ids = [e.event_id for e in event.state_events.values()]
+        auth_chain = yield self.store.get_auth_chain(set(
+            [event.event_id] + state_ids
+        ))
 
         defer.returnValue({
             "state": context.current_state.values(),
