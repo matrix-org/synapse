@@ -138,8 +138,8 @@ class StateHandler(object):
     @defer.inlineCallbacks
     def annotate_context_with_state(self, event, context, old_state=None):
         """ Fills out the context with the `current state` of the graph. The
-        `current state` here is defined to be exclusive of the given event,
-        i.e. its the state of the event graph just before the event.
+        `current state` here is defined to be the state of the event graph
+        just before the event - i.e. it never includes `event`
 
         If `event` has `auth_events` then this will also fill out the
         `auth_events` field on `context` from the `current_state`.
