@@ -45,8 +45,8 @@ class TypingNotificationHandler(BaseHandler):
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
 
-        self._member_typing_until = {} # clock time we expect to stop
-        self._member_typing_timer = {} # deferreds to manage theabove
+        self._member_typing_until = {}  # clock time we expect to stop
+        self._member_typing_timer = {}  # deferreds to manage theabove
 
         # map room IDs to serial numbers
         self._room_serials = {}

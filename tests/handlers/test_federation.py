@@ -34,7 +34,7 @@ class FederationTestCase(unittest.TestCase):
         self.mock_config.signing_key = [MockKey()]
 
         self.state_handler = NonCallableMock(spec_set=[
-            "annotate_context_with_state",
+            "compute_event_context",
         ])
 
         self.auth = NonCallableMock(spec_set=[
@@ -91,11 +91,12 @@ class FederationTestCase(unittest.TestCase):
         self.datastore.get_room.return_value = defer.succeed(True)
         self.auth.check_host_in_room.return_value = defer.succeed(True)
 
-        def annotate(ev, context, old_state=None):
+        def annotate(ev, old_state=None):
+            context = Mock()
             context.current_state = {}
             context.auth_events = {}
-            return defer.succeed(False)
-        self.state_handler.annotate_context_with_state.side_effect = annotate
+            return defer.succeed(context)
+        self.state_handler.compute_event_context.side_effect = annotate
 
         yield self.handlers.federation_handler.on_receive_pdu(
             "fo", pdu, False
@@ -109,15 +110,12 @@ class FederationTestCase(unittest.TestCase):
             context=ANY,
         )
 
-        self.state_handler.annotate_context_with_state.assert_called_once_with(
-            ANY,
-            ANY,
-            old_state=None,
+        self.state_handler.compute_event_context.assert_called_once_with(
+            ANY, old_state=None,
         )
 
         self.auth.check.assert_called_once_with(ANY, auth_events={})
 
         self.notifier.on_new_room_event.assert_called_once_with(
-            ANY,
-            extra_users=[]
+            ANY, extra_users=[]
         )

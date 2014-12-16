@@ -60,7 +60,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "check_host_in_room",
             ]),
             state_handler=NonCallableMock(spec_set=[
-                "annotate_context_with_state",
+                "compute_event_context",
                 "get_current_state",
             ]),
             config=self.mock_config,
@@ -110,7 +110,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             defer.succeed([])
         )
 
-        def annotate(_, ctx):
+        def annotate(_):
+            ctx = Mock()
             ctx.current_state = {
                 (EventTypes.Member, "@alice:green"): self._create_member(
                     user_id="@alice:green",
@@ -121,10 +122,11 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                     room_id=room_id,
                 ),
             }
+            ctx.prev_state_events = []
 
-            return defer.succeed(True)
+            return defer.succeed(ctx)
 
-        self.state_handler.annotate_context_with_state.side_effect = annotate
+        self.state_handler.compute_event_context.side_effect = annotate
 
         def add_auth(_, ctx):
             ctx.auth_events = ctx.current_state[
@@ -146,8 +148,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         yield room_handler.change_membership(event, context)
 
-        self.state_handler.annotate_context_with_state.assert_called_once_with(
-            builder, context
+        self.state_handler.compute_event_context.assert_called_once_with(
+            builder
         )
 
         self.auth.add_auth_events.assert_called_once_with(
@@ -189,7 +191,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             defer.succeed([])
         )
 
-        def annotate(_, ctx):
+        def annotate(_):
+            ctx = Mock()
             ctx.current_state = {
                 (EventTypes.Member, "@bob:red"): self._create_member(
                     user_id="@bob:red",
@@ -197,10 +200,11 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                     membership=Membership.INVITE
                 ),
             }
+            ctx.prev_state_events = []
 
-            return defer.succeed(True)
+            return defer.succeed(ctx)
 
-        self.state_handler.annotate_context_with_state.side_effect = annotate
+        self.state_handler.compute_event_context.side_effect = annotate
 
         def add_auth(_, ctx):
             ctx.auth_events = ctx.current_state[
@@ -262,7 +266,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             defer.succeed([])
         )
 
-        def annotate(_, ctx):
+        def annotate(_):
+            ctx = Mock()
             ctx.current_state = {
                 (EventTypes.Member, "@bob:red"): self._create_member(
                     user_id="@bob:red",
@@ -270,10 +275,11 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                     membership=Membership.JOIN
                 ),
             }
+            ctx.prev_state_events = []
 
-            return defer.succeed(True)
+            return defer.succeed(ctx)
 
-        self.state_handler.annotate_context_with_state.side_effect = annotate
+        self.state_handler.compute_event_context.side_effect = annotate
 
         def add_auth(_, ctx):
             ctx.auth_events = ctx.current_state[

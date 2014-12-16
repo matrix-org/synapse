@@ -18,8 +18,6 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
-from synapse.util.logcontext import PreserveLoggingContext
-
 from synapse.events.validator import EventValidator
 
 from ._base import BaseHandler
@@ -65,35 +63,6 @@ class MessageHandler(BaseHandler):
         # on how to do this.
 
         defer.returnValue(None)
-
-    @defer.inlineCallbacks
-    def send_message(self, event=None, suppress_auth=False):
-        """ Send a message.
-
-        Args:
-            event : The message event to store.
-            suppress_auth (bool) : True to suppress auth for this message. This
-            is primarily so the home server can inject messages into rooms at
-            will.
-        Raises:
-            SynapseError if something went wrong.
-        """
-
-        self.ratelimit(event.user_id)
-        # TODO(paul): Why does 'event' not have a 'user' object?
-        user = self.hs.parse_userid(event.user_id)
-        assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
-
-        snapshot = yield self.store.snapshot_room(event)
-
-        yield self._on_new_room_event(
-            event, snapshot, suppress_auth=suppress_auth
-        )
-
-        with PreserveLoggingContext():
-            self.hs.get_handlers().presence_handler.bump_presence_active_time(
-                user
-            )
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
@@ -216,13 +185,6 @@ class MessageHandler(BaseHandler):
         if fb:
             defer.returnValue(fb)
         defer.returnValue(None)
-
-    @defer.inlineCallbacks
-    def send_feedback(self, event):
-        snapshot = yield self.store.snapshot_room(event)
-
-        # store message in db
-        yield self._on_new_room_event(event, snapshot)
 
     @defer.inlineCallbacks
     def get_state_events(self, user_id, room_id):

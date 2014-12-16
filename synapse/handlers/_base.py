@@ -20,8 +20,6 @@ from synapse.util.async import run_on_reactor
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
 
-from synapse.events.snapshot import EventContext
-
 import logging
 
 
@@ -61,8 +59,6 @@ class BaseHandler(object):
     def _create_new_client_event(self, builder):
         yield run_on_reactor()
 
-        context = EventContext()
-
         latest_ret = yield self.store.get_latest_events_in_room(
             builder.room_id,
         )
@@ -78,14 +74,11 @@ class BaseHandler(object):
         builder.depth = depth
 
         state_handler = self.state_handler
-        ret = yield state_handler.annotate_context_with_state(
-            builder,
-            context,
-        )
-        prev_state = ret
+
+        context = yield state_handler.compute_event_context(builder)
 
         if builder.is_state():
-            builder.prev_state = prev_state
+            builder.prev_state = context.prev_state_events
 
         yield self.auth.add_auth_events(builder, context)
 

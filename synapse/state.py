@@ -19,10 +19,10 @@ from twisted.internet import defer
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
 from synapse.api.constants import EventTypes
+from synapse.events.snapshot import EventContext
 
 from collections import namedtuple
 
-import copy
 import logging
 import hashlib
 
@@ -42,71 +42,6 @@ class StateHandler(object):
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
-
-    @defer.inlineCallbacks
-    @log_function
-    def annotate_event_with_state(self, event, old_state=None):
-        """ Annotates the event with the current state events as of that event.
-
-        This method adds three new attributes to the event:
-            * `state_events`: The state up to and including the event. Encoded
-              as a dict mapping tuple (type, state_key) -> event.
-            * `old_state_events`: The state up to, but excluding, the event.
-              Encoded similarly as `state_events`.
-            * `state_group`: If there is an existing state group that can be
-              used, then return that. Otherwise return `None`. See state
-              storage for more information.
-
-        If the argument `old_state` is given (in the form of a list of
-        events), then they are used as a the values for `old_state_events` and
-        the value for `state_events` is generated from it. `state_group` is
-        set to None.
-
-        This needs to be called before persisting the event.
-        """
-        yield run_on_reactor()
-
-        if old_state:
-            event.state_group = None
-            event.old_state_events = {
-                (s.type, s.state_key): s for s in old_state
-            }
-            event.state_events = event.old_state_events
-
-            if hasattr(event, "state_key"):
-                event.state_events[(event.type, event.state_key)] = event
-
-            defer.returnValue(False)
-            return
-
-        if event.is_outlier():
-            event.state_group = None
-            event.old_state_events = None
-            event.state_events = None
-            defer.returnValue(False)
-            return
-
-        ids = [e for e, _ in event.prev_events]
-
-        ret = yield self.resolve_state_groups(ids)
-        state_group, new_state, _ = ret
-
-        event.old_state_events = copy.deepcopy(new_state)
-
-        if hasattr(event, "state_key"):
-            key = (event.type, event.state_key)
-            if key in new_state:
-                event.replaces_state = new_state[key].event_id
-            new_state[key] = event
-        elif state_group:
-            event.state_group = state_group
-            event.state_events = new_state
-            defer.returnValue(False)
-
-        event.state_group = None
-        event.state_events = new_state
-
-        defer.returnValue(hasattr(event, "state_key"))
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
@@ -136,7 +71,7 @@ class StateHandler(object):
         defer.returnValue(res[1].values())
 
     @defer.inlineCallbacks
-    def annotate_context_with_state(self, event, context, old_state=None):
+    def compute_event_context(self, event, old_state=None):
         """ Fills out the context with the `current state` of the graph. The
         `current state` here is defined to be the state of the event graph
         just before the event - i.e. it never includes `event`
@@ -146,8 +81,11 @@ class StateHandler(object):
 
         Args:
             event (EventBase)
-            context (EventContext)
+        Returns:
+            an EventContext
         """
+        context = EventContext()
+
         yield run_on_reactor()
 
         if old_state:
@@ -173,7 +111,8 @@ class StateHandler(object):
                     if replaces.event_id != event.event_id:  # Paranoia check
                         event.unsigned["replaces_state"] = replaces.event_id
 
-            defer.returnValue([])
+            context.prev_state_events = []
+            defer.returnValue(context)
 
         if event.is_state():
             ret = yield self.resolve_state_groups(
@@ -211,7 +150,8 @@ class StateHandler(object):
         else:
             context.auth_events = {}
 
-        defer.returnValue(prev_state)
+        context.prev_state_events = prev_state
+        defer.returnValue(context)
 
     @defer.inlineCallbacks
     @log_function

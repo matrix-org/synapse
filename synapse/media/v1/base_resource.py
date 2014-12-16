@@ -135,6 +135,7 @@ class BaseMediaResource(Resource):
         if download is None:
             download = self._get_remote_media_impl(server_name, media_id)
             self.downloads[key] = download
+
             @download.addBoth
             def callback(media_info):
                 del self.downloads[key]

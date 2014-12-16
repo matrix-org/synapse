@@ -156,4 +156,3 @@ class DirectoryHandler(BaseHandler):
             "sender": user_id,
             "content": {"aliases": aliases},
         })
-
