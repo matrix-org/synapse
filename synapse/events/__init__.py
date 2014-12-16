@@ -111,7 +111,7 @@ class EventBase(object):
 
 
 class FrozenEvent(EventBase):
-    def __init__(self, event_dict):
+    def __init__(self, event_dict, internal_metadata_dict={}):
         event_dict = copy.deepcopy(event_dict)
 
         signatures = copy.deepcopy(event_dict.pop("signatures", {}))
@@ -122,7 +122,8 @@ class FrozenEvent(EventBase):
         super(FrozenEvent, self).__init__(
             frozen_dict,
             signatures=signatures,
-            unsigned=unsigned
+            unsigned=unsigned,
+            internal_metadata_dict=internal_metadata_dict,
         )
 
     @staticmethod

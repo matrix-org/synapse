@@ -452,7 +452,7 @@ class SQLBaseStore(object):
     def _get_event_txn(self, txn, event_id, check_redacted=True,
                        get_prev_content=True):
         sql = (
-            "SELECT json, r.event_id FROM event_json as e "
+            "SELECT internal_metadata, json, r.event_id FROM event_json as e "
             "LEFT JOIN redactions as r ON e.event_id = r.redacts "
             "WHERE e.event_id = ? "
             "LIMIT 1 "
@@ -465,11 +465,12 @@ class SQLBaseStore(object):
         if not res:
             return None
 
-        js, redacted = res
+        internal_metadata, js, redacted = res
 
         d = json.loads(js)
+        internal_metadata = json.loads(internal_metadata)
 
-        ev = FrozenEvent(d)
+        ev = FrozenEvent(d, internal_metadata_dict=internal_metadata)
 
         if check_redacted and redacted:
             ev = prune_event(ev)

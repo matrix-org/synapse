@@ -156,12 +156,17 @@ class DataStore(RoomMemberStore, RoomStore,
             ]
         }
 
+        metadata_json =  encode_canonical_json(
+            event.internal_metadata.get_dict()
+        )
+
         self._simple_insert_txn(
             txn,
             table="event_json",
             values={
                 "event_id": event.event_id,
                 "room_id": event.room_id,
+                "internal_metadata": metadata_json.decode("UTF-8"),
                 "json": encode_canonical_json(event_dict).decode("UTF-8"),
             },
             or_replace=True,
