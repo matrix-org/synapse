@@ -15,8 +15,6 @@
 
 from frozendict import frozendict
 
-import json
-
 
 def freeze(o):
     if isinstance(o, dict) or isinstance(o, frozendict):
