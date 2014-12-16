@@ -550,10 +550,6 @@ def prepare_database(db_conn):
                 "Cannot use this database as it is too " +
                 "new for the server to understand"
             )
-        elif user_version < 10:
-            raise UpgradeDatabaseException(
-                "No delta for versions less than 10"
-            )
         elif user_version < SCHEMA_VERSION:
             logger.info(
                 "Upgrading database from version %d",
@@ -562,6 +558,10 @@ def prepare_database(db_conn):
 
             # Run every version since after the current version.
             for v in range(user_version + 1, SCHEMA_VERSION + 1):
+                if v == 10:
+                    raise UpgradeDatabaseException(
+                        "No delta for version 10"
+                    )
                 sql_script = read_schema("delta/v%d" % (v))
                 c.executescript(sql_script)
 
