@@ -156,7 +156,7 @@ class DataStore(RoomMemberStore, RoomStore,
             ]
         }
 
-        metadata_json =  encode_canonical_json(
+        metadata_json = encode_canonical_json(
             event.internal_metadata.get_dict()
         )
 

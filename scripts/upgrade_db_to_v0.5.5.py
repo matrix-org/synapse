@@ -31,6 +31,7 @@ delta_sql = """
 CREATE TABLE IF NOT EXISTS event_json(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
+    internal_metadata NOT NULL,
     json BLOB NOT NULL,
     CONSTRAINT ev_j_uniq UNIQUE (event_id)
 );
@@ -79,7 +80,7 @@ class Store(object):
 
             d.setdefault("unsigned", {})["age_ts"] = d.pop("age_ts")
 
-            d.pop("outlier", None)
+            outlier = d.pop("outlier", False)
 
             # d.pop("membership", None)
 
@@ -87,7 +88,10 @@ class Store(object):
 
             d.pop("replaces_state", None)
 
-            events.append(EventBuilder(d))
+            b = EventBuilder(d)
+            b.internal_metadata.outlier = outlier
+
+            events.append(b)
 
         for i, ev in enumerate(events):
             signatures = self._get_event_signatures_txn(
@@ -251,12 +255,17 @@ def reinsert_events(cursor, server_name, signing_key):
             event.get_dict()
         ).decode("UTF-8")
 
+        metadata_json = encode_canonical_json(
+            event.internal_metadata.get_dict()
+        ).decode("UTF-8")
+
         store._simple_insert_txn(
             cursor,
             table="event_json",
             values={
                 "event_id": event.event_id,
                 "room_id": event.room_id,
+                "internal_metadata": metadata_json,
                 "json": event_json,
             },
             or_replace=True,
