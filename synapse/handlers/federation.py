@@ -529,7 +529,7 @@ class FederationHandler(BaseHandler):
 
         yield self.replication_layer.send_pdu(new_pdu, destinations)
 
-        state_ids = [e.event_id for e in event.state_events.values()]
+        state_ids = [e.event_id for e in context.current_state.values()]
         auth_chain = yield self.store.get_auth_chain(set(
             [event.event_id] + state_ids
         ))
