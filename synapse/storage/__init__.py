@@ -66,7 +66,7 @@ SCHEMAS = [
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 class _RollbackButIsFineException(Exception):
@@ -446,6 +446,14 @@ def read_schema(schema):
         return schema_file.read()
 
 
+class PrepareDatabaseException(Exception):
+    pass
+
+
+class UpgradeDatabaseException(PrepareDatabaseException):
+    pass
+
+
 def prepare_database(db_conn):
     """ Set up all the dbs. Since all the *.sql have IF NOT EXISTS, so we
     don't have to worry about overwriting existing content.
@@ -470,6 +478,10 @@ def prepare_database(db_conn):
 
             # Run every version since after the current version.
             for v in range(user_version + 1, SCHEMA_VERSION + 1):
+                if v == 10:
+                    raise UpgradeDatabaseException(
+                        "No delta for version 10"
+                    )
                 sql_script = read_schema("delta/v%d" % (v))
                 c.executescript(sql_script)
 

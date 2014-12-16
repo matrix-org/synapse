@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage import prepare_database
+from synapse.storage import prepare_database, UpgradeDatabaseException
 
 from synapse.server import HomeServer
 
@@ -228,8 +228,15 @@ def setup():
 
     logger.info("Preparing database: %s...", db_name)
 
-    with sqlite3.connect(db_name) as db_conn:
-        prepare_database(db_conn)
+    try:
+        with sqlite3.connect(db_name) as db_conn:
+            prepare_database(db_conn)
+    except UpgradeDatabaseException:
+        sys.stderr.write(
+            "\nFailed to upgrade database.\n"
+            "Have you followed any instructions in UPGRADES.rst?\n"
+        )
+        sys.exit(1)
 
     logger.info("Database prepared in %s.", db_name)
 

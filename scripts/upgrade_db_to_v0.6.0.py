@@ -1,3 +1,5 @@
+
+from synapse.storage import SCHEMA_VERSION, read_schema
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.signatures import SignatureStore
 from synapse.storage.event_federation import EventFederationStore
@@ -19,8 +21,9 @@ from syutil.crypto.signing_key import decode_verify_key_bytes
 from syutil.jsonutil import encode_canonical_json
 
 import argparse
-import dns.resolver
+# import dns.resolver
 import hashlib
+import httplib
 import json
 import sqlite3
 import syutil
@@ -38,6 +41,8 @@ CREATE TABLE IF NOT EXISTS event_json(
 
 CREATE INDEX IF NOT EXISTS event_json_id ON event_json(event_id);
 CREATE INDEX IF NOT EXISTS event_json_room_id ON event_json(room_id);
+
+PRAGMA user_version = 10;
 """
 
 
@@ -142,49 +147,56 @@ class Store(object):
 store = Store()
 
 
-def get_key(server_name):
-    print "Getting keys for: %s" % (server_name,)
-    targets = []
-    if ":" in server_name:
-        target, port = server_name.split(":")
-        targets.append((target, int(port)))
-        return
-    try:
-        answers = dns.resolver.query("_matrix._tcp." + server_name, "SRV")
-        for srv in answers:
-            targets.append((srv.target, srv.port))
-    except dns.resolver.NXDOMAIN:
-        targets.append((server_name, 8448))
-    except:
-        print "Failed to lookup keys for %s" % (server_name,)
-        return {}
-
-    for target, port in targets:
-        url = "https://%s:%i/_matrix/key/v1" % (target, port)
-        try:
-            keys = json.load(urllib2.urlopen(url, timeout=2))
-            verify_keys = {}
-            for key_id, key_base64 in keys["verify_keys"].items():
-                verify_key = decode_verify_key_bytes(
-                    key_id, decode_base64(key_base64)
-                )
-                verify_signed_json(keys, server_name, verify_key)
-                verify_keys[key_id] = verify_key
-            print "Got keys for: %s" % (server_name,)
-            return verify_keys
-        except urllib2.URLError:
-            pass
-
-    print "Failed to get keys for %s" % (server_name,)
-    return {}
+# def get_key(server_name):
+#     print "Getting keys for: %s" % (server_name,)
+#     targets = []
+#     if ":" in server_name:
+#         target, port = server_name.split(":")
+#         targets.append((target, int(port)))
+#     try:
+#         answers = dns.resolver.query("_matrix._tcp." + server_name, "SRV")
+#         for srv in answers:
+#             targets.append((srv.target, srv.port))
+#     except dns.resolver.NXDOMAIN:
+#         targets.append((server_name, 8448))
+#     except:
+#         print "Failed to lookup keys for %s" % (server_name,)
+#         return {}
+#
+#     for target, port in targets:
+#         url = "https://%s:%i/_matrix/key/v1" % (target, port)
+#         try:
+#             keys = json.load(urllib2.urlopen(url, timeout=2))
+#             verify_keys = {}
+#             for key_id, key_base64 in keys["verify_keys"].items():
+#                 verify_key = decode_verify_key_bytes(
+#                     key_id, decode_base64(key_base64)
+#                 )
+#                 verify_signed_json(keys, server_name, verify_key)
+#                 verify_keys[key_id] = verify_key
+#             print "Got keys for: %s" % (server_name,)
+#             return verify_keys
+#         except urllib2.URLError:
+#             pass
+#         except urllib2.HTTPError:
+#             pass
+#         except httplib.HTTPException:
+#             pass
+#
+#     print "Failed to get keys for %s" % (server_name,)
+#     return {}
 
 
 def reinsert_events(cursor, server_name, signing_key):
+    print "Running delta: v10"
+
     cursor.executescript(delta_sql)
 
     cursor.execute(
         "SELECT * FROM events ORDER BY rowid ASC"
     )
+
+    print "Getting events..."
 
     rows = store.cursor_to_dict(cursor)
 
@@ -207,13 +219,20 @@ def reinsert_events(cursor, server_name, signing_key):
         }
     }
 
+    i = 0
+    N = len(events)
+
     for event in events:
-        for alg_name in event.hashes:
-            if check_event_content_hash(event, algorithms[alg_name]):
-                pass
-            else:
-                pass
-                print "FAIL content hash %s %s" % (alg_name, event.event_id, )
+        if i % 100 == 0:
+            print "Processed: %d/%d events" % (i,N,)
+        i += 1
+
+        # for alg_name in event.hashes:
+        #     if check_event_content_hash(event, algorithms[alg_name]):
+        #         pass
+        #     else:
+        #         pass
+        #         print "FAIL content hash %s %s" % (alg_name, event.event_id, )
 
         have_own_correctly_signed = False
         for host, sigs in event.signatures.items():
@@ -221,7 +240,7 @@ def reinsert_events(cursor, server_name, signing_key):
 
             for key_id in sigs:
                 if host not in server_keys:
-                    server_keys[host] = get_key(host)
+                    server_keys[host] = {}  # get_key(host)
                 if key_id in server_keys[host]:
                     try:
                         verify_signed_json(
@@ -275,8 +294,24 @@ def reinsert_events(cursor, server_name, signing_key):
 def main(database, server_name, signing_key):
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
+
+    # Do other deltas:
+    cursor.execute("PRAGMA user_version")
+    row = cursor.fetchone()
+
+    if row and row[0]:
+        user_version = row[0]
+        # Run every version since after the current version.
+        for v in range(user_version + 1, 10):
+            print "Running delta: %d" % (v,)
+            sql_script = read_schema("delta/v%d" % (v,))
+            cursor.executescript(sql_script)
+
     reinsert_events(cursor, server_name, signing_key)
+
     conn.commit()
+
+    print "Success!"
 
 
 if __name__ == "__main__":
