@@ -41,6 +41,7 @@ setup(
         "pynacl",
         "daemonize",
         "py-bcrypt",
+        "frozendict>=0.4",
         "pillow",
     ],
     dependency_links=[

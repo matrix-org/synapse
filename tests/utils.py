@@ -15,21 +15,17 @@
 
 from synapse.http.server import HttpServer
 from synapse.api.errors import cs_error, CodeMessageException, StoreError
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes
 from synapse.storage import prepare_database
 
 from synapse.util.logcontext import LoggingContext
-
-from synapse.api.events.room import (
-    RoomMemberEvent, MessageEvent
-)
 
 from twisted.internet import defer, reactor
 from twisted.enterprise.adbapi import ConnectionPool
 
 from collections import namedtuple
 from mock import patch, Mock
-import json
+import urllib
 import urlparse
 
 from inspect import getcallargs
@@ -103,9 +99,14 @@ class MockHttpResource(HttpServer):
             matcher = pattern.match(path)
             if matcher:
                 try:
+                    args = [
+                        urllib.unquote(u).decode("UTF-8")
+                        for u in matcher.groups()
+                    ]
+
                     (code, response) = yield func(
                         mock_request,
-                        *matcher.groups()
+                        *args
                     )
                     defer.returnValue((code, response))
                 except CodeMessageException as e:
@@ -271,7 +272,7 @@ class MemoryDataStore(object):
         return defer.succeed([])
 
     def persist_event(self, event):
-        if event.type == RoomMemberEvent.TYPE:
+        if event.type == EventTypes.Member:
             room_id = event.room_id
             user = event.state_key
             membership = event.membership

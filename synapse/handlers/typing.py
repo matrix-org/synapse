@@ -63,7 +63,7 @@ class TypingNotificationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def started_typing(self, target_user, auth_user, room_id, timeout):
-        if not target_user.is_mine:
+        if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         if target_user != auth_user:
@@ -100,7 +100,7 @@ class TypingNotificationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def stopped_typing(self, target_user, auth_user, room_id):
-        if not target_user.is_mine:
+        if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         if target_user != auth_user:
@@ -118,7 +118,7 @@ class TypingNotificationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
-        if user.is_mine:
+        if self.hs.is_mine(user):
             member = RoomMember(room_id=room_id, user=user)
             yield self._stopped_typing(member)
 

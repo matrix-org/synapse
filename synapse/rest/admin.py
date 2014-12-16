@@ -35,7 +35,7 @@ class WhoisRestServlet(RestServlet):
         if not is_admin and target_user != auth_user:
             raise AuthError(403, "You are not a server admin")
 
-        if not target_user.is_mine:
+        if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only whois a local user")
 
         ret = yield self.handlers.admin_handler.get_whois(target_user)

@@ -13,10 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .room import (
-    RoomMemberEvent, RoomJoinRulesEvent, RoomPowerLevelsEvent,
-    RoomAliasesEvent, RoomCreateEvent,
-)
+from synapse.api.constants import EventTypes
+from . import EventBase
 
 
 def prune_event(event):
@@ -31,7 +29,7 @@ def prune_event(event):
 
     allowed_keys = [
         "event_id",
-        "user_id",
+        "sender",
         "room_id",
         "hashes",
         "signatures",
@@ -44,6 +42,7 @@ def prune_event(event):
         "auth_events",
         "origin",
         "origin_server_ts",
+        "membership",
     ]
 
     new_content = {}
@@ -53,13 +52,13 @@ def prune_event(event):
             if field in event.content:
                 new_content[field] = event.content[field]
 
-    if event_type == RoomMemberEvent.TYPE:
+    if event_type == EventTypes.Member:
         add_fields("membership")
-    elif event_type == RoomCreateEvent.TYPE:
+    elif event_type == EventTypes.Create:
         add_fields("creator")
-    elif event_type == RoomJoinRulesEvent.TYPE:
+    elif event_type == EventTypes.JoinRules:
         add_fields("join_rule")
-    elif event_type == RoomPowerLevelsEvent.TYPE:
+    elif event_type == EventTypes.PowerLevels:
         add_fields(
             "users",
             "users_default",
@@ -71,15 +70,61 @@ def prune_event(event):
             "kick",
             "redact",
         )
-    elif event_type == RoomAliasesEvent.TYPE:
+    elif event_type == EventTypes.Aliases:
         add_fields("aliases")
 
     allowed_fields = {
         k: v
-        for k, v in event.get_full_dict().items()
+        for k, v in event.get_dict().items()
         if k in allowed_keys
     }
 
     allowed_fields["content"] = new_content
 
-    return type(event)(**allowed_fields)
+    allowed_fields["unsigned"] = {}
+
+    if "age_ts" in event.unsigned:
+        allowed_fields["unsigned"]["age_ts"] = event.unsigned["age_ts"]
+
+    return type(event)(allowed_fields)
+
+
+def serialize_event(hs, e):
+    # FIXME(erikj): To handle the case of presence events and the like
+    if not isinstance(e, EventBase):
+        return e
+
+    # Should this strip out None's?
+    d = {k: v for k, v in e.get_dict().items()}
+    if "age_ts" in d["unsigned"]:
+        now = int(hs.get_clock().time_msec())
+        d["unsigned"]["age"] = now - d["unsigned"]["age_ts"]
+        del d["unsigned"]["age_ts"]
+
+    d["user_id"] = d.pop("sender", None)
+
+    if "redacted_because" in e.unsigned:
+        d["redacted_because"] = serialize_event(
+            hs, e.unsigned["redacted_because"]
+        )
+
+        del d["unsigned"]["redacted_because"]
+
+    if "redacted_by" in e.unsigned:
+        d["redacted_by"] = e.unsigned["redacted_by"]
+        del d["unsigned"]["redacted_by"]
+
+    if "replaces_state" in e.unsigned:
+        d["replaces_state"] = e.unsigned["replaces_state"]
+        del d["unsigned"]["replaces_state"]
+
+    if "prev_content" in e.unsigned:
+        d["prev_content"] = e.unsigned["prev_content"]
+        del d["unsigned"]["prev_content"]
+
+    del d["auth_events"]
+    del d["prev_events"]
+    del d["hashes"]
+    del d["signatures"]
+
+    return d

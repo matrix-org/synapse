@@ -147,7 +147,7 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def is_presence_visible(self, observer_user, observed_user):
-        assert(observed_user.is_mine)
+        assert(self.hs.is_mine(observed_user))
 
         if observer_user == observed_user:
             defer.returnValue(True)
@@ -165,7 +165,7 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_state(self, target_user, auth_user, as_event=False):
-        if target_user.is_mine:
+        if self.hs.is_mine(target_user):
             visible = yield self.is_presence_visible(
                 observer_user=auth_user,
                 observed_user=target_user
@@ -212,7 +212,7 @@ class PresenceHandler(BaseHandler):
         # TODO (erikj): Turn this back on. Why did we end up sending EDUs
         # everywhere?
 
-        if not target_user.is_mine:
+        if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         if target_user != auth_user:
@@ -291,7 +291,7 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def user_joined_room(self, user, room_id):
-        if user.is_mine:
+        if self.hs.is_mine(user):
             statuscache = self._get_or_make_usercache(user)
 
             # No actual update but we need to bump the serial anyway for the
@@ -309,7 +309,7 @@ class PresenceHandler(BaseHandler):
         rm_handler = self.homeserver.get_handlers().room_member_handler
         curr_users = yield rm_handler.get_room_members(room_id)
 
-        for local_user in [c for c in curr_users if c.is_mine]:
+        for local_user in [c for c in curr_users if self.hs.is_mine(c)]:
             self.push_update_to_local_and_remote(
                 observed_user=local_user,
                 users_to_push=[user],
@@ -318,14 +318,14 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def send_invite(self, observer_user, observed_user):
-        if not observer_user.is_mine:
+        if not self.hs.is_mine(observer_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         yield self.store.add_presence_list_pending(
             observer_user.localpart, observed_user.to_string()
         )
 
-        if observed_user.is_mine:
+        if self.hs.is_mine(observed_user):
             yield self.invite_presence(observed_user, observer_user)
         else:
             yield self.federation.send_edu(
@@ -339,7 +339,7 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _should_accept_invite(self, observed_user, observer_user):
-        if not observed_user.is_mine:
+        if not self.hs.is_mine(observed_user):
             defer.returnValue(False)
 
         row = yield self.store.has_presence_state(observed_user.localpart)
@@ -359,7 +359,7 @@ class PresenceHandler(BaseHandler):
                 observed_user.localpart, observer_user.to_string()
             )
 
-        if observer_user.is_mine:
+        if self.hs.is_mine(observer_user):
             if accept:
                 yield self.accept_presence(observed_user, observer_user)
             else:
@@ -396,7 +396,7 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def drop(self, observed_user, observer_user):
-        if not observer_user.is_mine:
+        if not self.hs.is_mine(observer_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         yield self.store.del_presence_list(
@@ -410,7 +410,7 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_presence_list(self, observer_user, accepted=None):
-        if not observer_user.is_mine:
+        if not self.hs.is_mine(observer_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         presence = yield self.store.get_presence_list(
@@ -465,7 +465,7 @@ class PresenceHandler(BaseHandler):
         )
 
         for target_user in target_users:
-            if target_user.is_mine:
+            if self.hs.is_mine(target_user):
                 self._start_polling_local(user, target_user)
 
                 # We want to tell the person that just came online
@@ -477,7 +477,7 @@ class PresenceHandler(BaseHandler):
                 )
 
         deferreds = []
-        remote_users = [u for u in target_users if not u.is_mine]
+        remote_users = [u for u in target_users if not self.hs.is_mine(u)]
         remoteusers_by_domain = partition(remote_users, lambda u: u.domain)
         # Only poll for people in our get_presence_list
         for domain in remoteusers_by_domain:
@@ -520,7 +520,7 @@ class PresenceHandler(BaseHandler):
     def stop_polling_presence(self, user, target_user=None):
         logger.debug("Stop polling for presence from %s", user)
 
-        if not target_user or target_user.is_mine:
+        if not target_user or self.hs.is_mine(target_user):
             self._stop_polling_local(user, target_user=target_user)
 
         deferreds = []
@@ -579,7 +579,7 @@ class PresenceHandler(BaseHandler):
     @defer.inlineCallbacks
     @log_function
     def push_presence(self, user, statuscache):
-        assert(user.is_mine)
+        assert(self.hs.is_mine(user))
 
         logger.debug("Pushing presence update from %s", user)
 
@@ -696,7 +696,7 @@ class PresenceHandler(BaseHandler):
         for poll in content.get("poll", []):
             user = self.hs.parse_userid(poll)
 
-            if not user.is_mine:
+            if not self.hs.is_mine(user):
                 continue
 
             # TODO(paul) permissions checks
@@ -711,7 +711,7 @@ class PresenceHandler(BaseHandler):
         for unpoll in content.get("unpoll", []):
             user = self.hs.parse_userid(unpoll)
 
-            if not user.is_mine:
+            if not self.hs.is_mine(user):
                 continue
 
             if user in self._remote_sendmap:
@@ -730,7 +730,7 @@ class PresenceHandler(BaseHandler):
 
         localusers, remoteusers = partitionbool(
             users_to_push,
-            lambda u: u.is_mine
+            lambda u: self.hs.is_mine(u)
         )
 
         localusers = set(localusers)
@@ -788,7 +788,7 @@ class PresenceEventSource(object):
                 [u.to_string() for u in observer_user, observed_user])):
             defer.returnValue(True)
 
-        if observed_user.is_mine:
+        if self.hs.is_mine(observed_user):
             pushmap = presence._local_pushmap
 
             defer.returnValue(

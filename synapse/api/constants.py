@@ -59,3 +59,18 @@ class LoginType(object):
     EMAIL_URL = u"m.login.email.url"
     EMAIL_IDENTITY = u"m.login.email.identity"
     RECAPTCHA = u"m.login.recaptcha"
+
+
+class EventTypes(object):
+    Member = "m.room.member"
+    Create = "m.room.create"
+    JoinRules = "m.room.join_rules"
+    PowerLevels = "m.room.power_levels"
+    Aliases = "m.room.aliases"
+    Redaction = "m.room.redaction"
+    Feedback = "m.room.message.feedback"
+
+    # These are used for validation
+    Message = "m.room.message"
+    Topic = "m.room.topic"
+    Name = "m.room.name"

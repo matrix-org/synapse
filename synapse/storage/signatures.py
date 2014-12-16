@@ -13,7 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from _base import SQLBaseStore
+
+from syutil.base64util import encode_base64
 
 
 class SignatureStore(SQLBaseStore):
@@ -66,6 +70,21 @@ class SignatureStore(SQLBaseStore):
             "get_event_reference_hashes",
             f
         )
+
+    @defer.inlineCallbacks
+    def add_event_hashes(self, event_ids):
+        hashes = yield self.get_event_reference_hashes(
+            event_ids
+        )
+        hashes = [
+            {
+                k: encode_base64(v) for k, v in h.items()
+                if k == "sha256"
+            }
+            for h in hashes
+        ]
+
+        defer.returnValue(zip(event_ids, hashes))
 
     def _get_event_reference_hashes_txn(self, txn, event_id):
         """Get all the hashes for a given PDU.
