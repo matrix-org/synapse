@@ -46,11 +46,3 @@ def unfreeze(o):
         pass
 
     return o
-
-
-class FrozenEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, frozendict):
-            return dict(o)
-
-        return json.JSONEncoder(self, o)
