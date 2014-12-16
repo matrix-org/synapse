@@ -143,9 +143,7 @@ class DataStore(RoomMemberStore, RoomStore,
         elif event.type == EventTypes.Redaction:
             self._store_redaction(txn, event)
 
-        outlier = False
-        if hasattr(event.internal_metadata, "outlier"):
-            outlier = event.internal_metadata.outlier
+        outlier = event.internal_metadata.is_outlier()
 
         event_dict = {
             k: v

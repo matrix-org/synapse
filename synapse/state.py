@@ -79,7 +79,7 @@ class StateHandler(object):
             defer.returnValue(False)
             return
 
-        if hasattr(event, "outlier") and event.outlier:
+        if event.is_outlier():
             event.state_group = None
             event.old_state_events = None
             event.state_events = None

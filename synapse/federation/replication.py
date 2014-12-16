@@ -562,8 +562,8 @@ class ReplicationLayer(object):
 
         already_seen = (
             existing and (
-                not existing.internal_metadata.outlier
-                or pdu.internal_metadata.outlier
+                not existing.internal_metadata.is_outlier()
+                or pdu.internal_metadata.is_outlier()
             )
         )
         if already_seen:
@@ -604,7 +604,7 @@ class ReplicationLayer(object):
         #             )
 
         # Get missing pdus if necessary.
-        if not pdu.internal_metadata.outlier:
+        if not pdu.internal_metadata.is_outlier():
             # We only backfill backwards to the min depth.
             min_depth = yield self.handler.get_min_depth_for_context(
                 pdu.room_id
