@@ -20,8 +20,6 @@ from synapse.util.async import run_on_reactor
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
 
-from synapse.events.snapshot import EventContext
-
 import logging
 
 
@@ -77,15 +75,10 @@ class BaseHandler(object):
 
         state_handler = self.state_handler
 
-        context = EventContext()
-        ret = yield state_handler.annotate_context_with_state(
-            builder,
-            context,
-        )
-        prev_state = ret
+        context = yield state_handler.compute_event_context(builder)
 
         if builder.is_state():
-            builder.prev_state = prev_state
+            builder.prev_state = context.prev_state_events
 
         yield self.auth.add_auth_events(builder, context)
 

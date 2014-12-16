@@ -19,6 +19,7 @@ from twisted.internet import defer
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
 from synapse.api.constants import EventTypes
+from synapse.events.snapshot import EventContext
 
 from collections import namedtuple
 
@@ -70,7 +71,7 @@ class StateHandler(object):
         defer.returnValue(res[1].values())
 
     @defer.inlineCallbacks
-    def annotate_context_with_state(self, event, context, old_state=None):
+    def compute_event_context(self, event, old_state=None):
         """ Fills out the context with the `current state` of the graph. The
         `current state` here is defined to be the state of the event graph
         just before the event - i.e. it never includes `event`
@@ -80,8 +81,11 @@ class StateHandler(object):
 
         Args:
             event (EventBase)
-            context (EventContext)
+        Returns:
+            an EventContext
         """
+        context = EventContext()
+
         yield run_on_reactor()
 
         if old_state:
@@ -107,7 +111,8 @@ class StateHandler(object):
                     if replaces.event_id != event.event_id:  # Paranoia check
                         event.unsigned["replaces_state"] = replaces.event_id
 
-            defer.returnValue([])
+            context.prev_state_events = []
+            defer.returnValue(context)
 
         if event.is_state():
             ret = yield self.resolve_state_groups(
@@ -145,7 +150,8 @@ class StateHandler(object):
         else:
             context.auth_events = {}
 
-        defer.returnValue(prev_state)
+        context.prev_state_events = prev_state
+        defer.returnValue(context)
 
     @defer.inlineCallbacks
     @log_function

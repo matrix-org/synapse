@@ -17,7 +17,6 @@
 
 from ._base import BaseHandler
 
-from synapse.events.snapshot import EventContext
 from synapse.events.utils import prune_event
 from synapse.api.errors import (
     AuthError, FederationError, SynapseError, StoreError,
@@ -260,8 +259,7 @@ class FederationHandler(BaseHandler):
             event = pdu
 
             # FIXME (erikj): Not sure this actually works :/
-            context = EventContext()
-            yield self.state_handler.annotate_context_with_state(event, context)
+            context = yield self.state_handler.compute_event_context(event)
 
             events.append((event, context))
 
@@ -555,8 +553,7 @@ class FederationHandler(BaseHandler):
             )
         )
 
-        context = EventContext()
-        yield self.state_handler.annotate_context_with_state(event, context)
+        context = yield self.state_handler.compute_event_context(event)
 
         yield self.store.persist_event(
             event,
@@ -688,11 +685,8 @@ class FederationHandler(BaseHandler):
             event.event_id, event.signatures,
         )
 
-        context = EventContext()
-        yield self.state_handler.annotate_context_with_state(
-            event,
-            context,
-            old_state=state
+        context = yield self.state_handler.compute_event_context(
+            event, old_state=state
         )
 
         logger.debug(
