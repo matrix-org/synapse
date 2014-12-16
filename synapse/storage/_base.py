@@ -488,11 +488,13 @@ class SQLBaseStore(object):
                 ev.unsigned["redacted_because"] = because
 
         if get_prev_content and "replaces_state" in ev.unsigned:
-            ev.unsigned["prev_content"] = self._get_event_txn(
+            prev = self._get_event_txn(
                 txn,
                 ev.unsigned["replaces_state"],
                 get_prev_content=False,
-            ).get_dict()["content"]
+            )
+            if prev:
+                ev.unsigned["prev_content"] = prev.get_dict()["content"]
 
         return ev
 
