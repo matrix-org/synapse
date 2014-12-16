@@ -21,6 +21,7 @@ from syutil.jsonutil import encode_canonical_json
 import argparse
 import dns.resolver
 import hashlib
+import httplib
 import json
 import sqlite3
 import syutil
@@ -150,7 +151,6 @@ def get_key(server_name):
     if ":" in server_name:
         target, port = server_name.split(":")
         targets.append((target, int(port)))
-        return
     try:
         answers = dns.resolver.query("_matrix._tcp." + server_name, "SRV")
         for srv in answers:
@@ -175,6 +175,10 @@ def get_key(server_name):
             print "Got keys for: %s" % (server_name,)
             return verify_keys
         except urllib2.URLError:
+            pass
+        except urllib2.HTTPError:
+            pass
+        except httplib.HTTPException:
             pass
 
     print "Failed to get keys for %s" % (server_name,)
