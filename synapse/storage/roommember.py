@@ -183,20 +183,14 @@ class RoomMemberStore(SQLBaseStore):
         )
 
     def _get_members_query_txn(self, txn, where_clause, where_values):
-        del_sql = (
-            "SELECT event_id FROM redactions WHERE redacts = e.event_id "
-            "LIMIT 1"
-        )
-
         sql = (
-            "SELECT e.*, (%(redacted)s) AS redacted FROM events as e "
+            "SELECT e.* FROM events as e "
             "INNER JOIN room_memberships as m "
             "ON e.event_id = m.event_id "
             "INNER JOIN current_state_events as c "
             "ON m.event_id = c.event_id "
             "WHERE %(where)s "
         ) % {
-            "redacted": del_sql,
             "where": where_clause,
         }
 
