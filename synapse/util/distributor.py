@@ -115,10 +115,10 @@ class Signal(object):
                             failure.value,
                             failure.getTracebackObject()))
                     if not self.suppress_failures:
-                        raise failure
+                        failure.raiseException()
                 deferreds.append(d.addErrback(eb))
-
-            result = yield defer.DeferredList(
-                deferreds, fireOnOneErrback=not self.suppress_failures
-            )
-        defer.returnValue(result)
+            results = []
+            for deferred in deferreds:
+                result = yield deferred
+                results.append(results)
+        defer.returnValue(results)
