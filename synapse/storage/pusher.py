@@ -28,16 +28,18 @@ logger = logging.getLogger(__name__)
 
 class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
-    def get_all_pushers_after_id(self, min_id):
+    def get_pushers_by_app_id_and_pushkey(self, app_id_and_pushkey):
         sql = (
-            "SELECT id, user_name, kind, app_id, app_instance_id,"
+            "SELECT id, user_name, kind, app_id,"
             "app_display_name, device_display_name, pushkey, data, "
             "last_token, last_success, failing_since "
             "FROM pushers "
-            "WHERE id > ?"
+            "WHERE app_id = ? AND pushkey = ?"
         )
 
-        rows = yield self._execute(None, sql, min_id)
+        rows = yield self._execute(
+            None, sql, app_id_and_pushkey[0], app_id_and_pushkey[1]
+        )
 
         ret = [
             {
@@ -45,14 +47,43 @@ class PusherStore(SQLBaseStore):
                 "user_name": r[1],
                 "kind": r[2],
                 "app_id": r[3],
-                "app_instance_id": r[4],
-                "app_display_name": r[5],
-                "device_display_name": r[6],
-                "pushkey": r[7],
-                "data": r[8],
-                "last_token": r[9],
-                "last_success": r[10],
-                "failing_since": r[11]
+                "app_display_name": r[4],
+                "device_display_name": r[5],
+                "pushkey": r[6],
+                "data": r[7],
+                "last_token": r[8],
+                "last_success": r[9],
+                "failing_since": r[10]
+            }
+            for r in rows
+        ]
+
+        defer.returnValue(ret[0])
+
+    @defer.inlineCallbacks
+    def get_all_pushers(self):
+        sql = (
+            "SELECT id, user_name, kind, app_id,"
+            "app_display_name, device_display_name, pushkey, data, "
+            "last_token, last_success, failing_since "
+            "FROM pushers"
+        )
+
+        rows = yield self._execute(None, sql)
+
+        ret = [
+            {
+                "id": r[0],
+                "user_name": r[1],
+                "kind": r[2],
+                "app_id": r[3],
+                "app_display_name": r[4],
+                "device_display_name": r[5],
+                "pushkey": r[6],
+                "data": r[7],
+                "last_token": r[8],
+                "last_success": r[9],
+                "failing_since": r[10]
             }
             for r in rows
         ]
@@ -60,21 +91,22 @@ class PusherStore(SQLBaseStore):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def add_pusher(self, user_name, kind, app_id, app_instance_id,
+    def add_pusher(self, user_name, kind, app_id,
                    app_display_name, device_display_name, pushkey, data):
         try:
-            yield self._simple_insert(PushersTable.table_name, dict(
-                user_name=user_name,
-                kind=kind,
-                app_id=app_id,
-                app_instance_id=app_instance_id,
-                app_display_name=app_display_name,
-                device_display_name=device_display_name,
-                pushkey=pushkey,
-                data=data
-            ))
-        except IntegrityError:
-            raise StoreError(409, "Pushkey in use.")
+            yield self._simple_upsert(
+                PushersTable.table_name,
+                dict(
+                    app_id=app_id,
+                    pushkey=pushkey,
+                ),
+                dict(
+                    user_name=user_name,
+                    kind=kind,
+                    app_display_name=app_display_name,
+                    device_display_name=device_display_name,
+                    data=data
+                ))
         except Exception as e:
             logger.error("create_pusher with failed: %s", e)
             raise StoreError(500, "Problem creating pusher.")
@@ -113,7 +145,6 @@ class PushersTable(Table):
         "user_name",
         "kind",
         "app_id",
-        "app_instance_id",
         "app_display_name",
         "device_display_name",
         "pushkey",

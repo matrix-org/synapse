@@ -24,14 +24,13 @@ logger = logging.getLogger(__name__)
 
 
 class HttpPusher(Pusher):
-    def __init__(self, _hs, user_name, app_id, app_instance_id,
+    def __init__(self, _hs, user_name, app_id,
                  app_display_name, device_display_name, pushkey, data,
                  last_token, last_success, failing_since):
         super(HttpPusher, self).__init__(
             _hs,
             user_name,
             app_id,
-            app_instance_id,
             app_display_name,
             device_display_name,
             pushkey,
@@ -69,16 +68,18 @@ class HttpPusher(Pusher):
                 # we may have to fetch this over federation and we
                 # can't trust it anyway: is it worth it?
                 #'fromDisplayName': 'Steve Stevington'
-            },
-            #'counts': { -- we don't mark messages as read yet so
-            # we have no way of knowing
-            #    'unread': 1,
-            #    'missedCalls': 2
-            # },
-            'devices': {
-                self.pushkey: {
-                    'data': self.data_minus_url
-                }
+                #'counts': { -- we don't mark messages as read yet so
+                # we have no way of knowing
+                #    'unread': 1,
+                #    'missedCalls': 2
+                # },
+                'devices': [
+                    {
+                        'app_id': self.app_id,
+                        'pushkey': self.pushkey,
+                        'data': self.data_minus_url
+                    }
+                ]
             }
         }
 

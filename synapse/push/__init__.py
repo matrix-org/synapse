@@ -30,7 +30,7 @@ class Pusher(object):
     MAX_BACKOFF = 60 * 60 * 1000
     GIVE_UP_AFTER = 24 * 60 * 60 * 1000
 
-    def __init__(self, _hs, user_name, app_id, app_instance_id,
+    def __init__(self, _hs, user_name, app_id,
                  app_display_name, device_display_name, pushkey, data,
                  last_token, last_success, failing_since):
         self.hs = _hs
@@ -39,7 +39,6 @@ class Pusher(object):
         self.clock = self.hs.get_clock()
         self.user_name = user_name
         self.app_id = app_id
-        self.app_instance_id = app_instance_id
         self.app_display_name = app_display_name
         self.device_display_name = device_display_name
         self.pushkey = pushkey
@@ -48,6 +47,7 @@ class Pusher(object):
         self.last_success = last_success  # not actually used
         self.backoff_delay = Pusher.INITIAL_BACKOFF
         self.failing_since = failing_since
+        self.alive = True
 
     @defer.inlineCallbacks
     def start(self):
@@ -65,7 +65,7 @@ class Pusher(object):
             logger.info("Pusher %s for user %s starting from token %s",
                         self.pushkey, self.user_name, self.last_token)
 
-        while True:
+        while self.alive:
             from_tok = StreamToken.from_string(self.last_token)
             config = PaginationConfig(from_token=from_tok, limit='1')
             chunk = yield self.evStreamHandler.get_stream(
@@ -79,6 +79,9 @@ class Pusher(object):
                     single_event = c
                     break
             if not single_event:
+                continue
+
+            if not self.alive:
                 continue
 
             ret = yield self.dispatch_push(single_event)
@@ -141,6 +144,9 @@ class Pusher(object):
                     self.backoff_delay *= 2
                     if self.backoff_delay > Pusher.MAX_BACKOFF:
                         self.backoff_delay = Pusher.MAX_BACKOFF
+
+    def stop(self):
+        self.alive = False
 
     def dispatch_push(self, p):
         pass

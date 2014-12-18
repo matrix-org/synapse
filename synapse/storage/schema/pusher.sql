@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS pushers (
   user_name TEXT NOT NULL,
   kind varchar(8) NOT NULL,
   app_id varchar(64) NOT NULL,
-  app_instance_id varchar(64) NOT NULL,
   app_display_name varchar(64) NOT NULL,
   device_display_name varchar(128) NOT NULL,
   pushkey blob NOT NULL,
@@ -27,5 +26,5 @@ CREATE TABLE IF NOT EXISTS pushers (
   last_success BIGINT,
   failing_since BIGINT,
   FOREIGN KEY(user_name) REFERENCES users(name),
-  UNIQUE (user_name, pushkey)
+  UNIQUE (app_id, pushkey)
 );

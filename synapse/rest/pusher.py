@@ -23,16 +23,16 @@ import json
 
 
 class PusherRestServlet(RestServlet):
-    PATTERN = client_path_pattern("/pushers/(?P<pushkey>[\w]*)$")
+    PATTERN = client_path_pattern("/pushers/set$")
 
     @defer.inlineCallbacks
-    def on_PUT(self, request, pushkey):
+    def on_POST(self, request):
         user = yield self.auth.get_user_by_req(request)
 
         content = _parse_json(request)
 
-        reqd = ['kind', 'app_id', 'app_instance_id', 'app_display_name',
-                'device_display_name', 'data']
+        reqd = ['kind', 'app_id', 'app_display_name',
+                'device_display_name', 'pushkey', 'data']
         missing = []
         for i in reqd:
             if i not in content:
@@ -43,14 +43,13 @@ class PusherRestServlet(RestServlet):
 
         pusher_pool = self.hs.get_pusherpool()
         try:
-            pusher_pool.add_pusher(
+            yield pusher_pool.add_pusher(
                 user_name=user.to_string(),
                 kind=content['kind'],
                 app_id=content['app_id'],
-                app_instance_id=content['app_instance_id'],
                 app_display_name=content['app_display_name'],
                 device_display_name=content['device_display_name'],
-                pushkey=pushkey,
+                pushkey=content['pushkey'],
                 data=content['data']
             )
         except PusherConfigException as pce:

@@ -24,17 +24,23 @@ import json
 
 logger = logging.getLogger(__name__)
 
+
 class PusherPool:
     def __init__(self, _hs):
         self.hs = _hs
         self.store = self.hs.get_datastore()
-        self.pushers = []
+        self.pushers = {}
         self.last_pusher_started = -1
 
+    @defer.inlineCallbacks
     def start(self):
-        self._pushers_added()
+        pushers = yield self.store.get_all_pushers()
+        for p in pushers:
+            p['data'] = json.loads(p['data'])
+        self._start_pushers(pushers)
 
-    def add_pusher(self, user_name, kind, app_id, app_instance_id,
+    @defer.inlineCallbacks
+    def add_pusher(self, user_name, kind, app_id,
                    app_display_name, device_display_name, pushkey, data):
         # we try to create the pusher just to validate the config: it
         # will then get pulled out of the database,
@@ -44,7 +50,6 @@ class PusherPool:
             "user_name": user_name,
             "kind": kind,
             "app_id": app_id,
-            "app_instance_id": app_instance_id,
             "app_display_name": app_display_name,
             "device_display_name": device_display_name,
             "pushkey": pushkey,
@@ -53,25 +58,26 @@ class PusherPool:
             "last_success": None,
             "failing_since": None
         })
-        self._add_pusher_to_store(user_name, kind, app_id, app_instance_id,
-                                  app_display_name, device_display_name,
-                                  pushkey, data)
+        yield self._add_pusher_to_store(
+            user_name, kind, app_id,
+            app_display_name, device_display_name,
+            pushkey, data
+        )
 
     @defer.inlineCallbacks
-    def _add_pusher_to_store(self, user_name, kind, app_id, app_instance_id,
+    def _add_pusher_to_store(self, user_name, kind, app_id,
                              app_display_name, device_display_name,
                              pushkey, data):
         yield self.store.add_pusher(
             user_name=user_name,
             kind=kind,
             app_id=app_id,
-            app_instance_id=app_instance_id,
             app_display_name=app_display_name,
             device_display_name=device_display_name,
             pushkey=pushkey,
             data=json.dumps(data)
         )
-        self._pushers_added()
+        self._refresh_pusher((app_id, pushkey))
 
     def _create_pusher(self, pusherdict):
         if pusherdict['kind'] == 'http':
@@ -79,7 +85,6 @@ class PusherPool:
                 self.hs,
                 user_name=pusherdict['user_name'],
                 app_id=pusherdict['app_id'],
-                app_instance_id=pusherdict['app_instance_id'],
                 app_display_name=pusherdict['app_display_name'],
                 device_display_name=pusherdict['device_display_name'],
                 pushkey=pusherdict['pushkey'],
@@ -95,21 +100,21 @@ class PusherPool:
             )
 
     @defer.inlineCallbacks
-    def _pushers_added(self):
-        pushers = yield self.store.get_all_pushers_after_id(
-            self.last_pusher_started
+    def _refresh_pusher(self, app_id_pushkey):
+        p = yield self.store.get_pushers_by_app_id_and_pushkey(
+            app_id_pushkey
         )
-        for p in pushers:
-            p['data'] = json.loads(p['data'])
-        if len(pushers):
-            self.last_pusher_started = pushers[-1]['id']
+        p['data'] = json.loads(p['data'])
 
-        self._start_pushers(pushers)
+        self._start_pushers([p])
 
     def _start_pushers(self, pushers):
-        logger.info("Starting %d pushers", (len(pushers)))
+        logger.info("Starting %d pushers", len(pushers))
         for pusherdict in pushers:
             p = self._create_pusher(pusherdict)
             if p:
-                self.pushers.append(p)
+                fullid = "%s:%s" % (pusherdict['app_id'], pusherdict['pushkey'])
+                if fullid in self.pushers:
+                    self.pushers[fullid].stop()
+                self.pushers[fullid] = p
                 p.start()
