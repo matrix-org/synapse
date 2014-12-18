@@ -91,7 +91,7 @@ class FederationHandler(BaseHandler):
 
         yield run_on_reactor()
 
-        yield self.replication_layer.send_pdu(event, destinations)
+        self.replication_layer.send_pdu(event, destinations)
 
     @log_function
     @defer.inlineCallbacks
@@ -527,7 +527,7 @@ class FederationHandler(BaseHandler):
             event.signatures,
         )
 
-        yield self.replication_layer.send_pdu(new_pdu, destinations)
+        self.replication_layer.send_pdu(new_pdu, destinations)
 
         state_ids = [e.event_id for e in context.current_state.values()]
         auth_chain = yield self.store.get_auth_chain(set(
