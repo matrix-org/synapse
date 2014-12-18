@@ -17,10 +17,7 @@
 from twisted.internet import defer
 from tests import unittest
 
-from synapse.api.events.room import (
-    RoomMemberEvent,
-)
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes, Membership
 from synapse.handlers.room import RoomMemberHandler, RoomCreationHandler
 from synapse.handlers.profile import ProfileHandler
 from synapse.server import HomeServer
@@ -47,7 +44,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "get_room_member",
                 "get_room",
                 "store_room",
-                "snapshot_room",
+                "get_latest_events_in_room",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
@@ -63,7 +60,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "check_host_in_room",
             ]),
             state_handler=NonCallableMock(spec_set=[
-                "annotate_event_with_state",
+                "compute_event_context",
                 "get_current_state",
             ]),
             config=self.mock_config,
@@ -91,9 +88,6 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.handlers.profile_handler = ProfileHandler(self.hs)
         self.room_member_handler = self.handlers.room_member_handler
 
-        self.snapshot = Mock()
-        self.datastore.snapshot_room.return_value = self.snapshot
-
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
 
@@ -104,50 +98,70 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         target_user_id = "@red:blue"
         content = {"membership": Membership.INVITE}
 
-        event = self.hs.get_event_factory().create_event(
-            etype=RoomMemberEvent.TYPE,
-            user_id=user_id,
-            state_key=target_user_id,
-            room_id=room_id,
-            membership=Membership.INVITE,
-            content=content,
+        builder = self.hs.get_event_builder_factory().new({
+            "type": EventTypes.Member,
+            "sender": user_id,
+            "state_key": target_user_id,
+            "room_id": room_id,
+            "content": content,
+        })
+
+        self.datastore.get_latest_events_in_room.return_value = (
+            defer.succeed([])
         )
 
-        self.auth.check_host_in_room.return_value = defer.succeed(True)
+        def annotate(_):
+            ctx = Mock()
+            ctx.current_state = {
+                (EventTypes.Member, "@alice:green"): self._create_member(
+                    user_id="@alice:green",
+                    room_id=room_id,
+                ),
+                (EventTypes.Member, "@bob:red"): self._create_member(
+                    user_id="@bob:red",
+                    room_id=room_id,
+                ),
+            }
+            ctx.prev_state_events = []
 
-        store_id = "store_id_fooo"
-        self.datastore.persist_event.return_value = defer.succeed(store_id)
+            return defer.succeed(ctx)
 
-        self.datastore.get_room_member.return_value = defer.succeed(None)
+        self.state_handler.compute_event_context.side_effect = annotate
 
-        event.old_state_events = {
-            (RoomMemberEvent.TYPE, "@alice:green"): self._create_member(
-                user_id="@alice:green",
-                room_id=room_id,
-            ),
-            (RoomMemberEvent.TYPE, "@bob:red"): self._create_member(
-                user_id="@bob:red",
-                room_id=room_id,
-            ),
-        }
+        def add_auth(_, ctx):
+            ctx.auth_events = ctx.current_state[
+                (EventTypes.Member, "@bob:red")
+            ]
 
-        event.state_events = event.old_state_events
-        event.state_events[(RoomMemberEvent.TYPE, target_user_id)] = event
+            return defer.succeed(True)
+        self.auth.add_auth_events.side_effect = add_auth
 
-        # Actual invocation
-        yield self.room_member_handler.change_membership(event)
+        def send_invite(domain, event):
+            return defer.succeed(event)
 
-        self.federation.handle_new_event.assert_called_once_with(
-            event, self.snapshot,
+        self.federation.send_invite.side_effect = send_invite
+
+        room_handler = self.room_member_handler
+        event, context = yield room_handler._create_new_client_event(
+            builder
         )
 
-        self.assertEquals(
-            set(["red", "green"]),
-            set(event.destinations)
+        yield room_handler.change_membership(event, context)
+
+        self.state_handler.compute_event_context.assert_called_once_with(
+            builder
+        )
+
+        self.auth.add_auth_events.assert_called_once_with(
+            builder, context
+        )
+
+        self.federation.send_invite.assert_called_once_with(
+            "blue", event,
         )
 
         self.datastore.persist_event.assert_called_once_with(
-            event
+            event, context=context,
         )
         self.notifier.on_new_room_event.assert_called_once_with(
             event, extra_users=[self.hs.parse_userid(target_user_id)]
@@ -162,57 +176,58 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         user_id = "@bob:red"
         user = self.hs.parse_userid(user_id)
 
-        event = self._create_member(
-            user_id=user_id,
-            room_id=room_id,
-        )
-
-        self.auth.check_host_in_room.return_value = defer.succeed(True)
-
-        store_id = "store_id_fooo"
-        self.datastore.persist_event.return_value = defer.succeed(store_id)
-        self.datastore.get_room.return_value = defer.succeed(1)  # Not None.
-
-        prev_state = NonCallableMock()
-        prev_state.membership = Membership.INVITE
-        prev_state.sender = "@foo:red"
-        self.datastore.get_room_member.return_value = defer.succeed(prev_state)
-
         join_signal_observer = Mock()
         self.distributor.observe("user_joined_room", join_signal_observer)
 
-        event.state_events = {
-            (RoomMemberEvent.TYPE, "@alice:green"): self._create_member(
-                user_id="@alice:green",
-                room_id=room_id,
-            ),
-            (RoomMemberEvent.TYPE, user_id): event,
-        }
+        builder = self.hs.get_event_builder_factory().new({
+            "type": EventTypes.Member,
+            "sender": user_id,
+            "state_key": user_id,
+            "room_id": room_id,
+            "content": {"membership": Membership.JOIN},
+        })
 
-        event.old_state_events = {
-            (RoomMemberEvent.TYPE, "@alice:green"): self._create_member(
-                user_id="@alice:green",
-                room_id=room_id,
-            ),
-        }
-
-        event.state_events = event.old_state_events
-        event.state_events[(RoomMemberEvent.TYPE, user_id)] = event
-
-        # Actual invocation
-        yield self.room_member_handler.change_membership(event)
-
-        self.federation.handle_new_event.assert_called_once_with(
-            event, self.snapshot
+        self.datastore.get_latest_events_in_room.return_value = (
+            defer.succeed([])
         )
 
-        self.assertEquals(
-            set(["red", "green"]),
-            set(event.destinations)
+        def annotate(_):
+            ctx = Mock()
+            ctx.current_state = {
+                (EventTypes.Member, "@bob:red"): self._create_member(
+                    user_id="@bob:red",
+                    room_id=room_id,
+                    membership=Membership.INVITE
+                ),
+            }
+            ctx.prev_state_events = []
+
+            return defer.succeed(ctx)
+
+        self.state_handler.compute_event_context.side_effect = annotate
+
+        def add_auth(_, ctx):
+            ctx.auth_events = ctx.current_state[
+                (EventTypes.Member, "@bob:red")
+            ]
+
+            return defer.succeed(True)
+        self.auth.add_auth_events.side_effect = add_auth
+
+        room_handler = self.room_member_handler
+        event, context = yield room_handler._create_new_client_event(
+            builder
+        )
+
+        # Actual invocation
+        yield room_handler.change_membership(event, context)
+
+        self.federation.handle_new_event.assert_called_once_with(
+            event, None, destinations=set()
         )
 
         self.datastore.persist_event.assert_called_once_with(
-            event
+            event, context=context
         )
         self.notifier.on_new_room_event.assert_called_once_with(
             event, extra_users=[user]
@@ -222,14 +237,82 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             user=user, room_id=room_id
         )
 
-    def _create_member(self, user_id, room_id):
-        return self.hs.get_event_factory().create_event(
-            etype=RoomMemberEvent.TYPE,
-            user_id=user_id,
-            state_key=user_id,
-            room_id=room_id,
-            membership=Membership.JOIN,
-            content={"membership": Membership.JOIN},
+    def _create_member(self, user_id, room_id, membership=Membership.JOIN):
+        builder = self.hs.get_event_builder_factory().new({
+            "type": EventTypes.Member,
+            "sender": user_id,
+            "state_key": user_id,
+            "room_id": room_id,
+            "content": {"membership": membership},
+        })
+
+        return builder.build()
+
+    @defer.inlineCallbacks
+    def test_simple_leave(self):
+        room_id = "!foo:red"
+        user_id = "@bob:red"
+        user = self.hs.parse_userid(user_id)
+
+        builder = self.hs.get_event_builder_factory().new({
+            "type": EventTypes.Member,
+            "sender": user_id,
+            "state_key": user_id,
+            "room_id": room_id,
+            "content": {"membership": Membership.LEAVE},
+        })
+
+        self.datastore.get_latest_events_in_room.return_value = (
+            defer.succeed([])
+        )
+
+        def annotate(_):
+            ctx = Mock()
+            ctx.current_state = {
+                (EventTypes.Member, "@bob:red"): self._create_member(
+                    user_id="@bob:red",
+                    room_id=room_id,
+                    membership=Membership.JOIN
+                ),
+            }
+            ctx.prev_state_events = []
+
+            return defer.succeed(ctx)
+
+        self.state_handler.compute_event_context.side_effect = annotate
+
+        def add_auth(_, ctx):
+            ctx.auth_events = ctx.current_state[
+                (EventTypes.Member, "@bob:red")
+            ]
+
+            return defer.succeed(True)
+        self.auth.add_auth_events.side_effect = add_auth
+
+        room_handler = self.room_member_handler
+        event, context = yield room_handler._create_new_client_event(
+            builder
+        )
+
+        leave_signal_observer = Mock()
+        self.distributor.observe("user_left_room", leave_signal_observer)
+
+        # Actual invocation
+        yield room_handler.change_membership(event, context)
+
+        self.federation.handle_new_event.assert_called_once_with(
+            event, None, destinations=set(['red'])
+        )
+
+        self.datastore.persist_event.assert_called_once_with(
+            event, context=context
+        )
+        self.notifier.on_new_room_event.assert_called_once_with(
+            event, extra_users=[user]
+        )
+
+        leave_signal_observer.assert_called_with(
+            user=user, room_id=room_id
         )
 
 
@@ -254,13 +337,9 @@ class RoomCreationTest(unittest.TestCase):
             notifier=NonCallableMock(spec_set=["on_new_room_event"]),
             handlers=NonCallableMock(spec_set=[
                 "room_creation_handler",
-                "room_member_handler",
-                "federation_handler",
+                "message_handler",
             ]),
             auth=NonCallableMock(spec_set=["check", "add_auth_events"]),
-            state_handler=NonCallableMock(spec_set=[
-                "annotate_event_with_state",
-            ]),
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
@@ -271,30 +350,12 @@ class RoomCreationTest(unittest.TestCase):
             "handle_new_event",
         ])
 
-        self.datastore = hs.get_datastore()
         self.handlers = hs.get_handlers()
-        self.notifier = hs.get_notifier()
-        self.state_handler = hs.get_state_handler()
-        self.hs = hs
 
-        self.handlers.federation_handler = self.federation
-
-        self.handlers.room_creation_handler = RoomCreationHandler(self.hs)
+        self.handlers.room_creation_handler = RoomCreationHandler(hs)
         self.room_creation_handler = self.handlers.room_creation_handler
 
-        self.handlers.room_member_handler = NonCallableMock(spec_set=[
-            "change_membership"
-        ])
-        self.room_member_handler = self.handlers.room_member_handler
-
-        def annotate(event):
-            event.state_events = {}
-            return defer.succeed(None)
-        self.state_handler.annotate_event_with_state.side_effect = annotate
-
-        def hosts(room):
-            return defer.succeed([])
-        self.datastore.get_joined_hosts_for_room.side_effect = hosts
+        self.message_handler = self.handlers.message_handler
 
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -311,14 +372,37 @@ class RoomCreationTest(unittest.TestCase):
             config=config,
         )
 
-        self.assertTrue(self.room_member_handler.change_membership.called)
-        join_event = self.room_member_handler.change_membership.call_args[0][0]
+        self.assertTrue(self.message_handler.create_and_send_event.called)
 
-        self.assertEquals(RoomMemberEvent.TYPE, join_event.type)
-        self.assertEquals(room_id, join_event.room_id)
-        self.assertEquals(user_id, join_event.user_id)
-        self.assertEquals(user_id, join_event.state_key)
+        event_dicts = [
+            e[0][0]
+            for e in self.message_handler.create_and_send_event.call_args_list
+        ]
 
-        self.assertTrue(self.state_handler.annotate_event_with_state.called)
+        self.assertTrue(len(event_dicts) > 3)
 
-        self.assertTrue(self.federation.handle_new_event.called)
+        self.assertDictContainsSubset(
+            {
+                "type": EventTypes.Create,
+                "sender": user_id,
+                "room_id": room_id,
+            },
+            event_dicts[0]
+        )
+
+        self.assertEqual(user_id, event_dicts[0]["content"]["creator"])
+
+        self.assertDictContainsSubset(
+            {
+                "type": EventTypes.Member,
+                "sender": user_id,
+                "room_id": room_id,
+                "state_key": user_id,
+            },
+            event_dicts[1]
+        )
+
+        self.assertEqual(
+            Membership.JOIN,
+            event_dicts[1]["content"]["membership"]
+        )

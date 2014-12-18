@@ -38,3 +38,5 @@ graph/*.dot
 **/webclient/test/environment-protractor.js
 
 uploads
+
+.idea/

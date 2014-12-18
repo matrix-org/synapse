@@ -36,7 +36,7 @@ class LoggingConfig(Config):
             help="The verbosity level."
         )
         logging_group.add_argument(
-            '-f', '--log-file', dest="log_file", default=None,
+            '-f', '--log-file', dest="log_file", default="homeserver.log",
             help="File to log to."
         )
         logging_group.add_argument(

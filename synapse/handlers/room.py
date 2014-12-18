@@ -17,12 +17,8 @@
 from twisted.internet import defer
 
 from synapse.types import UserID, RoomAlias, RoomID
-from synapse.api.constants import Membership, JoinRules
+from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import StoreError, SynapseError
-from synapse.api.events.room import (
-    RoomMemberEvent, RoomCreateEvent, RoomPowerLevelsEvent,
-    RoomTopicEvent, RoomNameEvent, RoomJoinRulesEvent,
-)
 from synapse.util import stringutils
 from synapse.util.async import run_on_reactor
 from ._base import BaseHandler
@@ -52,9 +48,9 @@ class RoomCreationHandler(BaseHandler):
         self.ratelimit(user_id)
 
         if "room_alias_name" in config:
-            room_alias = RoomAlias.create_local(
+            room_alias = RoomAlias.create(
                 config["room_alias_name"],
-                self.hs
+                self.hs.hostname,
             )
             mapping = yield self.store.get_association_from_room_alias(
                 room_alias
@@ -76,8 +72,8 @@ class RoomCreationHandler(BaseHandler):
 
         if room_id:
             # Ensure room_id is the correct type
-            room_id_obj = RoomID.from_string(room_id, self.hs)
-            if not room_id_obj.is_mine:
+            room_id_obj = RoomID.from_string(room_id)
+            if not self.hs.is_mine(room_id_obj):
                 raise SynapseError(400, "Room id must be local")
 
             yield self.store.store_room(
@@ -93,7 +89,10 @@ class RoomCreationHandler(BaseHandler):
             while attempts < 5:
                 try:
                     random_string = stringutils.random_string(18)
-                    gen_room_id = RoomID.create_local(random_string, self.hs)
+                    gen_room_id = RoomID.create(
+                        random_string,
+                        self.hs.hostname,
+                    )
                     yield self.store.store_room(
                         room_id=gen_room_id.to_string(),
                         room_creator_user_id=user_id,
@@ -120,59 +119,37 @@ class RoomCreationHandler(BaseHandler):
             user, room_id, is_public=is_public
         )
 
-        room_member_handler = self.hs.get_handlers().room_member_handler
-
-        @defer.inlineCallbacks
-        def handle_event(event):
-            snapshot = yield self.store.snapshot_room(event)
-
-            logger.debug("Event: %s", event)
-
-            if event.type == RoomMemberEvent.TYPE:
-                yield room_member_handler.change_membership(
-                    event,
-                    do_auth=True
-                )
-            else:
-                yield self._on_new_room_event(
-                    event, snapshot, extra_users=[user], suppress_auth=True
-                )
+        msg_handler = self.hs.get_handlers().message_handler
 
         for event in creation_events:
-            yield handle_event(event)
+            yield msg_handler.create_and_send_event(event)
 
         if "name" in config:
             name = config["name"]
-            name_event = self.event_factory.create_event(
-                etype=RoomNameEvent.TYPE,
-                room_id=room_id,
-                user_id=user_id,
-                content={"name": name},
-            )
-
-            yield handle_event(name_event)
+            yield msg_handler.create_and_send_event({
+                "type": EventTypes.Name,
+                "room_id": room_id,
+                "sender": user_id,
+                "content": {"name": name},
+            })
 
         if "topic" in config:
             topic = config["topic"]
-            topic_event = self.event_factory.create_event(
-                etype=RoomTopicEvent.TYPE,
-                room_id=room_id,
-                user_id=user_id,
-                content={"topic": topic},
-            )
+            yield msg_handler.create_and_send_event({
+                "type": EventTypes.Topic,
+                "room_id": room_id,
+                "sender": user_id,
+                "content": {"topic": topic},
+            })
 
-            yield handle_event(topic_event)
-
-        content = {"membership": Membership.INVITE}
         for invitee in invite_list:
-            invite_event = self.event_factory.create_event(
-                etype=RoomMemberEvent.TYPE,
-                state_key=invitee,
-                room_id=room_id,
-                user_id=user_id,
-                content=content
-            )
-            yield handle_event(invite_event)
+            yield msg_handler.create_and_send_event({
+                "type": EventTypes.Member,
+                "state_key": invitee,
+                "room_id": room_id,
+                "user_id": user_id,
+                "content": {"membership": Membership.INVITE},
+            })
 
         result = {"room_id": room_id}
 
@@ -189,40 +166,44 @@ class RoomCreationHandler(BaseHandler):
 
         event_keys = {
             "room_id": room_id,
-            "user_id": creator_id,
+            "sender": creator_id,
+            "state_key": "",
         }
 
-        def create(etype, **content):
-            return self.event_factory.create_event(
-                etype=etype,
-                content=content,
-                **event_keys
-            )
+        def create(etype, content, **kwargs):
+            e = {
+                "type": etype,
+                "content": content,
+            }
+
+            e.update(event_keys)
+            e.update(kwargs)
+
+            return e
 
         creation_event = create(
-            etype=RoomCreateEvent.TYPE,
-            creator=creator.to_string(),
+            etype=EventTypes.Create,
+            content={"creator": creator.to_string()},
         )
 
-        join_event = self.event_factory.create_event(
-            etype=RoomMemberEvent.TYPE,
+        join_event = create(
+            etype=EventTypes.Member,
             state_key=creator_id,
             content={
                 "membership": Membership.JOIN,
             },
-            **event_keys
         )
 
-        power_levels_event = self.event_factory.create_event(
-            etype=RoomPowerLevelsEvent.TYPE,
+        power_levels_event = create(
+            etype=EventTypes.PowerLevels,
             content={
                 "users": {
                     creator.to_string(): 100,
                 },
                 "users_default": 0,
                 "events": {
-                    RoomNameEvent.TYPE: 100,
-                    RoomPowerLevelsEvent.TYPE: 100,
+                    EventTypes.Name: 100,
+                    EventTypes.PowerLevels: 100,
                 },
                 "events_default": 0,
                 "state_default": 50,
@@ -230,13 +211,12 @@ class RoomCreationHandler(BaseHandler):
                 "kick": 50,
                 "redact": 50
             },
-            **event_keys
         )
 
         join_rule = JoinRules.PUBLIC if is_public else JoinRules.INVITE
         join_rules_event = create(
-            etype=RoomJoinRulesEvent.TYPE,
-            join_rule=join_rule,
+            etype=EventTypes.JoinRules,
+            content={"join_rule": join_rule},
         )
 
         return [
@@ -260,6 +240,7 @@ class RoomMemberHandler(BaseHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("user_joined_room")
+        self.distributor.declare("user_left_room")
 
     @defer.inlineCallbacks
     def get_room_members(self, room_id, membership=Membership.JOIN):
@@ -287,7 +268,7 @@ class RoomMemberHandler(BaseHandler):
             if ignore_user is not None and member == ignore_user:
                 continue
 
-            if member.is_mine:
+            if self.hs.is_mine(member):
                 if localusers is not None:
                     localusers.add(member)
             else:
@@ -348,7 +329,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue(member)
 
     @defer.inlineCallbacks
-    def change_membership(self, event=None, do_auth=True):
+    def change_membership(self, event, context, do_auth=True):
         """ Change the membership status of a user in a room.
 
         Args:
@@ -358,11 +339,9 @@ class RoomMemberHandler(BaseHandler):
         """
         target_user_id = event.state_key
 
-        snapshot = yield self.store.snapshot_room(event)
-
-        ## TODO(markjh): get prev state from snapshot.
-        prev_state = yield self.store.get_room_member(
-            target_user_id, event.room_id
+        prev_state = context.current_state.get(
+            (EventTypes.Member, target_user_id),
+            None
         )
 
         room_id = event.room_id
@@ -371,10 +350,11 @@ class RoomMemberHandler(BaseHandler):
         # if this HS is not currently in the room, i.e. we have to do the
         # invite/join dance.
         if event.membership == Membership.JOIN:
-            yield self._do_join(event, snapshot, do_auth=do_auth)
+            yield self._do_join(event, context, do_auth=do_auth)
         else:
             # This is not a JOIN, so we can handle it normally.
 
+            # FIXME: This isn't idempotency.
             if prev_state and prev_state.membership == event.membership:
                 # double same action, treat this event as a NOOP.
                 defer.returnValue({})
@@ -383,9 +363,15 @@ class RoomMemberHandler(BaseHandler):
             yield self._do_local_membership_update(
                 event,
                 membership=event.content["membership"],
-                snapshot=snapshot,
+                context=context,
                 do_auth=do_auth,
             )
+
+            if prev_state and prev_state.membership == Membership.JOIN:
+                user = self.hs.parse_userid(event.user_id)
+                self.distributor.fire(
+                    "user_left_room", user=user, room_id=event.room_id
+                )
 
         defer.returnValue({"room_id": room_id})
 
@@ -405,31 +391,25 @@ class RoomMemberHandler(BaseHandler):
         host = hosts[0]
 
         content.update({"membership": Membership.JOIN})
-        new_event = self.event_factory.create_event(
-            etype=RoomMemberEvent.TYPE,
-            state_key=joinee.to_string(),
-            room_id=room_id,
-            user_id=joinee.to_string(),
-            membership=Membership.JOIN,
-            content=content,
-        )
+        builder = self.event_builder_factory.new({
+            "type": EventTypes.Member,
+            "state_key": joinee.to_string(),
+            "room_id": room_id,
+            "sender": joinee.to_string(),
+            "membership": Membership.JOIN,
+            "content": content,
+        })
+        event, context = yield self._create_new_client_event(builder)
 
-        snapshot = yield self.store.snapshot_room(new_event)
-
-        yield self._do_join(new_event, snapshot, room_host=host, do_auth=True)
+        yield self._do_join(event, context, room_host=host, do_auth=True)
 
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def _do_join(self, event, snapshot, room_host=None, do_auth=True):
+    def _do_join(self, event, context, room_host=None, do_auth=True):
         joinee = self.hs.parse_userid(event.state_key)
         # room_id = RoomID.from_string(event.room_id, self.hs)
         room_id = event.room_id
-
-        # If event doesn't include a display name, add one.
-        yield self.distributor.fire(
-            "collect_presencelike_data", joinee, event.content
-        )
 
         # XXX: We don't do an auth check if we are doing an invite
         # join dance for now, since we're kinda implicitly checking
@@ -452,31 +432,29 @@ class RoomMemberHandler(BaseHandler):
             )
 
             if prev_state and prev_state.membership == Membership.INVITE:
-                room = yield self.store.get_room(room_id)
-                inviter = UserID.from_string(
-                    prev_state.user_id, self.hs
-                )
+                inviter = UserID.from_string(prev_state.user_id)
 
-                should_do_dance = not inviter.is_mine and not room
+                should_do_dance = not self.hs.is_mine(inviter)
                 room_host = inviter.domain
             else:
                 should_do_dance = False
 
-        have_joined = False
         if should_do_dance:
             handler = self.hs.get_handlers().federation_handler
-            have_joined = yield handler.do_invite_join(
-                room_host, room_id, event.user_id, event.content, snapshot
+            yield handler.do_invite_join(
+                room_host,
+                room_id,
+                event.user_id,
+                event.get_dict()["content"],  # FIXME To get a non-frozen dict
+                context
             )
-
-        # We want to do the _do_update inside the room lock.
-        if not have_joined:
+        else:
             logger.debug("Doing normal join")
 
             yield self._do_local_membership_update(
                 event,
                 membership=event.content["membership"],
-                snapshot=snapshot,
+                context=context,
                 do_auth=do_auth,
             )
 
@@ -501,10 +479,10 @@ class RoomMemberHandler(BaseHandler):
         if prev_state and prev_state.membership == Membership.INVITE:
             room = yield self.store.get_room(room_id)
             inviter = UserID.from_string(
-                prev_state.sender, self.hs
+                prev_state.sender
             )
 
-            is_remote_invite_join = not inviter.is_mine and not room
+            is_remote_invite_join = not self.hs.is_mine(inviter) and not room
             room_host = inviter.domain
         else:
             is_remote_invite_join = False
@@ -526,25 +504,17 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue(room_ids)
 
     @defer.inlineCallbacks
-    def _do_local_membership_update(self, event, membership, snapshot,
+    def _do_local_membership_update(self, event, membership, context,
                                     do_auth):
         yield run_on_reactor()
 
-        # If we're inviting someone, then we should also send it to that
-        # HS.
-        target_user_id = event.state_key
-        target_user = self.hs.parse_userid(target_user_id)
-        if membership == Membership.INVITE and not target_user.is_mine:
-            do_invite_host = target_user.domain
-        else:
-            do_invite_host = None
+        target_user = self.hs.parse_userid(event.state_key)
 
-        yield self._on_new_room_event(
+        yield self.handle_new_client_event(
             event,
-            snapshot,
+            context,
             extra_users=[target_user],
             suppress_auth=(not do_auth),
-            do_invite_host=do_invite_host,
         )
 
 

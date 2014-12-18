@@ -15,10 +15,11 @@
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.events.validator import EventValidator
+
 from ._base import BaseHandler
 
 import logging
@@ -32,7 +33,7 @@ class MessageHandler(BaseHandler):
         super(MessageHandler, self).__init__(hs)
         self.hs = hs
         self.clock = hs.get_clock()
-        self.event_factory = hs.get_event_factory()
+        self.validator = EventValidator()
 
     @defer.inlineCallbacks
     def get_message(self, msg_id=None, room_id=None, sender_id=None,
@@ -62,35 +63,6 @@ class MessageHandler(BaseHandler):
         # on how to do this.
 
         defer.returnValue(None)
-
-    @defer.inlineCallbacks
-    def send_message(self, event=None, suppress_auth=False):
-        """ Send a message.
-
-        Args:
-            event : The message event to store.
-            suppress_auth (bool) : True to suppress auth for this message. This
-            is primarily so the home server can inject messages into rooms at
-            will.
-        Raises:
-            SynapseError if something went wrong.
-        """
-
-        self.ratelimit(event.user_id)
-        # TODO(paul): Why does 'event' not have a 'user' object?
-        user = self.hs.parse_userid(event.user_id)
-        assert user.is_mine, "User must be our own: %s" % (user,)
-
-        snapshot = yield self.store.snapshot_room(event)
-
-        yield self._on_new_room_event(
-            event, snapshot, suppress_auth=suppress_auth
-        )
-
-        with PreserveLoggingContext():
-            self.hs.get_handlers().presence_handler.bump_presence_active_time(
-                user
-            )
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
@@ -134,19 +106,53 @@ class MessageHandler(BaseHandler):
         defer.returnValue(chunk)
 
     @defer.inlineCallbacks
-    def store_room_data(self, event=None):
-        """ Stores data for a room.
+    def create_and_send_event(self, event_dict):
+        """ Given a dict from a client, create and handle a new event.
+
+        Creates an FrozenEvent object, filling out auth_events, prev_events,
+        etc.
+
+        Adds display names to Join membership events.
+
+        Persists and notifies local clients and federation.
 
         Args:
-            event : The room path event
-            stamp_event (bool) : True to stamp event content with server keys.
-        Raises:
-            SynapseError if something went wrong.
+            event_dict (dict): An entire event
         """
+        builder = self.event_builder_factory.new(event_dict)
 
-        snapshot = yield self.store.snapshot_room(event)
+        self.validator.validate_new(builder)
 
-        yield self._on_new_room_event(event, snapshot)
+        self.ratelimit(builder.user_id)
+        # TODO(paul): Why does 'event' not have a 'user' object?
+        user = self.hs.parse_userid(builder.user_id)
+        assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
+
+        if builder.type == EventTypes.Member:
+            membership = builder.content.get("membership", None)
+            if membership == Membership.JOIN:
+                joinee = self.hs.parse_userid(builder.state_key)
+                # If event doesn't include a display name, add one.
+                yield self.distributor.fire(
+                    "collect_presencelike_data",
+                    joinee,
+                    builder.content
+                )
+
+        event, context = yield self._create_new_client_event(
+            builder=builder,
+        )
+
+        if event.type == EventTypes.Member:
+            member_handler = self.hs.get_handlers().room_member_handler
+            yield member_handler.change_membership(event, context)
+        else:
+            yield self.handle_new_client_event(
+                event=event,
+                context=context,
+            )
+
+        defer.returnValue(event)
 
     @defer.inlineCallbacks
     def get_room_data(self, user_id=None, room_id=None,
@@ -179,13 +185,6 @@ class MessageHandler(BaseHandler):
         if fb:
             defer.returnValue(fb)
         defer.returnValue(None)
-
-    @defer.inlineCallbacks
-    def send_feedback(self, event):
-        snapshot = yield self.store.snapshot_room(event)
-
-        # store message in db
-        yield self._on_new_room_event(event, snapshot)
 
     @defer.inlineCallbacks
     def get_state_events(self, user_id, room_id):

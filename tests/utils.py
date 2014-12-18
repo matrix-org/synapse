@@ -15,19 +15,17 @@
 
 from synapse.http.server import HttpServer
 from synapse.api.errors import cs_error, CodeMessageException, StoreError
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes
 from synapse.storage import prepare_database
 
-from synapse.api.events.room import (
-    RoomMemberEvent, MessageEvent
-)
+from synapse.util.logcontext import LoggingContext
 
 from twisted.internet import defer, reactor
 from twisted.enterprise.adbapi import ConnectionPool
 
 from collections import namedtuple
 from mock import patch, Mock
-import json
+import urllib
 import urlparse
 
 from inspect import getcallargs
@@ -101,9 +99,14 @@ class MockHttpResource(HttpServer):
             matcher = pattern.match(path)
             if matcher:
                 try:
+                    args = [
+                        urllib.unquote(u).decode("UTF-8")
+                        for u in matcher.groups()
+                    ]
+
                     (code, response) = yield func(
                         mock_request,
-                        *matcher.groups()
+                        *args
                     )
                     defer.returnValue((code, response))
                 except CodeMessageException as e:
@@ -134,15 +137,42 @@ class MockKey(object):
 class MockClock(object):
     now = 1000
 
+    def __init__(self):
+        # list of tuples of (absolute_time, callback) in no particular order
+        self.timers = []
+
     def time(self):
         return self.now
 
     def time_msec(self):
         return self.time() * 1000
 
+    def call_later(self, delay, callback):
+        current_context = LoggingContext.current_context()
+
+        def wrapped_callback():
+            LoggingContext.thread_local.current_context = current_context
+            callback()
+
+        t = (self.now + delay, wrapped_callback)
+        self.timers.append(t)
+        return t
+
+    def cancel_call_later(self, timer):
+        self.timers = [t for t in self.timers if t != timer]
+
     # For unit testing
     def advance_time(self, secs):
         self.now += secs
+
+        timers = self.timers
+        self.timers = []
+
+        for time, callback in timers:
+            if self.now >= time:
+                callback()
+            else:
+                self.timers.append((time, callback))
 
 
 class SQLiteMemoryDbPool(ConnectionPool, object):
@@ -242,7 +272,7 @@ class MemoryDataStore(object):
         return defer.succeed([])
 
     def persist_event(self, event):
-        if event.type == RoomMemberEvent.TYPE:
+        if event.type == EventTypes.Member:
             room_id = event.room_id
             user = event.state_key
             membership = event.membership

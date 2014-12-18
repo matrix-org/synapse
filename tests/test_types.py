@@ -23,21 +23,21 @@ mock_homeserver = BaseHomeServer(hostname="my.domain")
 class UserIDTestCase(unittest.TestCase):
 
     def test_parse(self):
-        user = UserID.from_string("@1234abcd:my.domain", hs=mock_homeserver)
+        user = UserID.from_string("@1234abcd:my.domain")
 
         self.assertEquals("1234abcd", user.localpart)
         self.assertEquals("my.domain", user.domain)
-        self.assertEquals(True, user.is_mine)
+        self.assertEquals(True, mock_homeserver.is_mine(user))
 
     def test_build(self):
-        user = UserID("5678efgh", "my.domain", True)
+        user = UserID("5678efgh", "my.domain")
 
         self.assertEquals(user.to_string(), "@5678efgh:my.domain")
 
     def test_compare(self):
-        userA = UserID.from_string("@userA:my.domain", hs=mock_homeserver)
-        userAagain = UserID.from_string("@userA:my.domain", hs=mock_homeserver)
-        userB = UserID.from_string("@userB:my.domain", hs=mock_homeserver)
+        userA = UserID.from_string("@userA:my.domain")
+        userAagain = UserID.from_string("@userA:my.domain")
+        userB = UserID.from_string("@userB:my.domain")
 
         self.assertTrue(userA == userAagain)
         self.assertTrue(userA != userB)
@@ -52,14 +52,14 @@ class UserIDTestCase(unittest.TestCase):
 class RoomAliasTestCase(unittest.TestCase):
 
     def test_parse(self):
-        room = RoomAlias.from_string("#channel:my.domain", hs=mock_homeserver)
+        room = RoomAlias.from_string("#channel:my.domain")
 
         self.assertEquals("channel", room.localpart)
         self.assertEquals("my.domain", room.domain)
-        self.assertEquals(True, room.is_mine)
+        self.assertEquals(True, mock_homeserver.is_mine(room))
 
     def test_build(self):
-        room = RoomAlias("channel", "my.domain", True)
+        room = RoomAlias("channel", "my.domain")
 
         self.assertEquals(room.to_string(), "#channel:my.domain")
 

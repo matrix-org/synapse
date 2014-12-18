@@ -19,8 +19,7 @@ from twisted.internet import defer
 from base import RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
 from synapse.streams.config import PaginationConfig
-from synapse.api.events.room import RoomMemberEvent, RoomRedactionEvent
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes, Membership
 
 import json
 import logging
@@ -129,9 +128,9 @@ class RoomStateEventRestServlet(RestServlet):
         msg_handler = self.handlers.message_handler
         data = yield msg_handler.get_room_data(
             user_id=user.to_string(),
-            room_id=urllib.unquote(room_id),
-            event_type=urllib.unquote(event_type),
-            state_key=urllib.unquote(state_key),
+            room_id=room_id,
+            event_type=event_type,
+            state_key=state_key,
         )
 
         if not data:
@@ -143,32 +142,23 @@ class RoomStateEventRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, state_key):
         user = yield self.auth.get_user_by_req(request)
-        event_type = urllib.unquote(event_type)
 
         content = _parse_json(request)
 
-        event = self.event_factory.create_event(
-            etype=event_type,  # already urldecoded
-            content=content,
-            room_id=urllib.unquote(room_id),
-            user_id=user.to_string(),
-            state_key=urllib.unquote(state_key)
-            )
+        event_dict = {
+            "type": event_type,
+            "content": content,
+            "room_id": room_id,
+            "sender": user.to_string(),
+        }
 
-        self.validator.validate(event)
+        if state_key is not None:
+            event_dict["state_key"] = state_key
 
-        if event_type == RoomMemberEvent.TYPE:
-            # membership events are special
-            handler = self.handlers.room_member_handler
-            yield handler.change_membership(event)
-            defer.returnValue((200, {}))
-        else:
-            # store random bits of state
-            msg_handler = self.handlers.message_handler
-            yield msg_handler.store_room_data(
-                event=event
-            )
-            defer.returnValue((200, {}))
+        msg_handler = self.handlers.message_handler
+        yield msg_handler.create_and_send_event(event_dict)
+
+        defer.returnValue((200, {}))
 
 
 # TODO: Needs unit testing for generic events + feedback
@@ -184,17 +174,15 @@ class RoomSendEventRestServlet(RestServlet):
         user = yield self.auth.get_user_by_req(request)
         content = _parse_json(request)
 
-        event = self.event_factory.create_event(
-            etype=urllib.unquote(event_type),
-            room_id=urllib.unquote(room_id),
-            user_id=user.to_string(),
-            content=content
-        )
-
-        self.validator.validate(event)
-
         msg_handler = self.handlers.message_handler
-        yield msg_handler.send_message(event)
+        event = yield msg_handler.create_and_send_event(
+            {
+                "type": event_type,
+                "content": content,
+                "room_id": room_id,
+                "sender": user.to_string(),
+            }
+        )
 
         defer.returnValue((200, {"event_id": event.event_id}))
 
@@ -235,14 +223,10 @@ class JoinRoomAliasServlet(RestServlet):
         identifier = None
         is_room_alias = False
         try:
-            identifier = self.hs.parse_roomalias(
-                urllib.unquote(room_identifier)
-            )
+            identifier = self.hs.parse_roomalias(room_identifier)
             is_room_alias = True
         except SynapseError:
-            identifier = self.hs.parse_roomid(
-                urllib.unquote(room_identifier)
-            )
+            identifier = self.hs.parse_roomid(room_identifier)
 
         # TODO: Support for specifying the home server to join with?
 
@@ -251,18 +235,17 @@ class JoinRoomAliasServlet(RestServlet):
             ret_dict = yield handler.join_room_alias(user, identifier)
             defer.returnValue((200, ret_dict))
         else:  # room id
-            event = self.event_factory.create_event(
-                etype=RoomMemberEvent.TYPE,
-                content={"membership": Membership.JOIN},
-                room_id=urllib.unquote(identifier.to_string()),
-                user_id=user.to_string(),
-                state_key=user.to_string()
+            msg_handler = self.handlers.message_handler
+            yield msg_handler.create_and_send_event(
+                {
+                    "type": EventTypes.Member,
+                    "content": {"membership": Membership.JOIN},
+                    "room_id": identifier.to_string(),
+                    "sender": user.to_string(),
+                    "state_key": user.to_string(),
+                }
             )
 
-            self.validator.validate(event)
-
-            handler = self.handlers.room_member_handler
-            yield handler.change_membership(event)
             defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
@@ -301,7 +284,7 @@ class RoomMemberListRestServlet(RestServlet):
         user = yield self.auth.get_user_by_req(request)
         handler = self.handlers.room_member_handler
         members = yield handler.get_room_members_as_pagination_chunk(
-            room_id=urllib.unquote(room_id),
+            room_id=room_id,
             user_id=user.to_string())
 
         for event in members["chunk"]:
@@ -327,13 +310,13 @@ class RoomMessageListRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         user = yield self.auth.get_user_by_req(request)
-        pagination_config = PaginationConfig.from_request(request,
-            default_limit=10,
+        pagination_config = PaginationConfig.from_request(
+            request, default_limit=10,
         )
         with_feedback = "feedback" in request.args
         handler = self.handlers.message_handler
         msgs = yield handler.get_messages(
-            room_id=urllib.unquote(room_id),
+            room_id=room_id,
             user_id=user.to_string(),
             pagin_config=pagination_config,
             feedback=with_feedback)
@@ -351,7 +334,7 @@ class RoomStateRestServlet(RestServlet):
         handler = self.handlers.message_handler
         # Get all the current state for this room
         events = yield handler.get_state_events(
-            room_id=urllib.unquote(room_id),
+            room_id=room_id,
             user_id=user.to_string(),
         )
         defer.returnValue((200, events))
@@ -366,7 +349,7 @@ class RoomInitialSyncRestServlet(RestServlet):
         user = yield self.auth.get_user_by_req(request)
         pagination_config = PaginationConfig.from_request(request)
         content = yield self.handlers.message_handler.room_initial_sync(
-            room_id=urllib.unquote(room_id),
+            room_id=room_id,
             user_id=user.to_string(),
             pagin_config=pagination_config,
         )
@@ -378,8 +361,10 @@ class RoomTriggerBackfill(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
-        remote_server = urllib.unquote(request.args["remote"][0])
-        room_id = urllib.unquote(room_id)
+        remote_server = urllib.unquote(
+            request.args["remote"][0]
+        ).decode("UTF-8")
+
         limit = int(request.args["limit"][0])
 
         handler = self.handlers.federation_handler
@@ -414,18 +399,17 @@ class RoomMembershipRestServlet(RestServlet):
             if membership_action == "kick":
                 membership_action = "leave"
 
-        event = self.event_factory.create_event(
-            etype=RoomMemberEvent.TYPE,
-            content={"membership": unicode(membership_action)},
-            room_id=urllib.unquote(room_id),
-            user_id=user.to_string(),
-            state_key=state_key
+        msg_handler = self.handlers.message_handler
+        yield msg_handler.create_and_send_event(
+            {
+                "type": EventTypes.Member,
+                "content": {"membership": unicode(membership_action)},
+                "room_id": room_id,
+                "sender": user.to_string(),
+                "state_key": state_key,
+            }
         )
 
-        self.validator.validate(event)
-
-        handler = self.handlers.room_member_handler
-        yield handler.change_membership(event)
         defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
@@ -453,18 +437,16 @@ class RoomRedactEventRestServlet(RestServlet):
         user = yield self.auth.get_user_by_req(request)
         content = _parse_json(request)
 
-        event = self.event_factory.create_event(
-            etype=RoomRedactionEvent.TYPE,
-            room_id=urllib.unquote(room_id),
-            user_id=user.to_string(),
-            content=content,
-            redacts=urllib.unquote(event_id),
-        )
-
-        self.validator.validate(event)
-
         msg_handler = self.handlers.message_handler
-        yield msg_handler.send_message(event)
+        event = yield msg_handler.create_and_send_event(
+            {
+                "type": EventTypes.Redaction,
+                "content": content,
+                "room_id": room_id,
+                "sender": user.to_string(),
+                "redacts": event_id,
+            }
+        )
 
         defer.returnValue((200, {"event_id": event.event_id}))
 
@@ -481,6 +463,39 @@ class RoomRedactEventRestServlet(RestServlet):
 
         self.txns.store_client_transaction(request, txn_id, response)
         defer.returnValue(response)
+
+
+class RoomTypingRestServlet(RestServlet):
+    PATTERN = client_path_pattern(
+        "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$"
+    )
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_id, user_id):
+        auth_user = yield self.auth.get_user_by_req(request)
+
+        room_id = urllib.unquote(room_id)
+        target_user = self.hs.parse_userid(urllib.unquote(user_id))
+
+        content = _parse_json(request)
+
+        typing_handler = self.handlers.typing_notification_handler
+
+        if content["typing"]:
+            yield typing_handler.started_typing(
+                target_user=target_user,
+                auth_user=auth_user,
+                room_id=room_id,
+                timeout=content.get("timeout", 30000),
+            )
+        else:
+            yield typing_handler.stopped_typing(
+                target_user=target_user,
+                auth_user=auth_user,
+                room_id=room_id,
+            )
+
+        defer.returnValue((200, {}))
 
 
 def _parse_json(request):
@@ -538,3 +553,4 @@ def register_servlets(hs, http_server):
     RoomStateRestServlet(hs).register(http_server)
     RoomInitialSyncRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
+    RoomTypingRestServlet(hs).register(http_server)

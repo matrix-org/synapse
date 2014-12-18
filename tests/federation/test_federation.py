@@ -23,24 +23,20 @@ from ..utils import MockHttpResource, MockClock, MockKey
 
 from synapse.server import HomeServer
 from synapse.federation import initialize_http_replication
-from synapse.api.events import SynapseEvent
+from synapse.events import FrozenEvent
+
+from synapse.storage.transactions import DestinationsTable
 
 
 def make_pdu(prev_pdus=[], **kwargs):
     """Provide some default fields for making a PduTuple."""
     pdu_fields = {
-        "is_state": False,
-        "unrecognized_keys": [],
-        "outlier": False,
-        "have_processed": True,
         "state_key": None,
-        "power_level": None,
-        "prev_state_id": None,
-        "prev_state_origin": None,
+        "prev_events": prev_pdus,
     }
     pdu_fields.update(kwargs)
 
-    return SynapseEvent(prev_pdus=prev_pdus, **pdu_fields)
+    return FrozenEvent(pdu_fields)
 
 
 class FederationTestCase(unittest.TestCase):
@@ -55,9 +51,13 @@ class FederationTestCase(unittest.TestCase):
             "delivered_txn",
             "get_received_txn_response",
             "set_received_txn_response",
+            "get_destination_retry_timings",
         ])
         self.mock_persistence.get_received_txn_response.return_value = (
             defer.succeed(None)
+        )
+        self.mock_persistence.get_destination_retry_timings.return_value = (
+            defer.succeed(DestinationsTable.EntryType("", 0, 0))
         )
         self.mock_config = Mock()
         self.mock_config.signing_key = [MockKey()]
@@ -171,7 +171,7 @@ class FederationTestCase(unittest.TestCase):
             (200, "OK")
         )
 
-        pdu = SynapseEvent(
+        pdu = make_pdu(
             event_id="abc123def456",
             origin="red",
             user_id="@a:red",
@@ -180,10 +180,9 @@ class FederationTestCase(unittest.TestCase):
             origin_server_ts=123456789001,
             depth=1,
             content={"text": "Here is the message"},
-            destinations=["remote"],
         )
 
-        yield self.federation.send_pdu(pdu)
+        yield self.federation.send_pdu(pdu, ["remote"])
 
         self.mock_http_client.put_json.assert_called_with(
             "remote",

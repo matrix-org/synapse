@@ -17,14 +17,10 @@
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership, JoinRules
+from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
-from synapse.api.events.room import (
-    RoomMemberEvent, RoomPowerLevelsEvent, RoomRedactionEvent,
-    RoomJoinRulesEvent, RoomCreateEvent, RoomAliasesEvent,
-)
 from synapse.util.logutils import log_function
-from syutil.base64util import encode_base64
+from synapse.util.async import run_on_reactor
 
 import logging
 
@@ -53,15 +49,17 @@ class Auth(object):
                 logger.warn("Trusting event: %s", event.event_id)
                 return True
 
-            if event.type == RoomCreateEvent.TYPE:
+            if event.type == EventTypes.Create:
                 # FIXME
                 return True
 
             # FIXME: Temp hack
-            if event.type == RoomAliasesEvent.TYPE:
+            if event.type == EventTypes.Aliases:
                 return True
 
-            if event.type == RoomMemberEvent.TYPE:
+            logger.debug("Auth events: %s", auth_events)
+
+            if event.type == EventTypes.Member:
                 allowed = self.is_membership_change_allowed(
                     event, auth_events
                 )
@@ -74,10 +72,10 @@ class Auth(object):
             self.check_event_sender_in_room(event, auth_events)
             self._can_send_event(event, auth_events)
 
-            if event.type == RoomPowerLevelsEvent.TYPE:
+            if event.type == EventTypes.PowerLevels:
                 self._check_power_levels(event, auth_events)
 
-            if event.type == RoomRedactionEvent.TYPE:
+            if event.type == EventTypes.Redaction:
                 self._check_redaction(event, auth_events)
 
             logger.debug("Allowing! %s", event)
@@ -93,7 +91,7 @@ class Auth(object):
     def check_joined_room(self, room_id, user_id):
         member = yield self.state.get_current_state(
             room_id=room_id,
-            event_type=RoomMemberEvent.TYPE,
+            event_type=EventTypes.Member,
             state_key=user_id
         )
         self._check_joined_room(member, user_id, room_id)
@@ -104,7 +102,7 @@ class Auth(object):
         curr_state = yield self.state.get_current_state(room_id)
 
         for event in curr_state:
-            if event.type == RoomMemberEvent.TYPE:
+            if event.type == EventTypes.Member:
                 try:
                     if self.hs.parse_userid(event.state_key).domain != host:
                         continue
@@ -118,7 +116,7 @@ class Auth(object):
         defer.returnValue(False)
 
     def check_event_sender_in_room(self, event, auth_events):
-        key = (RoomMemberEvent.TYPE, event.user_id, )
+        key = (EventTypes.Member, event.user_id, )
         member_event = auth_events.get(key)
 
         return self._check_joined_room(
@@ -140,7 +138,7 @@ class Auth(object):
         # Check if this is the room creator joining:
         if len(event.prev_events) == 1 and Membership.JOIN == membership:
             # Get room creation event:
-            key = (RoomCreateEvent.TYPE, "", )
+            key = (EventTypes.Create, "", )
             create = auth_events.get(key)
             if create and event.prev_events[0][0] == create.event_id:
                 if create.content["creator"] == event.state_key:
@@ -149,19 +147,19 @@ class Auth(object):
         target_user_id = event.state_key
 
         # get info about the caller
-        key = (RoomMemberEvent.TYPE, event.user_id, )
+        key = (EventTypes.Member, event.user_id, )
         caller = auth_events.get(key)
 
         caller_in_room = caller and caller.membership == Membership.JOIN
         caller_invited = caller and caller.membership == Membership.INVITE
 
         # get info about the target
-        key = (RoomMemberEvent.TYPE, target_user_id, )
+        key = (EventTypes.Member, target_user_id, )
         target = auth_events.get(key)
 
         target_in_room = target and target.membership == Membership.JOIN
 
-        key = (RoomJoinRulesEvent.TYPE, "", )
+        key = (EventTypes.JoinRules, "", )
         join_rule_event = auth_events.get(key)
         if join_rule_event:
             join_rule = join_rule_event.content.get(
@@ -256,7 +254,7 @@ class Auth(object):
         return True
 
     def _get_power_level_from_event_state(self, event, user_id, auth_events):
-        key = (RoomPowerLevelsEvent.TYPE, "", )
+        key = (EventTypes.PowerLevels, "", )
         power_level_event = auth_events.get(key)
         level = None
         if power_level_event:
@@ -264,7 +262,7 @@ class Auth(object):
             if not level:
                 level = power_level_event.content.get("users_default", 0)
         else:
-            key = (RoomCreateEvent.TYPE, "", )
+            key = (EventTypes.Create, "", )
             create_event = auth_events.get(key)
             if (create_event is not None and
                     create_event.content["creator"] == user_id):
@@ -273,7 +271,7 @@ class Auth(object):
         return level
 
     def _get_ops_level_from_event_state(self, event, auth_events):
-        key = (RoomPowerLevelsEvent.TYPE, "", )
+        key = (EventTypes.PowerLevels, "", )
         power_level_event = auth_events.get(key)
 
         if power_level_event:
@@ -351,29 +349,31 @@ class Auth(object):
         return self.store.is_server_admin(user)
 
     @defer.inlineCallbacks
-    def add_auth_events(self, event):
-        if event.type == RoomCreateEvent.TYPE:
-            event.auth_events = []
+    def add_auth_events(self, builder, context):
+        yield run_on_reactor()
+
+        if builder.type == EventTypes.Create:
+            builder.auth_events = []
             return
 
-        auth_events = []
+        auth_ids = []
 
-        key = (RoomPowerLevelsEvent.TYPE, "", )
-        power_level_event = event.old_state_events.get(key)
+        key = (EventTypes.PowerLevels, "", )
+        power_level_event = context.current_state.get(key)
 
         if power_level_event:
-            auth_events.append(power_level_event.event_id)
+            auth_ids.append(power_level_event.event_id)
 
-        key = (RoomJoinRulesEvent.TYPE, "", )
-        join_rule_event = event.old_state_events.get(key)
+        key = (EventTypes.JoinRules, "", )
+        join_rule_event = context.current_state.get(key)
 
-        key = (RoomMemberEvent.TYPE, event.user_id, )
-        member_event = event.old_state_events.get(key)
+        key = (EventTypes.Member, builder.user_id, )
+        member_event = context.current_state.get(key)
 
-        key = (RoomCreateEvent.TYPE, "", )
-        create_event = event.old_state_events.get(key)
+        key = (EventTypes.Create, "", )
+        create_event = context.current_state.get(key)
         if create_event:
-            auth_events.append(create_event.event_id)
+            auth_ids.append(create_event.event_id)
 
         if join_rule_event:
             join_rule = join_rule_event.content.get("join_rule")
@@ -381,33 +381,37 @@ class Auth(object):
         else:
             is_public = False
 
-        if event.type == RoomMemberEvent.TYPE:
-            e_type = event.content["membership"]
+        if builder.type == EventTypes.Member:
+            e_type = builder.content["membership"]
             if e_type in [Membership.JOIN, Membership.INVITE]:
                 if join_rule_event:
-                    auth_events.append(join_rule_event.event_id)
+                    auth_ids.append(join_rule_event.event_id)
 
+            if e_type == Membership.JOIN:
                 if member_event and not is_public:
-                    auth_events.append(member_event.event_id)
+                    auth_ids.append(member_event.event_id)
+            else:
+                if member_event:
+                    auth_ids.append(member_event.event_id)
         elif member_event:
             if member_event.content["membership"] == Membership.JOIN:
-                auth_events.append(member_event.event_id)
+                auth_ids.append(member_event.event_id)
 
-        hashes = yield self.store.get_event_reference_hashes(
-            auth_events
+        auth_events_entries = yield self.store.add_event_hashes(
+            auth_ids
         )
-        hashes = [
-            {
-                k: encode_base64(v) for k, v in h.items()
-                if k == "sha256"
-            }
-            for h in hashes
-        ]
-        event.auth_events = zip(auth_events, hashes)
+
+        builder.auth_events = auth_events_entries
+
+        context.auth_events = {
+            k: v
+            for k, v in context.current_state.items()
+            if v.event_id in auth_ids
+        }
 
     @log_function
     def _can_send_event(self, event, auth_events):
-        key = (RoomPowerLevelsEvent.TYPE, "", )
+        key = (EventTypes.PowerLevels, "", )
         send_level_event = auth_events.get(key)
         send_level = None
         if send_level_event:

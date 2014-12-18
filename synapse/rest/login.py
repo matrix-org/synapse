@@ -47,8 +47,8 @@ class LoginRestServlet(RestServlet):
     @defer.inlineCallbacks
     def do_password_login(self, login_submission):
         if not login_submission["user"].startswith('@'):
-            login_submission["user"] = UserID.create_local(
-                login_submission["user"], self.hs).to_string()
+            login_submission["user"] = UserID.create(
+                login_submission["user"], self.hs.hostname).to_string()
 
         handler = self.handlers.login_handler
         token = yield handler.login(

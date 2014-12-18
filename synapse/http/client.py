@@ -61,6 +61,25 @@ class SimpleHttpClient(object):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
+    def post_json_get_json(self, uri, post_json):
+        json_str = json.dumps(post_json)
+
+        logger.info("HTTP POST %s -> %s", json_str, uri)
+
+        response = yield self.agent.request(
+            "POST",
+            uri.encode("ascii"),
+            headers=Headers({
+                "Content-Type": ["application/json"]
+            }),
+            bodyProducer=FileBodyProducer(StringIO(json_str))
+        )
+
+        body = yield readBody(response)
+
+        defer.returnValue(json.loads(body))
+
+    @defer.inlineCallbacks
     def get_json(self, uri, args={}):
         """ Get's some json from the given host and path
 

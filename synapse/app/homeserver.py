@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage import prepare_database
+from synapse.storage import prepare_database, UpgradeDatabaseException
 
 from synapse.server import HomeServer
 
@@ -24,12 +24,13 @@ from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
 from synapse.http.server import JsonResource, RootRedirect
-from synapse.http.content_repository import ContentRepoResource
+from synapse.media.v0.content_repository import ContentRepoResource
+from synapse.media.v1.media_repository import MediaRepositoryResource
 from synapse.http.server_key_resource import LocalKey
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX,
+    SERVER_KEY_PREFIX, MEDIA_PREFIX
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -69,6 +70,9 @@ class SynapseHomeServer(HomeServer):
             self, self.upload_dir, self.auth, self.content_addr
         )
 
+    def build_resource_for_media_repository(self):
+        return MediaRepositoryResource(self)
+
     def build_resource_for_server_key(self):
         return LocalKey(self)
 
@@ -99,6 +103,7 @@ class SynapseHomeServer(HomeServer):
             (FEDERATION_PREFIX, self.get_resource_for_federation()),
             (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
+            (MEDIA_PREFIX, self.get_resource_for_media_repository()),
         ]
         if web_client:
             logger.info("Adding the web client.")
@@ -223,8 +228,15 @@ def setup():
 
     logger.info("Preparing database: %s...", db_name)
 
-    with sqlite3.connect(db_name) as db_conn:
-        prepare_database(db_conn)
+    try:
+        with sqlite3.connect(db_name) as db_conn:
+            prepare_database(db_conn)
+    except UpgradeDatabaseException:
+        sys.stderr.write(
+            "\nFailed to upgrade database.\n"
+            "Have you followed any instructions in UPGRADES.rst?\n"
+        )
+        sys.exit(1)
 
     logger.info("Database prepared in %s.", db_name)
 
@@ -241,6 +253,8 @@ def setup():
     if config.no_tls:
         bind_port = None
     hs.start_listening(bind_port, config.unsecure_port)
+
+    hs.get_pusherpool().start()
 
     if config.daemonize:
         print config.pid_file
