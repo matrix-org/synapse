@@ -18,7 +18,6 @@ import collections
 from ._base import SQLBaseStore, Table
 from twisted.internet import defer
 
-from sqlite3 import IntegrityError
 from synapse.api.errors import StoreError
 
 import logging
