@@ -256,31 +256,35 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def get_state_for_context(self, destination, context, event_id=None):
+    def get_state_for_context(self, destination, context, event_id):
         """Requests all of the `current` state PDUs for a given context from
         a remote home server.
 
         Args:
             destination (str): The remote homeserver to query for the state.
             context (str): The context we're interested in.
+            event_id (str): The id of the event we want the state at.
 
         Returns:
             Deferred: Results in a list of PDUs.
         """
 
-        transaction_data = yield self.transport_layer.get_context_state(
+        result = yield self.transport_layer.get_context_state(
             destination,
             context,
             event_id=event_id,
         )
 
-        transaction = Transaction(**transaction_data)
         pdus = [
-            self.event_from_pdu_json(p, outlier=True)
-            for p in transaction.pdus
+            self.event_from_pdu_json(p, outlier=True) for p in result["pdus"]
         ]
 
-        defer.returnValue(pdus)
+        auth_chain = [
+            self.event_from_pdu_json(p, outlier=True)
+            for p in result.get("auth_chain", [])
+        ]
+
+        defer.returnValue((pdus, auth_chain))
 
     @defer.inlineCallbacks
     @log_function
@@ -383,10 +387,16 @@ class ReplicationLayer(object):
                 context,
                 event_id,
             )
+            auth_chain = yield self.store.get_auth_chain(
+                [pdu.event_id for pdu in pdus]
+            )
         else:
             raise NotImplementedError("Specify an event")
 
-        defer.returnValue((200, self._transaction_from_pdus(pdus).get_dict()))
+        defer.returnValue((200, {
+            "pdus": [pdu.get_pdu_json() for pdu in pdus],
+            "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
+        }))
 
     @defer.inlineCallbacks
     @log_function
@@ -573,6 +583,8 @@ class ReplicationLayer(object):
 
         state = None
 
+        auth_chain = []
+
         # We need to make sure we have all the auth events.
         # for e_id, _ in pdu.auth_events:
         #     exists = yield self._get_persisted_pdu(
@@ -645,7 +657,7 @@ class ReplicationLayer(object):
                     "_handle_new_pdu getting state for %s",
                     pdu.room_id
                 )
-                state = yield self.get_state_for_context(
+                state, auth_chain = yield self.get_state_for_context(
                     origin, pdu.room_id, pdu.event_id,
                 )
 
@@ -655,6 +667,7 @@ class ReplicationLayer(object):
                 pdu,
                 backfilled=backfilled,
                 state=state,
+                auth_chain=auth_chain,
             )
         else:
             ret = None

@@ -52,6 +52,7 @@ class FederationTestCase(unittest.TestCase):
             "get_received_txn_response",
             "set_received_txn_response",
             "get_destination_retry_timings",
+            "get_auth_chain",
         ])
         self.mock_persistence.get_received_txn_response.return_value = (
             defer.succeed(None)
@@ -59,6 +60,7 @@ class FederationTestCase(unittest.TestCase):
         self.mock_persistence.get_destination_retry_timings.return_value = (
             defer.succeed(DestinationsTable.EntryType("", 0, 0))
         )
+        self.mock_persistence.get_auth_chain.return_value = []
         self.mock_config = Mock()
         self.mock_config.signing_key = [MockKey()]
         self.clock = MockClock()
