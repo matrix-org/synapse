@@ -20,6 +20,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# FIXME: elsewhere we use FooStore to indicate something in the storage layer...
 class HttpTransactionStore(object):
 
     def __init__(self):

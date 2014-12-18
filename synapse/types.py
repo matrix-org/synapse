@@ -19,7 +19,7 @@ from collections import namedtuple
 
 
 class DomainSpecificString(
-        namedtuple("DomainSpecificString", ("localpart", "domain", "is_mine"))
+        namedtuple("DomainSpecificString", ("localpart", "domain"))
 ):
     """Common base class among ID/name strings that have a local part and a
     domain name, prefixed with a sigil.
@@ -28,15 +28,13 @@ class DomainSpecificString(
 
         'localpart' : The local part of the name (without the leading sigil)
         'domain' : The domain part of the name
-        'is_mine' : Boolean indicating if the domain name is recognised by the
-            HomeServer as being its own
     """
 
     # Deny iteration because it will bite you if you try to create a singleton
     # set by:
     #    users = set(user)
     def __iter__(self):
-        raise ValueError("Attempted to iterate a %s" % (type(self).__name__))
+        raise ValueError("Attempted to iterate a %s" % (type(self).__name__,))
 
     # Because this class is a namedtuple of strings and booleans, it is deeply
     # immutable.
@@ -47,7 +45,7 @@ class DomainSpecificString(
         return self
 
     @classmethod
-    def from_string(cls, s, hs):
+    def from_string(cls, s):
         """Parse the string given by 's' into a structure object."""
         if s[0] != cls.SIGIL:
             raise SynapseError(400, "Expected %s string to start with '%s'" % (
@@ -66,22 +64,15 @@ class DomainSpecificString(
 
         # This code will need changing if we want to support multiple domain
         # names on one HS
-        is_mine = domain == hs.hostname
-        return cls(localpart=parts[0], domain=domain, is_mine=is_mine)
+        return cls(localpart=parts[0], domain=domain)
 
     def to_string(self):
         """Return a string encoding the fields of the structure object."""
         return "%s%s:%s" % (self.SIGIL, self.localpart, self.domain)
 
     @classmethod
-    def create_local(cls, localpart, hs):
-        """Create a structure on the local domain"""
-        return cls(localpart=localpart, domain=hs.hostname, is_mine=True)
-
-    @classmethod
-    def create(cls, localpart, domain, hs):
-        is_mine = domain == hs.hostname
-        return cls(localpart=localpart, domain=domain, is_mine=is_mine)
+    def create(cls, localpart, domain,):
+        return cls(localpart=localpart, domain=domain)
 
 
 class UserID(DomainSpecificString):

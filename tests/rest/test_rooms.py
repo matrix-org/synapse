@@ -503,7 +503,7 @@ class RoomsMemberListTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_get_member_list_mixed_memberships(self):
-        room_creator = "@some_other_guy:blue"
+        room_creator = "@some_other_guy:red"
         room_id = yield self.create_room_as(room_creator)
         room_path = "/rooms/%s/members" % room_id
         yield self.invite(room=room_id, src=room_creator,
@@ -1066,7 +1066,3 @@ class RoomInitialSyncTestCase(RestTestCase):
         }
         self.assertTrue(self.user_id in presence_by_user)
         self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
-
-#        (code, response) = yield self.mock_resource.trigger("GET", path, None)
-#        self.assertEquals(200, code, msg=str(response))
-#        self.assert_dict(json.loads(content), response)

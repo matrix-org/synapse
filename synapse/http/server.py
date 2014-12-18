@@ -29,6 +29,7 @@ from twisted.web.util import redirectTo
 
 import collections
 import logging
+import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -122,9 +123,14 @@ class JsonResource(HttpServer, resource.Resource):
                     # We found a match! Trigger callback and then return the
                     # returned response. We pass both the request and any
                     # matched groups from the regex to the callback.
+
+                    args = [
+                        urllib.unquote(u).decode("UTF-8") for u in m.groups()
+                    ]
+
                     code, response = yield path_entry.callback(
                         request,
-                        *m.groups()
+                        *args
                     )
 
                     self._send_response(request, code, response)
@@ -166,14 +172,10 @@ class JsonResource(HttpServer, resource.Resource):
                 request)
             return
 
-        if not self._request_user_agent_is_curl(request):
-            json_bytes = encode_canonical_json(response_json_object)
-        else:
-            json_bytes = encode_pretty_printed_json(response_json_object)
-
         # TODO: Only enable CORS for the requests that need it.
-        respond_with_json_bytes(request, code, json_bytes, send_cors=True,
-                                response_code_message=response_code_message)
+        respond_with_json(request, code, response_json_object, send_cors=True,
+                          response_code_message=response_code_message,
+                          pretty_print=self._request_user_agent_is_curl)
 
     @staticmethod
     def _request_user_agent_is_curl(request):
@@ -200,6 +202,17 @@ class RootRedirect(resource.Resource):
         if len(name) == 0:
             return self  # select ourselves as the child to render
         return resource.Resource.getChild(self, name, request)
+
+
+def respond_with_json(request, code, json_object, send_cors=False,
+                      response_code_message=None, pretty_print=False):
+    if not pretty_print:
+        json_bytes = encode_pretty_printed_json(json_object)
+    else:
+        json_bytes = encode_canonical_json(json_object)
+
+    return respond_with_json_bytes(request, code, json_bytes, send_cors,
+                                   response_code_message=response_code_message)
 
 
 def respond_with_json_bytes(request, code, json_bytes, send_cors=False,

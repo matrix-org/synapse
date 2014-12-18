@@ -18,12 +18,11 @@ from tests import unittest
 from twisted.internet import defer
 
 from synapse.server import HomeServer
-from synapse.api.constants import Membership
-from synapse.api.events.room import (
-    RoomMemberEvent, MessageEvent, RoomRedactionEvent,
-)
+from synapse.api.constants import EventTypes, Membership
 
-from tests.utils import SQLiteMemoryDbPool
+from tests.utils import SQLiteMemoryDbPool, MockKey
+
+from mock import Mock
 
 
 class RedactionTestCase(unittest.TestCase):
@@ -33,13 +32,21 @@ class RedactionTestCase(unittest.TestCase):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
 
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer(
             "test",
             db_pool=db_pool,
+            config=self.mock_config,
+            resource_for_federation=Mock(),
+            http_client=None,
         )
 
         self.store = hs.get_datastore()
-        self.event_factory = hs.get_event_factory()
+        self.event_builder_factory = hs.get_event_builder_factory()
+        self.handlers = hs.get_handlers()
+        self.message_handler = self.handlers.message_handler
 
         self.u_alice = hs.parse_userid("@alice:test")
         self.u_bob = hs.parse_userid("@bob:test")
@@ -49,35 +56,23 @@ class RedactionTestCase(unittest.TestCase):
         self.depth = 1
 
     @defer.inlineCallbacks
-    def inject_room_member(self, room, user, membership, prev_state=None,
+    def inject_room_member(self, room, user, membership, replaces_state=None,
                            extra_content={}):
-        self.depth += 1
+        content = {"membership": membership}
+        content.update(extra_content)
+        builder = self.event_builder_factory.new({
+            "type": EventTypes.Member,
+            "sender": user.to_string(),
+            "state_key": user.to_string(),
+            "room_id": room.to_string(),
+            "content": content,
+        })
 
-        event = self.event_factory.create_event(
-            etype=RoomMemberEvent.TYPE,
-            user_id=user.to_string(),
-            state_key=user.to_string(),
-            room_id=room.to_string(),
-            membership=membership,
-            content={"membership": membership},
-            depth=self.depth,
-            prev_events=[],
+        event, context = yield self.message_handler._create_new_client_event(
+            builder
         )
 
-        event.content.update(extra_content)
-
-        if prev_state:
-            event.prev_state = prev_state
-
-        event.state_events = None
-        event.hashes = {}
-        event.prev_state = []
-        event.auth_events = []
-
-        # Have to create a join event using the eventfactory
-        yield self.store.persist_event(
-            event
-        )
+        yield self.store.persist_event(event, context)
 
         defer.returnValue(event)
 
@@ -85,46 +80,38 @@ class RedactionTestCase(unittest.TestCase):
     def inject_message(self, room, user, body):
         self.depth += 1
 
-        event = self.event_factory.create_event(
-            etype=MessageEvent.TYPE,
-            user_id=user.to_string(),
-            room_id=room.to_string(),
-            content={"body": body, "msgtype": u"message"},
-            depth=self.depth,
-            prev_events=[],
+        builder = self.event_builder_factory.new({
+            "type": EventTypes.Message,
+            "sender": user.to_string(),
+            "state_key": user.to_string(),
+            "room_id": room.to_string(),
+            "content": {"body": body, "msgtype": u"message"},
+        })
+
+        event, context = yield self.message_handler._create_new_client_event(
+            builder
         )
 
-        event.state_events = None
-        event.hashes = {}
-        event.auth_events = []
-
-        yield self.store.persist_event(
-            event
-        )
+        yield self.store.persist_event(event, context)
 
         defer.returnValue(event)
 
     @defer.inlineCallbacks
     def inject_redaction(self, room, event_id, user, reason):
-        event = self.event_factory.create_event(
-            etype=RoomRedactionEvent.TYPE,
-            user_id=user.to_string(),
-            room_id=room.to_string(),
-            content={"reason": reason},
-            depth=self.depth,
-            redacts=event_id,
-            prev_events=[],
+        builder = self.event_builder_factory.new({
+            "type": EventTypes.Redaction,
+            "sender": user.to_string(),
+            "state_key": user.to_string(),
+            "room_id": room.to_string(),
+            "content": {"reason": reason},
+            "redacts": event_id,
+        })
+
+        event, context = yield self.message_handler._create_new_client_event(
+            builder
         )
 
-        event.state_events = None
-        event.hashes = {}
-        event.auth_events = []
-
-        yield self.store.persist_event(
-            event
-        )
-
-        defer.returnValue(event)
+        yield self.store.persist_event(event, context)
 
     @defer.inlineCallbacks
     def test_redact(self):
@@ -152,14 +139,14 @@ class RedactionTestCase(unittest.TestCase):
 
         self.assertObjectHasAttributes(
             {
-                "type": MessageEvent.TYPE,
+                "type": EventTypes.Message,
                 "user_id": self.u_alice.to_string(),
                 "content": {"body": "t", "msgtype": "message"},
             },
             event,
         )
 
-        self.assertFalse(hasattr(event, "redacted_because"))
+        self.assertFalse("redacted_because" in event.unsigned)
 
         # Redact event
         reason = "Because I said so"
@@ -180,24 +167,26 @@ class RedactionTestCase(unittest.TestCase):
 
         event = results[0]
 
+        self.assertEqual(msg_event.event_id, event.event_id)
+
+        self.assertTrue("redacted_because" in event.unsigned)
+
         self.assertObjectHasAttributes(
             {
-                "type": MessageEvent.TYPE,
+                "type": EventTypes.Message,
                 "user_id": self.u_alice.to_string(),
                 "content": {},
             },
             event,
         )
 
-        self.assertTrue(hasattr(event, "redacted_because"))
-
         self.assertObjectHasAttributes(
             {
-                "type": RoomRedactionEvent.TYPE,
+                "type": EventTypes.Redaction,
                 "user_id": self.u_alice.to_string(),
                 "content": {"reason": reason},
             },
-            event.redacted_because,
+            event.unsigned["redacted_because"],
         )
 
     @defer.inlineCallbacks
@@ -229,7 +218,7 @@ class RedactionTestCase(unittest.TestCase):
 
         self.assertObjectHasAttributes(
             {
-                "type": RoomMemberEvent.TYPE,
+                "type": EventTypes.Member,
                 "user_id": self.u_bob.to_string(),
                 "content": {"membership": Membership.JOIN, "blue": "red"},
             },
@@ -257,22 +246,22 @@ class RedactionTestCase(unittest.TestCase):
 
         event = results[0]
 
+        self.assertTrue("redacted_because" in event.unsigned)
+
         self.assertObjectHasAttributes(
             {
-                "type": RoomMemberEvent.TYPE,
+                "type": EventTypes.Member,
                 "user_id": self.u_bob.to_string(),
                 "content": {"membership": Membership.JOIN},
             },
             event,
         )
 
-        self.assertTrue(hasattr(event, "redacted_because"))
-
         self.assertObjectHasAttributes(
             {
-                "type": RoomRedactionEvent.TYPE,
+                "type": EventTypes.Redaction,
                 "user_id": self.u_alice.to_string(),
                 "content": {"reason": reason},
             },
-            event.redacted_because,
+            event.unsigned["redacted_because"],
         )

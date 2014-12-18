@@ -1,3 +1,19 @@
+Upgrading to v0.6.0
+===================
+
+This update includes a change to the database schema. To upgrade you first need
+to upgrade the database by running::
+
+    python scripts/upgrade_db_to_v0.6.0.py <db> <server_name> <signing_key>
+
+Where `<db>` is the location of the database, `<server_name>` is the
+server name as specified in the synapse configuration, and `<signing_key>` is
+the location of the signing key as specified in the synapse configuration.
+
+This may take some time to complete. Failures of signatures and content hashes
+can safely be ignored.
+
+
 Upgrading to v0.5.1
 ===================
 

@@ -22,6 +22,7 @@ from synapse.api.errors import (
 )
 from ._base import BaseHandler
 import synapse.util.stringutils as stringutils
+from synapse.util.async import run_on_reactor
 from synapse.http.client import SimpleHttpClient
 from synapse.http.client import CaptchaServerHttpClient
 
@@ -54,12 +55,13 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
+        yield run_on_reactor()
         password_hash = None
         if password:
             password_hash = bcrypt.hashpw(password, bcrypt.gensalt())
 
         if localpart:
-            user = UserID(localpart, self.hs.hostname, True)
+            user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
 
             token = self._generate_token(user_id)
@@ -78,7 +80,7 @@ class RegistrationHandler(BaseHandler):
             while not user_id and not token:
                 try:
                     localpart = self._generate_user_id()
-                    user = UserID(localpart, self.hs.hostname, True)
+                    user = UserID(localpart, self.hs.hostname)
                     user_id = user.to_string()
 
                     token = self._generate_token(user_id)

@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS state_groups_state(
 
 CREATE TABLE IF NOT EXISTS event_to_state_groups(
     event_id TEXT NOT NULL,
-    state_group INTEGER NOT NULL
+    state_group INTEGER NOT NULL,
+    CONSTRAINT event_to_state_groups_uniq UNIQUE (event_id)
 );
 
 CREATE INDEX IF NOT EXISTS state_groups_id ON state_groups(id);

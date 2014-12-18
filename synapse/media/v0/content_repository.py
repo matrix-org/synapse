@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .server import respond_with_json_bytes
+from synapse.http.server import respond_with_json_bytes
 
 from synapse.util.stringutils import random_string
 from synapse.api.errors import (
