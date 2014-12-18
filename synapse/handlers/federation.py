@@ -95,7 +95,8 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def on_receive_pdu(self, origin, pdu, backfilled, state=None):
+    def on_receive_pdu(self, origin, pdu, backfilled, state=None,
+                       auth_chain=None):
         """ Called by the ReplicationLayer when we have a new pdu. We need to
         do auth checks and put it through the StateHandler.
         """
@@ -150,35 +151,35 @@ class FederationHandler(BaseHandler):
         if not is_in_room and not event.internal_metadata.outlier:
             logger.debug("Got event for room we're not in.")
 
-            replication_layer = self.replication_layer
-            auth_chain = yield replication_layer.get_event_auth(
-                origin,
-                context=event.room_id,
-                event_id=event.event_id,
-            )
+            replication = self.replication_layer
+
+            if not state:
+                state, auth_chain = yield replication.get_state_for_context(
+                    origin, context=event.room_id, event_id=event.event_id,
+                )
+
+            if not auth_chain:
+                auth_chain = yield replication.get_event_auth(
+                    origin,
+                    context=event.room_id,
+                    event_id=event.event_id,
+                )
 
             for e in auth_chain:
                 e.internal_metadata.outlier = True
                 try:
-                    yield self._handle_new_event(e, fetch_missing=False)
+                    yield self._handle_new_event(e, fetch_auth_from=origin)
                 except:
                     logger.exception(
                         "Failed to handle auth event %s",
                         e.event_id,
                     )
 
-            if not state:
-                state = yield replication_layer.get_state_for_context(
-                    origin,
-                    context=event.room_id,
-                    event_id=event.event_id,
-                )
-                # FIXME: Get auth chain for these state events
-
             current_state = state
 
         if state:
             for e in state:
+                logging.info("A :) %r", e)
                 e.internal_metadata.outlier = True
                 try:
                     yield self._handle_new_event(e)
@@ -392,7 +393,7 @@ class FederationHandler(BaseHandler):
             for e in auth_chain:
                 e.internal_metadata.outlier = True
                 try:
-                    yield self._handle_new_event(e, fetch_missing=False)
+                    yield self._handle_new_event(e)
                 except:
                     logger.exception(
                         "Failed to handle auth event %s",
@@ -404,8 +405,7 @@ class FederationHandler(BaseHandler):
                 e.internal_metadata.outlier = True
                 try:
                     yield self._handle_new_event(
-                        e,
-                        fetch_missing=True
+                        e, fetch_auth_from=target_host
                     )
                 except:
                     logger.exception(
@@ -682,7 +682,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _handle_new_event(self, event, state=None, backfilled=False,
-                          current_state=None, fetch_missing=True):
+                          current_state=None, fetch_auth_from=None):
 
         logger.debug(
             "_handle_new_event: Before annotate: %s, sigs: %s",
@@ -703,11 +703,20 @@ class FederationHandler(BaseHandler):
         known_ids = set(
             [s.event_id for s in context.auth_events.values()]
         )
+
         for e_id, _ in event.auth_events:
             if e_id not in known_ids:
-                e = yield self.store.get_event(
-                    e_id, allow_none=True,
-                )
+                e = yield self.store.get_event(e_id, allow_none=True)
+
+                if not e and fetch_auth_from is not None:
+                    # Grab the auth_chain over federation if we are missing
+                    # auth events.
+                    auth_chain = yield self.replication_layer.get_event_auth(
+                        fetch_auth_from, event.event_id, event.room_id
+                    )
+                    for auth_event in auth_chain:
+                        yield self._handle_new_event(auth_event)
+                    e = yield self.store.get_event(e_id, allow_none=True)
 
                 if not e:
                     # TODO: Do some conflict res to make sure that we're

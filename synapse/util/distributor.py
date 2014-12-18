@@ -120,5 +120,5 @@ class Signal(object):
             results = []
             for deferred in deferreds:
                 result = yield deferred
-                results.append(results)
+                results.append(result)
         defer.returnValue(results)
