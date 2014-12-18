@@ -52,12 +52,18 @@ class LoggingConfig(Config):
         if self.log_config is None:
 
             level = logging.INFO
+            level_for_storage = logging.INFO
             if self.verbosity:
                 level = logging.DEBUG
+                if self.verbosity > 1:
+                    level_for_storage = logging.DEBUG
 
             # FIXME: we need a logging.WARN for a -q quiet option
             logger = logging.getLogger('')
             logger.setLevel(level)
+
+            logging.getLogger('synapse.storage').setLevel(level_for_storage)
+
             formatter = logging.Formatter(log_format)
             if self.log_file:
                 handler = logging.FileHandler(self.log_file)

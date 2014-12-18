@@ -47,7 +47,8 @@ class PaginationConfig(object):
         self.limit = int(limit) if limit is not None else None
 
     @classmethod
-    def from_request(cls, request, raise_invalid_params=True):
+    def from_request(cls, request, raise_invalid_params=True,
+                     default_limit=None):
         def get_param(name, default=None):
             lst = request.args.get(name, [])
             if len(lst) > 1:
@@ -83,6 +84,9 @@ class PaginationConfig(object):
         limit = get_param("limit", None)
         if limit is not None and not limit.isdigit():
             raise SynapseError(400, "'limit' parameter must be an integer.")
+
+        if limit is None:
+            limit = default_limit
 
         try:
             return PaginationConfig(from_tok, to_tok, direction, limit)
