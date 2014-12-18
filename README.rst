@@ -143,6 +143,15 @@ Synapse can be installed on Cygwin. It requires the following Cygwin packages:
  - openssl (and openssl-devel, python-openssl)
  - python
  - python-setuptools
+ 
+The content repository requires additional packages and will be unable to process
+uploads without them:
+ - libjpeg8
+ - libjpeg8-devel
+ - zlib
+If you choose to install Synapse without these packages, you will need to reinstall
+``pillow`` for changes to be applied, e.g. ``pip uninstall pillow`` ``pip install
+pillow --user``
 
 Troubleshooting:
 
