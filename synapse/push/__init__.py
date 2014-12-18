@@ -79,6 +79,7 @@ class Pusher(object):
                     single_event = c
                     break
             if not single_event:
+                self.last_token = chunk['end']
                 continue
 
             if not self.alive:
