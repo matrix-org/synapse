@@ -194,6 +194,8 @@ class ProfileHandler(BaseHandler):
         if not self.hs.is_mine(user):
             return
 
+        self.ratelimit(user.to_string())
+
         joins = yield self.store.get_rooms_for_user_where_membership_is(
             user.to_string(),
             [Membership.JOIN],
@@ -214,5 +216,5 @@ class ProfileHandler(BaseHandler):
                 "room_id": j.room_id,
                 "state_key": j.state_key,
                 "content": content,
-                "sender": j.state_key,
-            })
+                "sender": j.state_key
+            }, ratelimit=False)

@@ -130,6 +130,7 @@ class RoomCreationHandler(BaseHandler):
                 "type": EventTypes.Name,
                 "room_id": room_id,
                 "sender": user_id,
+                "state_key": "",
                 "content": {"name": name},
             })
 
@@ -139,6 +140,7 @@ class RoomCreationHandler(BaseHandler):
                 "type": EventTypes.Topic,
                 "room_id": room_id,
                 "sender": user_id,
+                "state_key": "",
                 "content": {"topic": topic},
             })
 

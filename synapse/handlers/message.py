@@ -19,6 +19,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
 from synapse.events.validator import EventValidator
+from synapse.util.logcontext import PreserveLoggingContext
 
 from ._base import BaseHandler
 
@@ -106,7 +107,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue(chunk)
 
     @defer.inlineCallbacks
-    def create_and_send_event(self, event_dict):
+    def create_and_send_event(self, event_dict, ratelimit=True):
         """ Given a dict from a client, create and handle a new event.
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
@@ -123,7 +124,8 @@ class MessageHandler(BaseHandler):
 
         self.validator.validate_new(builder)
 
-        self.ratelimit(builder.user_id)
+        if ratelimit:
+            self.ratelimit(builder.user_id)
         # TODO(paul): Why does 'event' not have a 'user' object?
         user = self.hs.parse_userid(builder.user_id)
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
@@ -151,6 +153,11 @@ class MessageHandler(BaseHandler):
                 event=event,
                 context=context,
             )
+
+        if event.type == EventTypes.Message:
+            presence = self.hs.get_handlers().presence_handler
+            with PreserveLoggingContext():
+                presence.bump_presence_active_time(user)
 
         defer.returnValue(event)
 

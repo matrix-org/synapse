@@ -135,26 +135,26 @@ class RoomStore(SQLBaseStore):
         defer.returnValue(ret)
 
     def _store_room_topic_txn(self, txn, event):
-        if hasattr(event, "topic"):
+        if hasattr(event, "content") and "topic" in event.content:
             self._simple_insert_txn(
                 txn,
                 "topics",
                 {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
-                    "topic": event.topic,
+                    "topic": event.content["topic"],
                 }
             )
 
     def _store_room_name_txn(self, txn, event):
-        if hasattr(event, "name"):
+        if hasattr(event, "content") and "name" in event.content:
             self._simple_insert_txn(
                 txn,
                 "room_names",
                 {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
-                    "name": event.name,
+                    "name": event.content["name"],
                 }
             )
 

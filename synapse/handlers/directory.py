@@ -155,4 +155,4 @@ class DirectoryHandler(BaseHandler):
             "room_id": room_id,
             "sender": user_id,
             "content": {"aliases": aliases},
-        })
+        }, ratelimit=False)
