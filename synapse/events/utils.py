@@ -126,5 +126,8 @@ def serialize_event(hs, e):
     del d["prev_events"]
     del d["hashes"]
     del d["signatures"]
+    d.pop("depth", None)
+    d.pop("unsigned", None)
+    d.pop("origin", None)
 
     return d

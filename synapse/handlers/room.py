@@ -130,6 +130,7 @@ class RoomCreationHandler(BaseHandler):
                 "type": EventTypes.Name,
                 "room_id": room_id,
                 "sender": user_id,
+                "state_key": "",
                 "content": {"name": name},
             })
 
@@ -139,6 +140,7 @@ class RoomCreationHandler(BaseHandler):
                 "type": EventTypes.Topic,
                 "room_id": room_id,
                 "sender": user_id,
+                "state_key": "",
                 "content": {"topic": topic},
             })
 
@@ -147,7 +149,7 @@ class RoomCreationHandler(BaseHandler):
                 "type": EventTypes.Member,
                 "state_key": invitee,
                 "room_id": room_id,
-                "user_id": user_id,
+                "sender": user_id,
                 "content": {"membership": Membership.INVITE},
             })
 
@@ -389,6 +391,11 @@ class RoomMemberHandler(BaseHandler):
             raise SynapseError(404, "No known servers")
 
         host = hosts[0]
+
+        # If event doesn't include a display name, add one.
+        yield self.distributor.fire(
+            "collect_presencelike_data", joinee, content
+        )
 
         content.update({"membership": Membership.JOIN})
         builder = self.event_builder_factory.new({
