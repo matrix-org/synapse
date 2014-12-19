@@ -18,7 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError, Codes, CodeMessageException
-from synapse.api.events.room import RoomAliasesEvent
+from synapse.api.constants import EventTypes
 
 import logging
 
@@ -40,7 +40,7 @@ class DirectoryHandler(BaseHandler):
 
         # TODO(erikj): Do auth.
 
-        if not room_alias.is_mine:
+        if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
             # TODO(erikj): Change this.
 
@@ -64,7 +64,7 @@ class DirectoryHandler(BaseHandler):
     def delete_association(self, user_id, room_alias):
         # TODO Check if server admin
 
-        if not room_alias.is_mine:
+        if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
         room_id = yield self.store.delete_room_alias(room_alias)
@@ -75,7 +75,7 @@ class DirectoryHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_association(self, room_alias):
         room_id = None
-        if room_alias.is_mine:
+        if self.hs.is_mine(room_alias):
             result = yield self.store.get_association_from_room_alias(
                 room_alias
             )
@@ -123,7 +123,7 @@ class DirectoryHandler(BaseHandler):
     @defer.inlineCallbacks
     def on_directory_query(self, args):
         room_alias = self.hs.parse_roomalias(args["room_alias"])
-        if not room_alias.is_mine:
+        if not self.hs.is_mine(room_alias):
             raise SynapseError(
                 400, "Room Alias is not hosted on this Home Server"
             )
@@ -148,16 +148,11 @@ class DirectoryHandler(BaseHandler):
     def send_room_alias_update_event(self, user_id, room_id):
         aliases = yield self.store.get_aliases_for_room(room_id)
 
-        event = self.event_factory.create_event(
-            etype=RoomAliasesEvent.TYPE,
-            state_key=self.hs.hostname,
-            room_id=room_id,
-            user_id=user_id,
-            content={"aliases": aliases},
-        )
-
-        snapshot = yield self.store.snapshot_room(event)
-
-        yield self._on_new_room_event(
-            event, snapshot, extra_users=[user_id], suppress_auth=True
-        )
+        msg_handler = self.hs.get_handlers().message_handler
+        yield msg_handler.create_and_send_event({
+            "type": EventTypes.Aliases,
+            "state_key": self.hs.hostname,
+            "room_id": room_id,
+            "sender": user_id,
+            "content": {"aliases": aliases},
+        })

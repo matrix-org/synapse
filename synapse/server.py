@@ -20,9 +20,7 @@
 
 # Imports required for the default HomeServer() implementation
 from synapse.federation import initialize_http_replication
-from synapse.api.events import serialize_event
-from synapse.api.events.factory import EventFactory
-from synapse.api.events.validator import EventValidator
+from synapse.events.utils import serialize_event
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
@@ -36,6 +34,7 @@ from synapse.util.lockutils import LockManager
 from synapse.streams.events import EventSources
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.crypto.keyring import Keyring
+from synapse.events.builder import EventBuilderFactory
 
 
 class BaseHomeServer(object):
@@ -65,7 +64,6 @@ class BaseHomeServer(object):
         'persistence_service',
         'replication_layer',
         'datastore',
-        'event_factory',
         'handlers',
         'auth',
         'rest_servlet_factory',
@@ -78,10 +76,11 @@ class BaseHomeServer(object):
         'resource_for_web_client',
         'resource_for_content_repo',
         'resource_for_server_key',
+        'resource_for_media_repository',
         'event_sources',
         'ratelimiter',
         'keyring',
-        'event_validator',
+        'event_builder_factory',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -133,22 +132,22 @@ class BaseHomeServer(object):
     def parse_userid(self, s):
         """Parse the string given by 's' as a User ID and return a UserID
         object."""
-        return UserID.from_string(s, hs=self)
+        return UserID.from_string(s)
 
     def parse_roomalias(self, s):
         """Parse the string given by 's' as a Room Alias and return a RoomAlias
         object."""
-        return RoomAlias.from_string(s, hs=self)
+        return RoomAlias.from_string(s)
 
     def parse_roomid(self, s):
         """Parse the string given by 's' as a Room ID and return a RoomID
         object."""
-        return RoomID.from_string(s, hs=self)
+        return RoomID.from_string(s)
 
     def parse_eventid(self, s):
         """Parse the string given by 's' as a Event ID and return a EventID
         object."""
-        return EventID.from_string(s, hs=self)
+        return EventID.from_string(s)
 
     def serialize_event(self, e):
         return serialize_event(self, e)
@@ -164,6 +163,9 @@ class BaseHomeServer(object):
                 )[0]
 
         return ip_addr
+
+    def is_mine(self, domain_specific_string):
+        return domain_specific_string.domain == self.hostname
 
 # Build magic accessors for every dependency
 for depname in BaseHomeServer.DEPENDENCIES:
@@ -191,9 +193,6 @@ class HomeServer(BaseHomeServer):
 
     def build_datastore(self):
         return DataStore(self)
-
-    def build_event_factory(self):
-        return EventFactory(self)
 
     def build_handlers(self):
         return Handlers(self)
@@ -225,8 +224,11 @@ class HomeServer(BaseHomeServer):
     def build_keyring(self):
         return Keyring(self)
 
-    def build_event_validator(self):
-        return EventValidator(self)
+    def build_event_builder_factory(self):
+        return EventBuilderFactory(
+            clock=self.get_clock(),
+            hostname=self.hostname,
+        )
 
     def register_servlets(self):
         """ Register all servlets associated with this HomeServer.

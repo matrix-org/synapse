@@ -18,10 +18,11 @@ from tests import unittest
 from twisted.internet import defer
 
 from synapse.server import HomeServer
-from synapse.api.constants import Membership
-from synapse.api.events.room import RoomMemberEvent, MessageEvent
+from synapse.api.constants import EventTypes, Membership
 
-from tests.utils import SQLiteMemoryDbPool
+from tests.utils import SQLiteMemoryDbPool, MockKey
+
+from mock import Mock
 
 
 class StreamStoreTestCase(unittest.TestCase):
@@ -31,13 +32,21 @@ class StreamStoreTestCase(unittest.TestCase):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
 
+        self.mock_config = Mock()
+        self.mock_config.signing_key = [MockKey()]
+
         hs = HomeServer(
             "test",
             db_pool=db_pool,
+            config=self.mock_config,
+            resource_for_federation=Mock(),
+            http_client=None,
         )
 
         self.store = hs.get_datastore()
-        self.event_factory = hs.get_event_factory()
+        self.event_builder_factory = hs.get_event_builder_factory()
+        self.handlers = hs.get_handlers()
+        self.message_handler = self.handlers.message_handler
 
         self.u_alice = hs.parse_userid("@alice:test")
         self.u_bob = hs.parse_userid("@bob:test")
@@ -48,33 +57,22 @@ class StreamStoreTestCase(unittest.TestCase):
         self.depth = 1
 
     @defer.inlineCallbacks
-    def inject_room_member(self, room, user, membership, replaces_state=None):
+    def inject_room_member(self, room, user, membership):
         self.depth += 1
 
-        event = self.event_factory.create_event(
-            etype=RoomMemberEvent.TYPE,
-            user_id=user.to_string(),
-            state_key=user.to_string(),
-            room_id=room.to_string(),
-            membership=membership,
-            content={"membership": membership},
-            depth=self.depth,
-            prev_events=[],
+        builder = self.event_builder_factory.new({
+            "type": EventTypes.Member,
+            "sender": user.to_string(),
+            "state_key": user.to_string(),
+            "room_id": room.to_string(),
+            "content": {"membership": membership},
+        })
+
+        event, context = yield self.message_handler._create_new_client_event(
+            builder
         )
 
-        event.state_events = None
-        event.hashes = {}
-        event.prev_state = []
-        event.auth_events = []
-
-        if replaces_state:
-            event.prev_state = [(replaces_state, "hash")]
-            event.replaces_state = replaces_state
-
-        # Have to create a join event using the eventfactory
-        yield self.store.persist_event(
-            event
-        )
+        yield self.store.persist_event(event, context)
 
         defer.returnValue(event)
 
@@ -82,23 +80,19 @@ class StreamStoreTestCase(unittest.TestCase):
     def inject_message(self, room, user, body):
         self.depth += 1
 
-        event = self.event_factory.create_event(
-            etype=MessageEvent.TYPE,
-            user_id=user.to_string(),
-            room_id=room.to_string(),
-            content={"body": body, "msgtype": u"message"},
-            depth=self.depth,
-            prev_events=[],
+        builder = self.event_builder_factory.new({
+            "type": EventTypes.Message,
+            "sender": user.to_string(),
+            "state_key": user.to_string(),
+            "room_id": room.to_string(),
+            "content": {"body": body, "msgtype": u"message"},
+        })
+
+        event, context = yield self.message_handler._create_new_client_event(
+            builder
         )
 
-        event.state_events = None
-        event.hashes = {}
-        event.auth_events = []
-
-        # Have to create a join event using the eventfactory
-        yield self.store.persist_event(
-            event
-        )
+        yield self.store.persist_event(event, context)
 
     @defer.inlineCallbacks
     def test_event_stream_get_other(self):
@@ -130,7 +124,7 @@ class StreamStoreTestCase(unittest.TestCase):
 
         self.assertObjectHasAttributes(
             {
-                "type": MessageEvent.TYPE,
+                "type": EventTypes.Message,
                 "user_id": self.u_alice.to_string(),
                 "content": {"body": "test", "msgtype": "message"},
             },
@@ -167,7 +161,7 @@ class StreamStoreTestCase(unittest.TestCase):
 
         self.assertObjectHasAttributes(
             {
-                "type": MessageEvent.TYPE,
+                "type": EventTypes.Message,
                 "user_id": self.u_alice.to_string(),
                 "content": {"body": "test", "msgtype": "message"},
             },
@@ -220,7 +214,6 @@ class StreamStoreTestCase(unittest.TestCase):
 
         event2 = yield self.inject_room_member(
             self.room1, self.u_alice, Membership.JOIN,
-            replaces_state=event1.event_id,
         )
 
         end = yield self.store.get_room_events_max_id()
@@ -238,6 +231,6 @@ class StreamStoreTestCase(unittest.TestCase):
         event = results[0]
 
         self.assertTrue(
-            hasattr(event, "prev_content"),
+            "prev_content" in event.unsigned,
             msg="No prev_content key"
         )

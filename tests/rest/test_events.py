@@ -113,9 +113,6 @@ class EventStreamPermissionsTestCase(RestTestCase):
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
-        persistence_service = Mock(spec=["get_latest_pdus_in_context"])
-        persistence_service.get_latest_pdus_in_context.return_value = []
-
         self.mock_config = NonCallableMock()
         self.mock_config.signing_key = [MockKey()]
 
@@ -127,7 +124,6 @@ class EventStreamPermissionsTestCase(RestTestCase):
             db_pool=db_pool,
             http_client=None,
             replication_layer=Mock(),
-            persistence_service=persistence_service,
             clock=Mock(spec=[
                 "call_later",
                 "cancel_call_later",

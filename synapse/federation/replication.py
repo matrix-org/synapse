@@ -25,6 +25,7 @@ from .persistence import TransactionActions
 
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.events import FrozenEvent
 
 import logging
 
@@ -73,7 +74,7 @@ class ReplicationLayer(object):
 
         self._clock = hs.get_clock()
 
-        self.event_factory = hs.get_event_factory()
+        self.event_builder_factory = hs.get_event_builder_factory()
 
     def set_handler(self, handler):
         """Sets the handler that the replication layer will use to communicate
@@ -112,7 +113,7 @@ class ReplicationLayer(object):
         self.query_handlers[query_type] = handler
 
     @log_function
-    def send_pdu(self, pdu):
+    def send_pdu(self, pdu, destinations):
         """Informs the replication layer about a new PDU generated within the
         home server that should be transmitted to others.
 
@@ -131,7 +132,7 @@ class ReplicationLayer(object):
         logger.debug("[%s] transaction_layer.enqueue_pdu... ", pdu.event_id)
 
         # TODO, add errback, etc.
-        self._transaction_queue.enqueue_pdu(pdu, order)
+        self._transaction_queue.enqueue_pdu(pdu, destinations, order)
 
         logger.debug(
             "[%s] transaction_layer.enqueue_pdu... done",
@@ -255,31 +256,35 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     @log_function
-    def get_state_for_context(self, destination, context, event_id=None):
+    def get_state_for_context(self, destination, context, event_id):
         """Requests all of the `current` state PDUs for a given context from
         a remote home server.
 
         Args:
             destination (str): The remote homeserver to query for the state.
             context (str): The context we're interested in.
+            event_id (str): The id of the event we want the state at.
 
         Returns:
             Deferred: Results in a list of PDUs.
         """
 
-        transaction_data = yield self.transport_layer.get_context_state(
+        result = yield self.transport_layer.get_context_state(
             destination,
             context,
             event_id=event_id,
         )
 
-        transaction = Transaction(**transaction_data)
         pdus = [
-            self.event_from_pdu_json(p, outlier=True)
-            for p in transaction.pdus
+            self.event_from_pdu_json(p, outlier=True) for p in result["pdus"]
         ]
 
-        defer.returnValue(pdus)
+        auth_chain = [
+            self.event_from_pdu_json(p, outlier=True)
+            for p in result.get("auth_chain", [])
+        ]
+
+        defer.returnValue((pdus, auth_chain))
 
     @defer.inlineCallbacks
     @log_function
@@ -334,7 +339,7 @@ class ReplicationLayer(object):
             defer.returnValue(response)
             return
 
-        logger.debug("[%s] Transacition is new", transaction.transaction_id)
+        logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
         with PreserveLoggingContext():
             dl = []
@@ -382,10 +387,16 @@ class ReplicationLayer(object):
                 context,
                 event_id,
             )
+            auth_chain = yield self.store.get_auth_chain(
+                [pdu.event_id for pdu in pdus]
+            )
         else:
             raise NotImplementedError("Specify an event")
 
-        defer.returnValue((200, self._transaction_from_pdus(pdus).get_dict()))
+        defer.returnValue((200, {
+            "pdus": [pdu.get_pdu_json() for pdu in pdus],
+            "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
+        }))
 
     @defer.inlineCallbacks
     @log_function
@@ -438,7 +449,9 @@ class ReplicationLayer(object):
 
     @defer.inlineCallbacks
     def on_send_join_request(self, origin, content):
+        logger.debug("on_send_join_request: content: %s", content)
         pdu = self.event_from_pdu_json(content)
+        logger.debug("on_send_join_request: pdu sigs: %s", pdu.signatures)
         res_pdus = yield self.handler.on_send_join_request(origin, pdu)
         time_now = self._clock.time_msec()
         defer.returnValue((200, {
@@ -557,12 +570,20 @@ class ReplicationLayer(object):
             origin, pdu.event_id, do_auth=False
         )
 
-        if existing and (not existing.outlier or pdu.outlier):
+        already_seen = (
+            existing and (
+                not existing.internal_metadata.is_outlier()
+                or pdu.internal_metadata.is_outlier()
+            )
+        )
+        if already_seen:
             logger.debug("Already seen pdu %s", pdu.event_id)
             defer.returnValue({})
             return
 
         state = None
+
+        auth_chain = []
 
         # We need to make sure we have all the auth events.
         # for e_id, _ in pdu.auth_events:
@@ -595,7 +616,7 @@ class ReplicationLayer(object):
         #             )
 
         # Get missing pdus if necessary.
-        if not pdu.outlier:
+        if not pdu.internal_metadata.is_outlier():
             # We only backfill backwards to the min depth.
             min_depth = yield self.handler.get_min_depth_for_context(
                 pdu.room_id
@@ -636,7 +657,7 @@ class ReplicationLayer(object):
                     "_handle_new_pdu getting state for %s",
                     pdu.room_id
                 )
-                state = yield self.get_state_for_context(
+                state, auth_chain = yield self.get_state_for_context(
                     origin, pdu.room_id, pdu.event_id,
                 )
 
@@ -646,6 +667,7 @@ class ReplicationLayer(object):
                 pdu,
                 backfilled=backfilled,
                 state=state,
+                auth_chain=auth_chain,
             )
         else:
             ret = None
@@ -658,18 +680,13 @@ class ReplicationLayer(object):
         return "<ReplicationLayer(%s)>" % self.server_name
 
     def event_from_pdu_json(self, pdu_json, outlier=False):
-        #TODO: Check we have all the PDU keys here
-        pdu_json.setdefault("hashes", {})
-        pdu_json.setdefault("signatures", {})
-        sender = pdu_json.pop("sender", None)
-        if sender is not None:
-            pdu_json["user_id"] = sender
-        state_hash = pdu_json.get("unsigned", {}).pop("state_hash", None)
-        if state_hash is not None:
-            pdu_json["state_hash"] = state_hash
-        return self.event_factory.create_event(
-            pdu_json["type"], outlier=outlier, **pdu_json
+        event = FrozenEvent(
+            pdu_json
         )
+
+        event.internal_metadata.outlier = outlier
+
+        return event
 
 
 class _TransactionQueue(object):
@@ -685,6 +702,7 @@ class _TransactionQueue(object):
         self.transport_layer = transport_layer
 
         self._clock = hs.get_clock()
+        self.store = hs.get_datastore()
 
         # Is a mapping from destinations -> deferreds. Used to keep track
         # of which destinations have transactions in flight and when they are
@@ -705,15 +723,13 @@ class _TransactionQueue(object):
 
     @defer.inlineCallbacks
     @log_function
-    def enqueue_pdu(self, pdu, order):
+    def enqueue_pdu(self, pdu, destinations, order):
         # We loop through all destinations to see whether we already have
         # a transaction in progress. If we do, stick it in the pending_pdus
         # table and we'll get back to it later.
 
-        destinations = set([
-            d for d in pdu.destinations
-            if d != self.server_name
-        ])
+        destinations = set(destinations)
+        destinations.discard(self.server_name)
 
         logger.debug("Sending to: %s", str(destinations))
 
@@ -728,8 +744,14 @@ class _TransactionQueue(object):
                 (pdu, deferred, order)
             )
 
+            def eb(failure):
+                if not deferred.called:
+                    deferred.errback(failure)
+                else:
+                    logger.warn("Failed to send pdu", failure)
+
             with PreserveLoggingContext():
-                self._attempt_new_transaction(destination)
+                self._attempt_new_transaction(destination).addErrback(eb)
 
             deferreds.append(deferred)
 
@@ -738,6 +760,9 @@ class _TransactionQueue(object):
     # NO inlineCallbacks
     def enqueue_edu(self, edu):
         destination = edu.destination
+
+        if destination == self.server_name:
+            return
 
         deferred = defer.Deferred()
         self.pending_edus_by_dest.setdefault(destination, []).append(
@@ -748,7 +773,7 @@ class _TransactionQueue(object):
             if not deferred.called:
                 deferred.errback(failure)
             else:
-                logger.exception("Failed to send edu", failure)
+                logger.warn("Failed to send edu", failure)
 
         with PreserveLoggingContext():
             self._attempt_new_transaction(destination).addErrback(eb)
@@ -770,10 +795,33 @@ class _TransactionQueue(object):
     @defer.inlineCallbacks
     @log_function
     def _attempt_new_transaction(self, destination):
+
+        (retry_last_ts, retry_interval) = (0, 0)
+        retry_timings = yield self.store.get_destination_retry_timings(
+            destination
+        )
+        if retry_timings:
+            (retry_last_ts, retry_interval) = (
+                retry_timings.retry_last_ts, retry_timings.retry_interval
+            )
+            if retry_last_ts + retry_interval > int(self._clock.time_msec()):
+                logger.info(
+                    "TX [%s] not ready for retry yet - "
+                    "dropping transaction for now",
+                    destination,
+                )
+                return
+            else:
+                logger.info("TX [%s] is ready for retry", destination)
+
         if destination in self.pending_transactions:
+            # XXX: pending_transactions can get stuck on by a never-ending
+            # request at which point pending_pdus_by_dest just keeps growing.
+            # we need application-layer timeouts of some flavour of these
+            # requests
             return
 
-        #  list of (pending_pdu, deferred, order)
+        # list of (pending_pdu, deferred, order)
         pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
         pending_edus = self.pending_edus_by_dest.pop(destination, [])
         pending_failures = self.pending_failures_by_dest.pop(destination, [])
@@ -781,7 +829,14 @@ class _TransactionQueue(object):
         if not pending_pdus and not pending_edus and not pending_failures:
             return
 
-        logger.debug("TX [%s] Attempting new transaction", destination)
+        logger.debug(
+            "TX [%s] Attempting new transaction "
+            "(pdus: %d, edus: %d, failures: %d)",
+            destination,
+            len(pending_pdus),
+            len(pending_edus),
+            len(pending_failures)
+        )
 
         # Sort based on the order field
         pending_pdus.sort(key=lambda t: t[2])
@@ -814,7 +869,11 @@ class _TransactionQueue(object):
             yield self.transaction_actions.prepare_to_send(transaction)
 
             logger.debug("TX [%s] Persisted transaction", destination)
-            logger.debug("TX [%s] Sending transaction...", destination)
+            logger.info(
+                "TX [%s] Sending transaction [%s]",
+                destination,
+                transaction.transaction_id,
+            )
 
             # Actually send the transaction
 
@@ -835,6 +894,8 @@ class _TransactionQueue(object):
                 transaction, json_data_cb
             )
 
+            logger.info("TX [%s] got %d response", destination, code)
+
             logger.debug("TX [%s] Sent transaction", destination)
             logger.debug("TX [%s] Marking as delivered...", destination)
 
@@ -847,8 +908,14 @@ class _TransactionQueue(object):
 
             for deferred in deferreds:
                 if code == 200:
+                    if retry_last_ts:
+                        # this host is alive! reset retry schedule
+                        yield self.store.set_destination_retry_timings(
+                            destination, 0, 0
+                        )
                     deferred.callback(None)
                 else:
+                    self.set_retrying(destination, retry_interval)
                     deferred.errback(RuntimeError("Got status %d" % code))
 
                 # Ensures we don't continue until all callbacks on that
@@ -861,11 +928,15 @@ class _TransactionQueue(object):
             logger.debug("TX [%s] Yielded to callbacks", destination)
 
         except Exception as e:
-            logger.error("TX Problem in _attempt_transaction")
-
             # We capture this here as there as nothing actually listens
             # for this finishing functions deferred.
-            logger.exception(e)
+            logger.warn(
+                "TX [%s] Problem in _attempt_transaction: %s",
+                destination,
+                e,
+            )
+
+            self.set_retrying(destination, retry_interval)
 
             for deferred in deferreds:
                 if not deferred.called:
@@ -877,3 +948,22 @@ class _TransactionQueue(object):
 
             # Check to see if there is anything else to send.
             self._attempt_new_transaction(destination)
+
+    @defer.inlineCallbacks
+    def set_retrying(self, destination, retry_interval):
+        # track that this destination is having problems and we should
+        # give it a chance to recover before trying it again
+
+        if retry_interval:
+            retry_interval *= 2
+            # plateau at hourly retries for now
+            if retry_interval >= 60 * 60 * 1000:
+                retry_interval = 60 * 60 * 1000
+        else:
+            retry_interval = 2000  # try again at first after 2 seconds
+
+        yield self.store.set_destination_retry_timings(
+            destination,
+            int(self._clock.time_msec()),
+            retry_interval
+        )
