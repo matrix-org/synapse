@@ -147,7 +147,7 @@ class RoomCreationHandler(BaseHandler):
                 "type": EventTypes.Member,
                 "state_key": invitee,
                 "room_id": room_id,
-                "user_id": user_id,
+                "sender": user_id,
                 "content": {"membership": Membership.INVITE},
             })
 
