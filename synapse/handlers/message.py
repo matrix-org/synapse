@@ -106,7 +106,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue(chunk)
 
     @defer.inlineCallbacks
-    def create_and_send_event(self, event_dict):
+    def create_and_send_event(self, event_dict, ratelimit=True):
         """ Given a dict from a client, create and handle a new event.
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
@@ -123,7 +123,8 @@ class MessageHandler(BaseHandler):
 
         self.validator.validate_new(builder)
 
-        self.ratelimit(builder.user_id)
+        if ratelimit:
+            self.ratelimit(builder.user_id)
         # TODO(paul): Why does 'event' not have a 'user' object?
         user = self.hs.parse_userid(builder.user_id)
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
