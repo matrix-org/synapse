@@ -165,18 +165,27 @@ class ThumbnailResource(BaseMediaResource):
                         aspect_quality, size_quality, type_quality,
                         length_quality, info
                     ))
-            return min(info_list)[-1]
+            if info_list:
+                return min(info_list)[-1]
         else:
             info_list = []
+            info_list2 = []
             for info in thumbnail_infos:
                 t_w = info["thumbnail_width"]
                 t_h = info["thumbnail_height"]
                 t_method = info["thumbnail_method"]
+                size_quality = abs((d_w - t_w) * (d_h - t_h))
+                type_quality = desired_type != info["thumbnail_type"]
+                length_quality = info["thumbnail_length"]
                 if t_method == "scale" and (t_w >= d_w or t_h >= d_h):
-                    size_quality = abs((d_w - t_w) * (d_h - t_h))
-                    type_quality = desired_type != info["thumbnail_type"]
-                    length_quality = info["thumbnail_length"]
                     info_list.append((
                         size_quality, type_quality, length_quality, info
                     ))
-            return min(info_list)[-1]
+                elif t_method == "scale":
+                    info_list2.append((
+                        size_quality, type_quality, length_quality, info
+                    ))
+            if info_list:
+                return min(info_list)[-1]
+            else:
+                return min(info_list2)[-1]
