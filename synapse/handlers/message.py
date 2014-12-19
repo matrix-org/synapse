@@ -19,6 +19,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
 from synapse.events.validator import EventValidator
+from synapse.util.logcontext import PreserveLoggingContext
 
 from ._base import BaseHandler
 
@@ -152,6 +153,11 @@ class MessageHandler(BaseHandler):
                 event=event,
                 context=context,
             )
+
+        if event.type == EventTypes.Message:
+            presence = self.hs.get_handlers().presence_handler
+            with PreserveLoggingContext():
+                presence.bump_presence_active_time(user)
 
         defer.returnValue(event)
 
