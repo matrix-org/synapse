@@ -390,6 +390,11 @@ class RoomMemberHandler(BaseHandler):
 
         host = hosts[0]
 
+        # If event doesn't include a display name, add one.
+        yield self.distributor.fire(
+            "collect_presencelike_data", joinee, content
+        )
+
         content.update({"membership": Membership.JOIN})
         builder = self.event_builder_factory.new({
             "type": EventTypes.Member,
