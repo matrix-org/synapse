@@ -19,7 +19,7 @@ presence and profiles; namely, the displayname and avatar_url."""
 from tests import unittest
 from twisted.internet import defer
 
-from mock import Mock, call, ANY
+from mock import Mock, call, ANY, NonCallableMock
 
 from ..utils import MockClock, MockKey
 
@@ -75,8 +75,13 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 resource_for_federation=Mock(),
                 http_client=None,
                 replication_layer=MockReplication(),
-                config=self.mock_config,
-            )
+                ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+                ]),
+                config=self.mock_config
+        )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
         hs.handlers = PresenceAndProfileHandlers(hs)
 
         self.datastore = hs.get_datastore()

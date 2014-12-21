@@ -17,7 +17,7 @@
 from tests import unittest
 from twisted.internet import defer
 
-from mock import Mock
+from mock import Mock, NonCallableMock
 
 from synapse.api.errors import AuthError
 from synapse.server import HomeServer
@@ -59,7 +59,14 @@ class ProfileTestCase(unittest.TestCase):
                 resource_for_federation=Mock(),
                 replication_layer=self.mock_federation,
                 config=self.mock_config,
+                ratelimiter=NonCallableMock(spec_set=[
+                    "send_message",
+                ])
             )
+
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
+
         hs.handlers = ProfileHandlers(hs)
 
         self.store = hs.get_datastore()
