@@ -239,6 +239,11 @@ Upgrading an existing homeserver
 IMPORTANT: Before upgrading an existing homeserver to a new version, please
 refer to UPGRADE.rst for any additional instructions.
 
+Otherwise, simply re-install the new codebase over the current one - e.g.
+by ``pip install --user --process-dependency-links
+https://github.com/matrix-org/synapse/tarball/master``
+if using pip, or by ``git pull`` if running off a git working copy.
+
 
 Setting up Federation
 =====================
