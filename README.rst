@@ -108,6 +108,9 @@ To install the synapse homeserver run::
 This installs synapse, along with the libraries it uses, into
 ``$HOME/.local/lib/`` on Linux or ``$HOME/Library/Python/2.7/lib/`` on OSX.
 
+For reliable VoIP calls to be routed via this homeserver, you MUST configure
+a TURN server.  See docs/turn-howto.rst for details.
+
 Troubleshooting Installation
 ----------------------------
 
