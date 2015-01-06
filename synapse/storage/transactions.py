@@ -19,6 +19,8 @@ from collections import namedtuple
 
 from twisted.internet import defer
 
+from synapse.util.logutils import time_function
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -228,6 +230,7 @@ class TransactionStore(SQLBaseStore):
             "get_destination_retry_timings",
             self._get_destination_retry_timings, destination)
 
+    @time_function
     def _get_destination_retry_timings(cls, txn, destination):
         query = DestinationsTable.select_statement("destination = ?")
         txn.execute(query, (destination,))
