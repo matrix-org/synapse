@@ -239,26 +239,28 @@ class RoomMemberStore(SQLBaseStore):
         results = self._parse_events_txn(txn, rows)
         return results
 
-    @defer.inlineCallbacks
     def user_rooms_intersect(self, user_id_list):
         """ Checks whether all the users whose IDs are given in a list share a
         room.
         """
-        user_list_clause = " OR ".join(["m.user_id = ?"] * len(user_id_list))
-        sql = (
-            "SELECT m.room_id FROM room_memberships as m "
-            "INNER JOIN current_state_events as c "
-            "ON m.event_id = c.event_id "
-            "WHERE m.membership = 'join' "
-            "AND (%(clause)s) "
-            # TODO(paul): We've got duplicate rows in the database somewhere
-            #   so we have to DISTINCT m.user_id here
-            "GROUP BY m.room_id HAVING COUNT(DISTINCT m.user_id) = ?"
-        ) % {"clause": user_list_clause}
+        def interaction(txn):
+            user_list_clause = " OR ".join(["m.user_id = ?"] * len(user_id_list))
+            sql = (
+                "SELECT m.room_id FROM room_memberships as m "
+                "INNER JOIN current_state_events as c "
+                "ON m.event_id = c.event_id "
+                "WHERE m.membership = 'join' "
+                "AND (%(clause)s) "
+                # TODO(paul): We've got duplicate rows in the database somewhere
+                #   so we have to DISTINCT m.user_id here
+                "GROUP BY m.room_id HAVING COUNT(DISTINCT m.user_id) = ?"
+            ) % {"clause": user_list_clause}
 
-        args = list(user_id_list)
-        args.append(len(user_id_list))
+            args = list(user_id_list)
+            args.append(len(user_id_list))
 
-        rows = yield self._execute(None, sql, *args)
+            txn.execute(sql, args)
 
-        defer.returnValue(len(rows) > 0)
+            return len(txn.fetchall()) > 0
+
+        return self.runInteraction("user_rooms_intersect", interaction)
