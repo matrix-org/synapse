@@ -139,6 +139,7 @@ class BaseMediaResource(Resource):
             @download.addBoth
             def callback(media_info):
                 del self.downloads[key]
+                return media_info
         return download
 
     @defer.inlineCallbacks
