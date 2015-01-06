@@ -233,6 +233,7 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
     request.setResponseCode(code, message=response_code_message)
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Server", AGENT_NAME)
+    request.setHeader(b"Content-Length", b"%d" % len(json_bytes))
 
     if send_cors:
         request.setHeader("Access-Control-Allow-Origin", "*")
