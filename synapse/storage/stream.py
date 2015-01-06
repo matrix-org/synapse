@@ -142,7 +142,6 @@ class StreamStore(SQLBaseStore):
                                limit=0, with_feedback=False):
         # TODO (erikj): Handle compressed feedback
 
-
         current_room_membership_sql = (
             "SELECT m.room_id FROM room_memberships as m "
             "INNER JOIN current_state_events as c ON m.event_id = c.event_id "

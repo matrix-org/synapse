@@ -449,7 +449,8 @@ class SQLBaseStore(object):
         return [
             self._get_event_txn(
                 txn, event_id,
-                check_redacted=check_redacted, get_prev_content=get_prev_content
+                check_redacted=check_redacted,
+                get_prev_content=get_prev_content
             )
             for event_id in event_ids
         ]
@@ -473,7 +474,8 @@ class SQLBaseStore(object):
         internal_metadata, js, redacted = res
 
         return self._get_event_from_row_txn(
-            txn, internal_metadata, js, redacted, check_redacted=check_redacted,
+            txn, internal_metadata, js, redacted,
+            check_redacted=check_redacted,
             get_prev_content=get_prev_content,
         )
 
