@@ -440,15 +440,16 @@ class SQLBaseStore(object):
         )
 
     def _get_events_txn(self, txn, event_ids):
-	if not event_ids:
-		return []
+        if not event_ids:
+            return []
 
-	if len(event_ids) > 50:
-		events = []
-		n = 50
-		for e_ids in [event_ids[i:i + n] for i in range(0, len(event_ids), n)]:
-			events.extend(self._get_events_txn(txn, e_ids))
-		return events
+        if len(event_ids) > 50:
+            events = []
+            n = 50
+            split = [event_ids[i:i + n] for i in range(0, len(event_ids), n)]
+            for e_ids in split:
+                events.extend(self._get_events_txn(txn, e_ids))
+            return events
 
         where_clause = " OR ".join(["e.event_id = ?" for _ in event_ids])
 
@@ -482,13 +483,13 @@ class SQLBaseStore(object):
 
         internal_metadata, js, redacted = res
 
-	return self._get_event_from_row_txn(
-		txn, internal_metadata, js, redacted, check_redacted=check_redacted,
-		get_prev_content=get_prev_content,
-	)
+        return self._get_event_from_row_txn(
+            txn, internal_metadata, js, redacted, check_redacted=check_redacted,
+            get_prev_content=get_prev_content,
+        )
 
     def _get_event_from_row_txn(self, txn, internal_metadata, js, redacted,
-				check_redacted=True, get_prev_content=True):
+                                check_redacted=True, get_prev_content=True):
         d = json.loads(js)
         internal_metadata = json.loads(internal_metadata)
 
