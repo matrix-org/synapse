@@ -271,7 +271,7 @@ class StreamStore(SQLBaseStore):
         # TODO (erikj): Handle compressed feedback
 
         sql = (
-            "SELECT * FROM events "
+            "SELECT stream_ordering, topological_ordering, event_id FROM events "
             "WHERE room_id = ? AND stream_ordering <= ? AND outlier = 0 "
             "ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ? "
         )
