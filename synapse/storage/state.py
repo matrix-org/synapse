@@ -15,6 +15,10 @@
 
 from ._base import SQLBaseStore
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class StateStore(SQLBaseStore):
     """ Keeps track of the state at a given event.
@@ -54,6 +58,8 @@ class StateStore(SQLBaseStore):
                 if group:
                     groups.add(group)
 
+            logger.debug("Got groups: %s", groups)
+
             res = {}
             for group in groups:
                 state_ids = self._simple_select_onecol_txn(
@@ -62,6 +68,12 @@ class StateStore(SQLBaseStore):
                     keyvalues={"state_group": group},
                     retcol="event_id",
                 )
+
+                logger.debug(
+                    "Got %d events for group %s",
+                    len(state_ids), group
+                )
+
                 state = self._get_events_txn(txn, state_ids)
 
                 res[group] = state
