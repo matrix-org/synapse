@@ -443,6 +443,8 @@ class SQLBaseStore(object):
         if not event_ids:
             return []
 
+        logger.debug("_get_events_txn called with %d events", len(event_ids))
+
         if len(event_ids) > 50:
             events = []
             n = 50
@@ -450,6 +452,8 @@ class SQLBaseStore(object):
             for e_ids in split:
                 events.extend(self._get_events_txn(txn, e_ids))
             return events
+
+        logger.debug("_get_events_txn Fetching %d events", len(event_ids))
 
         where_clause = " OR ".join(["e.event_id = ?" for _ in event_ids])
 
