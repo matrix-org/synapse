@@ -446,7 +446,7 @@ class SQLBaseStore(object):
         if not event_ids:
             return []
 
-        return [
+        events = [
             self._get_event_txn(
                 txn, event_id,
                 check_redacted=check_redacted,
@@ -454,6 +454,8 @@ class SQLBaseStore(object):
             )
             for event_id in event_ids
         ]
+
+        return [e for e in events if e]
 
     def _get_event_txn(self, txn, event_id, check_redacted=True,
                        get_prev_content=False):
