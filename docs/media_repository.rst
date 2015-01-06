@@ -1,5 +1,7 @@
-Media Repository
+Media Repository 
 ================
+
+*Synapse implementation-specific details for the media repository*
 
 The media repository is where attachments and avatar photos are stored.
 It stores attachment content and thumbnails for media uploaded by local users.
