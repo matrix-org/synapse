@@ -446,43 +446,12 @@ class SQLBaseStore(object):
         if not event_ids:
             return []
 
-        logger.debug("_get_events_txn called with %d events", len(event_ids))
-
-        if len(event_ids) > 50:
-            events = []
-            n = 50
-            split = [event_ids[i:i + n] for i in range(0, len(event_ids), n)]
-            for e_ids in split:
-                events.extend(
-                    self._get_events_txn(
-                        txn, e_ids,
-                        check_redacted=check_redacted,
-                        get_prev_content=get_prev_content,
-                    )
-                )
-            return events
-
-        logger.debug("_get_events_txn Fetching %d events", len(event_ids))
-
-        where_clause = " OR ".join(["e.event_id = ?" for _ in event_ids])
-
-        sql = (
-            "SELECT internal_metadata, json, r.event_id FROM event_json as e "
-            "LEFT JOIN redactions as r ON e.event_id = r.redacts "
-            "WHERE %s"
-        ) % (where_clause,)
-
-        txn.execute(sql, event_ids)
-
-        res = txn.fetchall()
-
         return [
-            self._get_event_from_row_txn(
-                txn, r[0], r[1], r[2],
-                check_redacted=check_redacted,
-                get_prev_content=get_prev_content,
+            self._get_event_txn(
+                txn, event_id,
+                check_redacted=check_redacted, get_prev_content=get_prev_content
             )
-            for r in res
+            for event_id in event_ids
         ]
 
     def _get_event_txn(self, txn, event_id, check_redacted=True,
