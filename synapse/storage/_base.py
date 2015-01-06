@@ -499,6 +499,8 @@ class SQLBaseStore(object):
 
         ev = FrozenEvent(d, internal_metadata_dict=internal_metadata)
 
+        return ev
+
         if check_redacted and redacted:
             ev = prune_event(ev)
 
