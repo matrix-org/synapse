@@ -15,6 +15,10 @@
 
 from ._base import SQLBaseStore
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class StateStore(SQLBaseStore):
     """ Keeps track of the state at a given event.
@@ -62,14 +66,8 @@ class StateStore(SQLBaseStore):
                     keyvalues={"state_group": group},
                     retcol="event_id",
                 )
-                state = []
-                for state_id in state_ids:
-                    s = self._get_events_txn(
-                        txn,
-                        [state_id],
-                    )
-                    if s:
-                        state.extend(s)
+
+                state = self._get_events_txn(txn, state_ids)
 
                 res[group] = state
 

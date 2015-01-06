@@ -434,23 +434,29 @@ class SQLBaseStore(object):
 
         return self.runInteraction("_simple_max_id", func)
 
-    def _get_events(self, event_ids):
+    def _get_events(self, event_ids, check_redacted=True,
+                    get_prev_content=False):
         return self.runInteraction(
-            "_get_events", self._get_events_txn, event_ids
+            "_get_events", self._get_events_txn, event_ids,
+            check_redacted=check_redacted, get_prev_content=get_prev_content,
         )
 
-    def _get_events_txn(self, txn, event_ids):
-        events = []
-        for e_id in event_ids:
-            ev = self._get_event_txn(txn, e_id)
+    def _get_events_txn(self, txn, event_ids, check_redacted=True,
+                        get_prev_content=False):
+        if not event_ids:
+            return []
 
-            if ev:
-                events.append(ev)
-
-        return events
+        return [
+            self._get_event_txn(
+                txn, event_id,
+                check_redacted=check_redacted,
+                get_prev_content=get_prev_content
+            )
+            for event_id in event_ids
+        ]
 
     def _get_event_txn(self, txn, event_id, check_redacted=True,
-                       get_prev_content=True):
+                       get_prev_content=False):
         sql = (
             "SELECT internal_metadata, json, r.event_id FROM event_json as e "
             "LEFT JOIN redactions as r ON e.event_id = r.redacts "
@@ -467,6 +473,14 @@ class SQLBaseStore(object):
 
         internal_metadata, js, redacted = res
 
+        return self._get_event_from_row_txn(
+            txn, internal_metadata, js, redacted,
+            check_redacted=check_redacted,
+            get_prev_content=get_prev_content,
+        )
+
+    def _get_event_from_row_txn(self, txn, internal_metadata, js, redacted,
+                                check_redacted=True, get_prev_content=False):
         d = json.loads(js)
         internal_metadata = json.loads(internal_metadata)
 
