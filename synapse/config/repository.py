@@ -37,7 +37,7 @@ class ContentRepositoryConfig(Config):
         super(ContentRepositoryConfig, cls).add_arguments(parser)
         db_group = parser.add_argument_group("content_repository")
         db_group.add_argument(
-            "--max-upload-size", default="1M"
+            "--max-upload-size", default="10M"
         )
         db_group.add_argument(
             "--media-store-path", default=cls.default_path("media_store")
