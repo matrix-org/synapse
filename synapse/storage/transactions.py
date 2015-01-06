@@ -200,6 +200,7 @@ class TransactionStore(SQLBaseStore):
             self._get_transactions_after, transaction_id, destination
         )
 
+    @time_function
     def _get_transactions_after(cls, txn, transaction_id, destination):
         where = (
             "destination = ? AND id > (select id FROM %s WHERE "
