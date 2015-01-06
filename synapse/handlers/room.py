@@ -245,14 +245,12 @@ class RoomMemberHandler(BaseHandler):
         self.distributor.declare("user_left_room")
 
     @defer.inlineCallbacks
-    def get_room_members(self, room_id, membership=Membership.JOIN):
+    def get_room_members(self, room_id):
         hs = self.hs
 
-        memberships = yield self.store.get_room_members(
-            room_id=room_id, membership=membership
-        )
+        users = yield self.store.get_users_in_room(room_id)
 
-        defer.returnValue([hs.parse_userid(m.user_id) for m in memberships])
+        defer.returnValue([hs.parse_userid(u) for u in users])
 
     @defer.inlineCallbacks
     def fetch_room_distributions_into(self, room_id, localusers=None,
@@ -531,11 +529,10 @@ class RoomListHandler(BaseHandler):
     def get_public_room_list(self):
         chunk = yield self.store.get_rooms(is_public=True)
         for room in chunk:
-            joined_members = yield self.store.get_room_members(
+            joined_users = yield self.store.get_users_in_room(
                 room_id=room["room_id"],
-                membership=Membership.JOIN
             )
-            room["num_joined_members"] = len(joined_members)
+            room["num_joined_members"] = len(joined_users)
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
 

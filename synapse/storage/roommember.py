@@ -123,6 +123,19 @@ class RoomMemberStore(SQLBaseStore):
         else:
             return None
 
+    def get_users_in_room(self, room_id):
+        def f(txn):
+            sql = (
+                "SELECT m.user_id FROM room_memberships as m"
+                " INNER JOIN current_state_events as c"
+                " ON m.event_id = c.event_id"
+                " WHERE m.membership = ? AND m.room_id = ?"
+            )
+
+            txn.execute(sql, (Membership.JOIN, room_id))
+            return [r[0] for r in txn.fetchall()]
+        return self.runInteraction("get_users_in_room", f)
+
     def get_room_members(self, room_id, membership=None):
         """Retrieve the current room member list for a room.
 
