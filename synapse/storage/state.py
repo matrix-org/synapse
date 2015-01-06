@@ -58,8 +58,6 @@ class StateStore(SQLBaseStore):
                 if group:
                     groups.add(group)
 
-            logger.debug("Got groups: %s", groups)
-
             res = {}
             for group in groups:
                 state_ids = self._simple_select_onecol_txn(
@@ -67,11 +65,6 @@ class StateStore(SQLBaseStore):
                     table="state_groups_state",
                     keyvalues={"state_group": group},
                     retcol="event_id",
-                )
-
-                logger.debug(
-                    "Got %d events for group %s",
-                    len(state_ids), group
                 )
 
                 state = self._get_events_txn(txn, state_ids)
