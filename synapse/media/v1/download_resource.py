@@ -46,23 +46,29 @@ class DownloadResource(BaseMediaResource):
     def _respond_local_file(self, request, media_id):
         media_info = yield self.store.get_local_media(media_id)
         if not media_info:
-            self._respond_404()
+            self._respond_404(request)
             return
 
         media_type = media_info["media_type"]
+        media_length = media_info["media_length"]
         file_path = self.filepaths.local_media_filepath(media_id)
 
-        yield self._respond_with_file(request, media_type, file_path)
+        yield self._respond_with_file(
+            request, media_type, file_path, media_length
+        )
 
     @defer.inlineCallbacks
     def _respond_remote_file(self, request, server_name, media_id):
         media_info = yield self._get_remote_media(server_name, media_id)
 
         media_type = media_info["media_type"]
+        media_length = media_info["media_length"]
         filesystem_id = media_info["filesystem_id"]
 
         file_path = self.filepaths.remote_media_filepath(
             server_name, filesystem_id
         )
 
-        yield self._respond_with_file(request, media_type, file_path)
+        yield self._respond_with_file(
+            request, media_type, file_path, media_length
+        )
