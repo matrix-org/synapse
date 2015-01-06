@@ -64,7 +64,7 @@ class LoggingTransaction(object):
             # Don't let logging failures stop SQL from working
             pass
 
-        start = time.clock() * 1000
+        start = time.time() * 1000
         try:
             return self.txn.execute(
                 sql, *args, **kwargs
@@ -73,7 +73,7 @@ class LoggingTransaction(object):
                 logger.exception("[SQL FAIL] {%s}", self.name)
                 raise
         finally:
-            end = time.clock() * 1000
+            end = time.time() * 1000
             sql_logger.debug("[SQL time] {%s} %f", self.name, end - start)
 
 
@@ -93,7 +93,7 @@ class SQLBaseStore(object):
         def inner_func(txn, *args, **kwargs):
             with LoggingContext("runInteraction") as context:
                 current_context.copy_to(context)
-                start = time.clock() * 1000
+                start = time.time() * 1000
                 txn_id = SQLBaseStore._TXN_ID
 
                 # We don't really need these to be unique, so lets stop it from
@@ -109,7 +109,7 @@ class SQLBaseStore(object):
                     logger.exception("[TXN FAIL] {%s}", name)
                     raise
                 finally:
-                    end = time.clock() * 1000
+                    end = time.time() * 1000
                     transaction_logger.debug(
                         "[TXN END] {%s} %f",
                         name, end - start
