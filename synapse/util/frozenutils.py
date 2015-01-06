@@ -17,10 +17,11 @@ from frozendict import frozendict
 
 
 def freeze(o):
-    if isinstance(o, dict) or isinstance(o, frozendict):
+    t = type(o)
+    if t is dict:
         return frozendict({k: freeze(v) for k, v in o.items()})
 
-    if isinstance(o, basestring):
+    if t is str or t is unicode:
         return o
 
     try:
