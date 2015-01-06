@@ -263,7 +263,7 @@ class MessageHandler(BaseHandler):
             }
 
             if event.membership == Membership.INVITE:
-                d["inviter"] = event.user_id
+                d["inviter"] = event.sender
 
             rooms_ret.append(d)
 
