@@ -434,12 +434,15 @@ class SQLBaseStore(object):
 
         return self.runInteraction("_simple_max_id", func)
 
-    def _get_events(self, event_ids):
+    def _get_events(self, event_ids, check_redacted=True,
+                    get_prev_content=False):
         return self.runInteraction(
-            "_get_events", self._get_events_txn, event_ids
+            "_get_events", self._get_events_txn, event_ids,
+            check_redacted=check_redacted, get_prev_content=get_prev_content,
         )
 
-    def _get_events_txn(self, txn, event_ids):
+    def _get_events_txn(self, txn, event_ids, check_redacted=True,
+                        get_prev_content=False):
         if not event_ids:
             return []
 
@@ -450,7 +453,13 @@ class SQLBaseStore(object):
             n = 50
             split = [event_ids[i:i + n] for i in range(0, len(event_ids), n)]
             for e_ids in split:
-                events.extend(self._get_events_txn(txn, e_ids))
+                events.extend(
+                    self._get_events_txn(
+                        txn, e_ids,
+                        check_redacted=check_redacted,
+                        get_prev_content=get_prev_content,
+                    )
+                )
             return events
 
         logger.debug("_get_events_txn Fetching %d events", len(event_ids))
@@ -467,10 +476,17 @@ class SQLBaseStore(object):
 
         res = txn.fetchall()
 
-        return [self._get_event_from_row_txn(txn, *r) for r in res]
+        return [
+            self._get_event_from_row_txn(
+                txn, r[0], r[1], r[2],
+                check_redacted=check_redacted,
+                get_prev_content=get_prev_content,
+            )
+            for r in res
+        ]
 
     def _get_event_txn(self, txn, event_id, check_redacted=True,
-                       get_prev_content=True):
+                       get_prev_content=False):
         sql = (
             "SELECT internal_metadata, json, r.event_id FROM event_json as e "
             "LEFT JOIN redactions as r ON e.event_id = r.redacts "
@@ -493,13 +509,11 @@ class SQLBaseStore(object):
         )
 
     def _get_event_from_row_txn(self, txn, internal_metadata, js, redacted,
-                                check_redacted=True, get_prev_content=True):
+                                check_redacted=True, get_prev_content=False):
         d = json.loads(js)
         internal_metadata = json.loads(internal_metadata)
 
         ev = FrozenEvent(d, internal_metadata_dict=internal_metadata)
-
-        return ev
 
         if check_redacted and redacted:
             ev = prune_event(ev)
