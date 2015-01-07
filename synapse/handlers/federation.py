@@ -617,8 +617,8 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_backfill_request(self, origin, context, pdu_list, limit):
-        in_room = yield self.auth.check_host_in_room(context, origin)
+    def on_backfill_request(self, origin, room_id, pdu_list, limit):
+        in_room = yield self.auth.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
 

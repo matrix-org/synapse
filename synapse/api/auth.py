@@ -98,7 +98,16 @@ class Auth(object):
         defer.returnValue(member)
 
     @defer.inlineCallbacks
-    def check_host_in_room(self, room_id, host):
+    def check_host_in_room(self, room_id, host, context=None):
+        if context:
+            # XXX: check_host_in_room should really return True for a new
+            # room created by this home server. There are no m.room.member
+            # join events yet so we need to check for the m.room.create event
+            # instead.
+            if (u"m.room.create", u"") in context.auth_events:
+                defer.returnValue(True)
+                return
+
         curr_state = yield self.state.get_current_state(room_id)
 
         for event in curr_state:
