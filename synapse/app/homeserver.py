@@ -39,6 +39,8 @@ from synapse.util.logcontext import LoggingContext
 from daemonize import Daemonize
 import twisted.manhole.telnet
 
+import synapse
+
 import logging
 import os
 import re
@@ -199,6 +201,7 @@ def setup():
     config.setup_logging()
 
     logger.info("Server hostname: %s", config.server_name)
+    logger.info("Server version: %s", synapse.__version__)
 
     if re.search(":[0-9]+$", config.server_name):
         domain_with_port = config.server_name
