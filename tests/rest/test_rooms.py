@@ -294,7 +294,7 @@ class RoomPermissionsTestCase(RestTestCase):
         # set [invite/join/left] of self, set [invite/join/left] of other,
         # expect all 403s
         for usr in [self.user_id, self.rmcreator_id]:
-            yield self.join(room=room, user=usr, expect_code=403)
+            yield self.join(room=room, user=usr, expect_code=404)
             yield self.leave(room=room, user=usr, expect_code=403)
 
     @defer.inlineCallbacks
