@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -202,7 +202,8 @@ class BaseMediaResource(Resource):
         defer.returnValue(media_info)
 
     @defer.inlineCallbacks
-    def _respond_with_file(self, request, media_type, file_path):
+    def _respond_with_file(self, request, media_type, file_path,
+                           file_size=None):
         logger.debug("Responding with %r", file_path)
 
         if os.path.isfile(file_path):
@@ -216,13 +217,20 @@ class BaseMediaResource(Resource):
             request.setHeader(
                 b"Cache-Control", b"public,max-age=86400,s-maxage=86400"
             )
+            if file_size is None:
+                stat = os.stat(file_path)
+                file_size = stat.st_size
+
+            request.setHeader(
+                b"Content-Length", b"%d" % (file_size,)
+            )
 
             with open(file_path, "rb") as f:
                 yield FileSender().beginFileTransfer(f, request)
 
             request.finish()
         else:
-            self._respond_404()
+            self._respond_404(request)
 
     def _get_thumbnail_requirements(self, media_type):
         if media_type == "image/jpeg":

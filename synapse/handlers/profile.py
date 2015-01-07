@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes, Membership
 from synapse.util.logcontext import PreserveLoggingContext
 
 from ._base import BaseHandler
@@ -203,7 +203,7 @@ class ProfileHandler(BaseHandler):
 
         for j in joins:
             content = {
-                "membership": j.content["membership"],
+                "membership": Membership.JOIN,
             }
 
             yield self.distributor.fire(
@@ -212,9 +212,9 @@ class ProfileHandler(BaseHandler):
 
             msg_handler = self.hs.get_handlers().message_handler
             yield msg_handler.create_and_send_event({
-                "type": j.type,
+                "type": EventTypes.Member,
                 "room_id": j.room_id,
-                "state_key": j.state_key,
+                "state_key": user.to_string(),
                 "content": content,
-                "sender": j.state_key
+                "sender": user.to_string()
             }, ratelimit=False)

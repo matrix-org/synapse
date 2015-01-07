@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -730,6 +730,7 @@ class _TransactionQueue(object):
 
         destinations = set(destinations)
         destinations.discard(self.server_name)
+        destinations.discard("localhost")
 
         logger.debug("Sending to: %s", str(destinations))
 
@@ -814,6 +815,8 @@ class _TransactionQueue(object):
             else:
                 logger.info("TX [%s] is ready for retry", destination)
 
+        logger.info("TX [%s] _attempt_new_transaction", destination)
+        
         if destination in self.pending_transactions:
             # XXX: pending_transactions can get stuck on by a never-ending
             # request at which point pending_pdus_by_dest just keeps growing.
@@ -825,6 +828,9 @@ class _TransactionQueue(object):
         pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
         pending_edus = self.pending_edus_by_dest.pop(destination, [])
         pending_failures = self.pending_failures_by_dest.pop(destination, [])
+
+        if pending_pdus:
+            logger.info("TX [%s] len(pending_pdus_by_dest[dest]) = %d", destination, len(pending_pdus))
 
         if not pending_pdus and not pending_edus and not pending_failures:
             return

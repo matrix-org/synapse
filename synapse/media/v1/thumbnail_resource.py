@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -100,11 +100,12 @@ class ThumbnailResource(BaseMediaResource):
             t_type = thumbnail_info["thumbnail_type"]
             t_method = thumbnail_info["thumbnail_method"]
             file_id = thumbnail_info["filesystem_id"]
+            t_length = thumbnail_info["thumbnail_length"]
 
             file_path = self.filepaths.remote_media_thumbnail(
                 server_name, file_id, t_width, t_height, t_type, t_method,
             )
-            yield self._respond_with_file(request, t_type, file_path)
+            yield self._respond_with_file(request, t_type, file_path, t_length)
         else:
             yield self._respond_default_thumbnail(
                 request, media_info, width, height, method, m_type,
@@ -139,11 +140,12 @@ class ThumbnailResource(BaseMediaResource):
         t_height = thumbnail_info["thumbnail_height"]
         t_type = thumbnail_info["thumbnail_type"]
         t_method = thumbnail_info["thumbnail_method"]
+        t_length = thumbnail_info["thumbnail_length"]
 
         file_path = self.filepaths.default_thumbnail(
             top_level_type, sub_type, t_width, t_height, t_type, t_method,
         )
-        yield self.respond_with_file(request, t_type, file_path)
+        yield self.respond_with_file(request, t_type, file_path, t_length)
 
     def _select_thumbnail(self, desired_width, desired_height, desired_method,
                           desired_type, thumbnail_infos):

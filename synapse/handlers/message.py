@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -263,7 +263,7 @@ class MessageHandler(BaseHandler):
             }
 
             if event.membership == Membership.INVITE:
-                d["inviter"] = event.user_id
+                d["inviter"] = event.sender
 
             rooms_ret.append(d)
 

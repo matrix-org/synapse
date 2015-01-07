@@ -108,6 +108,9 @@ To install the synapse homeserver run::
 This installs synapse, along with the libraries it uses, into
 ``$HOME/.local/lib/`` on Linux or ``$HOME/Library/Python/2.7/lib/`` on OSX.
 
+For reliable VoIP calls to be routed via this homeserver, you MUST configure
+a TURN server.  See docs/turn-howto.rst for details.
+
 Troubleshooting Installation
 ----------------------------
 
@@ -238,6 +241,11 @@ Upgrading an existing homeserver
 
 IMPORTANT: Before upgrading an existing homeserver to a new version, please
 refer to UPGRADE.rst for any additional instructions.
+
+Otherwise, simply re-install the new codebase over the current one - e.g.
+by ``pip install --user --process-dependency-links
+https://github.com/matrix-org/synapse/tarball/master``
+if using pip, or by ``git pull`` if running off a git working copy.
 
 
 Setting up Federation

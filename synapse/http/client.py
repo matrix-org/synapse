@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 # limitations under the License.
 
 
+from synapse.http.agent_name import AGENT_NAME
 from twisted.internet import defer, reactor
 from twisted.web.client import (
     Agent, readBody, FileBodyProducer, PartialDownloadError
@@ -51,7 +52,8 @@ class SimpleHttpClient(object):
             "POST",
             uri.encode("ascii"),
             headers=Headers({
-                "Content-Type": ["application/x-www-form-urlencoded"]
+                b"Content-Type": [b"application/x-www-form-urlencoded"],
+                b"User-Agent": AGENT_NAME,
             }),
             bodyProducer=FileBodyProducer(StringIO(query_bytes))
         )
@@ -86,6 +88,9 @@ class SimpleHttpClient(object):
         response = yield self.agent.request(
             "GET",
             uri.encode("ascii"),
+            headers=Headers({
+                b"User-Agent": AGENT_NAME,
+            })
         )
 
         body = yield readBody(response)
@@ -108,7 +113,8 @@ class CaptchaServerHttpClient(SimpleHttpClient):
             url.encode("ascii"),
             bodyProducer=FileBodyProducer(StringIO(query_bytes)),
             headers=Headers({
-                "Content-Type": ["application/x-www-form-urlencoded"]
+                b"Content-Type": [b"application/x-www-form-urlencoded"],
+                b"User-Agent": AGENT_NAME,
             })
         )
 

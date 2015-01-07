@@ -1,4 +1,4 @@
-/* Copyright 2014 OpenMarket Ltd
+/* Copyright 2014, 2015 OpenMarket Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ CREATE INDEX IF NOT EXISTS sent_transaction_dest ON sent_transactions(destinatio
 CREATE INDEX IF NOT EXISTS sent_transaction_dest_referenced ON sent_transactions(
     destination
 );
+CREATE INDEX IF NOT EXISTS sent_transaction_txn_id ON sent_transactions(transaction_id);
 -- So that we can do an efficient look up of all transactions that have yet to be successfully
 -- sent.
 CREATE INDEX IF NOT EXISTS sent_transaction_sent ON sent_transactions(response_code);

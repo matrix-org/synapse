@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,13 +14,15 @@
 # limitations under the License.
 
 
-from syutil.jsonutil import (
-    encode_canonical_json, encode_pretty_printed_json
-)
+from synapse.http.agent_name import AGENT_NAME
 from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException
 )
 from synapse.util.logcontext import LoggingContext
+
+from syutil.jsonutil import (
+    encode_canonical_json, encode_pretty_printed_json
+)
 
 from twisted.internet import defer, reactor
 from twisted.web import server, resource
@@ -230,6 +232,8 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
 
     request.setResponseCode(code, message=response_code_message)
     request.setHeader(b"Content-Type", b"application/json")
+    request.setHeader(b"Server", AGENT_NAME)
+    request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
 
     if send_cors:
         request.setHeader("Access-Control-Allow-Origin", "*")
