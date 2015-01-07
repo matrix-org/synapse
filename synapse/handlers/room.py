@@ -428,7 +428,9 @@ class RoomMemberHandler(BaseHandler):
         if not is_host_in_room:
             # is *anyone* in the room?
             room_member_keys = [
-                v for (k,v) in context.current_state.keys() if k == "m.room.member"
+                v for (k, v) in context.current_state.keys() if (
+                    k == "m.room.member"
+                )
             ]
             if len(room_member_keys) == 0:
                 # has the room been created so we can join it?

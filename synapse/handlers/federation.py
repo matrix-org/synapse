@@ -623,7 +623,7 @@ class FederationHandler(BaseHandler):
             raise AuthError(403, "Host not in room.")
 
         events = yield self.store.get_backfill_events(
-            context,
+            room_id,
             pdu_list,
             limit
         )
