@@ -1,8 +1,8 @@
 Changes in synapse 0.6.1 (2015-01-07)
 =====================================
 
- * Various optimization to improve performance of event sending and initial
-   sync.
+ * Major optimizations to improve performance of initial sync and event sending
+   in large rooms (by up to 10x)
  * Media repository now includes a Content-Length header on media downloads.
  * Improve quality of thumbnails by changing resizing algorithm.
 
