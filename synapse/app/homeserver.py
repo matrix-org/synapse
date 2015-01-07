@@ -234,7 +234,7 @@ def setup():
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"
-            "Have you followed any instructions in UPGRADES.rst?\n"
+            "Have you checked for version specific instructions in UPGRADES.rst?\n"
         )
         sys.exit(1)
 
