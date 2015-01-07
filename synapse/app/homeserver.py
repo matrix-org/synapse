@@ -19,6 +19,7 @@ from synapse.storage import prepare_database, UpgradeDatabaseException
 from synapse.server import HomeServer
 
 from twisted.internet import reactor
+from twisted.application import service
 from twisted.enterprise import adbapi
 from twisted.web.resource import Resource
 from twisted.web.static import File
@@ -189,10 +190,10 @@ class SynapseHomeServer(HomeServer):
             logger.info("Synapse now listening on port %d", unsecure_port)
 
 
-def setup():
+def setup(config_options, should_run=True):
     config = HomeServerConfig.load_config(
         "Synapse Homeserver",
-        sys.argv[1:],
+        config_options,
         generate_section="Homeserver"
     )
 
@@ -254,6 +255,9 @@ def setup():
         bind_port = None
     hs.start_listening(bind_port, config.unsecure_port)
 
+    if not should_run:
+        return
+
     if config.daemonize:
         print config.pid_file
         daemon = Daemonize(
@@ -270,6 +274,17 @@ def setup():
         reactor.run()
 
 
+class SynapseService(service.Service):
+    def __init__(self, config):
+        self.config = config
+
+    def startService(self):
+        setup(self.config, should_run=False)
+
+    def stopService(self):
+        return self._port.stopListening()
+
+
 def run():
     with LoggingContext("run"):
         reactor.run()
@@ -277,7 +292,7 @@ def run():
 
 def main():
     with LoggingContext("main"):
-        setup()
+        setup(sys.argv[1:])
 
 
 if __name__ == '__main__':

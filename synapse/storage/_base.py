@@ -95,6 +95,7 @@ class SQLBaseStore(object):
                 current_context.copy_to(context)
                 start = time.time() * 1000
                 txn_id = SQLBaseStore._TXN_ID
+                SQLBaseStore._TXN_ID += 1
 
                 # We don't really need these to be unique, so lets stop it from
                 # growing really large.
