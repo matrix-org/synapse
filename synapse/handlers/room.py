@@ -423,9 +423,18 @@ class RoomMemberHandler(BaseHandler):
 
         is_host_in_room = yield self.auth.check_host_in_room(
             event.room_id,
-            self.hs.hostname,
-            context=context
+            self.hs.hostname
         )
+        if not is_host_in_room:
+            # is *anyone* in the room?
+            room_member_keys = [
+                v for (k,v) in context.current_state.keys() if k == "m.room.member"
+            ]
+            if len(room_member_keys) == 0:
+                # has the room been created so we can join it?
+                create_event = context.current_state.get(("m.room.create", ""))
+                if create_event:
+                    is_host_in_room = True
 
         if is_host_in_room:
             should_do_dance = False
