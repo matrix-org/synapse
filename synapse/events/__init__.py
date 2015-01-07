@@ -15,8 +15,6 @@
 
 from synapse.util.frozenutils import freeze, unfreeze
 
-import copy
-
 
 class _EventInternalMetadata(object):
     def __init__(self, internal_metadata_dict):
