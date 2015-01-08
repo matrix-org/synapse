@@ -66,7 +66,10 @@ class LoggingConfig(Config):
 
             formatter = logging.Formatter(log_format)
             if self.log_file:
-                handler = logging.FileHandler(self.log_file)
+                # TODO: Customisable file size / backup count
+                handler = logging.handlers.RotatingFileHandler(
+                    self.log_file, maxBytes=(1000 * 1000 * 100), backupCount=3
+                )
             else:
                 handler = logging.StreamHandler()
             handler.setFormatter(formatter)
