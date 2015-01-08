@@ -115,7 +115,7 @@ libraries, in which case you must add your local packages to your python path::
     $ export PYTHONPATH=$HOME/.local/lib/python2.7/site-packages
 
     $ # on OSX:
-    $ export PYTHONPATH=$HOME/Library/Python/2.7/lib/python2.7/site-packages
+    $ export PYTHONPATH=$HOME/Library/Python/2.7/lib/python/site-packages
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See docs/turn-howto.rst for details.
