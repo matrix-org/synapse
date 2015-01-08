@@ -67,7 +67,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
-                     feedback=False):
+                     feedback=False, as_client_event=True):
         """Get messages in a room.
 
         Args:
@@ -76,6 +76,7 @@ class MessageHandler(BaseHandler):
             pagin_config (synapse.api.streams.PaginationConfig): The pagination
             config rules to apply, if any.
             feedback (bool): True to get compressed feedback with the messages
+            as_client_event (bool): True to get events in client-server format.
         Returns:
             dict: Pagination API results
         """
@@ -99,7 +100,9 @@ class MessageHandler(BaseHandler):
         )
 
         chunk = {
-            "chunk": [self.hs.serialize_event(e) for e in events],
+            "chunk": [
+                self.hs.serialize_event(e, as_client_event) for e in events
+            ],
             "start": pagin_config.from_token.to_string(),
             "end": next_token.to_string(),
         }

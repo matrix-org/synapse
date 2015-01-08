@@ -314,12 +314,15 @@ class RoomMessageListRestServlet(RestServlet):
             request, default_limit=10,
         )
         with_feedback = "feedback" in request.args
+        as_client_event = "raw" not in request.args
         handler = self.handlers.message_handler
         msgs = yield handler.get_messages(
             room_id=room_id,
             user_id=user.to_string(),
             pagin_config=pagination_config,
-            feedback=with_feedback)
+            feedback=with_feedback,
+            as_client_event=as_client_event
+        )
 
         defer.returnValue((200, msgs))
 
