@@ -89,13 +89,21 @@ def prune_event(event):
     return type(event)(allowed_fields)
 
 
-def serialize_event(hs, e, remove_data=True):
+def serialize_event(hs, e, client_event=True):
     # FIXME(erikj): To handle the case of presence events and the like
     if not isinstance(e, EventBase):
         return e
 
     # Should this strip out None's?
     d = {k: v for k, v in e.get_dict().items()}
+
+    if not client_event:
+        # set the age and keep all other keys
+        if "age_ts" in d["unsigned"]:
+            now = int(hs.get_clock().time_msec())
+            d["unsigned"]["age"] = now - d["unsigned"]["age_ts"]
+        return d
+
     if "age_ts" in d["unsigned"]:
         now = int(hs.get_clock().time_msec())
         d["unsigned"]["age"] = now - d["unsigned"]["age_ts"]
@@ -122,13 +130,12 @@ def serialize_event(hs, e, remove_data=True):
         d["prev_content"] = e.unsigned["prev_content"]
         del d["unsigned"]["prev_content"]
 
-    if remove_data:
-        del d["auth_events"]
-        del d["prev_events"]
-        del d["hashes"]
-        del d["signatures"]
-        d.pop("depth", None)
-        d.pop("unsigned", None)
-        d.pop("origin", None)
+    del d["auth_events"]
+    del d["prev_events"]
+    del d["hashes"]
+    del d["signatures"]
+    d.pop("depth", None)
+    d.pop("unsigned", None)
+    d.pop("origin", None)
 
     return d

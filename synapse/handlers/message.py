@@ -211,7 +211,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def snapshot_all_rooms(self, user_id=None, pagin_config=None,
-                           feedback=False, trim_events=True):
+                           feedback=False, as_client_event=True):
         """Retrieve a snapshot of all rooms the user is invited or has joined.
 
         This snapshot may include messages for all rooms where the user is
@@ -222,6 +222,7 @@ class MessageHandler(BaseHandler):
             pagin_config (synapse.api.streams.PaginationConfig): The pagination
             config used to determine how many messages *PER ROOM* to return.
             feedback (bool): True to get feedback along with these messages.
+            as_client_event (bool): True to get events in client-server format.
         Returns:
             A list of dicts with "room_id" and "membership" keys for all rooms
             the user is currently invited or joined in on. Rooms where the user
@@ -281,7 +282,7 @@ class MessageHandler(BaseHandler):
 
                 d["messages"] = {
                     "chunk": [
-                        self.hs.serialize_event(m, trim_events)
+                        self.hs.serialize_event(m, as_client_event)
                         for m in messages
                     ],
                     "start": start_token.to_string(),
