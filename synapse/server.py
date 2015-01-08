@@ -149,8 +149,8 @@ class BaseHomeServer(object):
         object."""
         return EventID.from_string(s)
 
-    def serialize_event(self, e):
-        return serialize_event(self, e)
+    def serialize_event(self, e, remove_data=True):
+        return serialize_event(self, e, remove_data)
 
     def get_ip_from_request(self, request):
         # May be an X-Forwarding-For header depending on config

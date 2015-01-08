@@ -46,7 +46,8 @@ class EventStreamHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def get_stream(self, auth_user_id, pagin_config, timeout=0):
+    def get_stream(self, auth_user_id, pagin_config, timeout=0,
+                   trim_events=True):
         auth_user = self.hs.parse_userid(auth_user_id)
 
         try:
@@ -78,7 +79,9 @@ class EventStreamHandler(BaseHandler):
                     auth_user, room_ids, pagin_config, timeout
                 )
 
-            chunks = [self.hs.serialize_event(e) for e in events]
+            chunks = [
+                self.hs.serialize_event(e, trim_events) for e in events
+            ]
 
             chunk = {
                 "chunk": chunks,

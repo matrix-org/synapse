@@ -211,7 +211,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def snapshot_all_rooms(self, user_id=None, pagin_config=None,
-                           feedback=False):
+                           feedback=False, trim_events=True):
         """Retrieve a snapshot of all rooms the user is invited or has joined.
 
         This snapshot may include messages for all rooms where the user is
@@ -280,7 +280,9 @@ class MessageHandler(BaseHandler):
                 end_token = now_token.copy_and_replace("room_key", token[1])
 
                 d["messages"] = {
-                    "chunk": [self.hs.serialize_event(m) for m in messages],
+                    "chunk": [
+                    self.hs.serialize_event(m, trim_events) for m in messages
+                    ],
                     "start": start_token.to_string(),
                     "end": end_token.to_string(),
                 }

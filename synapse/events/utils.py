@@ -89,7 +89,7 @@ def prune_event(event):
     return type(event)(allowed_fields)
 
 
-def serialize_event(hs, e):
+def serialize_event(hs, e, remove_data=True):
     # FIXME(erikj): To handle the case of presence events and the like
     if not isinstance(e, EventBase):
         return e
@@ -122,12 +122,13 @@ def serialize_event(hs, e):
         d["prev_content"] = e.unsigned["prev_content"]
         del d["unsigned"]["prev_content"]
 
-    del d["auth_events"]
-    del d["prev_events"]
-    del d["hashes"]
-    del d["signatures"]
-    d.pop("depth", None)
-    d.pop("unsigned", None)
-    d.pop("origin", None)
+    if remove_data:
+        del d["auth_events"]
+        del d["prev_events"]
+        del d["hashes"]
+        del d["signatures"]
+        d.pop("depth", None)
+        d.pop("unsigned", None)
+        d.pop("origin", None)
 
     return d
