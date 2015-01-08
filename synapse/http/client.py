@@ -53,7 +53,7 @@ class SimpleHttpClient(object):
             uri.encode("ascii"),
             headers=Headers({
                 b"Content-Type": [b"application/x-www-form-urlencoded"],
-                b"User-Agent": AGENT_NAME,
+                b"User-Agent": [AGENT_NAME],
             }),
             bodyProducer=FileBodyProducer(StringIO(query_bytes))
         )
@@ -89,7 +89,7 @@ class SimpleHttpClient(object):
             "GET",
             uri.encode("ascii"),
             headers=Headers({
-                b"User-Agent": AGENT_NAME,
+                b"User-Agent": [AGENT_NAME],
             })
         )
 
@@ -114,7 +114,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
             bodyProducer=FileBodyProducer(StringIO(query_bytes)),
             headers=Headers({
                 b"Content-Type": [b"application/x-www-form-urlencoded"],
-                b"User-Agent": AGENT_NAME,
+                b"User-Agent": [AGENT_NAME],
             })
         )
 
