@@ -18,6 +18,8 @@ from synapse.storage import prepare_database, UpgradeDatabaseException
 
 from synapse.server import HomeServer
 
+from synapse.python_dependencies import check_requirements
+
 from twisted.internet import reactor
 from twisted.enterprise import adbapi
 from twisted.web.resource import Resource
@@ -200,6 +202,8 @@ def setup():
 
     config.setup_logging()
 
+    check_requirements()
+
     logger.info("Server hostname: %s", config.server_name)
     logger.info("Server version: %s", synapse.__version__)
 
@@ -280,6 +284,7 @@ def run():
 
 def main():
     with LoggingContext("main"):
+        check_requirements()
         setup()
 
 
