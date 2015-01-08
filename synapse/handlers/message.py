@@ -281,7 +281,8 @@ class MessageHandler(BaseHandler):
 
                 d["messages"] = {
                     "chunk": [
-                    self.hs.serialize_event(m, trim_events) for m in messages
+                        self.hs.serialize_event(m, trim_events)
+                        for m in messages
                     ],
                     "start": start_token.to_string(),
                     "end": end_token.to_string(),
