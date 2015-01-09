@@ -112,10 +112,10 @@ Your python may not give priority to locally installed libraries over system
 libraries, in which case you must add your local packages to your python path::
 
     $ # on Linux:
-    $ export PYTHONPATH=$HOME/.local/lib/python2.7/site-packages
+    $ export PYTHONPATH=$HOME/.local/lib/python2.7/site-packages:$PYTHONPATH
 
     $ # on OSX:
-    $ export PYTHONPATH=$HOME/Library/Python/2.7/lib/python/site-packages
+    $ export PYTHONPATH=$HOME/Library/Python/2.7/lib/python/site-packages:$PYTHONPATH
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See docs/turn-howto.rst for details.
