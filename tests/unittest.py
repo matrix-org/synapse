@@ -69,6 +69,8 @@ class TestCase(unittest.TestCase):
                     return ret
 
             logging.getLogger().setLevel(level)
+            # Don't set SQL logging
+            logging.getLogger("synapse.storage").setLevel(old_level)
             return orig()
 
     def assertObjectHasAttributes(self, attrs, obj):
