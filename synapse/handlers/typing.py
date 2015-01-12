@@ -91,7 +91,7 @@ class TypingNotificationHandler(BaseHandler):
 
         self._member_typing_until[member] = until
         self._member_typing_timer[member] = self.clock.call_later(
-            timeout / 1000, _cb
+            timeout / 1000.0, _cb
         )
 
         if was_present:
