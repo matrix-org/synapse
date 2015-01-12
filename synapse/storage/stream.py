@@ -284,8 +284,12 @@ class StreamStore(SQLBaseStore):
             rows.reverse()  # As we selected with reverse ordering
 
             if rows:
-                topo = rows[0]["topological_ordering"]
-                toke = rows[0]["stream_ordering"]
+                # XXX: Always subtract 1 since the start token always goes
+                # backwards (parity with paginate_room_events). It isn't
+                # obvious that this is correct; we should clarify the algorithm
+                # used here.
+                topo = rows[0]["topological_ordering"] - 1
+                toke = rows[0]["stream_ordering"] - 1
                 start_token = "t%s-%s" % (topo, toke)
 
                 token = (start_token, end_token)
