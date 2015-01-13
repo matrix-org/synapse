@@ -106,7 +106,7 @@ def serialize_event(hs, e, client_event=True):
 
     if "age_ts" in d["unsigned"]:
         now = int(hs.get_clock().time_msec())
-        d["unsigned"]["age"] = now - d["unsigned"]["age_ts"]
+        d["age"] = now - d["unsigned"]["age_ts"]
         del d["unsigned"]["age_ts"]
 
     d["user_id"] = d.pop("sender", None)
