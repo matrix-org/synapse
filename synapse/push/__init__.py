@@ -49,6 +49,17 @@ class Pusher(object):
         self.failing_since = failing_since
         self.alive = True
 
+    def _should_notify_for_event(self, ev):
+        """
+        This should take into account notification settings that the user
+        has configured both globally and per-room when we have the ability
+        to do such things.
+        """
+        if ev['user_id'] == self.user_name:
+            # let's assume you probably know about messages you sent yourself
+            return False
+        return True
+
     @defer.inlineCallbacks
     def start(self):
         if not self.last_token:
@@ -85,8 +96,12 @@ class Pusher(object):
             if not self.alive:
                 continue
 
-            ret = yield self.dispatch_push(single_event)
-            if ret:
+            processed = False
+            if self._should_notify_for_event(single_event):
+                processed = yield self.dispatch_push(single_event)
+            else:
+                processed = True
+            if processed:
                 self.backoff_delay = Pusher.INITIAL_BACKOFF
                 self.last_token = chunk['end']
                 self.store.update_pusher_last_token_and_success(
