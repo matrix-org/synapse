@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 class HttpPusher(Pusher):
     def __init__(self, _hs, user_name, app_id,
-                 app_display_name, device_display_name, pushkey, data,
-                 last_token, last_success, failing_since):
+                 app_display_name, device_display_name, pushkey, pushkey_ts,
+                 data, last_token, last_success, failing_since):
         super(HttpPusher, self).__init__(
             _hs,
             user_name,
@@ -34,6 +34,7 @@ class HttpPusher(Pusher):
             app_display_name,
             device_display_name,
             pushkey,
+            pushkey_ts,
             data,
             last_token,
             last_success,
@@ -77,6 +78,7 @@ class HttpPusher(Pusher):
                     {
                         'app_id': self.app_id,
                         'pushkey': self.pushkey,
+                        'pushkeyTs': long(self.pushkey_ts / 1000),
                         'data': self.data_minus_url
                     }
                 ]
@@ -87,10 +89,13 @@ class HttpPusher(Pusher):
     def dispatch_push(self, event):
         notification_dict = self._build_notification_dict(event)
         if not notification_dict:
-            defer.returnValue(True)
+            defer.returnValue([])
         try:
-            yield self.httpCli.post_json_get_json(self.url, notification_dict)
+            resp = yield self.httpCli.post_json_get_json(self.url, notification_dict)
         except:
             logger.exception("Failed to push %s ", self.url)
             defer.returnValue(False)
-        defer.returnValue(True)
+        rejected = []
+        if 'rejected' in resp:
+            rejected = resp['rejected']
+        defer.returnValue(rejected)

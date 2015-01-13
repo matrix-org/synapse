@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS pushers (
   app_display_name varchar(64) NOT NULL,
   device_display_name varchar(128) NOT NULL,
   pushkey blob NOT NULL,
+  ts BIGINT NOT NULL,
   data blob,
   last_token TEXT,
   last_success BIGINT,

@@ -31,8 +31,8 @@ class Pusher(object):
     GIVE_UP_AFTER = 24 * 60 * 60 * 1000
 
     def __init__(self, _hs, user_name, app_id,
-                 app_display_name, device_display_name, pushkey, data,
-                 last_token, last_success, failing_since):
+                 app_display_name, device_display_name, pushkey, pushkey_ts,
+                 data, last_token, last_success, failing_since):
         self.hs = _hs
         self.evStreamHandler = self.hs.get_handlers().event_stream_handler
         self.store = self.hs.get_datastore()
@@ -42,6 +42,7 @@ class Pusher(object):
         self.app_display_name = app_display_name
         self.device_display_name = device_display_name
         self.pushkey = pushkey
+        self.pushkey_ts = pushkey_ts
         self.data = data
         self.last_token = last_token
         self.last_success = last_success  # not actually used
@@ -98,9 +99,31 @@ class Pusher(object):
 
             processed = False
             if self._should_notify_for_event(single_event):
-                processed = yield self.dispatch_push(single_event)
+                rejected = yield self.dispatch_push(single_event)
+                if not rejected == False:
+                    processed = True
+                    for pk in rejected:
+                        if pk != self.pushkey:
+                            # for sanity, we only remove the pushkey if it
+                            # was the one we actually sent...
+                            logger.warn(
+                                ("Ignoring rejected pushkey %s because we" +
+                                "didn't send it"), (pk,)
+                            )
+                        else:
+                            logger.info(
+                                "Pushkey %s was rejected: removing",
+                                pk
+                            )
+                            yield self.hs.get_pusherpool().remove_pusher(
+                                self.app_id, pk
+                            )
             else:
                 processed = True
+
+            if not self.alive:
+                continue
+
             if processed:
                 self.backoff_delay = Pusher.INITIAL_BACKOFF
                 self.last_token = chunk['end']
@@ -165,6 +188,14 @@ class Pusher(object):
         self.alive = False
 
     def dispatch_push(self, p):
+        """
+        Overridden by implementing classes to actually deliver the notification
+        :param p: The event to notify for as a single event from the event stream
+        :return: If the notification was delivered, an array containing any
+                 pushkeys that were rejected by the push gateway.
+                 False if the notification could not be delivered (ie.
+                 should be retried).
+        """
         pass
 
 

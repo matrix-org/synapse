@@ -30,7 +30,7 @@ class PusherStore(SQLBaseStore):
     def get_pushers_by_app_id_and_pushkey(self, app_id_and_pushkey):
         sql = (
             "SELECT id, user_name, kind, app_id,"
-            "app_display_name, device_display_name, pushkey, data, "
+            "app_display_name, device_display_name, pushkey, ts, data, "
             "last_token, last_success, failing_since "
             "FROM pushers "
             "WHERE app_id = ? AND pushkey = ?"
@@ -49,10 +49,11 @@ class PusherStore(SQLBaseStore):
                 "app_display_name": r[4],
                 "device_display_name": r[5],
                 "pushkey": r[6],
-                "data": r[7],
-                "last_token": r[8],
-                "last_success": r[9],
-                "failing_since": r[10]
+                "pushkey_ts": r[7],
+                "data": r[8],
+                "last_token": r[9],
+                "last_success": r[10],
+                "failing_since": r[11]
             }
             for r in rows
         ]
@@ -63,7 +64,7 @@ class PusherStore(SQLBaseStore):
     def get_all_pushers(self):
         sql = (
             "SELECT id, user_name, kind, app_id,"
-            "app_display_name, device_display_name, pushkey, data, "
+            "app_display_name, device_display_name, pushkey, ts, data, "
             "last_token, last_success, failing_since "
             "FROM pushers"
         )
@@ -79,10 +80,11 @@ class PusherStore(SQLBaseStore):
                 "app_display_name": r[4],
                 "device_display_name": r[5],
                 "pushkey": r[6],
-                "data": r[7],
-                "last_token": r[8],
-                "last_success": r[9],
-                "failing_since": r[10]
+                "pushkey_ts": r[7],
+                "data": r[8],
+                "last_token": r[9],
+                "last_success": r[10],
+                "failing_since": r[11]
             }
             for r in rows
         ]
@@ -91,7 +93,8 @@ class PusherStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def add_pusher(self, user_name, kind, app_id,
-                   app_display_name, device_display_name, pushkey, data):
+                   app_display_name, device_display_name,
+                   pushkey, pushkey_ts, data):
         try:
             yield self._simple_upsert(
                 PushersTable.table_name,
@@ -104,11 +107,19 @@ class PusherStore(SQLBaseStore):
                     kind=kind,
                     app_display_name=app_display_name,
                     device_display_name=device_display_name,
+                    ts=pushkey_ts,
                     data=data
                 ))
         except Exception as e:
             logger.error("create_pusher with failed: %s", e)
             raise StoreError(500, "Problem creating pusher.")
+
+    @defer.inlineCallbacks
+    def delete_pusher_by_app_id_pushkey(self, app_id, pushkey):
+        yield self._simple_delete_one(
+            PushersTable.table_name,
+            dict(app_id=app_id, pushkey=pushkey)
+        )
 
     @defer.inlineCallbacks
     def update_pusher_last_token(self, user_name, pushkey, last_token):
@@ -147,6 +158,7 @@ class PushersTable(Table):
         "app_display_name",
         "device_display_name",
         "pushkey",
+        "pushkey_ts",
         "data",
         "last_token",
         "last_success",

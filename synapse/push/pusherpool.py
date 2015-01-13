@@ -53,6 +53,7 @@ class PusherPool:
             "app_display_name": app_display_name,
             "device_display_name": device_display_name,
             "pushkey": pushkey,
+            "pushkey_ts": self.hs.get_clock().time_msec(),
             "data": data,
             "last_token": None,
             "last_success": None,
@@ -75,6 +76,7 @@ class PusherPool:
             app_display_name=app_display_name,
             device_display_name=device_display_name,
             pushkey=pushkey,
+            pushkey_ts=self.hs.get_clock().time_msec(),
             data=json.dumps(data)
         )
         self._refresh_pusher((app_id, pushkey))
@@ -88,6 +90,7 @@ class PusherPool:
                 app_display_name=pusherdict['app_display_name'],
                 device_display_name=pusherdict['device_display_name'],
                 pushkey=pusherdict['pushkey'],
+                pushkey_ts=pusherdict['pushkey_ts'],
                 data=pusherdict['data'],
                 last_token=pusherdict['last_token'],
                 last_success=pusherdict['last_success'],
@@ -118,3 +121,12 @@ class PusherPool:
                     self.pushers[fullid].stop()
                 self.pushers[fullid] = p
                 p.start()
+
+    @defer.inlineCallbacks
+    def remove_pusher(self, app_id, pushkey):
+        fullid = "%s:%s" % (app_id, pushkey)
+        if fullid in self.pushers:
+            logger.info("Stopping pusher %s", fullid)
+            self.pushers[fullid].stop()
+            del self.pushers[fullid]
+        yield self.store.delete_pusher_by_app_id_pushkey(app_id, pushkey)
