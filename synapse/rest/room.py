@@ -246,7 +246,7 @@ class JoinRoomAliasServlet(RestServlet):
                 }
             )
 
-            defer.returnValue((200, {}))
+            defer.returnValue((200, {"room_id": identifier.to_string()}))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_identifier, txn_id):
