@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,10 +17,11 @@ from frozendict import frozendict
 
 
 def freeze(o):
-    if isinstance(o, dict) or isinstance(o, frozendict):
+    t = type(o)
+    if t is dict:
         return frozendict({k: freeze(v) for k, v in o.items()})
 
-    if isinstance(o, basestring):
+    if t is str or t is unicode:
         return o
 
     try:

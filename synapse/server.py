@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -151,8 +151,8 @@ class BaseHomeServer(object):
         object."""
         return EventID.from_string(s)
 
-    def serialize_event(self, e):
-        return serialize_event(self, e)
+    def serialize_event(self, e, as_client_event=True):
+        return serialize_event(self, e, as_client_event)
 
     def get_ip_from_request(self, request):
         # May be an X-Forwarding-For header depending on config

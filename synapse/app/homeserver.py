@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@
 from synapse.storage import prepare_database, UpgradeDatabaseException
 
 from synapse.server import HomeServer
+
+from synapse.python_dependencies import check_requirements
 
 from twisted.internet import reactor
 from twisted.enterprise import adbapi
@@ -38,6 +40,8 @@ from synapse.util.logcontext import LoggingContext
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
+
+import synapse
 
 import logging
 import os
@@ -198,7 +202,10 @@ def setup():
 
     config.setup_logging()
 
+    check_requirements()
+
     logger.info("Server hostname: %s", config.server_name)
+    logger.info("Server version: %s", synapse.__version__)
 
     if re.search(":[0-9]+$", config.server_name):
         domain_with_port = config.server_name
@@ -234,7 +241,7 @@ def setup():
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"
-            "Have you followed any instructions in UPGRADES.rst?\n"
+            "Have you checked for version specific instructions in UPGRADES.rst?\n"
         )
         sys.exit(1)
 
@@ -279,6 +286,7 @@ def run():
 
 def main():
     with LoggingContext("main"):
+        check_requirements()
         setup()
 
 

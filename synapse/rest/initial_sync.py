@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,12 +27,15 @@ class InitialSyncRestServlet(RestServlet):
     def on_GET(self, request):
         user = yield self.auth.get_user_by_req(request)
         with_feedback = "feedback" in request.args
+        as_client_event = "raw" not in request.args
         pagination_config = PaginationConfig.from_request(request)
         handler = self.handlers.message_handler
         content = yield handler.snapshot_all_rooms(
             user_id=user.to_string(),
             pagin_config=pagination_config,
-            feedback=with_feedback)
+            feedback=with_feedback,
+            as_client_event=as_client_event
+        )
 
         defer.returnValue((200, content))
 

@@ -23,13 +23,26 @@ import argparse
 from synapse.events import FrozenEvent
 
 
-def make_graph(db_name, room_id, file_prefix):
+def make_graph(db_name, room_id, file_prefix, limit):
     conn = sqlite3.connect(db_name)
 
-    c = conn.execute(
-        "SELECT json FROM event_json where room_id = ?",
-        (room_id,)
+    sql = (
+        "SELECT json FROM event_json as j "
+        "INNER JOIN events as e ON e.event_id = j.event_id "
+        "WHERE j.room_id = ?"
     )
+
+    args = [room_id]
+
+    if limit:
+        sql += (
+            " ORDER BY topological_ordering DESC, stream_ordering DESC "
+            "LIMIT ?"
+        )
+
+        args.append(limit)
+
+    c = conn.execute(sql, args)
 
     events = [FrozenEvent(json.loads(e[0])) for e in c.fetchall()]
 
@@ -128,11 +141,16 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-p", "--prefix", dest="prefix",
-        help="String to prefix output files with"
+        help="String to prefix output files with",
+        default="graph_output"
+    )
+    parser.add_argument(
+        "-l", "--limit",
+        help="Only retrieve the last N events.",
     )
     parser.add_argument('db')
     parser.add_argument('room')
 
     args = parser.parse_args()
 
-    make_graph(args.db, args.room, args.prefix)
+    make_graph(args.db, args.room, args.prefix, args.limit)

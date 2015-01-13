@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ class LoggingTransaction(object):
             # Don't let logging failures stop SQL from working
             pass
 
-        start = time.clock() * 1000
+        start = time.time() * 1000
         try:
             return self.txn.execute(
                 sql, *args, **kwargs
@@ -73,7 +73,7 @@ class LoggingTransaction(object):
                 logger.exception("[SQL FAIL] {%s}", self.name)
                 raise
         finally:
-            end = time.clock() * 1000
+            end = time.time() * 1000
             sql_logger.debug("[SQL time] {%s} %f", self.name, end - start)
 
 
@@ -93,7 +93,7 @@ class SQLBaseStore(object):
         def inner_func(txn, *args, **kwargs):
             with LoggingContext("runInteraction") as context:
                 current_context.copy_to(context)
-                start = time.clock() * 1000
+                start = time.time() * 1000
                 txn_id = SQLBaseStore._TXN_ID
 
                 # We don't really need these to be unique, so lets stop it from
@@ -109,7 +109,7 @@ class SQLBaseStore(object):
                     logger.exception("[TXN FAIL] {%s}", name)
                     raise
                 finally:
-                    end = time.clock() * 1000
+                    end = time.time() * 1000
                     transaction_logger.debug(
                         "[TXN END] {%s} %f",
                         name, end - start
@@ -479,23 +479,31 @@ class SQLBaseStore(object):
 
         return self.runInteraction("_simple_max_id", func)
 
-    def _get_events(self, event_ids):
+    def _get_events(self, event_ids, check_redacted=True,
+                    get_prev_content=False):
         return self.runInteraction(
-            "_get_events", self._get_events_txn, event_ids
+            "_get_events", self._get_events_txn, event_ids,
+            check_redacted=check_redacted, get_prev_content=get_prev_content,
         )
 
-    def _get_events_txn(self, txn, event_ids):
-        events = []
-        for e_id in event_ids:
-            ev = self._get_event_txn(txn, e_id)
+    def _get_events_txn(self, txn, event_ids, check_redacted=True,
+                        get_prev_content=False):
+        if not event_ids:
+            return []
 
-            if ev:
-                events.append(ev)
+        events = [
+            self._get_event_txn(
+                txn, event_id,
+                check_redacted=check_redacted,
+                get_prev_content=get_prev_content
+            )
+            for event_id in event_ids
+        ]
 
-        return events
+        return [e for e in events if e]
 
     def _get_event_txn(self, txn, event_id, check_redacted=True,
-                       get_prev_content=True):
+                       get_prev_content=False):
         sql = (
             "SELECT internal_metadata, json, r.event_id FROM event_json as e "
             "LEFT JOIN redactions as r ON e.event_id = r.redacts "
@@ -512,6 +520,14 @@ class SQLBaseStore(object):
 
         internal_metadata, js, redacted = res
 
+        return self._get_event_from_row_txn(
+            txn, internal_metadata, js, redacted,
+            check_redacted=check_redacted,
+            get_prev_content=get_prev_content,
+        )
+
+    def _get_event_from_row_txn(self, txn, internal_metadata, js, redacted,
+                                check_redacted=True, get_prev_content=False):
         d = json.loads(js)
         internal_metadata = json.loads(internal_metadata)
 
@@ -533,11 +549,13 @@ class SQLBaseStore(object):
                 ev.unsigned["redacted_because"] = because
 
         if get_prev_content and "replaces_state" in ev.unsigned:
-            ev.unsigned["prev_content"] = self._get_event_txn(
+            prev = self._get_event_txn(
                 txn,
                 ev.unsigned["replaces_state"],
                 get_prev_content=False,
-            ).get_dict()["content"]
+            )
+            if prev:
+                ev.unsigned["prev_content"] = prev.get_dict()["content"]
 
         return ev
 

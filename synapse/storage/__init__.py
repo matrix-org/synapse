@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ SCHEMAS = [
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 
 class _RollbackButIsFineException(Exception):
@@ -146,9 +146,7 @@ class DataStore(RoomMemberStore, RoomStore,
         elif event.type == EventTypes.Redaction:
             self._store_redaction(txn, event)
 
-        outlier = False
-        if hasattr(event.internal_metadata, "outlier"):
-            outlier = event.internal_metadata.outlier
+        outlier = event.internal_metadata.is_outlier()
 
         event_dict = {
             k: v

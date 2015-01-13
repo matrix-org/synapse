@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -115,10 +115,10 @@ class Signal(object):
                             failure.value,
                             failure.getTracebackObject()))
                     if not self.suppress_failures:
-                        raise failure
+                        failure.raiseException()
                 deferreds.append(d.addErrback(eb))
-
-            result = yield defer.DeferredList(
-                deferreds, fireOnOneErrback=not self.suppress_failures
-            )
-        defer.returnValue(result)
+            results = []
+            for deferred in deferreds:
+                result = yield deferred
+                results.append(result)
+        defer.returnValue(results)

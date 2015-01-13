@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -83,9 +83,15 @@ class TypingNotificationHandler(BaseHandler):
         if member in self._member_typing_timer:
             self.clock.cancel_call_later(self._member_typing_timer[member])
 
+        def _cb():
+            logger.debug(
+                "%s has timed out in %s", target_user.to_string(), room_id
+            )
+            self._stopped_typing(member)
+
         self._member_typing_until[member] = until
         self._member_typing_timer[member] = self.clock.call_later(
-            timeout / 1000, lambda: self._stopped_typing(member)
+            timeout / 1000.0, _cb
         )
 
         if was_present:

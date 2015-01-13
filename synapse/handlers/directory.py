@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -155,4 +155,4 @@ class DirectoryHandler(BaseHandler):
             "room_id": room_id,
             "sender": user_id,
             "content": {"aliases": aliases},
-        })
+        }, ratelimit=False)

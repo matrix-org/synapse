@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ class Thumbnailer(object):
 
     def scale(self, output_path, width, height, output_type):
         """Rescales the image to the given dimensions"""
-        scaled = self.image.resize((width, height), Image.BILINEAR)
+        scaled = self.image.resize((width, height), Image.ANTIALIAS)
         return self.save_image(scaled, output_type, output_path)
 
     def crop(self, output_path, width, height, output_type):
@@ -65,7 +65,7 @@ class Thumbnailer(object):
         if width * self.height > height * self.width:
             scaled_height = (width * self.height) // self.width
             scaled_image = self.image.resize(
-                (width, scaled_height), Image.BILINEAR
+                (width, scaled_height), Image.ANTIALIAS
             )
             crop_top = (scaled_height - height) // 2
             crop_bottom = height + crop_top
@@ -73,7 +73,7 @@ class Thumbnailer(object):
         else:
             scaled_width = (height * self.width) // self.height
             scaled_image = self.image.resize(
-                (scaled_width, height), Image.BILINEAR
+                (scaled_width, height), Image.ANTIALIAS
             )
             crop_left = (scaled_width - width) // 2
             crop_right = width + crop_left
@@ -82,7 +82,7 @@ class Thumbnailer(object):
 
     def save_image(self, output_image, output_type, output_path):
         output_bytes_io = BytesIO()
-        output_image.save(output_bytes_io, self.FORMATS[output_type])
+        output_image.save(output_bytes_io, self.FORMATS[output_type], quality=70)
         output_bytes = output_bytes_io.getvalue()
         with open(output_path, "wb") as output_file:
             output_file.write(output_bytes)

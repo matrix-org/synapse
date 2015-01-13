@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,14 +19,37 @@ from functools import wraps
 
 import logging
 import inspect
+import time
+
+
+_TIME_FUNC_ID = 0
+
+
+def _log_debug_as_f(f, msg, msg_args):
+    name = f.__module__
+    logger = logging.getLogger(name)
+
+    if logger.isEnabledFor(logging.DEBUG):
+        lineno = f.func_code.co_firstlineno
+        pathname = f.func_code.co_filename
+
+        record = logging.LogRecord(
+            name=name,
+            level=logging.DEBUG,
+            pathname=pathname,
+            lineno=lineno,
+            msg=msg,
+            args=msg_args,
+            exc_info=None
+        )
+
+        logger.handle(record)
 
 
 def log_function(f):
     """ Function decorator that logs every call to that function.
     """
     func_name = f.__name__
-    lineno = f.func_code.co_firstlineno
-    pathname = f.func_code.co_filename
 
     @wraps(f)
     def wrapped(*args, **kwargs):
@@ -52,21 +75,47 @@ def log_function(f):
                 "args": ", ".join(func_args)
             }
 
-            record = logging.LogRecord(
-                name=name,
-                level=level,
-                pathname=pathname,
-                lineno=lineno,
-                msg="Invoked '%(func_name)s' with args: %(args)s",
-                args=msg_args,
-                exc_info=None
+            _log_debug_as_f(
+                f,
+                "Invoked '%(func_name)s' with args: %(args)s",
+                msg_args
             )
-
-            logger.handle(record)
 
         return f(*args, **kwargs)
 
     wrapped.__name__ = func_name
+    return wrapped
+
+
+def time_function(f):
+    func_name = f.__name__
+
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        global _TIME_FUNC_ID
+        id = _TIME_FUNC_ID
+        _TIME_FUNC_ID += 1
+
+        start = time.clock() * 1000
+
+        try:
+            _log_debug_as_f(
+                f,
+                "[FUNC START] {%s-%d}",
+                (func_name, id),
+            )
+
+            r = f(*args, **kwargs)
+        finally:
+            end = time.clock() * 1000
+            _log_debug_as_f(
+                f,
+                "[FUNC END] {%s-%d} %f",
+                (func_name, id, end-start,),
+            )
+
+        return r
+
     return wrapped
 
 

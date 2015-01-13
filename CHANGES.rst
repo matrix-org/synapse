@@ -1,7 +1,21 @@
+Changes in synapse 0.6.1 (2015-01-07)
+=====================================
+
+ * Major optimizations to improve performance of initial sync and event sending
+   in large rooms (by up to 10x)
+ * Media repository now includes a Content-Length header on media downloads.
+ * Improve quality of thumbnails by changing resizing algorithm.
+
 Changes in synapse 0.6.0 (2014-12-16)
 =====================================
 
  * Add new API for media upload and download that supports thumbnailing.
+ * Replicate media uploads over multiple homeservers so media is always served
+   to clients from their local homeserver.  This obsoletes the
+   --content-addr parameter and confusion over accessing content directly
+   from remote homeservers.
+ * Implement exponential backoff when retrying federation requests when
+   sending to remote homeservers which are offline.
  * Implement typing notifications.
  * Fix bugs where we sent events with invalid signatures due to bugs where
    we incorrectly persisted events.

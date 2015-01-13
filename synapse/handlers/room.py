@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -130,6 +130,7 @@ class RoomCreationHandler(BaseHandler):
                 "type": EventTypes.Name,
                 "room_id": room_id,
                 "sender": user_id,
+                "state_key": "",
                 "content": {"name": name},
             })
 
@@ -139,6 +140,7 @@ class RoomCreationHandler(BaseHandler):
                 "type": EventTypes.Topic,
                 "room_id": room_id,
                 "sender": user_id,
+                "state_key": "",
                 "content": {"topic": topic},
             })
 
@@ -147,7 +149,7 @@ class RoomCreationHandler(BaseHandler):
                 "type": EventTypes.Member,
                 "state_key": invitee,
                 "room_id": room_id,
-                "user_id": user_id,
+                "sender": user_id,
                 "content": {"membership": Membership.INVITE},
             })
 
@@ -243,14 +245,12 @@ class RoomMemberHandler(BaseHandler):
         self.distributor.declare("user_left_room")
 
     @defer.inlineCallbacks
-    def get_room_members(self, room_id, membership=Membership.JOIN):
+    def get_room_members(self, room_id):
         hs = self.hs
 
-        memberships = yield self.store.get_room_members(
-            room_id=room_id, membership=membership
-        )
+        users = yield self.store.get_users_in_room(room_id)
 
-        defer.returnValue([hs.parse_userid(m.user_id) for m in memberships])
+        defer.returnValue([hs.parse_userid(u) for u in users])
 
     @defer.inlineCallbacks
     def fetch_room_distributions_into(self, room_id, localusers=None,
@@ -390,6 +390,11 @@ class RoomMemberHandler(BaseHandler):
 
         host = hosts[0]
 
+        # If event doesn't include a display name, add one.
+        yield self.distributor.fire(
+            "collect_presencelike_data", joinee, content
+        )
+
         content.update({"membership": Membership.JOIN})
         builder = self.event_builder_factory.new({
             "type": EventTypes.Member,
@@ -420,10 +425,22 @@ class RoomMemberHandler(BaseHandler):
             event.room_id,
             self.hs.hostname
         )
+        if not is_host_in_room:
+            # is *anyone* in the room?
+            room_member_keys = [
+                v for (k, v) in context.current_state.keys() if (
+                    k == "m.room.member"
+                )
+            ]
+            if len(room_member_keys) == 0:
+                # has the room been created so we can join it?
+                create_event = context.current_state.get(("m.room.create", ""))
+                if create_event:
+                    is_host_in_room = True
 
         if is_host_in_room:
             should_do_dance = False
-        elif room_host:
+        elif room_host:  # TODO: Shouldn't this be remote_room_host?
             should_do_dance = True
         else:
             # TODO(markjh): get prev_state from snapshot
@@ -437,7 +454,8 @@ class RoomMemberHandler(BaseHandler):
                 should_do_dance = not self.hs.is_mine(inviter)
                 room_host = inviter.domain
             else:
-                should_do_dance = False
+                # return the same error as join_room_alias does
+                raise SynapseError(404, "No known servers")
 
         if should_do_dance:
             handler = self.hs.get_handlers().federation_handler
@@ -524,11 +542,10 @@ class RoomListHandler(BaseHandler):
     def get_public_room_list(self):
         chunk = yield self.store.get_rooms(is_public=True)
         for room in chunk:
-            joined_members = yield self.store.get_room_members(
+            joined_users = yield self.store.get_users_in_room(
                 room_id=room["room_id"],
-                membership=Membership.JOIN
             )
-            room["num_joined_members"] = len(joined_members)
+            room["num_joined_members"] = len(joined_users)
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
 

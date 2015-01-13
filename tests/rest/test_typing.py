@@ -21,7 +21,7 @@ from twisted.internet import defer
 import synapse.rest.room
 from synapse.server import HomeServer
 
-from ..utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
+from ..utils import MockHttpResource, MockClock, SQLiteMemoryDbPool, MockKey
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
@@ -36,6 +36,8 @@ class RoomTypingTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        self.clock = MockClock()
+
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
 
@@ -47,6 +49,7 @@ class RoomTypingTestCase(RestTestCase):
 
         hs = HomeServer(
             "red",
+            clock=self.clock,
             db_pool=db_pool,
             http_client=None,
             replication_layer=Mock(),
@@ -76,6 +79,30 @@ class RoomTypingTestCase(RestTestCase):
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
+
+        def get_room_members(room_id):
+            if room_id == self.room_id:
+                return defer.succeed([hs.parse_userid(self.user_id)])
+            else:
+                return defer.succeed([])
+
+        @defer.inlineCallbacks
+        def fetch_room_distributions_into(room_id, localusers=None,
+                remotedomains=None, ignore_user=None):
+
+            members = yield get_room_members(room_id)
+            for member in members:
+                if ignore_user is not None and member == ignore_user:
+                    continue
+
+                if hs.is_mine(member):
+                    if localusers is not None:
+                        localusers.add(member)
+                else:
+                    if remotedomains is not None:
+                        remotedomains.add(member.domain)
+        hs.get_handlers().room_member_handler.fetch_room_distributions_into = (
+                fetch_room_distributions_into)
 
         synapse.rest.room.register_servlets(hs, self.mock_resource)
 
@@ -113,3 +140,25 @@ class RoomTypingTestCase(RestTestCase):
             '{"typing": false}'
         )
         self.assertEquals(200, code)
+
+    @defer.inlineCallbacks
+    def test_typing_timeout(self):
+        (code, _) = yield self.mock_resource.trigger("PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            '{"typing": true, "timeout": 30000}'
+        )
+        self.assertEquals(200, code)
+
+        self.assertEquals(self.event_source.get_current_key(), 1)
+
+        self.clock.advance_time(31);
+
+        self.assertEquals(self.event_source.get_current_key(), 2)
+
+        (code, _) = yield self.mock_resource.trigger("PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            '{"typing": true, "timeout": 30000}'
+        )
+        self.assertEquals(200, code)
+
+        self.assertEquals(self.event_source.get_current_key(), 3)

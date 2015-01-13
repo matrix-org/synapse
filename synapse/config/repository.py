@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 matrix.org
+# Copyright 2014, 2015 matrix.org
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ class ContentRepositoryConfig(Config):
         super(ContentRepositoryConfig, cls).add_arguments(parser)
         db_group = parser.add_argument_group("content_repository")
         db_group.add_argument(
-            "--max-upload-size", default="1M"
+            "--max-upload-size", default="10M"
         )
         db_group.add_argument(
             "--media-store-path", default=cls.default_path("media_store")

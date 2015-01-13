@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,8 +47,12 @@ class ServerConfig(Config):
     def add_arguments(cls, parser):
         super(ServerConfig, cls).add_arguments(parser)
         server_group = parser.add_argument_group("server")
-        server_group.add_argument("-H", "--server-name", default="localhost",
-                                  help="The name of the server")
+        server_group.add_argument(
+            "-H", "--server-name", default="localhost",
+            help="The domain name of the server, with optional explicit port. "
+                 "This is used by remote servers to connect to this server, "
+                 "e.g. matrix.org, localhost:8080, etc."
+        )
         server_group.add_argument("--signing-key-path",
                                   help="The signing key to sign messages with")
         server_group.add_argument("-p", "--bind-port", metavar="PORT",

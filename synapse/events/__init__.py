@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,12 +15,10 @@
 
 from synapse.util.frozenutils import freeze, unfreeze
 
-import copy
-
 
 class _EventInternalMetadata(object):
     def __init__(self, internal_metadata_dict):
-        self.__dict__ = copy.deepcopy(internal_metadata_dict)
+        self.__dict__ = internal_metadata_dict
 
     def get_dict(self):
         return dict(self.__dict__)
@@ -49,10 +47,10 @@ def _event_dict_property(key):
 class EventBase(object):
     def __init__(self, event_dict, signatures={}, unsigned={},
                  internal_metadata_dict={}):
-        self.signatures = copy.deepcopy(signatures)
-        self.unsigned = copy.deepcopy(unsigned)
+        self.signatures = signatures
+        self.unsigned = unsigned
 
-        self._event_dict = copy.deepcopy(event_dict)
+        self._event_dict = event_dict
 
         self.internal_metadata = _EventInternalMetadata(
             internal_metadata_dict
@@ -112,10 +110,16 @@ class EventBase(object):
 
 class FrozenEvent(EventBase):
     def __init__(self, event_dict, internal_metadata_dict={}):
-        event_dict = copy.deepcopy(event_dict)
+        event_dict = dict(event_dict)
 
-        signatures = copy.deepcopy(event_dict.pop("signatures", {}))
-        unsigned = copy.deepcopy(event_dict.pop("unsigned", {}))
+        # Signatures is a dict of dicts, and this is faster than doing a
+        # copy.deepcopy
+        signatures = {
+            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            for name, sigs in event_dict.pop("signatures", {}).items()
+        }
+
+        unsigned = dict(event_dict.pop("unsigned", {}))
 
         frozen_dict = freeze(event_dict)
 

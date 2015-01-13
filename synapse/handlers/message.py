@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
 from synapse.events.validator import EventValidator
+from synapse.util.logcontext import PreserveLoggingContext
 
 from ._base import BaseHandler
 
@@ -66,7 +67,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
-                     feedback=False):
+                     feedback=False, as_client_event=True):
         """Get messages in a room.
 
         Args:
@@ -75,6 +76,7 @@ class MessageHandler(BaseHandler):
             pagin_config (synapse.api.streams.PaginationConfig): The pagination
             config rules to apply, if any.
             feedback (bool): True to get compressed feedback with the messages
+            as_client_event (bool): True to get events in client-server format.
         Returns:
             dict: Pagination API results
         """
@@ -98,7 +100,9 @@ class MessageHandler(BaseHandler):
         )
 
         chunk = {
-            "chunk": [self.hs.serialize_event(e) for e in events],
+            "chunk": [
+                self.hs.serialize_event(e, as_client_event) for e in events
+            ],
             "start": pagin_config.from_token.to_string(),
             "end": next_token.to_string(),
         }
@@ -106,7 +110,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue(chunk)
 
     @defer.inlineCallbacks
-    def create_and_send_event(self, event_dict):
+    def create_and_send_event(self, event_dict, ratelimit=True):
         """ Given a dict from a client, create and handle a new event.
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
@@ -123,7 +127,8 @@ class MessageHandler(BaseHandler):
 
         self.validator.validate_new(builder)
 
-        self.ratelimit(builder.user_id)
+        if ratelimit:
+            self.ratelimit(builder.user_id)
         # TODO(paul): Why does 'event' not have a 'user' object?
         user = self.hs.parse_userid(builder.user_id)
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
@@ -151,6 +156,11 @@ class MessageHandler(BaseHandler):
                 event=event,
                 context=context,
             )
+
+        if event.type == EventTypes.Message:
+            presence = self.hs.get_handlers().presence_handler
+            with PreserveLoggingContext():
+                presence.bump_presence_active_time(user)
 
         defer.returnValue(event)
 
@@ -204,7 +214,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def snapshot_all_rooms(self, user_id=None, pagin_config=None,
-                           feedback=False):
+                           feedback=False, as_client_event=True):
         """Retrieve a snapshot of all rooms the user is invited or has joined.
 
         This snapshot may include messages for all rooms where the user is
@@ -215,6 +225,7 @@ class MessageHandler(BaseHandler):
             pagin_config (synapse.api.streams.PaginationConfig): The pagination
             config used to determine how many messages *PER ROOM* to return.
             feedback (bool): True to get feedback along with these messages.
+            as_client_event (bool): True to get events in client-server format.
         Returns:
             A list of dicts with "room_id" and "membership" keys for all rooms
             the user is currently invited or joined in on. Rooms where the user
@@ -256,7 +267,7 @@ class MessageHandler(BaseHandler):
             }
 
             if event.membership == Membership.INVITE:
-                d["inviter"] = event.user_id
+                d["inviter"] = event.sender
 
             rooms_ret.append(d)
 
@@ -273,7 +284,10 @@ class MessageHandler(BaseHandler):
                 end_token = now_token.copy_and_replace("room_key", token[1])
 
                 d["messages"] = {
-                    "chunk": [self.hs.serialize_event(m) for m in messages],
+                    "chunk": [
+                        self.hs.serialize_event(m, as_client_event)
+                        for m in messages
+                    ],
                     "start": start_token.to_string(),
                     "end": end_token.to_string(),
                 }
