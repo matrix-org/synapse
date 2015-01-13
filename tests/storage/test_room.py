@@ -57,17 +57,6 @@ class RoomStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_store_room_config(self):
-        yield self.store.store_room_config(self.room.to_string(),
-            visibility=False
-        )
-
-        self.assertObjectHasAttributes(
-            {"is_public": False},
-            (yield self.store.get_room(self.room.to_string()))
-        )
-
-    @defer.inlineCallbacks
     def test_get_rooms(self):
         # get_rooms does an INNER JOIN on the room_aliases table :(
 

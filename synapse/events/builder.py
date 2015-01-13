@@ -33,12 +33,6 @@ class EventBuilder(EventBase):
             unsigned=unsigned
         )
 
-    def update_event_key(self, key, value):
-        self._event_dict[key] = value
-
-    def update_event_keys(self, other_dict):
-        self._event_dict.update(other_dict)
-
     def build(self):
         return FrozenEvent.from_event(self)
 
