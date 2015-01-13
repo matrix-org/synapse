@@ -120,6 +120,10 @@ class TypingNotificationHandler(BaseHandler):
 
         member = RoomMember(room_id=room_id, user=target_user)
 
+        if member in self._member_typing_timer:
+            self.clock.cancel_call_later(self._member_typing_timer[member])
+            del self._member_typing_timer[member]
+
         yield self._stopped_typing(member)
 
     @defer.inlineCallbacks
@@ -142,8 +146,10 @@ class TypingNotificationHandler(BaseHandler):
 
         del self._member_typing_until[member]
 
-        self.clock.cancel_call_later(self._member_typing_timer[member])
-        del self._member_typing_timer[member]
+        if member in self._member_typing_timer:
+            # Don't cancel it - either it already expired, or the real
+            # stopped_typing() will cancel it
+            del self._member_typing_timer[member]
 
     @defer.inlineCallbacks
     def _push_update(self, room_id, user, typing):
