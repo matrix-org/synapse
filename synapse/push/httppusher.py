@@ -50,6 +50,7 @@ class HttpPusher(Pusher):
         self.data_minus_url.update(self.data)
         del self.data_minus_url['url']
 
+    @defer.inlineCallbacks
     def _build_notification_dict(self, event):
         # we probably do not want to push for every presence update
         # (we may want to be able to set up notifications when specific
@@ -57,9 +58,11 @@ class HttpPusher(Pusher):
         # Actually, presence events will not get this far now because we
         # need to filter them out in the main Pusher code.
         if 'event_id' not in event:
-            return None
+            defer.returnValue(None)
 
-        return {
+        ctx = yield self.get_context_for_event(event)
+
+        d = {
             'notification': {
                 'transition': 'new',
                 # everything is new for now: we don't have read receipts
@@ -85,9 +88,16 @@ class HttpPusher(Pusher):
             }
         }
 
+        if len(ctx['aliases']):
+            d['notification']['roomAlias'] = ctx['aliases'][0]
+        if 'name' in ctx:
+            d['notification']['roomName'] = ctx['name']
+
+        defer.returnValue(d)
+
     @defer.inlineCallbacks
     def dispatch_push(self, event):
-        notification_dict = self._build_notification_dict(event)
+        notification_dict = yield self._build_notification_dict(event)
         if not notification_dict:
             defer.returnValue([])
         try:

@@ -62,6 +62,19 @@ class Pusher(object):
         return True
 
     @defer.inlineCallbacks
+    def get_context_for_event(self, ev):
+        name_aliases = yield self.store.get_room_name_and_aliases(
+            ev['room_id']
+        )
+
+        ctx = {'aliases': name_aliases[1]}
+        if name_aliases[0] is not None:
+            ctx['name'] = name_aliases[0]
+
+        defer.returnValue(ctx)
+
+
+    @defer.inlineCallbacks
     def start(self):
         if not self.last_token:
             # First-time setup: get a token to start from (we can't
