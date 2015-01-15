@@ -81,7 +81,9 @@ class Pusher(object):
             from_tok = StreamToken.from_string(self.last_token)
             config = PaginationConfig(from_token=from_tok, limit='1')
             chunk = yield self.evStreamHandler.get_stream(
-                self.user_name, config, timeout=100*365*24*60*60*1000)
+                self.user_name, config,
+                timeout=100*365*24*60*60*1000, affect_presence=False
+            )
 
             # limiting to 1 may get 1 event plus 1 presence event, so
             # pick out the actual event
