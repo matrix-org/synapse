@@ -41,7 +41,7 @@ class PusherPool:
 
     @defer.inlineCallbacks
     def add_pusher(self, user_name, kind, app_id,
-                   app_display_name, device_display_name, pushkey, data):
+                   app_display_name, device_display_name, pushkey, lang, data):
         # we try to create the pusher just to validate the config: it
         # will then get pulled out of the database,
         # recreated, added and started: this means we have only one
@@ -54,6 +54,7 @@ class PusherPool:
             "device_display_name": device_display_name,
             "pushkey": pushkey,
             "pushkey_ts": self.hs.get_clock().time_msec(),
+            "lang": lang,
             "data": data,
             "last_token": None,
             "last_success": None,
@@ -62,13 +63,13 @@ class PusherPool:
         yield self._add_pusher_to_store(
             user_name, kind, app_id,
             app_display_name, device_display_name,
-            pushkey, data
+            pushkey, lang, data
         )
 
     @defer.inlineCallbacks
     def _add_pusher_to_store(self, user_name, kind, app_id,
                              app_display_name, device_display_name,
-                             pushkey, data):
+                             pushkey, lang, data):
         yield self.store.add_pusher(
             user_name=user_name,
             kind=kind,
@@ -77,6 +78,7 @@ class PusherPool:
             device_display_name=device_display_name,
             pushkey=pushkey,
             pushkey_ts=self.hs.get_clock().time_msec(),
+            lang=lang,
             data=json.dumps(data)
         )
         self._refresh_pusher((app_id, pushkey))

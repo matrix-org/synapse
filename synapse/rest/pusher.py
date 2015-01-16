@@ -32,7 +32,7 @@ class PusherRestServlet(RestServlet):
         content = _parse_json(request)
 
         reqd = ['kind', 'app_id', 'app_display_name',
-                'device_display_name', 'pushkey', 'data']
+                'device_display_name', 'pushkey', 'lang', 'data']
         missing = []
         for i in reqd:
             if i not in content:
@@ -50,6 +50,7 @@ class PusherRestServlet(RestServlet):
                 app_display_name=content['app_display_name'],
                 device_display_name=content['device_display_name'],
                 pushkey=content['pushkey'],
+                lang=content['lang'],
                 data=content['data']
             )
         except PusherConfigException as pce:

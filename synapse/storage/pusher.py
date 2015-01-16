@@ -94,7 +94,7 @@ class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
     def add_pusher(self, user_name, kind, app_id,
                    app_display_name, device_display_name,
-                   pushkey, pushkey_ts, data):
+                   pushkey, pushkey_ts, lang, data):
         try:
             yield self._simple_upsert(
                 PushersTable.table_name,
@@ -108,6 +108,7 @@ class PusherStore(SQLBaseStore):
                     app_display_name=app_display_name,
                     device_display_name=device_display_name,
                     ts=pushkey_ts,
+                    lang=lang,
                     data=data
                 ))
         except Exception as e:
