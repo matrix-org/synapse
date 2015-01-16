@@ -29,7 +29,7 @@ class TransportLayerClient(object):
     """Sends federation HTTP requests to other servers"""
 
     @log_function
-    def get_context_state(self, destination, context, event_id=None):
+    def get_context_state(self, destination, context, event_id):
         """ Requests all state for a given context (i.e. room) from the
         given server.
 
@@ -37,6 +37,7 @@ class TransportLayerClient(object):
             destination (str): The host name of the remote home server we want
                 to get the state from.
             context (str): The name of the context we want the state of
+            event_id (str): The event we want the context at.
 
         Returns:
             Deferred: Results in a dict received from the remote homeserver.
@@ -44,14 +45,9 @@ class TransportLayerClient(object):
         logger.debug("get_context_state dest=%s, context=%s",
                      destination, context)
 
-        subpath = "/state/%s/" % context
-
-        args = {}
-        if event_id:
-            args["event_id"] = event_id
-
-        return self._do_request_for_transaction(
-            destination, subpath, args=args
+        path = PREFIX + "/state/%s/" % context
+        return self.client.get_json(
+            destination, path=path, args={"event_id": event_id},
         )
 
     @log_function
@@ -69,9 +65,8 @@ class TransportLayerClient(object):
         logger.debug("get_pdu dest=%s, event_id=%s",
                      destination, event_id)
 
-        subpath = "/event/%s/" % (event_id, )
-
-        return self._do_request_for_transaction(destination, subpath)
+        path = PREFIX + "/event/%s/" % (event_id, )
+        return self.client.get_json(destination, path=path)
 
     @log_function
     def backfill(self, dest, context, event_tuples, limit):
@@ -96,16 +91,16 @@ class TransportLayerClient(object):
             # TODO: raise?
             return
 
-        subpath = "/backfill/%s/" % (context,)
+        path = PREFIX + "/backfill/%s/" % (context,)
 
         args = {
             "v": event_tuples,
             "limit": [str(limit)],
         }
 
-        return self._do_request_for_transaction(
-            dest,
-            subpath,
+        return self.client.get_json(
+            destination,
+            path=path,
             args=args,
         )
 
@@ -227,31 +222,3 @@ class TransportLayerClient(object):
         )
 
         defer.returnValue(response)
-
-    @defer.inlineCallbacks
-    @log_function
-    def _do_request_for_transaction(self, destination, subpath, args={}):
-        """
-        Args:
-            destination (str)
-            path (str)
-            args (dict): This is parsed directly to the HttpClient.
-
-        Returns:
-            Deferred: Results in a dict.
-        """
-
-        data = yield self.client.get_json(
-            destination,
-            path=PREFIX + subpath,
-            args=args,
-        )
-
-        # Add certain keys to the JSON, ready for decoding as a Transaction
-        data.update(
-            origin=destination,
-            destination=self.server_name,
-            transaction_id=None
-        )
-
-        defer.returnValue(data)
