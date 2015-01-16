@@ -285,7 +285,6 @@ class TransportLayerServer(object):
 
         defer.returnValue((code, response))
 
-
     @log_function
     def _on_backfill_request(self, origin, context, v_list, limits):
         if not limits:

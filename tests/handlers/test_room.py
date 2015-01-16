@@ -223,7 +223,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         yield room_handler.change_membership(event, context)
 
         self.federation.handle_new_event.assert_called_once_with(
-            event, None, destinations=set()
+            event, destinations=set()
         )
 
         self.datastore.persist_event.assert_called_once_with(
@@ -301,7 +301,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         yield room_handler.change_membership(event, context)
 
         self.federation.handle_new_event.assert_called_once_with(
-            event, None, destinations=set(['red'])
+            event, destinations=set(['red'])
         )
 
         self.datastore.persist_event.assert_called_once_with(

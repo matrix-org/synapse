@@ -29,9 +29,9 @@ class TransportLayerClient(object):
     """Sends federation HTTP requests to other servers"""
 
     @log_function
-    def get_context_state(self, destination, context, event_id):
-        """ Requests all state for a given context (i.e. room) from the
-        given server.
+    def get_room_state(self, destination, room_id, event_id):
+        """ Requests all state for a given room from the given server at the
+        given event.
 
         Args:
             destination (str): The host name of the remote home server we want
@@ -42,10 +42,10 @@ class TransportLayerClient(object):
         Returns:
             Deferred: Results in a dict received from the remote homeserver.
         """
-        logger.debug("get_context_state dest=%s, context=%s",
-                     destination, context)
+        logger.debug("get_room_state dest=%s, room=%s",
+                     destination, room_id)
 
-        path = PREFIX + "/state/%s/" % context
+        path = PREFIX + "/state/%s/" % room_id
         return self.client.get_json(
             destination, path=path, args={"event_id": event_id},
         )
@@ -69,13 +69,13 @@ class TransportLayerClient(object):
         return self.client.get_json(destination, path=path)
 
     @log_function
-    def backfill(self, dest, context, event_tuples, limit):
+    def backfill(self, destination, room_id, event_tuples, limit):
         """ Requests `limit` previous PDUs in a given context before list of
         PDUs.
 
         Args:
             dest (str)
-            context (str)
+            room_id (str)
             event_tuples (list)
             limt (int)
 
@@ -83,15 +83,15 @@ class TransportLayerClient(object):
             Deferred: Results in a dict received from the remote homeserver.
         """
         logger.debug(
-            "backfill dest=%s, context=%s, event_tuples=%s, limit=%s",
-            dest, context, repr(event_tuples), str(limit)
+            "backfill dest=%s, room_id=%s, event_tuples=%s, limit=%s",
+            destination, room_id, repr(event_tuples), str(limit)
         )
 
         if not event_tuples:
             # TODO: raise?
             return
 
-        path = PREFIX + "/backfill/%s/" % (context,)
+        path = PREFIX + "/backfill/%s/" % (room_id,)
 
         args = {
             "v": event_tuples,
@@ -159,8 +159,8 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def make_join(self, destination, context, user_id, retry_on_dns_fail=True):
-        path = PREFIX + "/make_join/%s/%s" % (context, user_id,)
+    def make_join(self, destination, room_id, user_id, retry_on_dns_fail=True):
+        path = PREFIX + "/make_join/%s/%s" % (room_id, user_id)
 
         response = yield self.client.get_json(
             destination=destination,
@@ -172,11 +172,8 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_join(self, destination, context, event_id, content):
-        path = PREFIX + "/send_join/%s/%s" % (
-            context,
-            event_id,
-        )
+    def send_join(self, destination, room_id, event_id, content):
+        path = PREFIX + "/send_join/%s/%s" % (room_id, event_id)
 
         code, content = yield self.client.put_json(
             destination=destination,
@@ -191,11 +188,8 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_invite(self, destination, context, event_id, content):
-        path = PREFIX + "/invite/%s/%s" % (
-            context,
-            event_id,
-        )
+    def send_invite(self, destination, room_id, event_id, content):
+        path = PREFIX + "/invite/%s/%s" % (room_id, event_id)
 
         code, content = yield self.client.put_json(
             destination=destination,
@@ -210,11 +204,8 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def get_event_auth(self, destination, context, event_id):
-        path = PREFIX + "/event_auth/%s/%s" % (
-            context,
-            event_id,
-        )
+    def get_event_auth(self, destination, room_id, event_id):
+        path = PREFIX + "/event_auth/%s/%s" % (room_id, event_id)
 
         response = yield self.client.get_json(
             destination=destination,
