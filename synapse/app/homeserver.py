@@ -253,7 +253,7 @@ def setup():
     if db_name == ":memory:":
         # Memory databases will need to be setup each time they are opened.
         reactor.callWhenRunning(
-            hs.get_db_pool().runWithConnection, prepare_database
+            db_pool.runWithConnection, prepare_database
         )
 
     if config.manhole:
