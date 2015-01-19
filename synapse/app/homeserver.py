@@ -247,7 +247,13 @@ def setup():
 
     logger.info("Database prepared in %s.", db_name)
 
-    hs.get_db_pool()
+    db_pool = hs.get_db_pool()
+
+    if db_name == ":memory:"
+        # Memory databases will need to be setup each time they are opened.
+        reactor.callWhenRunning(
+            hs.get_db_pool().runWithConnection, prepare_database
+        )
 
     if config.manhole:
         f = twisted.manhole.telnet.ShellFactory()
