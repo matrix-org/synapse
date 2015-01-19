@@ -241,7 +241,8 @@ def setup():
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"
-            "Have you checked for version specific instructions in UPGRADES.rst?\n"
+            "Have you checked for version specific instructions in"
+            " UPGRADES.rst?\n"
         )
         sys.exit(1)
 
@@ -249,7 +250,7 @@ def setup():
 
     db_pool = hs.get_db_pool()
 
-    if db_name == ":memory:"
+    if db_name == ":memory:":
         # Memory databases will need to be setup each time they are opened.
         reactor.callWhenRunning(
             hs.get_db_pool().runWithConnection, prepare_database
