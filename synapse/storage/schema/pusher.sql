@@ -16,6 +16,7 @@
 CREATE TABLE IF NOT EXISTS pushers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_name TEXT NOT NULL,
+  instance_handle varchar(32) NOT NULL,
   kind varchar(8) NOT NULL,
   app_id varchar(64) NOT NULL,
   app_display_name varchar(64) NOT NULL,
