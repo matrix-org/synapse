@@ -72,17 +72,17 @@ class HttpPusher(Pusher):
                 'from': event['user_id'],
                 # we may have to fetch this over federation and we
                 # can't trust it anyway: is it worth it?
-                #'fromDisplayName': 'Steve Stevington'
+                #'from_display_name': 'Steve Stevington'
                 #'counts': { -- we don't mark messages as read yet so
                 # we have no way of knowing
                 #    'unread': 1,
-                #    'missedCalls': 2
+                #    'missed_calls': 2
                 # },
                 'devices': [
                     {
                         'app_id': self.app_id,
                         'pushkey': self.pushkey,
-                        'pushkeyTs': long(self.pushkey_ts / 1000),
+                        'pushkey_ts': long(self.pushkey_ts / 1000),
                         'data': self.data_minus_url
                     }
                 ]
