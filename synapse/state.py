@@ -19,6 +19,7 @@ from twisted.internet import defer
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
 from synapse.api.constants import EventTypes
+from synapse.api.errors import AuthError
 from synapse.events.snapshot import EventContext
 
 from collections import namedtuple
@@ -42,6 +43,8 @@ class StateHandler(object):
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
+        # self.auth = hs.get_auth()
+        self.hs = hs
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
@@ -210,14 +213,21 @@ class StateHandler(object):
         else:
             prev_states = []
 
+        auth_events = {
+            k: e for k, e in unconflicted_state.items()
+            if k[0] in (EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,)
+        }
+
         try:
-            new_state = {}
-            new_state.update(unconflicted_state)
-            for key, events in conflicted_state.items():
-                new_state[key] = self._resolve_state_events(events)
+            resolved_state = self._resolve_state_events(
+                conflicted_state, auth_events
+            )
         except:
             logger.exception("Failed to resolve state")
             raise
+
+        new_state = unconflicted_state
+        new_state.update(resolved_state)
 
         defer.returnValue((None, new_state, prev_states))
 
@@ -238,36 +248,65 @@ class StateHandler(object):
             return 0
 
     @log_function
-    def _resolve_state_events(self, events):
-        curr_events = events
+    def _resolve_state_events(self, conflicted_state, auth_events):
+        resolved_state = {}
+        power_key = (EventTypes.PowerLevels, "")
+        if power_key in conflicted_state.items():
+            power_levels = conflicted_state[power_key]
+            resolved_state[power_key] = self._resolve_auth_events(power_levels)
 
-        new_powers = [
-            self._get_power_level_from_event_state(e, e.user_id)
-            for e in curr_events
-        ]
+        auth_events.update(resolved_state)
 
-        new_powers = [
-            int(p) if p else 0 for p in new_powers
-        ]
+        for key, events in conflicted_state.items():
+            if key[0] == EventTypes.Member:
+                resolved_state[key] = self._resolve_auth_events(
+                    events,
+                    auth_events
+                )
 
-        max_power = max(new_powers)
+        auth_events.update(resolved_state)
 
-        curr_events = [
-            z[0] for z in zip(curr_events, new_powers)
-            if z[1] == max_power
-        ]
+        for key, events in conflicted_state.items():
+            if key not in resolved_state:
+                resolved_state[key] = self._resolve_normal_events(
+                    events, auth_events
+                )
 
-        if not curr_events:
-            raise RuntimeError("Max didn't get a max?")
-        elif len(curr_events) == 1:
-            return curr_events[0]
+        return resolved_state
 
-        # TODO: For now, just choose the one with the largest event_id.
-        return (
-            sorted(
-                curr_events,
-                key=lambda e: hashlib.sha1(
-                    e.event_id + e.user_id + e.room_id + e.type
-                ).hexdigest()
-            )[0]
-        )
+    def _resolve_auth_events(self, events, auth_events):
+        reverse = [i for i in reversed(self._ordered_events(events))]
+
+        auth_events = dict(auth_events)
+
+        prev_event = reverse[0]
+        for event in reverse[1:]:
+            auth_events[(prev_event.type, prev_event.state_key)] = prev_event
+            try:
+                # FIXME: hs.get_auth() is bad style, but we need to do it to
+                # get around circular deps.
+                self.hs.get_auth().check(event, auth_events)
+                prev_event = event
+            except AuthError:
+                return prev_event
+
+        return event
+
+    def _resolve_normal_events(self, events, auth_events):
+        for event in self._ordered_events(events):
+            try:
+                # FIXME: hs.get_auth() is bad style, but we need to do it to
+                # get around circular deps.
+                self.hs.get_auth().check(event, auth_events)
+                return event
+            except AuthError as e:
+                pass
+
+        # Oh dear.
+        return event
+
+    def _ordered_events(self, events):
+        def key_func(e):
+            return -int(e.depth), hashlib.sha1(e.event_id).hexdigest()
+
+        return sorted(events, key=key_func)
