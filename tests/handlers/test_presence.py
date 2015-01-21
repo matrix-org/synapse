@@ -113,17 +113,18 @@ class PresenceTestCase(unittest.TestCase):
 
         self.handler = hs.get_handlers().presence_handler
 
+        self.room_id = "a-room"
         self.room_members = []
 
         def get_rooms_for_user(user):
             if user in self.room_members:
-                return defer.succeed(["a-room"])
+                return defer.succeed([self.room_id])
             else:
                 return defer.succeed([])
         room_member_handler.get_rooms_for_user = get_rooms_for_user
 
         def get_room_members(room_id):
-            if room_id == "a-room":
+            if room_id == self.room_id:
                 return defer.succeed(self.room_members)
             else:
                 return defer.succeed([])
@@ -529,24 +530,25 @@ class PresencePushTestCase(unittest.TestCase):
         ])
         self.room_member_handler = hs.handlers.room_member_handler
 
+        self.room_id = "a-room"
         self.room_members = []
 
         def get_rooms_for_user(user):
             if user in self.room_members:
-                return defer.succeed(["a-room"])
+                return defer.succeed([self.room_id])
             else:
                 return defer.succeed([])
         self.room_member_handler.get_rooms_for_user = get_rooms_for_user
 
         def get_room_members(room_id):
-            if room_id == "a-room":
+            if room_id == self.room_id:
                 return defer.succeed(self.room_members)
             else:
                 return defer.succeed([])
         self.room_member_handler.get_room_members = get_room_members
 
         def get_room_hosts(room_id):
-            if room_id == "a-room":
+            if room_id == self.room_id:
                 hosts = set([u.domain for u in self.room_members])
                 return defer.succeed(hosts)
             else:
@@ -882,7 +884,7 @@ class PresencePushTestCase(unittest.TestCase):
         )
 
         yield self.distributor.fire("user_joined_room", self.u_clementine,
-            "a-room"
+            self.room_id
         )
 
         self.room_members.append(self.u_clementine)
@@ -945,7 +947,7 @@ class PresencePushTestCase(unittest.TestCase):
         self.room_members = [self.u_apple, self.u_banana]
 
         yield self.distributor.fire("user_joined_room", self.u_potato,
-            "a-room"
+            self.room_id
         )
 
         yield put_json.await_calls()
@@ -974,7 +976,7 @@ class PresencePushTestCase(unittest.TestCase):
         self.room_members.append(self.u_potato)
 
         yield self.distributor.fire("user_joined_room", self.u_clementine,
-            "a-room"
+            self.room_id
         )
 
         put_json.await_calls()
