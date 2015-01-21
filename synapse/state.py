@@ -231,24 +231,20 @@ class StateHandler(object):
 
         defer.returnValue((None, new_state, prev_states))
 
-    def _get_power_level_from_event_state(self, event, user_id):
-        if hasattr(event, "old_state_events") and event.old_state_events:
-            key = (EventTypes.PowerLevels, "", )
-            power_level_event = event.old_state_events.get(key)
-            level = None
-            if power_level_event:
-                level = power_level_event.content.get("users", {}).get(
-                    user_id
-                )
-                if not level:
-                    level = power_level_event.content.get("users_default", 0)
-
-            return level
-        else:
-            return 0
-
     @log_function
     def _resolve_state_events(self, conflicted_state, auth_events):
+        """ This is where we actually decide which of the conflicted state to
+        use.
+
+        We resolve conflicts in the following order:
+            1. power levels
+            2. memberships
+            3. other events.
+
+        :param conflicted_state:
+        :param auth_events:
+        :return:
+        """
         resolved_state = {}
         power_key = (EventTypes.PowerLevels, "")
         if power_key in conflicted_state.items():
