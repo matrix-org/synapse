@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This is a reference implementation of a synapse home server.
+""" This is a reference implementation of a Matrix home server.
 """
 
-__version__ = "0.6.0"
+__version__ = "0.6.1b"

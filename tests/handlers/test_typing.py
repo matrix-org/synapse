@@ -352,3 +352,29 @@ class TypingNotificationsTestCase(unittest.TestCase):
                 }},
             ]
         )
+
+        # SYN-230 - see if we can still set after timeout
+
+        yield self.handler.started_typing(
+            target_user=self.u_apple,
+            auth_user=self.u_apple,
+            room_id=self.room_id,
+            timeout=10000,
+        )
+
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
+        ])
+        self.on_new_user_event.reset_mock()
+
+        self.assertEquals(self.event_source.get_current_key(), 3)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "content": {
+                     "user_ids": [self.u_apple.to_string()],
+                }},
+            ]
+        )

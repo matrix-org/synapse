@@ -75,14 +75,14 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def handle_new_event(self, event, snapshot, destinations):
+    def handle_new_event(self, event, destinations):
         """ Takes in an event from the client to server side, that has already
         been authed and handled by the state module, and sends it to any
         remote home servers that may be interested.
 
         Args:
-            event
-            snapshot (.storage.Snapshot): THe snapshot the event happened after
+            event: The event to send
+            destinations: A list of destinations to send it to
 
         Returns:
             Deferred: Resolved when it has successfully been queued for
@@ -154,7 +154,7 @@ class FederationHandler(BaseHandler):
             replication = self.replication_layer
 
             if not state:
-                state, auth_chain = yield replication.get_state_for_context(
+                state, auth_chain = yield replication.get_state_for_room(
                     origin, context=event.room_id, event_id=event.event_id,
                 )
 
@@ -281,7 +281,7 @@ class FederationHandler(BaseHandler):
         """
         pdu = yield self.replication_layer.send_invite(
             destination=target_host,
-            context=event.room_id,
+            room_id=event.room_id,
             event_id=event.event_id,
             pdu=event
         )
@@ -617,13 +617,13 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_backfill_request(self, origin, context, pdu_list, limit):
-        in_room = yield self.auth.check_host_in_room(context, origin)
+    def on_backfill_request(self, origin, room_id, pdu_list, limit):
+        in_room = yield self.auth.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
         events = yield self.store.get_backfill_events(
-            context,
+            room_id,
             pdu_list,
             limit
         )

@@ -144,7 +144,5 @@ class BaseHandler(object):
         yield self.notifier.on_new_room_event(event, extra_users=extra_users)
 
         yield federation_handler.handle_new_event(
-            event,
-            None,
-            destinations=destinations,
+            event, destinations=destinations,
         )

@@ -425,10 +425,22 @@ class RoomMemberHandler(BaseHandler):
             event.room_id,
             self.hs.hostname
         )
+        if not is_host_in_room:
+            # is *anyone* in the room?
+            room_member_keys = [
+                v for (k, v) in context.current_state.keys() if (
+                    k == "m.room.member"
+                )
+            ]
+            if len(room_member_keys) == 0:
+                # has the room been created so we can join it?
+                create_event = context.current_state.get(("m.room.create", ""))
+                if create_event:
+                    is_host_in_room = True
 
         if is_host_in_room:
             should_do_dance = False
-        elif room_host:
+        elif room_host:  # TODO: Shouldn't this be remote_room_host?
             should_do_dance = True
         else:
             # TODO(markjh): get prev_state from snapshot
@@ -442,7 +454,8 @@ class RoomMemberHandler(BaseHandler):
                 should_do_dance = not self.hs.is_mine(inviter)
                 room_host = inviter.domain
             else:
-                should_do_dance = False
+                # return the same error as join_room_alias does
+                raise SynapseError(404, "No known servers")
 
         if should_do_dance:
             handler = self.hs.get_handlers().federation_handler

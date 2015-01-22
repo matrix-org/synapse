@@ -59,23 +59,29 @@ class JustPresenceHandlers(object):
     def __init__(self, hs):
         self.presence_handler = PresenceHandler(hs)
 
-class PresenceStateTestCase(unittest.TestCase):
-    """ Tests presence management. """
 
+class PresenceTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
 
+        self.clock = MockClock()
+
         self.mock_config = NonCallableMock()
         self.mock_config.signing_key = [MockKey()]
 
+        self.mock_federation_resource = MockHttpResource()
+
+        self.mock_http_client = Mock(spec=[])
+        self.mock_http_client.put_json = DeferredMockCallable()
+
         hs = HomeServer("test",
-            clock=MockClock(),
+            clock=self.clock,
             db_pool=db_pool,
             handlers=None,
-            resource_for_federation=Mock(),
-            http_client=None,
+            resource_for_federation=self.mock_federation_resource,
+            http_client=self.mock_http_client,
             config=self.mock_config,
             keyring=Mock(),
         )
@@ -92,24 +98,33 @@ class PresenceStateTestCase(unittest.TestCase):
         self.u_banana = hs.parse_userid("@banana:test")
         self.u_clementine = hs.parse_userid("@clementine:test")
 
-        yield self.store.create_presence(self.u_apple.localpart)
+        for u in self.u_apple, self.u_banana, self.u_clementine:
+            yield self.store.create_presence(u.localpart)
+
         yield self.store.set_presence_state(
             self.u_apple.localpart, {"state": ONLINE, "status_msg": "Online"}
         )
 
+        # ID of a local user that does not exist
+        self.u_durian = hs.parse_userid("@durian:test")
+
+        # A remote user
+        self.u_cabbage = hs.parse_userid("@cabbage:elsewhere")
+
         self.handler = hs.get_handlers().presence_handler
 
+        self.room_id = "a-room"
         self.room_members = []
 
         def get_rooms_for_user(user):
             if user in self.room_members:
-                return defer.succeed(["a-room"])
+                return defer.succeed([self.room_id])
             else:
                 return defer.succeed([])
         room_member_handler.get_rooms_for_user = get_rooms_for_user
 
         def get_room_members(room_id):
-            if room_id == "a-room":
+            if room_id == self.room_id:
                 return defer.succeed(self.room_members)
             else:
                 return defer.succeed([])
@@ -127,6 +142,10 @@ class PresenceStateTestCase(unittest.TestCase):
 
         self.handler.start_polling_presence = self.mock_start
         self.handler.stop_polling_presence = self.mock_stop
+
+
+class PresenceStateTestCase(PresenceTestCase):
+    """ Tests presence management. """
 
     @defer.inlineCallbacks
     def test_get_my_state(self):
@@ -206,55 +225,8 @@ class PresenceStateTestCase(unittest.TestCase):
         self.mock_stop.assert_called_with(self.u_apple)
 
 
-class PresenceInvitesTestCase(unittest.TestCase):
+class PresenceInvitesTestCase(PresenceTestCase):
     """ Tests presence management. """
-
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.mock_http_client = Mock(spec=[])
-        self.mock_http_client.put_json = DeferredMockCallable()
-
-        self.mock_federation_resource = MockHttpResource()
-
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer("test",
-            clock=MockClock(),
-            db_pool=db_pool,
-            handlers=None,
-            resource_for_client=Mock(),
-            resource_for_federation=self.mock_federation_resource,
-            http_client=self.mock_http_client,
-            config=self.mock_config,
-            keyring=Mock(),
-        )
-        hs.handlers = JustPresenceHandlers(hs)
-
-        self.store = hs.get_datastore()
-
-        # Some local users to test with
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
-        yield self.store.create_presence(self.u_apple.localpart)
-        yield self.store.create_presence(self.u_banana.localpart)
-
-        # ID of a local user that does not exist
-        self.u_durian = hs.parse_userid("@durian:test")
-
-        # A remote user
-        self.u_cabbage = hs.parse_userid("@cabbage:elsewhere")
-
-        self.handler = hs.get_handlers().presence_handler
-
-        self.mock_start = Mock()
-        self.mock_stop = Mock()
-
-        self.handler.start_polling_presence = self.mock_start
-        self.handler.stop_polling_presence = self.mock_stop
 
     @defer.inlineCallbacks
     def test_invite_local(self):
@@ -558,24 +530,25 @@ class PresencePushTestCase(unittest.TestCase):
         ])
         self.room_member_handler = hs.handlers.room_member_handler
 
+        self.room_id = "a-room"
         self.room_members = []
 
         def get_rooms_for_user(user):
             if user in self.room_members:
-                return defer.succeed(["a-room"])
+                return defer.succeed([self.room_id])
             else:
                 return defer.succeed([])
         self.room_member_handler.get_rooms_for_user = get_rooms_for_user
 
         def get_room_members(room_id):
-            if room_id == "a-room":
+            if room_id == self.room_id:
                 return defer.succeed(self.room_members)
             else:
                 return defer.succeed([])
         self.room_member_handler.get_room_members = get_room_members
 
         def get_room_hosts(room_id):
-            if room_id == "a-room":
+            if room_id == self.room_id:
                 hosts = set([u.domain for u in self.room_members])
                 return defer.succeed(hosts)
             else:
@@ -911,7 +884,7 @@ class PresencePushTestCase(unittest.TestCase):
         )
 
         yield self.distributor.fire("user_joined_room", self.u_clementine,
-            "a-room"
+            self.room_id
         )
 
         self.room_members.append(self.u_clementine)
@@ -974,7 +947,7 @@ class PresencePushTestCase(unittest.TestCase):
         self.room_members = [self.u_apple, self.u_banana]
 
         yield self.distributor.fire("user_joined_room", self.u_potato,
-            "a-room"
+            self.room_id
         )
 
         yield put_json.await_calls()
@@ -1003,7 +976,7 @@ class PresencePushTestCase(unittest.TestCase):
         self.room_members.append(self.u_potato)
 
         yield self.distributor.fire("user_joined_room", self.u_clementine,
-            "a-room"
+            self.room_id
         )
 
         put_json.await_calls()

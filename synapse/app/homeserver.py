@@ -18,6 +18,8 @@ from synapse.storage import prepare_database, UpgradeDatabaseException
 
 from synapse.server import HomeServer
 
+from synapse.python_dependencies import check_requirements
+
 from twisted.internet import reactor
 from twisted.application import service
 from twisted.enterprise import adbapi
@@ -39,6 +41,8 @@ from synapse.util.logcontext import LoggingContext
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
+
+import synapse
 
 import logging
 import os
@@ -199,7 +203,10 @@ def setup(config_options, should_run=True):
 
     config.setup_logging()
 
+    check_requirements()
+
     logger.info("Server hostname: %s", config.server_name)
+    logger.info("Server version: %s", synapse.__version__)
 
     if re.search(":[0-9]+$", config.server_name):
         domain_with_port = config.server_name
@@ -235,13 +242,20 @@ def setup(config_options, should_run=True):
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"
-            "Have you checked for version specific instructions in UPGRADES.rst?\n"
+            "Have you checked for version specific instructions in"
+            " UPGRADES.rst?\n"
         )
         sys.exit(1)
 
     logger.info("Database prepared in %s.", db_name)
 
-    hs.get_db_pool()
+    db_pool = hs.get_db_pool()
+
+    if db_name == ":memory:":
+        # Memory databases will need to be setup each time they are opened.
+        reactor.callWhenRunning(
+            db_pool.runWithConnection, prepare_database
+        )
 
     if config.manhole:
         f = twisted.manhole.telnet.ShellFactory()
@@ -292,6 +306,7 @@ def run():
 
 def main():
     with LoggingContext("main"):
+        check_requirements()
         setup(sys.argv[1:])
 
 

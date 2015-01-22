@@ -44,8 +44,11 @@ class EventStreamRestServlet(RestServlet):
                 except ValueError:
                     raise SynapseError(400, "timeout must be in milliseconds.")
 
+            as_client_event = "raw" not in request.args
+
             chunk = yield handler.get_stream(
-                auth_user.to_string(), pagin_config, timeout=timeout
+                auth_user.to_string(), pagin_config, timeout=timeout,
+                as_client_event=as_client_event
             )
         except:
             logger.exception("Event stream failed")

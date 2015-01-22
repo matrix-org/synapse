@@ -22,7 +22,8 @@ except IOError as e:
     if str(e).startswith("decoder jpeg not available"):
         raise Exception(
             "FATAL: jpeg codec not supported. Install pillow correctly! "
-            " 'sudo apt-get install libjpeg-dev' then 'pip install -I pillow'"
+            " 'sudo apt-get install libjpeg-dev' then 'pip uninstall pillow &&"
+            " pip install pillow --user'"
         )
 except Exception:
     # any other exception is fine
@@ -36,7 +37,8 @@ except IOError as e:
     if str(e).startswith("decoder zip not available"):
         raise Exception(
             "FATAL: zip codec not supported. Install pillow correctly! "
-            " 'sudo apt-get install libjpeg-dev' then 'pip install -I pillow'"
+            " 'sudo apt-get install libjpeg-dev' then 'pip uninstall pillow &&"
+            " pip install pillow --user'"
         )
 except Exception:
     # any other exception is fine
