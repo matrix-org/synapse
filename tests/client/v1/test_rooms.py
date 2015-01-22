@@ -18,7 +18,7 @@
 # twisted imports
 from twisted.internet import defer
 
-import synapse.client.v1.room
+import synapse.rest.client.v1.room
 from synapse.api.constants import Membership
 
 from synapse.server import HomeServer
@@ -82,7 +82,7 @@ class RoomPermissionsTestCase(RestTestCase):
 
         self.auth_user_id = self.rmcreator_id
 
-        synapse.client.v1.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         self.auth = hs.get_auth()
 
@@ -476,7 +476,7 @@ class RoomsMemberListTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.client.v1.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
     def tearDown(self):
         pass
@@ -565,7 +565,7 @@ class RoomsCreateTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.client.v1.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
     def tearDown(self):
         pass
@@ -668,7 +668,7 @@ class RoomTopicTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.client.v1.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         # create the room
         self.room_id = yield self.create_room_as(self.user_id)
@@ -783,7 +783,7 @@ class RoomMemberStateTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.client.v1.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         self.room_id = yield self.create_room_as(self.user_id)
 
@@ -919,7 +919,7 @@ class RoomMessagesTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.client.v1.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         self.room_id = yield self.create_room_as(self.user_id)
 
@@ -1023,7 +1023,7 @@ class RoomInitialSyncTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.client.v1.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         # Since I'm getting my own presence I need to exist as far as presence
         # is concerned.

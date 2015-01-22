@@ -18,7 +18,7 @@
 # twisted imports
 from twisted.internet import defer
 
-import synapse.client.v1.room
+import synapse.rest.client.v1.room
 from synapse.server import HomeServer
 
 from ...utils import MockHttpResource, MockClock, SQLiteMemoryDbPool, MockKey
@@ -104,7 +104,7 @@ class RoomTypingTestCase(RestTestCase):
         hs.get_handlers().room_member_handler.fetch_room_distributions_into = (
                 fetch_room_distributions_into)
 
-        synapse.client.v1.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         self.room_id = yield self.create_room_as(self.user_id)
         # Need another user to make notifications actually work
