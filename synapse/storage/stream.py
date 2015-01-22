@@ -269,8 +269,11 @@ class StreamStore(SQLBaseStore):
         # TODO (erikj): Handle compressed feedback
 
         sql = (
-            "SELECT stream_ordering, topological_ordering, event_id FROM events "
-            "WHERE room_id = ? AND stream_ordering <= ? AND outlier = 0 "
+            "SELECT stream_ordering, topological_ordering, "
+            "internal_metadata, json, r.event_id FROM events as e "
+            "LEFT JOIN event_json as ej ON e.event_id = ej.event_id "
+            "LEFT JOIN redactions as r ON e.event_id = r.redacts "
+            "WHERE e.room_id = ? AND stream_ordering <= ? AND outlier = 0 "
             "ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ? "
         )
 
@@ -295,11 +298,15 @@ class StreamStore(SQLBaseStore):
             else:
                 token = (end_token, end_token)
 
-            events = self._get_events_txn(
-                txn,
-                [r["event_id"] for r in rows],
-                get_prev_content=True
-            )
+            events = [
+                self._get_event_from_row_txn(
+                    txn,
+                    r["internal_metadata"],
+                    r["json"],
+                    r["event_id"],
+                )
+                for r in rows
+            ]
 
             return events, token
 
