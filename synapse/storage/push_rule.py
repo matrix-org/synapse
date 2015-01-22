@@ -29,11 +29,11 @@ class PushRuleStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_push_rules_for_user_name(self, user_name):
         sql = (
-            "SELECT "+",".join(PushRuleTable.fields)+
-            "FROM pushers "
-            "WHERE user_name = ?"
+            "SELECT "+",".join(PushRuleTable.fields)+" "
+            "FROM "+PushRuleTable.table_name+" "
+            "WHERE user_name = ? "
+            "ORDER BY priority_class DESC, priority DESC"
         )
-
         rows = yield self._execute(None, sql, user_name)
 
         dicts = []

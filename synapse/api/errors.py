@@ -87,10 +87,22 @@ class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.NOT_FOUND
+            kwargs["errcode"] = Codes.UNRECOGNIZED
         super(UnrecognizedRequestError, self).__init__(
             400,
             "Unrecognized request",
+            **kwargs
+        )
+
+
+class NotFoundError(SynapseError):
+    """An error indicating we can't find the thing you asked for"""
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.NOT_FOUND
+        super(UnrecognizedRequestError, self).__init__(
+            404,
+            "Not found",
             **kwargs
         )
 

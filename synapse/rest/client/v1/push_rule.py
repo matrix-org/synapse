@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
+from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError, NotFoundError
 from base import RestServlet, client_path_pattern
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 
@@ -24,6 +24,14 @@ import json
 
 class PushRuleRestServlet(RestServlet):
     PATTERN = client_path_pattern("/pushrules/.*$")
+    PRIORITY_CLASS_MAP = {
+        'underride': 0,
+        'sender': 1,
+        'room': 2,
+        'content': 3,
+        'override': 4
+    }
+    PRIORITY_CLASS_INVERSE_MAP = {v: k for k,v in PRIORITY_CLASS_MAP.items()}
 
     def rule_spec_from_path(self, path):
         if len(path) < 2:
@@ -109,15 +117,7 @@ class PushRuleRestServlet(RestServlet):
         return (conditions, actions)
 
     def priority_class_from_spec(self, spec):
-        map = {
-            'underride': 0,
-            'sender': 1,
-            'room': 2,
-            'content': 3,
-            'override': 4
-        }
-
-        if spec['template'] not in map.keys():
+        if spec['template'] not in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
             raise InvalidRuleException("Unknown template: %s" % (spec['kind']))
         pc = map[spec['template']]
 
@@ -171,8 +171,126 @@ class PushRuleRestServlet(RestServlet):
 
         defer.returnValue((200, {}))
 
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        user = yield self.auth.get_user_by_req(request)
+
+        # we build up the full structure and then decide which bits of it
+        # to send which means doing unnecessary work sometimes but is
+        # is probably not going to make a whole lot of difference
+        rawrules = yield self.hs.get_datastore().get_push_rules_for_user_name(user.to_string())
+
+        rules = {'global': {}, 'device': {}}
+
+        rules['global'] = _add_empty_priority_class_arrays(rules['global'])
+
+        for r in rawrules:
+            rulearray = None
+
+            r["conditions"] = json.loads(r["conditions"])
+            r["actions"] = json.loads(r["actions"])
+
+            template_name = _priority_class_to_template_name(r['priority_class'])
+
+            if r['priority_class'] > PushRuleRestServlet.PRIORITY_CLASS_MAP['override']:
+                # per-device rule
+                instance_handle = _instance_handle_from_conditions(r["conditions"])
+                if not instance_handle:
+                    continue
+                if instance_handle not in rules['device']:
+                    rules['device'][instance_handle] = []
+                    rules['device'][instance_handle] = \
+                        _add_empty_priority_class_arrays(rules['device'][instance_handle])
+
+                rulearray = rules['device'][instance_handle]
+            else:
+                rulearray = rules['global'][template_name]
+
+            template_rule = _rule_to_template(r)
+            if template_rule:
+                rulearray.append(template_rule)
+
+        path = request.postpath[1:]
+        if path == []:
+            defer.returnValue((200, rules))
+
+        if path[0] == 'global':
+            path = path[1:]
+            result = _filter_ruleset_with_path(rules['global'], path)
+            defer.returnValue((200, result))
+        elif path[0] == 'device':
+            path = path[1:]
+            if path == []:
+                raise UnrecognizedRequestError
+            instance_handle = path[0]
+            if instance_handle not in rules['device']:
+                ret = {}
+                ret = _add_empty_priority_class_arrays(ret)
+                defer.returnValue((200, ret))
+            ruleset = rules['device'][instance_handle]
+            result = _filter_ruleset_with_path(ruleset, path)
+            defer.returnValue((200, result))
+        else:
+            raise UnrecognizedRequestError()
+
+
     def on_OPTIONS(self, _):
         return 200, {}
+
+
+def _add_empty_priority_class_arrays(d):
+    for pc in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
+        d[pc] = []
+    return d
+
+def _instance_handle_from_conditions(conditions):
+    """
+    Given a list of conditions, return the instance handle of the
+    device rule if there is one
+    """
+    for c in conditions:
+        if c['kind'] == 'device':
+            return c['instance_handle']
+    return None
+
+def _filter_ruleset_with_path(ruleset, path):
+    if path == []:
+        return ruleset
+    template_kind = path[0]
+    if template_kind not in ruleset:
+        raise UnrecognizedRequestError()
+    path = path[1:]
+    if path == []:
+        return ruleset[template_kind]
+    rule_id = path[0]
+    for r in ruleset[template_kind]:
+        if r['rule_id'] == rule_id:
+            return r
+    raise NotFoundError
+
+def _priority_class_to_template_name(pc):
+    if pc > PushRuleRestServlet.PRIORITY_CLASS_MAP['override']:
+        # per-device
+        prio_class_index = pc - PushRuleRestServlet.PRIORITY_CLASS_MAP['override']
+        return PushRuleRestServlet.PRIORITY_CLASS_INVERSE_MAP[prio_class_index]
+    else:
+        return PushRuleRestServlet.PRIORITY_CLASS_INVERSE_MAP[pc]
+
+def _rule_to_template(rule):
+    template_name = _priority_class_to_template_name(rule['priority_class'])
+    if template_name in ['override', 'underride']:
+        return {k:rule[k] for k in ["rule_id", "conditions", "actions"]}
+    elif template_name in ["sender", "room"]:
+        return {k:rule[k] for k in ["rule_id", "actions"]}
+    elif template_name == 'content':
+        if len(rule["conditions"]) != 1:
+            return None
+        thecond = rule["conditions"][0]
+        if "pattern" not in thecond:
+            return None
+        ret = {k:rule[k] for k in ["rule_id", "actions"]}
+        ret["pattern"] = thecond["pattern"]
+        return ret
 
 
 class InvalidRuleException(Exception):
