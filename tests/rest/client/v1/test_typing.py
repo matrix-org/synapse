@@ -21,7 +21,7 @@ from twisted.internet import defer
 import synapse.rest.client.v1.room
 from synapse.server import HomeServer
 
-from ...utils import MockHttpResource, MockClock, SQLiteMemoryDbPool, MockKey
+from ....utils import MockHttpResource, MockClock, SQLiteMemoryDbPool, MockKey
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock

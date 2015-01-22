@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 from mock import Mock
 
-from ...utils import MockHttpResource, MockKey
+from ....utils import MockHttpResource, MockKey
 
 from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler

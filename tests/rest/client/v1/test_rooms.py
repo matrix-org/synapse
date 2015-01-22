@@ -30,7 +30,7 @@ import json
 import urllib
 import types
 
-from ...utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
+from ....utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
