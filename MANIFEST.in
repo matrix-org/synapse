@@ -2,6 +2,7 @@ include synctl
 include LICENSE
 include VERSION
 include *.rst
+include demo/README
 
 recursive-include synapse/storage/schema *.sql
 
