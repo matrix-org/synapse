@@ -78,12 +78,6 @@ class StateStore(SQLBaseStore):
             f,
         )
 
-    def store_state_groups(self, event):
-        return self.runInteraction(
-            "store_state_groups",
-            self._store_state_groups_txn, event
-        )
-
     def _store_state_groups_txn(self, txn, event, context):
         if context.current_state is None:
             return

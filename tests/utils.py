@@ -138,7 +138,8 @@ class MockClock(object):
     now = 1000
 
     def __init__(self):
-        # list of tuples of (absolute_time, callback) in no particular order
+        # list of lists of [absolute_time, callback, expired] in no particular
+        # order
         self.timers = []
 
     def time(self):
@@ -154,11 +155,16 @@ class MockClock(object):
             LoggingContext.thread_local.current_context = current_context
             callback()
 
-        t = (self.now + delay, wrapped_callback)
+        t = [self.now + delay, wrapped_callback, False]
         self.timers.append(t)
+
         return t
 
     def cancel_call_later(self, timer):
+        if timer[2]:
+            raise Exception("Cannot cancel an expired timer")
+
+        timer[2] = True
         self.timers = [t for t in self.timers if t != timer]
 
     # For unit testing
@@ -168,11 +174,17 @@ class MockClock(object):
         timers = self.timers
         self.timers = []
 
-        for time, callback in timers:
+        for t in timers:
+            time, callback, expired = t
+
+            if expired:
+                raise Exception("Timer already expired")
+
             if self.now >= time:
+                t[2] = True
                 callback()
             else:
-                self.timers.append((time, callback))
+                self.timers.append(t)
 
 
 class SQLiteMemoryDbPool(ConnectionPool, object):

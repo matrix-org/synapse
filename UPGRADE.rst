@@ -52,7 +52,7 @@ resulting conflicts during the upgrade process.
 Before running the command the homeserver should be first completely 
 shutdown. To run it, simply specify the location of the database, e.g.:
 
-  ./database-prepare-for-0.5.0.sh "homeserver.db"
+  ./scripts/database-prepare-for-0.5.0.sh "homeserver.db"
 
 Once this has successfully completed it will be safe to restart the 
 homeserver. You may notice that the homeserver takes a few seconds longer to 
@@ -147,7 +147,7 @@ rooms the home server was a member of and room alias mappings.
 Before running the command the homeserver should be first completely 
 shutdown. To run it, simply specify the location of the database, e.g.:
 
-  ./database-prepare-for-0.0.1.sh "homeserver.db"
+  ./scripts/database-prepare-for-0.0.1.sh "homeserver.db"
 
 Once this has successfully completed it will be safe to restart the 
 homeserver. You may notice that the homeserver takes a few seconds longer to 

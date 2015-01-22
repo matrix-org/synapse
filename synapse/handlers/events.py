@@ -70,10 +70,8 @@ class EventStreamHandler(BaseHandler):
                 pagin_config.from_token = None
 
             rm_handler = self.hs.get_handlers().room_member_handler
-            logger.debug("BETA")
             room_ids = yield rm_handler.get_rooms_for_user(auth_user)
 
-            logger.debug("ALPHA")
             with PreserveLoggingContext():
                 events, tokens = yield self.notifier.get_events_for(
                     auth_user, room_ids, pagin_config, timeout

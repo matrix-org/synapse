@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 from mock import Mock, NonCallableMock
 
-from ..utils import MockHttpResource, MockKey
+from ....utils import MockHttpResource, MockKey
 
 from synapse.api.errors import SynapseError, AuthError
 from synapse.server import HomeServer

@@ -24,7 +24,7 @@ from synapse.events.utils import serialize_event
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
-from synapse.rest import RestServletFactory
+from synapse.rest.client.v1 import RestServletFactory
 from synapse.state import StateHandler
 from synapse.storage import DataStore
 from synapse.types import UserID, RoomAlias, RoomID, EventID

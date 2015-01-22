@@ -39,6 +39,8 @@ from ._base import SQLBaseStore
 from synapse.api.errors import SynapseError
 from synapse.util.logutils import log_function
 
+from collections import namedtuple
+
 import logging
 
 
@@ -52,91 +54,79 @@ _STREAM_TOKEN = "stream"
 _TOPOLOGICAL_TOKEN = "topological"
 
 
-def _parse_stream_token(string):
-    try:
-        if string[0] != 's':
-            raise
-        return int(string[1:])
-    except:
-        raise SynapseError(400, "Invalid token")
+class _StreamToken(namedtuple("_StreamToken", "topological stream")):
+    """Tokens are positions between events. The token "s1" comes after event 1.
 
+            s0    s1
+            |     |
+        [0] V [1] V [2]
 
-def _parse_topological_token(string):
-    try:
-        if string[0] != 't':
-            raise
-        parts = string[1:].split('-', 1)
-        return (int(parts[0]), int(parts[1]))
-    except:
-        raise SynapseError(400, "Invalid token")
+    Tokens can either be a point in the live event stream or a cursor going
+    through historic events.
 
+    When traversing the live event stream events are ordered by when they
+    arrived at the homeserver.
 
-def is_stream_token(string):
-    try:
-        _parse_stream_token(string)
-        return True
-    except:
-        return False
+    When traversing historic events the events are ordered by their depth in
+    the event graph "topological_ordering" and then by when they arrived at the
+    homeserver "stream_ordering".
 
+    Live tokens start with an "s" followed by the "stream_ordering" id of the
+    event it comes after. Historic tokens start with a "t" followed by the
+    "topological_ordering" id of the event it comes after, follewed by "-",
+    followed by the "stream_ordering" id of the event it comes after.
+    """
+    __slots__ = []
 
-def is_topological_token(string):
-    try:
-        _parse_topological_token(string)
-        return True
-    except:
-        return False
+    @classmethod
+    def parse(cls, string):
+        try:
+            if string[0] == 's':
+                return cls(None, int(string[1:]))
+            if string[0] == 't':
+                parts = string[1:].split('-', 1)
+                return cls(int(parts[1]), int(parts[0]))
+        except:
+            pass
+        raise SynapseError(400, "Invalid token %r" % (string,))
 
+    @classmethod
+    def parse_stream_token(cls, string):
+        try:
+            if string[0] == 's':
+                return cls(None, int(string[1:]))
+        except:
+            pass
+        raise SynapseError(400, "Invalid token %r" % (string,))
 
-def _get_token_bound(token, comparison):
-    try:
-        s = _parse_stream_token(token)
-        return "%s %s %d" % ("stream_ordering", comparison, s)
-    except:
-        pass
+    def __str__(self):
+        if self.topological is not None:
+            return "t%d-%d" % (self.topological, self.stream)
+        else:
+            return "s%d" % (self.stream,)
 
-    try:
-        top, stream = _parse_topological_token(token)
-        return "%s %s %d AND %s %s %d" % (
-            "topological_ordering", comparison, top,
-            "stream_ordering", comparison, stream,
-        )
-    except:
-        pass
+    def lower_bound(self):
+        if self.topological is None:
+            return "(%d < %s)" % (self.stream, "stream_ordering")
+        else:
+            return "(%d < %s OR (%d == %s AND %d < %s))" % (
+                self.topological, "topological_ordering",
+                self.topological, "topological_ordering",
+                self.stream, "stream_ordering",
+            )
 
-    raise SynapseError(400, "Invalid token")
+    def upper_bound(self):
+        if self.topological is None:
+            return "(%d >= %s)" % (self.stream, "stream_ordering")
+        else:
+            return "(%d > %s OR (%d == %s AND %d >= %s))" % (
+                self.topological, "topological_ordering",
+                self.topological, "topological_ordering",
+                self.stream, "stream_ordering",
+            )
 
 
 class StreamStore(SQLBaseStore):
-    @log_function
-    def get_room_events(self, user_id, from_key, to_key, room_id, limit=0,
-                        direction='f', with_feedback=False):
-        # We deal with events request in two different ways depending on if
-        # this looks like an /events request or a pagination request.
-        is_events = (
-            direction == 'f'
-            and user_id
-            and is_stream_token(from_key)
-            and to_key and is_stream_token(to_key)
-        )
-
-        if is_events:
-            return self.get_room_events_stream(
-                user_id=user_id,
-                from_key=from_key,
-                to_key=to_key,
-                room_id=room_id,
-                limit=limit,
-                with_feedback=with_feedback,
-            )
-        else:
-            return self.paginate_room_events(
-                from_key=from_key,
-                to_key=to_key,
-                room_id=room_id,
-                limit=limit,
-                with_feedback=with_feedback,
-            )
-
     @log_function
     def get_room_events_stream(self, user_id, from_key, to_key, room_id,
                                limit=0, with_feedback=False):
@@ -162,8 +152,8 @@ class StreamStore(SQLBaseStore):
             limit = MAX_STREAM_SIZE
 
         # From and to keys should be integers from ordering.
-        from_id = _parse_stream_token(from_key)
-        to_id = _parse_stream_token(to_key)
+        from_id = _StreamToken.parse_stream_token(from_key)
+        to_id = _StreamToken.parse_stream_token(to_key)
 
         if from_key == to_key:
             return defer.succeed(([], to_key))
@@ -181,7 +171,7 @@ class StreamStore(SQLBaseStore):
         }
 
         def f(txn):
-            txn.execute(sql, (user_id, user_id, from_id, to_id,))
+            txn.execute(sql, (user_id, user_id, from_id.stream, to_id.stream,))
 
             rows = self.cursor_to_dict(txn)
 
@@ -211,17 +201,21 @@ class StreamStore(SQLBaseStore):
         # Tokens really represent positions between elements, but we use
         # the convention of pointing to the event before the gap. Hence
         # we have a bit of asymmetry when it comes to equalities.
-        from_comp = '<=' if direction == 'b' else '>'
-        to_comp = '>' if direction == 'b' else '<='
-        order = "DESC" if direction == 'b' else "ASC"
-
         args = [room_id]
-
-        bounds = _get_token_bound(from_key, from_comp)
-        if to_key:
-            bounds = "%s AND %s" % (
-                bounds, _get_token_bound(to_key, to_comp)
-            )
+        if direction == 'b':
+            order = "DESC"
+            bounds = _StreamToken.parse(from_key).upper_bound()
+            if to_key:
+                bounds = "%s AND %s" % (
+                    bounds, _StreamToken.parse(to_key).lower_bound()
+                )
+        else:
+            order = "ASC"
+            bounds = _StreamToken.parse(from_key).lower_bound()
+            if to_key:
+                bounds = "%s AND %s" % (
+                    bounds, _StreamToken.parse(to_key).upper_bound()
+                )
 
         if int(limit) > 0:
             args.append(int(limit))
@@ -249,9 +243,13 @@ class StreamStore(SQLBaseStore):
                 topo = rows[-1]["topological_ordering"]
                 toke = rows[-1]["stream_ordering"]
                 if direction == 'b':
-                    topo -= 1
+                    # Tokens are positions between events.
+                    # This token points *after* the last event in the chunk.
+                    # We need it to point to the event before it in the chunk
+                    # when we are going backwards so we subtract one from the
+                    # stream part.
                     toke -= 1
-                next_token = "t%s-%s" % (topo, toke)
+                next_token = str(_StreamToken(topo, toke))
             else:
                 # TODO (erikj): We should work out what to do here instead.
                 next_token = to_key if to_key else from_key
@@ -284,13 +282,14 @@ class StreamStore(SQLBaseStore):
             rows.reverse()  # As we selected with reverse ordering
 
             if rows:
-                # XXX: Always subtract 1 since the start token always goes
-                # backwards (parity with paginate_room_events). It isn't
-                # obvious that this is correct; we should clarify the algorithm
-                # used here.
-                topo = rows[0]["topological_ordering"] - 1
+                # Tokens are positions between events.
+                # This token points *after* the last event in the chunk.
+                # We need it to point to the event before it in the chunk
+                # since we are going backwards so we subtract one from the
+                # stream part.
+                topo = rows[0]["topological_ordering"]
                 toke = rows[0]["stream_ordering"] - 1
-                start_token = "t%s-%s" % (topo, toke)
+                start_token = str(_StreamToken(topo, toke))
 
                 token = (start_token, end_token)
             else:

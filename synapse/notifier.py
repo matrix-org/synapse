@@ -244,14 +244,14 @@ class Notifier(object):
             )
 
         if timeout:
-            self.clock.call_later(timeout/1000.0, _timeout_listener)
-
             self._register_with_keys(listener)
 
         yield self._check_for_updates(listener)
 
         if not timeout:
             _timeout_listener()
+        else:
+            self.clock.call_later(timeout/1000.0, _timeout_listener)
 
         return
 

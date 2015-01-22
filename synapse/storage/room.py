@@ -58,13 +58,6 @@ class RoomStore(SQLBaseStore):
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
 
-    def store_room_config(self, room_id, visibility):
-        return self._simple_update_one(
-            table=RoomsTable.table_name,
-            keyvalues={"room_id": room_id},
-            updatevalues={"is_public": visibility}
-        )
-
     def get_room(self, room_id):
         """Retrieve a room.
 
