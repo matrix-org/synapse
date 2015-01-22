@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class Codes(object):
+    UNRECOGNIZED = "M_UNRECOGNIZED"
     UNAUTHORIZED = "M_UNAUTHORIZED"
     FORBIDDEN = "M_FORBIDDEN"
     BAD_JSON = "M_BAD_JSON"
@@ -81,6 +82,17 @@ class RegistrationError(SynapseError):
     """An error raised when a registration event fails."""
     pass
 
+
+class UnrecognizedRequestError(SynapseError):
+    """An error indicating we don't understand the request you're trying to make"""
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.NOT_FOUND
+        super(UnrecognizedRequestError, self).__init__(
+            400,
+            "Unrecognized request",
+            **kwargs
+        )
 
 class AuthError(SynapseError):
     """An error raised when there was a problem authorising an event."""

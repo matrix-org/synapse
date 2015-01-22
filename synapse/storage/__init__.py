@@ -30,6 +30,7 @@ from .transactions import TransactionStore
 from .keys import KeyStore
 from .event_federation import EventFederationStore
 from .pusher import PusherStore
+from .push_rule import PushRuleStore
 from .media_repository import MediaRepositoryStore
 
 from .state import StateStore
@@ -62,6 +63,7 @@ SCHEMAS = [
     "event_edges",
     "event_signatures",
     "pusher",
+    "push_rules",
     "media_repository",
 ]
 
@@ -85,6 +87,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 EventFederationStore,
                 MediaRepositoryStore,
                 PusherStore,
+                PushRuleStore
                 ):
 
     def __init__(self, hs):
