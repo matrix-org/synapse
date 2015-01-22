@@ -15,7 +15,7 @@
 
 """ This module contains base REST classes for constructing REST servlets. """
 from synapse.api.urls import CLIENT_PREFIX
-from synapse.rest.transactions import HttpTransactionStore
+from .transactions import HttpTransactionStore
 import re
 
 import logging
