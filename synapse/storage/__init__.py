@@ -63,7 +63,6 @@ SCHEMAS = [
     "event_edges",
     "event_signatures",
     "pusher",
-    "push_rules",
     "media_repository",
 ]
 
