@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.streams.config import PaginationConfig
-from synapse.rest.base import RestServlet, client_path_pattern
+from .base import RestServlet, client_path_pattern
 
 import logging
 

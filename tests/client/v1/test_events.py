@@ -19,13 +19,13 @@ from tests import unittest
 # twisted imports
 from twisted.internet import defer
 
-import synapse.rest.events
-import synapse.rest.register
-import synapse.rest.room
+import synapse.client.v1.events
+import synapse.client.v1.register
+import synapse.client.v1.room
 
 from synapse.server import HomeServer
 
-from ..utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
+from ...utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
@@ -144,9 +144,9 @@ class EventStreamPermissionsTestCase(RestTestCase):
         hs.get_clock().time_msec.return_value = 1000000
         hs.get_clock().time.return_value = 1000
 
-        synapse.rest.register.register_servlets(hs, self.mock_resource)
-        synapse.rest.events.register_servlets(hs, self.mock_resource)
-        synapse.rest.room.register_servlets(hs, self.mock_resource)
+        synapse.client.v1.register.register_servlets(hs, self.mock_resource)
+        synapse.client.v1.events.register_servlets(hs, self.mock_resource)
+        synapse.client.v1.room.register_servlets(hs, self.mock_resource)
 
         # register an account
         self.user_id = "sid1"
