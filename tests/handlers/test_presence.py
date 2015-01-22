@@ -188,7 +188,7 @@ class PresenceTestCase(unittest.TestCase):
         self.u_cabbage = hs.parse_userid("@cabbage:elsewhere")
 
 
-class MockedDatastoreTestCase(PresenceTestCase):
+class MockedDatastorePresenceTestCase(PresenceTestCase):
     def make_datastore_mock(self):
         datastore = Mock(spec=[
             # Bits that Federation needs
@@ -605,7 +605,7 @@ class PresenceInvitesTestCase(PresenceTestCase):
         ], presence)
 
 
-class PresencePushTestCase(MockedDatastoreTestCase):
+class PresencePushTestCase(MockedDatastorePresenceTestCase):
     """ Tests steady-state presence status updates.
 
     They assert that presence state update messages are pushed around the place
@@ -990,7 +990,7 @@ class PresencePushTestCase(MockedDatastoreTestCase):
         put_json.await_calls()
 
 
-class PresencePollingTestCase(MockedDatastoreTestCase):
+class PresencePollingTestCase(MockedDatastorePresenceTestCase):
     """ Tests presence status polling. """
 
     # For this test, we have three local users; apple is watching and is
