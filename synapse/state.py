@@ -295,7 +295,7 @@ class StateHandler(object):
                 # get around circular deps.
                 self.hs.get_auth().check(event, auth_events)
                 return event
-            except AuthError as e:
+            except AuthError:
                 pass
 
         # Oh dear.
