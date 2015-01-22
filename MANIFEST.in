@@ -1,4 +1,13 @@
-recursive-include docs *
-recursive-include tests *.py
+include synctl
+include LICENSE
+include VERSION
+include *.rst
+
 recursive-include synapse/storage/schema *.sql
-recursive-include syweb/webclient *
+
+recursive-include demo *.dh
+recursive-include demo *.py
+recursive-include demo *.sh
+recursive-include docs *
+recursive-include scripts *
+recursive-include tests *.py
