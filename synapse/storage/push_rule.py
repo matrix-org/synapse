@@ -172,6 +172,7 @@ class PushRuleStore(SQLBaseStore):
 
         txn.execute(sql, new_rule.values())
 
+
 class RuleNotFoundException(Exception):
     pass
 
