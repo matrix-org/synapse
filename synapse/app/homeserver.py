@@ -32,12 +32,13 @@ from synapse.http.server_key_resource import LocalKey
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX
+    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX,
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
 from synapse.rest.client.v1 import ClientV1RestResource
+from synapse.rest.client.v2_alpha import ClientV2AlphaRestResource
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
@@ -61,6 +62,9 @@ class SynapseHomeServer(HomeServer):
 
     def build_resource_for_client(self):
         return ClientV1RestResource(self)
+
+    def build_resource_for_client_v2_alpha(self):
+        return ClientV2AlphaRestResource(self)
 
     def build_resource_for_federation(self):
         return JsonResource()
@@ -105,6 +109,7 @@ class SynapseHomeServer(HomeServer):
         # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
         desired_tree = [
             (CLIENT_PREFIX, self.get_resource_for_client()),
+            (CLIENT_V2_ALPHA_PREFIX, self.get_resource_for_client_v2_alpha()),
             (FEDERATION_PREFIX, self.get_resource_for_federation()),
             (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),

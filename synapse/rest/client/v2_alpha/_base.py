@@ -13,12 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains the URL paths to prefix various aspects of the server with. """
+"""This module contains base REST classes for constructing client v1 servlets.
+"""
 
-CLIENT_PREFIX = "/_matrix/client/api/v1"
-CLIENT_V2_ALPHA_PREFIX = "/_matrix/client/v2_alpha"
-FEDERATION_PREFIX = "/_matrix/federation/v1"
-WEB_CLIENT_PREFIX = "/_matrix/client"
-CONTENT_REPO_PREFIX = "/_matrix/content"
-SERVER_KEY_PREFIX = "/_matrix/key/v1"
-MEDIA_PREFIX = "/_matrix/media/v1"
+from synapse.api.urls import CLIENT_V2_ALPHA_PREFIX
+import re
+
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
+def client_v2_pattern(path_regex):
+    """Creates a regex compiled client path with the correct client path
+    prefix.
+
+    Args:
+        path_regex (str): The regex string to match. This should NOT have a ^
+        as this will be prefixed.
+    Returns:
+        SRE_Pattern
+    """
+    return re.compile("^" + CLIENT_V2_ALPHA_PREFIX + path_regex)
