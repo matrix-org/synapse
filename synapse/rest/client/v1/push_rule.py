@@ -102,7 +102,7 @@ class PushRuleRestServlet(RestServlet):
                 'pattern': req_obj['pattern']
             }]
         else:
-            raise InvalidRuleException("Unknown rule template: %s" % (rule_template))
+            raise InvalidRuleException("Unknown rule template: %s" % (rule_template,))
 
         if device:
             conditions.append({
