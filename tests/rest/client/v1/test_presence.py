@@ -25,6 +25,8 @@ from ....utils import MockHttpResource, MockKey
 from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler
 from synapse.server import HomeServer
+from synapse.rest.client.v1 import presence
+from synapse.rest.client.v1 import events
 
 
 OFFLINE = PresenceState.OFFLINE
@@ -86,7 +88,7 @@ class PresenceStateTestCase(unittest.TestCase):
             return defer.succeed([])
         room_member_handler.get_rooms_for_user = get_rooms_for_user
 
-        hs.register_servlets()
+        presence.register_servlets(hs, self.mock_resource)
 
         self.u_apple = hs.parse_userid(myid)
 
@@ -172,7 +174,7 @@ class PresenceListTestCase(unittest.TestCase):
 
         hs.get_auth().get_user_by_token = _get_user_by_token
 
-        hs.register_servlets()
+        presence.register_servlets(hs, self.mock_resource)
 
         self.u_apple = hs.parse_userid("@apple:test")
         self.u_banana = hs.parse_userid("@banana:test")
@@ -283,7 +285,8 @@ class PresenceEventStreamTestCase(unittest.TestCase):
 
         hs.get_auth().get_user_by_req = _get_user_by_req
 
-        hs.register_servlets()
+        presence.register_servlets(hs, self.mock_resource)
+        events.register_servlets(hs, self.mock_resource)
 
         hs.handlers.room_member_handler = Mock(spec=[])
 

@@ -24,7 +24,6 @@ from synapse.events.utils import serialize_event
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
-from synapse.rest.client.v1 import RestServletFactory
 from synapse.state import StateHandler
 from synapse.storage import DataStore
 from synapse.types import UserID, RoomAlias, RoomID, EventID
@@ -203,9 +202,6 @@ class HomeServer(BaseHomeServer):
     def build_auth(self):
         return Auth(self)
 
-    def build_rest_servlet_factory(self):
-        return RestServletFactory(self)
-
     def build_state_handler(self):
         return StateHandler(self)
 
@@ -229,9 +225,3 @@ class HomeServer(BaseHomeServer):
             clock=self.get_clock(),
             hostname=self.hostname,
         )
-
-    def register_servlets(self):
-        """ Register all servlets associated with this HomeServer.
-        """
-        # Simply building the ServletFactory is sufficient to have it register
-        self.get_rest_servlet_factory()
