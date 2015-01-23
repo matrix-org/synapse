@@ -73,7 +73,7 @@ class PushRuleRestServlet(RestServlet):
             spec['device'] = device
         return spec
 
-    def rule_tuple_from_request_object(self, rule_template, rule_id, req_obj):
+    def rule_tuple_from_request_object(self, rule_template, rule_id, req_obj, device=None):
         if rule_template in ['override', 'underride']:
             if 'conditions' not in req_obj:
                 raise InvalidRuleException("Missing 'conditions'")
@@ -103,6 +103,12 @@ class PushRuleRestServlet(RestServlet):
             }]
         else:
             raise InvalidRuleException("Unknown rule template: %s" % (rule_template))
+
+        if device:
+            conditions.append({
+                'kind': 'device',
+                'instance_handle': device
+            })
 
         if 'actions' not in req_obj:
             raise InvalidRuleException("No actions found")
@@ -144,7 +150,8 @@ class PushRuleRestServlet(RestServlet):
             (conditions, actions) = self.rule_tuple_from_request_object(
                 spec['template'],
                 spec['rule_id'],
-                content
+                content,
+                device=spec['device'] if 'device' in spec else None
             )
         except InvalidRuleException as e:
             raise SynapseError(400, e.message)
@@ -200,11 +207,11 @@ class PushRuleRestServlet(RestServlet):
                 if not instance_handle:
                     continue
                 if instance_handle not in rules['device']:
-                    rules['device'][instance_handle] = []
+                    rules['device'][instance_handle] = {}
                     rules['device'][instance_handle] = \
                         _add_empty_priority_class_arrays(rules['device'][instance_handle])
 
-                rulearray = rules['device'][instance_handle]
+                rulearray = rules['device'][instance_handle][template_name]
             else:
                 rulearray = rules['global'][template_name]
 
@@ -227,7 +234,10 @@ class PushRuleRestServlet(RestServlet):
         elif path[0] == 'device':
             path = path[1:]
             if path == []:
-                raise UnrecognizedRequestError
+                raise UnrecognizedRequestError(PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR)
+            if path[0] == '':
+                defer.returnValue((200, rules['device']))
+
             instance_handle = path[0]
             if instance_handle not in rules['device']:
                 ret = {}
