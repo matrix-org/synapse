@@ -17,12 +17,12 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.types import UserID
-from base import RestServlet, client_path_pattern
+from base import ClientV1RestServlet, client_path_pattern
 
 import json
 
 
-class LoginRestServlet(RestServlet):
+class LoginRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/login$")
     PASS_TYPE = "m.login.password"
 
@@ -64,7 +64,7 @@ class LoginRestServlet(RestServlet):
         defer.returnValue((200, result))
 
 
-class LoginFallbackRestServlet(RestServlet):
+class LoginFallbackRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/login/fallback$")
 
     def on_GET(self, request):
@@ -73,7 +73,7 @@ class LoginFallbackRestServlet(RestServlet):
         return (200, {})
 
 
-class PasswordResetRestServlet(RestServlet):
+class PasswordResetRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/login/reset")
 
     @defer.inlineCallbacks

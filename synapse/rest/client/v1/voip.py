@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from base import RestServlet, client_path_pattern
+from base import ClientV1RestServlet, client_path_pattern
 
 
 import hmac
@@ -23,7 +23,7 @@ import hashlib
 import base64
 
 
-class VoipRestServlet(RestServlet):
+class VoipRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/voip/turnServer$")
 
     @defer.inlineCallbacks
