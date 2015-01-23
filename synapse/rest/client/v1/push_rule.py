@@ -15,7 +15,8 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError, NotFoundError
+from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError, NotFoundError, \
+    StoreError
 from base import RestServlet, client_path_pattern
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 
@@ -174,6 +175,44 @@ class PushRuleRestServlet(RestServlet):
             raise SynapseError(400, e.message)
 
         defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def on_DELETE(self, request):
+        spec = self.rule_spec_from_path(request.postpath)
+        try:
+            priority_class = _priority_class_from_spec(spec)
+        except InvalidRuleException as e:
+            raise SynapseError(400, e.message)
+
+        user = yield self.auth.get_user_by_req(request)
+
+        if 'device' in spec:
+            rules = yield self.hs.get_datastore().get_push_rules_for_user_name(
+                user.to_string()
+            )
+
+            for r in rules:
+                conditions = json.loads(r['conditions'])
+                ih = _instance_handle_from_conditions(conditions)
+                if ih == spec['device'] and r['priority_class'] == priority_class:
+                    yield self.hs.get_datastore().delete_push_rule(
+                        user.to_string(), spec['rule_id']
+                    )
+                    defer.returnValue((200, {}))
+            raise NotFoundError()
+        else:
+            try:
+                yield self.hs.get_datastore().delete_push_rule(
+                    user.to_string(), spec['rule_id'],
+                    priority_class=priority_class
+                )
+                defer.returnValue((200, {}))
+            except StoreError as e:
+                if e.code == 404:
+                    raise NotFoundError()
+                else:
+                    raise
+
 
     @defer.inlineCallbacks
     def on_GET(self, request):

@@ -174,6 +174,15 @@ class PushRuleStore(SQLBaseStore):
 
         txn.execute(sql, new_rule.values())
 
+    @defer.inlineCallbacks
+    def delete_push_rule(self, user_name, rule_id):
+        yield self._simple_delete_one(
+            PushRuleTable.table_name,
+            {
+                'user_name': user_name,
+                'rule_id': rule_id
+            }
+        )
 
 class RuleNotFoundException(Exception):
     pass
