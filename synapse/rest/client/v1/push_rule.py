@@ -65,7 +65,7 @@ class PushRuleRestServlet(RestServlet):
         rule_id = path[0]
 
         spec = {
-            'scope' : scope,
+            'scope': scope,
             'template': template,
             'rule_id': rule_id
         }
