@@ -249,7 +249,6 @@ class PushRuleRestServlet(RestServlet):
         else:
             raise UnrecognizedRequestError()
 
-
     def on_OPTIONS(self, _):
         return 200, {}
 
@@ -258,6 +257,7 @@ def _add_empty_priority_class_arrays(d):
     for pc in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
         d[pc] = []
     return d
+
 
 def _instance_handle_from_conditions(conditions):
     """
@@ -289,6 +289,7 @@ def _filter_ruleset_with_path(ruleset, path):
             return r
     raise NotFoundError
 
+
 def _priority_class_to_template_name(pc):
     if pc > PushRuleRestServlet.PRIORITY_CLASS_MAP['override']:
         # per-device
@@ -297,12 +298,13 @@ def _priority_class_to_template_name(pc):
     else:
         return PushRuleRestServlet.PRIORITY_CLASS_INVERSE_MAP[pc]
 
+
 def _rule_to_template(rule):
     template_name = _priority_class_to_template_name(rule['priority_class'])
     if template_name in ['override', 'underride']:
         return {k:rule[k] for k in ["rule_id", "conditions", "actions"]}
     elif template_name in ["sender", "room"]:
-        return {k:rule[k] for k in ["rule_id", "actions"]}
+        return {k: rule[k] for k in ["rule_id", "actions"]}
     elif template_name == 'content':
         if len(rule["conditions"]) != 1:
             return None
