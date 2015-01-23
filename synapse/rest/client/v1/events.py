@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.streams.config import PaginationConfig
-from .base import RestServlet, client_path_pattern
+from .base import ClientV1RestServlet, client_path_pattern
 
 import logging
 
@@ -26,7 +26,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class EventStreamRestServlet(RestServlet):
+class EventStreamRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/events$")
 
     DEFAULT_LONGPOLL_TIME_MS = 30000
@@ -61,7 +61,7 @@ class EventStreamRestServlet(RestServlet):
 
 
 # TODO: Unit test gets, with and without auth, with different kinds of events.
-class EventRestServlet(RestServlet):
+class EventRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/events/(?P<event_id>[^/]*)$")
 
     @defer.inlineCallbacks

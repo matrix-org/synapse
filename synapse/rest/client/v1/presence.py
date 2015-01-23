@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.types import UserID
-from .base import RestServlet, client_path_pattern
+from .base import ClientV1RestServlet, client_path_pattern
 
 import json
 import logging
@@ -27,7 +27,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class PresenceStatusRestServlet(RestServlet):
+class PresenceStatusRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/presence/(?P<user_id>[^/]*)/status")
 
     @defer.inlineCallbacks
@@ -72,7 +72,7 @@ class PresenceStatusRestServlet(RestServlet):
         return (200, {})
 
 
-class PresenceListRestServlet(RestServlet):
+class PresenceListRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/presence/list/(?P<user_id>[^/]*)")
 
     @defer.inlineCallbacks
