@@ -26,7 +26,7 @@ from synapse.api.auth import Auth
 from synapse.handlers import Handlers
 from synapse.state import StateHandler
 from synapse.storage import DataStore
-from synapse.types import RoomAlias, EventID
+from synapse.types import EventID
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.lockutils import LockManager
@@ -126,11 +126,6 @@ class BaseHomeServer(object):
 
     # TODO: Why are these parse_ methods so high up along with other globals?
     # Surely these should be in a util package or in the api package?
-
-    def parse_roomalias(self, s):
-        """Parse the string given by 's' as a Room Alias and return a RoomAlias
-        object."""
-        return RoomAlias.from_string(s)
 
     def parse_eventid(self, s):
         """Parse the string given by 's' as a Event ID and return a EventID

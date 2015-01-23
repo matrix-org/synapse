@@ -56,9 +56,3 @@ class RoomAliasTestCase(unittest.TestCase):
         room = RoomAlias("channel", "my.domain")
 
         self.assertEquals(room.to_string(), "#channel:my.domain")
-
-    def test_via_homeserver(self):
-        room = mock_homeserver.parse_roomalias("#elsewhere:my.domain")
-
-        self.assertEquals("elsewhere", room.localpart)
-        self.assertEquals("my.domain", room.domain)

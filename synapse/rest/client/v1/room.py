@@ -20,7 +20,7 @@ from base import RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
-from synapse.types import UserID, RoomID
+from synapse.types import UserID, RoomID, RoomAlias
 
 import json
 import logging
@@ -224,7 +224,7 @@ class JoinRoomAliasServlet(RestServlet):
         identifier = None
         is_room_alias = False
         try:
-            identifier = self.hs.parse_roomalias(room_identifier)
+            identifier = RoomAlias.from_string(room_identifier)
             is_room_alias = True
         except SynapseError:
             identifier = RoomID.from_string(room_identifier)
