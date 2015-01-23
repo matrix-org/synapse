@@ -119,7 +119,7 @@ class PushRuleRestServlet(RestServlet):
     def priority_class_from_spec(self, spec):
         if spec['template'] not in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
             raise InvalidRuleException("Unknown template: %s" % (spec['kind']))
-        pc = map[spec['template']]
+        pc = PushRuleRestServlet.PRIORITY_CLASS_MAP[spec['template']]
 
         if spec['scope'] == 'device':
             pc += 5
