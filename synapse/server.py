@@ -70,6 +70,7 @@ class BaseHomeServer(object):
         'notifier',
         'distributor',
         'resource_for_client',
+        'resource_for_client_v2_alpha',
         'resource_for_federation',
         'resource_for_web_client',
         'resource_for_content_repo',
