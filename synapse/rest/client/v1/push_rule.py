@@ -96,10 +96,15 @@ class PushRuleRestServlet(RestServlet):
         elif rule_template == 'content':
             if 'pattern' not in req_obj:
                 raise InvalidRuleException("Content rule missing 'pattern'")
+            pat = req_obj['pattern']
+            if pat.strip("*?[]") == pat:
+                # no special glob characters so we assume the user means
+                # 'contains this string' rather than 'is this string'
+                pat = "*%s*" % (pat)
             conditions = [{
                 'kind': 'event_match',
                 'key': 'content.body',
-                'pattern': req_obj['pattern']
+                'pattern': pat
             }]
         else:
             raise InvalidRuleException("Unknown rule template: %s" % (rule_template,))
@@ -115,7 +120,7 @@ class PushRuleRestServlet(RestServlet):
         actions = req_obj['actions']
 
         for a in actions:
-            if a in ['notify', 'dont-notify', 'coalesce']:
+            if a in ['notify', 'dont_notify', 'coalesce']:
                 pass
             elif isinstance(a, dict) and 'set_sound' in a:
                 pass
@@ -124,21 +129,11 @@ class PushRuleRestServlet(RestServlet):
 
         return conditions, actions
 
-    def priority_class_from_spec(self, spec):
-        if spec['template'] not in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
-            raise InvalidRuleException("Unknown template: %s" % (spec['kind']))
-        pc = PushRuleRestServlet.PRIORITY_CLASS_MAP[spec['template']]
-
-        if spec['scope'] == 'device':
-            pc += 5
-
-        return pc
-
     @defer.inlineCallbacks
     def on_PUT(self, request):
         spec = self.rule_spec_from_path(request.postpath)
         try:
-            priority_class = self.priority_class_from_spec(spec)
+            priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
             raise SynapseError(400, e.message)
 
@@ -204,6 +199,7 @@ class PushRuleRestServlet(RestServlet):
             if r['priority_class'] > PushRuleRestServlet.PRIORITY_CLASS_MAP['override']:
                 # per-device rule
                 instance_handle = _instance_handle_from_conditions(r["conditions"])
+                r = _strip_device_condition(r)
                 if not instance_handle:
                     continue
                 if instance_handle not in rules['device']:
@@ -239,6 +235,7 @@ class PushRuleRestServlet(RestServlet):
                 defer.returnValue((200, rules['device']))
 
             instance_handle = path[0]
+            path = path[1:]
             if instance_handle not in rules['device']:
                 ret = {}
                 ret = _add_empty_priority_class_arrays(ret)
@@ -290,10 +287,21 @@ def _filter_ruleset_with_path(ruleset, path):
     raise NotFoundError
 
 
+def _priority_class_from_spec(spec):
+    if spec['template'] not in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
+        raise InvalidRuleException("Unknown template: %s" % (spec['kind']))
+    pc = PushRuleRestServlet.PRIORITY_CLASS_MAP[spec['template']]
+
+    if spec['scope'] == 'device':
+        pc += len(PushRuleRestServlet.PRIORITY_CLASS_MAP)
+
+    return pc
+
+
 def _priority_class_to_template_name(pc):
     if pc > PushRuleRestServlet.PRIORITY_CLASS_MAP['override']:
         # per-device
-        prio_class_index = pc - PushRuleRestServlet.PRIORITY_CLASS_MAP['override']
+        prio_class_index = pc - len(PushRuleRestServlet.PRIORITY_CLASS_MAP)
         return PushRuleRestServlet.PRIORITY_CLASS_INVERSE_MAP[prio_class_index]
     else:
         return PushRuleRestServlet.PRIORITY_CLASS_INVERSE_MAP[pc]
@@ -314,6 +322,13 @@ def _rule_to_template(rule):
         ret = {k:rule[k] for k in ["rule_id", "actions"]}
         ret["pattern"] = thecond["pattern"]
         return ret
+
+
+def _strip_device_condition(rule):
+    for i,c in enumerate(rule['conditions']):
+        if c['kind'] == 'device':
+            del rule['conditions'][i]
+    return rule
 
 
 class InvalidRuleException(Exception):

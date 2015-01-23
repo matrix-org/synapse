@@ -21,6 +21,8 @@ from synapse.types import StreamToken
 import synapse.util.async
 
 import logging
+import fnmatch
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,7 @@ class Pusher(object):
     INITIAL_BACKOFF = 1000
     MAX_BACKOFF = 60 * 60 * 1000
     GIVE_UP_AFTER = 24 * 60 * 60 * 1000
+    DEFAULT_ACTIONS = ['notify']
 
     def __init__(self, _hs, instance_handle, user_name, app_id,
                  app_display_name, device_display_name, pushkey, pushkey_ts,
@@ -37,7 +40,7 @@ class Pusher(object):
         self.evStreamHandler = self.hs.get_handlers().event_stream_handler
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
-        self.instance_handle = instance_handle,
+        self.instance_handle = instance_handle
         self.user_name = user_name
         self.app_id = app_id
         self.app_display_name = app_display_name
@@ -51,7 +54,8 @@ class Pusher(object):
         self.failing_since = failing_since
         self.alive = True
 
-    def _should_notify_for_event(self, ev):
+    @defer.inlineCallbacks
+    def _actions_for_event(self, ev):
         """
         This should take into account notification settings that the user
         has configured both globally and per-room when we have the ability
@@ -59,8 +63,47 @@ class Pusher(object):
         """
         if ev['user_id'] == self.user_name:
             # let's assume you probably know about messages you sent yourself
+            defer.returnValue(['dont_notify'])
+
+        rules = yield self.store.get_push_rules_for_user_name(self.user_name)
+
+        for r in rules:
+            matches = True
+
+            conditions = json.loads(r['conditions'])
+            actions = json.loads(r['actions'])
+
+            for c in conditions:
+                matches &= self._event_fulfills_condition(ev, c)
+            # ignore rules with no actions (we have an explict 'dont_notify'
+            if len(actions) == 0:
+                logger.warn(
+                    "Ignoring rule id %s with no actions for user %s" %
+                    (r['rule_id'], r['user_name'])
+                )
+                continue
+            if matches:
+                defer.returnValue(actions)
+
+        defer.returnValue(Pusher.DEFAULT_ACTIONS)
+
+    def _event_fulfills_condition(self, ev, condition):
+        if condition['kind'] == 'event_match':
+            if 'pattern' not in condition:
+                logger.warn("event_match condition with no pattern")
+                return False
+            pat = condition['pattern']
+
+            val = _value_for_dotted_key(condition['key'], ev)
+            if fnmatch.fnmatch(val, pat):
+                return True
             return False
-        return True
+        elif condition['kind'] == 'device':
+            if 'instance_handle' not in condition:
+                return True
+            return condition['instance_handle'] == self.instance_handle
+        else:
+            return True
 
     @defer.inlineCallbacks
     def get_context_for_event(self, ev):
@@ -113,8 +156,23 @@ class Pusher(object):
                 continue
 
             processed = False
-            if self._should_notify_for_event(single_event):
-                rejected = yield self.dispatch_push(single_event)
+            actions = yield self._actions_for_event(single_event)
+            tweaks = _tweaks_for_actions(actions)
+
+            if len(actions) == 0:
+                logger.warn("Empty actions! Using default action.")
+                actions = Pusher.DEFAULT_ACTIONS
+            if 'notify' not in actions and 'dont_notify' not in actions:
+                logger.warn("Neither notify nor dont_notify in actions: adding default")
+                actions.extend(Pusher.DEFAULT_ACTIONS)
+            if 'dont_notify' in actions:
+                logger.debug(
+                    "%s for %s: dont_notify",
+                    single_event['event_id'], self.user_name
+                )
+                processed = True
+            else:
+                rejected = yield self.dispatch_push(single_event, tweaks)
                 if not rejected is False:
                     processed = True
                     for pk in rejected:
@@ -133,8 +191,6 @@ class Pusher(object):
                             yield self.hs.get_pusherpool().remove_pusher(
                                 self.app_id, pk
                             )
-            else:
-                processed = True
 
             if not self.alive:
                 continue
@@ -202,7 +258,7 @@ class Pusher(object):
     def stop(self):
         self.alive = False
 
-    def dispatch_push(self, p):
+    def dispatch_push(self, p, tweaks):
         """
         Overridden by implementing classes to actually deliver the notification
         :param p: The event to notify for as a single event from the event stream
@@ -213,6 +269,25 @@ class Pusher(object):
         """
         pass
 
+
+def _value_for_dotted_key(dotted_key, event):
+    parts = dotted_key.split(".")
+    val = event
+    while len(parts) > 0:
+        if parts[0] not in val:
+            return None
+        val = val[parts[0]]
+        parts = parts[1:]
+    return val
+
+def _tweaks_for_actions(actions):
+    tweaks = {}
+    for a in actions:
+        if not isinstance(a, dict):
+            continue
+        if 'set_sound' in a:
+            tweaks['sound'] = a['set_sound']
+    return tweaks
 
 class PusherConfigException(Exception):
     def __init__(self, msg):

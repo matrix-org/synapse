@@ -52,7 +52,7 @@ class HttpPusher(Pusher):
         del self.data_minus_url['url']
 
     @defer.inlineCallbacks
-    def _build_notification_dict(self, event):
+    def _build_notification_dict(self, event, tweaks):
         # we probably do not want to push for every presence update
         # (we may want to be able to set up notifications when specific
         # people sign in, but we'd want to only deliver the pertinent ones)
@@ -83,7 +83,8 @@ class HttpPusher(Pusher):
                         'app_id': self.app_id,
                         'pushkey': self.pushkey,
                         'pushkey_ts': long(self.pushkey_ts / 1000),
-                        'data': self.data_minus_url
+                        'data': self.data_minus_url,
+                        'tweaks': tweaks
                     }
                 ]
             }
@@ -97,8 +98,8 @@ class HttpPusher(Pusher):
         defer.returnValue(d)
 
     @defer.inlineCallbacks
-    def dispatch_push(self, event):
-        notification_dict = yield self._build_notification_dict(event)
+    def dispatch_push(self, event, tweaks):
+        notification_dict = yield self._build_notification_dict(event, tweaks)
         if not notification_dict:
             defer.returnValue([])
         try:
