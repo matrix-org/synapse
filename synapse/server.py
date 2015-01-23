@@ -26,7 +26,7 @@ from synapse.api.auth import Auth
 from synapse.handlers import Handlers
 from synapse.state import StateHandler
 from synapse.storage import DataStore
-from synapse.types import UserID, RoomAlias, RoomID, EventID
+from synapse.types import RoomAlias, EventID
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.lockutils import LockManager
@@ -131,11 +131,6 @@ class BaseHomeServer(object):
         """Parse the string given by 's' as a Room Alias and return a RoomAlias
         object."""
         return RoomAlias.from_string(s)
-
-    def parse_roomid(self, s):
-        """Parse the string given by 's' as a Room ID and return a RoomID
-        object."""
-        return RoomID.from_string(s)
 
     def parse_eventid(self, s):
         """Parse the string given by 's' as a Event ID and return a EventID

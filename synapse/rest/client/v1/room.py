@@ -20,7 +20,7 @@ from base import RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
-from synapse.types import UserID
+from synapse.types import UserID, RoomID
 
 import json
 import logging
@@ -227,7 +227,7 @@ class JoinRoomAliasServlet(RestServlet):
             identifier = self.hs.parse_roomalias(room_identifier)
             is_room_alias = True
         except SynapseError:
-            identifier = self.hs.parse_roomid(room_identifier)
+            identifier = RoomID.from_string(room_identifier)
 
         # TODO: Support for specifying the home server to join with?
 

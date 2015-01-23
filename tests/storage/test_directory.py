@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 from synapse.server import HomeServer
 from synapse.storage.directory import DirectoryStore
+from synapse.types import RoomID
 
 from tests.utils import SQLiteMemoryDbPool
 
@@ -37,7 +38,7 @@ class DirectoryStoreTestCase(unittest.TestCase):
 
         self.store = DirectoryStore(hs)
 
-        self.room = hs.parse_roomid("!abcde:test")
+        self.room = RoomID.from_string("!abcde:test")
         self.alias = hs.parse_roomalias("#my-room:test")
 
     @defer.inlineCallbacks

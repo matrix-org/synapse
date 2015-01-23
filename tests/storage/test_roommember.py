@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.server import HomeServer
 from synapse.api.constants import EventTypes, Membership
-from synapse.types import UserID
+from synapse.types import UserID, RoomID
 
 from tests.utils import SQLiteMemoryDbPool, MockKey
 
@@ -56,7 +56,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
         # User elsewhere on another host
         self.u_charlie = UserID.from_string("@charlie:elsewhere")
 
-        self.room = hs.parse_roomid("!abc123:test")
+        self.room = RoomID.from_string("!abc123:test")
 
     @defer.inlineCallbacks
     def inject_room_member(self, room, user, membership, replaces_state=None):

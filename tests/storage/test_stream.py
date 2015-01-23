@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.server import HomeServer
 from synapse.api.constants import EventTypes, Membership
-from synapse.types import UserID
+from synapse.types import UserID, RoomID
 
 from tests.utils import SQLiteMemoryDbPool, MockKey
 
@@ -52,8 +52,8 @@ class StreamStoreTestCase(unittest.TestCase):
         self.u_alice = UserID.from_string("@alice:test")
         self.u_bob = UserID.from_string("@bob:test")
 
-        self.room1 = hs.parse_roomid("!abc123:test")
-        self.room2 = hs.parse_roomid("!xyx987:test")
+        self.room1 = RoomID.from_string("!abc123:test")
+        self.room2 = RoomID.from_string("!xyx987:test")
 
         self.depth = 1
 
