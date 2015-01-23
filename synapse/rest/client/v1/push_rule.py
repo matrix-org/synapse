@@ -122,7 +122,7 @@ class PushRuleRestServlet(RestServlet):
             else:
                 raise InvalidRuleException("Unrecognised action")
 
-        return (conditions, actions)
+        return conditions, actions
 
     def priority_class_from_spec(self, spec):
         if spec['template'] not in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
