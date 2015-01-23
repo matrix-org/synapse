@@ -100,7 +100,7 @@ class NotFoundError(SynapseError):
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.NOT_FOUND
-        super(UnrecognizedRequestError, self).__init__(
+        super(NotFoundError, self).__init__(
             404,
             "Not found",
             **kwargs
