@@ -16,11 +16,11 @@
 from twisted.internet import defer
 
 from synapse.streams.config import PaginationConfig
-from base import RestServlet, client_path_pattern
+from base import ClientV1RestServlet, client_path_pattern
 
 
 # TODO: Needs unit testing
-class InitialSyncRestServlet(RestServlet):
+class InitialSyncRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/initialSync$")
 
     @defer.inlineCallbacks

@@ -18,10 +18,11 @@
 # twisted imports
 from twisted.internet import defer
 
-import synapse.rest.room
+import synapse.rest.client.v1.room
 from synapse.server import HomeServer
+from synapse.types import UserID
 
-from ..utils import MockHttpResource, MockClock, SQLiteMemoryDbPool, MockKey
+from ....utils import MockHttpResource, MockClock, SQLiteMemoryDbPool, MockKey
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
@@ -69,7 +70,7 @@ class RoomTypingTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -82,7 +83,7 @@ class RoomTypingTestCase(RestTestCase):
 
         def get_room_members(room_id):
             if room_id == self.room_id:
-                return defer.succeed([hs.parse_userid(self.user_id)])
+                return defer.succeed([UserID.from_string(self.user_id)])
             else:
                 return defer.succeed([])
 
@@ -104,7 +105,7 @@ class RoomTypingTestCase(RestTestCase):
         hs.get_handlers().room_member_handler.fetch_room_distributions_into = (
                 fetch_room_distributions_into)
 
-        synapse.rest.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         self.room_id = yield self.create_room_as(self.user_id)
         # Need another user to make notifications actually work

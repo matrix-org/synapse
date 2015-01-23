@@ -16,17 +16,18 @@
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 from twisted.internet import defer
 
-from base import RestServlet, client_path_pattern
+from .base import ClientV1RestServlet, client_path_pattern
+from synapse.types import UserID
 
 import json
 
 
-class ProfileDisplaynameRestServlet(RestServlet):
+class ProfileDisplaynameRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/profile/(?P<user_id>[^/]*)/displayname")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         displayname = yield self.handlers.profile_handler.get_displayname(
             user,
@@ -37,7 +38,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         try:
             content = json.loads(request.content.read())
@@ -54,12 +55,12 @@ class ProfileDisplaynameRestServlet(RestServlet):
         return (200, {})
 
 
-class ProfileAvatarURLRestServlet(RestServlet):
+class ProfileAvatarURLRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/profile/(?P<user_id>[^/]*)/avatar_url")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         avatar_url = yield self.handlers.profile_handler.get_avatar_url(
             user,
@@ -70,7 +71,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         try:
             content = json.loads(request.content.read())
@@ -87,12 +88,12 @@ class ProfileAvatarURLRestServlet(RestServlet):
         return (200, {})
 
 
-class ProfileRestServlet(RestServlet):
+class ProfileRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/profile/(?P<user_id>[^/]*)")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         displayname = yield self.handlers.profile_handler.get_displayname(
             user,

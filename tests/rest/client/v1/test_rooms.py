@@ -18,19 +18,16 @@
 # twisted imports
 from twisted.internet import defer
 
-import synapse.rest.room
+import synapse.rest.client.v1.room
 from synapse.api.constants import Membership
 
 from synapse.server import HomeServer
+from synapse.types import UserID
 
-from tests import unittest
-
-# python imports
 import json
 import urllib
-import types
 
-from ..utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
+from ....utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
@@ -70,7 +67,7 @@ class RoomPermissionsTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -82,7 +79,7 @@ class RoomPermissionsTestCase(RestTestCase):
 
         self.auth_user_id = self.rmcreator_id
 
-        synapse.rest.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         self.auth = hs.get_auth()
 
@@ -466,7 +463,7 @@ class RoomsMemberListTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -476,7 +473,7 @@ class RoomsMemberListTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.rest.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
     def tearDown(self):
         pass
@@ -555,7 +552,7 @@ class RoomsCreateTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -565,7 +562,7 @@ class RoomsCreateTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.rest.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
     def tearDown(self):
         pass
@@ -657,7 +654,7 @@ class RoomTopicTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -668,7 +665,7 @@ class RoomTopicTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.rest.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         # create the room
         self.room_id = yield self.create_room_as(self.user_id)
@@ -773,7 +770,7 @@ class RoomMemberStateTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -783,7 +780,7 @@ class RoomMemberStateTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.rest.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         self.room_id = yield self.create_room_as(self.user_id)
 
@@ -909,7 +906,7 @@ class RoomMessagesTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -919,7 +916,7 @@ class RoomMessagesTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.rest.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         self.room_id = yield self.create_room_as(self.user_id)
 
@@ -1013,7 +1010,7 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -1023,12 +1020,12 @@ class RoomInitialSyncTestCase(RestTestCase):
             return defer.succeed(None)
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        synapse.rest.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
         # Since I'm getting my own presence I need to exist as far as presence
         # is concerned.
         hs.get_handlers().presence_handler.registered_user(
-            hs.parse_userid(self.user_id)
+            UserID.from_string(self.user_id)
         )
 
         # create the room

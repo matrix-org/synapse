@@ -17,6 +17,7 @@ from twisted.internet import defer
 
 from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.logutils import log_function
+from synapse.types import UserID
 
 from ._base import BaseHandler
 
@@ -48,7 +49,7 @@ class EventStreamHandler(BaseHandler):
     @log_function
     def get_stream(self, auth_user_id, pagin_config, timeout=0,
                    as_client_event=True):
-        auth_user = self.hs.parse_userid(auth_user_id)
+        auth_user = UserID.from_string(auth_user_id)
 
         try:
             if auth_user not in self._streams_per_user:

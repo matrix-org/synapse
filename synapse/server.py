@@ -24,10 +24,8 @@ from synapse.events.utils import serialize_event
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
-from synapse.rest import RestServletFactory
 from synapse.state import StateHandler
 from synapse.storage import DataStore
-from synapse.types import UserID, RoomAlias, RoomID, EventID
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.lockutils import LockManager
@@ -125,30 +123,6 @@ class BaseHomeServer(object):
 
         setattr(BaseHomeServer, "get_%s" % (depname), _get)
 
-    # TODO: Why are these parse_ methods so high up along with other globals?
-    # Surely these should be in a util package or in the api package?
-
-    # Other utility methods
-    def parse_userid(self, s):
-        """Parse the string given by 's' as a User ID and return a UserID
-        object."""
-        return UserID.from_string(s)
-
-    def parse_roomalias(self, s):
-        """Parse the string given by 's' as a Room Alias and return a RoomAlias
-        object."""
-        return RoomAlias.from_string(s)
-
-    def parse_roomid(self, s):
-        """Parse the string given by 's' as a Room ID and return a RoomID
-        object."""
-        return RoomID.from_string(s)
-
-    def parse_eventid(self, s):
-        """Parse the string given by 's' as a Event ID and return a EventID
-        object."""
-        return EventID.from_string(s)
-
     def serialize_event(self, e, as_client_event=True):
         return serialize_event(self, e, as_client_event)
 
@@ -203,9 +177,6 @@ class HomeServer(BaseHomeServer):
     def build_auth(self):
         return Auth(self)
 
-    def build_rest_servlet_factory(self):
-        return RestServletFactory(self)
-
     def build_state_handler(self):
         return StateHandler(self)
 
@@ -229,9 +200,3 @@ class HomeServer(BaseHomeServer):
             clock=self.get_clock(),
             hostname=self.hostname,
         )
-
-    def register_servlets(self):
-        """ Register all servlets associated with this HomeServer.
-        """
-        # Simply building the ServletFactory is sufficient to have it register
-        self.get_rest_servlet_factory()

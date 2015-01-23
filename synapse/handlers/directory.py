@@ -19,6 +19,7 @@ from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError, Codes, CodeMessageException
 from synapse.api.constants import EventTypes
+from synapse.types import RoomAlias
 
 import logging
 
@@ -122,7 +123,7 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def on_directory_query(self, args):
-        room_alias = self.hs.parse_roomalias(args["room_alias"])
+        room_alias = RoomAlias.from_string(args["room_alias"])
         if not self.hs.is_mine(room_alias):
             raise SynapseError(
                 400, "Room Alias is not hosted on this Home Server"

@@ -20,10 +20,13 @@ from twisted.internet import defer
 
 from mock import Mock, NonCallableMock
 
-from ..utils import MockHttpResource, MockKey
+from ....utils import MockHttpResource, MockKey
 
 from synapse.api.errors import SynapseError, AuthError
 from synapse.server import HomeServer
+from synapse.types import UserID
+
+from synapse.rest.client.v1 import profile
 
 myid = "@1234ABCD:test"
 PATH_PREFIX = "/_matrix/client/api/v1"
@@ -55,13 +58,13 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         def _get_user_by_req(request=None):
-            return hs.parse_userid(myid)
+            return UserID.from_string(myid)
 
         hs.get_auth().get_user_by_req = _get_user_by_req
 
         hs.get_handlers().profile_handler = self.mock_handler
 
-        hs.register_servlets()
+        profile.register_servlets(hs, self.mock_resource)
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
