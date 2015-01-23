@@ -16,7 +16,8 @@
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 from twisted.internet import defer
 
-from base import RestServlet, client_path_pattern
+from .base import RestServlet, client_path_pattern
+from synapse.types import UserID
 
 import json
 
@@ -26,7 +27,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         displayname = yield self.handlers.profile_handler.get_displayname(
             user,
@@ -37,7 +38,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         try:
             content = json.loads(request.content.read())
@@ -59,7 +60,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         avatar_url = yield self.handlers.profile_handler.get_avatar_url(
             user,
@@ -70,7 +71,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         try:
             content = json.loads(request.content.read())
@@ -92,7 +93,7 @@ class ProfileRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         displayname = yield self.handlers.profile_handler.get_displayname(
             user,

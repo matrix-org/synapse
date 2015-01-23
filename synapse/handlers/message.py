@@ -20,6 +20,7 @@ from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
 from synapse.events.validator import EventValidator
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.types import UserID
 
 from ._base import BaseHandler
 
@@ -89,7 +90,7 @@ class MessageHandler(BaseHandler):
                 yield self.hs.get_event_sources().get_current_token()
             )
 
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         events, next_key = yield data_source.get_pagination_rows(
             user, pagin_config.get_source_config("room"), room_id
@@ -130,13 +131,13 @@ class MessageHandler(BaseHandler):
         if ratelimit:
             self.ratelimit(builder.user_id)
         # TODO(paul): Why does 'event' not have a 'user' object?
-        user = self.hs.parse_userid(builder.user_id)
+        user = UserID.from_string(builder.user_id)
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
             if membership == Membership.JOIN:
-                joinee = self.hs.parse_userid(builder.state_key)
+                joinee = UserID.from_string(builder.state_key)
                 # If event doesn't include a display name, add one.
                 yield self.distributor.fire(
                     "collect_presencelike_data",
@@ -237,7 +238,7 @@ class MessageHandler(BaseHandler):
             membership_list=[Membership.INVITE, Membership.JOIN]
         )
 
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         rooms_ret = []
 
@@ -316,7 +317,7 @@ class MessageHandler(BaseHandler):
 
         # TODO(paul): I wish I was called with user objects not user_id
         #   strings...
-        auth_user = self.hs.parse_userid(user_id)
+        auth_user = UserID.from_string(user_id)
 
         # TODO: These concurrently
         state_tuples = yield self.state_handler.get_current_state(room_id)
@@ -349,7 +350,7 @@ class MessageHandler(BaseHandler):
         for m in room_members:
             try:
                 member_presence = yield presence_handler.get_state(
-                    target_user=self.hs.parse_userid(m.user_id),
+                    target_user=UserID.from_string(m.user_id),
                     auth_user=auth_user,
                     as_event=True,
                 )

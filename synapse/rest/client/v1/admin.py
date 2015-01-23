@@ -16,6 +16,8 @@
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError
+from synapse.types import UserID
+
 from base import RestServlet, client_path_pattern
 
 import logging
@@ -28,7 +30,7 @@ class WhoisRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        target_user = self.hs.parse_userid(user_id)
+        target_user = UserID.from_string(user_id)
         auth_user = yield self.auth.get_user_by_req(request)
         is_admin = yield self.auth.is_server_admin(auth_user)
 

@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 from synapse.server import HomeServer
 from synapse.api.constants import EventTypes, Membership
+from synapse.types import UserID
 
 from tests.utils import SQLiteMemoryDbPool, MockKey
 
@@ -49,11 +50,11 @@ class RoomMemberStoreTestCase(unittest.TestCase):
         self.handlers = hs.get_handlers()
         self.message_handler = self.handlers.message_handler
 
-        self.u_alice = hs.parse_userid("@alice:test")
-        self.u_bob = hs.parse_userid("@bob:test")
+        self.u_alice = UserID.from_string("@alice:test")
+        self.u_bob = UserID.from_string("@bob:test")
 
         # User elsewhere on another host
-        self.u_charlie = hs.parse_userid("@charlie:elsewhere")
+        self.u_charlie = UserID.from_string("@charlie:elsewhere")
 
         self.room = hs.parse_roomid("!abc123:test")
 

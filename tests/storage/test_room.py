@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 from synapse.server import HomeServer
 from synapse.api.constants import EventTypes
+from synapse.types import UserID
 
 from tests.utils import SQLiteMemoryDbPool
 
@@ -40,7 +41,7 @@ class RoomStoreTestCase(unittest.TestCase):
 
         self.room = hs.parse_roomid("!abcde:test")
         self.alias = hs.parse_roomalias("#a-room-name:test")
-        self.u_creator = hs.parse_userid("@creator:test")
+        self.u_creator = UserID.from_string("@creator:test")
 
         yield self.store.store_room(self.room.to_string(),
             room_creator_user_id=self.u_creator.to_string(),

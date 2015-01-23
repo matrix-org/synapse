@@ -127,12 +127,6 @@ class BaseHomeServer(object):
     # TODO: Why are these parse_ methods so high up along with other globals?
     # Surely these should be in a util package or in the api package?
 
-    # Other utility methods
-    def parse_userid(self, s):
-        """Parse the string given by 's' as a User ID and return a UserID
-        object."""
-        return UserID.from_string(s)
-
     def parse_roomalias(self, s):
         """Parse the string given by 's' as a Room Alias and return a RoomAlias
         object."""

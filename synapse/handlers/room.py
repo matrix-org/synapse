@@ -64,7 +64,7 @@ class RoomCreationHandler(BaseHandler):
         invite_list = config.get("invite", [])
         for i in invite_list:
             try:
-                self.hs.parse_userid(i)
+                UserID.from_string(i)
             except:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
 
@@ -114,7 +114,7 @@ class RoomCreationHandler(BaseHandler):
                 servers=[self.hs.hostname],
             )
 
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
         creation_events = self._create_events_for_new_room(
             user, room_id, is_public=is_public
         )
@@ -250,7 +250,7 @@ class RoomMemberHandler(BaseHandler):
 
         users = yield self.store.get_users_in_room(room_id)
 
-        defer.returnValue([hs.parse_userid(u) for u in users])
+        defer.returnValue([UserID.from_string(u) for u in users])
 
     @defer.inlineCallbacks
     def fetch_room_distributions_into(self, room_id, localusers=None,
@@ -368,7 +368,7 @@ class RoomMemberHandler(BaseHandler):
             )
 
             if prev_state and prev_state.membership == Membership.JOIN:
-                user = self.hs.parse_userid(event.user_id)
+                user = UserID.from_string(event.user_id)
                 self.distributor.fire(
                     "user_left_room", user=user, room_id=event.room_id
                 )
@@ -412,7 +412,7 @@ class RoomMemberHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _do_join(self, event, context, room_host=None, do_auth=True):
-        joinee = self.hs.parse_userid(event.state_key)
+        joinee = UserID.from_string(event.state_key)
         # room_id = RoomID.from_string(event.room_id, self.hs)
         room_id = event.room_id
 
@@ -476,7 +476,7 @@ class RoomMemberHandler(BaseHandler):
                 do_auth=do_auth,
             )
 
-        user = self.hs.parse_userid(event.user_id)
+        user = UserID.from_string(event.user_id)
         yield self.distributor.fire(
             "user_joined_room", user=user, room_id=room_id
         )
@@ -526,7 +526,7 @@ class RoomMemberHandler(BaseHandler):
                                     do_auth):
         yield run_on_reactor()
 
-        target_user = self.hs.parse_userid(event.state_key)
+        target_user = UserID.from_string(event.state_key)
 
         yield self.handle_new_client_event(
             event,

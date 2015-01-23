@@ -21,6 +21,7 @@ from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
+from synapse.types import UserID
 
 import logging
 
@@ -104,7 +105,7 @@ class Auth(object):
         for event in curr_state:
             if event.type == EventTypes.Member:
                 try:
-                    if self.hs.parse_userid(event.state_key).domain != host:
+                    if UserID.from_string(event.state_key).domain != host:
                         continue
                 except:
                     logger.warn("state_key not user_id: %s", event.state_key)
@@ -337,7 +338,7 @@ class Auth(object):
             user_info = {
                 "admin": bool(ret.get("admin", False)),
                 "device_id": ret.get("device_id"),
-                "user": self.hs.parse_userid(ret.get("name")),
+                "user": UserID.from_string(ret.get("name")),
             }
 
             defer.returnValue(user_info)
@@ -461,7 +462,7 @@ class Auth(object):
                             "You are not allowed to set others state"
                         )
                     else:
-                        sender_domain = self.hs.parse_userid(
+                        sender_domain = UserID.from_string(
                             event.user_id
                         ).domain
 
@@ -496,7 +497,7 @@ class Auth(object):
         # Validate users
         for k, v in user_list.items():
             try:
-                self.hs.parse_userid(k)
+                UserID.from_string(k)
             except:
                 raise SynapseError(400, "Not a valid user_id: %s" % (k,))
 
