@@ -32,6 +32,8 @@ class PushRuleRestServlet(RestServlet):
         'override': 4
     }
     PRIORITY_CLASS_INVERSE_MAP = {v: k for k,v in PRIORITY_CLASS_MAP.items()}
+    SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR =\
+        "Unrecognised request: You probably wanted a trailing slash"
 
     def rule_spec_from_path(self, path):
         if len(path) < 2:
@@ -211,10 +213,14 @@ class PushRuleRestServlet(RestServlet):
                 rulearray.append(template_rule)
 
         path = request.postpath[1:]
-        if path == []:
-            defer.returnValue((200, rules))
 
-        if path[0] == 'global':
+        if path == []:
+            # we're a reference impl: pedantry is our job.
+            raise UnrecognizedRequestError(PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR)
+
+        if path[0] == '':
+            defer.returnValue((200, rules))
+        elif path[0] == 'global':
             path = path[1:]
             result = _filter_ruleset_with_path(rules['global'], path)
             defer.returnValue((200, result))
@@ -255,12 +261,17 @@ def _instance_handle_from_conditions(conditions):
 
 def _filter_ruleset_with_path(ruleset, path):
     if path == []:
+        raise UnrecognizedRequestError(PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR)
+
+    if path[0] == '':
         return ruleset
     template_kind = path[0]
     if template_kind not in ruleset:
         raise UnrecognizedRequestError()
     path = path[1:]
     if path == []:
+        raise UnrecognizedRequestError(PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR)
+    if path[0] == '':
         return ruleset[template_kind]
     rule_id = path[0]
     for r in ruleset[template_kind]:

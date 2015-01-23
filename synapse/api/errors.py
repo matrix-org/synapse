@@ -88,9 +88,14 @@ class UnrecognizedRequestError(SynapseError):
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.UNRECOGNIZED
+        message = None
+        if len(args) == 0:
+            message = "Unrecognized request"
+        else:
+            message = args[0]
         super(UnrecognizedRequestError, self).__init__(
             400,
-            "Unrecognized request",
+            message,
             **kwargs
         )
 
