@@ -37,6 +37,7 @@ from synapse.api.urls import (
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
+from synapse.rest.client.v1 import ClientV1RestResource
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
@@ -59,7 +60,7 @@ class SynapseHomeServer(HomeServer):
         return MatrixFederationHttpClient(self)
 
     def build_resource_for_client(self):
-        return JsonResource()
+        return ClientV1RestResource(self)
 
     def build_resource_for_federation(self):
         return JsonResource()
@@ -223,8 +224,6 @@ def setup():
         config=config,
         content_addr=config.content_addr,
     )
-
-    hs.register_servlets()
 
     hs.create_resource_tree(
         web_client=config.webclient,
