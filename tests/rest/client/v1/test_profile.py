@@ -24,6 +24,7 @@ from ....utils import MockHttpResource, MockKey
 
 from synapse.api.errors import SynapseError, AuthError
 from synapse.server import HomeServer
+from synapse.types import UserID
 
 from synapse.rest.client.v1 import profile
 
@@ -57,7 +58,7 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         def _get_user_by_req(request=None):
-            return hs.parse_userid(myid)
+            return UserID.from_string(myid)
 
         hs.get_auth().get_user_by_req = _get_user_by_req
 

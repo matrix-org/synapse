@@ -27,6 +27,7 @@ from synapse.handlers.presence import PresenceHandler
 from synapse.server import HomeServer
 from synapse.rest.client.v1 import presence
 from synapse.rest.client.v1 import events
+from synapse.types import UserID
 
 
 OFFLINE = PresenceState.OFFLINE
@@ -71,7 +72,7 @@ class PresenceStateTestCase(unittest.TestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(myid),
+                "user": UserID.from_string(myid),
                 "admin": False,
                 "device_id": None,
             }
@@ -90,7 +91,7 @@ class PresenceStateTestCase(unittest.TestCase):
 
         presence.register_servlets(hs, self.mock_resource)
 
-        self.u_apple = hs.parse_userid(myid)
+        self.u_apple = UserID.from_string(myid)
 
     @defer.inlineCallbacks
     def test_get_my_status(self):
@@ -161,12 +162,12 @@ class PresenceListTestCase(unittest.TestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(myid),
+                "user": UserID.from_string(myid),
                 "admin": False,
                 "device_id": None,
             }
 
-        room_member_handler = hs.handlers.room_member_handler = Mock(
+        hs.handlers.room_member_handler = Mock(
             spec=[
                 "get_rooms_for_user",
             ]
@@ -176,8 +177,8 @@ class PresenceListTestCase(unittest.TestCase):
 
         presence.register_servlets(hs, self.mock_resource)
 
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
+        self.u_apple = UserID.from_string("@apple:test")
+        self.u_banana = UserID.from_string("@banana:test")
 
     @defer.inlineCallbacks
     def test_get_my_list(self):
@@ -281,7 +282,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         hs.get_clock().time_msec.return_value = 1000000
 
         def _get_user_by_req(req=None):
-            return hs.parse_userid(myid)
+            return UserID.from_string(myid)
 
         hs.get_auth().get_user_by_req = _get_user_by_req
 
@@ -322,8 +323,8 @@ class PresenceEventStreamTestCase(unittest.TestCase):
 
         self.presence = hs.get_handlers().presence_handler
 
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
+        self.u_apple = UserID.from_string("@apple:test")
+        self.u_banana = UserID.from_string("@banana:test")
 
     @defer.inlineCallbacks
     def test_shortpoll(self):

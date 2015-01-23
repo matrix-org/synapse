@@ -22,7 +22,7 @@ from mock import Mock, NonCallableMock
 from synapse.api.errors import AuthError
 from synapse.server import HomeServer
 from synapse.handlers.profile import ProfileHandler
-from synapse.api.constants import Membership
+from synapse.types import UserID
 
 from tests.utils import SQLiteMemoryDbPool, MockKey
 
@@ -71,9 +71,9 @@ class ProfileTestCase(unittest.TestCase):
 
         self.store = hs.get_datastore()
 
-        self.frank = hs.parse_userid("@1234ABCD:test")
-        self.bob   = hs.parse_userid("@4567:test")
-        self.alice = hs.parse_userid("@alice:remote")
+        self.frank = UserID.from_string("@1234ABCD:test")
+        self.bob   = UserID.from_string("@4567:test")
+        self.alice = UserID.from_string("@alice:remote")
 
         yield self.store.create_profile(self.frank.localpart)
 

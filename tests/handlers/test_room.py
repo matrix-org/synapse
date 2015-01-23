@@ -15,12 +15,13 @@
 
 
 from twisted.internet import defer
-from tests import unittest
+from .. import unittest
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.handlers.room import RoomMemberHandler, RoomCreationHandler
 from synapse.handlers.profile import ProfileHandler
 from synapse.server import HomeServer
+from synapse.types import UserID
 from ..utils import MockKey
 
 from mock import Mock, NonCallableMock
@@ -164,7 +165,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             event, context=context,
         )
         self.notifier.on_new_room_event.assert_called_once_with(
-            event, extra_users=[self.hs.parse_userid(target_user_id)]
+            event, extra_users=[UserID.from_string(target_user_id)]
         )
         self.assertFalse(self.datastore.get_room.called)
         self.assertFalse(self.datastore.store_room.called)
@@ -174,7 +175,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
     def test_simple_join(self):
         room_id = "!foo:red"
         user_id = "@bob:red"
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         join_signal_observer = Mock()
         self.distributor.observe("user_joined_room", join_signal_observer)
@@ -252,7 +253,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
     def test_simple_leave(self):
         room_id = "!foo:red"
         user_id = "@bob:red"
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         builder = self.hs.get_event_builder_factory().new({
             "type": EventTypes.Member,

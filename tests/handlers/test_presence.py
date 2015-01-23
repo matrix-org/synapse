@@ -17,7 +17,7 @@
 from tests import unittest
 from twisted.internet import defer, reactor
 
-from mock import Mock, call, ANY, NonCallableMock, patch
+from mock import Mock, call, ANY, NonCallableMock
 import json
 
 from tests.utils import (
@@ -31,6 +31,7 @@ from synapse.api.errors import SynapseError
 from synapse.handlers.presence import PresenceHandler, UserPresenceCache
 from synapse.streams.config import SourcePaginationConfig
 from synapse.storage.transactions import DestinationsTable
+from synapse.types import UserID
 
 OFFLINE = PresenceState.OFFLINE
 UNAVAILABLE = PresenceState.UNAVAILABLE
@@ -170,9 +171,9 @@ class PresenceTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp_users(self, hs):
         # Some local users to test with
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
-        self.u_clementine = hs.parse_userid("@clementine:test")
+        self.u_apple = UserID.from_string("@apple:test")
+        self.u_banana = UserID.from_string("@banana:test")
+        self.u_clementine = UserID.from_string("@clementine:test")
 
         for u in self.u_apple, self.u_banana, self.u_clementine:
             yield self.datastore.create_presence(u.localpart)
@@ -182,10 +183,10 @@ class PresenceTestCase(unittest.TestCase):
         )
 
         # ID of a local user that does not exist
-        self.u_durian = hs.parse_userid("@durian:test")
+        self.u_durian = UserID.from_string("@durian:test")
 
         # A remote user
-        self.u_cabbage = hs.parse_userid("@cabbage:elsewhere")
+        self.u_cabbage = UserID.from_string("@cabbage:elsewhere")
 
 
 class MockedDatastorePresenceTestCase(PresenceTestCase):
@@ -250,16 +251,16 @@ class MockedDatastorePresenceTestCase(PresenceTestCase):
     @defer.inlineCallbacks
     def setUp_users(self, hs):
         # Some local users to test with
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
-        self.u_clementine = hs.parse_userid("@clementine:test")
-        self.u_durian = hs.parse_userid("@durian:test")
-        self.u_elderberry = hs.parse_userid("@elderberry:test")
-        self.u_fig = hs.parse_userid("@fig:test")
+        self.u_apple = UserID.from_string("@apple:test")
+        self.u_banana = UserID.from_string("@banana:test")
+        self.u_clementine = UserID.from_string("@clementine:test")
+        self.u_durian = UserID.from_string("@durian:test")
+        self.u_elderberry = UserID.from_string("@elderberry:test")
+        self.u_fig = UserID.from_string("@fig:test")
 
         # Remote user
-        self.u_onion = hs.parse_userid("@onion:farm")
-        self.u_potato = hs.parse_userid("@potato:remote")
+        self.u_onion = UserID.from_string("@onion:farm")
+        self.u_potato = UserID.from_string("@potato:remote")
 
         yield
 

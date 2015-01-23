@@ -20,6 +20,7 @@ from base import RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
+from synapse.types import UserID, RoomID, RoomAlias
 
 import json
 import logging
@@ -223,10 +224,10 @@ class JoinRoomAliasServlet(RestServlet):
         identifier = None
         is_room_alias = False
         try:
-            identifier = self.hs.parse_roomalias(room_identifier)
+            identifier = RoomAlias.from_string(room_identifier)
             is_room_alias = True
         except SynapseError:
-            identifier = self.hs.parse_roomid(room_identifier)
+            identifier = RoomID.from_string(room_identifier)
 
         # TODO: Support for specifying the home server to join with?
 
@@ -289,7 +290,7 @@ class RoomMemberListRestServlet(RestServlet):
 
         for event in members["chunk"]:
             # FIXME: should probably be state_key here, not user_id
-            target_user = self.hs.parse_userid(event["user_id"])
+            target_user = UserID.from_string(event["user_id"])
             # Presence is an optional cache; don't fail if we can't fetch it
             try:
                 presence_handler = self.handlers.presence_handler
@@ -478,7 +479,7 @@ class RoomTypingRestServlet(RestServlet):
         auth_user = yield self.auth.get_user_by_req(request)
 
         room_id = urllib.unquote(room_id)
-        target_user = self.hs.parse_userid(urllib.unquote(user_id))
+        target_user = UserID.from_string(urllib.unquote(user_id))
 
         content = _parse_json(request)
 
