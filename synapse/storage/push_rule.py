@@ -46,7 +46,7 @@ class PushRuleStore(SQLBaseStore):
         defer.returnValue(dicts)
 
     @defer.inlineCallbacks
-    def add_push_rule(self, **kwargs):
+    def add_push_rule(self, before, after, **kwargs):
         vals = copy.copy(kwargs)
         if 'conditions' in vals:
             vals['conditions'] = json.dumps(vals['conditions'])
@@ -57,10 +57,12 @@ class PushRuleStore(SQLBaseStore):
         if 'id' in vals:
             del vals['id']
 
-        if 'after' in kwargs or 'before' in kwargs:
+        if before or after:
             ret = yield self.runInteraction(
                 "_add_push_rule_relative_txn",
                 self._add_push_rule_relative_txn,
+                before=before,
+                after=after,
                 **vals
             )
             defer.returnValue(ret)
@@ -89,7 +91,7 @@ class PushRuleStore(SQLBaseStore):
         txn.execute(sql, (user_name, relative_to_rule))
         res = txn.fetchall()
         if not res:
-            raise RuleNotFoundException()
+            raise RuleNotFoundException("before/after rule not found: %s" % (relative_to_rule))
         (priority_class, base_rule_priority) = res[0]
 
         if 'priority_class' in kwargs and kwargs['priority_class'] != priority_class:

@@ -166,8 +166,8 @@ class PushRuleRestServlet(RestServlet):
             )
         except InconsistentRuleException as e:
             raise SynapseError(400, e.message)
-        except RuleNotFoundException:
-            raise SynapseError(400, "before/after rule not found")
+        except RuleNotFoundException as e:
+            raise SynapseError(400, e.message)
 
         defer.returnValue((200, {}))
 
