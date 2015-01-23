@@ -74,7 +74,6 @@ class Pusher(object):
 
         defer.returnValue(ctx)
 
-
     @defer.inlineCallbacks
     def start(self):
         if not self.last_token:
@@ -116,7 +115,7 @@ class Pusher(object):
             processed = False
             if self._should_notify_for_event(single_event):
                 rejected = yield self.dispatch_push(single_event)
-                if not rejected == False:
+                if not rejected is False:
                     processed = True
                     for pk in rejected:
                         if pk != self.pushkey:
