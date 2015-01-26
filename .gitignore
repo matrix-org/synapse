@@ -35,3 +35,9 @@ uploads
 
 .idea/
 media_store/
+
+*.tac
+
+build/
+
+localhost-800*/
