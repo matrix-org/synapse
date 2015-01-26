@@ -124,9 +124,6 @@ class BaseHomeServer(object):
 
         setattr(BaseHomeServer, "get_%s" % (depname), _get)
 
-    def serialize_event(self, e, as_client_event=True):
-        return serialize_event(self, e, as_client_event)
-
     def get_ip_from_request(self, request):
         # May be an X-Forwarding-For header depending on config
         ip_addr = request.getClientIP()
