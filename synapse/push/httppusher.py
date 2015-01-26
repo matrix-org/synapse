@@ -65,8 +65,6 @@ class HttpPusher(Pusher):
 
         d = {
             'notification': {
-                'transition': 'new',
-                # everything is new for now: we don't have read receipts
                 'id': event['event_id'],
                 'type': event['type'],
                 'from': event['user_id'],
@@ -89,11 +87,13 @@ class HttpPusher(Pusher):
                 ]
             }
         }
+        if event['type'] == 'm.room.member':
+            d['notification']['membership'] = event['content']['membership']
 
         if len(ctx['aliases']):
-            d['notification']['roomAlias'] = ctx['aliases'][0]
+            d['notification']['room_alias'] = ctx['aliases'][0]
         if 'name' in ctx:
-            d['notification']['roomName'] = ctx['name']
+            d['notification']['room_name'] = ctx['name']
 
         defer.returnValue(d)
 

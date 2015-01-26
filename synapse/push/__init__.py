@@ -65,6 +65,10 @@ class Pusher(object):
             # let's assume you probably know about messages you sent yourself
             defer.returnValue(['dont_notify'])
 
+        if ev['type'] == 'm.room.member':
+            if ev['state_key'] != self.user_name:
+                defer.returnValue(['dont_notify'])
+
         rules = yield self.store.get_push_rules_for_user_name(self.user_name)
 
         for r in rules:
