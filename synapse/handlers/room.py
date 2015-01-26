@@ -16,12 +16,14 @@
 """Contains functions for performing events on rooms."""
 from twisted.internet import defer
 
+from ._base import BaseHandler
+
 from synapse.types import UserID, RoomAlias, RoomID
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import StoreError, SynapseError
 from synapse.util import stringutils
 from synapse.util.async import run_on_reactor
-from ._base import BaseHandler
+from synapse.events.utils import serialize_event
 
 import logging
 
@@ -293,8 +295,9 @@ class RoomMemberHandler(BaseHandler):
         yield self.auth.check_joined_room(room_id, user_id)
 
         member_list = yield self.store.get_room_members(room_id=room_id)
+        time_now = self.clock.time_msec()
         event_list = [
-            self.hs.serialize_event(entry)
+            serialize_event(entry, time_now)
             for entry in member_list
         ]
         chunk_data = {
