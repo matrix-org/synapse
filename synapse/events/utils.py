@@ -89,7 +89,7 @@ def prune_event(event):
     return type(event)(allowed_fields)
 
 
-def serialize_event(e, time_now_ms, client_event=True):
+def serialize_event(e, time_now_ms, client_event=True, strip_ids=False):
     # FIXME(erikj): To handle the case of presence events and the like
     if not isinstance(e, EventBase):
         return e
@@ -137,5 +137,9 @@ def serialize_event(e, time_now_ms, client_event=True):
     d.pop("depth", None)
     d.pop("unsigned", None)
     d.pop("origin", None)
+
+    if strip_ids:
+        d.pop("room_id", None)
+        d.pop("event_id", None)
 
     return d

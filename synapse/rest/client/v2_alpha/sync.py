@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,9 @@
 from twisted.internet import defer
 
 from synapse.http.servlet import RestServlet
+from synapse.handlers.sync import SyncConfig
+from synapse.types import StreamToken
+from synapse.events.utils import serialize_event
 from ._base import client_v2_pattern
 
 import logging
@@ -73,14 +76,15 @@ class SyncRestServlet(RestServlet):
     def __init__(self, hs):
         super(SyncRestServlet, self).__init__()
         self.auth = hs.get_auth()
-        #self.sync_handler = hs.get_handlers().sync_hanlder
+        self.sync_handler = hs.get_handlers().sync_handler
+        self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
         user = yield self.auth.get_user_by_req(request)
 
         timeout = self.parse_integer(request, "timeout", default=0)
-        limit = self.parse_integer(request, "limit", default=None)
+        limit = self.parse_integer(request, "limit", required=True)
         gap = self.parse_boolean(request, "gap", default=True)
         sort = self.parse_string(
             request, "sort", default="timeline,asc",
@@ -91,7 +95,7 @@ class SyncRestServlet(RestServlet):
             request, "set_presence", default="online",
             allowed_values=self.ALLOWED_PRESENCE
         )
-        backfill = self.parse_boolean(request, "backfill", default=True)
+        backfill = self.parse_boolean(request, "backfill", default=False)
         filter_id = self.parse_string(request, "filter", default=None)
 
         logger.info(
@@ -108,35 +112,80 @@ class SyncRestServlet(RestServlet):
         # if filter.matches(event):
         #   # stuff
 
-        # if timeout != 0:
-        #   register for updates from the event stream
+        sync_config = SyncConfig(
+            user=user,
+            device="TODO", # TODO(mjark) Get the device_id from access_token
+            gap=gap,
+            limit=limit,
+            sort=sort,
+            backfill=backfill,
+            filter="TODO", # TODO(mjark) Add the filter to the config.
+        )
 
-        #rooms = []
-
-        if gap:
-            pass
-            # now_stream_token = get_current_stream_token
-            # for room_id in get_rooms_for_user(user, filter=filter):
-            #   state, events, start, end, limited, published = updates_for_room(
-            #       from=since, to=now_stream_token, limit=limit,
-            #       anchor_to_start=False
-            #   )
-            #   rooms[room_id] = (state, events, start, limited, published)
-            # next_stream_token = now.
+        if since is not None:
+            since_token = StreamToken.from_string(since)
         else:
-            pass
-            # now_stream_token = get_current_stream_token
-            # for room_id in get_rooms_for_user(user, filter=filter)
-            #   state, events, start, end, limited, published = updates_for_room(
-            #       from=since, to=now_stream_token, limit=limit,
-            #       anchor_to_start=False
-            #   )
-            #   next_stream_token = min(next_stream_token, end)
+            since_token = None
 
+        sync_result = yield self.sync_handler.wait_for_sync_for_user(
+            sync_config, since_token=since_token, timeout=timeout
+        )
 
-        response_content = {}
+        time_now = self.clock.time_msec()
+
+        response_content = {
+            "public_user_data": self.encode_events(
+                sync_result.public_user_data, filter, time_now
+            ),
+            "private_user_data": self.encode_events(
+                sync_result.private_user_data, filter, time_now
+            ),
+            "rooms": self.encode_rooms(sync_result.rooms, filter, time_now),
+            "next_batch": sync_result.next_batch.to_string(),
+        }
 
         defer.returnValue((200, response_content))
+
+    def encode_events(self, events, filter, time_now):
+        return [self.encode_event(event, filter, time_now) for event in events]
+
+    @staticmethod
+    def encode_event(event, filter, time_now):
+        # TODO(mjark): Respect formatting requirements in the filter.
+        return serialize_event(event, time_now)
+
+    def encode_rooms(self, rooms, filter, time_now):
+        return [self.encode_room(room, filter, time_now) for room in rooms]
+
+    @staticmethod
+    def encode_room(room, filter, time_now):
+        event_map = {}
+        state_event_ids = []
+        recent_event_ids = []
+        for event in room.state:
+            # TODO(mjark): Respect formatting requirements in the filter.
+            event_map[event.event_id] = serialize_event(
+                event, time_now, strip_ids=True
+            )
+            state_event_ids.append(event.event_id)
+
+        for event in room.events:
+            # TODO(mjark): Respect formatting requirements in the filter.
+            event_map[event.event_id] = serialize_event(
+                event, time_now, strip_ids=True
+            )
+            recent_event_ids.append(event.event_id)
+        return {
+            "room_id": room.room_id,
+            "event_map": event_map,
+            "events": {
+                "batch": recent_event_ids,
+                "prev_batch": room.prev_batch.to_string(),
+            },
+            "state": state_event_ids,
+            "limited": room.limited,
+            "published": room.published,
+        }
 
 
 def register_servlets(hs, http_server):
