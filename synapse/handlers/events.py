@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.logutils import log_function
 from synapse.types import UserID
+from synapse.events.utils import serialize_event
 
 from ._base import BaseHandler
 
@@ -78,8 +79,10 @@ class EventStreamHandler(BaseHandler):
                     auth_user, room_ids, pagin_config, timeout
                 )
 
+            time_now = self.clock.time_msec()
+
             chunks = [
-                self.hs.serialize_event(e, as_client_event) for e in events
+                serialize_event(e, time_now, as_client_event) for e in events
             ]
 
             chunk = {

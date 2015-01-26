@@ -21,6 +21,7 @@ from synapse.api.errors import SynapseError, Codes
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.types import UserID, RoomID, RoomAlias
+from synapse.events.utils import serialize_event
 
 import json
 import logging
@@ -363,6 +364,10 @@ class RoomInitialSyncRestServlet(ClientV1RestServlet):
 class RoomTriggerBackfill(ClientV1RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/backfill$")
 
+    def __init__(self, hs):
+        super(RoomTriggerBackfill, self).__init__(hs)
+        self.clock = hs.get_clock()
+
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         remote_server = urllib.unquote(
@@ -374,7 +379,9 @@ class RoomTriggerBackfill(ClientV1RestServlet):
         handler = self.handlers.federation_handler
         events = yield handler.backfill(remote_server, room_id, limit)
 
-        res = [self.hs.serialize_event(event) for event in events]
+        time_now = self.clock.time_msec()
+
+        res = [serialize_event(event, time_now) for event in events]
         defer.returnValue((200, res))
 
 
