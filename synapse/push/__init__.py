@@ -173,7 +173,7 @@ class Pusher(object):
                 processed = True
             else:
                 rejected = yield self.dispatch_push(single_event, tweaks)
-                if not rejected is False:
+                if isinstance(rejected, list) or isinstance(rejected, tuple):
                     processed = True
                     for pk in rejected:
                         if pk != self.pushkey:
