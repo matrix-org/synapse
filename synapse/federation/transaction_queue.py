@@ -16,6 +16,7 @@
 
 from twisted.internet import defer
 
+from .persistence import TransactionActions
 from .units import Transaction
 
 from synapse.util.logutils import log_function
@@ -34,13 +35,15 @@ class TransactionQueue(object):
     It batches pending PDUs into single transactions.
     """
 
-    def __init__(self, hs, transaction_actions, transport_layer):
+    def __init__(self, hs, transport_layer):
         self.server_name = hs.hostname
-        self.transaction_actions = transaction_actions
+
+        self.store = hs.get_datastore()
+        self.transaction_actions = TransactionActions(self.store)
+
         self.transport_layer = transport_layer
 
         self._clock = hs.get_clock()
-        self.store = hs.get_datastore()
 
         # Is a mapping from destinations -> deferreds. Used to keep track
         # of which destinations have transactions in flight and when they are

@@ -434,7 +434,7 @@ class DataStore(RoomMemberStore, RoomStore,
             sql = (
                 "SELECT e.event_id, reason FROM events as e "
                 "LEFT JOIN rejections as r ON e.event_id = r.event_id "
-                "WHERE event_id = ?"
+                "WHERE e.event_id = ?"
             )
 
             res = {}
