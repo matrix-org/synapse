@@ -30,21 +30,18 @@ class ApplicationServicesHandler(BaseHandler):
         super(ApplicationServicesHandler, self).__init__(hs)
 
     @defer.inlineCallbacks
-    def register(self, base_url, token, namespaces):
+    def register(self, app_service):
         # check the token is recognised
         try:
-            app_service = yield self.store.get_app_service(token)
-            if not app_service:
-                raise StoreError
+            stored_service = yield self.store.get_app_service(app_service.token)
+            if not stored_service:
+                raise StoreError(404, "Not found")
         except StoreError:
             raise SynapseError(
                 403, "Unrecognised application services token. "
                 "Consult the home server admin."
             )
-
-        # store this AS
-
-        defer.returnValue("not_implemented_yet")
+        # TODO store this AS
 
     def unregister(self, token):
         yield self.store.unregister_app_service(token)

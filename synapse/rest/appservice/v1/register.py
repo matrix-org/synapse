@@ -18,6 +18,7 @@ from twisted.internet import defer
 
 from base import AppServiceRestServlet, as_path_pattern
 from synapse.api.errors import CodeMessageException, SynapseError
+from synapse.storage.appservice import ApplicationService
 
 import json
 import logging
@@ -58,7 +59,10 @@ class RegisterRestServlet(AppServiceRestServlet):
             self._parse_namespace(namespaces, params["namespaces"], "rooms")
             self._parse_namespace(namespaces, params["namespaces"], "aliases")
 
-        hs_token = yield self.handler.register(as_url, as_token, namespaces)
+        app_service = ApplicationService(as_token, as_url, namespaces)
+
+        yield self.handler.register(app_service)
+        hs_token = "_not_implemented_yet"  # TODO: Pull this from self.hs?
 
         defer.returnValue({
           "hs_token": hs_token
@@ -97,7 +101,7 @@ class UnregisterRestServlet(AppServiceRestServlet):
         except (KeyError, ValueError):
             raise SynapseError(400, "Missing required key: as_token(str)")
 
-        # TODO: pass to the appservice handler
+        yield self.handler.unregister(as_token)
 
         raise CodeMessageException(500, "Not implemented")
 

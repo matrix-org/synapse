@@ -116,8 +116,7 @@ class ApplicationServiceStore(SQLBaseStore):
     def get_services_for_event(self, event):
         return self.cache.get_services_for_event(event)
 
-    @defer.inlineCallbacks
-    def get_app_service(self, as_token, from_cache=True):
+    def get_app_service(self, token, from_cache=True):
         """Get the application service with the given token.
 
         Args:
@@ -130,21 +129,18 @@ class ApplicationServiceStore(SQLBaseStore):
 
         if from_cache:
             for service in self.cache.services:
-                if service.token == as_token:
-                    defer.returnValue(service)
-                    return
-            defer.returnValue(None)
-            return
-
+                if service.token == token:
+                    return service
+            return None
 
         # TODO: This should be JOINed with the application_services_regex table.
         row = self._simple_select_one(
-            "application_services", {"token": as_token},
+            "application_services", {"token": token},
             ["url", "token"]
         )
         if not row:
             raise StoreError(400, "Bad application services token supplied.")
-        defer.returnValue(row)
+        return row
 
     def _populate_cache(self):
         """Populates the ApplicationServiceCache from the database."""
