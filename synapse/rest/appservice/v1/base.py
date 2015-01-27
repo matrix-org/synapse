@@ -45,3 +45,4 @@ class AppServiceRestServlet(RestServlet):
 
     def __init__(self, hs):
         self.hs = hs
+        self.handler = hs.get_handlers().appservice_handler

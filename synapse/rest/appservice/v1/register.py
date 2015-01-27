@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """This module contains REST servlets to do with registration: /register"""
+from twisted.internet import defer
 
 from base import AppServiceRestServlet, as_path_pattern
 from synapse.api.errors import CodeMessageException, SynapseError
@@ -30,6 +31,7 @@ class RegisterRestServlet(AppServiceRestServlet):
 
     PATTERN = as_path_pattern("/register$")
 
+    @defer.inlineCallbacks
     def on_POST(self, request):
         params = _parse_json(request)
 
@@ -56,9 +58,11 @@ class RegisterRestServlet(AppServiceRestServlet):
             self._parse_namespace(namespaces, params["namespaces"], "rooms")
             self._parse_namespace(namespaces, params["namespaces"], "aliases")
 
-        # TODO: pass to the appservice handler
+        hs_token = yield self.handler.register(as_url, as_token, namespaces)
 
-        raise CodeMessageException(500, "Not implemented.")
+        defer.returnValue({
+          "hs_token": hs_token
+        })
 
     def _parse_namespace(self, target_ns, origin_ns, ns):
         if ns not in target_ns or ns not in origin_ns:

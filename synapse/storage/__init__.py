@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.util.logutils import log_function
 from synapse.api.constants import EventTypes
 
+from .appservice import ApplicationServiceStore
 from .directory import DirectoryStore
 from .feedback import FeedbackStore
 from .presence import PresenceStore
@@ -80,8 +81,8 @@ class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, TransactionStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
-                EventFederationStore,
-                MediaRepositoryStore,
+                EventFederationStore, MediaRepositoryStore,
+                ApplicationServiceStore
                 ):
 
     def __init__(self, hs):
