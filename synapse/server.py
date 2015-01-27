@@ -20,7 +20,6 @@
 
 # Imports required for the default HomeServer() implementation
 from synapse.federation import initialize_http_replication
-from synapse.events.utils import serialize_event
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
@@ -123,9 +122,6 @@ class BaseHomeServer(object):
             )
 
         setattr(BaseHomeServer, "get_%s" % (depname), _get)
-
-    def serialize_event(self, e, as_client_event=True):
-        return serialize_event(self, e, as_client_event)
 
     def get_ip_from_request(self, request):
         # May be an X-Forwarding-For header depending on config
