@@ -26,13 +26,14 @@ from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
 from synapse.http.server import JsonResource, RootRedirect
+from synapse.rest.appservice.v1 import AppServiceRestResource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
 from synapse.http.server_key_resource import LocalKey
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX,
+    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX, APP_SERVICE_PREFIX
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -68,6 +69,9 @@ class SynapseHomeServer(HomeServer):
 
     def build_resource_for_federation(self):
         return JsonResource()
+
+    def build_resource_for_app_services(self):
+        return AppServiceRestResource(self)
 
     def build_resource_for_web_client(self):
         syweb_path = os.path.dirname(syweb.__file__)
@@ -114,6 +118,7 @@ class SynapseHomeServer(HomeServer):
             (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
             (MEDIA_PREFIX, self.get_resource_for_media_repository()),
+            (APP_SERVICE_PREFIX, self.get_resource_for_app_services()),
         ]
         if web_client:
             logger.info("Adding the web client.")
