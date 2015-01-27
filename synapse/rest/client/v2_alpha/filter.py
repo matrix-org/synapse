@@ -54,10 +54,12 @@ class GetFilterRestServlet(RestServlet):
             raise SynapseError(400, "Invalid filter_id")
 
         try:
-            defer.returnValue((200, self.filtering.get_user_filter(
+            filter = yield self.filtering.get_user_filter(
                 user_localpart=target_user.localpart,
                 filter_id=filter_id,
-            )))
+            )
+
+            defer.returnValue((200, filter))
         except KeyError:
             raise SynapseError(400, "No such filter")
 
@@ -89,7 +91,7 @@ class CreateFilterRestServlet(RestServlet):
         except:
             raise SynapseError(400, "Invalid filter definition")
 
-        filter_id = self.filtering.add_user_filter(
+        filter_id = yield self.filtering.add_user_filter(
             user_localpart=target_user.localpart,
             definition=content,
         )

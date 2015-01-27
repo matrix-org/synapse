@@ -53,14 +53,15 @@ class FilteringTestCase(unittest.TestCase):
 
         self.filtering = hs.get_filtering()
 
+    @defer.inlineCallbacks
     def test_filter(self):
-        filter_id = self.filtering.add_user_filter(
+        filter_id = yield self.filtering.add_user_filter(
             user_localpart=user_localpart,
             definition={"type": ["m.*"]},
         )
         self.assertEquals(filter_id, 0)
 
-        filter = self.filtering.get_user_filter(
+        filter = yield self.filtering.get_user_filter(
             user_localpart=user_localpart,
             filter_id=filter_id,
         )

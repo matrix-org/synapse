@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 
 # TODO(paul)
 _filters_for_user = {}
@@ -24,18 +26,28 @@ class Filtering(object):
         super(Filtering, self).__init__()
         self.hs = hs
 
+    @defer.inlineCallbacks
     def get_user_filter(self, user_localpart, filter_id):
         filters = _filters_for_user.get(user_localpart, None)
 
         if not filters or filter_id >= len(filters):
             raise KeyError()
 
-        return filters[filter_id]
+        # trivial yield to make it a generator so d.iC works
+        yield
+        defer.returnValue(filters[filter_id])
 
+    @defer.inlineCallbacks
     def add_user_filter(self, user_localpart, definition):
         filters = _filters_for_user.setdefault(user_localpart, [])
 
         filter_id = len(filters)
         filters.append(definition)
 
-        return filter_id
+        # trivial yield, see above
+        yield
+        defer.returnValue(filter_id)
+
+    # TODO(paul): surely we should probably add a delete_user_filter or
+    #   replace_user_filter at some point? There's no REST API specified for
+    #   them however
