@@ -28,10 +28,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# TODO(paul)
-_filters_for_user = {}
-
-
 class GetFilterRestServlet(RestServlet):
     PATTERN = client_v2_pattern("/user/(?P<user_id>[^/]*)/filter/(?P<filter_id>[^/]*)")
 
@@ -39,6 +35,7 @@ class GetFilterRestServlet(RestServlet):
         super(GetFilterRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
+        self.filtering = hs.get_filtering()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, filter_id):
@@ -56,12 +53,13 @@ class GetFilterRestServlet(RestServlet):
         except:
             raise SynapseError(400, "Invalid filter_id")
 
-        filters = _filters_for_user.get(target_user.localpart, None)
-
-        if not filters or filter_id >= len(filters):
+        try:
+            defer.returnValue((200, self.filtering.get_user_filter(
+                user_localpart=target_user.localpart,
+                filter_id=filter_id,
+            )))
+        except KeyError:
             raise SynapseError(400, "No such filter")
-
-        defer.returnValue((200, filters[filter_id]))
 
 
 class CreateFilterRestServlet(RestServlet):
@@ -71,6 +69,7 @@ class CreateFilterRestServlet(RestServlet):
         super(CreateFilterRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
+        self.filtering = hs.get_filtering()
 
     @defer.inlineCallbacks
     def on_POST(self, request, user_id):
@@ -90,10 +89,10 @@ class CreateFilterRestServlet(RestServlet):
         except:
             raise SynapseError(400, "Invalid filter definition")
 
-        filters = _filters_for_user.setdefault(target_user.localpart, [])
-
-        filter_id = len(filters)
-        filters.append(content)
+        filter_id = self.filtering.add_user_filter(
+            user_localpart=target_user.localpart,
+            definition=content,
+        )
 
         defer.returnValue((200, {"filter_id": str(filter_id)}))
 
