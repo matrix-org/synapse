@@ -30,9 +30,9 @@ from .transactions import TransactionStore
 from .keys import KeyStore
 from .event_federation import EventFederationStore
 from .media_repository import MediaRepositoryStore
-
 from .state import StateStore
 from .signatures import SignatureStore
+from .filtering import FilteringStore
 
 from syutil.base64util import decode_base64
 from syutil.jsonutil import encode_canonical_json
@@ -82,6 +82,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
                 EventFederationStore,
                 MediaRepositoryStore,
+                FilteringStore,
                 ):
 
     def __init__(self, hs):

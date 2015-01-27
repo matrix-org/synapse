@@ -15,20 +15,32 @@
 
 from twisted.internet import defer
 
+from ._base import SQLBaseStore
 
-class Filtering(object):
 
-    def __init__(self, hs):
-        super(Filtering, self).__init__()
-        self.store = hs.get_datastore()
+# TODO(paul)
+_filters_for_user = {}
 
+
+class FilteringStore(SQLBaseStore):
+    @defer.inlineCallbacks
     def get_user_filter(self, user_localpart, filter_id):
-        return self.store.get_user_filter(user_localpart, filter_id)
+        filters = _filters_for_user.get(user_localpart, None)
 
+        if not filters or filter_id >= len(filters):
+            raise KeyError()
+
+        # trivial yield to make it a generator so d.iC works
+        yield
+        defer.returnValue(filters[filter_id])
+
+    @defer.inlineCallbacks
     def add_user_filter(self, user_localpart, definition):
-        # TODO(paul): implement sanity checking of the definition
-        return self.store.add_user_filter(user_localpart, definition)
+        filters = _filters_for_user.setdefault(user_localpart, [])
 
-    # TODO(paul): surely we should probably add a delete_user_filter or
-    #   replace_user_filter at some point? There's no REST API specified for
-    #   them however
+        filter_id = len(filters)
+        filters.append(definition)
+
+        # trivial yield, see above
+        yield
+        defer.returnValue(filter_id)

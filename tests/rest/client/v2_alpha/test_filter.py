@@ -15,6 +15,8 @@
 
 from twisted.internet import defer
 
+from mock import Mock
+
 from . import V2AlphaRestTestCase
 
 from synapse.rest.client.v2_alpha import filter
@@ -23,6 +25,25 @@ from synapse.rest.client.v2_alpha import filter
 class FilterTestCase(V2AlphaRestTestCase):
     USER_ID = "@apple:test"
     TO_REGISTER = [filter]
+
+    def make_datastore_mock(self):
+        datastore = super(FilterTestCase, self).make_datastore_mock()
+
+        self._user_filters = {}
+
+        def add_user_filter(user_localpart, definition):
+            filters = self._user_filters.setdefault(user_localpart, [])
+            filter_id = len(filters)
+            filters.append(definition)
+            return defer.succeed(filter_id)
+        datastore.add_user_filter = add_user_filter
+
+        def get_user_filter(user_localpart, filter_id):
+            filters = self._user_filters[user_localpart]
+            return defer.succeed(filters[filter_id])
+        datastore.get_user_filter = get_user_filter
+
+        return datastore
 
     @defer.inlineCallbacks
     def test_filter(self):
