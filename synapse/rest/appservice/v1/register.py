@@ -16,8 +16,9 @@
 """This module contains REST servlets to do with registration: /register"""
 
 from base import AppServiceRestServlet, as_path_pattern
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import CodeMessageException, SynapseError
 
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,8 +31,83 @@ class RegisterRestServlet(AppServiceRestServlet):
     PATTERN = as_path_pattern("/register$")
 
     def on_POST(self, request):
+        params = _parse_json(request)
+
+        # sanity check required params
+        try:
+            as_token = params["as_token"]
+            as_url = params["url"]
+            if (not isinstance(as_token, basestring) or
+                    not isinstance(as_url, basestring)):
+                raise ValueError
+        except (KeyError, ValueError):
+            raise SynapseError(
+                400, "Missed required keys: as_token(str) / url(str)."
+            )
+
+        namespaces = {
+            "users": [],
+            "rooms": [],
+            "aliases": []
+        }
+
+        if "namespaces" in params:
+            self._parse_namespace(namespaces, params["namespaces"], "users")
+            self._parse_namespace(namespaces, params["namespaces"], "rooms")
+            self._parse_namespace(namespaces, params["namespaces"], "aliases")
+
+        # TODO: pass to the appservice handler
+
+        raise CodeMessageException(500, "Not implemented.")
+
+    def _parse_namespace(self, target_ns, origin_ns, ns):
+        if ns not in target_ns or ns not in origin_ns:
+            return  # nothing to parse / map through to.
+
+        possible_regex_list = origin_ns[ns]
+        if not type(possible_regex_list) == list:
+            raise SynapseError(400, "Namespace %s isn't an array." % ns)
+
+        for regex in possible_regex_list:
+            if not isinstance(regex, basestring):
+                raise SynapseError(
+                    400, "Regex '%s' isn't a string in namespace %s" %
+                    (regex, ns)
+                )
+
+        target_ns[ns] = origin_ns[ns]
+
+
+class UnregisterRestServlet(AppServiceRestServlet):
+    """Handles AS registration with the home server.
+    """
+
+    PATTERN = as_path_pattern("/unregister$")
+
+    def on_POST(self, request):
+        params = _parse_json(request)
+        try:
+            as_token = params["as_token"]
+            if not isinstance(as_token, basestring):
+                raise ValueError
+        except (KeyError, ValueError):
+            raise SynapseError(400, "Missing required key: as_token(str)")
+
+        # TODO: pass to the appservice handler
+
         raise CodeMessageException(500, "Not implemented")
+
+
+def _parse_json(request):
+    try:
+        content = json.loads(request.content.read())
+        if type(content) != dict:
+            raise SynapseError(400, "Content must be a JSON object.")
+        return content
+    except ValueError:
+        raise SynapseError(400, "Content not JSON.")
 
 
 def register_servlets(hs, http_server):
     RegisterRestServlet(hs).register(http_server)
+    UnregisterRestServlet(hs).register(http_server)
