@@ -72,6 +72,7 @@ class SyncHandler(BaseHandler):
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
 
+    @defer.inlineCallbacks
     def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0):
         """Get the sync for a client if we have new data for it now. Otherwise
         wait for new data to arrive on the server. If the timeout expires, then
@@ -80,15 +81,19 @@ class SyncHandler(BaseHandler):
             A Deferred SyncResult.
         """
         if timeout == 0 or since_token is None:
-            return self.current_sync_for_user(sync_config, since_token)
+            result = yield self.current_sync_for_user(sync_config, since_token)
+            defer.returnValue(result)
         else:
-            def current_sync_callback(since_token):
-                return self.current_sync_for_user(
-                    self, since_token, sync_config
-                )
-            return self.notifier.wait_for_events(
-                sync_config.filter, since_token, current_sync_callback
+            def current_sync_callback():
+                return self.current_sync_for_user(sync_config, since_token)
+
+            rm_handler = self.hs.get_handlers().room_member_handler
+            room_ids = yield rm_handler.get_rooms_for_user(sync_config.user)
+            result = yield self.notifier.wait_for_events(
+                sync_config.user, room_ids,
+                sync_config.filter, timeout, current_sync_callback
             )
+            defer.returnValue(result)
 
     def current_sync_for_user(self, sync_config, since_token=None):
         """Get the sync for client needed to match what the server has now.
