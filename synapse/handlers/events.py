@@ -99,6 +99,7 @@ class EventStreamHandler(BaseHandler):
 
                     # 10 seconds of grace to allow the client to reconnect again
                     #   before we think they're gone
+                    @defer.inlineCallbacks
                     def _later():
                         logger.debug(
                             "_later stopped_user_eventstream %s", auth_user
