@@ -25,11 +25,12 @@ from synapse.rest.client.v2_alpha import filter
 from synapse.types import UserID
 
 
-myid = "@apple:test"
 PATH_PREFIX = "/_matrix/client/v2_alpha"
 
 
 class FilterTestCase(unittest.TestCase):
+    USER_ID = "@apple:test"
+    TO_REGISTER = [filter]
 
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
@@ -50,25 +51,26 @@ class FilterTestCase(unittest.TestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": UserID.from_string(myid),
+                "user": UserID.from_string(self.USER_ID),
                 "admin": False,
                 "device_id": None,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
-        filter.register_servlets(hs, self.mock_resource)
+        for r in self.TO_REGISTER:
+            r.register_servlets(hs, self.mock_resource)
 
     @defer.inlineCallbacks
     def test_filter(self):
         (code, response) = yield self.mock_resource.trigger("POST",
-            "/user/%s/filter" % (myid),
+            "/user/%s/filter" % (self.USER_ID),
             '{"type": ["m.*"]}'
         )
         self.assertEquals(200, code)
         self.assertEquals({"filter_id": "0"}, response)
 
         (code, response) = yield self.mock_resource.trigger("GET",
-            "/user/%s/filter/0" % (myid), None
+            "/user/%s/filter/0" % (self.USER_ID), None
         )
         self.assertEquals(200, code)
         self.assertEquals({"type": ["m.*"]}, response)
