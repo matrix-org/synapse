@@ -214,7 +214,7 @@ class Notifier(object):
 
         deferred = defer.Deferred()
 
-        from_token=StreamToken("s0","0","0")
+        from_token = StreamToken("s0", "0", "0")
 
         listener = [_NotificationListener(
             user=user,
@@ -231,6 +231,7 @@ class Notifier(object):
         result = yield callback()
         if timeout:
             timed_out = [False]
+
             def _timeout_listener():
                 timed_out[0] = True
                 listener[0].notify(self, [], from_token, from_token)
@@ -251,7 +252,6 @@ class Notifier(object):
                 result = yield callback()
 
         defer.returnValue(result)
-
 
     def get_events_for(self, user, rooms, pagination_config, timeout):
         """ For the given user and rooms, return any new events for them. If

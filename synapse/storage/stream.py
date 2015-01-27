@@ -289,7 +289,6 @@ class StreamStore(SQLBaseStore):
                 " LIMIT ?"
             )
 
-
         def get_recent_events_for_room_txn(txn):
             if from_token is None:
                 txn.execute(sql, (room_id, end_token.stream, limit,))

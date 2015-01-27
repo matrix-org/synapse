@@ -52,10 +52,10 @@ class RoomSyncResult(collections.namedtuple("RoomSyncResult", [
 
 
 class SyncResult(collections.namedtuple("SyncResult", [
-    "next_batch", # Token for the next sync
-    "private_user_data", # List of private events for the user.
-    "public_user_data", # List of public events for all users.
-    "rooms", # RoomSyncResult for each room.
+    "next_batch",  # Token for the next sync
+    "private_user_data",  # List of private events for the user.
+    "public_user_data",  # List of public events for all users.
+    "rooms",  # RoomSyncResult for each room.
 ])):
     __slots__ = []
 
@@ -181,7 +181,6 @@ class SyncHandler(BaseHandler):
             limited=True,
         ))
 
-
     @defer.inlineCallbacks
     def incremental_sync_with_gap(self, sync_config, since_token):
         """ Get the incremental delta needed to bring the client up to
@@ -230,7 +229,6 @@ class SyncHandler(BaseHandler):
             rooms=rooms,
             next_batch=now_token,
         ))
-
 
     @defer.inlineCallbacks
     def incremental_sync_with_gap_for_room(self, room_id, sync_config,
@@ -316,7 +314,6 @@ class SyncHandler(BaseHandler):
             state = ()
         defer.returnValue(state)
 
-
     def compute_state_delta(self, since_token, previous_state, current_state):
         """ Works out the differnce in state between the current state and the
         state the client got when it last performed a sync.
@@ -327,7 +324,7 @@ class SyncHandler(BaseHandler):
         # after the previous sync, since we need to include those state
         # updates even if they occured logically before the previous event.
         # TODO(mjark) Check for new redactions in the state events.
-        previous_dict = {event.event_id:event for event in previous_state}
+        previous_dict = {event.event_id: event for event in previous_state}
         state_delta = []
         for event in current_state:
             if event.event_id not in previous_dict:

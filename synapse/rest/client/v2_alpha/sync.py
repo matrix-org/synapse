@@ -68,7 +68,6 @@ class SyncRestServlet(RestServlet):
         }
     """
 
-
     PATTERN = client_v2_pattern("/sync$")
     ALLOWED_SORT = set(["timeline,asc", "timeline,desc"])
     ALLOWED_PRESENCE = set(["online", "offline", "idle"])
@@ -114,12 +113,12 @@ class SyncRestServlet(RestServlet):
 
         sync_config = SyncConfig(
             user=user,
-            device="TODO", # TODO(mjark) Get the device_id from access_token
+            device="TODO",  # TODO(mjark) Get the device_id from access_token
             gap=gap,
             limit=limit,
             sort=sort,
             backfill=backfill,
-            filter="TODO", # TODO(mjark) Add the filter to the config.
+            filter="TODO",  # TODO(mjark) Add the filter to the config.
         )
 
         if since is not None:
