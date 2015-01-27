@@ -51,6 +51,9 @@ class ApplicationService(object):
 
         return True
 
+    def __str__(self):
+        return "ApplicationService: %s" % (self.__dict__,)
+
 
 class ApplicationServiceCache(object):
     """Caches ApplicationServices and provides utility functions on top.
@@ -83,7 +86,6 @@ class ApplicationServiceStore(SQLBaseStore):
     def __init__(self, hs):
         super(ApplicationServiceStore, self).__init__(hs)
         self.cache = ApplicationServiceCache()
-        self.clock = hs.get_clock()
         self._populate_cache()
 
     def unregister_app_service(self, token):

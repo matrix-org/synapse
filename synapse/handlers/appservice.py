@@ -31,6 +31,7 @@ class ApplicationServicesHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def register(self, app_service):
+        logger.info("Register -> %s", app_service)
         # check the token is recognised
         try:
             stored_service = yield self.store.get_app_service(app_service.token)
@@ -44,6 +45,7 @@ class ApplicationServicesHandler(BaseHandler):
         # TODO store this AS
 
     def unregister(self, token):
+        logger.info("Unregister as_token=%s", token)
         yield self.store.unregister_app_service(token)
 
     def notify_interested_services(self, event):
