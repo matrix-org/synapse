@@ -137,6 +137,7 @@ def serialize_event(e, time_now_ms, client_event=True, strip_ids=False):
     d.pop("depth", None)
     d.pop("unsigned", None)
     d.pop("origin", None)
+    d.pop("prev_state", None)
 
     if strip_ids:
         d.pop("room_id", None)
