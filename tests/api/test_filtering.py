@@ -53,16 +53,33 @@ class FilteringTestCase(unittest.TestCase):
 
         self.filtering = hs.get_filtering()
 
+        self.datastore = hs.get_datastore()
+
     @defer.inlineCallbacks
-    def test_filter(self):
+    def test_add_filter(self):
         filter_id = yield self.filtering.add_user_filter(
             user_localpart=user_localpart,
             definition={"type": ["m.*"]},
         )
+
         self.assertEquals(filter_id, 0)
+        self.assertEquals({"type": ["m.*"]},
+            (yield self.datastore.get_user_filter(
+                user_localpart=user_localpart,
+                filter_id=0,
+            ))
+        )
+
+    @defer.inlineCallbacks
+    def test_get_filter(self):
+        filter_id = yield self.datastore.add_user_filter(
+            user_localpart=user_localpart,
+            definition={"type": ["m.*"]},
+        )
 
         filter = yield self.filtering.get_user_filter(
             user_localpart=user_localpart,
             filter_id=filter_id,
         )
+
         self.assertEquals(filter, {"type": ["m.*"]})

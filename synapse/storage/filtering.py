@@ -17,6 +17,8 @@ from twisted.internet import defer
 
 from ._base import SQLBaseStore
 
+import json
+
 
 # TODO(paul)
 _filters_for_user = {}
@@ -25,22 +27,41 @@ _filters_for_user = {}
 class FilteringStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_user_filter(self, user_localpart, filter_id):
-        filters = _filters_for_user.get(user_localpart, None)
+        def_json = yield self._simple_select_one_onecol(
+            table="user_filters",
+            keyvalues={
+                "user_id": user_localpart,
+                "filter_id": filter_id,
+            },
+            retcol="definition",
+            allow_none=False,
+        )
 
-        if not filters or filter_id >= len(filters):
-            raise KeyError()
+        defer.returnValue(json.loads(def_json))
 
-        # trivial yield to make it a generator so d.iC works
-        yield
-        defer.returnValue(filters[filter_id])
-
-    @defer.inlineCallbacks
     def add_user_filter(self, user_localpart, definition):
-        filters = _filters_for_user.setdefault(user_localpart, [])
+        def_json = json.dumps(definition)
 
-        filter_id = len(filters)
-        filters.append(definition)
+        # Need an atomic transaction to SELECT the maximal ID so far then
+        # INSERT a new one
+        def _do_txn(txn):
+            sql = (
+                "SELECT MAX(filter_id) FROM user_filters "
+                "WHERE user_id = ?"
+            )
+            txn.execute(sql, (user_localpart,))
+            max_id = txn.fetchone()[0]
+            if max_id is None:
+                filter_id = 0
+            else:
+                filter_id = max_id + 1
 
-        # trivial yield, see above
-        yield
-        defer.returnValue(filter_id)
+            sql = (
+                "INSERT INTO user_filters (user_id, filter_id, definition)"
+                "VALUES(?, ?, ?)"
+            )
+            txn.execute(sql, (user_localpart, filter_id, def_json))
+
+            return filter_id
+
+        return self.runInteraction("add_user_filter", _do_txn)
