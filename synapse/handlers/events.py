@@ -56,7 +56,6 @@ class EventStreamHandler(BaseHandler):
                     self._streams_per_user[auth_user] = 0
                     if auth_user in self._stop_timer_per_user:
                         try:
-                            print "cancel",auth_user
                             self.clock.cancel_call_later(
                                 self._stop_timer_per_user.pop(auth_user)
                             )
