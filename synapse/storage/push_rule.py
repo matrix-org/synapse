@@ -175,14 +175,17 @@ class PushRuleStore(SQLBaseStore):
         txn.execute(sql, new_rule.values())
 
     @defer.inlineCallbacks
-    def delete_push_rule(self, user_name, rule_id):
-        yield self._simple_delete_one(
-            PushRuleTable.table_name,
-            {
-                'user_name': user_name,
-                'rule_id': rule_id
-            }
-        )
+    def delete_push_rule(self, user_name, rule_id, **kwargs):
+        """
+        Delete a push rule. Args specify the row to be deleted and can be
+        any of the columns in the push_rule table, but below are the
+        standard ones
+
+        Args:
+            user_name (str): The matrix ID of the push rule owner
+            rule_id (str): The rule_id of the rule to be deleted
+        """
+        yield self._simple_delete_one(PushRuleTable.table_name, kwargs)
 
 
 class RuleNotFoundException(Exception):
