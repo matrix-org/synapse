@@ -270,7 +270,7 @@ class Pusher(object):
         """
         Overridden by implementing classes to actually deliver the notification
         Args:
-            p The event to notify for as a single event from the event stream
+            p: The event to notify for as a single event from the event stream
         Returns: If the notification was delivered, an array containing any
                  pushkeys that were rejected by the push gateway.
                  False if the notification could not be delivered (ie.
