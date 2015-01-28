@@ -346,7 +346,7 @@ def _priority_class_to_template_name(pc):
 def _rule_to_template(rule):
     template_name = _priority_class_to_template_name(rule['priority_class'])
     if template_name in ['override', 'underride']:
-        return {k:rule[k] for k in ["rule_id", "conditions", "actions"]}
+        return {k: rule[k] for k in ["rule_id", "conditions", "actions"]}
     elif template_name in ["sender", "room"]:
         return {k: rule[k] for k in ["rule_id", "actions"]}
     elif template_name == 'content':
@@ -355,7 +355,7 @@ def _rule_to_template(rule):
         thecond = rule["conditions"][0]
         if "pattern" not in thecond:
             return None
-        ret = {k:rule[k] for k in ["rule_id", "actions"]}
+        ret = {k: rule[k] for k in ["rule_id", "actions"]}
         ret["pattern"] = thecond["pattern"]
         return ret
 
