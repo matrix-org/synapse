@@ -101,7 +101,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
             if pat.strip("*?[]") == pat:
                 # no special glob characters so we assume the user means
                 # 'contains this string' rather than 'is this string'
-                pat = "*%s*" % (pat)
+                pat = "*%s*" % (pat,)
             conditions = [{
                 'kind': 'event_match',
                 'key': 'content.body',
