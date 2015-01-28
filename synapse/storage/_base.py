@@ -195,10 +195,11 @@ class SQLBaseStore(object):
 
     def _simple_upsert(self, table, keyvalues, values):
         """
-        :param table: The table to upsert into
-        :param keyvalues: Dict of the unique key tables and their new values
-        :param values: Dict of all the nonunique columns and their new values
-        :return: A deferred
+        Args:
+            table (str): The table to upsert into
+            keyvalues (dict): The unique key tables and their new values
+            values (dict): The nonunique columns and their new values
+        Returns: A deferred
         """
         return self.runInteraction(
             "_simple_upsert",
