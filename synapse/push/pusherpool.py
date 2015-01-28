@@ -18,7 +18,6 @@ from twisted.internet import defer
 
 from httppusher import HttpPusher
 from synapse.push import PusherConfigException
-from synapse.api.constants import PresenceState
 
 import logging
 import json
