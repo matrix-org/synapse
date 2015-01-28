@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 from synapse.server import HomeServer
 from synapse.storage.profile import ProfileStore
+from synapse.types import UserID
 
 from tests.utils import SQLiteMemoryDbPool
 
@@ -36,7 +37,7 @@ class ProfileStoreTestCase(unittest.TestCase):
 
         self.store = ProfileStore(hs)
 
-        self.u_frank = hs.parse_userid("@frank:test")
+        self.u_frank = UserID.from_string("@frank:test")
 
     @defer.inlineCallbacks
     def test_displayname(self):

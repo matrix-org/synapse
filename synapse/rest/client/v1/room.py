@@ -16,10 +16,12 @@
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 from twisted.internet import defer
 
-from base import RestServlet, client_path_pattern
+from base import ClientV1RestServlet, client_path_pattern
 from synapse.api.errors import SynapseError, Codes
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
+from synapse.types import UserID, RoomID, RoomAlias
+from synapse.events.utils import serialize_event
 
 import json
 import logging
@@ -29,7 +31,7 @@ import urllib
 logger = logging.getLogger(__name__)
 
 
-class RoomCreateRestServlet(RestServlet):
+class RoomCreateRestServlet(ClientV1RestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def register(self, http_server):
@@ -93,7 +95,7 @@ class RoomCreateRestServlet(RestServlet):
 
 
 # TODO: Needs unit testing for generic events
-class RoomStateEventRestServlet(RestServlet):
+class RoomStateEventRestServlet(ClientV1RestServlet):
     def register(self, http_server):
         # /room/$roomid/state/$eventtype
         no_state_key = "/rooms/(?P<room_id>[^/]*)/state/(?P<event_type>[^/]*)$"
@@ -162,7 +164,7 @@ class RoomStateEventRestServlet(RestServlet):
 
 
 # TODO: Needs unit testing for generic events + feedback
-class RoomSendEventRestServlet(RestServlet):
+class RoomSendEventRestServlet(ClientV1RestServlet):
 
     def register(self, http_server):
         # /rooms/$roomid/send/$event_type[/$txn_id]
@@ -205,7 +207,7 @@ class RoomSendEventRestServlet(RestServlet):
 
 
 # TODO: Needs unit testing for room ID + alias joins
-class JoinRoomAliasServlet(RestServlet):
+class JoinRoomAliasServlet(ClientV1RestServlet):
 
     def register(self, http_server):
         # /join/$room_identifier[/$txn_id]
@@ -223,10 +225,10 @@ class JoinRoomAliasServlet(RestServlet):
         identifier = None
         is_room_alias = False
         try:
-            identifier = self.hs.parse_roomalias(room_identifier)
+            identifier = RoomAlias.from_string(room_identifier)
             is_room_alias = True
         except SynapseError:
-            identifier = self.hs.parse_roomid(room_identifier)
+            identifier = RoomID.from_string(room_identifier)
 
         # TODO: Support for specifying the home server to join with?
 
@@ -264,7 +266,7 @@ class JoinRoomAliasServlet(RestServlet):
 
 
 # TODO: Needs unit testing
-class PublicRoomListRestServlet(RestServlet):
+class PublicRoomListRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/publicRooms$")
 
     @defer.inlineCallbacks
@@ -275,7 +277,7 @@ class PublicRoomListRestServlet(RestServlet):
 
 
 # TODO: Needs unit testing
-class RoomMemberListRestServlet(RestServlet):
+class RoomMemberListRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/members$")
 
     @defer.inlineCallbacks
@@ -289,7 +291,7 @@ class RoomMemberListRestServlet(RestServlet):
 
         for event in members["chunk"]:
             # FIXME: should probably be state_key here, not user_id
-            target_user = self.hs.parse_userid(event["user_id"])
+            target_user = UserID.from_string(event["user_id"])
             # Presence is an optional cache; don't fail if we can't fetch it
             try:
                 presence_handler = self.handlers.presence_handler
@@ -304,7 +306,7 @@ class RoomMemberListRestServlet(RestServlet):
 
 
 # TODO: Needs unit testing
-class RoomMessageListRestServlet(RestServlet):
+class RoomMessageListRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/messages$")
 
     @defer.inlineCallbacks
@@ -328,7 +330,7 @@ class RoomMessageListRestServlet(RestServlet):
 
 
 # TODO: Needs unit testing
-class RoomStateRestServlet(RestServlet):
+class RoomStateRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/state$")
 
     @defer.inlineCallbacks
@@ -344,7 +346,7 @@ class RoomStateRestServlet(RestServlet):
 
 
 # TODO: Needs unit testing
-class RoomInitialSyncRestServlet(RestServlet):
+class RoomInitialSyncRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/initialSync$")
 
     @defer.inlineCallbacks
@@ -359,8 +361,12 @@ class RoomInitialSyncRestServlet(RestServlet):
         defer.returnValue((200, content))
 
 
-class RoomTriggerBackfill(RestServlet):
+class RoomTriggerBackfill(ClientV1RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/backfill$")
+
+    def __init__(self, hs):
+        super(RoomTriggerBackfill, self).__init__(hs)
+        self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -373,12 +379,14 @@ class RoomTriggerBackfill(RestServlet):
         handler = self.handlers.federation_handler
         events = yield handler.backfill(remote_server, room_id, limit)
 
-        res = [self.hs.serialize_event(event) for event in events]
+        time_now = self.clock.time_msec()
+
+        res = [serialize_event(event, time_now) for event in events]
         defer.returnValue((200, res))
 
 
 # TODO: Needs unit testing
-class RoomMembershipRestServlet(RestServlet):
+class RoomMembershipRestServlet(ClientV1RestServlet):
 
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
@@ -430,7 +438,7 @@ class RoomMembershipRestServlet(RestServlet):
         defer.returnValue(response)
 
 
-class RoomRedactEventRestServlet(RestServlet):
+class RoomRedactEventRestServlet(ClientV1RestServlet):
     def register(self, http_server):
         PATTERN = ("/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)")
         register_txn_path(self, PATTERN, http_server)
@@ -468,7 +476,7 @@ class RoomRedactEventRestServlet(RestServlet):
         defer.returnValue(response)
 
 
-class RoomTypingRestServlet(RestServlet):
+class RoomTypingRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern(
         "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$"
     )
@@ -478,7 +486,7 @@ class RoomTypingRestServlet(RestServlet):
         auth_user = yield self.auth.get_user_by_req(request)
 
         room_id = urllib.unquote(room_id)
-        target_user = self.hs.parse_userid(urllib.unquote(user_id))
+        target_user = UserID.from_string(urllib.unquote(user_id))
 
         content = _parse_json(request)
 

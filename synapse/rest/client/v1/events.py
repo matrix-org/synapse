@@ -18,7 +18,8 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.streams.config import PaginationConfig
-from .base import RestServlet, client_path_pattern
+from .base import ClientV1RestServlet, client_path_pattern
+from synapse.events.utils import serialize_event
 
 import logging
 
@@ -26,7 +27,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class EventStreamRestServlet(RestServlet):
+class EventStreamRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/events$")
 
     DEFAULT_LONGPOLL_TIME_MS = 30000
@@ -61,8 +62,12 @@ class EventStreamRestServlet(RestServlet):
 
 
 # TODO: Unit test gets, with and without auth, with different kinds of events.
-class EventRestServlet(RestServlet):
+class EventRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/events/(?P<event_id>[^/]*)$")
+
+    def __init__(self, hs):
+        super(EventRestServlet, self).__init__(hs)
+        self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
     def on_GET(self, request, event_id):
@@ -70,8 +75,9 @@ class EventRestServlet(RestServlet):
         handler = self.handlers.event_handler
         event = yield handler.get_event(auth_user, event_id)
 
+        time_now = self.clock.time_msec()
         if event:
-            defer.returnValue((200, self.hs.serialize_event(event)))
+            defer.returnValue((200, serialize_event(event, time_now)))
         else:
             defer.returnValue((404, "Event not found."))
 

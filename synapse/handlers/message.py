@@ -18,8 +18,10 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import RoomError
 from synapse.streams.config import PaginationConfig
+from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.types import UserID
 
 from ._base import BaseHandler
 
@@ -89,7 +91,7 @@ class MessageHandler(BaseHandler):
                 yield self.hs.get_event_sources().get_current_token()
             )
 
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         events, next_key = yield data_source.get_pagination_rows(
             user, pagin_config.get_source_config("room"), room_id
@@ -99,9 +101,11 @@ class MessageHandler(BaseHandler):
             "room_key", next_key
         )
 
+        time_now = self.clock.time_msec()
+
         chunk = {
             "chunk": [
-                self.hs.serialize_event(e, as_client_event) for e in events
+                serialize_event(e, time_now, as_client_event) for e in events
             ],
             "start": pagin_config.from_token.to_string(),
             "end": next_token.to_string(),
@@ -130,13 +134,13 @@ class MessageHandler(BaseHandler):
         if ratelimit:
             self.ratelimit(builder.user_id)
         # TODO(paul): Why does 'event' not have a 'user' object?
-        user = self.hs.parse_userid(builder.user_id)
+        user = UserID.from_string(builder.user_id)
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
             if membership == Membership.JOIN:
-                joinee = self.hs.parse_userid(builder.state_key)
+                joinee = UserID.from_string(builder.state_key)
                 # If event doesn't include a display name, add one.
                 yield self.distributor.fire(
                     "collect_presencelike_data",
@@ -210,7 +214,8 @@ class MessageHandler(BaseHandler):
 
         # TODO: This is duplicating logic from snapshot_all_rooms
         current_state = yield self.state_handler.get_current_state(room_id)
-        defer.returnValue([self.hs.serialize_event(c) for c in current_state])
+        now = self.clock.time_msec()
+        defer.returnValue([serialize_event(c, now) for c in current_state])
 
     @defer.inlineCallbacks
     def snapshot_all_rooms(self, user_id=None, pagin_config=None,
@@ -237,7 +242,7 @@ class MessageHandler(BaseHandler):
             membership_list=[Membership.INVITE, Membership.JOIN]
         )
 
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         rooms_ret = []
 
@@ -282,10 +287,11 @@ class MessageHandler(BaseHandler):
 
                 start_token = now_token.copy_and_replace("room_key", token[0])
                 end_token = now_token.copy_and_replace("room_key", token[1])
+                time_now = self.clock.time_msec()
 
                 d["messages"] = {
                     "chunk": [
-                        self.hs.serialize_event(m, as_client_event)
+                        serialize_event(m, time_now, as_client_event)
                         for m in messages
                     ],
                     "start": start_token.to_string(),
@@ -296,7 +302,8 @@ class MessageHandler(BaseHandler):
                     event.room_id
                 )
                 d["state"] = [
-                    self.hs.serialize_event(c) for c in current_state
+                    serialize_event(c, time_now, as_client_event)
+                    for c in current_state
                 ]
             except:
                 logger.exception("Failed to get snapshot")
@@ -316,11 +323,12 @@ class MessageHandler(BaseHandler):
 
         # TODO(paul): I wish I was called with user objects not user_id
         #   strings...
-        auth_user = self.hs.parse_userid(user_id)
+        auth_user = UserID.from_string(user_id)
 
         # TODO: These concurrently
+        time_now = self.clock.time_msec()
         state_tuples = yield self.state_handler.get_current_state(room_id)
-        state = [self.hs.serialize_event(x) for x in state_tuples]
+        state = [serialize_event(x, time_now) for x in state_tuples]
 
         member_event = (yield self.store.get_room_member(
             user_id=user_id,
@@ -349,7 +357,7 @@ class MessageHandler(BaseHandler):
         for m in room_members:
             try:
                 member_presence = yield presence_handler.get_state(
-                    target_user=self.hs.parse_userid(m.user_id),
+                    target_user=UserID.from_string(m.user_id),
                     auth_user=auth_user,
                     as_event=True,
                 )
@@ -359,11 +367,13 @@ class MessageHandler(BaseHandler):
                     "Failed to get member presence of %r", m.user_id
                 )
 
+        time_now = self.clock.time_msec()
+
         defer.returnValue({
             "membership": member_event.membership,
             "room_id": room_id,
             "messages": {
-                "chunk": [self.hs.serialize_event(m) for m in messages],
+                "chunk": [serialize_event(m, time_now) for m in messages],
                 "start": start_token.to_string(),
                 "end": end_token.to_string(),
             },

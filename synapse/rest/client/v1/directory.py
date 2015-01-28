@@ -17,7 +17,8 @@
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError, Codes
-from base import RestServlet, client_path_pattern
+from synapse.types import RoomAlias
+from .base import ClientV1RestServlet, client_path_pattern
 
 import json
 import logging
@@ -30,12 +31,12 @@ def register_servlets(hs, http_server):
     ClientDirectoryServer(hs).register(http_server)
 
 
-class ClientDirectoryServer(RestServlet):
+class ClientDirectoryServer(ClientV1RestServlet):
     PATTERN = client_path_pattern("/directory/room/(?P<room_alias>[^/]*)$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_alias):
-        room_alias = self.hs.parse_roomalias(room_alias)
+        room_alias = RoomAlias.from_string(room_alias)
 
         dir_handler = self.handlers.directory_handler
         res = yield dir_handler.get_association(room_alias)
@@ -53,7 +54,7 @@ class ClientDirectoryServer(RestServlet):
 
         logger.debug("Got content: %s", content)
 
-        room_alias = self.hs.parse_roomalias(room_alias)
+        room_alias = RoomAlias.from_string(room_alias)
 
         logger.debug("Got room name: %s", room_alias.to_string())
 
@@ -92,7 +93,7 @@ class ClientDirectoryServer(RestServlet):
 
         dir_handler = self.handlers.directory_handler
 
-        room_alias = self.hs.parse_roomalias(room_alias)
+        room_alias = RoomAlias.from_string(room_alias)
 
         yield dir_handler.delete_association(
             user.to_string(), room_alias

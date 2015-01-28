@@ -19,22 +19,18 @@ from . import (
     voip, admin, pusher, push_rule
 )
 
+from synapse.http.server import JsonResource
 
-class RestServletFactory(object):
 
-    """ A factory for creating REST servlets.
-
-    These REST servlets represent the entire client-server REST API. Generally
-    speaking, they serve as wrappers around events and the handlers that
-    process them.
-
-    See synapse.events for information on synapse events.
-    """
+class ClientV1RestResource(JsonResource):
+    """A resource for version 1 of the matrix client API."""
 
     def __init__(self, hs):
-        client_resource = hs.get_resource_for_client()
+        JsonResource.__init__(self)
+        self.register_servlets(self, hs)
 
-        # TODO(erikj): There *must* be a better way of doing this.
+    @staticmethod
+    def register_servlets(client_resource, hs):
         room.register_servlets(hs, client_resource)
         events.register_servlets(hs, client_resource)
         register.register_servlets(hs, client_resource)

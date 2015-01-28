@@ -18,7 +18,8 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from base import RestServlet, client_path_pattern
+from synapse.types import UserID
+from .base import ClientV1RestServlet, client_path_pattern
 
 import json
 import logging
@@ -26,13 +27,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class PresenceStatusRestServlet(RestServlet):
+class PresenceStatusRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/presence/(?P<user_id>[^/]*)/status")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         state = yield self.handlers.presence_handler.get_state(
             target_user=user, auth_user=auth_user)
@@ -42,7 +43,7 @@ class PresenceStatusRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         state = {}
         try:
@@ -71,13 +72,13 @@ class PresenceStatusRestServlet(RestServlet):
         return (200, {})
 
 
-class PresenceListRestServlet(RestServlet):
+class PresenceListRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/presence/list/(?P<user_id>[^/]*)")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User not hosted on this Home Server")
@@ -97,7 +98,7 @@ class PresenceListRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, user_id):
         auth_user = yield self.auth.get_user_by_req(request)
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User not hosted on this Home Server")
@@ -118,7 +119,7 @@ class PresenceListRestServlet(RestServlet):
                     raise SynapseError(400, "Bad invite value.")
                 if len(u) == 0:
                     continue
-                invited_user = self.hs.parse_userid(u)
+                invited_user = UserID.from_string(u)
                 yield self.handlers.presence_handler.send_invite(
                     observer_user=user, observed_user=invited_user
                 )
@@ -129,7 +130,7 @@ class PresenceListRestServlet(RestServlet):
                     raise SynapseError(400, "Bad drop value.")
                 if len(u) == 0:
                     continue
-                dropped_user = self.hs.parse_userid(u)
+                dropped_user = UserID.from_string(u)
                 yield self.handlers.presence_handler.drop(
                     observer_user=user, observed_user=dropped_user
                 )

@@ -13,12 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains the URL paths to prefix various aspects of the server with. """
 
-CLIENT_PREFIX = "/_matrix/client/api/v1"
-CLIENT_V2_ALPHA_PREFIX = "/_matrix/client/v2_alpha"
-FEDERATION_PREFIX = "/_matrix/federation/v1"
-WEB_CLIENT_PREFIX = "/_matrix/client"
-CONTENT_REPO_PREFIX = "/_matrix/content"
-SERVER_KEY_PREFIX = "/_matrix/key/v1"
-MEDIA_PREFIX = "/_matrix/media/v1"
+from synapse.http.server import JsonResource
+
+
+class ClientV2AlphaRestResource(JsonResource):
+    """A resource for version 2 alpha of the matrix client API."""
+
+    def __init__(self, hs):
+        JsonResource.__init__(self)
+        self.register_servlets(self, hs)
+
+    @staticmethod
+    def register_servlets(client_resource, hs):
+        pass

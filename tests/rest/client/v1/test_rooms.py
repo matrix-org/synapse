@@ -22,13 +22,10 @@ import synapse.rest.client.v1.room
 from synapse.api.constants import Membership
 
 from synapse.server import HomeServer
+from synapse.types import UserID
 
-from tests import unittest
-
-# python imports
 import json
 import urllib
-import types
 
 from ....utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
 from .utils import RestTestCase
@@ -70,7 +67,7 @@ class RoomPermissionsTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -466,7 +463,7 @@ class RoomsMemberListTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -555,7 +552,7 @@ class RoomsCreateTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -657,7 +654,7 @@ class RoomTopicTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -773,7 +770,7 @@ class RoomMemberStateTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -909,7 +906,7 @@ class RoomMessagesTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -1013,7 +1010,7 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         def _get_user_by_token(token=None):
             return {
-                "user": hs.parse_userid(self.auth_user_id),
+                "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
             }
@@ -1028,7 +1025,7 @@ class RoomInitialSyncTestCase(RestTestCase):
         # Since I'm getting my own presence I need to exist as far as presence
         # is concerned.
         hs.get_handlers().presence_handler.registered_user(
-            hs.parse_userid(self.user_id)
+            UserID.from_string(self.user_id)
         )
 
         # create the room

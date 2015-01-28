@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.api.constants import LoginType
-from base import RestServlet, client_path_pattern
+from base import ClientV1RestServlet, client_path_pattern
 import synapse.util.stringutils as stringutils
 
 from synapse.util.async import run_on_reactor
@@ -42,7 +42,7 @@ else:
     compare_digest = lambda a, b: a == b
 
 
-class RegisterRestServlet(RestServlet):
+class RegisterRestServlet(ClientV1RestServlet):
     """Handles registration with the home server.
 
     This servlet is in control of the registration flow; the registration

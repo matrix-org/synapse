@@ -27,6 +27,7 @@ from synapse.server import HomeServer
 from synapse.handlers.typing import TypingNotificationHandler
 
 from synapse.storage.transactions import DestinationsTable
+from synapse.types import UserID
 
 
 def _expect_edu(destination, edu_type, content, origin="test"):
@@ -153,11 +154,11 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.auth.check_joined_room = check_joined_room
 
         # Some local users to test with
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
+        self.u_apple = UserID.from_string("@apple:test")
+        self.u_banana = UserID.from_string("@banana:test")
 
         # Remote user
-        self.u_onion = hs.parse_userid("@onion:farm")
+        self.u_onion = UserID.from_string("@onion:farm")
 
     @defer.inlineCallbacks
     def test_started_typing_local(self):

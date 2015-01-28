@@ -21,6 +21,7 @@ from mock import Mock
 
 from synapse.server import HomeServer
 from synapse.handlers.directory import DirectoryHandler
+from synapse.types import RoomAlias
 
 from tests.utils import SQLiteMemoryDbPool, MockKey
 
@@ -65,9 +66,9 @@ class DirectoryTestCase(unittest.TestCase):
 
         self.store = hs.get_datastore()
 
-        self.my_room = hs.parse_roomalias("#my-room:test")
-        self.your_room = hs.parse_roomalias("#your-room:test")
-        self.remote_room = hs.parse_roomalias("#another:remote")
+        self.my_room = RoomAlias.from_string("#my-room:test")
+        self.your_room = RoomAlias.from_string("#your-room:test")
+        self.remote_room = RoomAlias.from_string("#another:remote")
 
     @defer.inlineCallbacks
     def test_get_local_association(self):
