@@ -85,8 +85,8 @@ class PushRuleStore(SQLBaseStore):
 
         # get the priority of the rule we're inserting after/before
         sql = (
-            "SELECT priority_class, priority FROM "+PushRuleTable.table_name+
-            " WHERE user_name = ? and rule_id = ?"
+            "SELECT priority_class, priority FROM ? "
+            "WHERE user_name = ? and rule_id = ?" % (PushRuleTable.table_name,)
         )
         txn.execute(sql, (user_name, relative_to_rule))
         res = txn.fetchall()
