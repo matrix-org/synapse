@@ -33,8 +33,8 @@ class PushRuleRestServlet(ClientV1RestServlet):
         'override': 4
     }
     PRIORITY_CLASS_INVERSE_MAP = {v: k for k,v in PRIORITY_CLASS_MAP.items()}
-    SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR =\
-        "Unrecognised request: You probably wanted a trailing slash"
+    SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR = (
+        "Unrecognised request: You probably wanted a trailing slash")
 
     def rule_spec_from_path(self, path):
         if len(path) < 2:
