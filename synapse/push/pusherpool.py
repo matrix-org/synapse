@@ -18,6 +18,7 @@ from twisted.internet import defer
 
 from httppusher import HttpPusher
 from synapse.push import PusherConfigException
+from synapse.api.constants import PresenceState
 
 import logging
 import json
@@ -31,6 +32,22 @@ class PusherPool:
         self.store = self.hs.get_datastore()
         self.pushers = {}
         self.last_pusher_started = -1
+
+        distributor = self.hs.get_distributor()
+        distributor.observe(
+            "user_presence_changed", self.user_presence_changed
+        )
+
+    @defer.inlineCallbacks
+    def user_presence_changed(self, user, state):
+        user_name = user.to_string()
+
+        # until we have read receipts, pushers use this to reset a user's
+        # badge counters to zero
+        for p in self.pushers.values():
+            if p.user_name == user_name:
+                yield p.presence_changed(state)
+
 
     @defer.inlineCallbacks
     def start(self):

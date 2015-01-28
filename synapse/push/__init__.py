@@ -54,6 +54,9 @@ class Pusher(object):
         self.failing_since = failing_since
         self.alive = True
 
+        # The last value of last_active_time that we saw
+        self.last_last_active_time = 0
+
     @defer.inlineCallbacks
     def _actions_for_event(self, ev):
         """
@@ -272,6 +275,22 @@ class Pusher(object):
                  should be retried).
         """
         pass
+
+    def reset_badge_count(self):
+        pass
+
+    def presence_changed(self, state):
+        """
+        We clear badge counts whenever a user's last_active time is bumped
+        This is by no means perfect but I think it's the best we can do
+        without read receipts.
+        """
+        if 'last_active' in state.state:
+            last_active = state.state['last_active']
+            if last_active > self.last_last_active_time:
+                logger.info("Resetting badge count for %s", self.user_name)
+                self.reset_badge_count()
+                self.last_last_active_time = last_active
 
 
 def _value_for_dotted_key(dotted_key, event):

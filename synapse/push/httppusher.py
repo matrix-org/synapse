@@ -71,11 +71,12 @@ class HttpPusher(Pusher):
                 # we may have to fetch this over federation and we
                 # can't trust it anyway: is it worth it?
                 #'from_display_name': 'Steve Stevington'
-                #'counts': { -- we don't mark messages as read yet so
+                'counts': { #-- we don't mark messages as read yet so
                 # we have no way of knowing
-                #    'unread': 1,
+                    # Just set the badge to 1 until we have read receipts
+                    'unread': 1,
                 #    'missed_calls': 2
-                # },
+                },
                 'devices': [
                     {
                         'app_id': self.app_id,
@@ -104,6 +105,37 @@ class HttpPusher(Pusher):
             defer.returnValue([])
         try:
             resp = yield self.httpCli.post_json_get_json(self.url, notification_dict)
+        except:
+            logger.exception("Failed to push %s ", self.url)
+            defer.returnValue(False)
+        rejected = []
+        if 'rejected' in resp:
+            rejected = resp['rejected']
+        defer.returnValue(rejected)
+
+    @defer.inlineCallbacks
+    def reset_badge_count(self):
+        d = {
+            'notification': {
+                'id': '',
+                'type': None,
+                'from': '',
+                'counts': {
+                    'unread': 0,
+                    'missed_calls': 0
+                },
+                'devices': [
+                    {
+                        'app_id': self.app_id,
+                        'pushkey': self.pushkey,
+                        'pushkey_ts': long(self.pushkey_ts / 1000),
+                        'data': self.data_minus_url,
+                    }
+                ]
+            }
+        }
+        try:
+            resp = yield self.httpCli.post_json_get_json(self.url, d)
         except:
             logger.exception("Failed to push %s ", self.url)
             defer.returnValue(False)

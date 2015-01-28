@@ -86,6 +86,10 @@ class PresenceHandler(BaseHandler):
             "changed_presencelike_data", self.changed_presencelike_data
         )
 
+        # outbound signal from the presence module to advertise when a user's
+        # presence has changed
+        distributor.declare("user_presence_changed")
+
         self.distributor = distributor
 
         self.federation = hs.get_replication_layer()
@@ -603,6 +607,7 @@ class PresenceHandler(BaseHandler):
             room_ids=room_ids,
             statuscache=statuscache,
         )
+        yield self.distributor.fire("user_presence_changed", user, statuscache)
 
     @defer.inlineCallbacks
     def _push_presence_remote(self, user, destination, state=None):
