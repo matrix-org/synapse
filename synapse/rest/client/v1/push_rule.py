@@ -213,7 +213,6 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 else:
                     raise
 
-
     @defer.inlineCallbacks
     def on_GET(self, request):
         user = yield self.auth.get_user_by_req(request)
