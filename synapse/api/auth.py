@@ -353,9 +353,23 @@ class Auth(object):
     def add_auth_events(self, builder, context):
         yield run_on_reactor()
 
-        if builder.type == EventTypes.Create:
-            builder.auth_events = []
-            return
+        auth_ids = self.compute_auth_events(builder, context)
+
+        auth_events_entries = yield self.store.add_event_hashes(
+            auth_ids
+        )
+
+        builder.auth_events = auth_events_entries
+
+        context.auth_events = {
+            k: v
+            for k, v in context.current_state.items()
+            if v.event_id in auth_ids
+        }
+
+    def compute_auth_events(self, event, context):
+        if event.type == EventTypes.Create:
+            return []
 
         auth_ids = []
 
@@ -368,7 +382,7 @@ class Auth(object):
         key = (EventTypes.JoinRules, "", )
         join_rule_event = context.current_state.get(key)
 
-        key = (EventTypes.Member, builder.user_id, )
+        key = (EventTypes.Member, event.user_id, )
         member_event = context.current_state.get(key)
 
         key = (EventTypes.Create, "", )
@@ -382,8 +396,8 @@ class Auth(object):
         else:
             is_public = False
 
-        if builder.type == EventTypes.Member:
-            e_type = builder.content["membership"]
+        if event.type == EventTypes.Member:
+            e_type = event.content["membership"]
             if e_type in [Membership.JOIN, Membership.INVITE]:
                 if join_rule_event:
                     auth_ids.append(join_rule_event.event_id)
@@ -398,17 +412,7 @@ class Auth(object):
             if member_event.content["membership"] == Membership.JOIN:
                 auth_ids.append(member_event.event_id)
 
-        auth_events_entries = yield self.store.add_event_hashes(
-            auth_ids
-        )
-
-        builder.auth_events = auth_events_entries
-
-        context.auth_events = {
-            k: v
-            for k, v in context.current_state.items()
-            if v.event_id in auth_ids
-        }
+        return auth_ids
 
     @log_function
     def _can_send_event(self, event, auth_events):

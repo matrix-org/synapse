@@ -128,5 +128,6 @@ CREATE TABLE IF NOT EXISTS rejections(
     event_id TEXT NOT NULL,
     reason TEXT NOT NULL,
     last_check TEXT NOT NULL,
+    root_rejected TEXT,
     CONSTRAINT ev_id UNIQUE (event_id) ON CONFLICT REPLACE
 );
