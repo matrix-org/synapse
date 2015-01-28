@@ -187,7 +187,7 @@ class Pusher(object):
                             # for sanity, we only remove the pushkey if it
                             # was the one we actually sent...
                             logger.warn(
-                                ("Ignoring rejected pushkey %s because we " +
+                                ("Ignoring rejected pushkey %s because we "
                                 "didn't send it"), pk
                             )
                         else:
@@ -234,7 +234,8 @@ class Pusher(object):
                     # of old notifications.
                     logger.warn("Giving up on a notification to user %s, "
                                 "pushkey %s",
-                                self.user_name, self.pushkey)
+                                self.user_name, self.pushkey
+                    )
                     self.backoff_delay = Pusher.INITIAL_BACKOFF
                     self.last_token = chunk['end']
                     self.store.update_pusher_last_token(
@@ -256,7 +257,7 @@ class Pusher(object):
                                 self.user_name,
                                 self.clock.time_msec() - self.failing_since,
                                 self.backoff_delay
-                                )
+                    )
                     yield synapse.util.async.sleep(self.backoff_delay / 1000.0)
                     self.backoff_delay *= 2
                     if self.backoff_delay > Pusher.MAX_BACKOFF:
