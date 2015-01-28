@@ -73,6 +73,7 @@ class RoomTypingTestCase(RestTestCase):
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
+                "token_id": 1,
             }
 
         hs.get_auth().get_user_by_token = _get_user_by_token
