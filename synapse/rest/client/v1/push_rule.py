@@ -138,7 +138,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         except InvalidRuleException as e:
             raise SynapseError(400, e.message)
 
-        user = yield self.auth.get_user_by_req(request)
+        user, _ = yield self.auth.get_user_by_req(request)
 
         content = _parse_json(request)
 
@@ -184,7 +184,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         except InvalidRuleException as e:
             raise SynapseError(400, e.message)
 
-        user = yield self.auth.get_user_by_req(request)
+        user, _ = yield self.auth.get_user_by_req(request)
 
         if 'device' in spec:
             rules = yield self.hs.get_datastore().get_push_rules_for_user_name(
@@ -215,7 +215,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        user = yield self.auth.get_user_by_req(request)
+        user, _ = yield self.auth.get_user_by_req(request)
 
         # we build up the full structure and then decide which bits of it
         # to send which means doing unnecessary work sometimes but is
