@@ -21,7 +21,7 @@ from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
-from synapse.types import UserID, ClientID
+from synapse.types import UserID, ClientInfo
 
 import logging
 
@@ -318,7 +318,7 @@ class Auth(object):
                     user_agent=user_agent
                 )
 
-            defer.returnValue((user, ClientID(device_id, token_id)))
+            defer.returnValue((user, ClientInfo(device_id, token_id)))
         except KeyError:
             raise AuthError(403, "Missing access token.")
 

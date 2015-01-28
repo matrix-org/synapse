@@ -121,4 +121,4 @@ class StreamToken(
         return StreamToken(**d)
 
 
-ClientID = namedtuple("ClientID", ("device_id", "token_id"))
+ClientInfo = namedtuple("ClientInfo", ("device_id", "token_id"))
