@@ -187,8 +187,8 @@ class Pusher(object):
                             # for sanity, we only remove the pushkey if it
                             # was the one we actually sent...
                             logger.warn(
-                                ("Ignoring rejected pushkey %s because we" +
-                                "didn't send it"), (pk,)
+                                ("Ignoring rejected pushkey %s because we " +
+                                "didn't send it"), pk
                             )
                         else:
                             logger.info(
