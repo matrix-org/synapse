@@ -17,13 +17,13 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError, NotFoundError, \
     StoreError
-from base import RestServlet, client_path_pattern
+from .base import ClientV1RestServlet, client_path_pattern
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 
 import json
 
 
-class PushRuleRestServlet(RestServlet):
+class PushRuleRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/pushrules/.*$")
     PRIORITY_CLASS_MAP = {
         'underride': 0,

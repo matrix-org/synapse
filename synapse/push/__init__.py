@@ -269,8 +269,9 @@ class Pusher(object):
     def dispatch_push(self, p, tweaks):
         """
         Overridden by implementing classes to actually deliver the notification
-        :param p: The event to notify for as a single event from the event stream
-        :return: If the notification was delivered, an array containing any
+        Args:
+            p The event to notify for as a single event from the event stream
+        Returns: If the notification was delivered, an array containing any
                  pushkeys that were rejected by the push gateway.
                  False if the notification could not be delivered (ie.
                  should be retried).
