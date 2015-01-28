@@ -16,7 +16,7 @@ if [ $# -eq 1 ]; then
     fi
 fi
 
-for port in 8080; do
+for port in 8080 8081 8082; do
     echo "Starting server on port $port... "
 
     https_port=$((port + 400))

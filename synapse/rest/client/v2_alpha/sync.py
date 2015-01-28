@@ -80,7 +80,7 @@ class SyncRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        user = yield self.auth.get_user_by_req(request)
+        user, client = yield self.auth.get_user_by_req(request)
 
         timeout = self.parse_integer(request, "timeout", default=0)
         limit = self.parse_integer(request, "limit", required=True)
