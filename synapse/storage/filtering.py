@@ -33,7 +33,7 @@ class FilteringStore(SQLBaseStore):
                 "user_id": user_localpart,
                 "filter_id": filter_id,
             },
-            retcol="definition",
+            retcol="filter_json",
             allow_none=False,
         )
 
@@ -57,7 +57,7 @@ class FilteringStore(SQLBaseStore):
                 filter_id = max_id + 1
 
             sql = (
-                "INSERT INTO user_filters (user_id, filter_id, definition)"
+                "INSERT INTO user_filters (user_id, filter_id, filter_json)"
                 "VALUES(?, ?, ?)"
             )
             txn.execute(sql, (user_localpart, filter_id, def_json))
