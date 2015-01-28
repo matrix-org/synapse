@@ -237,8 +237,6 @@ class SQLBaseStore(object):
             )
             txn.execute(sql, allvalues.values())
 
-
-
     def _simple_select_one(self, table, keyvalues, retcols,
                            allow_none=False):
         """Executes a SELECT query on the named table, which is expected to
