@@ -119,3 +119,6 @@ class StreamToken(
         d = self._asdict()
         d[key] = new_value
         return StreamToken(**d)
+
+
+ClientInfo = namedtuple("ClientInfo", ("device_id", "token_id"))
