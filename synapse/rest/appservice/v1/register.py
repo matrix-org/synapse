@@ -64,9 +64,9 @@ class RegisterRestServlet(AppServiceRestServlet):
         yield self.handler.register(app_service)
         hs_token = "_not_implemented_yet"  # TODO: Pull this from self.hs?
 
-        defer.returnValue({
+        defer.returnValue((200, {
           "hs_token": hs_token
-        })
+        }))
 
     def _parse_namespace(self, target_ns, origin_ns, ns):
         if ns not in target_ns or ns not in origin_ns:

@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from ._base import BaseHandler
-from synapse.api.errors import StoreError, SynapseError
+from synapse.api.errors import Codes, StoreError, SynapseError
 
 import logging
 
@@ -36,11 +36,12 @@ class ApplicationServicesHandler(BaseHandler):
         try:
             stored_service = yield self.store.get_app_service(app_service.token)
             if not stored_service:
-                raise StoreError(404, "Not found")
+                raise StoreError(404, "Application Service Not found")
         except StoreError:
             raise SynapseError(
                 403, "Unrecognised application services token. "
-                "Consult the home server admin."
+                "Consult the home server admin.",
+                errcode=Codes.FORBIDDEN
             )
         # TODO store this AS
 

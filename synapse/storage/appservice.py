@@ -12,10 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from synapse.api.errors import StoreError
+import logging
+from twisted.internet import defer
 
 from ._base import SQLBaseStore
+
+
+logger = logging.getLogger(__name__)
 
 
 # XXX: This feels like it should belong in a "models" module, not storage.
@@ -30,7 +33,22 @@ class ApplicationService(object):
         if url:
             self.url = url
         if namespaces:
-            self.namespaces = namespaces
+            self._set_namespaces(namespaces)
+
+    def _set_namespaces(self, namespaces):
+        # Sanity check that it is of the form:
+        # {
+        #   users: ["regex",...],
+        #   aliases: ["regex",...],
+        #   rooms: ["regex",...],
+        # }
+        for ns in ["users", "rooms", "aliases"]:
+            if type(namespaces[ns]) != list:
+                raise ValueError("Bad namespace value for '%s'", ns)
+            for regex in namespaces[ns]:
+                if not isinstance(regex, basestring):
+                    raise ValueError("Expected string regex for ns '%s'", ns)
+        self.namespaces = namespaces
 
     def is_interested(self, event):
         """Check if this service is interested in this event.
@@ -133,15 +151,64 @@ class ApplicationServiceStore(SQLBaseStore):
                     return service
             return None
 
+        # TODO: The from_cache=False impl
         # TODO: This should be JOINed with the application_services_regex table.
-        row = self._simple_select_one(
-            "application_services", {"token": token},
-            ["url", "token"]
-        )
-        if not row:
-            raise StoreError(400, "Bad application services token supplied.")
-        return row
 
+
+    @defer.inlineCallbacks
     def _populate_cache(self):
         """Populates the ApplicationServiceCache from the database."""
-        pass
+        sql = ("SELECT * FROM application_services LEFT JOIN "
+               "application_services_regex ON application_services.id = "
+               "application_services_regex.as_id")
+
+        namespace_enum = [
+            "users",    # 0
+            "aliases",  # 1
+            "rooms"   # 2
+        ]
+        # SQL results in the form:
+        # [
+        #   {
+        #     'regex': "something",
+        #     'url': "something",
+        #     'namespace': enum,
+        #     'as_id': 0,
+        #     'token': "something",
+        #     'id': 0
+        #   }
+        # ]
+        services = {}
+        results = yield self._execute_and_decode(sql)
+        for res in results:
+            as_token = res["token"]
+            if as_token not in services:
+                # add the service
+                services[as_token] = {
+                    "url": res["url"],
+                    "token": as_token,
+                    "namespaces": {
+                        "users": [],
+                        "aliases": [],
+                        "rooms": []
+                    }
+                }
+            # add the namespace regex if one exists
+            ns_int = res["namespace"]
+            if ns_int is None:
+                continue
+            try:
+                services[as_token]["namespaces"][namespace_enum[ns_int]].append(
+                    res["regex"]
+                )
+            except IndexError:
+                logger.error("Bad namespace enum '%s'. %s", ns_int, res)
+
+        for service in services.values():
+            logger.info("Found application service: %s", service)
+            self.cache.services.append(ApplicationService(
+                service["token"],
+                service["url"],
+                service["namespaces"]
+            ))
+

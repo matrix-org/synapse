@@ -62,6 +62,7 @@ SCHEMAS = [
     "event_edges",
     "event_signatures",
     "media_repository",
+    "application_services"
 ]
 
 
