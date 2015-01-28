@@ -290,7 +290,6 @@ class PushRuleRestServlet(ClientV1RestServlet):
     def on_OPTIONS(self, _):
         return 200, {}
 
-
 def _add_empty_priority_class_arrays(d):
     for pc in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
         d[pc] = []
