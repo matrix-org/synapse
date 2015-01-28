@@ -25,7 +25,7 @@ class InitialSyncRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        user, device_id = yield self.auth.get_user_by_req(request)
+        user, client = yield self.auth.get_user_by_req(request)
         with_feedback = "feedback" in request.args
         as_client_event = "raw" not in request.args
         pagination_config = PaginationConfig.from_request(request)

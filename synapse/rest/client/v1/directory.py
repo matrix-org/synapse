@@ -45,7 +45,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_alias):
-        user, device_id = yield self.auth.get_user_by_req(request)
+        user, client = yield self.auth.get_user_by_req(request)
 
         content = _parse_json(request)
         if not "room_id" in content:
@@ -85,7 +85,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, room_alias):
-        user, device_id = yield self.auth.get_user_by_req(request)
+        user, client = yield self.auth.get_user_by_req(request)
 
         is_admin = yield self.auth.is_server_admin(user)
         if not is_admin:
