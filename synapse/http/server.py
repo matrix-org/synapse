@@ -16,7 +16,7 @@
 
 from synapse.http.agent_name import AGENT_NAME
 from synapse.api.errors import (
-    cs_exception, SynapseError, CodeMessageException
+    cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError
 )
 from synapse.util.logcontext import LoggingContext
 
@@ -139,11 +139,7 @@ class JsonResource(HttpServer, resource.Resource):
                     return
 
             # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-            self._send_response(
-                request,
-                400,
-                {"error": "Unrecognized request"}
-            )
+            raise UnrecognizedRequestError()
         except CodeMessageException as e:
             if isinstance(e, SynapseError):
                 logger.info("%s SynapseError: %s - %s", request, e.code, e.msg)

@@ -31,6 +31,7 @@ from synapse.util.lockutils import LockManager
 from synapse.streams.events import EventSources
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.crypto.keyring import Keyring
+from synapse.push.pusherpool import PusherPool
 from synapse.events.builder import EventBuilderFactory
 
 
@@ -78,6 +79,7 @@ class BaseHomeServer(object):
         'event_sources',
         'ratelimiter',
         'keyring',
+        'pusherpool',
         'event_builder_factory',
     ]
 
@@ -197,3 +199,6 @@ class HomeServer(BaseHomeServer):
             clock=self.get_clock(),
             hostname=self.hostname,
         )
+
+    def build_pusherpool(self):
+        return PusherPool(self)
