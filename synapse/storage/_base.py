@@ -210,8 +210,8 @@ class SQLBaseStore(object):
         # Try to update
         sql = "UPDATE %s SET %s WHERE %s" % (
             table,
-            ", ".join("%s = ?" % (k) for k in values),
-            " AND ".join("%s = ?" % (k) for k in keyvalues)
+            ", ".join("%s = ?" % (k,) for k in values),
+            " AND ".join("%s = ?" % (k,) for k in keyvalues)
         )
         sqlargs = values.values() + keyvalues.values()
         logger.debug(
@@ -390,8 +390,8 @@ class SQLBaseStore(object):
         if updatevalues:
             update_sql = "UPDATE %s SET %s WHERE %s" % (
                 table,
-                ", ".join("%s = ?" % (k) for k in updatevalues),
-                " AND ".join("%s = ?" % (k) for k in keyvalues)
+                ", ".join("%s = ?" % (k,) for k in updatevalues),
+                " AND ".join("%s = ?" % (k,) for k in keyvalues)
             )
 
         def func(txn):
