@@ -290,7 +290,7 @@ class Auth(object):
         Args:
             request - An HTTP request with an access_token query parameter.
         Returns:
-            Tuple of UserID and device string:
+            tuple : of UserID and device string:
                 User ID object of the user making the request
                 Client ID object of the client instance the user is using
         Raises:
