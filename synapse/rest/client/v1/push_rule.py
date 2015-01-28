@@ -295,7 +295,6 @@ def _add_empty_priority_class_arrays(d):
         d[pc] = []
     return d
 
-
 def _instance_handle_from_conditions(conditions):
     """
     Given a list of conditions, return the instance handle of the
@@ -326,7 +325,6 @@ def _filter_ruleset_with_path(ruleset, path):
             return r
     raise NotFoundError
 
-
 def _priority_class_from_spec(spec):
     if spec['template'] not in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
         raise InvalidRuleException("Unknown template: %s" % (spec['kind']))
@@ -337,7 +335,6 @@ def _priority_class_from_spec(spec):
 
     return pc
 
-
 def _priority_class_to_template_name(pc):
     if pc > PushRuleRestServlet.PRIORITY_CLASS_MAP['override']:
         # per-device
@@ -345,7 +342,6 @@ def _priority_class_to_template_name(pc):
         return PushRuleRestServlet.PRIORITY_CLASS_INVERSE_MAP[prio_class_index]
     else:
         return PushRuleRestServlet.PRIORITY_CLASS_INVERSE_MAP[pc]
-
 
 def _rule_to_template(rule):
     template_name = _priority_class_to_template_name(rule['priority_class'])
@@ -362,7 +358,6 @@ def _rule_to_template(rule):
         ret = {k:rule[k] for k in ["rule_id", "actions"]}
         ret["pattern"] = thecond["pattern"]
         return ret
-
 
 def _strip_device_condition(rule):
     for i,c in enumerate(rule['conditions']):
