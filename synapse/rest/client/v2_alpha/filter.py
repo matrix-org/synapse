@@ -93,7 +93,7 @@ class CreateFilterRestServlet(RestServlet):
 
         filter_id = yield self.filtering.add_user_filter(
             user_localpart=target_user.localpart,
-            definition=content,
+            user_filter=content,
         )
 
         defer.returnValue((200, {"filter_id": str(filter_id)}))

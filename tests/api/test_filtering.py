@@ -57,13 +57,21 @@ class FilteringTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_add_filter(self):
+        user_filter = {
+            "room": {
+                "state": {
+                    "types": ["m.*"]
+                }
+            }
+        }
+
         filter_id = yield self.filtering.add_user_filter(
             user_localpart=user_localpart,
-            definition={"type": ["m.*"]},
+            user_filter=user_filter,
         )
 
         self.assertEquals(filter_id, 0)
-        self.assertEquals({"type": ["m.*"]},
+        self.assertEquals(user_filter,
             (yield self.datastore.get_user_filter(
                 user_localpart=user_localpart,
                 filter_id=0,
@@ -72,9 +80,17 @@ class FilteringTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_filter(self):
+        user_filter = {
+            "room": {
+                "state": {
+                    "types": ["m.*"]
+                }
+            }
+        }
+
         filter_id = yield self.datastore.add_user_filter(
             user_localpart=user_localpart,
-            definition={"type": ["m.*"]},
+            user_filter=user_filter,
         )
 
         filter = yield self.filtering.get_user_filter(
@@ -82,4 +98,4 @@ class FilteringTestCase(unittest.TestCase):
             filter_id=filter_id,
         )
 
-        self.assertEquals(filter, {"type": ["m.*"]})
+        self.assertEquals(filter, user_filter)

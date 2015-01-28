@@ -39,8 +39,8 @@ class FilteringStore(SQLBaseStore):
 
         defer.returnValue(json.loads(def_json))
 
-    def add_user_filter(self, user_localpart, definition):
-        def_json = json.dumps(definition)
+    def add_user_filter(self, user_localpart, user_filter):
+        def_json = json.dumps(user_filter)
 
         # Need an atomic transaction to SELECT the maximal ID so far then
         # INSERT a new one
