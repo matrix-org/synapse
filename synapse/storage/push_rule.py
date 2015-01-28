@@ -184,6 +184,7 @@ class PushRuleStore(SQLBaseStore):
             }
         )
 
+
 class RuleNotFoundException(Exception):
     pass
 
