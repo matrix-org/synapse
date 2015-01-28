@@ -226,9 +226,9 @@ class Pusher(object):
                         self.failing_since
                     )
 
-                if self.failing_since and \
-                   self.failing_since < \
-                   self.clock.time_msec() - Pusher.GIVE_UP_AFTER:
+                if (self.failing_since and
+                   self.failing_since <
+                   self.clock.time_msec() - Pusher.GIVE_UP_AFTER):
                     # we really only give up so that if the URL gets
                     # fixed, we don't suddenly deliver a load
                     # of old notifications.
