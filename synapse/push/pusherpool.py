@@ -47,7 +47,6 @@ class PusherPool:
             if p.user_name == user_name:
                 yield p.presence_changed(state)
 
-
     @defer.inlineCallbacks
     def start(self):
         pushers = yield self.store.get_all_pushers()
