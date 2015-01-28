@@ -242,8 +242,11 @@ class PushRuleRestServlet(ClientV1RestServlet):
                     continue
                 if instance_handle not in rules['device']:
                     rules['device'][instance_handle] = {}
-                    rules['device'][instance_handle] = \
-                        _add_empty_priority_class_arrays(rules['device'][instance_handle])
+                    rules['device'][instance_handle] = (
+                        _add_empty_priority_class_arrays(
+                            rules['device'][instance_handle]
+                        )
+                    )
 
                 rulearray = rules['device'][instance_handle][template_name]
             else:
