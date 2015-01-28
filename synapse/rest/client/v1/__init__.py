@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from . import (
     room, events, register, login, profile, presence, initial_sync, directory,
     voip, admin, pusher, push_rule
