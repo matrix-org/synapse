@@ -290,7 +290,9 @@ class Auth(object):
         Args:
             request - An HTTP request with an access_token query parameter.
         Returns:
-            UserID : User ID object of the user making the request
+            Tuple of UserID and device string:
+                User ID object of the user making the request
+                Device ID string of the device the user is using
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -299,6 +301,7 @@ class Auth(object):
             access_token = request.args["access_token"][0]
             user_info = yield self.get_user_by_token(access_token)
             user = user_info["user"]
+            device_id = user_info["device_id"]
 
             ip_addr = self.hs.get_ip_from_request(request)
             user_agent = request.requestHeaders.getRawHeaders(
@@ -314,7 +317,7 @@ class Auth(object):
                     user_agent=user_agent
                 )
 
-            defer.returnValue(user)
+            defer.returnValue((user, device_id))
         except KeyError:
             raise AuthError(403, "Missing access token.")
 
