@@ -56,7 +56,7 @@ class FilteringTestCase(unittest.TestCase):
 
         self.datastore = hs.get_datastore()
 
-    def test_definition_include_literal_types(self):
+    def test_definition_types_works_with_literals(self):
         definition = {
             "types": ["m.room.message", "org.matrix.foo.bar"]
         }
@@ -65,12 +65,11 @@ class FilteringTestCase(unittest.TestCase):
             type="m.room.message",
             room_id="!foo:bar"
         )
-
         self.assertTrue(
             self.filtering._passes_definition(definition, event)
         )
 
-    def test_definition_include_wildcard_types(self):
+    def test_definition_types_works_with_wildcards(self):
         definition = {
             "types": ["m.*", "org.matrix.foo.bar"]
         }
@@ -79,12 +78,11 @@ class FilteringTestCase(unittest.TestCase):
             type="m.room.message",
             room_id="!foo:bar"
         )
-
         self.assertTrue(
             self.filtering._passes_definition(definition, event)
         )
 
-    def test_definition_exclude_unknown_types(self):
+    def test_definition_types_works_with_unknowns(self):
         definition = {
             "types": ["m.room.message", "org.matrix.foo.bar"]
         }
@@ -93,7 +91,263 @@ class FilteringTestCase(unittest.TestCase):
             type="now.for.something.completely.different",
             room_id="!foo:bar"
         )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
 
+    def test_definition_not_types_works_with_literals(self):
+        definition = {
+            "not_types": ["m.room.message", "org.matrix.foo.bar"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!foo:bar"
+        )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_not_types_works_with_wildcards(self):
+        definition = {
+            "not_types": ["m.room.message", "org.matrix.*"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="org.matrix.custom.event",
+            room_id="!foo:bar"
+        )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_not_types_works_with_unknowns(self):
+        definition = {
+            "not_types": ["m.*", "org.*"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="com.nom.nom.nom",
+            room_id="!foo:bar"
+        )
+        self.assertTrue(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_not_types_takes_priority_over_types(self):
+        definition = {
+            "not_types": ["m.*", "org.*"],
+            "types": ["m.room.message", "m.room.topic"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.topic",
+            room_id="!foo:bar"
+        )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_senders_works_with_literals(self):
+        definition = {
+            "senders": ["@flibble:wibble"]
+        }
+        event = MockEvent(
+            sender="@flibble:wibble",
+            type="com.nom.nom.nom",
+            room_id="!foo:bar"
+        )
+        self.assertTrue(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_senders_works_with_unknowns(self):
+        definition = {
+            "senders": ["@flibble:wibble"]
+        }
+        event = MockEvent(
+            sender="@challenger:appears",
+            type="com.nom.nom.nom",
+            room_id="!foo:bar"
+        )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_not_senders_works_with_literals(self):
+        definition = {
+            "not_senders": ["@flibble:wibble"]
+        }
+        event = MockEvent(
+            sender="@flibble:wibble",
+            type="com.nom.nom.nom",
+            room_id="!foo:bar"
+        )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_not_senders_works_with_unknowns(self):
+        definition = {
+            "not_senders": ["@flibble:wibble"]
+        }
+        event = MockEvent(
+            sender="@challenger:appears",
+            type="com.nom.nom.nom",
+            room_id="!foo:bar"
+        )
+        self.assertTrue(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_not_senders_takes_priority_over_senders(self):
+        definition = {
+            "not_senders": ["@misspiggy:muppets"],
+            "senders": ["@kermit:muppets", "@misspiggy:muppets"]
+        }
+        event = MockEvent(
+            sender="@misspiggy:muppets",
+            type="m.room.topic",
+            room_id="!foo:bar"
+        )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_rooms_works_with_literals(self):
+        definition = {
+            "rooms": ["!secretbase:unknown"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown"
+        )
+        self.assertTrue(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_rooms_works_with_unknowns(self):
+        definition = {
+            "rooms": ["!secretbase:unknown"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!anothersecretbase:unknown"
+        )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_not_rooms_works_with_literals(self):
+        definition = {
+            "not_rooms": ["!anothersecretbase:unknown"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!anothersecretbase:unknown"
+        )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_not_rooms_works_with_unknowns(self):
+        definition = {
+            "not_rooms": ["!secretbase:unknown"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!anothersecretbase:unknown"
+        )
+        self.assertTrue(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_not_rooms_takes_priority_over_rooms(self):
+        definition = {
+            "not_rooms": ["!secretbase:unknown"],
+            "rooms": ["!secretbase:unknown"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown"
+        )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_combined_event(self):
+        definition = {
+            "not_senders": ["@misspiggy:muppets"],
+            "senders": ["@kermit:muppets"],
+            "rooms": ["!stage:unknown"],
+            "not_rooms": ["!piggyshouse:muppets"],
+            "types": ["m.room.message", "muppets.kermit.*"],
+            "not_types": ["muppets.misspiggy.*"]
+        }
+        event = MockEvent(
+            sender="@kermit:muppets",  # yup
+            type="m.room.message",  # yup
+            room_id="!stage:unknown"  # yup
+        )
+        self.assertTrue(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_combined_event_bad_sender(self):
+        definition = {
+            "not_senders": ["@misspiggy:muppets"],
+            "senders": ["@kermit:muppets"],
+            "rooms": ["!stage:unknown"],
+            "not_rooms": ["!piggyshouse:muppets"],
+            "types": ["m.room.message", "muppets.kermit.*"],
+            "not_types": ["muppets.misspiggy.*"]
+        }
+        event = MockEvent(
+            sender="@misspiggy:muppets",  # nope
+            type="m.room.message",  # yup
+            room_id="!stage:unknown"  # yup
+        )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_combined_event_bad_room(self):
+        definition = {
+            "not_senders": ["@misspiggy:muppets"],
+            "senders": ["@kermit:muppets"],
+            "rooms": ["!stage:unknown"],
+            "not_rooms": ["!piggyshouse:muppets"],
+            "types": ["m.room.message", "muppets.kermit.*"],
+            "not_types": ["muppets.misspiggy.*"]
+        }
+        event = MockEvent(
+            sender="@kermit:muppets",  # yup
+            type="m.room.message",  # yup
+            room_id="!piggyshouse:muppets"  # nope
+        )
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_combined_event_bad_type(self):
+        definition = {
+            "not_senders": ["@misspiggy:muppets"],
+            "senders": ["@kermit:muppets"],
+            "rooms": ["!stage:unknown"],
+            "not_rooms": ["!piggyshouse:muppets"],
+            "types": ["m.room.message", "muppets.kermit.*"],
+            "not_types": ["muppets.misspiggy.*"]
+        }
+        event = MockEvent(
+            sender="@kermit:muppets",  # yup
+            type="muppets.misspiggy.kisses",  # nope
+            room_id="!stage:unknown"  # yup
+        )
         self.assertFalse(
             self.filtering._passes_definition(definition, event)
         )
