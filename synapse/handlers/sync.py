@@ -158,7 +158,7 @@ class SyncHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def initial_sync_for_room(self, room_id, sync_config, now_token,
-                             published_room_ids):
+                              published_room_ids):
         """Sync a room for a client which is starting without any state
         Returns:
             A Deferred RoomSyncResult.
