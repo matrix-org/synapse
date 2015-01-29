@@ -18,7 +18,9 @@ from twisted.internet import defer
 from synapse.http.servlet import RestServlet
 from synapse.handlers.sync import SyncConfig
 from synapse.types import StreamToken
-from synapse.events.utils import serialize_event
+from synapse.events.utils import (
+    serialize_event, format_event_for_client_v2_without_event_id,
+)
 from ._base import client_v2_pattern
 
 import logging
@@ -139,7 +141,9 @@ class SyncRestServlet(RestServlet):
             "private_user_data": self.encode_events(
                 sync_result.private_user_data, filter, time_now
             ),
-            "rooms": self.encode_rooms(sync_result.rooms, filter, time_now),
+            "rooms": self.encode_rooms(
+                sync_result.rooms, filter, time_now, client.token_id
+            ),
             "next_batch": sync_result.next_batch.to_string(),
         }
 
@@ -153,25 +157,30 @@ class SyncRestServlet(RestServlet):
         # TODO(mjark): Respect formatting requirements in the filter.
         return serialize_event(event, time_now)
 
-    def encode_rooms(self, rooms, filter, time_now):
-        return [self.encode_room(room, filter, time_now) for room in rooms]
+    def encode_rooms(self, rooms, filter, time_now, token_id):
+        return [
+            self.encode_room(room, filter, time_now, token_id)
+            for room in rooms
+        ]
 
     @staticmethod
-    def encode_room(room, filter, time_now):
+    def encode_room(room, filter, time_now, token_id):
         event_map = {}
         state_event_ids = []
         recent_event_ids = []
         for event in room.state:
             # TODO(mjark): Respect formatting requirements in the filter.
             event_map[event.event_id] = serialize_event(
-                event, time_now, strip_ids=True
+                event, time_now, token_id=token_id,
+                event_format=format_event_for_client_v2_without_event_id,
             )
             state_event_ids.append(event.event_id)
 
         for event in room.events:
             # TODO(mjark): Respect formatting requirements in the filter.
             event_map[event.event_id] = serialize_event(
-                event, time_now, strip_ids=True
+                event, time_now, token_id=token_id,
+                event_format=format_event_for_client_v2_without_event_id,
             )
             recent_event_ids.append(event.event_id)
         return {

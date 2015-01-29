@@ -103,7 +103,7 @@ def format_event_for_client_v1(d):
 
     drop_keys = (
         "auth_events", "prev_events", "hashes", "signatures", "depth",
-        "unsigned", "origin"
+        "unsigned", "origin", "prev_state"
     )
     for key in drop_keys:
         d.pop(key, None)
@@ -112,7 +112,8 @@ def format_event_for_client_v1(d):
 
 def format_event_for_client_v2(d):
     drop_keys = (
-        "auth_events", "prev_events", "hashes", "signatures", "depth", "origin"
+        "auth_events", "prev_events", "hashes", "signatures", "depth",
+        "origin", "prev_state",
     )
     for key in drop_keys:
         d.pop(key, None)
@@ -140,7 +141,7 @@ def serialize_event(e, time_now_ms, as_client_event=True,
 
     if "age_ts" in d["unsigned"]:
         d["unsigned"]["age"] = time_now_ms - d["unsigned"]["age_ts"]
-        d["unsigned"]["age_ts"]
+        del d["unsigned"]["age_ts"]
 
     if "redacted_because" in e.unsigned:
         d["unsigned"]["redacted_because"] = serialize_event(
@@ -148,8 +149,8 @@ def serialize_event(e, time_now_ms, as_client_event=True,
         )
 
     if token_id is not None:
-        if token_id == e.internal_metadata["token_id"]:
-            txn_id = e.internal_metadata.get("txn_id", None)
+        if token_id == getattr(e.internal_metadata, "token_id", None):
+            txn_id = getattr(e.internal_metadata, "txn_id", None)
             if txn_id is not None:
                 d["unsigned"]["transaction_id"] = txn_id
 
