@@ -135,10 +135,10 @@ class SyncRestServlet(RestServlet):
         time_now = self.clock.time_msec()
 
         response_content = {
-            "public_user_data": self.encode_events(
+            "public_user_data": self.encode_user_data(
                 sync_result.public_user_data, filter, time_now
             ),
-            "private_user_data": self.encode_events(
+            "private_user_data": self.encode_user_data(
                 sync_result.private_user_data, filter, time_now
             ),
             "rooms": self.encode_rooms(
@@ -149,13 +149,8 @@ class SyncRestServlet(RestServlet):
 
         defer.returnValue((200, response_content))
 
-    def encode_events(self, events, filter, time_now):
-        return [self.encode_event(event, filter, time_now) for event in events]
-
-    @staticmethod
-    def encode_event(event, filter, time_now):
-        # TODO(mjark): Respect formatting requirements in the filter.
-        return serialize_event(event, time_now)
+    def encode_user_data(self, events, filter, time_now):
+        return events
 
     def encode_rooms(self, rooms, filter, time_now, token_id):
         return [
@@ -183,7 +178,7 @@ class SyncRestServlet(RestServlet):
                 event_format=format_event_for_client_v2_without_event_id,
             )
             recent_event_ids.append(event.event_id)
-        return {
+        result = {
             "room_id": room.room_id,
             "event_map": event_map,
             "events": {
@@ -194,6 +189,9 @@ class SyncRestServlet(RestServlet):
             "limited": room.limited,
             "published": room.published,
         }
+        if room.typing is not None:
+            result["typing"] = room.typing
+        return result
 
 
 def register_servlets(hs, http_server):

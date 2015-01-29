@@ -44,11 +44,12 @@ class RoomSyncResult(collections.namedtuple("RoomSyncResult", [
     "events",
     "state",
     "prev_batch",
+    "typing",
 ])):
     __slots__ = []
 
     def __nonzero__(self):
-        return bool(self.events or self.state)
+        return bool(self.events or self.state or self.typing)
 
 
 class SyncResult(collections.namedtuple("SyncResult", [
@@ -196,15 +197,25 @@ class SyncHandler(BaseHandler):
 
         now_token = yield self.event_sources.get_current_token()
 
-        presence_stream = self.event_sources.sources["presence"]
-        pagination_config = PaginationConfig(
-            from_token=since_token, to_token=now_token
-        )
-        presence, _ = yield presence_stream.get_pagination_rows(
+        presence_source = self.event_sources.sources["presence"]
+        presence, presence_key = yield presence_source.get_new_events_for_user(
             user=sync_config.user,
-            pagination_config=pagination_config.get_source_config("presence"),
-            key=None
+            from_key=since_token.presence_key,
+            limit=sync_config.limit,
         )
+        now_token = now_token.copy_and_replace("presence_key", presence_key)
+
+        typing_source = self.event_sources.sources["typing"]
+        typing, typing_key = yield typing_source.get_new_events_for_user(
+            user=sync_config.user,
+            from_key=since_token.typing_key,
+            limit=sync_config.limit,
+        )
+        now_token = now_token.copy_and_replace("typing_key", typing_key)
+
+        typing_by_room = {event["room_id"]: event for event in typing}
+        logger.debug("Typing %r", typing_by_room)
+
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
             user_id=sync_config.user.to_string(),
             membership_list=[Membership.INVITE, Membership.JOIN]
@@ -218,7 +229,7 @@ class SyncHandler(BaseHandler):
         for event in room_list:
             room_sync = yield self.incremental_sync_with_gap_for_room(
                 event.room_id, sync_config, since_token, now_token,
-                published_room_ids
+                published_room_ids, typing_by_room
             )
             if room_sync:
                 rooms.append(room_sync)
@@ -233,7 +244,7 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def incremental_sync_with_gap_for_room(self, room_id, sync_config,
                                            since_token, now_token,
-                                           published_room_ids):
+                                           published_room_ids, typing_by_room):
         """ Get the incremental delta needed to bring the client up to date for
         the room. Gives the client the most recent events and the changes to
         state.
@@ -285,6 +296,7 @@ class SyncHandler(BaseHandler):
             prev_batch=prev_batch_token,
             state=state_events_delta,
             limited=limited,
+            typing=typing_by_room.get(room_id, None)
         )
 
         logging.debug("Room sync: %r", room_sync)
