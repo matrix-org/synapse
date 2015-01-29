@@ -157,7 +157,7 @@ class SyncHandler(BaseHandler):
         ))
 
     @defer.inlineCallbacks
-    def intial_sync_for_room(self, room_id, sync_config, now_token,
+    def initial_sync_for_room(self, room_id, sync_config, now_token,
                              published_room_ids):
         """Sync a room for a client which is starting without any state
         Returns:
@@ -180,6 +180,7 @@ class SyncHandler(BaseHandler):
             prev_batch=prev_batch_token,
             state=current_state_events,
             limited=True,
+            typing=None,
         ))
 
     @defer.inlineCallbacks
