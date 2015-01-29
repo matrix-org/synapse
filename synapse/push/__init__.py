@@ -56,6 +56,7 @@ class Pusher(object):
 
         # The last value of last_active_time that we saw
         self.last_last_active_time = 0
+        self.has_unread = True
 
     @defer.inlineCallbacks
     def _actions_for_event(self, ev):
@@ -180,6 +181,7 @@ class Pusher(object):
                 processed = True
             else:
                 rejected = yield self.dispatch_push(single_event, tweaks)
+                self.has_unread = True
                 if isinstance(rejected, list) or isinstance(rejected, tuple):
                     processed = True
                     for pk in rejected:
@@ -290,9 +292,12 @@ class Pusher(object):
         if 'last_active' in state.state:
             last_active = state.state['last_active']
             if last_active > self.last_last_active_time:
-                logger.info("Resetting badge count for %s", self.user_name)
-                self.reset_badge_count()
                 self.last_last_active_time = last_active
+                if self.has_unread:
+                    logger.info("Resetting badge count for %s", self.user_name)
+                    self.reset_badge_count()
+                    self.has_unread = False
+
 
 
 def _value_for_dotted_key(dotted_key, event):
