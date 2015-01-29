@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.types import UserID, RoomID
@@ -59,19 +60,21 @@ class Filtering(object):
     #   replace_user_filter at some point? There's no REST API specified for
     #   them however
 
+    @defer.inlineCallbacks
     def _filter_on_key(self, events, user, filter_id, keys):
-        filter_json = self.get_user_filter(user.localpart, filter_id)
+        filter_json = yield self.get_user_filter(user.localpart, filter_id)
         if not filter_json:
-            return events
+            defer.returnValue(events)
 
         try:
             # extract the right definition from the filter
             definition = filter_json
             for key in keys:
                 definition = definition[key]
-            return self._filter_with_definition(events, definition)
+            defer.returnValue(self._filter_with_definition(events, definition))
         except KeyError:
-            return events  # return all events if definition isn't specified.
+            # return all events if definition isn't specified.
+            defer.returnValue(events)  
 
     def _filter_with_definition(self, events, definition):
         return [e for e in events if self._passes_definition(definition, e)]

@@ -24,7 +24,7 @@ from tests.utils import (
 )
 
 from synapse.server import HomeServer
-
+from synapse.types import UserID
 
 user_localpart = "test_user"
 MockEvent = namedtuple("MockEvent", "sender type room_id")
@@ -351,6 +351,58 @@ class FilteringTestCase(unittest.TestCase):
         self.assertFalse(
             self.filtering._passes_definition(definition, event)
         )
+
+    @defer.inlineCallbacks
+    def test_filter_public_user_data_match(self):
+        user_filter = {
+            "public_user_data": {
+                "types": ["m.*"]
+            }
+        }
+        user = UserID.from_string("@" + user_localpart + ":test")
+        filter_id = yield self.datastore.add_user_filter(
+            user_localpart=user_localpart,
+            user_filter=user_filter,
+        )
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.profile",
+            room_id="!foo:bar"
+        )
+        events = [event]
+
+        results = yield self.filtering.filter_public_user_data(
+            events=events,
+            user=user,
+            filter_id=filter_id
+        )
+        self.assertEquals(events, results)
+
+    @defer.inlineCallbacks
+    def test_filter_public_user_data_no_match(self):
+        user_filter = {
+            "public_user_data": {
+                "types": ["m.*"]
+            }
+        }
+        user = UserID.from_string("@" + user_localpart + ":test")
+        filter_id = yield self.datastore.add_user_filter(
+            user_localpart=user_localpart,
+            user_filter=user_filter,
+        )
+        event = MockEvent(
+            sender="@foo:bar",
+            type="custom.avatar.3d.crazy",
+            room_id="!foo:bar"
+        )
+        events = [event]
+
+        results = yield self.filtering.filter_public_user_data(
+            events=events,
+            user=user,
+            filter_id=filter_id
+        )
+        self.assertEquals([], results)
 
     @defer.inlineCallbacks
     def test_add_filter(self):
