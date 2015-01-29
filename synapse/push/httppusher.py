@@ -87,6 +87,8 @@ class HttpPusher(Pusher):
         }
         if event['type'] == 'm.room.member':
             d['notification']['membership'] = event['content']['membership']
+        if 'content' in event:
+            d['notification']['content'] = event['content']
 
         if len(ctx['aliases']):
             d['notification']['room_alias'] = ctx['aliases'][0]
