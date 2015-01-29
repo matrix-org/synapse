@@ -39,9 +39,7 @@ class V2AlphaRestTestCase(unittest.TestCase):
 
         hs = HomeServer("test",
             db_pool=None,
-            datastore=Mock(spec=[
-                "insert_client_ip",
-            ]),
+            datastore=self.make_datastore_mock(),
             http_client=None,
             resource_for_client=self.mock_resource,
             resource_for_federation=self.mock_resource,
@@ -58,3 +56,8 @@ class V2AlphaRestTestCase(unittest.TestCase):
 
         for r in self.TO_REGISTER:
             r.register_servlets(hs, self.mock_resource)
+
+    def make_datastore_mock(self):
+        return Mock(spec=[
+            "insert_client_ip",
+        ])

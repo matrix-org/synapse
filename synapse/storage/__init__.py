@@ -32,9 +32,9 @@ from .event_federation import EventFederationStore
 from .pusher import PusherStore
 from .push_rule import PushRuleStore
 from .media_repository import MediaRepositoryStore
-
 from .state import StateStore
 from .signatures import SignatureStore
+from .filtering import FilteringStore
 
 from syutil.base64util import decode_base64
 from syutil.jsonutil import encode_canonical_json
@@ -64,6 +64,7 @@ SCHEMAS = [
     "event_signatures",
     "pusher",
     "media_repository",
+    "filtering",
 ]
 
 
@@ -85,6 +86,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
                 EventFederationStore,
                 MediaRepositoryStore,
+                FilteringStore,
                 PusherStore,
                 PushRuleStore
                 ):

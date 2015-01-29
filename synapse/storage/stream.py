@@ -82,10 +82,10 @@ class _StreamToken(namedtuple("_StreamToken", "topological stream")):
     def parse(cls, string):
         try:
             if string[0] == 's':
-                return cls(None, int(string[1:]))
+                return cls(topological=None, stream=int(string[1:]))
             if string[0] == 't':
                 parts = string[1:].split('-', 1)
-                return cls(int(parts[1]), int(parts[0]))
+                return cls(topological=int(parts[0]), stream=int(parts[1]))
         except:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
@@ -94,7 +94,7 @@ class _StreamToken(namedtuple("_StreamToken", "topological stream")):
     def parse_stream_token(cls, string):
         try:
             if string[0] == 's':
-                return cls(None, int(string[1:]))
+                return cls(topological=None, stream=int(string[1:]))
         except:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
