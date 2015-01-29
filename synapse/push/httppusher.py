@@ -71,11 +71,11 @@ class HttpPusher(Pusher):
                 # we may have to fetch this over federation and we
                 # can't trust it anyway: is it worth it?
                 #'from_display_name': 'Steve Stevington'
-                'counts': { #-- we don't mark messages as read yet so
-                # we have no way of knowing
+                'counts': {  # -- we don't mark messages as read yet so
+                             # we have no way of knowing
                     # Just set the badge to 1 until we have read receipts
                     'unread': 1,
-                #    'missed_calls': 2
+                    # 'missed_calls': 2
                 },
                 'devices': [
                     {

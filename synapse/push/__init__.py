@@ -189,8 +189,8 @@ class Pusher(object):
                             # for sanity, we only remove the pushkey if it
                             # was the one we actually sent...
                             logger.warn(
-                                ("Ignoring rejected pushkey %s because we "
-                                "didn't send it"), pk
+                                ("Ignoring rejected pushkey %s because we"
+                                 " didn't send it"), pk
                             )
                         else:
                             logger.info(
@@ -236,8 +236,7 @@ class Pusher(object):
                     # of old notifications.
                     logger.warn("Giving up on a notification to user %s, "
                                 "pushkey %s",
-                                self.user_name, self.pushkey
-                    )
+                                self.user_name, self.pushkey)
                     self.backoff_delay = Pusher.INITIAL_BACKOFF
                     self.last_token = chunk['end']
                     self.store.update_pusher_last_token(
@@ -258,8 +257,7 @@ class Pusher(object):
                                 "Trying again in %dms",
                                 self.user_name,
                                 self.clock.time_msec() - self.failing_since,
-                                self.backoff_delay
-                    )
+                                self.backoff_delay)
                     yield synapse.util.async.sleep(self.backoff_delay / 1000.0)
                     self.backoff_delay *= 2
                     if self.backoff_delay > Pusher.MAX_BACKOFF:
@@ -299,7 +297,6 @@ class Pusher(object):
                     self.has_unread = False
 
 
-
 def _value_for_dotted_key(dotted_key, event):
     parts = dotted_key.split(".")
     val = event
@@ -310,6 +307,7 @@ def _value_for_dotted_key(dotted_key, event):
         parts = parts[1:]
     return val
 
+
 def _tweaks_for_actions(actions):
     tweaks = {}
     for a in actions:
@@ -318,6 +316,7 @@ def _tweaks_for_actions(actions):
         if 'set_sound' in a:
             tweaks['sound'] = a['set_sound']
     return tweaks
+
 
 class PusherConfigException(Exception):
     def __init__(self, msg):
