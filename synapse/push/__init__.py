@@ -16,9 +16,10 @@
 from twisted.internet import defer
 
 from synapse.streams.config import PaginationConfig
-from synapse.types import StreamToken
+from synapse.types import StreamToken, UserID
 
 import synapse.util.async
+import baserules
 
 import logging
 import fnmatch
@@ -76,13 +77,33 @@ class Pusher(object):
         rules = yield self.store.get_push_rules_for_user_name(self.user_name)
 
         for r in rules:
+            r['conditions'] = json.loads(r['conditions'])
+            r['actions'] = json.loads(r['actions'])
+
+        user_name_localpart = UserID.from_string(self.user_name).localpart
+
+        rules.extend(baserules.make_base_rules(user_name_localpart))
+
+        # get *our* member event for display name matching
+        member_events_for_room = yield self.store.get_current_state(
+            room_id=ev['room_id'],
+            event_type='m.room.member',
+            state_key=self.user_name
+        )
+        my_display_name = None
+        if len(member_events_for_room) > 0:
+            my_display_name = member_events_for_room[0].content['displayname']
+
+        for r in rules:
             matches = True
 
-            conditions = json.loads(r['conditions'])
-            actions = json.loads(r['actions'])
+            conditions = r['conditions']
+            actions = r['actions']
 
             for c in conditions:
-                matches &= self._event_fulfills_condition(ev, c)
+                matches &= self._event_fulfills_condition(
+                    ev, c, display_name=my_display_name
+                )
             # ignore rules with no actions (we have an explict 'dont_notify'
             if len(actions) == 0:
                 logger.warn(
@@ -95,7 +116,7 @@ class Pusher(object):
 
         defer.returnValue(Pusher.DEFAULT_ACTIONS)
 
-    def _event_fulfills_condition(self, ev, condition):
+    def _event_fulfills_condition(self, ev, condition, display_name):
         if condition['kind'] == 'event_match':
             if 'pattern' not in condition:
                 logger.warn("event_match condition with no pattern")
@@ -103,13 +124,23 @@ class Pusher(object):
             pat = condition['pattern']
 
             val = _value_for_dotted_key(condition['key'], ev)
-            if fnmatch.fnmatch(val, pat):
-                return True
-            return False
+            if val is None:
+                return False
+            return fnmatch.fnmatch(val.upper(), pat.upper())
         elif condition['kind'] == 'device':
             if 'instance_handle' not in condition:
                 return True
             return condition['instance_handle'] == self.instance_handle
+        elif condition['kind'] == 'contains_display_name':
+            # This is special because display names can be different
+            # between rooms and so you can't really hard code it in a rule.
+            # Optimisation: we should cache these names and update them from
+            # the event stream.
+            if 'content' not in ev or 'body' not in ev['content']:
+                return False
+            return fnmatch.fnmatch(
+                ev['content']['body'].upper(), "*%s*" % (display_name.upper(),)
+            )
         else:
             return True
 
