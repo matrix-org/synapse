@@ -163,7 +163,7 @@ class RegistrationHandler(BaseHandler):
         # each request
         httpCli = SimpleHttpClient(self.hs)
         # XXX: make this configurable!
-        trustedIdServers = ['matrix.org:8090']
+        trustedIdServers = ['matrix.org:8090', 'matrix.org']
         if not creds['idServer'] in trustedIdServers:
             logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
                         'credentials', creds['idServer'])

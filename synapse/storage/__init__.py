@@ -29,6 +29,8 @@ from .stream import StreamStore
 from .transactions import TransactionStore
 from .keys import KeyStore
 from .event_federation import EventFederationStore
+from .pusher import PusherStore
+from .push_rule import PushRuleStore
 from .media_repository import MediaRepositoryStore
 from .state import StateStore
 from .signatures import SignatureStore
@@ -60,6 +62,7 @@ SCHEMAS = [
     "state",
     "event_edges",
     "event_signatures",
+    "pusher",
     "media_repository",
     "filtering",
 ]
@@ -84,6 +87,8 @@ class DataStore(RoomMemberStore, RoomStore,
                 EventFederationStore,
                 MediaRepositoryStore,
                 FilteringStore,
+                PusherStore,
+                PushRuleStore
                 ):
 
     def __init__(self, hs):
@@ -382,6 +387,41 @@ class DataStore(RoomMemberStore, RoomStore,
 
         events = yield self._parse_events(results)
         defer.returnValue(events)
+
+    @defer.inlineCallbacks
+    def get_room_name_and_aliases(self, room_id):
+        del_sql = (
+            "SELECT event_id FROM redactions WHERE redacts = e.event_id "
+            "LIMIT 1"
+        )
+
+        sql = (
+            "SELECT e.*, (%(redacted)s) AS redacted FROM events as e "
+            "INNER JOIN current_state_events as c ON e.event_id = c.event_id "
+            "INNER JOIN state_events as s ON e.event_id = s.event_id "
+            "WHERE c.room_id = ? "
+        ) % {
+            "redacted": del_sql,
+        }
+
+        sql += " AND ((s.type = 'm.room.name' AND s.state_key = '')"
+        sql += " OR s.type = 'm.room.aliases')"
+        args = (room_id,)
+
+        results = yield self._execute_and_decode(sql, *args)
+
+        events = yield self._parse_events(results)
+
+        name = None
+        aliases = []
+
+        for e in events:
+            if e.type == 'm.room.name':
+                name = e.content['name']
+            elif e.type == 'm.room.aliases':
+                aliases.extend(e.content['aliases'])
+
+        defer.returnValue((name, aliases))
 
     @defer.inlineCallbacks
     def _get_min_token(self):

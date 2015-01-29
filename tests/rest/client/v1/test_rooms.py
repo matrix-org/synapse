@@ -70,6 +70,7 @@ class RoomPermissionsTestCase(RestTestCase):
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
+                "token_id": 1,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
@@ -466,6 +467,7 @@ class RoomsMemberListTestCase(RestTestCase):
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
+                "token_id": 1,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
@@ -555,6 +557,7 @@ class RoomsCreateTestCase(RestTestCase):
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
+                "token_id": 1,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
@@ -657,6 +660,7 @@ class RoomTopicTestCase(RestTestCase):
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
+                "token_id": 1,
             }
 
         hs.get_auth().get_user_by_token = _get_user_by_token
@@ -773,6 +777,7 @@ class RoomMemberStateTestCase(RestTestCase):
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
+                "token_id": 1,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
@@ -909,6 +914,7 @@ class RoomMessagesTestCase(RestTestCase):
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
+                "token_id": 1,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
@@ -1013,6 +1019,7 @@ class RoomInitialSyncTestCase(RestTestCase):
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
                 "device_id": None,
+                "token_id": 1,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
