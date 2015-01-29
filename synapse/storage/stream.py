@@ -181,6 +181,13 @@ class StreamStore(SQLBaseStore):
                 get_prev_content=True
             )
 
+            for event, row in zip(ret, rows):
+                stream = row["stream_ordering"]
+                topo = event.depth
+                internal = event.internal_metadata
+                internal.before = str(_StreamToken(topo, stream - 1))
+                internal.after = str(_StreamToken(topo, stream))
+
             if rows:
                 key = "s%d" % max([r["stream_ordering"] for r in rows])
             else:
