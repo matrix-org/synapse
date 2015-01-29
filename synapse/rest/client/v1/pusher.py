@@ -31,6 +31,16 @@ class PusherRestServlet(ClientV1RestServlet):
 
         content = _parse_json(request)
 
+        pusher_pool = self.hs.get_pusherpool()
+
+        if ('pushkey' in content and 'app_id' in content
+                    and 'kind' in content and
+                    content['kind'] is None):
+            yield pusher_pool.remove_pusher(
+                content['app_id'], content['pushkey']
+            )
+            defer.returnValue((200, {}))
+
         reqd = ['instance_handle', 'kind', 'app_id', 'app_display_name',
                 'device_display_name', 'pushkey', 'lang', 'data']
         missing = []
@@ -41,7 +51,6 @@ class PusherRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "Missing parameters: "+','.join(missing),
                                errcode=Codes.MISSING_PARAM)
 
-        pusher_pool = self.hs.get_pusherpool()
         try:
             yield pusher_pool.add_pusher(
                 user_name=user.to_string(),
