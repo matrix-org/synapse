@@ -265,7 +265,7 @@ class MatrixFederationHttpClient(object):
             self.sign_request(
                 destination, method, url_bytes, headers_dict, data
             )
-            return None
+            return _JsonProducer(data)
 
         response = yield self._create_request(
             destination.encode("ascii"),
