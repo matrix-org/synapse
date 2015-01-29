@@ -34,6 +34,21 @@ class Filtering(object):
     #   replace_user_filter at some point? There's no REST API specified for
     #   them however
 
+    def passes_filter(self, filter_json, event):
+        """Check if the event passes through the filter.
+
+        Args:
+            filter_json(dict): The filter specification
+            event(Event): The event to check
+        Returns:
+            True if the event passes through the filter.
+        """
+        return True
+
+    def filter_events(self, events, user, filter_id):
+        filter_json = self.get_user_filter(user, filter_id)
+        return [e for e in events if self.passes_filter(filter_json, e)]
+
     def _check_valid_filter(self, user_filter):
         """Check if the provided filter is valid.
 
