@@ -30,24 +30,68 @@ class Filtering(object):
         self._check_valid_filter(user_filter)
         return self.store.add_user_filter(user_localpart, user_filter)
 
+    def filter_public_user_data(self, events, user, filter_id):
+        return self._filter_on_key(
+            events, user, filter_id, ["public_user_data"]
+        )
+
+    def filter_private_user_data(self, events, user, filter_id):
+        return self._filter_on_key(
+            events, user, filter_id, ["private_user_data"]
+        )
+
+    def filter_room_state(self, events, user, filter_id):
+        return self._filter_on_key(
+            events, user, filter_id, ["room", "state"]
+        )
+
+    def filter_room_events(self, events, user, filter_id):
+        return self._filter_on_key(
+            events, user, filter_id, ["room", "events"]
+        )
+
+    def filter_room_ephemeral(self, events, user, filter_id):
+        return self._filter_on_key(
+            events, user, filter_id, ["room", "ephemeral"]
+        )
+
     # TODO(paul): surely we should probably add a delete_user_filter or
     #   replace_user_filter at some point? There's no REST API specified for
     #   them however
 
-    def passes_filter(self, filter_json, event):
-        """Check if the event passes through the filter.
+    def _filter_on_key(self, events, user, filter_id, keys):
+        filter_json = self.get_user_filter(user.localpart, filter_id)
+        if not filter_json:
+            return events
+
+        try:
+            # extract the right definition from the filter
+            definition = filter_json
+            for key in keys:
+                definition = definition[key]
+            return self._filter_with_definition(events, definition)
+        except KeyError:
+            return events  # return all events if definition isn't specified.
+
+    def _filter_with_definition(self, events, definition):
+        return [e for e in events if self._passes_definition(definition, e)]
+
+    def _passes_definition(self, definition, event):
+        """Check if the event passes through the given definition.
 
         Args:
-            filter_json(dict): The filter specification
-            event(Event): The event to check
+            definition(dict): The definition to check against.
+            event(Event): The event to check.
         Returns:
             True if the event passes through the filter.
         """
+        # Algorithm notes:
+        # For each key in the definition, check the event meets the criteria:
+        #   * For types: Literal match or prefix match (if ends with wildcard)
+        #   * For senders/rooms: Literal match only
+        #   * "not_" checks take presedence (e.g. if "m.*" is in both 'types'
+        #     and 'not_types' then it is treated as only being in 'not_types')
         return True
-
-    def filter_events(self, events, user, filter_id):
-        filter_json = self.get_user_filter(user, filter_id)
-        return [e for e in events if self.passes_filter(filter_json, e)]
 
     def _check_valid_filter(self, user_filter):
         """Check if the provided filter is valid.
