@@ -405,6 +405,62 @@ class FilteringTestCase(unittest.TestCase):
         self.assertEquals([], results)
 
     @defer.inlineCallbacks
+    def test_filter_room_state_match(self):
+        user_filter = {
+            "room": {
+                "state": {
+                    "types": ["m.*"]
+                }
+            }
+        }
+        user = UserID.from_string("@" + user_localpart + ":test")
+        filter_id = yield self.datastore.add_user_filter(
+            user_localpart=user_localpart,
+            user_filter=user_filter,
+        )
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.topic",
+            room_id="!foo:bar"
+        )
+        events = [event]
+
+        results = yield self.filtering.filter_room_state(
+            events=events,
+            user=user,
+            filter_id=filter_id
+        )
+        self.assertEquals(events, results)
+
+    @defer.inlineCallbacks
+    def test_filter_room_state_no_match(self):
+        user_filter = {
+            "room": {
+                "state": {
+                    "types": ["m.*"]
+                }
+            }
+        }
+        user = UserID.from_string("@" + user_localpart + ":test")
+        filter_id = yield self.datastore.add_user_filter(
+            user_localpart=user_localpart,
+            user_filter=user_filter,
+        )
+        event = MockEvent(
+            sender="@foo:bar",
+            type="org.matrix.custom.event",
+            room_id="!foo:bar"
+        )
+        events = [event]
+
+        results = yield self.filtering.filter_room_state(
+            events=events,
+            user=user,
+            filter_id=filter_id
+        )
+        self.assertEquals([], results)
+
+    @defer.inlineCallbacks
     def test_add_filter(self):
         user_filter = {
             "room": {
