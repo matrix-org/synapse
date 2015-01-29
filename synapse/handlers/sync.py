@@ -255,7 +255,6 @@ class SyncHandler(BaseHandler):
         # the previous sync and this one.
         # TODO(mjark): Apply the event filter in sync_config
         # TODO(mjark): Check for redactions we might have missed.
-        # TODO(mjark): Typing notifications.
         recents, token = yield self.store.get_recent_events_for_room(
             room_id,
             limit=sync_config.limit + 1,
