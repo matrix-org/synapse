@@ -15,7 +15,7 @@
 CREATE TABLE IF NOT EXISTS user_filters(
   user_id TEXT,
   filter_id INTEGER,
-  definition TEXT,
+  filter_json TEXT,
   FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
