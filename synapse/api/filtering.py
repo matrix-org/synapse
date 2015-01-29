@@ -91,7 +91,56 @@ class Filtering(object):
         #   * For senders/rooms: Literal match only
         #   * "not_" checks take presedence (e.g. if "m.*" is in both 'types'
         #     and 'not_types' then it is treated as only being in 'not_types')
+        
+        # room checks
+        if hasattr(event, "room_id"):
+            room_id = event.room_id
+            allow_rooms = definition["rooms"] if "rooms" in definition else None
+            reject_rooms = (
+                definition["not_rooms"] if "not_rooms" in definition else None
+            )
+            if reject_rooms and room_id in reject_rooms:
+                return False
+            if allow_rooms and room_id not in allow_rooms:
+                return False
+
+        # sender checks
+        if hasattr(event, "sender"):
+            # Should we be including event.state_key for some event types?
+            sender = event.sender
+            allow_senders = (
+                definition["senders"] if "senders" in definition else None
+            )
+            reject_senders = (
+                definition["not_senders"] if "not_senders" in definition else None
+            )
+            if reject_senders and sender in reject_senders:
+                return False
+            if allow_senders and sender not in allow_senders:
+                return False
+
+        # type checks
+        if "not_types" in definition:
+            for def_type in definition["not_types"]:
+                if self._event_matches_type(event, def_type):
+                    return False
+        if "types" in definition:
+            included = False
+            for def_type in definition["types"]:
+                if self._event_matches_type(event, def_type):
+                    included = True
+                    break
+            if not included:
+                return False
+
         return True
+
+    def _event_matches_type(self, event, def_type):
+        if def_type.endswith("*"):
+            type_prefix = def_type[:-1]
+            return event.type.startswith(type_prefix)
+        else:
+            return event.type == def_type
 
     def _check_valid_filter(self, user_filter):
         """Check if the provided filter is valid.

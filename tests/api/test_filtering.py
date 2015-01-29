@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+from collections import namedtuple
 from tests import unittest
 from twisted.internet import defer
 
@@ -27,6 +27,7 @@ from synapse.server import HomeServer
 
 
 user_localpart = "test_user"
+MockEvent = namedtuple("MockEvent", "sender type room_id")
 
 class FilteringTestCase(unittest.TestCase):
 
@@ -54,6 +55,48 @@ class FilteringTestCase(unittest.TestCase):
         self.filtering = hs.get_filtering()
 
         self.datastore = hs.get_datastore()
+
+    def test_definition_include_literal_types(self):
+        definition = {
+            "types": ["m.room.message", "org.matrix.foo.bar"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!foo:bar"
+        )
+
+        self.assertTrue(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_include_wildcard_types(self):
+        definition = {
+            "types": ["m.*", "org.matrix.foo.bar"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!foo:bar"
+        )
+
+        self.assertTrue(
+            self.filtering._passes_definition(definition, event)
+        )
+
+    def test_definition_exclude_unknown_types(self):
+        definition = {
+            "types": ["m.room.message", "org.matrix.foo.bar"]
+        }
+        event = MockEvent(
+            sender="@foo:bar",
+            type="now.for.something.completely.different",
+            room_id="!foo:bar"
+        )
+
+        self.assertFalse(
+            self.filtering._passes_definition(definition, event)
+        )
 
     @defer.inlineCallbacks
     def test_add_filter(self):
