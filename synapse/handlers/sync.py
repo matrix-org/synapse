@@ -44,12 +44,12 @@ class RoomSyncResult(collections.namedtuple("RoomSyncResult", [
     "events",
     "state",
     "prev_batch",
-    "typing",
+    "ephemeral",
 ])):
     __slots__ = []
 
     def __nonzero__(self):
-        return bool(self.events or self.state or self.typing)
+        return bool(self.events or self.state or self.ephemeral)
 
 
 class SyncResult(collections.namedtuple("SyncResult", [
@@ -180,7 +180,7 @@ class SyncHandler(BaseHandler):
             prev_batch=prev_batch_token,
             state=current_state_events,
             limited=True,
-            typing=None,
+            ephemeral=[],
         ))
 
     @defer.inlineCallbacks
@@ -214,7 +214,9 @@ class SyncHandler(BaseHandler):
         )
         now_token = now_token.copy_and_replace("typing_key", typing_key)
 
-        typing_by_room = {event["room_id"]: event for event in typing}
+        typing_by_room = {event["room_id"]: [event] for event in typing}
+        for event in typing:
+            event.pop("room_id")
         logger.debug("Typing %r", typing_by_room)
 
         rm_handler = self.hs.get_handlers().room_member_handler
@@ -256,7 +258,7 @@ class SyncHandler(BaseHandler):
                     prev_batch=prev_batch,
                     state=state,
                     limited=False,
-                    typing=typing_by_room.get(room_id, None)
+                    ephemeral=typing_by_room.get(room_id, [])
                 )
                 if room_sync:
                     rooms.append(room_sync)

@@ -66,6 +66,7 @@ class SyncRestServlet(RestServlet):
                 }
                 "state": [] // list of EventIDs updating the current state to
                             // be what it should be at the end of the batch.
+                "ephemeral": []
             }]
         }
     """
@@ -188,9 +189,8 @@ class SyncRestServlet(RestServlet):
             "state": state_event_ids,
             "limited": room.limited,
             "published": room.published,
+            "ephemeral": room.ephemeral,
         }
-        if room.typing is not None:
-            result["typing"] = room.typing
         return result
 
 
