@@ -245,6 +245,43 @@ class MatrixFederationHttpClient(object):
         defer.returnValue((response.code, body))
 
     @defer.inlineCallbacks
+    def post_json(self, destination, path, data={}):
+        """ Sends the specifed json data using POST
+
+        Args:
+            destination (str): The remote server to send the HTTP request
+                to.
+            path (str): The HTTP path.
+            data (dict): A dict containing the data that will be used as
+                the request body. This will be encoded as JSON.
+
+        Returns:
+            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            will be the decoded JSON body. On a 4xx or 5xx error response a
+            CodeMessageException is raised.
+        """
+
+        def body_callback(method, url_bytes, headers_dict):
+            self.sign_request(
+                destination, method, url_bytes, headers_dict, data
+            )
+            return None
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "POST",
+            path.encode("ascii"),
+            body_callback=body_callback,
+            headers_dict={"Content-Type": ["application/json"]},
+        )
+
+        logger.debug("Getting resp body")
+        body = yield readBody(response)
+        logger.debug("Got resp body")
+
+        defer.returnValue((response.code, body))
+
+    @defer.inlineCallbacks
     def get_json(self, destination, path, args={}, retry_on_dns_fail=True):
         """ GETs some json from the given host homeserver and path
 
