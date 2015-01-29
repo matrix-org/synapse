@@ -21,6 +21,7 @@ from synapse.types import StreamToken
 from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_event_id,
 )
+from synapse.api.filtering import Filter
 from ._base import client_v2_pattern
 
 import logging
@@ -80,6 +81,7 @@ class SyncRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.sync_handler = hs.get_handlers().sync_handler
         self.clock = hs.get_clock()
+        self.filtering = hs.get_filtering()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -109,9 +111,14 @@ class SyncRestServlet(RestServlet):
         )
 
         # TODO(mjark): Load filter and apply overrides.
-        # filter = self.filters.load_fitler(filter_id_str)
+        try:
+            filter = yield self.filtering.get_user_filter(
+                user.localpart, filter_id
+            )
+        except:
+           filter = Filter({})
         # filter = filter.apply_overrides(http_request)
-        # if filter.matches(event):
+        #if filter.matches(event):
         #   # stuff
 
         sync_config = SyncConfig(
@@ -121,7 +128,7 @@ class SyncRestServlet(RestServlet):
             limit=limit,
             sort=sort,
             backfill=backfill,
-            filter="TODO",  # TODO(mjark) Add the filter to the config.
+            filter=filter,
         )
 
         if since is not None:
@@ -162,9 +169,11 @@ class SyncRestServlet(RestServlet):
     @staticmethod
     def encode_room(room, filter, time_now, token_id):
         event_map = {}
+        state_events = filter.filter_room_state(room.state)
+        recent_events = filter.filter_room_events(room.events)
         state_event_ids = []
         recent_event_ids = []
-        for event in room.state:
+        for event in state_events:
             # TODO(mjark): Respect formatting requirements in the filter.
             event_map[event.event_id] = serialize_event(
                 event, time_now, token_id=token_id,
@@ -172,7 +181,7 @@ class SyncRestServlet(RestServlet):
             )
             state_event_ids.append(event.event_id)
 
-        for event in room.events:
+        for event in recent_events:
             # TODO(mjark): Respect formatting requirements in the filter.
             event_map[event.event_id] = serialize_event(
                 event, time_now, token_id=token_id,
