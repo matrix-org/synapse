@@ -345,7 +345,7 @@ class FederationClient(object):
             "auth_chain": [e.get_pdu_json(time_now) for e in local_auth],
         }
 
-        code, content = yield self.transport_layer.send_invite(
+        code, content = yield self.transport_layer.send_query_auth(
             destination=destination,
             room_id=room_id,
             event_id=event_id,

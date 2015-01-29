@@ -230,6 +230,39 @@ class FederationServer(object):
             "auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus],
         }))
 
+    @defer.inlineCallbacks
+    def on_query_auth_request(self, origin, content, event_id):
+        auth_chain = [
+            (yield self._check_sigs_and_hash(self.event_from_pdu_json(e)))
+            for e in content["auth_chain"]
+        ]
+
+        missing = [
+            (yield self._check_sigs_and_hash(self.event_from_pdu_json(e)))
+            for e in content.get("missing", [])
+        ]
+
+        ret = yield self.handler.on_query_auth(
+            origin, event_id, auth_chain, content.get("rejects", []), missing
+        )
+
+        time_now = self._clock.time_msec()
+        send_content = {
+            "auth_chain": [
+                e.get_pdu_json(time_now)
+                for e in ret["auth_chain"]
+            ],
+            "rejects": content.get("rejects", []),
+            "missing": [
+                e.get_pdu_json(time_now)
+                for e in ret.get("missing", [])
+            ],
+        }
+
+        defer.returnValue(
+            (200, send_content)
+        )
+
     @log_function
     def _get_persisted_pdu(self, origin, event_id, do_auth=True):
         """ Get a PDU from the database with given origin and id.
