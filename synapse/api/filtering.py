@@ -74,7 +74,7 @@ class Filtering(object):
             defer.returnValue(self._filter_with_definition(events, definition))
         except KeyError:
             # return all events if definition isn't specified.
-            defer.returnValue(events)  
+            defer.returnValue(events)
 
     def _filter_with_definition(self, events, definition):
         return [e for e in events if self._passes_definition(definition, e)]
@@ -94,14 +94,12 @@ class Filtering(object):
         #   * For senders/rooms: Literal match only
         #   * "not_" checks take presedence (e.g. if "m.*" is in both 'types'
         #     and 'not_types' then it is treated as only being in 'not_types')
-        
+
         # room checks
         if hasattr(event, "room_id"):
             room_id = event.room_id
-            allow_rooms = definition["rooms"] if "rooms" in definition else None
-            reject_rooms = (
-                definition["not_rooms"] if "not_rooms" in definition else None
-            )
+            allow_rooms = definition.get("rooms", None)
+            reject_rooms = definition.get("not_rooms", None)
             if reject_rooms and room_id in reject_rooms:
                 return False
             if allow_rooms and room_id not in allow_rooms:
@@ -111,12 +109,8 @@ class Filtering(object):
         if hasattr(event, "sender"):
             # Should we be including event.state_key for some event types?
             sender = event.sender
-            allow_senders = (
-                definition["senders"] if "senders" in definition else None
-            )
-            reject_senders = (
-                definition["not_senders"] if "not_senders" in definition else None
-            )
+            allow_senders = definition.get("senders", None)
+            reject_senders = definition.get("not_senders", None)
             if reject_senders and sender in reject_senders:
                 return False
             if allow_senders and sender not in allow_senders:
@@ -175,7 +169,6 @@ class Filtering(object):
             for key in room_level_definitions:
                 if key in user_filter["room"]:
                     self._check_definition(user_filter["room"][key])
-
 
     def _check_definition(self, definition):
         """Check if the provided definition is valid.
