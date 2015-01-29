@@ -258,7 +258,7 @@ class SyncHandler(BaseHandler):
                     limited=False,
                     typing=typing_by_room.get(room_id, None)
                 )
-                if room_sync is not None:
+                if room_sync:
                     rooms.append(room_sync)
         else:
             for room_id in room_ids:
