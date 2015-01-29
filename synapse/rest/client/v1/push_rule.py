@@ -26,11 +26,11 @@ import json
 class PushRuleRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/pushrules/.*$")
     PRIORITY_CLASS_MAP = {
-        'underride': 0,
-        'sender': 1,
-        'room': 2,
-        'content': 3,
-        'override': 4,
+        'underride': 1,
+        'sender': 2,
+        'room': 3,
+        'content': 4,
+        'override': 5,
     }
     PRIORITY_CLASS_INVERSE_MAP = {v: k for k, v in PRIORITY_CLASS_MAP.items()}
     SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR = (
