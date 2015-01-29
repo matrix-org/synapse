@@ -154,6 +154,16 @@ class Pusher(object):
         if name_aliases[0] is not None:
             ctx['name'] = name_aliases[0]
 
+        their_member_events_for_room = yield self.store.get_current_state(
+            room_id=ev['room_id'],
+            event_type='m.room.member',
+            state_key=ev['user_id']
+        )
+        if len(their_member_events_for_room) > 0:
+            dn = their_member_events_for_room[0].content['displayname']
+            if dn is not None:
+                ctx['sender_display_name'] = dn
+
         defer.returnValue(ctx)
 
     @defer.inlineCallbacks

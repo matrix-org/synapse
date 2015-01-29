@@ -67,10 +67,7 @@ class HttpPusher(Pusher):
             'notification': {
                 'id': event['event_id'],
                 'type': event['type'],
-                'from': event['user_id'],
-                # we may have to fetch this over federation and we
-                # can't trust it anyway: is it worth it?
-                #'from_display_name': 'Steve Stevington'
+                'sender': event['user_id'],
                 'counts': {  # -- we don't mark messages as read yet so
                              # we have no way of knowing
                     # Just set the badge to 1 until we have read receipts
@@ -93,6 +90,8 @@ class HttpPusher(Pusher):
 
         if len(ctx['aliases']):
             d['notification']['room_alias'] = ctx['aliases'][0]
+        if 'sender_display_name' in ctx:
+            d['notification']['sender_display_name'] = ctx['sender_display_name']
         if 'name' in ctx:
             d['notification']['room_name'] = ctx['name']
 
@@ -119,7 +118,7 @@ class HttpPusher(Pusher):
             'notification': {
                 'id': '',
                 'type': None,
-                'from': '',
+                'sender': '',
                 'counts': {
                     'unread': 0,
                     'missed_calls': 0
