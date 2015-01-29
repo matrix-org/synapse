@@ -290,7 +290,8 @@ class SyncHandler(BaseHandler):
         """
         # TODO(mjark): Check if they have joined the room between
         # the previous sync and this one.
-        # TODO(mjark): Apply the event filter in sync_config
+        # TODO(mjark): Apply the event filter in sync_config taking care to get
+        # enough events to reach the limit
         # TODO(mjark): Check for redactions we might have missed.
         recents, token = yield self.store.get_recent_events_for_room(
             room_id,
