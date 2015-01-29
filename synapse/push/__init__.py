@@ -56,6 +56,7 @@ class Pusher(object):
 
         # The last value of last_active_time that we saw
         self.last_last_active_time = 0
+        self.has_unread = True
 
     @defer.inlineCallbacks
     def _actions_for_event(self, ev):
@@ -180,6 +181,7 @@ class Pusher(object):
                 processed = True
             else:
                 rejected = yield self.dispatch_push(single_event, tweaks)
+                self.has_unread = True
                 if isinstance(rejected, list) or isinstance(rejected, tuple):
                     processed = True
                     for pk in rejected:
@@ -187,8 +189,8 @@ class Pusher(object):
                             # for sanity, we only remove the pushkey if it
                             # was the one we actually sent...
                             logger.warn(
-                                ("Ignoring rejected pushkey %s because we "
-                                "didn't send it"), pk
+                                ("Ignoring rejected pushkey %s because we"
+                                 " didn't send it"), pk
                             )
                         else:
                             logger.info(
@@ -234,8 +236,7 @@ class Pusher(object):
                     # of old notifications.
                     logger.warn("Giving up on a notification to user %s, "
                                 "pushkey %s",
-                                self.user_name, self.pushkey
-                    )
+                                self.user_name, self.pushkey)
                     self.backoff_delay = Pusher.INITIAL_BACKOFF
                     self.last_token = chunk['end']
                     self.store.update_pusher_last_token(
@@ -256,8 +257,7 @@ class Pusher(object):
                                 "Trying again in %dms",
                                 self.user_name,
                                 self.clock.time_msec() - self.failing_since,
-                                self.backoff_delay
-                    )
+                                self.backoff_delay)
                     yield synapse.util.async.sleep(self.backoff_delay / 1000.0)
                     self.backoff_delay *= 2
                     if self.backoff_delay > Pusher.MAX_BACKOFF:
@@ -290,9 +290,11 @@ class Pusher(object):
         if 'last_active' in state.state:
             last_active = state.state['last_active']
             if last_active > self.last_last_active_time:
-                logger.info("Resetting badge count for %s", self.user_name)
-                self.reset_badge_count()
                 self.last_last_active_time = last_active
+                if self.has_unread:
+                    logger.info("Resetting badge count for %s", self.user_name)
+                    self.reset_badge_count()
+                    self.has_unread = False
 
 
 def _value_for_dotted_key(dotted_key, event):
@@ -305,6 +307,7 @@ def _value_for_dotted_key(dotted_key, event):
         parts = parts[1:]
     return val
 
+
 def _tweaks_for_actions(actions):
     tweaks = {}
     for a in actions:
@@ -313,6 +316,7 @@ def _tweaks_for_actions(actions):
         if 'set_sound' in a:
             tweaks['sound'] = a['set_sound']
     return tweaks
+
 
 class PusherConfigException(Exception):
     def __init__(self, msg):

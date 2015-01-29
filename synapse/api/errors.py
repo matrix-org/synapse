@@ -111,6 +111,7 @@ class NotFoundError(SynapseError):
             **kwargs
         )
 
+
 class AuthError(SynapseError):
     """An error raised when there was a problem authorising an event."""
 

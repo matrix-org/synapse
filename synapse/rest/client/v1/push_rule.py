@@ -30,9 +30,9 @@ class PushRuleRestServlet(ClientV1RestServlet):
         'sender': 1,
         'room': 2,
         'content': 3,
-        'override': 4
+        'override': 4,
     }
-    PRIORITY_CLASS_INVERSE_MAP = {v: k for k,v in PRIORITY_CLASS_MAP.items()}
+    PRIORITY_CLASS_INVERSE_MAP = {v: k for k, v in PRIORITY_CLASS_MAP.items()}
     SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR = (
         "Unrecognised request: You probably wanted a trailing slash")
 
@@ -260,7 +260,9 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         if path == []:
             # we're a reference impl: pedantry is our job.
-            raise UnrecognizedRequestError(PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR)
+            raise UnrecognizedRequestError(
+                PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR
+            )
 
         if path[0] == '':
             defer.returnValue((200, rules))
@@ -271,7 +273,9 @@ class PushRuleRestServlet(ClientV1RestServlet):
         elif path[0] == 'device':
             path = path[1:]
             if path == []:
-                raise UnrecognizedRequestError(PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR)
+                raise UnrecognizedRequestError(
+                    PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR
+                )
             if path[0] == '':
                 defer.returnValue((200, rules['device']))
 
@@ -290,10 +294,12 @@ class PushRuleRestServlet(ClientV1RestServlet):
     def on_OPTIONS(self, _):
         return 200, {}
 
+
 def _add_empty_priority_class_arrays(d):
     for pc in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
         d[pc] = []
     return d
+
 
 def _instance_handle_from_conditions(conditions):
     """
@@ -305,9 +311,12 @@ def _instance_handle_from_conditions(conditions):
             return c['instance_handle']
     return None
 
+
 def _filter_ruleset_with_path(ruleset, path):
     if path == []:
-        raise UnrecognizedRequestError(PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR)
+        raise UnrecognizedRequestError(
+            PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR
+        )
 
     if path[0] == '':
         return ruleset
@@ -316,7 +325,9 @@ def _filter_ruleset_with_path(ruleset, path):
         raise UnrecognizedRequestError()
     path = path[1:]
     if path == []:
-        raise UnrecognizedRequestError(PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR)
+        raise UnrecognizedRequestError(
+            PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR
+        )
     if path[0] == '':
         return ruleset[template_kind]
     rule_id = path[0]
@@ -324,6 +335,7 @@ def _filter_ruleset_with_path(ruleset, path):
         if r['rule_id'] == rule_id:
             return r
     raise NotFoundError
+
 
 def _priority_class_from_spec(spec):
     if spec['template'] not in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
@@ -335,6 +347,7 @@ def _priority_class_from_spec(spec):
 
     return pc
 
+
 def _priority_class_to_template_name(pc):
     if pc > PushRuleRestServlet.PRIORITY_CLASS_MAP['override']:
         # per-device
@@ -342,6 +355,7 @@ def _priority_class_to_template_name(pc):
         return PushRuleRestServlet.PRIORITY_CLASS_INVERSE_MAP[prio_class_index]
     else:
         return PushRuleRestServlet.PRIORITY_CLASS_INVERSE_MAP[pc]
+
 
 def _rule_to_template(rule):
     template_name = _priority_class_to_template_name(rule['priority_class'])
@@ -359,8 +373,9 @@ def _rule_to_template(rule):
         ret["pattern"] = thecond["pattern"]
         return ret
 
+
 def _strip_device_condition(rule):
-    for i,c in enumerate(rule['conditions']):
+    for i, c in enumerate(rule['conditions']):
         if c['kind'] == 'device':
             del rule['conditions'][i]
     return rule

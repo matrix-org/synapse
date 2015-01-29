@@ -117,7 +117,7 @@ class PushRuleStore(SQLBaseStore):
         new_rule['priority'] = new_rule_priority
 
         sql = (
-            "SELECT COUNT(*) FROM "+PushRuleTable.table_name+
+            "SELECT COUNT(*) FROM " + PushRuleTable.table_name +
             " WHERE user_name = ? AND priority_class = ? AND priority = ?"
         )
         txn.execute(sql, (user_name, priority_class, new_rule_priority))
@@ -146,10 +146,11 @@ class PushRuleStore(SQLBaseStore):
 
         txn.execute(sql, new_rule.values())
 
-    def _add_push_rule_highest_priority_txn(self, txn, user_name, priority_class, **kwargs):
+    def _add_push_rule_highest_priority_txn(self, txn, user_name,
+                                            priority_class, **kwargs):
         # find the highest priority rule in that class
         sql = (
-            "SELECT COUNT(*), MAX(priority) FROM "+PushRuleTable.table_name+
+            "SELECT COUNT(*), MAX(priority) FROM " + PushRuleTable.table_name +
             " WHERE user_name = ? and priority_class = ?"
         )
         txn.execute(sql, (user_name, priority_class))
