@@ -343,6 +343,10 @@ class FederationHandler(BaseHandler):
 
             for e in auth_chain:
                 e.internal_metadata.outlier = True
+
+                if e.event_id == event.event_id:
+                    continue
+
                 try:
                     auth_ids = [e_id for e_id, _ in e.auth_events]
                     auth = {
@@ -359,7 +363,9 @@ class FederationHandler(BaseHandler):
                     )
 
             for e in state:
-                # FIXME: Auth these.
+                if e.event_id == event.event_id:
+                    continue
+
                 e.internal_metadata.outlier = True
                 try:
                     auth_ids = [e_id for e_id, _ in e.auth_events]
@@ -376,11 +382,18 @@ class FederationHandler(BaseHandler):
                         e.event_id,
                     )
 
+            auth_ids = [e_id for e_id, _ in event.auth_events]
+            auth_events = {
+                (e.type, e.state_key): e for e in auth_chain
+                if e.event_id in auth_ids
+            }
+
             yield self._handle_new_event(
                 target_host,
                 new_event,
                 state=state,
                 current_state=state,
+                auth_events=auth_events,
             )
 
             yield self.notifier.on_new_room_event(
@@ -752,7 +765,17 @@ class FederationHandler(BaseHandler):
                 origin, event.room_id, event.event_id
             )
 
+            seen_remotes = yield self.store.have_events(
+                [e.event_id for e in remote_auth_chain]
+            )
+
             for e in remote_auth_chain:
+                if e.event_id in seen_remotes.keys():
+                    continue
+
+                if e.event_id == event.event_id:
+                    continue
+
                 try:
                     auth_ids = [e_id for e_id, _ in e.auth_events]
                     auth = {
@@ -760,10 +783,17 @@ class FederationHandler(BaseHandler):
                         if e.event_id in auth_ids
                     }
                     e.internal_metadata.outlier = True
+
+                    logger.debug(
+                        "do_auth %s missing_auth: %s",
+                        event.event_id, e.event_id
+                    )
                     yield self._handle_new_event(
                         origin, e, auth_events=auth
                     )
-                    auth_events[(e.type, e.state_key)] = e
+
+                    if e.event_id in event_auth_events:
+                        auth_events[(e.type, e.state_key)] = e
                 except AuthError:
                     pass
 
@@ -788,20 +818,31 @@ class FederationHandler(BaseHandler):
                 local_auth_chain,
             )
 
-            # 3. Process any remote auth chain events we haven't seen.
-            for missing_id in result.get("missing", []):
-                try:
-                    for e in result["auth_chain"]:
-                        if e.event_id == missing_id:
-                            ev = e
-                            break
+            seen_remotes = yield self.store.have_events(
+                [e.event_id for e in result["auth_chain"]]
+            )
 
+            # 3. Process any remote auth chain events we haven't seen.
+            for ev in result["auth_chain"]:
+                if ev.event_id in seen_remotes.keys():
+                    continue
+
+                if ev.event_id == event.event_id:
+                    continue
+
+                try:
                     auth_ids = [e_id for e_id, _ in ev.auth_events]
                     auth = {
                         (e.type, e.state_key): e for e in result["auth_chain"]
                         if e.event_id in auth_ids
                     }
                     ev.internal_metadata.outlier = True
+
+                    logger.debug(
+                        "do_auth %s different_auth: %s",
+                        event.event_id, e.event_id
+                    )
+
                     yield self._handle_new_event(
                         origin, ev, auth_events=auth
                     )
