@@ -20,7 +20,6 @@
 
 # Imports required for the default HomeServer() implementation
 from synapse.federation import initialize_http_replication
-from synapse.events.utils import serialize_event
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
@@ -32,6 +31,7 @@ from synapse.util.lockutils import LockManager
 from synapse.streams.events import EventSources
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.crypto.keyring import Keyring
+from synapse.push.pusherpool import PusherPool
 from synapse.events.builder import EventBuilderFactory
 
 
@@ -70,6 +70,7 @@ class BaseHomeServer(object):
         'notifier',
         'distributor',
         'resource_for_client',
+        'resource_for_client_v2_alpha',
         'resource_for_federation',
         'resource_for_web_client',
         'resource_for_content_repo',
@@ -78,6 +79,7 @@ class BaseHomeServer(object):
         'event_sources',
         'ratelimiter',
         'keyring',
+        'pusherpool',
         'event_builder_factory',
     ]
 
@@ -122,9 +124,6 @@ class BaseHomeServer(object):
             )
 
         setattr(BaseHomeServer, "get_%s" % (depname), _get)
-
-    def serialize_event(self, e, as_client_event=True):
-        return serialize_event(self, e, as_client_event)
 
     def get_ip_from_request(self, request):
         # May be an X-Forwarding-For header depending on config
@@ -200,3 +199,6 @@ class HomeServer(BaseHomeServer):
             clock=self.get_clock(),
             hostname=self.hostname,
         )
+
+    def build_pusherpool(self):
+        return PusherPool(self)
