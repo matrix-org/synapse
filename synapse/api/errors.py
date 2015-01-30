@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class Codes(object):
+    UNRECOGNIZED = "M_UNRECOGNIZED"
     UNAUTHORIZED = "M_UNAUTHORIZED"
     FORBIDDEN = "M_FORBIDDEN"
     BAD_JSON = "M_BAD_JSON"
@@ -34,6 +35,7 @@ class Codes(object):
     LIMIT_EXCEEDED = "M_LIMIT_EXCEEDED"
     CAPTCHA_NEEDED = "M_CAPTCHA_NEEDED"
     CAPTCHA_INVALID = "M_CAPTCHA_INVALID"
+    MISSING_PARAM = "M_MISSING_PARAM",
     TOO_LARGE = "M_TOO_LARGE"
 
 
@@ -79,6 +81,35 @@ class RoomError(SynapseError):
 class RegistrationError(SynapseError):
     """An error raised when a registration event fails."""
     pass
+
+
+class UnrecognizedRequestError(SynapseError):
+    """An error indicating we don't understand the request you're trying to make"""
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.UNRECOGNIZED
+        message = None
+        if len(args) == 0:
+            message = "Unrecognized request"
+        else:
+            message = args[0]
+        super(UnrecognizedRequestError, self).__init__(
+            400,
+            message,
+            **kwargs
+        )
+
+
+class NotFoundError(SynapseError):
+    """An error indicating we can't find the thing you asked for"""
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.NOT_FOUND
+        super(NotFoundError, self).__init__(
+            404,
+            "Not found",
+            **kwargs
+        )
 
 
 class AuthError(SynapseError):

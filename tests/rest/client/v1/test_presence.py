@@ -75,6 +75,7 @@ class PresenceStateTestCase(unittest.TestCase):
                 "user": UserID.from_string(myid),
                 "admin": False,
                 "device_id": None,
+                "token_id": 1,
             }
 
         hs.get_auth().get_user_by_token = _get_user_by_token
@@ -165,6 +166,7 @@ class PresenceListTestCase(unittest.TestCase):
                 "user": UserID.from_string(myid),
                 "admin": False,
                 "device_id": None,
+                "token_id": 1,
             }
 
         hs.handlers.room_member_handler = Mock(
@@ -282,7 +284,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         hs.get_clock().time_msec.return_value = 1000000
 
         def _get_user_by_req(req=None):
-            return UserID.from_string(myid)
+            return (UserID.from_string(myid), "")
 
         hs.get_auth().get_user_by_req = _get_user_by_req
 
