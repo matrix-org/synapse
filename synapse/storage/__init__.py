@@ -32,11 +32,8 @@ from .event_federation import EventFederationStore
 from .pusher import PusherStore
 from .push_rule import PushRuleStore
 from .media_repository import MediaRepositoryStore
-<<<<<<< HEAD
 from .rejections import RejectionsStore
 
-=======
->>>>>>> 471c47441d0c188e845b75c8f446c44899fdcfe7
 from .state import StateStore
 from .signatures import SignatureStore
 from .filtering import FilteringStore
