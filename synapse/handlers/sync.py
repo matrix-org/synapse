@@ -49,6 +49,9 @@ class RoomSyncResult(collections.namedtuple("RoomSyncResult", [
     __slots__ = []
 
     def __nonzero__(self):
+        """Make the result appear empty if there are no updates. This is used
+        to tell if room needs to be part of the sync result.
+        """
         return bool(self.events or self.state or self.ephemeral)
 
 
@@ -61,6 +64,10 @@ class SyncResult(collections.namedtuple("SyncResult", [
     __slots__ = []
 
     def __nonzero__(self):
+        """Make the result appear empty if there are no updates. This is used
+        to tell if the notifier needs to wait for more events when polling for
+        events.
+        """
         return bool(
             self.private_user_data or self.public_user_data or self.rooms
         )
@@ -108,7 +115,7 @@ class SyncHandler(BaseHandler):
                 return self.incremental_sync_with_gap(sync_config, since_token)
             else:
                 #TODO(mjark): Handle gapless sync
-                pass
+                raise NotImplementedError()
 
     @defer.inlineCallbacks
     def initial_sync(self, sync_config):
