@@ -19,6 +19,7 @@ from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError, No
     StoreError
 from .base import ClientV1RestServlet, client_path_pattern
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
+import synapse.push.baserules as baserules
 
 import json
 
@@ -26,6 +27,7 @@ import json
 class PushRuleRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/pushrules/.*$")
     PRIORITY_CLASS_MAP = {
+        'default': 0,
         'underride': 1,
         'sender': 2,
         'room': 3,
@@ -137,6 +139,9 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         user, _ = yield self.auth.get_user_by_req(request)
 
+        if spec['template'] == 'default':
+            raise SynapseError(403, "The default rules are immutable.")
+
         content = _parse_json(request)
 
         try:
@@ -218,6 +223,10 @@ class PushRuleRestServlet(ClientV1RestServlet):
         # to send which means doing unnecessary work sometimes but is
         # is probably not going to make a whole lot of difference
         rawrules = yield self.hs.get_datastore().get_push_rules_for_user_name(user.to_string())
+        for r in rawrules:
+            r["conditions"] = json.loads(r["conditions"])
+            r["actions"] = json.loads(r["actions"])
+        rawrules.extend(baserules.make_base_rules(user.to_string()))
 
         rules = {'global': {}, 'device': {}}
 
@@ -225,9 +234,6 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         for r in rawrules:
             rulearray = None
-
-            r["conditions"] = json.loads(r["conditions"])
-            r["actions"] = json.loads(r["actions"])
 
             template_name = _priority_class_to_template_name(r['priority_class'])
 
@@ -356,7 +362,9 @@ def _priority_class_to_template_name(pc):
 
 def _rule_to_template(rule):
     template_name = _priority_class_to_template_name(rule['priority_class'])
-    if template_name in ['override', 'underride']:
+    if template_name in ['default']:
+        return {k: rule[k] for k in ["conditions", "actions"]}
+    elif template_name in ['override', 'underride']:
         return {k: rule[k] for k in ["rule_id", "conditions", "actions"]}
     elif template_name in ["sender", "room"]:
         return {k: rule[k] for k in ["rule_id", "actions"]}

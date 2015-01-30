@@ -1,9 +1,5 @@
 def make_base_rules(user_name):
-    """
-    Nominally we reserve priority class 0 for these rules, although
-    in practice we just append them to the end so we don't actually need it.
-    """
-    return [
+    rules = [
         {
             'conditions': [
                 {
@@ -47,3 +43,6 @@ def make_base_rules(user_name):
             ]
         }
     ]
+    for r in rules:
+        r['priority_class'] = 0
+    return rules
