@@ -27,6 +27,7 @@ from synapse.server import HomeServer
 from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.profile import ProfileHandler
+from synapse.types import UserID
 
 
 OFFLINE = PresenceState.OFFLINE
@@ -136,12 +137,12 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 lambda u: defer.succeed([]))
 
         # Some local users to test with
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
-        self.u_clementine = hs.parse_userid("@clementine:test")
+        self.u_apple = UserID.from_string("@apple:test")
+        self.u_banana = UserID.from_string("@banana:test")
+        self.u_clementine = UserID.from_string("@clementine:test")
 
         # Remote user
-        self.u_potato = hs.parse_userid("@potato:remote")
+        self.u_potato = UserID.from_string("@potato:remote")
 
         self.mock_get_joined = (
             self.datastore.get_rooms_for_user_where_membership_is

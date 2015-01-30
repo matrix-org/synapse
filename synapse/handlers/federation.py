@@ -28,6 +28,7 @@ from synapse.crypto.event_signing import (
     compute_event_signature, check_event_content_hash,
     add_hashes_and_signatures,
 )
+from synapse.types import UserID
 from syutil.jsonutil import encode_canonical_json
 
 from twisted.internet import defer
@@ -227,7 +228,7 @@ class FederationHandler(BaseHandler):
             extra_users = []
             if event.type == EventTypes.Member:
                 target_user_id = event.state_key
-                target_user = self.hs.parse_userid(target_user_id)
+                target_user = UserID.from_string(target_user_id)
                 extra_users.append(target_user)
 
             yield self.notifier.on_new_room_event(
@@ -236,7 +237,7 @@ class FederationHandler(BaseHandler):
 
         if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
-                user = self.hs.parse_userid(event.state_key)
+                user = UserID.from_string(event.state_key)
                 yield self.distributor.fire(
                     "user_joined_room", user=user, room_id=event.room_id
                 )
@@ -491,7 +492,7 @@ class FederationHandler(BaseHandler):
         extra_users = []
         if event.type == EventTypes.Member:
             target_user_id = event.state_key
-            target_user = self.hs.parse_userid(target_user_id)
+            target_user = UserID.from_string(target_user_id)
             extra_users.append(target_user)
 
         yield self.notifier.on_new_room_event(
@@ -500,7 +501,7 @@ class FederationHandler(BaseHandler):
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.JOIN:
-                user = self.hs.parse_userid(event.state_key)
+                user = UserID.from_string(event.state_key)
                 yield self.distributor.fire(
                     "user_joined_room", user=user, room_id=event.room_id
                 )
@@ -514,7 +515,7 @@ class FederationHandler(BaseHandler):
                 if k[0] == EventTypes.Member:
                     if s.content["membership"] == Membership.JOIN:
                         destinations.add(
-                            self.hs.parse_userid(s.state_key).domain
+                            UserID.from_string(s.state_key).domain
                         )
             except:
                 logger.warn(
@@ -565,7 +566,7 @@ class FederationHandler(BaseHandler):
             backfilled=False,
         )
 
-        target_user = self.hs.parse_userid(event.state_key)
+        target_user = UserID.from_string(event.state_key)
         yield self.notifier.on_new_room_event(
             event, extra_users=[target_user],
         )

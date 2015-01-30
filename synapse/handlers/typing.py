@@ -18,6 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError, AuthError
+from synapse.types import UserID
 
 import logging
 
@@ -185,7 +186,7 @@ class TypingNotificationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _recv_edu(self, origin, content):
         room_id = content["room_id"]
-        user = self.homeserver.parse_userid(content["user_id"])
+        user = UserID.from_string(content["user_id"])
 
         localusers = set()
 

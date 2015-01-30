@@ -32,7 +32,8 @@ for port in 8080 8081 8082; do
         -D --pid-file "$DIR/$port.pid" \
         --manhole $((port + 1000)) \
         --tls-dh-params-path "demo/demo.tls.dh" \
-		$PARAMS $SYNAPSE_PARAMS
+        --media-store-path "demo/media_store.$port" \
+		$PARAMS $SYNAPSE_PARAMS \
 
     python -m synapse.app.homeserver \
         --config-path "demo/etc/$port.config" \
