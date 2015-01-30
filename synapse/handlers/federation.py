@@ -706,7 +706,6 @@ class FederationHandler(BaseHandler):
                 event.event_id, e.msg
             )
 
-            # TODO: Store rejection.
             context.rejected = RejectedReason.AUTH_ERROR
 
             yield self.store.persist_event(
@@ -827,6 +826,9 @@ class FederationHandler(BaseHandler):
 
             # 4. Look at rejects and their proofs.
             # TODO.
+
+            context.current_state.update(auth_events)
+            context.state_group = None
 
         try:
             self.auth.check(event, auth_events=auth_events)
