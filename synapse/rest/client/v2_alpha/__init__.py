@@ -13,11 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from . import (
+    sync,
     filter
 )
-
 
 from synapse.http.server import JsonResource
 
@@ -31,4 +30,5 @@ class ClientV2AlphaRestResource(JsonResource):
 
     @staticmethod
     def register_servlets(client_resource, hs):
+        sync.register_servlets(hs, client_resource)
         filter.register_servlets(hs, client_resource)

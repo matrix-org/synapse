@@ -89,7 +89,47 @@ def prune_event(event):
     return type(event)(allowed_fields)
 
 
-def serialize_event(e, time_now_ms, client_event=True):
+def format_event_raw(d):
+    return d
+
+
+def format_event_for_client_v1(d):
+    d["user_id"] = d.pop("sender", None)
+
+    move_keys = ("age", "redacted_because", "replaces_state", "prev_content")
+    for key in move_keys:
+        if key in d["unsigned"]:
+            d[key] = d["unsigned"][key]
+
+    drop_keys = (
+        "auth_events", "prev_events", "hashes", "signatures", "depth",
+        "unsigned", "origin", "prev_state"
+    )
+    for key in drop_keys:
+        d.pop(key, None)
+    return d
+
+
+def format_event_for_client_v2(d):
+    drop_keys = (
+        "auth_events", "prev_events", "hashes", "signatures", "depth",
+        "origin", "prev_state",
+    )
+    for key in drop_keys:
+        d.pop(key, None)
+    return d
+
+
+def format_event_for_client_v2_without_event_id(d):
+    d = format_event_for_client_v2(d)
+    d.pop("room_id", None)
+    d.pop("event_id", None)
+    return d
+
+
+def serialize_event(e, time_now_ms, as_client_event=True,
+                    event_format=format_event_for_client_v1,
+                    token_id=None):
     # FIXME(erikj): To handle the case of presence events and the like
     if not isinstance(e, EventBase):
         return e
@@ -99,43 +139,22 @@ def serialize_event(e, time_now_ms, client_event=True):
     # Should this strip out None's?
     d = {k: v for k, v in e.get_dict().items()}
 
-    if not client_event:
-        # set the age and keep all other keys
-        if "age_ts" in d["unsigned"]:
-            d["unsigned"]["age"] = time_now_ms - d["unsigned"]["age_ts"]
-        return d
-
     if "age_ts" in d["unsigned"]:
-        d["age"] = time_now_ms - d["unsigned"]["age_ts"]
+        d["unsigned"]["age"] = time_now_ms - d["unsigned"]["age_ts"]
         del d["unsigned"]["age_ts"]
 
-    d["user_id"] = d.pop("sender", None)
-
     if "redacted_because" in e.unsigned:
-        d["redacted_because"] = serialize_event(
+        d["unsigned"]["redacted_because"] = serialize_event(
             e.unsigned["redacted_because"], time_now_ms
         )
 
-        del d["unsigned"]["redacted_because"]
+    if token_id is not None:
+        if token_id == getattr(e.internal_metadata, "token_id", None):
+            txn_id = getattr(e.internal_metadata, "txn_id", None)
+            if txn_id is not None:
+                d["unsigned"]["transaction_id"] = txn_id
 
-    if "redacted_by" in e.unsigned:
-        d["redacted_by"] = e.unsigned["redacted_by"]
-        del d["unsigned"]["redacted_by"]
-
-    if "replaces_state" in e.unsigned:
-        d["replaces_state"] = e.unsigned["replaces_state"]
-        del d["unsigned"]["replaces_state"]
-
-    if "prev_content" in e.unsigned:
-        d["prev_content"] = e.unsigned["prev_content"]
-        del d["unsigned"]["prev_content"]
-
-    del d["auth_events"]
-    del d["prev_events"]
-    del d["hashes"]
-    del d["signatures"]
-    d.pop("depth", None)
-    d.pop("unsigned", None)
-    d.pop("origin", None)
-
-    return d
+    if as_client_event:
+        return event_format(d)
+    else:
+        return d
