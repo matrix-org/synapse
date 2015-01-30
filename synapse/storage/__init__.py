@@ -375,9 +375,12 @@ class DataStore(RoomMemberStore, RoomStore,
             "redacted": del_sql,
         }
 
-        if event_type:
+        if event_type and state_key is not None:
             sql += " AND s.type = ? AND s.state_key = ? "
             args = (room_id, event_type, state_key)
+        elif event_type:
+            sql += " AND s.type = ?"
+            args = (room_id, event_type)
         else:
             args = (room_id, )
 
