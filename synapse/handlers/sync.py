@@ -164,7 +164,7 @@ class SyncHandler(BaseHandler):
             A Deferred RoomSyncResult.
         """
 
-        recents, prev_batch_token, limited = self.load_filtered_recents(
+        recents, prev_batch_token, limited = yield self.load_filtered_recents(
             room_id, sync_config, now_token,
         )
 
@@ -288,7 +288,7 @@ class SyncHandler(BaseHandler):
         room_key = now_token.room_key
 
         while limited and len(recents) < sync_config.limit and max_repeat:
-            events, room_key = yield self.store.get_recent_events_for_room(
+            events, (room_key,_) = yield self.store.get_recent_events_for_room(
                 room_id,
                 limit=load_limit + 1,
                 from_token=since_token.room_key if since_token else None,
@@ -326,7 +326,7 @@ class SyncHandler(BaseHandler):
         # the previous sync and this one.
         # TODO(mjark): Check for redactions we might have missed.
 
-        recents, prev_batch_token, limited = self.load_filtered_recents(
+        recents, prev_batch_token, limited = yield self.load_filtered_recents(
             room_id, sync_config, now_token, since_token,
         )
 

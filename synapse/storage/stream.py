@@ -316,9 +316,9 @@ class StreamStore(SQLBaseStore):
                 toke = rows[0]["stream_ordering"] - 1
                 start_token = str(_StreamToken(topo, toke))
 
-                token = (start_token, end_token)
+                token = (start_token, str(end_token))
             else:
-                token = (end_token, end_token)
+                token = (str(end_token), str(end_token))
 
             events = self._get_events_txn(
                 txn,
