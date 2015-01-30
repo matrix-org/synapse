@@ -204,10 +204,11 @@ class Pusher(object):
             event_type='m.room.member',
             state_key=ev['user_id']
         )
-        if len(their_member_events_for_room) > 0:
-            dn = their_member_events_for_room[0].content['displayname']
-            if dn is not None:
-                ctx['sender_display_name'] = dn
+        for mev in their_member_events_for_room:
+            if mev.content['membership'] == 'join' and 'displayname' in mev.content:
+                dn = mev.content['displayname']
+                if dn is not None:
+                    ctx['sender_display_name'] = dn
 
         defer.returnValue(ctx)
 
