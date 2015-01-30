@@ -20,10 +20,6 @@ from ._base import SQLBaseStore
 import json
 
 
-# TODO(paul)
-_filters_for_user = {}
-
-
 class FilteringStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_user_filter(self, user_localpart, filter_id):

@@ -114,21 +114,17 @@ class Filtering(object):
                     if not isinstance(event_type, basestring):
                         raise SynapseError(400, "Event type should be a string")
 
-        try:
+        if "format" in definition:
             event_format = definition["format"]
             if event_format not in ["federation", "events"]:
                 raise SynapseError(400, "Invalid format: %s" % (event_format,))
-        except KeyError:
-            pass  # format is optional
 
-        try:
+        if "select" in definition:
             event_select_list = definition["select"]
             for select_key in event_select_list:
                 if select_key not in ["event_id", "origin_server_ts",
                                       "thread_id", "content", "content.body"]:
                     raise SynapseError(400, "Bad select: %s" % (select_key,))
-        except KeyError:
-            pass  # select is optional
 
         if ("bundle_updates" in definition and
                 type(definition["bundle_updates"]) != bool):
