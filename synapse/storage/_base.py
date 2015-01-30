@@ -504,7 +504,7 @@ class SQLBaseStore(object):
     def _get_event_txn(self, txn, event_id, check_redacted=True,
                        get_prev_content=False, allow_rejected=False):
         sql = (
-            "SELECT internal_metadata, json, r.event_id, reason "
+            "SELECT e.internal_metadata, e.json, r.event_id, rej.reason "
             "FROM event_json as e "
             "LEFT JOIN redactions as r ON e.event_id = r.redacts "
             "LEFT JOIN rejections as rej on rej.event_id = e.event_id  "
