@@ -32,7 +32,7 @@ setup(
     description="Reference Synapse Home Server",
     install_requires=[
         "syutil==0.0.2",
-        "matrix_angular_sdk==0.6.0",
+        "matrix_angular_sdk>=0.6.0",
         "Twisted==14.0.2",
         "service_identity>=1.0.0",
         "pyopenssl>=0.14",
