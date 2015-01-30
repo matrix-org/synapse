@@ -163,12 +163,11 @@ class SyncHandler(BaseHandler):
         Returns:
             A Deferred RoomSyncResult.
         """
-        recent_events, token = yield self.store.get_recent_events_for_room(
-            room_id,
-            limit=sync_config.limit,
-            end_token=now_token.room_key,
+
+        recents, prev_batch_token, limited = self.load_filtered_recents(
+            room_id, sync_config, now_token,
         )
-        prev_batch_token = now_token.copy_and_replace("room_key", token[0])
+
         current_state_events = yield self.state_handler.get_current_state(
             room_id
         )
@@ -176,10 +175,10 @@ class SyncHandler(BaseHandler):
         defer.returnValue(RoomSyncResult(
             room_id=room_id,
             published=room_id in published_room_ids,
-            events=recent_events,
+            events=recents,
             prev_batch=prev_batch_token,
             state=current_state_events,
-            limited=True,
+            limited=limited,
             ephemeral=[],
         ))
 
@@ -279,8 +278,8 @@ class SyncHandler(BaseHandler):
         ))
 
     @defer.inlineCallbacks
-    def load_filtered_recents(self, room_id, sync_config, since_token,
-                              now_token):
+    def load_filtered_recents(self, room_id, sync_config, now_token,
+                              since_token=None):
         limited = True
         recents = []
         filtering_factor = 2
@@ -292,7 +291,7 @@ class SyncHandler(BaseHandler):
             events, room_key = yield self.store.get_recent_events_for_room(
                 room_id,
                 limit=load_limit + 1,
-                from_token=since_token.room_key,
+                from_token=since_token.room_key if since_token else None,
                 end_token=room_key,
             )
             loaded_recents = sync_config.filter.filter_room_events(events)
@@ -328,7 +327,7 @@ class SyncHandler(BaseHandler):
         # TODO(mjark): Check for redactions we might have missed.
 
         recents, prev_batch_token, limited = self.load_filtered_recents(
-            room_id, sync_config, since_token,
+            room_id, sync_config, now_token, since_token,
         )
 
         logging.debug("Recents %r", recents)
