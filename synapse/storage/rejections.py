@@ -13,11 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from ._base import SQLBaseStore
 
-class EventContext(object):
+import logging
 
-    def __init__(self, current_state=None, auth_events=None):
-        self.current_state = current_state
-        self.auth_events = auth_events
-        self.state_group = None
-        self.rejected = False
+logger = logging.getLogger(__name__)
+
+
+class RejectionsStore(SQLBaseStore):
+    def _store_rejections_txn(self, txn, event_id, reason):
+        self._simple_insert_txn(
+            txn,
+            table="rejections",
+            values={
+                "event_id": event_id,
+                "reason": reason,
+                "last_failure": self._clock.time_msec(),
+            }
+        )

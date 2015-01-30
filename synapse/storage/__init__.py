@@ -32,6 +32,7 @@ from .event_federation import EventFederationStore
 from .pusher import PusherStore
 from .push_rule import PushRuleStore
 from .media_repository import MediaRepositoryStore
+from .rejections import RejectionsStore
 
 from .state import StateStore
 from .signatures import SignatureStore
@@ -85,6 +86,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
                 EventFederationStore,
                 MediaRepositoryStore,
+                RejectionsStore,
                 PusherStore,
                 PushRuleStore
                 ):
@@ -229,6 +231,9 @@ class DataStore(RoomMemberStore, RoomStore,
         if not outlier:
             self._store_state_groups_txn(txn, event, context)
 
+        if context.rejected:
+            self._store_rejections_txn(txn, event.event_id, context.rejected)
+
         if current_state:
             txn.execute(
                 "DELETE FROM current_state_events WHERE room_id = ?",
@@ -267,7 +272,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 or_replace=True,
             )
 
-            if is_new_state:
+            if is_new_state and not context.rejected:
                 self._simple_insert_txn(
                     txn,
                     "current_state_events",
@@ -293,7 +298,7 @@ class DataStore(RoomMemberStore, RoomStore,
                     or_ignore=True,
                 )
 
-            if not backfilled:
+            if not backfilled and not context.rejected:
                 self._simple_insert_txn(
                     txn,
                     table="state_forward_extremities",
