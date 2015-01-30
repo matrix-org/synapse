@@ -137,6 +137,11 @@ class Pusher(object):
                 return False
             pat = condition['pattern']
 
+            if pat.strip("*?[]") == pat:
+                # no special glob characters so we assume the user means
+                # 'contains this string' rather than 'is this string'
+                pat = "*%s*" % (pat,)
+
             val = _value_for_dotted_key(condition['key'], ev)
             if val is None:
                 return False
