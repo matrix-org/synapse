@@ -46,7 +46,6 @@ class StateHandler(object):
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
-        # self.auth = hs.get_auth()
         self.hs = hs
 
     @defer.inlineCallbacks
