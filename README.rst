@@ -110,6 +110,15 @@ To install the synapse homeserver run::
 This installs synapse, along with the libraries it uses, into a virtual
 environment under ``synapse``.
 
+To set up your homeserver, run (in your virtualenv, as before)::
+
+    $ python -m synapse.app.homeserver \
+        --server-name machine.my.domain.name \
+        --config-path homeserver.config \
+        --generate-config
+
+Substituting your host and domain name as appropriate.
+
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See docs/turn-howto.rst for details.
 
