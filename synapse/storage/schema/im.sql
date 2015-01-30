@@ -123,10 +123,3 @@ CREATE TABLE IF NOT EXISTS room_hosts(
 );
 
 CREATE INDEX IF NOT EXISTS room_hosts_room_id ON room_hosts (room_id);
-
-CREATE TABLE IF NOT EXISTS rejections(
-    event_id TEXT NOT NULL,
-    reason TEXT NOT NULL,
-    last_check TEXT NOT NULL,
-    CONSTRAINT ev_id UNIQUE (event_id) ON CONFLICT REPLACE
-);
