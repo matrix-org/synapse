@@ -181,15 +181,11 @@ class StreamStore(SQLBaseStore):
                 get_prev_content=True
             )
 
-            for event, row in zip(ret, rows):
-                stream = row["stream_ordering"]
-                topo = event.depth
-                internal = event.internal_metadata
-                internal.before = str(_StreamToken(topo, stream - 1))
-                internal.after = str(_StreamToken(topo, stream))
+            self._set_before_and_after(ret, rows)
 
             if rows:
                 key = "s%d" % max([r["stream_ordering"] for r in rows])
+
             else:
                 # Assume we didn't get anything because there was nothing to
                 # get.
@@ -267,6 +263,8 @@ class StreamStore(SQLBaseStore):
                 get_prev_content=True
             )
 
+            self._set_before_and_after(events, rows)
+
             return events, next_token,
 
         return self.runInteraction("paginate_room_events", f)
@@ -328,6 +326,8 @@ class StreamStore(SQLBaseStore):
                 get_prev_content=True
             )
 
+            self._set_before_and_after(events, rows)
+
             return events, token
 
         return self.runInteraction(
@@ -354,3 +354,12 @@ class StreamStore(SQLBaseStore):
 
         key = res[0]["m"]
         return "s%d" % (key,)
+
+    @staticmethod
+    def _set_before_and_after(events, rows):
+        for event, row in zip(events, rows):
+            stream = row["stream_ordering"]
+            topo = event.depth
+            internal = event.internal_metadata
+            internal.before = str(_StreamToken(topo, stream - 1))
+            internal.after = str(_StreamToken(topo, stream))

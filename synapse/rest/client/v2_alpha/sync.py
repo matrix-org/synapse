@@ -116,7 +116,7 @@ class SyncRestServlet(RestServlet):
                 user.localpart, filter_id
             )
         except:
-           filter = Filter({})
+            filter = Filter({})
         # filter = filter.apply_overrides(http_request)
         #if filter.matches(event):
         #   # stuff
