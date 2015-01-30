@@ -114,7 +114,7 @@ To set up your homeserver, run (in your virtualenv, as before)::
 
     $ python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
-        --config-path homeserver.config \
+        --config-path homeserver.yaml \
         --generate-config
 
 Substituting your host and domain name as appropriate.
@@ -273,9 +273,9 @@ For the first form, simply pass the required hostname (of the machine) as the
 
     $ python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
-        --config-path homeserver.config \
+        --config-path homeserver.yaml \
         --generate-config
-    $ python -m synapse.app.homeserver --config-path homeserver.config
+    $ python -m synapse.app.homeserver --config-path homeserver.yaml
 
 Alternatively, you can run ``synctl start`` to guide you through the process.
 
@@ -295,9 +295,9 @@ SRV record, as that is the name other machines will expect it to have::
     $ python -m synapse.app.homeserver \
         --server-name YOURDOMAIN \
         --bind-port 8448 \
-        --config-path homeserver.config \
+        --config-path homeserver.yaml \
         --generate-config
-    $ python -m synapse.app.homeserver --config-path homeserver.config
+    $ python -m synapse.app.homeserver --config-path homeserver.yaml
 
 
 You may additionally want to pass one or more "-v" options, in order to
