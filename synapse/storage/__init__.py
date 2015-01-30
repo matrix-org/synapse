@@ -36,6 +36,7 @@ from .rejections import RejectionsStore
 
 from .state import StateStore
 from .signatures import SignatureStore
+from .filtering import FilteringStore
 
 from syutil.base64util import decode_base64
 from syutil.jsonutil import encode_canonical_json
@@ -65,6 +66,8 @@ SCHEMAS = [
     "event_signatures",
     "pusher",
     "media_repository",
+    "filtering",
+    "rejections",
 ]
 
 
@@ -87,6 +90,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 EventFederationStore,
                 MediaRepositoryStore,
                 RejectionsStore,
+                FilteringStore,
                 PusherStore,
                 PushRuleStore
                 ):
@@ -380,9 +384,12 @@ class DataStore(RoomMemberStore, RoomStore,
             "redacted": del_sql,
         }
 
-        if event_type:
+        if event_type and state_key is not None:
             sql += " AND s.type = ? AND s.state_key = ? "
             args = (room_id, event_type, state_key)
+        elif event_type:
+            sql += " AND s.type = ?"
+            args = (room_id, event_type)
         else:
             args = (room_id, )
 

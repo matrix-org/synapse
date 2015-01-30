@@ -32,4 +32,18 @@ def make_base_rules(user_name):
                 }
             ]
         },
+        {
+            'conditions': [
+                {
+                    'kind': 'room_member_count',
+                    'is': '2'
+                }
+            ],
+            'actions': [
+                'notify',
+                {
+                    'set_sound': 'default'
+                }
+            ]
+        }
     ]

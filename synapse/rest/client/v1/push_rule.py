@@ -98,10 +98,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
             if 'pattern' not in req_obj:
                 raise InvalidRuleException("Content rule missing 'pattern'")
             pat = req_obj['pattern']
-            if pat.strip("*?[]") == pat:
-                # no special glob characters so we assume the user means
-                # 'contains this string' rather than 'is this string'
-                pat = "*%s*" % (pat,)
+
             conditions = [{
                 'kind': 'event_match',
                 'key': 'content.body',

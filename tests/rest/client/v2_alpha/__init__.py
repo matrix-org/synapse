@@ -39,9 +39,7 @@ class V2AlphaRestTestCase(unittest.TestCase):
 
         hs = HomeServer("test",
             db_pool=None,
-            datastore=Mock(spec=[
-                "insert_client_ip",
-            ]),
+            datastore=self.make_datastore_mock(),
             http_client=None,
             resource_for_client=self.mock_resource,
             resource_for_federation=self.mock_resource,
@@ -53,8 +51,14 @@ class V2AlphaRestTestCase(unittest.TestCase):
                 "user": UserID.from_string(self.USER_ID),
                 "admin": False,
                 "device_id": None,
+                "token_id": 1,
             }
         hs.get_auth().get_user_by_token = _get_user_by_token
 
         for r in self.TO_REGISTER:
             r.register_servlets(hs, self.mock_resource)
+
+    def make_datastore_mock(self):
+        return Mock(spec=[
+            "insert_client_ip",
+        ])

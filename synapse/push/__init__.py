@@ -24,6 +24,7 @@ import baserules
 import logging
 import fnmatch
 import json
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,8 @@ class Pusher(object):
     MAX_BACKOFF = 60 * 60 * 1000
     GIVE_UP_AFTER = 24 * 60 * 60 * 1000
     DEFAULT_ACTIONS = ['notify']
+
+    INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
     def __init__(self, _hs, instance_handle, user_name, app_id,
                  app_display_name, device_display_name, pushkey, pushkey_ts,
@@ -88,11 +91,21 @@ class Pusher(object):
         member_events_for_room = yield self.store.get_current_state(
             room_id=ev['room_id'],
             event_type='m.room.member',
-            state_key=self.user_name
+            state_key=None
         )
         my_display_name = None
-        if len(member_events_for_room) > 0:
-            my_display_name = member_events_for_room[0].content['displayname']
+        room_member_count = 0
+        for mev in member_events_for_room:
+            if mev.content['membership'] != 'join':
+                continue
+
+            # This loop does two things:
+            # 1) Find our current display name
+            if mev.state_key == self.user_name:
+                my_display_name = mev.content['displayname']
+
+            # and 2) Get the number of people in that room
+            room_member_count += 1
 
         for r in rules:
             matches = True
@@ -102,7 +115,8 @@ class Pusher(object):
 
             for c in conditions:
                 matches &= self._event_fulfills_condition(
-                    ev, c, display_name=my_display_name
+                    ev, c, display_name=my_display_name,
+                    room_member_count=room_member_count
                 )
             # ignore rules with no actions (we have an explict 'dont_notify'
             if len(actions) == 0:
@@ -116,12 +130,17 @@ class Pusher(object):
 
         defer.returnValue(Pusher.DEFAULT_ACTIONS)
 
-    def _event_fulfills_condition(self, ev, condition, display_name):
+    def _event_fulfills_condition(self, ev, condition, display_name, room_member_count):
         if condition['kind'] == 'event_match':
             if 'pattern' not in condition:
                 logger.warn("event_match condition with no pattern")
                 return False
             pat = condition['pattern']
+
+            if pat.strip("*?[]") == pat:
+                # no special glob characters so we assume the user means
+                # 'contains this string' rather than 'is this string'
+                pat = "*%s*" % (pat,)
 
             val = _value_for_dotted_key(condition['key'], ev)
             if val is None:
@@ -138,9 +157,35 @@ class Pusher(object):
             # the event stream.
             if 'content' not in ev or 'body' not in ev['content']:
                 return False
+            if not display_name:
+                return False
             return fnmatch.fnmatch(
                 ev['content']['body'].upper(), "*%s*" % (display_name.upper(),)
             )
+        elif condition['kind'] == 'room_member_count':
+            if 'is' not in condition:
+                return False
+            m = Pusher.INEQUALITY_EXPR.match(condition['is'])
+            if not m:
+                return False
+            ineq = m.group(1)
+            rhs = m.group(2)
+            if not rhs.isdigit():
+                return False
+            rhs = int(rhs)
+
+            if ineq == '' or ineq == '==':
+                return room_member_count == rhs
+            elif ineq == '<':
+                return room_member_count < rhs
+            elif ineq == '>':
+                return room_member_count > rhs
+            elif ineq == '>=':
+                return room_member_count >= rhs
+            elif ineq == '<=':
+                return room_member_count <= rhs
+            else:
+                return False
         else:
             return True
 
