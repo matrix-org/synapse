@@ -805,7 +805,9 @@ class FederationHandler(BaseHandler):
                     yield self._handle_new_event(
                         origin, ev, auth_events=auth
                     )
-                    auth_events[(ev.type, ev.state_key)] = ev
+
+                    if ev.event_id in event_auth_events:
+                        auth_events[(ev.type, ev.state_key)] = ev
                 except AuthError:
                     pass
 
