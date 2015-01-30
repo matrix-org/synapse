@@ -370,7 +370,7 @@ class SyncHandler(BaseHandler):
             prev_batch=prev_batch_token,
             state=state_events_delta,
             limited=limited,
-            ephemeral=typing_by_room.get(room_id, None)
+            ephemeral=typing_by_room.get(room_id, [])
         )
 
         logging.debug("Room sync: %r", room_sync)
