@@ -26,17 +26,18 @@ htmlcov
 
 demo/*.db
 demo/*.log
+demo/*.log.*
 demo/*.pid
+demo/media_store.*
 demo/etc
-
-graph/*.svg
-graph/*.png
-graph/*.dot
-
-**/webclient/config.js
-**/webclient/test/coverage/
-**/webclient/test/environment-protractor.js
 
 uploads
 
 .idea/
+media_store/
+
+*.tac
+
+build/
+
+localhost-800*/

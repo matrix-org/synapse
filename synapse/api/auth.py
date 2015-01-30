@@ -21,6 +21,7 @@ from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
+from synapse.types import UserID, ClientInfo
 
 import logging
 
@@ -104,7 +105,7 @@ class Auth(object):
         for event in curr_state:
             if event.type == EventTypes.Member:
                 try:
-                    if self.hs.parse_userid(event.state_key).domain != host:
+                    if UserID.from_string(event.state_key).domain != host:
                         continue
                 except:
                     logger.warn("state_key not user_id: %s", event.state_key)
@@ -289,7 +290,9 @@ class Auth(object):
         Args:
             request - An HTTP request with an access_token query parameter.
         Returns:
-            UserID : User ID object of the user making the request
+            tuple : of UserID and device string:
+                User ID object of the user making the request
+                Client ID object of the client instance the user is using
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -298,6 +301,8 @@ class Auth(object):
             access_token = request.args["access_token"][0]
             user_info = yield self.get_user_by_token(access_token)
             user = user_info["user"]
+            device_id = user_info["device_id"]
+            token_id = user_info["token_id"]
 
             ip_addr = self.hs.get_ip_from_request(request)
             user_agent = request.requestHeaders.getRawHeaders(
@@ -313,7 +318,7 @@ class Auth(object):
                     user_agent=user_agent
                 )
 
-            defer.returnValue(user)
+            defer.returnValue((user, ClientInfo(device_id, token_id)))
         except KeyError:
             raise AuthError(403, "Missing access token.")
 
@@ -337,7 +342,8 @@ class Auth(object):
             user_info = {
                 "admin": bool(ret.get("admin", False)),
                 "device_id": ret.get("device_id"),
-                "user": self.hs.parse_userid(ret.get("name")),
+                "user": UserID.from_string(ret.get("name")),
+                "token_id": ret.get("token_id", None),
             }
 
             defer.returnValue(user_info)
@@ -461,7 +467,7 @@ class Auth(object):
                             "You are not allowed to set others state"
                         )
                     else:
-                        sender_domain = self.hs.parse_userid(
+                        sender_domain = UserID.from_string(
                             event.user_id
                         ).domain
 
@@ -496,7 +502,7 @@ class Auth(object):
         # Validate users
         for k, v in user_list.items():
             try:
-                self.hs.parse_userid(k)
+                UserID.from_string(k)
             except:
                 raise SynapseError(400, "Not a valid user_id: %s" % (k,))
 

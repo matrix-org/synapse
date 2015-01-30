@@ -122,7 +122,8 @@ class RegistrationStore(SQLBaseStore):
 
     def _query_for_auth(self, txn, token):
         sql = (
-            "SELECT users.name, users.admin, access_tokens.device_id"
+            "SELECT users.name, users.admin,"
+            " access_tokens.device_id, access_tokens.id as token_id"
             " FROM users"
             " INNER JOIN access_tokens on users.id = access_tokens.user_id"
             " WHERE token = ?"

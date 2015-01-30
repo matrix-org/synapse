@@ -20,6 +20,7 @@ from synapse.api.constants import PresenceState
 
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.types import UserID
 
 from ._base import BaseHandler
 
@@ -86,6 +87,10 @@ class PresenceHandler(BaseHandler):
             "changed_presencelike_data", self.changed_presencelike_data
         )
 
+        # outbound signal from the presence module to advertise when a user's
+        # presence has changed
+        distributor.declare("user_presence_changed")
+
         self.distributor = distributor
 
         self.federation = hs.get_replication_layer()
@@ -96,22 +101,22 @@ class PresenceHandler(BaseHandler):
         self.federation.register_edu_handler(
             "m.presence_invite",
             lambda origin, content: self.invite_presence(
-                observed_user=hs.parse_userid(content["observed_user"]),
-                observer_user=hs.parse_userid(content["observer_user"]),
+                observed_user=UserID.from_string(content["observed_user"]),
+                observer_user=UserID.from_string(content["observer_user"]),
             )
         )
         self.federation.register_edu_handler(
             "m.presence_accept",
             lambda origin, content: self.accept_presence(
-                observed_user=hs.parse_userid(content["observed_user"]),
-                observer_user=hs.parse_userid(content["observer_user"]),
+                observed_user=UserID.from_string(content["observed_user"]),
+                observer_user=UserID.from_string(content["observer_user"]),
             )
         )
         self.federation.register_edu_handler(
             "m.presence_deny",
             lambda origin, content: self.deny_presence(
-                observed_user=hs.parse_userid(content["observed_user"]),
-                observer_user=hs.parse_userid(content["observer_user"]),
+                observed_user=UserID.from_string(content["observed_user"]),
+                observer_user=UserID.from_string(content["observer_user"]),
             )
         )
 
@@ -418,7 +423,7 @@ class PresenceHandler(BaseHandler):
         )
 
         for p in presence:
-            observed_user = self.hs.parse_userid(p.pop("observed_user_id"))
+            observed_user = UserID.from_string(p.pop("observed_user_id"))
             p["observed_user"] = observed_user
             p.update(self._get_or_offline_usercache(observed_user).get_state())
             if "last_active" in p:
@@ -441,7 +446,7 @@ class PresenceHandler(BaseHandler):
                 user.localpart, accepted=True
             )
             target_users = set([
-                self.hs.parse_userid(x["observed_user_id"]) for x in presence
+                UserID.from_string(x["observed_user_id"]) for x in presence
             ])
 
             # Also include people in all my rooms
@@ -603,6 +608,7 @@ class PresenceHandler(BaseHandler):
             room_ids=room_ids,
             statuscache=statuscache,
         )
+        yield self.distributor.fire("user_presence_changed", user, statuscache)
 
     @defer.inlineCallbacks
     def _push_presence_remote(self, user, destination, state=None):
@@ -646,7 +652,7 @@ class PresenceHandler(BaseHandler):
         deferreds = []
 
         for push in content.get("push", []):
-            user = self.hs.parse_userid(push["user_id"])
+            user = UserID.from_string(push["user_id"])
 
             logger.debug("Incoming presence update from %s", user)
 
@@ -694,7 +700,7 @@ class PresenceHandler(BaseHandler):
                 del self._user_cachemap[user]
 
         for poll in content.get("poll", []):
-            user = self.hs.parse_userid(poll)
+            user = UserID.from_string(poll)
 
             if not self.hs.is_mine(user):
                 continue
@@ -709,7 +715,7 @@ class PresenceHandler(BaseHandler):
             deferreds.append(self._push_presence_remote(user, origin))
 
         for unpoll in content.get("unpoll", []):
-            user = self.hs.parse_userid(unpoll)
+            user = UserID.from_string(unpoll)
 
             if not self.hs.is_mine(user):
                 continue

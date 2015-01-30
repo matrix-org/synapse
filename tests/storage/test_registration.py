@@ -53,7 +53,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            {"admin": 0, "device_id": None, "name": self.user_id},
+            {"admin": 0,
+             "device_id": None,
+             "name": self.user_id,
+             "token_id": 1},
             (yield self.store.get_user_by_token(self.tokens[0]))
         )
 
@@ -63,7 +66,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
         yield self.store.add_access_token_to_user(self.user_id, self.tokens[1])
 
         self.assertEquals(
-            {"admin": 0, "device_id": None, "name": self.user_id},
+            {"admin": 0,
+             "device_id": None,
+             "name": self.user_id,
+             "token_id": 2},
             (yield self.store.get_user_by_token(self.tokens[1]))
         )
 
