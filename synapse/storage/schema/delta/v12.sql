@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 /* Copyright 2015 OpenMarket Ltd
-=======
-/* Copyright 2014 OpenMarket Ltd
->>>>>>> fc946f3b8da8c7f71a9c25bf542c04472147bc5b
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,4 +53,3 @@ CREATE TABLE IF NOT EXISTS push_rules (
 );
 
 CREATE INDEX IF NOT EXISTS push_rules_user_name on push_rules (user_name);
-

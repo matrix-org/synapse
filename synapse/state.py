@@ -37,13 +37,15 @@ def _get_state_key_from_event(event):
 KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 
 
+AuthEventTypes = (EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,)
+
+
 class StateHandler(object):
     """ Responsible for doing state conflict resolution.
     """
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
-        # self.auth = hs.get_auth()
         self.hs = hs
 
     @defer.inlineCallbacks
@@ -231,7 +233,7 @@ class StateHandler(object):
 
         auth_events = {
             k: e for k, e in unconflicted_state.items()
-            if k[0] in (EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,)
+            if k[0] in AuthEventTypes
         }
 
         try:
