@@ -121,19 +121,19 @@ you get errors about ``error: no such option: --process-dependency-links`` you
 may need to manually upgrade it::
 
     $ sudo pip install --upgrade pip
-    
+
 If pip crashes mid-installation for reason (e.g. lost terminal), pip may
 refuse to run until you remove the temporary installation directory it
 created. To reset the installation::
 
     $ rm -rf /tmp/pip_install_matrix
-    
+
 pip seems to leak *lots* of memory during installation.  For instance, a Linux 
 host with 512MB of RAM may run out of memory whilst installing Twisted.  If this 
 happens, you will have to individually install the dependencies which are 
 failing, e.g.::
 
-    $ pip install --user twisted
+    $ pip install twisted
 
 On OSX, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
 will need to export CFLAGS=-Qunused-arguments.
@@ -148,7 +148,7 @@ Synapse can be installed on Cygwin. It requires the following Cygwin packages:
  - openssl (and openssl-devel, python-openssl)
  - python
  - python-setuptools
- 
+
 The content repository requires additional packages and will be unable to process
 uploads without them:
  - libjpeg8
@@ -176,7 +176,7 @@ To actually run your new homeserver, pick a working directory for Synapse to run
 (e.g. ``~/.synapse``), and::
 
     $ cd ~/.synapse
-    $ ./bin/activate
+    $ source ./bin/activate
     $ synctl start
 
 Troubleshooting Running
@@ -211,7 +211,7 @@ The homeserver has a number of external dependencies, that are easiest
 to install using pip and a virtualenv::
 
     $ virtualenv env
-    $ env/bin/activate
+    $ source env/bin/activate
     $ python synapse/dependencies | xargs -i pip install
     $ pip install setuptools_trial mock
 
@@ -237,7 +237,7 @@ IMPORTANT: Before upgrading an existing homeserver to a new version, please
 refer to UPGRADE.rst for any additional instructions.
 
 Otherwise, simply re-install the new codebase over the current one - e.g.
-by ``pip install --user --process-dependency-links
+by ``pip install --process-dependency-links
 https://github.com/matrix-org/synapse/tarball/master``
 if using pip, or by ``git pull`` if running off a git working copy.
 
