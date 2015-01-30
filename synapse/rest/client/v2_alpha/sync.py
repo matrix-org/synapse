@@ -123,7 +123,7 @@ class SyncRestServlet(RestServlet):
 
         sync_config = SyncConfig(
             user=user,
-            device="TODO",  # TODO(mjark) Get the device_id from access_token
+            client_info=client,
             gap=gap,
             limit=limit,
             sort=sort,

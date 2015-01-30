@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 SyncConfig = collections.namedtuple("SyncConfig", [
     "user",
-    "device",
+    "client_info",
     "limit",
     "gap",
     "sort",
@@ -288,12 +288,13 @@ class SyncHandler(BaseHandler):
         room_key = now_token.room_key
 
         while limited and len(recents) < sync_config.limit and max_repeat:
-            events, (room_key,_) = yield self.store.get_recent_events_for_room(
+            events, keys = yield self.store.get_recent_events_for_room(
                 room_id,
                 limit=load_limit + 1,
                 from_token=since_token.room_key if since_token else None,
                 end_token=room_key,
             )
+            (room_key, _) = keys
             loaded_recents = sync_config.filter.filter_room_events(events)
             loaded_recents.extend(recents)
             recents = loaded_recents
