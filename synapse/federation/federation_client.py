@@ -357,15 +357,10 @@ class FederationClient(object):
             for e in content["auth_chain"]
         ]
 
-        missing = [
-            (yield self._check_sigs_and_hash(self.event_from_pdu_json(e)))
-            for e in content.get("missing", [])
-        ]
-
         ret = {
             "auth_chain": auth_chain,
             "rejects": content.get("rejects", []),
-            "missing": missing,
+            "missing": content.get("missing", []),
         }
 
         defer.returnValue(ret)

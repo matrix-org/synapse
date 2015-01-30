@@ -166,8 +166,15 @@ class StateHandler(object):
         first is the name of a state group if one and only one is involved,
         otherwise `None`.
         """
+        logger.debug("resolve_state_groups event_ids %s", event_ids)
+
         state_groups = yield self.store.get_state_groups(
             event_ids
+        )
+
+        logger.debug(
+            "resolve_state_groups state_groups %s",
+            state_groups.keys()
         )
 
         group_names = set(state_groups.keys())
@@ -205,6 +212,15 @@ class StateHandler(object):
             if len(v.values()) > 1
         }
 
+        logger.debug(
+            "resolve_state_groups Unconflicted state: %s",
+            unconflicted_state.values(),
+        )
+        logger.debug(
+            "resolve_state_groups Conflicted state: %s",
+            conflicted_state.values(),
+        )
+
         if event_type:
             prev_states_events = conflicted_state.get(
                 (event_type, state_key), []
@@ -240,10 +256,6 @@ class StateHandler(object):
             1. power levels
             2. memberships
             3. other events.
-
-        :param conflicted_state:
-        :param auth_events:
-        :return:
         """
         resolved_state = {}
         power_key = (EventTypes.PowerLevels, "")

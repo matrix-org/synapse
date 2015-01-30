@@ -252,11 +252,8 @@ class FederationServer(object):
                 e.get_pdu_json(time_now)
                 for e in ret["auth_chain"]
             ],
-            "rejects": content.get("rejects", []),
-            "missing": [
-                e.get_pdu_json(time_now)
-                for e in ret.get("missing", [])
-            ],
+            "rejects": ret.get("rejects", []),
+            "missing": ret.get("missing", []),
         }
 
         defer.returnValue(
@@ -372,7 +369,10 @@ class FederationServer(object):
                             logger.exception("Failed to get PDU")
                             fetch_state = True
             else:
-                fetch_state = True
+                prevs = {e_id for e_id, _ in pdu.prev_events}
+                seen = set(have_seen.keys())
+                if prevs - seen:
+                    fetch_state = True
         else:
             fetch_state = True
 

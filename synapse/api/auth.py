@@ -102,6 +102,8 @@ class Auth(object):
     def check_host_in_room(self, room_id, host):
         curr_state = yield self.state.get_current_state(room_id)
 
+        logger.debug("Got curr_state %s", curr_state)
+
         for event in curr_state:
             if event.type == EventTypes.Member:
                 try:

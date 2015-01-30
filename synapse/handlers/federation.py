@@ -121,38 +121,18 @@ class FederationHandler(BaseHandler):
         )
         if not is_in_room and not event.internal_metadata.is_outlier():
             logger.debug("Got event for room we're not in.")
-
-            replication = self.replication_layer
-
-            if not state:
-                state, auth_chain = yield replication.get_state_for_room(
-                    origin, room_id=event.room_id, event_id=event.event_id,
-                )
-
-            if not auth_chain:
-                auth_chain = yield replication.get_event_auth(
-                    origin,
-                    context=event.room_id,
-                    event_id=event.event_id,
-                )
-
-            for e in auth_chain:
-                e.internal_metadata.outlier = True
-                try:
-                    yield self._handle_new_event(origin, e)
-                except:
-                    logger.exception(
-                        "Failed to handle auth event %s",
-                        e.event_id,
-                    )
-
             current_state = state
 
-        if state:
+        if state and auth_chain is not None:
             for e in state:
                 e.internal_metadata.outlier = True
                 try:
-                    yield self._handle_new_event(origin, e)
+                    auth_ids = [e_id for e_id, _ in e.auth_events]
+                    auth = {
+                        (e.type, e.state_key): e for e in auth_chain
+                        if e.event_id in auth_ids
+                    }
+                    yield self._handle_new_event(origin, e, auth_events=auth)
                 except:
                     logger.exception(
                         "Failed to handle state event %s",
@@ -809,18 +789,23 @@ class FederationHandler(BaseHandler):
             )
 
             # 3. Process any remote auth chain events we haven't seen.
-            for e in result.get("missing", []):
+            for missing_id in result.get("missing", []):
                 try:
-                    auth_ids = [e_id for e_id, _ in e.auth_events]
+                    for e in result["auth_chain"]:
+                        if e.event_id == missing_id:
+                            ev = e
+                            break
+
+                    auth_ids = [e_id for e_id, _ in ev.auth_events]
                     auth = {
                         (e.type, e.state_key): e for e in result["auth_chain"]
                         if e.event_id in auth_ids
                     }
-                    e.internal_metadata.outlier = True
+                    ev.internal_metadata.outlier = True
                     yield self._handle_new_event(
-                        origin, e, auth_events=auth
+                        origin, ev, auth_events=auth
                     )
-                    auth_events[(e.type, e.state_key)] = e
+                    auth_events[(ev.type, ev.state_key)] = ev
                 except AuthError:
                     pass
 
@@ -970,5 +955,5 @@ class FederationHandler(BaseHandler):
                 }
                 for e in base_remote_rejected
             },
-            "missing": missing_locals,
+            "missing": [e.event_id for e in missing_locals],
         })
