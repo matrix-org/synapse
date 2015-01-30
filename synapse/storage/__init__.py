@@ -70,6 +70,7 @@ SCHEMAS = [
     "pusher",
     "media_repository",
     "filtering",
+    "rejections",
 ]
 
 
