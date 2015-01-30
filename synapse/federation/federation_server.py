@@ -366,10 +366,13 @@ class FederationServer(object):
                                 logger.debug("Processed pdu %s", event_id)
                             else:
                                 logger.warn("Failed to get PDU %s", event_id)
+                                fetch_state = True
                         except:
                             # TODO(erikj): Do some more intelligent retries.
                             logger.exception("Failed to get PDU")
                             fetch_state = True
+            else:
+                fetch_state = True
         else:
             fetch_state = True
 

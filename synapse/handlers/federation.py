@@ -119,7 +119,7 @@ class FederationHandler(BaseHandler):
             event.room_id,
             self.server_name
         )
-        if not is_in_room and not event.internal_metadata.outlier:
+        if not is_in_room and not event.internal_metadata.is_outlier():
             logger.debug("Got event for room we're not in.")
 
             replication = self.replication_layer
@@ -780,6 +780,7 @@ class FederationHandler(BaseHandler):
                         (e.type, e.state_key): e for e in remote_auth_chain
                         if e.event_id in auth_ids
                     }
+                    e.internal_metadata.outlier = True
                     yield self._handle_new_event(
                         origin, e, auth_events=auth
                     )
@@ -787,6 +788,8 @@ class FederationHandler(BaseHandler):
                 except AuthError:
                     pass
 
+        # FIXME: Assumes we have and stored all the state for all the
+        # prev_events
         current_state = set(e.event_id for e in auth_events.values())
         different_auth = event_auth_events - current_state
 
@@ -814,6 +817,7 @@ class FederationHandler(BaseHandler):
                         (e.type, e.state_key): e for e in result["auth_chain"]
                         if e.event_id in auth_ids
                     }
+                    e.internal_metadata.outlier = True
                     yield self._handle_new_event(
                         origin, e, auth_events=auth
                     )
@@ -882,7 +886,7 @@ class FederationHandler(BaseHandler):
 
         missing_remotes = []
         missing_locals = []
-        while current_local and current_remote:
+        while current_local or current_remote:
             if current_remote is None:
                 missing_locals.append(current_local)
                 current_local = get_next(local_iter)
