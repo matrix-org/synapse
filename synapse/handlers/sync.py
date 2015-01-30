@@ -16,7 +16,7 @@
 from ._base import BaseHandler
 
 from synapse.streams.config import PaginationConfig
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, EventTypes
 
 from twisted.internet import defer
 
@@ -250,6 +250,11 @@ class SyncHandler(BaseHandler):
                     )
                 else:
                     prev_batch = now_token
+
+                state = yield self.check_joined_room(
+                    sync_config, room_id, state
+                )
+
                 room_sync = RoomSyncResult(
                     room_id=room_id,
                     published=room_id in published_room_ids,
@@ -323,8 +328,6 @@ class SyncHandler(BaseHandler):
             A Deferred RoomSyncResult
         """
 
-        # TODO(mjark): Check if they have joined the room between
-        # the previous sync and this one.
         # TODO(mjark): Check for redactions we might have missed.
 
         recents, prev_batch_token, limited = yield self.load_filtered_recents(
@@ -349,6 +352,10 @@ class SyncHandler(BaseHandler):
             current_state=current_state_events,
         )
 
+        state_events_delta = yield self.check_joined_room(
+            sync_config, room_id, state_events_delta
+        )
+
         room_sync = RoomSyncResult(
             room_id=room_id,
             published=room_id in published_room_ids,
@@ -356,7 +363,7 @@ class SyncHandler(BaseHandler):
             prev_batch=prev_batch_token,
             state=state_events_delta,
             limited=limited,
-            typing=typing_by_room.get(room_id, None)
+            ephemeral=typing_by_room.get(room_id, None)
         )
 
         logging.debug("Room sync: %r", room_sync)
@@ -402,3 +409,19 @@ class SyncHandler(BaseHandler):
             if event.event_id not in previous_dict:
                 state_delta.append(event)
         return state_delta
+
+    @defer.inlineCallbacks
+    def check_joined_room(self, sync_config, room_id, state_delta):
+        joined = False
+        for event in state_delta:
+            if (
+                event.type == EventTypes.Member
+                and event.state_key == sync_config.user.to_string()
+            ):
+                if event.content["membership"] == Membership.JOIN:
+                    joined = True
+
+        if joined:
+            state_delta = yield self.state_handler.get_current_state(room_id)
+
+        defer.returnValue(state_delta)
