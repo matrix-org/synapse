@@ -14,6 +14,11 @@
 # limitations under the License.
 
 
+from . import (
+    filter
+)
+
+
 from synapse.http.server import JsonResource
 
 
@@ -26,4 +31,4 @@ class ClientV2AlphaRestResource(JsonResource):
 
     @staticmethod
     def register_servlets(client_resource, hs):
-        pass
+        filter.register_servlets(hs, client_resource)
