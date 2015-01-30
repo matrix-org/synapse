@@ -95,7 +95,7 @@ Installing prerequisites on Ubuntu or Debian::
 
     $ sudo apt-get install build-essential python2.7-dev libffi-dev \
                            python-pip python-setuptools sqlite3 \
-                           libssl-dev
+                           libssl-dev python-virtualenv libjpeg-dev
 
 Installing prerequisites on Mac OS X::
 
@@ -103,10 +103,12 @@ Installing prerequisites on Mac OS X::
     
 To install the synapse homeserver run::
 
-    $ pip install --user --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+    $ virutalenv ~/.synapse
+    $ source ~/.synapse/bin/activate
+    $ pip install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
 
-This installs synapse, along with the libraries it uses, into
-``$HOME/.local/lib/`` on Linux or ``$HOME/Library/Python/2.7/lib/`` on OSX.
+This installs synapse, along with the libraries it uses, into a virtual
+environment under ``synapse``.
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See docs/turn-howto.rst for details.
@@ -173,22 +175,12 @@ Running Your Homeserver
 To actually run your new homeserver, pick a working directory for Synapse to run 
 (e.g. ``~/.synapse``), and::
 
-    $ mkdir ~/.synapse
     $ cd ~/.synapse
-    
-    $ # on Linux
-    $ ~/.local/bin/synctl start
-    
-    $ # on OSX
-    $ ~/Library/Python/2.7/bin/synctl start
+    $ ./bin/activate
+    $ synctl start
 
 Troubleshooting Running
 -----------------------
-
-If ``synctl`` fails with ``pkg_resources.DistributionNotFound`` errors you may 
-need a newer version of setuptools than that provided by your OS.::
-
-    $ sudo pip install setuptools --upgrade
 
 If synapse fails with ``missing "sodium.h"`` crypto errors, you may need 
 to manually upgrade PyNaCL, as synapse uses NaCl (http://nacl.cr.yp.to/) for 
@@ -216,13 +208,15 @@ directory of your choice::
     $ cd synapse
 
 The homeserver has a number of external dependencies, that are easiest
-to install by making setup.py do so, in --user mode::
+to install using pip and a virtualenv::
 
-    $ python setup.py develop --user
+    $ virtualenv env
+    $ env/bin/activate
+    $ python synapse/dependencies | xargs -i pip install
+    $ pip install setuptools_trial mock
 
-This will run a process of downloading and installing into your
-user's .local/lib directory all of the required dependencies that are
-missing.
+This will run a process of downloading and installing all the needed
+dependencies into a virtual env.
 
 Once this is done, you may wish to run the homeserver's unit tests, to
 check that everything is installed as it should be::
