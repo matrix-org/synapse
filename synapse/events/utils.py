@@ -88,7 +88,10 @@ def prune_event(event):
     if "age_ts" in event.unsigned:
         allowed_fields["unsigned"]["age_ts"] = event.unsigned["age_ts"]
 
-    return type(event)(allowed_fields)
+    return type(event)(
+        allowed_fields,
+        internal_metadata_dict=event.internal_metadata.get_dict()
+    )
 
 
 def serialize_event(hs, e, client_event=True):
