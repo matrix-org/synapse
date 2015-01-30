@@ -296,7 +296,8 @@ class StateHandler(object):
             except AuthError:
                 pass
 
-        # Oh dear.
+        # Use the last event (the one with the least depth) if they all fail
+        # the auth check.
         return event
 
     def _ordered_events(self, events):
