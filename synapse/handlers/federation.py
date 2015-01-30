@@ -741,6 +741,15 @@ class FederationHandler(BaseHandler):
             local_auth_chain, remote_auth_chain
         )
 
+        for event in ret["auth_chain"]:
+            event.signatures.update(
+                compute_event_signature(
+                    event,
+                    self.hs.hostname,
+                    self.hs.config.signing_key[0]
+                )
+            )
+
         logger.debug("on_query_auth reutrning: %s", ret)
 
         defer.returnValue(ret)
