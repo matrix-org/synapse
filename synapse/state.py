@@ -214,15 +214,6 @@ class StateHandler(object):
             if len(v.values()) > 1
         }
 
-        logger.debug(
-            "resolve_state_groups Unconflicted state: %s",
-            unconflicted_state.values(),
-        )
-        logger.debug(
-            "resolve_state_groups Conflicted state: %s",
-            conflicted_state.values(),
-        )
-
         if event_type:
             prev_states_events = conflicted_state.get(
                 (event_type, state_key), []
