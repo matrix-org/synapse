@@ -20,6 +20,13 @@ from .units import Edu
 
 from synapse.util.logutils import log_function
 from synapse.events import FrozenEvent
+from synapse.events.utils import prune_event
+
+from syutil.jsonutil import encode_canonical_json
+
+from synapse.crypto.event_signing import check_event_content_hash
+
+from synapse.api.errors import SynapseError
 
 import logging
 
@@ -126,6 +133,11 @@ class FederationClient(object):
             for p in transaction_data["pdus"]
         ]
 
+        for i, pdu in enumerate(pdus):
+            pdus[i] = yield self._check_sigs_and_hash(pdu)
+
+            # FIXME: We should handle signature failures more gracefully.
+
         defer.returnValue(pdus)
 
     @defer.inlineCallbacks
@@ -159,24 +171,28 @@ class FederationClient(object):
                 transaction_data = yield self.transport_layer.get_event(
                     destination, event_id
                 )
+
+                logger.debug("transaction_data %r", transaction_data)
+
+                pdu_list = [
+                    self.event_from_pdu_json(p, outlier=outlier)
+                    for p in transaction_data["pdus"]
+                ]
+
+                if pdu_list:
+                    pdu = pdu_list[0]
+
+                    # Check signatures are correct.
+                    pdu = yield self._check_sigs_and_hash(pdu)
+
+                    break
+
             except Exception as e:
                 logger.info(
                     "Failed to get PDU %s from %s because %s",
                     event_id, destination, e,
                 )
                 continue
-
-            logger.debug("transaction_data %r", transaction_data)
-
-            pdu_list = [
-                self.event_from_pdu_json(p, outlier=outlier)
-                for p in transaction_data["pdus"]
-            ]
-
-            if pdu_list:
-                pdu = pdu_list[0]
-                # TODO: We need to check signatures here
-                break
 
         defer.returnValue(pdu)
 
@@ -208,6 +224,16 @@ class FederationClient(object):
             for p in result.get("auth_chain", [])
         ]
 
+        for i, pdu in enumerate(pdus):
+            pdus[i] = yield self._check_sigs_and_hash(pdu)
+
+            # FIXME: We should handle signature failures more gracefully.
+
+        for i, pdu in enumerate(auth_chain):
+            auth_chain[i] = yield self._check_sigs_and_hash(pdu)
+
+            # FIXME: We should handle signature failures more gracefully.
+
         defer.returnValue((pdus, auth_chain))
 
     @defer.inlineCallbacks
@@ -221,6 +247,11 @@ class FederationClient(object):
             self.event_from_pdu_json(p, outlier=True)
             for p in res["auth_chain"]
         ]
+
+        for i, pdu in enumerate(auth_chain):
+            auth_chain[i] = yield self._check_sigs_and_hash(pdu)
+
+            # FIXME: We should handle signature failures more gracefully.
 
         auth_chain.sort(key=lambda e: e.depth)
 
@@ -260,6 +291,16 @@ class FederationClient(object):
             for p in content.get("auth_chain", [])
         ]
 
+        for i, pdu in enumerate(state):
+            state[i] = yield self._check_sigs_and_hash(pdu)
+
+            # FIXME: We should handle signature failures more gracefully.
+
+        for i, pdu in enumerate(auth_chain):
+            auth_chain[i] = yield self._check_sigs_and_hash(pdu)
+
+            # FIXME: We should handle signature failures more gracefully.
+
         auth_chain.sort(key=lambda e: e.depth)
 
         defer.returnValue({
@@ -281,7 +322,48 @@ class FederationClient(object):
 
         logger.debug("Got response to send_invite: %s", pdu_dict)
 
-        defer.returnValue(self.event_from_pdu_json(pdu_dict))
+        pdu = self.event_from_pdu_json(pdu_dict)
+
+        # Check signatures are correct.
+        pdu = yield self._check_sigs_and_hash(pdu)
+
+        # FIXME: We should handle signature failures more gracefully.
+
+        defer.returnValue(pdu)
+
+    @defer.inlineCallbacks
+    def query_auth(self, destination, room_id, event_id, local_auth):
+        """
+        Params:
+            destination (str)
+            event_it (str)
+            local_auth (list)
+        """
+        time_now = self._clock.time_msec()
+
+        send_content = {
+            "auth_chain": [e.get_pdu_json(time_now) for e in local_auth],
+        }
+
+        code, content = yield self.transport_layer.send_query_auth(
+            destination=destination,
+            room_id=room_id,
+            event_id=event_id,
+            content=send_content,
+        )
+
+        auth_chain = [
+            (yield self._check_sigs_and_hash(self.event_from_pdu_json(e)))
+            for e in content["auth_chain"]
+        ]
+
+        ret = {
+            "auth_chain": auth_chain,
+            "rejects": content.get("rejects", []),
+            "missing": content.get("missing", []),
+        }
+
+        defer.returnValue(ret)
 
     def event_from_pdu_json(self, pdu_json, outlier=False):
         event = FrozenEvent(
@@ -291,3 +373,37 @@ class FederationClient(object):
         event.internal_metadata.outlier = outlier
 
         return event
+
+    @defer.inlineCallbacks
+    def _check_sigs_and_hash(self, pdu):
+        """Throws a SynapseError if the PDU does not have the correct
+        signatures.
+
+        Returns:
+            FrozenEvent: Either the given event or it redacted if it failed the
+            content hash check.
+        """
+        # Check signatures are correct.
+        redacted_event = prune_event(pdu)
+        redacted_pdu_json = redacted_event.get_pdu_json()
+
+        try:
+            yield self.keyring.verify_json_for_server(
+                pdu.origin, redacted_pdu_json
+            )
+        except SynapseError:
+            logger.warn(
+                "Signature check failed for %s redacted to %s",
+                encode_canonical_json(pdu.get_pdu_json()),
+                encode_canonical_json(redacted_pdu_json),
+            )
+            raise
+
+        if not check_event_content_hash(pdu):
+            logger.warn(
+                "Event content has been tampered, redacting %s, %s",
+                pdu.event_id, encode_canonical_json(pdu.get_dict())
+            )
+            defer.returnValue(redacted_event)
+
+        defer.returnValue(pdu)

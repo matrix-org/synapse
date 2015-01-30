@@ -28,6 +28,16 @@ class RejectionsStore(SQLBaseStore):
             values={
                 "event_id": event_id,
                 "reason": reason,
-                "last_failure": self._clock.time_msec(),
+                "last_check": self._clock.time_msec(),
             }
+        )
+
+    def get_rejection_reason(self, event_id):
+        return self._simple_select_one_onecol(
+            table="rejections",
+            retcol="reason",
+            keyvalues={
+                "event_id": event_id,
+            },
+            allow_none=True,
         )

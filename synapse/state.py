@@ -168,8 +168,15 @@ class StateHandler(object):
         first is the name of a state group if one and only one is involved,
         otherwise `None`.
         """
+        logger.debug("resolve_state_groups event_ids %s", event_ids)
+
         state_groups = yield self.store.get_state_groups(
             event_ids
+        )
+
+        logger.debug(
+            "resolve_state_groups state_groups %s",
+            state_groups.keys()
         )
 
         group_names = set(state_groups.keys())
