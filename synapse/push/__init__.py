@@ -101,7 +101,7 @@ class Pusher(object):
 
             # This loop does two things:
             # 1) Find our current display name
-            if mev.state_key == self.user_name:
+            if mev.state_key == self.user_name and 'displayname' in mev.content:
                 my_display_name = mev.content['displayname']
 
             # and 2) Get the number of people in that room
