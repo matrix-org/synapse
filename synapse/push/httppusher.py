@@ -92,9 +92,9 @@ class HttpPusher(Pusher):
 
         if len(ctx['aliases']):
             d['notification']['room_alias'] = ctx['aliases'][0]
-        if 'sender_display_name' in ctx:
+        if 'sender_display_name' in ctx and len(ctx['sender_display_name']) > 0:
             d['notification']['sender_display_name'] = ctx['sender_display_name']
-        if 'name' in ctx:
+        if 'name' in ctx and len(ctx['name']) > 0:
             d['notification']['room_name'] = ctx['name']
 
         defer.returnValue(d)
