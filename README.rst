@@ -100,15 +100,16 @@ Installing prerequisites on Ubuntu or Debian::
 Installing prerequisites on Mac OS X::
 
     $ xcode-select --install
+    $ sudo pip install virtualenv
     
 To install the synapse homeserver run::
 
-    $ virutalenv ~/.synapse
+    $ virtualenv ~/.synapse
     $ source ~/.synapse/bin/activate
     $ pip install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
 
 This installs synapse, along with the libraries it uses, into a virtual
-environment under ``synapse``.
+environment under ``~/.synapse``.
 
 To set up your homeserver, run (in your virtualenv, as before)::
 
