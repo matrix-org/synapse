@@ -33,7 +33,7 @@ setup(
     install_requires=[
         "syutil==0.0.2",
         "matrix_angular_sdk>=0.6.1",
-        "Twisted>=14.0.0",
+        "Twisted==14.0.2",
         "service_identity>=1.0.0",
         "pyopenssl>=0.14",
         "pyyaml",
@@ -50,6 +50,7 @@ setup(
         "https://github.com/matrix-org/matrix-angular-sdk/tarball/v0.6.1/#egg=matrix_angular_sdk-0.6.1",
     ],
     setup_requires=[
+        "Twisted==14.0.2",
         "setuptools_trial",
         "setuptools>=1.0.0", # Needs setuptools that supports git+ssh.
                              # TODO: Do we need this now? we don't use git+ssh.
