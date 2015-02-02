@@ -111,6 +111,7 @@ class ApplicationServiceStore(SQLBaseStore):
         self.cache = ApplicationServiceCache()
         self._populate_cache()
 
+    @defer.inlineCallbacks
     def unregister_app_service(self, token):
         """Unregisters this service.
 
@@ -150,6 +151,7 @@ class ApplicationServiceStore(SQLBaseStore):
         )
         return True
 
+    @defer.inlineCallbacks
     def update_app_service(self, service):
         """Update an application service, clobbering what was previously there.
 
