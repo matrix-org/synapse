@@ -224,17 +224,17 @@ class FederationClient(object):
             for p in result.get("auth_chain", [])
         ]
 
-        for i, pdu in enumerate(pdus):
-            pdus[i] = yield self._check_sigs_and_hash(pdu)
+        signed_pdus = yield self._check_sigs_and_hash_and_fetch(
+            pdus, outlier=True
+        )
 
-            # FIXME: We should handle signature failures more gracefully.
+        signed_auth = yield self._check_sigs_and_hash_and_fetch(
+            auth_chain, outlier=True
+        )
 
-        for i, pdu in enumerate(auth_chain):
-            auth_chain[i] = yield self._check_sigs_and_hash(pdu)
+        signed_auth.sort(key=lambda e: e.depth)
 
-            # FIXME: We should handle signature failures more gracefully.
-
-        defer.returnValue((pdus, auth_chain))
+        defer.returnValue((signed_pdus, signed_auth))
 
     @defer.inlineCallbacks
     @log_function
@@ -248,14 +248,13 @@ class FederationClient(object):
             for p in res["auth_chain"]
         ]
 
-        for i, pdu in enumerate(auth_chain):
-            auth_chain[i] = yield self._check_sigs_and_hash(pdu)
+        signed_auth = yield self._check_sigs_and_hash_and_fetch(
+            auth_chain, outlier=True
+        )
 
-            # FIXME: We should handle signature failures more gracefully.
+        signed_auth.sort(key=lambda e: e.depth)
 
-        auth_chain.sort(key=lambda e: e.depth)
-
-        defer.returnValue(auth_chain)
+        defer.returnValue(signed_auth)
 
     @defer.inlineCallbacks
     def make_join(self, destination, room_id, user_id):
@@ -291,21 +290,19 @@ class FederationClient(object):
             for p in content.get("auth_chain", [])
         ]
 
-        for i, pdu in enumerate(state):
-            state[i] = yield self._check_sigs_and_hash(pdu)
+        signed_state = yield self._check_sigs_and_hash_and_fetch(
+            state, outlier=True
+        )
 
-            # FIXME: We should handle signature failures more gracefully.
-
-        for i, pdu in enumerate(auth_chain):
-            auth_chain[i] = yield self._check_sigs_and_hash(pdu)
-
-            # FIXME: We should handle signature failures more gracefully.
+        signed_auth = yield self._check_sigs_and_hash_and_fetch(
+            auth_chain, outlier=True
+        )
 
         auth_chain.sort(key=lambda e: e.depth)
 
         defer.returnValue({
-            "state": state,
-            "auth_chain": auth_chain,
+            "state": signed_state,
+            "auth_chain": signed_auth,
         })
 
     @defer.inlineCallbacks
@@ -353,12 +350,18 @@ class FederationClient(object):
         )
 
         auth_chain = [
-            (yield self._check_sigs_and_hash(self.event_from_pdu_json(e)))
+            self.event_from_pdu_json(e)
             for e in content["auth_chain"]
         ]
 
+        signed_auth = yield self._check_sigs_and_hash_and_fetch(
+            auth_chain, outlier=True
+        )
+
+        signed_auth.sort(key=lambda e: e.depth)
+
         ret = {
-            "auth_chain": auth_chain,
+            "auth_chain": signed_auth,
             "rejects": content.get("rejects", []),
             "missing": content.get("missing", []),
         }
@@ -373,6 +376,58 @@ class FederationClient(object):
         event.internal_metadata.outlier = outlier
 
         return event
+
+    @defer.inlineCallbacks
+    def _check_sigs_and_hash_and_fetch(self, pdus, outlier=False):
+        """Takes a list of PDUs and checks the signatures and hashs of each
+        one. If a PDU fails its signature check then we check if we have it in
+        the database and if not then request if from the originating server of
+        that PDU.
+
+        If a PDU fails its content hash check then it is redacted.
+
+        The given list of PDUs are not modified, instead the function returns
+        a new list.
+
+        Args:
+            pdu (list)
+            outlier (bool)
+
+        Returns:
+            Deferred : A list of PDUs that have valid signatures and hashes.
+        """
+        signed_pdus = []
+        for pdu in pdus:
+            try:
+                new_pdu = yield self._check_sigs_and_hash(pdu)
+                signed_pdus.append(new_pdu)
+            except SynapseError:
+                # FIXME: We should handle signature failures more gracefully.
+
+                # Check local db.
+                new_pdu = yield self.store.get_event(
+                    pdu.event_id,
+                    allow_rejected=True
+                )
+                if new_pdu:
+                    signed_pdus.append(new_pdu)
+                    continue
+
+                # Check pdu.origin
+                new_pdu = yield self.get_pdu(
+                    destinations=[pdu.origin],
+                    event_id=pdu.event_id,
+                    outlier=outlier,
+                )
+
+                if new_pdu:
+                    signed_pdus.append(new_pdu)
+                    continue
+
+                logger.warn("Failed to find copy of %s with valid signature")
+
+        defer.returnValue(signed_pdus)
+
 
     @defer.inlineCallbacks
     def _check_sigs_and_hash(self, pdu):
