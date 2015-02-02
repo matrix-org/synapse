@@ -225,11 +225,11 @@ class FederationClient(object):
         ]
 
         signed_pdus = yield self._check_sigs_and_hash_and_fetch(
-            pdus, outlier=True
+            destination, pdus, outlier=True
         )
 
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            auth_chain, outlier=True
+            destination, auth_chain, outlier=True
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -249,7 +249,7 @@ class FederationClient(object):
         ]
 
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            auth_chain, outlier=True
+            destination, auth_chain, outlier=True
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -291,11 +291,11 @@ class FederationClient(object):
         ]
 
         signed_state = yield self._check_sigs_and_hash_and_fetch(
-            state, outlier=True
+            destination, state, outlier=True
         )
 
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            auth_chain, outlier=True
+            destination, auth_chain, outlier=True
         )
 
         auth_chain.sort(key=lambda e: e.depth)
@@ -355,7 +355,7 @@ class FederationClient(object):
         ]
 
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            auth_chain, outlier=True
+            destination, auth_chain, outlier=True
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -378,7 +378,7 @@ class FederationClient(object):
         return event
 
     @defer.inlineCallbacks
-    def _check_sigs_and_hash_and_fetch(self, pdus, outlier=False):
+    def _check_sigs_and_hash_and_fetch(self, origin, pdus, outlier=False):
         """Takes a list of PDUs and checks the signatures and hashs of each
         one. If a PDU fails its signature check then we check if we have it in
         the database and if not then request if from the originating server of
@@ -414,15 +414,16 @@ class FederationClient(object):
                     continue
 
                 # Check pdu.origin
-                new_pdu = yield self.get_pdu(
-                    destinations=[pdu.origin],
-                    event_id=pdu.event_id,
-                    outlier=outlier,
-                )
+                if pdu.origin != origin:
+                    new_pdu = yield self.get_pdu(
+                        destinations=[pdu.origin],
+                        event_id=pdu.event_id,
+                        outlier=outlier,
+                    )
 
-                if new_pdu:
-                    signed_pdus.append(new_pdu)
-                    continue
+                    if new_pdu:
+                        signed_pdus.append(new_pdu)
+                        continue
 
                 logger.warn("Failed to find copy of %s with valid signature")
 
