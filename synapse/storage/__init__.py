@@ -67,7 +67,7 @@ SCHEMAS = [
     "event_signatures",
     "pusher",
     "media_repository",
-    "application_services"
+    "application_services",
     "filtering",
     "rejections",
 ]

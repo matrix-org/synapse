@@ -15,11 +15,17 @@
 import logging
 from twisted.internet import defer
 
+from synapse.api.errors import StoreError
 from ._base import SQLBaseStore
 
 
 logger = logging.getLogger(__name__)
 
+namespace_enum = [
+    "users",    # 0
+    "aliases",  # 1
+    "rooms"   # 2
+]
 
 # XXX: This feels like it should belong in a "models" module, not storage.
 class ApplicationService(object):
@@ -30,25 +36,26 @@ class ApplicationService(object):
 
     def __init__(self, token, url=None, namespaces=None):
         self.token = token
-        if url:
-            self.url = url
-        if namespaces:
-            self._set_namespaces(namespaces)
+        self.url = url
+        self.namespaces = self._get_namespaces(namespaces)
 
-    def _set_namespaces(self, namespaces):
+    def _get_namespaces(self, namespaces):
         # Sanity check that it is of the form:
         # {
         #   users: ["regex",...],
         #   aliases: ["regex",...],
         #   rooms: ["regex",...],
         # }
+        if not namespaces:
+            return None
+
         for ns in ["users", "rooms", "aliases"]:
             if type(namespaces[ns]) != list:
                 raise ValueError("Bad namespace value for '%s'", ns)
             for regex in namespaces[ns]:
                 if not isinstance(regex, basestring):
                     raise ValueError("Expected string regex for ns '%s'", ns)
-        self.namespaces = namespaces
+        return namespaces
 
     def is_interested(self, event):
         """Check if this service is interested in this event.
@@ -110,10 +117,38 @@ class ApplicationServiceStore(SQLBaseStore):
         This removes all AS specific regex and the base URL. The token is the
         only thing preserved for future registration attempts.
         """
-        # TODO: DELETE FROM application_services_regex WHERE id=this service
-        # TODO: SET url=NULL WHERE token=token
-        # TODO: Update cache
-        pass
+        yield self.runInteraction(
+            "unregister_app_service",
+            self._unregister_app_service_txn,
+            token,
+        )
+        # update cache TODO: Should this be in the txn?
+        for service in self.cache.services:
+            if service.token == token:
+                service.url = None
+                service.namespaces = None
+
+    def _unregister_app_service_txn(self, txn, token):
+        # kill the url to prevent pushes
+        txn.execute(
+            "UPDATE application_services SET url=NULL WHERE token=?",
+            (token,)
+        )
+
+        # cleanup regex
+        as_id = self._get_as_id_txn(txn, token)
+        if not as_id:
+            logger.warning(
+                "unregister_app_service_txn: Failed to find as_id for token=",
+                token
+            )
+            return False
+
+        txn.execute(
+            "DELETE FROM application_services_regex WHERE as_id=?",
+            (as_id,)
+        )
+        return True
 
     def update_app_service(self, service):
         """Update an application service, clobbering what was previously there.
@@ -124,12 +159,61 @@ class ApplicationServiceStore(SQLBaseStore):
         # NB: There is no "insert" since we provide no public-facing API to
         # allocate new ASes. It relies on the server admin inserting the AS
         # token into the database manually.
+        if not service.token or not service.url:
+            raise StoreError(400, "Token and url must be specified.")
 
-        # TODO: UPDATE application_services, SET url WHERE token=service.token
-        # TODO: DELETE FROM application_services_regex WHERE id=this service
-        # TODO: INSERT INTO application_services_regex <new namespace regex>
-        # TODO: Update cache
-        pass
+        yield self.runInteraction(
+            "update_app_service",
+            self._update_app_service_txn,
+            service
+        )
+
+        # update cache TODO: Should this be in the txn?
+        for (index, cache_service) in enumerate(self.cache.services):
+            if service.token == cache_service.token:
+                self.cache.services[index] = service
+                logger.info("Updated: %s", service)
+                return
+        # new entry
+        self.cache.services.append(service)
+        logger.info("Updated(new): %s", service)
+
+    def _update_app_service_txn(self, txn, service):
+        as_id = self._get_as_id_txn(txn, service.token)
+        if not as_id:
+            logger.warning(
+                "update_app_service_txn: Failed to find as_id for token=",
+                service.token
+            )
+            return False
+
+        txn.execute(
+            "UPDATE application_services SET url=? WHERE id=?",
+            (service.url, as_id,)
+        )
+        # cleanup regex
+        txn.execute(
+            "DELETE FROM application_services_regex WHERE id=?",
+            (as_id,)
+        )
+        for (ns_int, ns_str) in enumerate(namespace_enum):
+            if ns_str in service.namespaces:
+                for regex in service.namespaces[ns_str]:
+                    txn.execute(
+                        "INSERT INTO application_services_regex("
+                        "as_id, namespace, regex) values(?,?,?)",
+                        (as_id, ns_int, regex)
+                    )
+        return True
+
+    def _get_as_id_txn(self, txn, token):
+        cursor = txn.execute(
+            "SELECT id FROM application_services WHERE token=?",
+            (token,)
+        )
+        res = cursor.fetchone()
+        if res:
+            return res[0]
 
     def get_services_for_event(self, event):
         return self.cache.get_services_for_event(event)
@@ -161,12 +245,6 @@ class ApplicationServiceStore(SQLBaseStore):
         sql = ("SELECT * FROM application_services LEFT JOIN "
                "application_services_regex ON application_services.id = "
                "application_services_regex.as_id")
-
-        namespace_enum = [
-            "users",    # 0
-            "aliases",  # 1
-            "rooms"   # 2
-        ]
         # SQL results in the form:
         # [
         #   {

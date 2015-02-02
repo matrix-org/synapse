@@ -43,7 +43,8 @@ class ApplicationServicesHandler(BaseHandler):
                 "Consult the home server admin.",
                 errcode=Codes.FORBIDDEN
             )
-        # TODO store this AS
+        logger.info("Updating application service info...")
+        yield self.store.update_app_service(app_service)
 
     def unregister(self, token):
         logger.info("Unregister as_token=%s", token)
