@@ -43,6 +43,7 @@ setup(
         "py-bcrypt",
         "frozendict>=0.4",
         "pillow",
+        "pydenticon",
     ],
     dependency_links=[
         "https://github.com/matrix-org/syutil/tarball/v0.0.2#egg=syutil-0.0.2",

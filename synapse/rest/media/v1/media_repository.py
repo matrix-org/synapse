@@ -16,6 +16,7 @@
 from .upload_resource import UploadResource
 from .download_resource import DownloadResource
 from .thumbnail_resource import ThumbnailResource
+from .identicon_resource import IdenticonResource
 from .filepath import MediaFilePaths
 
 from twisted.web.resource import Resource
@@ -75,3 +76,4 @@ class MediaRepositoryResource(Resource):
         self.putChild("upload", UploadResource(hs, filepaths))
         self.putChild("download", DownloadResource(hs, filepaths))
         self.putChild("thumbnail", ThumbnailResource(hs, filepaths))
+        self.putChild("identicon", IdenticonResource())
