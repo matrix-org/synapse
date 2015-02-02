@@ -16,6 +16,7 @@ REQUIREMENTS = {
     "py-bcrypt": ["bcrypt"],
     "frozendict>=0.4": ["frozendict"],
     "pillow": ["PIL"],
+    "pydenticon": ["pydenticon"],
 }
 
 
