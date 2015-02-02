@@ -42,7 +42,7 @@ class IdenticonResource(Resource):
     def render_GET(self, request):
         name = "/".join(request.postpath)
         width = int(request.args.get("width", 96))
-        height = int(request.args.get("width", 96))
+        height = int(request.args.get("height", 96))
         identicon_bytes = self.generate_identicon(name, width, height)
         request.setHeader(b"Content-Type", b"image/png")
         return identicon_bytes
