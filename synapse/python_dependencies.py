@@ -18,6 +18,27 @@ REQUIREMENTS = {
     "pillow": ["PIL"],
 }
 
+def github_link(project, version, egg):
+    return "https://github.com/%s/tarball/%s/#egg=%s" % (project, version, egg)
+
+DEPENDENCY_LINKS=[
+    github_link(
+        project="matrix-org/syutil",
+        version="v0.0.2",
+        egg="syutil-0.0.2",
+    ),
+    github_link(
+        project="matrix-org/matrix-angular-sdk",
+        version="v0.6.0",
+        egg="matrix_angular_sdk-0.6.0",
+    ),
+    github_link(
+        project="pyca/pynacl",
+        version="d4d3175589b892f6ea7c22f466e0e223853516fa",
+        egg="pynacl-0.3.0",
+    )
+]
+
 
 class MissingRequirementError(Exception):
     pass
@@ -78,3 +99,23 @@ def check_requirements():
                         "Unexpected version of %r in %r. %r != %r"
                         % (dependency, file_path, version, required_version)
                     )
+
+def list_requirements():
+    result = []
+    linked = []
+    for link in DEPENDENCY_LINKS:
+        egg = link.split("#egg=")[1]
+        linked.append(egg.split('-')[0])
+        result.append(link)
+    for requirement in REQUIREMENTS:
+        is_linked = False
+        for link in linked:
+            if requirement.replace('-','_').startswith(link):
+                is_linked = True
+        if not is_linked:
+            result.append(requirement)
+    return result
+
+if __name__ == "__main__":
+    import sys
+    sys.stdout.writelines(req + "\n" for req in list_requirements())
