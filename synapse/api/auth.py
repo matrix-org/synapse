@@ -21,7 +21,7 @@ from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
-from synapse.types import UserID
+from synapse.types import UserID, ClientInfo
 
 import logging
 
@@ -101,6 +101,8 @@ class Auth(object):
     @defer.inlineCallbacks
     def check_host_in_room(self, room_id, host):
         curr_state = yield self.state.get_current_state(room_id)
+
+        logger.debug("Got curr_state %s", curr_state)
 
         for event in curr_state:
             if event.type == EventTypes.Member:
@@ -290,7 +292,9 @@ class Auth(object):
         Args:
             request - An HTTP request with an access_token query parameter.
         Returns:
-            UserID : User ID object of the user making the request
+            tuple : of UserID and device string:
+                User ID object of the user making the request
+                Client ID object of the client instance the user is using
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -299,6 +303,8 @@ class Auth(object):
             access_token = request.args["access_token"][0]
             user_info = yield self.get_user_by_token(access_token)
             user = user_info["user"]
+            device_id = user_info["device_id"]
+            token_id = user_info["token_id"]
 
             ip_addr = self.hs.get_ip_from_request(request)
             user_agent = request.requestHeaders.getRawHeaders(
@@ -314,7 +320,7 @@ class Auth(object):
                     user_agent=user_agent
                 )
 
-            defer.returnValue(user)
+            defer.returnValue((user, ClientInfo(device_id, token_id)))
         except KeyError:
             raise AuthError(403, "Missing access token.")
 
@@ -339,6 +345,7 @@ class Auth(object):
                 "admin": bool(ret.get("admin", False)),
                 "device_id": ret.get("device_id"),
                 "user": UserID.from_string(ret.get("name")),
+                "token_id": ret.get("token_id", None),
             }
 
             defer.returnValue(user_info)
@@ -353,9 +360,23 @@ class Auth(object):
     def add_auth_events(self, builder, context):
         yield run_on_reactor()
 
-        if builder.type == EventTypes.Create:
-            builder.auth_events = []
-            return
+        auth_ids = self.compute_auth_events(builder, context)
+
+        auth_events_entries = yield self.store.add_event_hashes(
+            auth_ids
+        )
+
+        builder.auth_events = auth_events_entries
+
+        context.auth_events = {
+            k: v
+            for k, v in context.current_state.items()
+            if v.event_id in auth_ids
+        }
+
+    def compute_auth_events(self, event, context):
+        if event.type == EventTypes.Create:
+            return []
 
         auth_ids = []
 
@@ -368,7 +389,7 @@ class Auth(object):
         key = (EventTypes.JoinRules, "", )
         join_rule_event = context.current_state.get(key)
 
-        key = (EventTypes.Member, builder.user_id, )
+        key = (EventTypes.Member, event.user_id, )
         member_event = context.current_state.get(key)
 
         key = (EventTypes.Create, "", )
@@ -382,8 +403,8 @@ class Auth(object):
         else:
             is_public = False
 
-        if builder.type == EventTypes.Member:
-            e_type = builder.content["membership"]
+        if event.type == EventTypes.Member:
+            e_type = event.content["membership"]
             if e_type in [Membership.JOIN, Membership.INVITE]:
                 if join_rule_event:
                     auth_ids.append(join_rule_event.event_id)
@@ -398,17 +419,7 @@ class Auth(object):
             if member_event.content["membership"] == Membership.JOIN:
                 auth_ids.append(member_event.event_id)
 
-        auth_events_entries = yield self.store.add_event_hashes(
-            auth_ids
-        )
-
-        builder.auth_events = auth_events_entries
-
-        context.auth_events = {
-            k: v
-            for k, v in context.current_state.items()
-            if v.event_id in auth_ids
-        }
+        return auth_ids
 
     @log_function
     def _can_send_event(self, event, auth_events):

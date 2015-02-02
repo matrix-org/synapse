@@ -20,3 +20,4 @@ class EventContext(object):
         self.current_state = current_state
         self.auth_events = auth_events
         self.state_group = None
+        self.rejected = False

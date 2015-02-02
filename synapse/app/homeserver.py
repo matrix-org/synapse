@@ -277,6 +277,8 @@ def setup():
         bind_port = None
     hs.start_listening(bind_port, config.unsecure_port)
 
+    hs.get_pusherpool().start()
+
     if config.daemonize:
         print config.pid_file
         daemon = Daemonize(

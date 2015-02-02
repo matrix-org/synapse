@@ -27,6 +27,7 @@ from .directory import DirectoryHandler
 from .typing import TypingNotificationHandler
 from .admin import AdminHandler
 from .appservice import ApplicationServicesHandler
+from .sync import SyncHandler
 
 
 class Handlers(object):
@@ -53,3 +54,4 @@ class Handlers(object):
         self.typing_notification_handler = TypingNotificationHandler(hs)
         self.admin_handler = AdminHandler(hs)
         self.appservice_handler = ApplicationServicesHandler(hs)
+        self.sync_handler = SyncHandler(hs)
