@@ -67,12 +67,9 @@ SCHEMAS = [
     "event_signatures",
     "pusher",
     "media_repository",
-<<<<<<< HEAD
     "application_services"
-=======
     "filtering",
     "rejections",
->>>>>>> develop
 ]
 
 
@@ -92,17 +89,13 @@ class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, TransactionStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
-<<<<<<< HEAD
-                EventFederationStore, MediaRepositoryStore,
-                ApplicationServiceStore
-=======
+                ApplicationServiceStore,
                 EventFederationStore,
                 MediaRepositoryStore,
                 RejectionsStore,
                 FilteringStore,
                 PusherStore,
                 PushRuleStore
->>>>>>> develop
                 ):
 
     def __init__(self, hs):
