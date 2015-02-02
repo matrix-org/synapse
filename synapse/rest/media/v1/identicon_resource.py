@@ -45,4 +45,7 @@ class IdenticonResource(Resource):
         height = int(request.args.get("height", [96])[0])
         identicon_bytes = self.generate_identicon(name, width, height)
         request.setHeader(b"Content-Type", b"image/png")
+        request.setHeader(
+            b"Cache-Control", b"public,max-age=86400,s-maxage=86400"
+        )
         return identicon_bytes
