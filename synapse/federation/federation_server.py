@@ -22,11 +22,6 @@ from .units import Transaction, Edu
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
 from synapse.events import FrozenEvent
-from synapse.events.utils import prune_event
-
-from syutil.jsonutil import encode_canonical_json
-
-from synapse.crypto.event_signing import check_event_content_hash
 
 from synapse.api.errors import FederationError, SynapseError
 
