@@ -34,9 +34,11 @@ class ApplicationServicesHandler(BaseHandler):
         logger.info("Register -> %s", app_service)
         # check the token is recognised
         try:
-            stored_service = yield self.store.get_app_service(app_service.token)
+            stored_service = yield self.store.get_app_service_by_token(
+                app_service.token
+            )
             if not stored_service:
-                raise StoreError(404, "Application Service Not found")
+                raise StoreError(404, "Application service not found")
         except StoreError:
             raise SynapseError(
                 403, "Unrecognised application services token. "
@@ -49,6 +51,25 @@ class ApplicationServicesHandler(BaseHandler):
     def unregister(self, token):
         logger.info("Unregister as_token=%s", token)
         yield self.store.unregister_app_service(token)
+
+    def get_services_for_event(self, event):
+        """Retrieve a list of application services interested in this event.
+
+        Args:
+            event(Event): The event to check.
+        Returns:
+            list<ApplicationService>: A list of services interested in this
+            event based on the service regex.
+        """
+        # We need to know the aliases associated with this event.room_id, if any
+        alias_list = []  # TODO
+
+        interested_list = [
+            s for s in self.store.get_app_services() if (
+                s.is_interested(event, alias_list)
+            )
+        ]
+        return interested_list
 
     def notify_interested_services(self, event):
         """Notifies (pushes) all application services interested in this event.

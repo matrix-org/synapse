@@ -13,8 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import re
 from twisted.internet import defer
 
+from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from ._base import SQLBaseStore
 
@@ -27,6 +29,7 @@ namespace_enum = [
     "rooms"   # 2
 ]
 
+
 # XXX: This feels like it should belong in a "models" module, not storage.
 class ApplicationService(object):
     """Defines an application service.
@@ -37,9 +40,9 @@ class ApplicationService(object):
     def __init__(self, token, url=None, namespaces=None):
         self.token = token
         self.url = url
-        self.namespaces = self._get_namespaces(namespaces)
+        self.namespaces = self._check_namespaces(namespaces)
 
-    def _get_namespaces(self, namespaces):
+    def _check_namespaces(self, namespaces):
         # Sanity check that it is of the form:
         # {
         #   users: ["regex",...],
@@ -57,22 +60,50 @@ class ApplicationService(object):
                     raise ValueError("Expected string regex for ns '%s'", ns)
         return namespaces
 
-    def is_interested(self, event):
+    def _matches_regex(self, test_string, namespace_key):
+        for regex in self.namespaces[namespace_key]:
+            if re.match(regex, test_string):
+                return True
+        return False
+
+    def _matches_user(self, event):
+        if (hasattr(event, "user_id") and
+                self._matches_regex(event.user_id, "users")):
+            return True
+        # also check m.room.member state key
+        if (hasattr(event, "type") and event.type == EventTypes.Member
+                and hasattr(event, "state_key")
+                and self._matches_regex(event.state_key, "users")):
+            return True
+        return False
+
+    def _matches_room_id(self, event):
+        if hasattr(event, "room_id"):
+            return self._matches_regex(event.room_id, "rooms")
+        return False
+
+    def _matches_aliases(self, event, alias_list):
+        for alias in alias_list:
+            if self._matches_regex(alias, "aliases"):
+                return True
+        return False
+
+    def is_interested(self, event, aliases_for_event=None):
         """Check if this service is interested in this event.
 
         Args:
             event(Event): The event to check.
+            aliases_for_event(list): A list of all the known room aliases for
+            this event.
         Returns:
             bool: True if this service would like to know about this event.
         """
-        # NB: This does not check room alias regex matches because that requires
-        # more context that an Event can provide. Room alias matches are checked
-        # in the ApplicationServiceHandler.
+        if aliases_for_event is None:
+            aliases_for_event = []
 
-        # TODO check if event.room_id regex matches
-        # TODO check if event.user_id regex matches (or m.room.member state_key)
-
-        return True
+        return (self._matches_user(event)
+                or self._matches_aliases(event, aliases_for_event)
+                or self._matches_room_id(event))
 
     def __str__(self):
         return "ApplicationService: %s" % (self.__dict__,)
@@ -88,20 +119,6 @@ class ApplicationServiceCache(object):
 
     def __init__(self):
         self.services = []
-
-    def get_services_for_event(self, event):
-        """Retrieve a list of application services interested in this event.
-
-        Args:
-            event(Event): The event to check.
-        Returns:
-            list<ApplicationService>: A list of services interested in this
-            event based on the service regex.
-        """
-        interested_list = [
-            s for s in self.services if s.is_event_claimed(event)
-        ]
-        return interested_list
 
 
 class ApplicationServiceStore(SQLBaseStore):
@@ -217,10 +234,10 @@ class ApplicationServiceStore(SQLBaseStore):
         if res:
             return res[0]
 
-    def get_services_for_event(self, event):
-        return self.cache.get_services_for_event(event)
+    def get_app_services(self):
+        return self.cache.services
 
-    def get_app_service(self, token, from_cache=True):
+    def get_app_service_by_token(self, token, from_cache=True):
         """Get the application service with the given token.
 
         Args:
