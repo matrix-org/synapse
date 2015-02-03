@@ -33,6 +33,9 @@ class ApplicationService(object):
     NS_USERS = "users"
     NS_ALIASES = "aliases"
     NS_ROOMS = "rooms"
+    # The ordering here is important as it is used to map database values (which
+    # are stored as ints representing the position in this list) to namespace
+    # values.
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
     def __init__(self, token, url=None, namespaces=None):
@@ -103,13 +106,21 @@ class ApplicationService(object):
         """
         if aliases_for_event is None:
             aliases_for_event = []
-        if restrict_to not in ApplicationService.NS_LIST:
-            # this is a programming error, so raise a general exception
+        if restrict_to and restrict_to not in ApplicationService.NS_LIST:
+            # this is a programming error, so fail early and raise a general
+            # exception
             raise Exception("Unexpected restrict_to value: %s". restrict_to)
 
-        return (self._matches_user(event)
-                or self._matches_aliases(event, aliases_for_event)
-                or self._matches_room_id(event))
+        if not restrict_to:
+            return (self._matches_user(event)
+                    or self._matches_aliases(event, aliases_for_event)
+                    or self._matches_room_id(event))
+        elif restrict_to == ApplicationService.NS_ALIASES:
+            return self._matches_aliases(event, aliases_for_event)
+        elif restrict_to == ApplicationService.NS_ROOMS:
+            return self._matches_room_id(event)
+        elif restrict_to == ApplicationService.NS_USERS:
+            return self._matches_user(event)
 
     def __str__(self):
         return "ApplicationService: %s" % (self.__dict__,)

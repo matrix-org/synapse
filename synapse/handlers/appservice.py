@@ -17,6 +17,7 @@ from twisted.internet import defer
 
 from ._base import BaseHandler
 from synapse.api.errors import Codes, StoreError, SynapseError
+from synapse.storage.appservice import ApplicationService
 
 import logging
 
@@ -88,8 +89,26 @@ class ApplicationServicesHandler(BaseHandler):
 
         # Do we know this user exists? If not, poke the user query API for
         # all services which match that user regex.
+        unknown_user = False  # TODO check
+        if unknown_user:
+            user_query_services = self.get_services_for_event(
+                event=event,
+                restrict_to=ApplicationService.NS_USERS
+            )
+            for user_service in user_query_services:
+                pass  # TODO poke User Query API
 
         # Do we know this room alias exists? If not, poke the room alias query
         # API for all services which match that room alias regex.
+        unknown_room_alias = False  # TODO check
+        if unknown_room_alias:
+            alias_query_services = self.get_services_for_event(
+                event=event,
+                restrict_to=ApplicationService.NS_ALIASES
+            )
+            for alias_service in alias_query_services:
+                pass  # TODO poke Room Alias Query API
 
         # Fork off pushes to these services - XXX First cut, best effort
+        for service in services:
+            pass  # TODO push event to service
