@@ -94,6 +94,85 @@ def prune_event(event):
     )
 
 
+def old_prune_event(event):
+    """This is an old and buggy version of the prune event function. The
+    difference between this and the new version is that when including dicts
+    in the content they were included as frozen_dicts rather than dicts. This
+    caused the JSON encoder to encode as a list of the keys rather than the
+    dict.
+    """
+    event_type = event.type
+
+    allowed_keys = [
+        "event_id",
+        "sender",
+        "room_id",
+        "hashes",
+        "signatures",
+        "content",
+        "type",
+        "state_key",
+        "depth",
+        "prev_events",
+        "prev_state",
+        "auth_events",
+        "origin",
+        "origin_server_ts",
+        "membership",
+    ]
+
+    event_dict = event.get_dict()
+
+    new_content = {}
+
+    def add_fields(*fields):
+        for field in fields:
+            if field in event.content:
+                # This is the line that is buggy: event.content may return
+                # a frozen_dict which the json encoders encode as lists rather
+                # than dicts.
+                new_content[field] = event.content[field]
+
+    if event_type == EventTypes.Member:
+        add_fields("membership")
+    elif event_type == EventTypes.Create:
+        add_fields("creator")
+    elif event_type == EventTypes.JoinRules:
+        add_fields("join_rule")
+    elif event_type == EventTypes.PowerLevels:
+        add_fields(
+            "users",
+            "users_default",
+            "events",
+            "events_default",
+            "events_default",
+            "state_default",
+            "ban",
+            "kick",
+            "redact",
+        )
+    elif event_type == EventTypes.Aliases:
+        add_fields("aliases")
+
+    allowed_fields = {
+        k: v
+        for k, v in event_dict.items()
+        if k in allowed_keys
+    }
+
+    allowed_fields["content"] = new_content
+
+    allowed_fields["unsigned"] = {}
+
+    if "age_ts" in event.unsigned:
+        allowed_fields["unsigned"]["age_ts"] = event.unsigned["age_ts"]
+
+    return type(event)(
+        allowed_fields,
+        internal_metadata_dict=event.internal_metadata.get_dict()
+    )
+
+
 def format_event_raw(d):
     return d
 

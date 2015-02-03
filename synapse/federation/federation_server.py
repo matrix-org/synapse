@@ -16,6 +16,7 @@
 
 from twisted.internet import defer
 
+from .federation_base import FederationBase
 from .units import Transaction, Edu
 
 from synapse.util.logutils import log_function
@@ -35,7 +36,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class FederationServer(object):
+class FederationServer(FederationBase):
     def set_handler(self, handler):
         """Sets the handler that the replication layer will use to communicate
         receipt of new PDUs from other home servers. The required methods are
@@ -251,17 +252,20 @@ class FederationServer(object):
             Deferred: Results in `dict` with the same format as `content`
         """
         auth_chain = [
-            (yield self._check_sigs_and_hash(self.event_from_pdu_json(e)))
+            self.event_from_pdu_json(e)
             for e in content["auth_chain"]
         ]
 
-        missing = [
-            (yield self._check_sigs_and_hash(self.event_from_pdu_json(e)))
-            for e in content.get("missing", [])
-        ]
+        signed_auth = yield self._check_sigs_and_hash_and_fetch(
+            origin, auth_chain, outlier=True
+        )
 
         ret = yield self.handler.on_query_auth(
-            origin, event_id, auth_chain, content.get("rejects", []), missing
+            origin,
+            event_id,
+            signed_auth,
+            content.get("rejects", []),
+            content.get("missing", []),
         )
 
         time_now = self._clock.time_msec()
@@ -426,37 +430,3 @@ class FederationServer(object):
         event.internal_metadata.outlier = outlier
 
         return event
-
-    @defer.inlineCallbacks
-    def _check_sigs_and_hash(self, pdu):
-        """Throws a SynapseError if the PDU does not have the correct
-        signatures.
-
-        Returns:
-            FrozenEvent: Either the given event or it redacted if it failed the
-            content hash check.
-        """
-        # Check signatures are correct.
-        redacted_event = prune_event(pdu)
-        redacted_pdu_json = redacted_event.get_pdu_json()
-
-        try:
-            yield self.keyring.verify_json_for_server(
-                pdu.origin, redacted_pdu_json
-            )
-        except SynapseError:
-            logger.warn(
-                "Signature check failed for %s redacted to %s",
-                encode_canonical_json(pdu.get_pdu_json()),
-                encode_canonical_json(redacted_pdu_json),
-            )
-            raise
-
-        if not check_event_content_hash(pdu):
-            logger.warn(
-                "Event content has been tampered, redacting %s, %s",
-                pdu.event_id, encode_canonical_json(pdu.get_dict())
-            )
-            defer.returnValue(redacted_event)
-
-        defer.returnValue(pdu)
