@@ -16,7 +16,7 @@
 
 from twisted.internet import defer
 
-from synapse.events.utils import prune_event, old_prune_event
+from synapse.events.utils import prune_event
 
 from syutil.jsonutil import encode_canonical_json
 
@@ -96,18 +96,10 @@ class FederationBase(object):
         redacted_event = prune_event(pdu)
         redacted_pdu_json = redacted_event.get_pdu_json()
 
-        old_redacted = old_prune_event(pdu)
-        old_redacted_pdu_json = old_redacted.get_pdu_json()
-
         try:
-            try:
-                yield self.keyring.verify_json_for_server(
-                    pdu.origin, old_redacted_pdu_json
-                )
-            except SynapseError:
-                yield self.keyring.verify_json_for_server(
-                    pdu.origin, redacted_pdu_json
-                )
+            yield self.keyring.verify_json_for_server(
+                pdu.origin, redacted_pdu_json
+            )
         except SynapseError:
             logger.warn(
                 "Signature check failed for %s redacted to %s",
