@@ -1000,7 +1000,7 @@ class FederationHandler(BaseHandler):
             if reason is None:
                 # FIXME: ERRR?!
                 logger.warn("Could not find reason for %s", e.event_id)
-                raise RuntimeError("")
+                raise RuntimeError("Could not find reason for %s" % e.event_id)
 
             reason_map[e.event_id] = reason
 
