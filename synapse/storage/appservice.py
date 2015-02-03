@@ -23,12 +23,6 @@ from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
-namespace_enum = [
-    "users",    # 0
-    "aliases",  # 1
-    "rooms"   # 2
-]
-
 
 # XXX: This feels like it should belong in a "models" module, not storage.
 class ApplicationService(object):
@@ -36,6 +30,10 @@ class ApplicationService(object):
 
     Provides methods to check if this service is "interested" in events.
     """
+    NS_USERS = "users"
+    NS_ALIASES = "aliases"
+    NS_ROOMS = "rooms"
+    NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
     def __init__(self, token, url=None, namespaces=None):
         self.token = token
@@ -52,7 +50,7 @@ class ApplicationService(object):
         if not namespaces:
             return None
 
-        for ns in ["users", "rooms", "aliases"]:
+        for ns in ApplicationService.NS_LIST:
             if type(namespaces[ns]) != list:
                 raise ValueError("Bad namespace value for '%s'", ns)
             for regex in namespaces[ns]:
@@ -68,31 +66,36 @@ class ApplicationService(object):
 
     def _matches_user(self, event):
         if (hasattr(event, "user_id") and
-                self._matches_regex(event.user_id, "users")):
+                self._matches_regex(
+                event.user_id, ApplicationService.NS_USERS)):
             return True
         # also check m.room.member state key
         if (hasattr(event, "type") and event.type == EventTypes.Member
                 and hasattr(event, "state_key")
-                and self._matches_regex(event.state_key, "users")):
+                and self._matches_regex(
+                event.state_key, ApplicationService.NS_USERS)):
             return True
         return False
 
     def _matches_room_id(self, event):
         if hasattr(event, "room_id"):
-            return self._matches_regex(event.room_id, "rooms")
+            return self._matches_regex(
+                event.room_id, ApplicationService.NS_ROOMS
+            )
         return False
 
     def _matches_aliases(self, event, alias_list):
         for alias in alias_list:
-            if self._matches_regex(alias, "aliases"):
+            if self._matches_regex(alias, ApplicationService.NS_ALIASES):
                 return True
         return False
 
-    def is_interested(self, event, aliases_for_event=None):
+    def is_interested(self, event, restrict_to=None, aliases_for_event=None):
         """Check if this service is interested in this event.
 
         Args:
             event(Event): The event to check.
+            restrict_to(str): The namespace to restrict regex tests to.
             aliases_for_event(list): A list of all the known room aliases for
             this event.
         Returns:
@@ -100,6 +103,9 @@ class ApplicationService(object):
         """
         if aliases_for_event is None:
             aliases_for_event = []
+        if restrict_to not in ApplicationService.NS_LIST:
+            # this is a programming error, so raise a general exception
+            raise Exception("Unexpected restrict_to value: %s". restrict_to)
 
         return (self._matches_user(event)
                 or self._matches_aliases(event, aliases_for_event)
@@ -215,7 +221,7 @@ class ApplicationServiceStore(SQLBaseStore):
             "DELETE FROM application_services_regex WHERE as_id=?",
             (as_id,)
         )
-        for (ns_int, ns_str) in enumerate(namespace_enum):
+        for (ns_int, ns_str) in enumerate(ApplicationService.NS_LIST):
             if ns_str in service.namespaces:
                 for regex in service.namespaces[ns_str]:
                     txn.execute(
@@ -285,9 +291,9 @@ class ApplicationServiceStore(SQLBaseStore):
                     "url": res["url"],
                     "token": as_token,
                     "namespaces": {
-                        "users": [],
-                        "aliases": [],
-                        "rooms": []
+                        ApplicationService.NS_USERS: [],
+                        ApplicationService.NS_ALIASES: [],
+                        ApplicationService.NS_ROOMS: []
                     }
                 }
             # add the namespace regex if one exists
@@ -295,7 +301,8 @@ class ApplicationServiceStore(SQLBaseStore):
             if ns_int is None:
                 continue
             try:
-                services[as_token]["namespaces"][namespace_enum[ns_int]].append(
+                services[as_token]["namespaces"][
+                    ApplicationService.NS_LIST[ns_int]].append(
                     res["regex"]
                 )
             except IndexError:

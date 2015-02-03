@@ -52,11 +52,12 @@ class ApplicationServicesHandler(BaseHandler):
         logger.info("Unregister as_token=%s", token)
         yield self.store.unregister_app_service(token)
 
-    def get_services_for_event(self, event):
+    def get_services_for_event(self, event, restrict_to=""):
         """Retrieve a list of application services interested in this event.
 
         Args:
             event(Event): The event to check.
+            restrict_to(str): The namespace to restrict regex tests to.
         Returns:
             list<ApplicationService>: A list of services interested in this
             event based on the service regex.
@@ -66,7 +67,7 @@ class ApplicationServicesHandler(BaseHandler):
 
         interested_list = [
             s for s in self.store.get_app_services() if (
-                s.is_interested(event, alias_list)
+                s.is_interested(event, restrict_to, alias_list)
             )
         ]
         return interested_list
@@ -80,11 +81,15 @@ class ApplicationServicesHandler(BaseHandler):
         Args:
             event(Event): The event to push out to interested services.
         """
-        # TODO: Gather interested services
-        #         get_services_for_event(event) <-- room IDs and user IDs
-        #         Get a list of room aliases. Check regex.
-        # TODO: If unknown user: poke User Query API.
-        # TODO: If unknown room alias: poke Room Alias Query API.
+        # Gather interested services
+        services = self.get_services_for_event(event)
+        if len(services) == 0:
+            return  # no services need notifying
 
-        # TODO: Fork off pushes to these services - XXX First cut, best effort
-        pass
+        # Do we know this user exists? If not, poke the user query API for
+        # all services which match that user regex.
+
+        # Do we know this room alias exists? If not, poke the room alias query
+        # API for all services which match that room alias regex.
+
+        # Fork off pushes to these services - XXX First cut, best effort
