@@ -767,7 +767,7 @@ class FederationHandler(BaseHandler):
                 )
             )
 
-        logger.debug("on_query_auth reutrning: %s", ret)
+        logger.debug("on_query_auth returning: %s", ret)
 
         defer.returnValue(ret)
 
