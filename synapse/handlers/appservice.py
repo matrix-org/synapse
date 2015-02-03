@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from ._base import BaseHandler
 from synapse.api.errors import Codes, StoreError, SynapseError
-from synapse.storage.appservice import ApplicationService
+from synapse.appservice import ApplicationService
 
 import logging
 
@@ -96,6 +96,7 @@ class ApplicationServicesHandler(BaseHandler):
                 restrict_to=ApplicationService.NS_USERS
             )
             for user_service in user_query_services:
+                # this needs to block XXX: Need to feed response back to caller
                 pass  # TODO poke User Query API
 
         # Do we know this room alias exists? If not, poke the room alias query
@@ -107,6 +108,7 @@ class ApplicationServicesHandler(BaseHandler):
                 restrict_to=ApplicationService.NS_ALIASES
             )
             for alias_service in alias_query_services:
+                # this needs to block XXX: Need to feed response back to caller
                 pass  # TODO poke Room Alias Query API
 
         # Fork off pushes to these services - XXX First cut, best effort
