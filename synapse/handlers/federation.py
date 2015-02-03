@@ -716,6 +716,8 @@ class FederationHandler(BaseHandler):
 
             context.rejected = RejectedReason.AUTH_ERROR
 
+            # FIXME: Don't store as rejected with AUTH_ERROR if we haven't
+            # seen all the auth events.
             yield self.store.persist_event(
                 event,
                 context=context,
