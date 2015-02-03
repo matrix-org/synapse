@@ -161,6 +161,39 @@ class DataStore(RoomMemberStore, RoomStore,
 
         outlier = event.internal_metadata.is_outlier()
 
+        have_persisted = self._simple_select_one_onecol_txn(
+            txn,
+            table="event_json",
+            keyvalues={"event_id": event.event_id},
+            retcol="event_id",
+            allow_none=True,
+        )
+
+        metadata_json = encode_canonical_json(
+            event.internal_metadata.get_dict()
+        )
+
+        if have_persisted:
+            if not outlier:
+                sql = (
+                    "UPDATE event_json SET internal_metadata = ?"
+                    " WHERE event_id = ?"
+                )
+                txn.execute(
+                    sql,
+                    (metadata_json.decode("UTF-8"), event.event_id,)
+                )
+
+                sql = (
+                    "UPDATE events SET outlier = 0"
+                    " WHERE event_id = ?"
+                )
+                txn.execute(
+                    sql,
+                    (event.event_id,)
+                )
+            return
+
         event_dict = {
             k: v
             for k, v in event.get_dict().items()
@@ -169,10 +202,6 @@ class DataStore(RoomMemberStore, RoomStore,
                 "redacted_because",
             ]
         }
-
-        metadata_json = encode_canonical_json(
-            event.internal_metadata.get_dict()
-        )
 
         self._simple_insert_txn(
             txn,
@@ -482,6 +511,9 @@ class DataStore(RoomMemberStore, RoomStore,
             the rejected reason string if we rejected the event, else maps to
             None.
         """
+        if not event_ids:
+            return defer.succeed({})
+
         def f(txn):
             sql = (
                 "SELECT e.event_id, reason FROM events as e "

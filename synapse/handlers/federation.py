@@ -112,6 +112,14 @@ class FederationHandler(BaseHandler):
 
         logger.debug("Event: %s", event)
 
+        event_ids = set()
+        if state:
+            event_ids += {e.event_id for e in state}
+        if auth_chain:
+            event_ids += {e.event_id for e in auth_chain}
+
+        seen_ids = (yield self.store.have_events(event_ids)).keys()
+
         # FIXME (erikj): Awful hack to make the case where we are not currently
         # in the room work
         current_state = None
@@ -124,20 +132,26 @@ class FederationHandler(BaseHandler):
             current_state = state
 
         if state and auth_chain is not None:
-            for e in state:
-                e.internal_metadata.outlier = True
-                try:
-                    auth_ids = [e_id for e_id, _ in e.auth_events]
-                    auth = {
-                        (e.type, e.state_key): e for e in auth_chain
-                        if e.event_id in auth_ids
-                    }
-                    yield self._handle_new_event(origin, e, auth_events=auth)
-                except:
-                    logger.exception(
-                        "Failed to handle state event %s",
-                        e.event_id,
-                    )
+            for list_of_pdus in [auth_chain, state]:
+                for e in list_of_pdus:
+                    if e.event_id in seen_ids:
+                        continue
+
+                    e.internal_metadata.outlier = True
+                    try:
+                        auth_ids = [e_id for e_id, _ in e.auth_events]
+                        auth = {
+                            (e.type, e.state_key): e for e in auth_chain
+                            if e.event_id in auth_ids
+                        }
+                        yield self._handle_new_event(
+                            origin, e, auth_events=auth
+                        )
+                    except:
+                        logger.exception(
+                            "Failed to handle state event %s",
+                            e.event_id,
+                        )
 
         try:
             yield self._handle_new_event(
