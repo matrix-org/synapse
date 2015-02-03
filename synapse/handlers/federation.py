@@ -114,9 +114,9 @@ class FederationHandler(BaseHandler):
 
         event_ids = set()
         if state:
-            event_ids += {e.event_id for e in state}
+            event_ids |= {e.event_id for e in state}
         if auth_chain:
-            event_ids += {e.event_id for e in auth_chain}
+            event_ids |= {e.event_id for e in auth_chain}
 
         seen_ids = (yield self.store.have_events(event_ids)).keys()
 
