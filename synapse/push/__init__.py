@@ -37,14 +37,14 @@ class Pusher(object):
 
     INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
-    def __init__(self, _hs, instance_handle, user_name, app_id,
+    def __init__(self, _hs, profile_tag, user_name, app_id,
                  app_display_name, device_display_name, pushkey, pushkey_ts,
                  data, last_token, last_success, failing_since):
         self.hs = _hs
         self.evStreamHandler = self.hs.get_handlers().event_stream_handler
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
-        self.instance_handle = instance_handle
+        self.profile_tag = profile_tag
         self.user_name = user_name
         self.app_id = app_id
         self.app_display_name = app_display_name
@@ -147,9 +147,9 @@ class Pusher(object):
                 return False
             return fnmatch.fnmatch(val.upper(), pat.upper())
         elif condition['kind'] == 'device':
-            if 'instance_handle' not in condition:
+            if 'profile_tag' not in condition:
                 return True
-            return condition['instance_handle'] == self.instance_handle
+            return condition['profile_tag'] == self.profile_tag
         elif condition['kind'] == 'contains_display_name':
             # This is special because display names can be different
             # between rooms and so you can't really hard code it in a rule.

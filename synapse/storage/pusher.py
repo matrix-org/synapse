@@ -29,7 +29,7 @@ class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_pushers_by_app_id_and_pushkey(self, app_id_and_pushkey):
         sql = (
-            "SELECT id, user_name, kind, instance_handle, app_id,"
+            "SELECT id, user_name, kind, profile_tag, app_id,"
             "app_display_name, device_display_name, pushkey, ts, data, "
             "last_token, last_success, failing_since "
             "FROM pushers "
@@ -45,7 +45,7 @@ class PusherStore(SQLBaseStore):
                 "id": r[0],
                 "user_name": r[1],
                 "kind": r[2],
-                "instance_handle": r[3],
+                "profile_tag": r[3],
                 "app_id": r[4],
                 "app_display_name": r[5],
                 "device_display_name": r[6],
@@ -64,7 +64,7 @@ class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_all_pushers(self):
         sql = (
-            "SELECT id, user_name, kind, instance_handle, app_id,"
+            "SELECT id, user_name, kind, profile_tag, app_id,"
             "app_display_name, device_display_name, pushkey, ts, data, "
             "last_token, last_success, failing_since "
             "FROM pushers"
@@ -77,7 +77,7 @@ class PusherStore(SQLBaseStore):
                 "id": r[0],
                 "user_name": r[1],
                 "kind": r[2],
-                "instance_handle": r[3],
+                "profile_tag": r[3],
                 "app_id": r[4],
                 "app_display_name": r[5],
                 "device_display_name": r[6],
@@ -94,7 +94,7 @@ class PusherStore(SQLBaseStore):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def add_pusher(self, user_name, instance_handle, kind, app_id,
+    def add_pusher(self, user_name, profile_tag, kind, app_id,
                    app_display_name, device_display_name,
                    pushkey, pushkey_ts, lang, data):
         try:
@@ -107,7 +107,7 @@ class PusherStore(SQLBaseStore):
                 dict(
                     user_name=user_name,
                     kind=kind,
-                    instance_handle=instance_handle,
+                    profile_tag=profile_tag,
                     app_display_name=app_display_name,
                     device_display_name=device_display_name,
                     ts=pushkey_ts,
@@ -158,7 +158,7 @@ class PushersTable(Table):
         "id",
         "user_name",
         "kind",
-        "instance_handle",
+        "profile_tag",
         "app_id",
         "app_display_name",
         "device_display_name",

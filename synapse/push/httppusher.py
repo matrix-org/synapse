@@ -24,12 +24,12 @@ logger = logging.getLogger(__name__)
 
 
 class HttpPusher(Pusher):
-    def __init__(self, _hs, instance_handle, user_name, app_id,
+    def __init__(self, _hs, profile_tag, user_name, app_id,
                  app_display_name, device_display_name, pushkey, pushkey_ts,
                  data, last_token, last_success, failing_since):
         super(HttpPusher, self).__init__(
             _hs,
-            instance_handle,
+            profile_tag,
             user_name,
             app_id,
             app_display_name,

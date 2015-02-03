@@ -112,7 +112,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         if device:
             conditions.append({
                 'kind': 'device',
-                'instance_handle': device
+                'profile_tag': device
             })
 
         if 'actions' not in req_obj:
@@ -195,7 +195,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
             for r in rules:
                 conditions = json.loads(r['conditions'])
-                ih = _instance_handle_from_conditions(conditions)
+                ih = _profile_tag_from_conditions(conditions)
                 if ih == spec['device'] and r['priority_class'] == priority_class:
                     yield self.hs.get_datastore().delete_push_rule(
                         user.to_string(), spec['rule_id']
@@ -239,19 +239,19 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
             if r['priority_class'] > PushRuleRestServlet.PRIORITY_CLASS_MAP['override']:
                 # per-device rule
-                instance_handle = _instance_handle_from_conditions(r["conditions"])
+                profile_tag = _profile_tag_from_conditions(r["conditions"])
                 r = _strip_device_condition(r)
-                if not instance_handle:
+                if not profile_tag:
                     continue
-                if instance_handle not in rules['device']:
-                    rules['device'][instance_handle] = {}
-                    rules['device'][instance_handle] = (
+                if profile_tag not in rules['device']:
+                    rules['device'][profile_tag] = {}
+                    rules['device'][profile_tag] = (
                         _add_empty_priority_class_arrays(
-                            rules['device'][instance_handle]
+                            rules['device'][profile_tag]
                         )
                     )
 
-                rulearray = rules['device'][instance_handle][template_name]
+                rulearray = rules['device'][profile_tag][template_name]
             else:
                 rulearray = rules['global'][template_name]
 
@@ -282,13 +282,13 @@ class PushRuleRestServlet(ClientV1RestServlet):
             if path[0] == '':
                 defer.returnValue((200, rules['device']))
 
-            instance_handle = path[0]
+            profile_tag = path[0]
             path = path[1:]
-            if instance_handle not in rules['device']:
+            if profile_tag not in rules['device']:
                 ret = {}
                 ret = _add_empty_priority_class_arrays(ret)
                 defer.returnValue((200, ret))
-            ruleset = rules['device'][instance_handle]
+            ruleset = rules['device'][profile_tag]
             result = _filter_ruleset_with_path(ruleset, path)
             defer.returnValue((200, result))
         else:
@@ -304,14 +304,14 @@ def _add_empty_priority_class_arrays(d):
     return d
 
 
-def _instance_handle_from_conditions(conditions):
+def _profile_tag_from_conditions(conditions):
     """
     Given a list of conditions, return the instance handle of the
     device rule if there is one
     """
     for c in conditions:
         if c['kind'] == 'device':
-            return c['instance_handle']
+            return c['profile_tag']
     return None
 
 
