@@ -632,6 +632,7 @@ class FederationHandler(BaseHandler):
         event = yield self.store.get_event(
             event_id,
             allow_none=True,
+            allow_rejected=True,
         )
 
         if event:
