@@ -212,7 +212,7 @@ class ApplicationServiceStore(SQLBaseStore):
         )
         # cleanup regex
         txn.execute(
-            "DELETE FROM application_services_regex WHERE id=?",
+            "DELETE FROM application_services_regex WHERE as_id=?",
             (as_id,)
         )
         for (ns_int, ns_str) in enumerate(namespace_enum):
