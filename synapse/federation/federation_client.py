@@ -429,7 +429,6 @@ class FederationClient(object):
 
         defer.returnValue(signed_pdus)
 
-
     @defer.inlineCallbacks
     def _check_sigs_and_hash(self, pdu):
         """Throws a SynapseError if the PDU does not have the correct
