@@ -400,8 +400,8 @@ def _tweaks_for_actions(actions):
     for a in actions:
         if not isinstance(a, dict):
             continue
-        if 'set_sound' in a:
-            tweaks['sound'] = a['set_sound']
+        if 'set_tweak' in a and 'value' in a:
+            tweaks[a['set_tweak']] = a['value']
     return tweaks
 
 
