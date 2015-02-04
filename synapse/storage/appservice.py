@@ -216,6 +216,7 @@ class ApplicationServiceStore(SQLBaseStore):
             except IndexError:
                 logger.error("Bad namespace enum '%s'. %s", ns_int, res)
 
+        # TODO get last successful txn id f.e. service
         for service in services.values():
             logger.info("Found application service: %s", service)
             self.cache.services.append(ApplicationService(

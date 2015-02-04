@@ -18,6 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.appservice import ApplicationService
+from synapse.appservice.api import ApplicationServiceApi
 
 import logging
 
@@ -29,6 +30,7 @@ class ApplicationServicesHandler(BaseHandler):
 
     def __init__(self, hs):
         super(ApplicationServicesHandler, self).__init__(hs)
+        self.appservice_api = ApplicationServiceApi(hs)
 
     @defer.inlineCallbacks
     def register(self, app_service):
@@ -97,7 +99,12 @@ class ApplicationServicesHandler(BaseHandler):
             )
             for user_service in user_query_services:
                 # this needs to block XXX: Need to feed response back to caller
-                pass  # TODO poke User Query API
+                is_known_user = self.appservice_api.query_user(
+                    user_service, event
+                )
+                if is_known_user:
+                    # the user exists now,so don't query more ASes.
+                    break
 
         # Do we know this room alias exists? If not, poke the room alias query
         # API for all services which match that room alias regex.
@@ -109,8 +116,13 @@ class ApplicationServicesHandler(BaseHandler):
             )
             for alias_service in alias_query_services:
                 # this needs to block XXX: Need to feed response back to caller
-                pass  # TODO poke Room Alias Query API
+                is_known_alias = self.appservice_api.query_alias(
+                    alias_service, event
+                )
+                if is_known_alias:
+                    # the alias exists now so don't query more ASes.
+                    break
 
         # Fork off pushes to these services - XXX First cut, best effort
         for service in services:
-            pass  # TODO push event to service
+            self.appservice_api.push(service, event)

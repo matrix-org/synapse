@@ -13,3 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+class ApplicationServiceApi(object):
+    """This class manages HS -> AS communications, including querying and
+    pushing.
+    """
+
+    def __init__(self,  hs):
+        self.hs_token = "_hs_token_"  # TODO extract hs token
+
+    def query_user(self, service, user_id):
+        pass
+
+    def query_alias(self, service, alias):
+        pass
+
+    def push_bulk(self, service, events):
+        pass
+
+    def push(self, service, event):
+        pass
+
