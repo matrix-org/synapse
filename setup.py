@@ -50,7 +50,7 @@ setup(
         "https://github.com/matrix-org/matrix-angular-sdk/tarball/v0.6.1/#egg=matrix_angular_sdk-0.6.1",
     ],
     setup_requires=[
-        "Twisted==14.0.2",
+        "Twisted==14.0.2", # Here to override setuptools_trial's dependency on Twisted>=2.4.0
         "setuptools_trial",
         "setuptools>=1.0.0", # Needs setuptools that supports git+ssh.
                              # TODO: Do we need this now? we don't use git+ssh.
