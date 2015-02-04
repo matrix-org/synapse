@@ -14,7 +14,10 @@
 # limitations under the License.
 from synapse.api.constants import EventTypes
 
+import logging
 import re
+
+logger = logging.getLogger(__name__)
 
 
 class ApplicationService(object):
@@ -56,15 +59,22 @@ class ApplicationService(object):
         return namespaces
 
     def _matches_regex(self, test_string, namespace_key):
+        if not isinstance(test_string, basestring):
+            logger.warning(
+                "Expected a string to test regex against, but got %s",
+                test_string
+            )
+            return False
+
         for regex in self.namespaces[namespace_key]:
             if re.match(regex, test_string):
                 return True
         return False
 
     def _matches_user(self, event):
-        if (hasattr(event, "user_id") and
+        if (hasattr(event, "sender") and
                 self._matches_regex(
-                event.user_id, ApplicationService.NS_USERS)):
+                event.sender, ApplicationService.NS_USERS)):
             return True
         # also check m.room.member state key
         if (hasattr(event, "type") and event.type == EventTypes.Member

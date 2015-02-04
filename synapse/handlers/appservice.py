@@ -26,10 +26,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ApplicationServicesHandler(BaseHandler):
+# NB: Purposefully not inheriting BaseHandler since that contains way too much
+# setup code which this handler does not need or use. This makes testing a lot
+# easier.
+class ApplicationServicesHandler(object):
 
     def __init__(self, hs):
-        super(ApplicationServicesHandler, self).__init__(hs)
+        self.store = hs.get_datastore()
+        self.hs = hs
         self.appservice_api = ApplicationServiceApi(hs)
 
     @defer.inlineCallbacks
