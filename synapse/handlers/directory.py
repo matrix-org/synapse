@@ -113,7 +113,16 @@ class DirectoryHandler(BaseHandler):
             )
 
         extra_servers = yield self.store.get_joined_hosts_for_room(room_id)
-        servers = list(set(extra_servers) | set(servers))
+        servers = set(extra_servers) | set(servers)
+
+        # If this server is in the list of servers, return it first.
+        if self.server_name in servers:
+            servers = (
+                [self.server_name]
+                + [s for s in servers if s != self.server_name]
+            )
+        else:
+            servers = list(servers)
 
         defer.returnValue({
             "room_id": room_id,
