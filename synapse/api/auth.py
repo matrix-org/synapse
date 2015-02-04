@@ -358,7 +358,7 @@ class Auth(object):
     def add_auth_events(self, builder, context):
         yield run_on_reactor()
 
-        auth_ids = self.compute_auth_events(builder, context)
+        auth_ids = self.compute_auth_events(builder, context.current_state)
 
         auth_events_entries = yield self.store.add_event_hashes(
             auth_ids
@@ -372,26 +372,26 @@ class Auth(object):
             if v.event_id in auth_ids
         }
 
-    def compute_auth_events(self, event, context):
+    def compute_auth_events(self, event, current_state):
         if event.type == EventTypes.Create:
             return []
 
         auth_ids = []
 
         key = (EventTypes.PowerLevels, "", )
-        power_level_event = context.current_state.get(key)
+        power_level_event = current_state.get(key)
 
         if power_level_event:
             auth_ids.append(power_level_event.event_id)
 
         key = (EventTypes.JoinRules, "", )
-        join_rule_event = context.current_state.get(key)
+        join_rule_event = current_state.get(key)
 
         key = (EventTypes.Member, event.user_id, )
-        member_event = context.current_state.get(key)
+        member_event = current_state.get(key)
 
         key = (EventTypes.Create, "", )
-        create_event = context.current_state.get(key)
+        create_event = current_state.get(key)
         if create_event:
             auth_ids.append(create_event.event_id)
 

@@ -842,7 +842,9 @@ class FederationHandler(BaseHandler):
             logger.debug("Different auth: %s", different_auth)
 
             # 1. Get what we think is the auth chain.
-            auth_ids = self.auth.compute_auth_events(event, context)
+            auth_ids = self.auth.compute_auth_events(
+                event, context.current_state
+            )
             local_auth_chain = yield self.store.get_auth_chain(auth_ids)
 
             try:
