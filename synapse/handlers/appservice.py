@@ -55,10 +55,14 @@ class ApplicationServicesHandler(object):
         logger.info("Updating application service info...")
         yield self.store.update_app_service(app_service)
 
+        logger.info("Sending ping to %s...", app_service.url)
+        yield self.appservice_api.query_alias(app_service, "ping")
+
     def unregister(self, token):
         logger.info("Unregister as_token=%s", token)
         yield self.store.unregister_app_service(token)
 
+    @defer.inlineCallbacks
     def get_services_for_event(self, event, restrict_to=""):
         """Retrieve a list of application services interested in this event.
 
@@ -71,14 +75,15 @@ class ApplicationServicesHandler(object):
         """
         # We need to know the aliases associated with this event.room_id, if any
         alias_list = []  # TODO
-
+        services = yield self.store.get_app_services()
         interested_list = [
-            s for s in self.store.get_app_services() if (
+            s for s in services if (
                 s.is_interested(event, restrict_to, alias_list)
             )
         ]
-        return interested_list
+        defer.returnValue(interested_list)
 
+    @defer.inlineCallbacks
     def notify_interested_services(self, event):
         """Notifies (pushes) all application services interested in this event.
 
@@ -89,7 +94,7 @@ class ApplicationServicesHandler(object):
             event(Event): The event to push out to interested services.
         """
         # Gather interested services
-        services = self.get_services_for_event(event)
+        services = yield self.get_services_for_event(event)
         if len(services) == 0:
             return  # no services need notifying
 
@@ -97,14 +102,14 @@ class ApplicationServicesHandler(object):
         # all services which match that user regex.
         unknown_user = False  # TODO check
         if unknown_user:
-            user_query_services = self.get_services_for_event(
+            user_query_services = yield self.get_services_for_event(
                 event=event,
                 restrict_to=ApplicationService.NS_USERS
             )
             for user_service in user_query_services:
                 # this needs to block XXX: Need to feed response back to caller
-                is_known_user = self.appservice_api.query_user(
-                    user_service, event
+                is_known_user = yield self.appservice_api.query_user(
+                    user_service, event.sender
                 )
                 if is_known_user:
                     # the user exists now,so don't query more ASes.
@@ -114,14 +119,15 @@ class ApplicationServicesHandler(object):
         # API for all services which match that room alias regex.
         unknown_room_alias = False  # TODO check
         if unknown_room_alias:
-            alias_query_services = self.get_services_for_event(
+            alias = "something"  # TODO
+            alias_query_services = yield self.get_services_for_event(
                 event=event,
                 restrict_to=ApplicationService.NS_ALIASES
             )
             for alias_service in alias_query_services:
                 # this needs to block XXX: Need to feed response back to caller
-                is_known_alias = self.appservice_api.query_alias(
-                    alias_service, event
+                is_known_alias = yield self.appservice_api.query_alias(
+                    alias_service, alias
                 )
                 if is_known_alias:
                     # the alias exists now so don't query more ASes.

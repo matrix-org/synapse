@@ -12,25 +12,64 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from twisted.internet import defer
+from twisted.web.client import PartialDownloadError
+
+from synapse.http.client import SimpleHttpClient
+
+import logging
+import urllib
+
+logger = logging.getLogger(__name__)
 
 
-class ApplicationServiceApi(object):
+class ApplicationServiceApi(SimpleHttpClient):
     """This class manages HS -> AS communications, including querying and
     pushing.
     """
 
     def __init__(self,  hs):
+        super(ApplicationServiceApi, self).__init__(hs)
         self.hs_token = "_hs_token_"  # TODO extract hs token
 
+    @defer.inlineCallbacks
     def query_user(self, service, user_id):
-        pass
+        uri = service.url + ("/users/%s" % urllib.quote(user_id))
+        response = None
+        try:
+            response = yield self.get_json(uri, {
+                "access_token": self.hs_token
+            })
+            if response:  # just an empty json object
+                defer.returnValue(True)
+        except PartialDownloadError as e:
+            if e.status == 404:
+                defer.returnValue(False)
+                return
+            logger.warning("query_user to %s received %s", (uri, e.status))
 
+    @defer.inlineCallbacks
     def query_alias(self, service, alias):
-        pass
+        uri = service.url + ("/rooms/%s" % urllib.quote(alias))
+        response = None
+        try:
+            response = yield self.get_json(uri, {
+                "access_token": self.hs_token
+            })
+            logger.info("%s", response[0])
+            if response:  # just an empty json object
+                defer.returnValue(True)
+        except PartialDownloadError as e:
+            if e.status == 404:
+                defer.returnValue(False)
+                return
+            logger.warning("query_alias to %s received %s", (uri, e.status))
 
     def push_bulk(self, service, events):
         pass
 
+    @defer.inlineCallbacks
     def push(self, service, event):
-        pass
+        response = yield self.push_bulk(service, [event])
+        defer.returnValue(response)
 
