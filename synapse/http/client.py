@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+from synapse.api.errors import CodeMessageException
 from synapse.http.agent_name import AGENT_NAME
 from twisted.internet import defer, reactor
 from twisted.web.client import (
@@ -83,7 +83,7 @@ class SimpleHttpClient(object):
 
     @defer.inlineCallbacks
     def get_json(self, uri, args={}):
-        """ Get's some json from the given host and path
+        """ Gets some json from the given host and path
 
         Args:
             uri (str): The URI to request, not including query parameters
@@ -91,15 +91,11 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-
         Returns:
-            Deferred: Succeeds when we get *any* HTTP response.
-
-            The result of the deferred is a tuple of `(code, response)`,
-            where `response` is a dict representing the decoded JSON body.
+            Deferred: Succeeds when we get *any* 2xx HTTP response.
+        Raises:
+            On a non-2xx HTTP response.
         """
-
-        yield
         if len(args):
             query_bytes = urllib.urlencode(args, True)
             uri = "%s?%s" % (uri, query_bytes)
@@ -114,7 +110,10 @@ class SimpleHttpClient(object):
 
         body = yield readBody(response)
 
-        defer.returnValue(json.loads(body))
+        if 200 <= response.code < 300:
+            defer.returnValue(json.loads(body))
+        else:
+            raise CodeMessageException(response.code, body)
 
 
 class CaptchaServerHttpClient(SimpleHttpClient):

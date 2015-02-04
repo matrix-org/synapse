@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from synapse.types import UserID
 from synapse.api.errors import (
-    SynapseError, RegistrationError, InvalidCaptchaError
+    SynapseError, RegistrationError, InvalidCaptchaError, CodeMessageException
 )
 from ._base import BaseHandler
 import synapse.util.stringutils as stringutils
@@ -28,6 +28,7 @@ from synapse.http.client import CaptchaServerHttpClient
 
 import base64
 import bcrypt
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -161,21 +162,26 @@ class RegistrationHandler(BaseHandler):
     def _threepid_from_creds(self, creds):
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
-        httpCli = SimpleHttpClient(self.hs)
+        http_client = SimpleHttpClient(self.hs)
         # XXX: make this configurable!
         trustedIdServers = ['matrix.org:8090', 'matrix.org']
         if not creds['idServer'] in trustedIdServers:
             logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
                         'credentials', creds['idServer'])
             defer.returnValue(None)
-        data = yield httpCli.get_json(
-            # XXX: This should be HTTPS
-            "http://%s%s" % (
-                creds['idServer'],
-                "/_matrix/identity/api/v1/3pid/getValidated3pid"
-            ),
-            {'sid': creds['sid'], 'clientSecret': creds['clientSecret']}
-        )
+
+        data = {}
+        try:
+            data = yield http_client.get_json(
+                # XXX: This should be HTTPS
+                "http://%s%s" % (
+                    creds['idServer'],
+                    "/_matrix/identity/api/v1/3pid/getValidated3pid"
+                ),
+                {'sid': creds['sid'], 'clientSecret': creds['clientSecret']}
+            )
+        except CodeMessageException as e:
+            data = json.loads(e.msg)
 
         if 'medium' in data:
             defer.returnValue(data)
@@ -185,19 +191,23 @@ class RegistrationHandler(BaseHandler):
     def _bind_threepid(self, creds, mxid):
         yield
         logger.debug("binding threepid")
-        httpCli = SimpleHttpClient(self.hs)
-        data = yield httpCli.post_urlencoded_get_json(
-            # XXX: Change when ID servers are all HTTPS
-            "http://%s%s" % (
-                creds['idServer'], "/_matrix/identity/api/v1/3pid/bind"
-            ),
-            {
-                'sid': creds['sid'],
-                'clientSecret': creds['clientSecret'],
-                'mxid': mxid,
-            }
-        )
-        logger.debug("bound threepid")
+        http_client = SimpleHttpClient(self.hs)
+        data = None
+        try:
+            data = yield http_client.post_urlencoded_get_json(
+                # XXX: Change when ID servers are all HTTPS
+                "http://%s%s" % (
+                    creds['idServer'], "/_matrix/identity/api/v1/3pid/bind"
+                ),
+                {
+                    'sid': creds['sid'],
+                    'clientSecret': creds['clientSecret'],
+                    'mxid': mxid,
+                }
+            )
+            logger.debug("bound threepid")
+        except CodeMessageException as e:
+            data = json.loads(e.msg)
         defer.returnValue(data)
 
     @defer.inlineCallbacks
