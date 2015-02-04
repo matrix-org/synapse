@@ -288,7 +288,7 @@ class FederationHandler(BaseHandler):
         logger.debug("Joining %s to %s", joinee, room_id)
 
         pdu = yield self.replication_layer.make_join(
-            target_host,
+            [target_host],
             room_id,
             joinee
         )
@@ -331,7 +331,7 @@ class FederationHandler(BaseHandler):
             new_event = builder.build()
 
             ret = yield self.replication_layer.send_join(
-                target_host,
+                [target_host],
                 new_event
             )
 

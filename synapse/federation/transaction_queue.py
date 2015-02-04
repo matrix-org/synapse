@@ -19,6 +19,7 @@ from twisted.internet import defer
 from .persistence import TransactionActions
 from .units import Transaction
 
+from synapse.api.errors import HttpResponseException
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
 
@@ -238,9 +239,14 @@ class TransactionQueue(object):
                             del p["age_ts"]
                 return data
 
-            code, response = yield self.transport_layer.send_transaction(
-                transaction, json_data_cb
-            )
+            try:
+                response = yield self.transport_layer.send_transaction(
+                    transaction, json_data_cb
+                )
+                code = 200
+            except HttpResponseException as e:
+                code = e.code
+                response = e.response
 
             logger.info("TX [%s] got %d response", destination, code)
 
@@ -274,11 +280,18 @@ class TransactionQueue(object):
                     pass
 
             logger.debug("TX [%s] Yielded to callbacks", destination)
-
-        except Exception as e:
+        except RuntimeError as e:
             # We capture this here as there as nothing actually listens
             # for this finishing functions deferred.
             logger.warn(
+                "TX [%s] Problem in _attempt_transaction: %s",
+                destination,
+                e,
+            )
+        except Exception as e:
+            # We capture this here as there as nothing actually listens
+            # for this finishing functions deferred.
+            logger.exception(
                 "TX [%s] Problem in _attempt_transaction: %s",
                 destination,
                 e,
