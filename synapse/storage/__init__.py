@@ -239,6 +239,12 @@ class DataStore(RoomMemberStore, RoomStore,
             event.internal_metadata.get_dict()
         )
 
+        # If we have already persisted this event, we don't need to do any
+        # more processing.
+        # The processing above must be done on every call to persist event,
+        # since they might not have happened on previous calls. For example,
+        # if we are persisting an event that we had persisted as an outlier,
+        # but is no longer one.
         if have_persisted:
             if not outlier:
                 sql = (
