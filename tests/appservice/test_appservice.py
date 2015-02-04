@@ -56,3 +56,90 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.event.type = "m.room.member"
         self.event.state_key = "@irc_foobar:matrix.org"
         self.assertTrue(self.service.is_interested(self.event))
+
+    def test_regex_room_id_match(self):
+        self.service.namespaces[ApplicationService.NS_ROOMS].append(
+            "!some_prefix.*some_suffix:matrix.org"
+        )
+        self.event.room_id = "!some_prefixs0m3th1nGsome_suffix:matrix.org"
+        self.assertTrue(self.service.is_interested(self.event))
+
+    def test_regex_room_id_no_match(self):
+        self.service.namespaces[ApplicationService.NS_ROOMS].append(
+            "!some_prefix.*some_suffix:matrix.org"
+        )
+        self.event.room_id = "!XqBunHwQIXUiqCaoxq:matrix.org"
+        self.assertFalse(self.service.is_interested(self.event))
+
+    def test_regex_alias_match(self):
+        self.service.namespaces[ApplicationService.NS_ALIASES].append(
+            "#irc_.*:matrix.org"
+        )
+        self.assertTrue(self.service.is_interested(
+            self.event,
+            aliases_for_event=["#irc_foobar:matrix.org", "#athing:matrix.org"]
+        ))
+
+    def test_regex_alias_no_match(self):
+        self.service.namespaces[ApplicationService.NS_ALIASES].append(
+            "#irc_.*:matrix.org"
+        )
+        self.assertFalse(self.service.is_interested(
+            self.event,
+            aliases_for_event=["#xmpp_foobar:matrix.org", "#athing:matrix.org"]
+        ))
+
+    def test_regex_multiple_matches(self):
+        self.service.namespaces[ApplicationService.NS_ALIASES].append(
+            "#irc_.*:matrix.org"
+        )
+        self.service.namespaces[ApplicationService.NS_USERS].append(
+            "@irc_.*"
+        )
+        self.event.sender = "@irc_foobar:matrix.org"
+        self.assertTrue(self.service.is_interested(
+            self.event,
+            aliases_for_event=["#irc_barfoo:matrix.org"]
+        ))
+
+    def test_restrict_to_rooms(self):
+        self.service.namespaces[ApplicationService.NS_ROOMS].append(
+            "!flibble_.*:matrix.org"
+        )
+        self.service.namespaces[ApplicationService.NS_USERS].append(
+            "@irc_.*"
+        )
+        self.event.sender = "@irc_foobar:matrix.org"
+        self.event.room_id = "!wibblewoo:matrix.org"
+        self.assertFalse(self.service.is_interested(
+            self.event,
+            restrict_to=ApplicationService.NS_ROOMS
+        ))
+
+    def test_restrict_to_aliases(self):
+        self.service.namespaces[ApplicationService.NS_ALIASES].append(
+            "#xmpp_.*:matrix.org"
+        )
+        self.service.namespaces[ApplicationService.NS_USERS].append(
+            "@irc_.*"
+        )
+        self.event.sender = "@irc_foobar:matrix.org"
+        self.assertFalse(self.service.is_interested(
+            self.event,
+            restrict_to=ApplicationService.NS_ALIASES,
+            aliases_for_event=["#irc_barfoo:matrix.org"]
+        ))
+
+    def test_restrict_to_senders(self):
+        self.service.namespaces[ApplicationService.NS_ALIASES].append(
+            "#xmpp_.*:matrix.org"
+        )
+        self.service.namespaces[ApplicationService.NS_USERS].append(
+            "@irc_.*"
+        )
+        self.event.sender = "@xmpp_foobar:matrix.org"
+        self.assertFalse(self.service.is_interested(
+            self.event,
+            restrict_to=ApplicationService.NS_USERS,
+            aliases_for_event=["#xmpp_barfoo:matrix.org"]
+        ))

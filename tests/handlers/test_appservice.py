@@ -18,11 +18,7 @@ from .. import unittest
 
 from synapse.handlers.appservice import ApplicationServicesHandler
 
-from collections import namedtuple
 from mock import Mock
-
-# TODO: Should this be a more general thing? tests/api/test_filtering.py uses it
-MockEvent = namedtuple("MockEvent", "sender type room_id")
 
 
 class AppServiceHandlerTestCase(unittest.TestCase):
@@ -51,7 +47,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         self.mock_store.get_app_services = Mock(return_value=services)
 
-        event = MockEvent(
+        event = Mock(
             sender="@someone:anywhere",
             type="m.room.message",
             room_id="!foo:bar"

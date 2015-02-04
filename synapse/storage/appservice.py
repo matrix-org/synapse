@@ -40,7 +40,7 @@ class ApplicationServiceStore(SQLBaseStore):
     def __init__(self, hs):
         super(ApplicationServiceStore, self).__init__(hs)
         self.cache = ApplicationServiceCache()
-        self._populate_cache()
+        self.cache_defer = self._populate_cache()
 
     @defer.inlineCallbacks
     def unregister_app_service(self, token):
@@ -49,6 +49,7 @@ class ApplicationServiceStore(SQLBaseStore):
         This removes all AS specific regex and the base URL. The token is the
         only thing preserved for future registration attempts.
         """
+        yield self.cache_defer  # make sure the cache is ready
         yield self.runInteraction(
             "unregister_app_service",
             self._unregister_app_service_txn,
@@ -89,9 +90,13 @@ class ApplicationServiceStore(SQLBaseStore):
         Args:
             service(ApplicationService): The updated service.
         """
+        yield self.cache_defer  # make sure the cache is ready
+
         # NB: There is no "insert" since we provide no public-facing API to
         # allocate new ASes. It relies on the server admin inserting the AS
         # token into the database manually.
+
+
         if not service.token or not service.url:
             raise StoreError(400, "Token and url must be specified.")
 
@@ -148,9 +153,12 @@ class ApplicationServiceStore(SQLBaseStore):
         if res:
             return res[0]
 
+    @defer.inlineCallbacks
     def get_app_services(self):
-        return self.cache.services
+        yield self.cache_defer  # make sure the cache is ready
+        defer.returnValue(self.cache.services)
 
+    @defer.inlineCallbacks
     def get_app_service_by_token(self, token, from_cache=True):
         """Get the application service with the given token.
 
@@ -161,12 +169,14 @@ class ApplicationServiceStore(SQLBaseStore):
         Raises:
             StoreError if there was a problem retrieving this service.
         """
+        yield self.cache_defer  # make sure the cache is ready
 
         if from_cache:
             for service in self.cache.services:
                 if service.token == token:
-                    return service
-            return None
+                    defer.returnValue(service)
+                    return
+            defer.returnValue(None)
 
         # TODO: The from_cache=False impl
         # TODO: This should be JOINed with the application_services_regex table.
