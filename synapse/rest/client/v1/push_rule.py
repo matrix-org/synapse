@@ -73,7 +73,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
             'rule_id': rule_id
         }
         if device:
-            spec['device'] = device
+            spec['profile_tag'] = device
         return spec
 
     def rule_tuple_from_request_object(self, rule_template, rule_id, req_obj, device=None):
@@ -188,15 +188,15 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         user, _ = yield self.auth.get_user_by_req(request)
 
-        if 'device' in spec:
+        if 'profile_tag' in spec:
             rules = yield self.hs.get_datastore().get_push_rules_for_user_name(
                 user.to_string()
             )
 
             for r in rules:
                 conditions = json.loads(r['conditions'])
-                ih = _profile_tag_from_conditions(conditions)
-                if ih == spec['device'] and r['priority_class'] == priority_class:
+                pt = _profile_tag_from_conditions(conditions)
+                if pt == spec['profile_tag'] and r['priority_class'] == priority_class:
                     yield self.hs.get_datastore().delete_push_rule(
                         user.to_string(), spec['rule_id']
                     )
@@ -306,7 +306,7 @@ def _add_empty_priority_class_arrays(d):
 
 def _profile_tag_from_conditions(conditions):
     """
-    Given a list of conditions, return the instance handle of the
+    Given a list of conditions, return the profile tag of the
     device rule if there is one
     """
     for c in conditions:
