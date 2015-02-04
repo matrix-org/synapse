@@ -37,7 +37,10 @@ def _get_state_key_from_event(event):
 KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 
 
-AuthEventTypes = (EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,)
+AuthEventTypes = (
+    EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,
+    EventTypes.JoinRules,
+)
 
 
 class StateHandler(object):
@@ -255,6 +258,15 @@ class StateHandler(object):
         if power_key in conflicted_state.items():
             power_levels = conflicted_state[power_key]
             resolved_state[power_key] = self._resolve_auth_events(power_levels)
+
+        auth_events.update(resolved_state)
+
+        for key, events in conflicted_state.items():
+            if key[0] == EventTypes.JoinRules:
+                resolved_state[key] = self._resolve_auth_events(
+                    events,
+                    auth_events
+                )
 
         auth_events.update(resolved_state)
 
