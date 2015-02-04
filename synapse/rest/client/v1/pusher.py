@@ -41,7 +41,7 @@ class PusherRestServlet(ClientV1RestServlet):
             )
             defer.returnValue((200, {}))
 
-        reqd = ['instance_handle', 'kind', 'app_id', 'app_display_name',
+        reqd = ['profile_tag', 'kind', 'app_id', 'app_display_name',
                 'device_display_name', 'pushkey', 'lang', 'data']
         missing = []
         for i in reqd:
@@ -54,7 +54,7 @@ class PusherRestServlet(ClientV1RestServlet):
         try:
             yield pusher_pool.add_pusher(
                 user_name=user.to_string(),
-                instance_handle=content['instance_handle'],
+                profile_tag=content['profile_tag'],
                 kind=content['kind'],
                 app_id=content['app_id'],
                 app_display_name=content['app_display_name'],
