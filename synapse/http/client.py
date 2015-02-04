@@ -113,6 +113,9 @@ class SimpleHttpClient(object):
         if 200 <= response.code < 300:
             defer.returnValue(json.loads(body))
         else:
+            # NB: This is explicitly not json.loads(body)'d because the contract
+            # of CodeMessageException is a *string* message. Callers can always
+            # load it into JSON if they want.
             raise CodeMessageException(response.code, body)
 
 

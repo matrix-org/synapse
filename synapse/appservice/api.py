@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from twisted.internet import defer
-from twisted.web.client import PartialDownloadError
 
+from synapse.api.errors import CodeMessageException
 from synapse.http.client import SimpleHttpClient
 
 import logging
@@ -42,11 +42,11 @@ class ApplicationServiceApi(SimpleHttpClient):
             })
             if response:  # just an empty json object
                 defer.returnValue(True)
-        except PartialDownloadError as e:
-            if e.status == 404:
+        except CodeMessageException as e:
+            if e.code == 404:
                 defer.returnValue(False)
                 return
-            logger.warning("query_user to %s received %s", (uri, e.status))
+            logger.warning("query_user to %s received %s", uri, e.code)
 
     @defer.inlineCallbacks
     def query_alias(self, service, alias):
@@ -56,14 +56,13 @@ class ApplicationServiceApi(SimpleHttpClient):
             response = yield self.get_json(uri, {
                 "access_token": self.hs_token
             })
-            logger.info("%s", response[0])
             if response:  # just an empty json object
                 defer.returnValue(True)
-        except PartialDownloadError as e:
-            if e.status == 404:
+        except CodeMessageException as e:
+            if e.code == 404:
                 defer.returnValue(False)
                 return
-            logger.warning("query_alias to %s received %s", (uri, e.status))
+            logger.warning("query_alias to %s received %s", uri, e.code)
 
     def push_bulk(self, service, events):
         pass
