@@ -77,7 +77,7 @@ class EventBase(object):
         return self.content["membership"]
 
     def is_state(self):
-        return hasattr(self, "state_key")
+        return hasattr(self, "state_key") and self.state_key is not None
 
     def get_dict(self):
         d = dict(self._event_dict)

@@ -515,6 +515,8 @@ class FederationHandler(BaseHandler):
                     "Failed to get destination from event %s", s.event_id
                 )
 
+        destinations.remove(origin)
+
         logger.debug(
             "on_send_join_request: Sending event: %s, signatures: %s",
             event.event_id,
