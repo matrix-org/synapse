@@ -111,6 +111,15 @@ To install the synapse homeserver run::
 This installs synapse, along with the libraries it uses, into a virtual
 environment under ``~/.synapse``.
 
+To set up your homeserver, run (in your virtualenv, as before)::
+
+    $ python -m synapse.app.homeserver \
+        --server-name machine.my.domain.name \
+        --config-path homeserver.yaml \
+        --generate-config
+
+Substituting your host and domain name as appropriate.
+
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See docs/turn-howto.rst for details.
 
@@ -213,7 +222,7 @@ to install using pip and a virtualenv::
 
     $ virtualenv env
     $ source env/bin/activate
-    $ python synapse/dependencies | xargs -i pip install
+    $ python synapse/python_dependencies.py | xargs -n1 pip install
     $ pip install setuptools_trial mock
 
 This will run a process of downloading and installing all the needed
@@ -265,9 +274,9 @@ For the first form, simply pass the required hostname (of the machine) as the
 
     $ python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
-        --config-path homeserver.config \
+        --config-path homeserver.yaml \
         --generate-config
-    $ python -m synapse.app.homeserver --config-path homeserver.config
+    $ python -m synapse.app.homeserver --config-path homeserver.yaml
 
 Alternatively, you can run ``synctl start`` to guide you through the process.
 
@@ -287,9 +296,9 @@ SRV record, as that is the name other machines will expect it to have::
     $ python -m synapse.app.homeserver \
         --server-name YOURDOMAIN \
         --bind-port 8448 \
-        --config-path homeserver.config \
+        --config-path homeserver.yaml \
         --generate-config
-    $ python -m synapse.app.homeserver --config-path homeserver.config
+    $ python -m synapse.app.homeserver --config-path homeserver.yaml
 
 
 You may additionally want to pass one or more "-v" options, in order to
