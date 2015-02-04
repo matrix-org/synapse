@@ -251,16 +251,21 @@ class FederationClient(FederationBase):
         defer.returnValue(signed_auth)
 
     @defer.inlineCallbacks
-    def make_join(self, destination, room_id, user_id):
-        ret = yield self.transport_layer.make_join(
-            destination, room_id, user_id
-        )
+    def make_join(self, destinations, room_id, user_id):
+        for destination in destinations:
+            try:
+                ret = yield self.transport_layer.make_join(
+                    destination, room_id, user_id
+                )
 
-        pdu_dict = ret["event"]
+                pdu_dict = ret["event"]
 
-        logger.debug("Got response to make_join: %s", pdu_dict)
+                logger.debug("Got response to make_join: %s", pdu_dict)
 
-        defer.returnValue(self.event_from_pdu_json(pdu_dict))
+                defer.returnValue(self.event_from_pdu_json(pdu_dict))
+                break
+            except Exception as e:
+                logger.warn("Failed to make_join via %s", destination)
 
     @defer.inlineCallbacks
     def send_join(self, destination, pdu):
