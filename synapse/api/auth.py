@@ -302,6 +302,12 @@ class Auth(object):
 
             # Check for application service tokens with a user_id override
             try:
+                if "user_id" not in request.args:
+                    # This has to be done like this rather than relying on it
+                    # natively throwing because tests use a Mock for the request
+                    # object which doesn't throw :/
+                    raise KeyError
+
                 masquerade_user_id = request.args["user_id"][0]
                 app_service = yield self.store.get_app_service_by_token(
                     access_token
