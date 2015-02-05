@@ -36,6 +36,7 @@ def make_base_rules(user, kind):
 
     for r in rules:
         r['priority_class'] = PRIORITY_CLASS_MAP[kind]
+        r['default'] = True
 
     return rules
 

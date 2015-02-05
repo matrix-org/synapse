@@ -345,7 +345,7 @@ def _priority_class_to_template_name(pc):
 def _rule_to_template(rule):
     unscoped_rule_id = None
     if 'rule_id' in rule:
-        _rule_id_from_namespaced(rule['rule_id'])
+        unscoped_rule_id = _rule_id_from_namespaced(rule['rule_id'])
 
     template_name = _priority_class_to_template_name(rule['priority_class'])
     if template_name in ['override', 'underride']:
@@ -364,6 +364,8 @@ def _rule_to_template(rule):
 
     if unscoped_rule_id:
             templaterule['rule_id'] = unscoped_rule_id
+    if 'default' in rule:
+        templaterule['default'] = rule['default']
     return templaterule
 
 
