@@ -9,7 +9,6 @@ import json
 import sys
 
 
-
 def check_auth(auth, auth_chain, events):
     auth_chain.sort(key=lambda e: e.depth)
 
@@ -37,6 +36,7 @@ def check_auth(auth, auth_chain, events):
             auth.check(e, auth_events=auth_events)
         except Exception as ex:
             print "Failed:", e.event_id, e.type, e.state_key
+            print "Auth_events:", auth_events
             print ex
             print json.dumps(e.get_dict(), sort_keys=True, indent=4)
             # raise
