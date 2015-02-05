@@ -270,7 +270,7 @@ class FederationClient(FederationBase):
                 break
             except CodeMessageException:
                 raise
-            except RuntimeError as e:
+            except Exception as e:
                 logger.warn(
                     "Failed to make_join via %s: %s",
                     destination, e.message
@@ -319,7 +319,7 @@ class FederationClient(FederationBase):
                 })
             except CodeMessageException:
                 raise
-            except RuntimeError as e:
+            except Exception as e:
                 logger.warn(
                     "Failed to send_join via %s: %s",
                     destination, e.message
