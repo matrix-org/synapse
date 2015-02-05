@@ -29,13 +29,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api = Mock()
         hs = Mock()
         hs.get_datastore = Mock(return_value=self.mock_store)
-        self.handler = ApplicationServicesHandler(hs)  # thing being tested
-
-        # FIXME Would be nice to DI this rather than monkey patch:(
-        if not hasattr(self.handler, "appservice_api"):
-            # someone probably updated the handler but not the tests. Fail fast.
-            raise Exception("Test expected handler.appservice_api to exist.")
-        self.handler.appservice_api = self.mock_as_api
+        self.handler = ApplicationServicesHandler(
+            hs, self.mock_as_api
+        )
 
     @defer.inlineCallbacks
     def test_notify_interested_services(self):

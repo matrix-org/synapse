@@ -18,7 +18,6 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.appservice import ApplicationService
-from synapse.appservice.api import ApplicationServiceApi
 from synapse.types import UserID
 import synapse.util.stringutils as stringutils
 
@@ -32,10 +31,10 @@ logger = logging.getLogger(__name__)
 # easier.
 class ApplicationServicesHandler(object):
 
-    def __init__(self, hs):
+    def __init__(self, hs, appservice_api):
         self.store = hs.get_datastore()
         self.hs = hs
-        self.appservice_api = ApplicationServiceApi(hs)
+        self.appservice_api = appservice_api
 
     @defer.inlineCallbacks
     def register(self, app_service):
