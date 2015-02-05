@@ -46,6 +46,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         ]
 
         self.mock_store.get_app_services = Mock(return_value=services)
+        self.mock_store.get_user_by_id = Mock(return_value=[])
 
         event = Mock(
             sender="@someone:anywhere",

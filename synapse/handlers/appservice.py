@@ -15,10 +15,10 @@
 
 from twisted.internet import defer
 
-from ._base import BaseHandler
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.appservice.api import ApplicationServiceApi
+from synapse.types import UserID
 import synapse.util.stringutils as stringutils
 
 import logging
@@ -74,7 +74,7 @@ class ApplicationServicesHandler(object):
             event based on the service regex.
         """
         # We need to know the aliases associated with this event.room_id, if any
-        alias_list = []  # TODO
+        alias_list = yield self.store.get_aliases_for_room(event.room_id)
         services = yield self.store.get_app_services()
         interested_list = [
             s for s in services if (
@@ -100,7 +100,7 @@ class ApplicationServicesHandler(object):
 
         # Do we know this user exists? If not, poke the user query API for
         # all services which match that user regex.
-        unknown_user = False  # TODO check
+        unknown_user = yield self._is_unknown_user(event.sender)
         if unknown_user:
             user_query_services = yield self.get_services_for_event(
                 event=event,
@@ -117,7 +117,7 @@ class ApplicationServicesHandler(object):
 
         # Do we know this room alias exists? If not, poke the room alias query
         # API for all services which match that room alias regex.
-        unknown_room_alias = False  # TODO check
+        unknown_room_alias = False  # TODO
         if unknown_room_alias:
             alias = "something"  # TODO
             alias_query_services = yield self.get_services_for_event(
@@ -137,5 +137,19 @@ class ApplicationServicesHandler(object):
         for service in services:
             self.appservice_api.push(service, event)
 
+    @defer.inlineCallbacks
+    def _is_unknown_user(self, user_id):
+        user = UserID.from_string(user_id)
+        if not self.hs.is_mine(user):
+            # we don't know if they are unknown or not since it isn't one of our
+            # users. We can't poke ASes.
+            defer.returnValue(False)
+            return
+
+        user_info = yield self.store.get_user_by_id(user_id)
+        defer.returnValue(len(user_info) == 0)
+
+
+
     def _generate_hs_token(self):
-        return stringutils.random_string(18)
+        return stringutils.random_string(24)
