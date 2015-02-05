@@ -273,7 +273,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def do_invite_join(self, target_host, room_id, joinee, content, snapshot):
+    def do_invite_join(self, target_hosts, room_id, joinee, content, snapshot):
         """ Attempts to join the `joinee` to the room `room_id` via the
         server `target_host`.
 
@@ -287,8 +287,8 @@ class FederationHandler(BaseHandler):
         """
         logger.debug("Joining %s to %s", joinee, room_id)
 
-        pdu = yield self.replication_layer.make_join(
-            [target_host],
+        origin, pdu = yield self.replication_layer.make_join(
+            target_hosts,
             room_id,
             joinee
         )
@@ -330,11 +330,17 @@ class FederationHandler(BaseHandler):
 
             new_event = builder.build()
 
+            # Try the host we successfully got a response to /make_join/
+            # request first.
+            target_hosts.remove(origin)
+            target_hosts.insert(0, origin)
+
             ret = yield self.replication_layer.send_join(
-                [target_host],
+                target_hosts,
                 new_event
             )
 
+            origin = ret["origin"]
             state = ret["state"]
             auth_chain = ret["auth_chain"]
             auth_chain.sort(key=lambda e: e.depth)
@@ -371,7 +377,7 @@ class FederationHandler(BaseHandler):
                         if e.event_id in auth_ids
                     }
                     yield self._handle_new_event(
-                        target_host, e, auth_events=auth
+                        origin, e, auth_events=auth
                     )
                 except:
                     logger.exception(
@@ -391,7 +397,7 @@ class FederationHandler(BaseHandler):
                         if e.event_id in auth_ids
                     }
                     yield self._handle_new_event(
-                        target_host, e, auth_events=auth
+                        origin, e, auth_events=auth
                     )
                 except:
                     logger.exception(
@@ -406,7 +412,7 @@ class FederationHandler(BaseHandler):
             }
 
             yield self._handle_new_event(
-                target_host,
+                origin,
                 new_event,
                 state=state,
                 current_state=state,

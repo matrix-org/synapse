@@ -264,7 +264,9 @@ class FederationClient(FederationBase):
 
                 logger.debug("Got response to make_join: %s", pdu_dict)
 
-                defer.returnValue(self.event_from_pdu_json(pdu_dict))
+                defer.returnValue(
+                    (destination, self.event_from_pdu_json(pdu_dict))
+                )
                 break
             except CodeMessageException:
                 raise
@@ -313,6 +315,7 @@ class FederationClient(FederationBase):
                 defer.returnValue({
                     "state": signed_state,
                     "auth_chain": signed_auth,
+                    "origin": destination,
                 })
             except CodeMessageException:
                 raise
