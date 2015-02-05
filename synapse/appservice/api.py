@@ -64,8 +64,25 @@ class ApplicationServiceApi(SimpleHttpClient):
                 return
             logger.warning("query_alias to %s received %s", uri, e.code)
 
+    @defer.inlineCallbacks
     def push_bulk(self, service, events):
-        pass
+        uri = service.url + ("/transactions/%s" %
+                             urllib.quote(str(0)))  # TODO txn_ids
+        response = None
+        try:
+            response = yield self.put_json(
+                uri,
+                {
+                    "events": events
+                },
+                {
+                    "access_token": self.hs_token
+                })
+            if response:  # just an empty json object
+                defer.returnValue(True)
+        except CodeMessageException as e:
+            logger.warning("push_bulk to %s received %s", uri, e.code)
+            defer.returnValue(False)
 
     @defer.inlineCallbacks
     def push(self, service, event):

@@ -56,7 +56,7 @@ class ApplicationServicesHandler(object):
         yield self.store.update_app_service(app_service)
 
         logger.info("Sending ping to %s...", app_service.url)
-        yield self.appservice_api.query_alias(app_service, "ping")
+        yield self.appservice_api.push(app_service, "pinger")
 
     def unregister(self, token):
         logger.info("Unregister as_token=%s", token)
