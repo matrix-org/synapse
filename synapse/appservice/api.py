@@ -30,7 +30,6 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     def __init__(self,  hs):
         super(ApplicationServiceApi, self).__init__(hs)
-        self.hs_token = "_hs_token_"  # TODO extract hs token
 
     @defer.inlineCallbacks
     def query_user(self, service, user_id):
@@ -38,7 +37,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         response = None
         try:
             response = yield self.get_json(uri, {
-                "access_token": self.hs_token
+                "access_token": service.hs_token
             })
             if response:  # just an empty json object
                 defer.returnValue(True)
@@ -54,7 +53,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         response = None
         try:
             response = yield self.get_json(uri, {
-                "access_token": self.hs_token
+                "access_token": service.hs_token
             })
             if response:  # just an empty json object
                 defer.returnValue(True)
@@ -76,9 +75,10 @@ class ApplicationServiceApi(SimpleHttpClient):
                     "events": events
                 },
                 {
-                    "access_token": self.hs_token
+                    "access_token": service.hs_token
                 })
             if response:  # just an empty json object
+                # TODO: Mark txn as sent successfully
                 defer.returnValue(True)
         except CodeMessageException as e:
             logger.warning("push_bulk to %s received %s", uri, e.code)

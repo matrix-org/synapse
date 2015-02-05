@@ -19,6 +19,7 @@ from ._base import BaseHandler
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.appservice.api import ApplicationServiceApi
+import synapse.util.stringutils as stringutils
 
 import logging
 
@@ -53,10 +54,9 @@ class ApplicationServicesHandler(object):
                 errcode=Codes.FORBIDDEN
             )
         logger.info("Updating application service info...")
+        app_service.hs_token = self._generate_hs_token()
         yield self.store.update_app_service(app_service)
-
-        logger.info("Sending ping to %s...", app_service.url)
-        yield self.appservice_api.push(app_service, "pinger")
+        defer.returnValue(app_service)
 
     def unregister(self, token):
         logger.info("Unregister as_token=%s", token)
@@ -136,3 +136,6 @@ class ApplicationServicesHandler(object):
         # Fork off pushes to these services - XXX First cut, best effort
         for service in services:
             self.appservice_api.push(service, event)
+
+    def _generate_hs_token(self):
+        return stringutils.random_string(18)

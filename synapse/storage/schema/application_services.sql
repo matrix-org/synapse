@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS application_services(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     url TEXT,
     token TEXT,
+    hs_token TEXT,
     UNIQUE(token) ON CONFLICT ROLLBACK
 );
 

@@ -60,6 +60,7 @@ class ApplicationServiceStore(SQLBaseStore):
             if service.token == token:
                 service.url = None
                 service.namespaces = None
+                service.hs_token = None
 
     def _unregister_app_service_txn(self, txn, token):
         # kill the url to prevent pushes
@@ -100,6 +101,9 @@ class ApplicationServiceStore(SQLBaseStore):
         if not service.token or not service.url:
             raise StoreError(400, "Token and url must be specified.")
 
+        if not service.hs_token:
+            raise StoreError(500, "No HS token")
+
         yield self.runInteraction(
             "update_app_service",
             self._update_app_service_txn,
@@ -126,8 +130,8 @@ class ApplicationServiceStore(SQLBaseStore):
             return False
 
         txn.execute(
-            "UPDATE application_services SET url=? WHERE id=?",
-            (service.url, as_id,)
+            "UPDATE application_services SET url=?, hs_token=? WHERE id=?",
+            (service.url, service.hs_token, as_id,)
         )
         # cleanup regex
         txn.execute(
@@ -196,6 +200,7 @@ class ApplicationServiceStore(SQLBaseStore):
         #     'namespace': enum,
         #     'as_id': 0,
         #     'token': "something",
+        #     'hs_token': "otherthing",
         #     'id': 0
         #   }
         # ]
@@ -208,6 +213,7 @@ class ApplicationServiceStore(SQLBaseStore):
                 services[as_token] = {
                     "url": res["url"],
                     "token": as_token,
+                    "hs_token": res["hs_token"],
                     "namespaces": {
                         ApplicationService.NS_USERS: [],
                         ApplicationService.NS_ALIASES: [],
@@ -230,8 +236,9 @@ class ApplicationServiceStore(SQLBaseStore):
         for service in services.values():
             logger.info("Found application service: %s", service)
             self.cache.services.append(ApplicationService(
-                service["token"],
-                service["url"],
-                service["namespaces"]
+                token=service["token"],
+                url=service["url"],
+                namespaces=service["namespaces"],
+                hs_token=service["hs_token"]
             ))
 

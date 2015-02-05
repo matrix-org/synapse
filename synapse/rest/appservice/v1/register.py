@@ -61,8 +61,8 @@ class RegisterRestServlet(AppServiceRestServlet):
 
         app_service = ApplicationService(as_token, as_url, namespaces)
 
-        yield self.handler.register(app_service)
-        hs_token = "_not_implemented_yet"  # TODO: Pull this from self.hs?
+        app_service = yield self.handler.register(app_service)
+        hs_token = app_service.hs_token
 
         defer.returnValue((200, {
           "hs_token": hs_token

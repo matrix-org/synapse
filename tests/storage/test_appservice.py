@@ -46,13 +46,15 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_update_and_retrieval_of_service(self):
         url = "https://matrix.org/appservices/foobar"
+        hs_token = "hstok"
         user_regex = ["@foobar_.*:matrix.org"]
         alias_regex = ["#foobar_.*:matrix.org"]
         room_regex = []
-        service = ApplicationService(url=url, token=self.as_token, namespaces={
-            ApplicationService.NS_USERS: user_regex,
-            ApplicationService.NS_ALIASES: alias_regex,
-            ApplicationService.NS_ROOMS: room_regex
+        service = ApplicationService(
+            url=url, hs_token=hs_token, token=self.as_token, namespaces={
+                ApplicationService.NS_USERS: user_regex,
+                ApplicationService.NS_ALIASES: alias_regex,
+                ApplicationService.NS_ROOMS: room_regex
         })
         yield self.store.update_app_service(service)
 
