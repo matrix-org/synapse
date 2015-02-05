@@ -60,7 +60,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_query_room_alias_exists(self):
-        room_alias = "#foo:bar"
+        room_alias_str = "#foo:bar"
+        room_alias = Mock()
+        room_alias.to_string = Mock(return_value=room_alias_str)
+
         room_id = "!alpha:bet"
         servers = ["aperture"]
         interested_service = self._mkservice(is_interested=True)
@@ -79,7 +82,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         self.mock_as_api.query_alias.assert_called_once_with(
             interested_service,
-            room_alias
+            room_alias_str
         )
         self.assertEquals(result.room_id, room_id)
         self.assertEquals(result.servers, servers)
