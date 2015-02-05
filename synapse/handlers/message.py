@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import RoomError
+from synapse.api.errors import RoomError, SynapseError
 from synapse.streams.config import PaginationConfig
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
@@ -372,10 +372,17 @@ class MessageHandler(BaseHandler):
                     as_event=True,
                 )
                 presence.append(member_presence)
-            except Exception:
-                logger.exception(
-                    "Failed to get member presence of %r", m.user_id
-                )
+            except SynapseError as e:
+                if e.code == 404:
+                    # FIXME: We are doing this as a warn since this gets hit a
+                    # lot and spams the logs. Why is this happening?
+                    logger.warn(
+                        "Failed to get member presence of %r", m.user_id
+                    )
+                else:
+                    logger.exception(
+                        "Failed to get member presence of %r", m.user_id
+                    )
 
         time_now = self.clock.time_msec()
 
