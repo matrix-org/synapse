@@ -75,27 +75,23 @@ class ApplicationService(object):
 
     def _matches_user(self, event):
         if (hasattr(event, "sender") and
-                self._matches_regex(
-                event.sender, ApplicationService.NS_USERS)):
+                self.is_interested_in_user(event.sender)):
             return True
         # also check m.room.member state key
         if (hasattr(event, "type") and event.type == EventTypes.Member
                 and hasattr(event, "state_key")
-                and self._matches_regex(
-                event.state_key, ApplicationService.NS_USERS)):
+                and self.is_interested_in_user(event.state_key)):
             return True
         return False
 
     def _matches_room_id(self, event):
         if hasattr(event, "room_id"):
-            return self._matches_regex(
-                event.room_id, ApplicationService.NS_ROOMS
-            )
+            return self.is_interested_in_room(event.room_id)
         return False
 
     def _matches_aliases(self, event, alias_list):
         for alias in alias_list:
-            if self._matches_regex(alias, ApplicationService.NS_ALIASES):
+            if self.is_interested_in_alias(alias):
                 return True
         return False
 
@@ -127,6 +123,15 @@ class ApplicationService(object):
             return self._matches_room_id(event)
         elif restrict_to == ApplicationService.NS_USERS:
             return self._matches_user(event)
+
+    def is_interested_in_user(self, user_id):
+        return self._matches_regex(user_id, ApplicationService.NS_USERS)
+
+    def is_interested_in_alias(self, alias):
+        return self._matches_regex(alias, ApplicationService.NS_ALIASES)
+
+    def is_interested_in_room(self, room_id):
+        return self._matches_regex(room_id, ApplicationService.NS_ROOMS)
 
     def __str__(self):
         return "ApplicationService: %s" % (self.__dict__,)

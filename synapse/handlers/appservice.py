@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 
+from synapse.api.constants import EventTypes
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.appservice.api import ApplicationServiceApi
@@ -78,32 +79,31 @@ class ApplicationServicesHandler(object):
             return  # no services need notifying
 
         # Do we know this user exists? If not, poke the user query API for
-        # all services which match that user regex.
-        unknown_user = yield self._is_unknown_user(event.sender)
-        if unknown_user:
-            yield self.query_user_exists(event)
+        # all services which match that user regex. This needs to block as these
+        # user queries need to be made BEFORE pushing the event.
+        yield self._check_user_exists(event.sender)
+        if event.type == EventTypes.Member:
+            yield self._check_user_exists(event.state_key)
 
         # Fork off pushes to these services - XXX First cut, best effort
         for service in services:
             self.appservice_api.push(service, event)
 
     @defer.inlineCallbacks
-    def query_user_exists(self, event):
-        """Check if an application services knows this event.sender exists.
+    def query_user_exists(self, user_id):
+        """Check if any application service knows this user_id exists.
 
         Args:
-            event: An event sent by the user to query
+            user_id(str): The user to query if they exist on any AS.
         Returns:
-            True if this user exists.
+            True if this user exists on at least one application service.
         """
-        # TODO Would be nice for this to accept a user ID instead of an event.
-        user_query_services = yield self._get_services_for_event(
-            event=event,
-            restrict_to=ApplicationService.NS_USERS
+        user_query_services = yield self._get_services_for_user(
+            user_id=user_id
         )
         for user_service in user_query_services:
             is_known_user = yield self.appservice_api.query_user(
-                user_service, event.sender
+                user_service, user_id
             )
             if is_known_user:
                 defer.returnValue(True)
@@ -162,6 +162,16 @@ class ApplicationServicesHandler(object):
         defer.returnValue(interested_list)
 
     @defer.inlineCallbacks
+    def _get_services_for_user(self, user_id):
+        services = yield self.store.get_app_services()
+        interested_list = [
+            s for s in services if (
+                s.is_interested_in_user(user_id)
+            )
+        ]
+        defer.returnValue(interested_list)
+
+    @defer.inlineCallbacks
     def _is_unknown_user(self, user_id):
         user = UserID.from_string(user_id)
         if not self.hs.is_mine(user):
@@ -172,6 +182,14 @@ class ApplicationServicesHandler(object):
 
         user_info = yield self.store.get_user_by_id(user_id)
         defer.returnValue(len(user_info) == 0)
+
+    @defer.inlineCallbacks
+    def _check_user_exists(self, user_id):
+        unknown_user = yield self._is_unknown_user(user_id)
+        if unknown_user:
+            exists = yield self.query_user_exists(user_id)
+            defer.returnValue(exists)
+        defer.returnValue(True)
 
     def _generate_hs_token(self):
         return stringutils.random_string(24)
