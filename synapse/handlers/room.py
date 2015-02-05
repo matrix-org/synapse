@@ -389,8 +389,6 @@ class RoomMemberHandler(BaseHandler):
         if not hosts:
             raise SynapseError(404, "No known servers")
 
-        host = hosts[0]
-
         # If event doesn't include a display name, add one.
         yield self.distributor.fire(
             "collect_presencelike_data", joinee, content
@@ -407,12 +405,12 @@ class RoomMemberHandler(BaseHandler):
         })
         event, context = yield self._create_new_client_event(builder)
 
-        yield self._do_join(event, context, room_host=host, do_auth=True)
+        yield self._do_join(event, context, room_hosts=hosts, do_auth=True)
 
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def _do_join(self, event, context, room_host=None, do_auth=True):
+    def _do_join(self, event, context, room_hosts=None, do_auth=True):
         joinee = UserID.from_string(event.state_key)
         # room_id = RoomID.from_string(event.room_id, self.hs)
         room_id = event.room_id
@@ -441,7 +439,7 @@ class RoomMemberHandler(BaseHandler):
 
         if is_host_in_room:
             should_do_dance = False
-        elif room_host:  # TODO: Shouldn't this be remote_room_host?
+        elif room_hosts:  # TODO: Shouldn't this be remote_room_host?
             should_do_dance = True
         else:
             # TODO(markjh): get prev_state from snapshot
@@ -453,7 +451,7 @@ class RoomMemberHandler(BaseHandler):
                 inviter = UserID.from_string(prev_state.user_id)
 
                 should_do_dance = not self.hs.is_mine(inviter)
-                room_host = inviter.domain
+                room_hosts = [inviter.domain]
             else:
                 # return the same error as join_room_alias does
                 raise SynapseError(404, "No known servers")
@@ -461,7 +459,7 @@ class RoomMemberHandler(BaseHandler):
         if should_do_dance:
             handler = self.hs.get_handlers().federation_handler
             yield handler.do_invite_join(
-                room_host,
+                room_hosts,
                 room_id,
                 event.user_id,
                 event.get_dict()["content"],  # FIXME To get a non-frozen dict

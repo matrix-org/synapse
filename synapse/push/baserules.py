@@ -38,7 +38,8 @@ def make_base_rules(user_name):
             'actions': [
                 'notify',
                 {
-                    'set_sound': 'default'
+                    'set_tweak': 'sound',
+                    'value': 'default'
                 }
             ]
         }
