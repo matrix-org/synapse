@@ -299,6 +299,29 @@ class Auth(object):
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
             access_token = request.args["access_token"][0]
+
+            # Check for application service tokens with a user_id override
+            try:
+                masquerade_user_id = request.args["user_id"][0]
+                app_service = yield self.store.get_app_service_by_token(
+                    access_token
+                )
+                if not app_service:
+                    raise AuthError(
+                        403, "Invalid application service access token"
+                    )
+                if not app_service.is_interested_in_user(masquerade_user_id):
+                    raise AuthError(
+                        403,
+                        "Application service cannot masquerade as this user."
+                    )
+                defer.returnValue(
+                    (UserID.from_string(masquerade_user_id), ClientInfo("", ""))
+                )
+                return
+            except KeyError:
+                pass  # normal users won't have this query parameter set
+
             user_info = yield self.get_user_by_token(access_token)
             user = user_info["user"]
             device_id = user_info["device_id"]
