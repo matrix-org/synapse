@@ -82,10 +82,6 @@ class PushRuleRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_DELETE(self, request):
         spec = _rule_spec_from_path(request.postpath)
-        try:
-            priority_class = _priority_class_from_spec(spec)
-        except InvalidRuleException as e:
-            raise SynapseError(400, e.message)
 
         user, _ = yield self.auth.get_user_by_req(request)
 
