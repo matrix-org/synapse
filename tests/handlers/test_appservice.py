@@ -37,6 +37,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             raise Exception("Test expected handler.appservice_api to exist.")
         self.handler.appservice_api = self.mock_as_api
 
+    @defer.inlineCallbacks
     def test_notify_interested_services(self):
         interested_service = self._mkservice(is_interested=True)
         services = [
@@ -54,8 +55,36 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.mock_as_api.push = Mock()
-        self.handler.notify_interested_services(event)
+        yield self.handler.notify_interested_services(event)
         self.mock_as_api.push.assert_called_once_with(interested_service, event)
+
+    @defer.inlineCallbacks
+    def test_query_room_alias_exists(self):
+        room_alias = "#foo:bar"
+        room_id = "!alpha:bet"
+        servers = ["aperture"]
+        interested_service = self._mkservice(is_interested=True)
+        services = [
+            self._mkservice(is_interested=False),
+            interested_service,
+            self._mkservice(is_interested=False)
+        ]
+
+        self.mock_store.get_app_services = Mock(return_value=services)
+        self.mock_store.get_association_from_room_alias = Mock(
+            return_value=Mock(room_id=room_id, servers=servers)
+        )
+
+        result = yield self.handler.query_room_alias_exists(room_alias)
+
+        self.mock_as_api.query_alias.assert_called_once_with(
+            interested_service,
+            room_alias
+        )
+        self.assertEquals(result.room_id, room_id)
+        self.assertEquals(result.servers, servers)
+
+
 
     def _mkservice(self, is_interested):
         service = Mock()
