@@ -62,7 +62,7 @@ class ApplicationService(object):
 
     def _matches_regex(self, test_string, namespace_key):
         if not isinstance(test_string, basestring):
-            logger.warning(
+            logger.error(
                 "Expected a string to test regex against, but got %s",
                 test_string
             )

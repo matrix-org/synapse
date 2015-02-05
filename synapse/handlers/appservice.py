@@ -23,7 +23,6 @@ import synapse.util.stringutils as stringutils
 
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -58,6 +57,7 @@ class ApplicationServicesHandler(object):
         yield self.store.update_app_service(app_service)
         defer.returnValue(app_service)
 
+    @defer.inlineCallbacks
     def unregister(self, token):
         logger.info("Unregister as_token=%s", token)
         yield self.store.unregister_app_service(token)
@@ -81,34 +81,45 @@ class ApplicationServicesHandler(object):
         # all services which match that user regex.
         unknown_user = yield self._is_unknown_user(event.sender)
         if unknown_user:
-            user_query_services = yield self._get_services_for_event(
-                event=event,
-                restrict_to=ApplicationService.NS_USERS
-            )
-            for user_service in user_query_services:
-                # this needs to block XXX: Need to feed response back to caller
-                is_known_user = yield self.appservice_api.query_user(
-                    user_service, event.sender
-                )
-                if is_known_user:
-                    # the user exists now,so don't query more ASes.
-                    break
+            yield self.query_user_exists(event)
 
         # Fork off pushes to these services - XXX First cut, best effort
         for service in services:
             self.appservice_api.push(service, event)
 
+    @defer.inlineCallbacks
+    def query_user_exists(self, event):
+        """Check if an application services knows this event.sender exists.
+
+        Args:
+            event: An event sent by the user to query
+        Returns:
+            True if this user exists.
+        """
+        # TODO Would be nice for this to accept a user ID instead of an event.
+        user_query_services = yield self._get_services_for_event(
+            event=event,
+            restrict_to=ApplicationService.NS_USERS
+        )
+        for user_service in user_query_services:
+            is_known_user = yield self.appservice_api.query_user(
+                user_service, event.sender
+            )
+            if is_known_user:
+                defer.returnValue(True)
+        defer.returnValue(False)
 
     @defer.inlineCallbacks
     def query_room_alias_exists(self, room_alias):
         """Check if an application service knows this room alias exists.
 
         Args:
-            room_alias(str): The room alias to query.
+            room_alias(RoomAlias): The room alias to query.
         Returns:
             namedtuple: with keys "room_id" and "servers" or None if no
             association can be found.
         """
+        room_alias = room_alias.to_string()
         alias_query_services = yield self._get_services_for_event(
             event=None,
             restrict_to=ApplicationService.NS_ALIASES,

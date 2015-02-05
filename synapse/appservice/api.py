@@ -46,6 +46,9 @@ class ApplicationServiceApi(SimpleHttpClient):
                 defer.returnValue(False)
                 return
             logger.warning("query_user to %s received %s", uri, e.code)
+        except Exception as ex:
+            logger.warning("query_user to %s threw exception %s", uri, ex)
+        defer.returnValue(False)
 
     @defer.inlineCallbacks
     def query_alias(self, service, alias):
@@ -62,6 +65,10 @@ class ApplicationServiceApi(SimpleHttpClient):
                 defer.returnValue(False)
                 return
             logger.warning("query_alias to %s received %s", uri, e.code)
+        except Exception as ex:
+            logger.warning("query_alias to %s threw exception %s", uri, ex)
+        defer.returnValue(False)
+
 
     @defer.inlineCallbacks
     def push_bulk(self, service, events):
@@ -82,7 +89,9 @@ class ApplicationServiceApi(SimpleHttpClient):
                 defer.returnValue(True)
         except CodeMessageException as e:
             logger.warning("push_bulk to %s received %s", uri, e.code)
-            defer.returnValue(False)
+        except Exception as ex:
+            logger.warning("push_bulk to %s threw exception %s", uri, ex)
+        defer.returnValue(False)
 
     @defer.inlineCallbacks
     def push(self, service, event):
