@@ -77,15 +77,15 @@ class Pusher(object):
             if ev['state_key'] != self.user_name:
                 defer.returnValue(['dont_notify'])
 
-        rules = yield self.store.get_push_rules_for_user_name(self.user_name)
+        rawrules = yield self.store.get_push_rules_for_user_name(self.user_name)
 
-        for r in rules:
+        for r in rawrules:
             r['conditions'] = json.loads(r['conditions'])
             r['actions'] = json.loads(r['actions'])
 
-        user_name_localpart = UserID.from_string(self.user_name).localpart
+        user = UserID.from_string(self.user_name)
 
-        rules.extend(baserules.make_base_rules(user_name_localpart))
+        rules = baserules.list_with_base_rules(rawrules, user)
 
         # get *our* member event for display name matching
         member_events_for_room = yield self.store.get_current_state(

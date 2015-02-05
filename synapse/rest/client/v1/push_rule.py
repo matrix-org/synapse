@@ -20,21 +20,13 @@ from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError, No
 from .base import ClientV1RestServlet, client_path_pattern
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 import synapse.push.baserules as baserules
+from synapse.push.rulekinds import PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 
 import json
 
 
 class PushRuleRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/pushrules/.*$")
-    PRIORITY_CLASS_MAP = {
-        'default': 0,
-        'underride': 1,
-        'sender': 2,
-        'room': 3,
-        'content': 4,
-        'override': 5,
-    }
-    PRIORITY_CLASS_INVERSE_MAP = {v: k for k, v in PRIORITY_CLASS_MAP.items()}
     SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR = (
         "Unrecognised request: You probably wanted a trailing slash")
 
@@ -48,11 +40,8 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         user, _ = yield self.auth.get_user_by_req(request)
 
-        if spec['template'] == 'default':
-            raise SynapseError(403, "The default rules are immutable.")
-
-        if not spec['rule_id'].isalnum():
-            raise SynapseError(400, "rule_id may only contain alphanumeric characters")
+        if '/' in spec['rule_id'] or '\\' in spec['rule_id']:
+            raise SynapseError(400, "rule_id may not contain slashes")
 
         content = _parse_json(request)
 
@@ -121,21 +110,23 @@ class PushRuleRestServlet(ClientV1RestServlet):
         # to send which means doing unnecessary work sometimes but is
         # is probably not going to make a whole lot of difference
         rawrules = yield self.hs.get_datastore().get_push_rules_for_user_name(user.to_string())
+
         for r in rawrules:
             r["conditions"] = json.loads(r["conditions"])
             r["actions"] = json.loads(r["actions"])
-        rawrules.extend(baserules.make_base_rules(user.to_string()))
+
+        ruleslist = baserules.list_with_base_rules(rawrules, user)
 
         rules = {'global': {}, 'device': {}}
 
         rules['global'] = _add_empty_priority_class_arrays(rules['global'])
 
-        for r in rawrules:
+        for r in ruleslist:
             rulearray = None
 
             template_name = _priority_class_to_template_name(r['priority_class'])
 
-            if r['priority_class'] > PushRuleRestServlet.PRIORITY_CLASS_MAP['override']:
+            if r['priority_class'] > PRIORITY_CLASS_MAP['override']:
                 # per-device rule
                 profile_tag = _profile_tag_from_conditions(r["conditions"])
                 r = _strip_device_condition(r)
@@ -290,7 +281,7 @@ def _rule_tuple_from_request_object(rule_template, rule_id, req_obj, device=None
 
 
 def _add_empty_priority_class_arrays(d):
-    for pc in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
+    for pc in PRIORITY_CLASS_MAP.keys():
         d[pc] = []
     return d
 
@@ -332,46 +323,48 @@ def _filter_ruleset_with_path(ruleset, path):
 
 
 def _priority_class_from_spec(spec):
-    if spec['template'] not in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
+    if spec['template'] not in PRIORITY_CLASS_MAP.keys():
         raise InvalidRuleException("Unknown template: %s" % (spec['kind']))
-    pc = PushRuleRestServlet.PRIORITY_CLASS_MAP[spec['template']]
+    pc = PRIORITY_CLASS_MAP[spec['template']]
 
     if spec['scope'] == 'device':
-        pc += len(PushRuleRestServlet.PRIORITY_CLASS_MAP)
+        pc += len(PRIORITY_CLASS_MAP)
 
     return pc
 
 
 def _priority_class_to_template_name(pc):
-    if pc > PushRuleRestServlet.PRIORITY_CLASS_MAP['override']:
+    if pc > PRIORITY_CLASS_MAP['override']:
         # per-device
         prio_class_index = pc - len(PushRuleRestServlet.PRIORITY_CLASS_MAP)
-        return PushRuleRestServlet.PRIORITY_CLASS_INVERSE_MAP[prio_class_index]
+        return PRIORITY_CLASS_INVERSE_MAP[prio_class_index]
     else:
-        return PushRuleRestServlet.PRIORITY_CLASS_INVERSE_MAP[pc]
+        return PRIORITY_CLASS_INVERSE_MAP[pc]
 
 
 def _rule_to_template(rule):
-    unscoped_rule_id = _rule_id_from_namespaced(rule['rule_id'])
+    unscoped_rule_id = None
+    if 'rule_id' in rule:
+        _rule_id_from_namespaced(rule['rule_id'])
 
     template_name = _priority_class_to_template_name(rule['priority_class'])
-    if template_name in ['default']:
-        return {k: rule[k] for k in ["conditions", "actions"]}
-    elif template_name in ['override', 'underride']:
-        ret = {k: rule[k] for k in ["conditions", "actions"]}
-        ret['rule_id'] = unscoped_rule_id
-        return ret
+    if template_name in ['override', 'underride']:
+        templaterule = {k: rule[k] for k in ["conditions", "actions"]}
     elif template_name in ["sender", "room"]:
-        return {'rule_id': unscoped_rule_id, 'actions': rule['actions']}
+        templaterule = {'actions': rule['actions']}
+        unscoped_rule_id = rule['conditions'][0]['pattern']
     elif template_name == 'content':
         if len(rule["conditions"]) != 1:
             return None
         thecond = rule["conditions"][0]
         if "pattern" not in thecond:
             return None
-        ret = {'rule_id': unscoped_rule_id, 'actions': rule['actions']}
-        ret["pattern"] = thecond["pattern"]
-        return ret
+        templaterule = {'actions': rule['actions']}
+        templaterule["pattern"] = thecond["pattern"]
+
+    if unscoped_rule_id:
+            templaterule['rule_id'] = unscoped_rule_id
+    return templaterule
 
 
 def _strip_device_condition(rule):
@@ -385,12 +378,12 @@ def _namespaced_rule_id_from_spec(spec):
     if spec['scope'] == 'global':
         scope = 'global'
     else:
-        scope = 'device.%s' % (spec['profile_tag'])
-    return "%s.%s.%s" % (scope, spec['template'], spec['rule_id'])
+        scope = 'device/%s' % (spec['profile_tag'])
+    return "%s/%s/%s" % (scope, spec['template'], spec['rule_id'])
 
 
-def _rule_id_from_namespaced(in_rule_id, spec):
-    return in_rule_id.split('.')[-1]
+def _rule_id_from_namespaced(in_rule_id):
+    return in_rule_id.split('/')[-1]
 
 class InvalidRuleException(Exception):
     pass
