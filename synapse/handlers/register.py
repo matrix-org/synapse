@@ -106,6 +106,26 @@ class RegistrationHandler(BaseHandler):
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
+    def appservice_register(self, user_localpart, as_token):
+        user = UserID(user_localpart, self.hs.hostname)
+        user_id = user.to_string()
+        service = yield self.store.get_app_service_by_token(as_token)
+        if not service:
+            raise SynapseError(403, "Invalid application service token.")
+        if not service.is_interested_in_user(user_id):
+            raise SynapseError(
+                400, "Invalid user localpart for this application service."
+            )
+        token = self._generate_token(user_id)
+        yield self.store.register(
+            user_id=user_id,
+            token=token,
+            password_hash=""
+        )
+        self.distributor.fire("registered_user", user)
+        defer.returnValue((user_id, token))
+
+    @defer.inlineCallbacks
     def check_recaptcha(self, ip, private_key, challenge, response):
         """Checks a recaptcha is correct."""
 
