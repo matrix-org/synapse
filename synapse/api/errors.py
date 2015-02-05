@@ -39,7 +39,7 @@ class Codes(object):
     TOO_LARGE = "M_TOO_LARGE"
 
 
-class CodeMessageException(Exception):
+class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes."""
 
     def __init__(self, code, msg):
@@ -227,3 +227,9 @@ class FederationError(RuntimeError):
             "affected": self.affected,
             "source": self.source if self.source else self.affected,
         }
+
+
+class HttpResponseException(CodeMessageException):
+    def __init__(self, code, msg, response):
+        self.response = response
+        super(HttpResponseException, self).__init__(code, msg)

@@ -19,6 +19,7 @@ from twisted.internet import defer
 from .federation_base import FederationBase
 from .units import Edu
 
+from synapse.api.errors import CodeMessageException
 from synapse.util.logutils import log_function
 from synapse.events import FrozenEvent
 
@@ -180,7 +181,8 @@ class FederationClient(FederationBase):
                     pdu = yield self._check_sigs_and_hash(pdu)
 
                     break
-
+            except CodeMessageException:
+                raise
             except Exception as e:
                 logger.info(
                     "Failed to get PDU %s from %s because %s",
@@ -251,53 +253,79 @@ class FederationClient(FederationBase):
         defer.returnValue(signed_auth)
 
     @defer.inlineCallbacks
-    def make_join(self, destination, room_id, user_id):
-        ret = yield self.transport_layer.make_join(
-            destination, room_id, user_id
-        )
+    def make_join(self, destinations, room_id, user_id):
+        for destination in destinations:
+            try:
+                ret = yield self.transport_layer.make_join(
+                    destination, room_id, user_id
+                )
 
-        pdu_dict = ret["event"]
+                pdu_dict = ret["event"]
 
-        logger.debug("Got response to make_join: %s", pdu_dict)
+                logger.debug("Got response to make_join: %s", pdu_dict)
 
-        defer.returnValue(self.event_from_pdu_json(pdu_dict))
+                defer.returnValue(
+                    (destination, self.event_from_pdu_json(pdu_dict))
+                )
+                break
+            except CodeMessageException:
+                raise
+            except Exception as e:
+                logger.warn(
+                    "Failed to make_join via %s: %s",
+                    destination, e.message
+                )
+
+        raise RuntimeError("Failed to send to any server.")
 
     @defer.inlineCallbacks
-    def send_join(self, destination, pdu):
-        time_now = self._clock.time_msec()
-        _, content = yield self.transport_layer.send_join(
-            destination=destination,
-            room_id=pdu.room_id,
-            event_id=pdu.event_id,
-            content=pdu.get_pdu_json(time_now),
-        )
+    def send_join(self, destinations, pdu):
+        for destination in destinations:
+            try:
+                time_now = self._clock.time_msec()
+                _, content = yield self.transport_layer.send_join(
+                    destination=destination,
+                    room_id=pdu.room_id,
+                    event_id=pdu.event_id,
+                    content=pdu.get_pdu_json(time_now),
+                )
 
-        logger.debug("Got content: %s", content)
+                logger.debug("Got content: %s", content)
 
-        state = [
-            self.event_from_pdu_json(p, outlier=True)
-            for p in content.get("state", [])
-        ]
+                state = [
+                    self.event_from_pdu_json(p, outlier=True)
+                    for p in content.get("state", [])
+                ]
 
-        auth_chain = [
-            self.event_from_pdu_json(p, outlier=True)
-            for p in content.get("auth_chain", [])
-        ]
+                auth_chain = [
+                    self.event_from_pdu_json(p, outlier=True)
+                    for p in content.get("auth_chain", [])
+                ]
 
-        signed_state = yield self._check_sigs_and_hash_and_fetch(
-            destination, state, outlier=True
-        )
+                signed_state = yield self._check_sigs_and_hash_and_fetch(
+                    destination, state, outlier=True
+                )
 
-        signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True
-        )
+                signed_auth = yield self._check_sigs_and_hash_and_fetch(
+                    destination, auth_chain, outlier=True
+                )
 
-        auth_chain.sort(key=lambda e: e.depth)
+                auth_chain.sort(key=lambda e: e.depth)
 
-        defer.returnValue({
-            "state": signed_state,
-            "auth_chain": signed_auth,
-        })
+                defer.returnValue({
+                    "state": signed_state,
+                    "auth_chain": signed_auth,
+                    "origin": destination,
+                })
+            except CodeMessageException:
+                raise
+            except Exception as e:
+                logger.warn(
+                    "Failed to send_join via %s: %s",
+                    destination, e.message
+                )
+
+        raise RuntimeError("Failed to send to any server.")
 
     @defer.inlineCallbacks
     def send_invite(self, destination, room_id, event_id, pdu):
