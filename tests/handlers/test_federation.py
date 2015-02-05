@@ -91,7 +91,10 @@ class FederationTestCase(unittest.TestCase):
         self.datastore.persist_event.return_value = defer.succeed(None)
         self.datastore.get_room.return_value = defer.succeed(True)
         self.auth.check_host_in_room.return_value = defer.succeed(True)
-        self.datastore.have_events.return_value = defer.succeed({})
+
+        def have_events(event_ids):
+            return defer.succeed({})
+        self.datastore.have_events.side_effect = have_events
 
         def annotate(ev, old_state=None):
             context = Mock()
