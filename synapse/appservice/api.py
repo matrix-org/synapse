@@ -16,6 +16,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import CodeMessageException
 from synapse.http.client import SimpleHttpClient
+from synapse.events.utils import serialize_event
 
 import logging
 import urllib
@@ -30,6 +31,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     def __init__(self,  hs):
         super(ApplicationServiceApi, self).__init__(hs)
+        self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
     def query_user(self, service, user_id):
@@ -72,6 +74,8 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     @defer.inlineCallbacks
     def push_bulk(self, service, events):
+        events = self._serialize(events)
+
         uri = service.url + ("/transactions/%s" %
                              urllib.quote(str(0)))  # TODO txn_ids
         response = None
@@ -97,4 +101,10 @@ class ApplicationServiceApi(SimpleHttpClient):
     def push(self, service, event):
         response = yield self.push_bulk(service, [event])
         defer.returnValue(response)
+
+    def _serialize(self, events):
+        time_now = self.clock.time_msec()
+        return [
+            serialize_event(e, time_now, as_client_event=True) for e in events
+        ]
 
