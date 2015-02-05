@@ -49,6 +49,12 @@ class DirectoryHandler(BaseHandler):
 
         # TODO(erikj): Check if there is a current association.
 
+        is_claimed = yield self.is_alias_exclusive_to_appservices(room_alias)
+        if is_claimed:
+            raise SynapseError(
+                400, "This alias is reserved by an application service."
+            )
+
         if not servers:
             servers = yield self.store.get_joined_hosts_for_room(room_id)
 
@@ -68,6 +74,12 @@ class DirectoryHandler(BaseHandler):
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
+        is_claimed = yield self.is_alias_exclusive_to_appservices(room_alias)
+        if is_claimed:
+            raise SynapseError(
+                400, "This alias is reserved by an application service."
+            )
+
         room_id = yield self.store.delete_room_alias(room_alias)
 
         if room_id:
@@ -77,20 +89,13 @@ class DirectoryHandler(BaseHandler):
     def get_association(self, room_alias):
         room_id = None
         if self.hs.is_mine(room_alias):
-            result = yield self.store.get_association_from_room_alias(
+            result = yield self.get_association_from_room_alias(
                 room_alias
             )
 
             if result:
                 room_id = result.room_id
                 servers = result.servers
-            else:
-                # Query AS to see if it exists
-                as_handler = self.hs.get_handlers().appservice_handler
-                result = yield as_handler.query_room_alias_exists(room_alias)
-                if result:
-                    room_id = result.room_id
-                    servers = result.servers
         else:
             try:
                 result = yield self.federation.make_query(
@@ -145,7 +150,7 @@ class DirectoryHandler(BaseHandler):
                 400, "Room Alias is not hosted on this Home Server"
             )
 
-        result = yield self.store.get_association_from_room_alias(
+        result = yield self.get_association_from_room_alias(
             room_alias
         )
 
@@ -173,3 +178,22 @@ class DirectoryHandler(BaseHandler):
             "sender": user_id,
             "content": {"aliases": aliases},
         }, ratelimit=False)
+
+    @defer.inlineCallbacks
+    def get_association_from_room_alias(self, room_alias):
+        result = yield self.store.get_association_from_room_alias(
+            room_alias
+        )
+        if not result:
+            # Query AS to see if it exists
+            as_handler = self.hs.get_handlers().appservice_handler
+            result = yield as_handler.query_room_alias_exists(room_alias)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def is_alias_exclusive_to_appservices(self, alias):
+        services = yield self.store.get_app_services()
+        interested_services = [
+            s for s in services if s.is_interested_in_alias(alias.to_string())
+        ]
+        defer.returnValue(len(interested_services) > 0)
