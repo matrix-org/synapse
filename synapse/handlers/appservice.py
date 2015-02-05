@@ -63,27 +63,6 @@ class ApplicationServicesHandler(object):
         yield self.store.unregister_app_service(token)
 
     @defer.inlineCallbacks
-    def get_services_for_event(self, event, restrict_to=""):
-        """Retrieve a list of application services interested in this event.
-
-        Args:
-            event(Event): The event to check.
-            restrict_to(str): The namespace to restrict regex tests to.
-        Returns:
-            list<ApplicationService>: A list of services interested in this
-            event based on the service regex.
-        """
-        # We need to know the aliases associated with this event.room_id, if any
-        alias_list = yield self.store.get_aliases_for_room(event.room_id)
-        services = yield self.store.get_app_services()
-        interested_list = [
-            s for s in services if (
-                s.is_interested(event, restrict_to, alias_list)
-            )
-        ]
-        defer.returnValue(interested_list)
-
-    @defer.inlineCallbacks
     def notify_interested_services(self, event):
         """Notifies (pushes) all application services interested in this event.
 
@@ -94,7 +73,7 @@ class ApplicationServicesHandler(object):
             event(Event): The event to push out to interested services.
         """
         # Gather interested services
-        services = yield self.get_services_for_event(event)
+        services = yield self._get_services_for_event(event)
         if len(services) == 0:
             return  # no services need notifying
 
@@ -102,7 +81,7 @@ class ApplicationServicesHandler(object):
         # all services which match that user regex.
         unknown_user = yield self._is_unknown_user(event.sender)
         if unknown_user:
-            user_query_services = yield self.get_services_for_event(
+            user_query_services = yield self._get_services_for_event(
                 event=event,
                 restrict_to=ApplicationService.NS_USERS
             )
@@ -115,27 +94,61 @@ class ApplicationServicesHandler(object):
                     # the user exists now,so don't query more ASes.
                     break
 
-        # Do we know this room alias exists? If not, poke the room alias query
-        # API for all services which match that room alias regex.
-        unknown_room_alias = False  # TODO
-        if unknown_room_alias:
-            alias = "something"  # TODO
-            alias_query_services = yield self.get_services_for_event(
-                event=event,
-                restrict_to=ApplicationService.NS_ALIASES
-            )
-            for alias_service in alias_query_services:
-                # this needs to block XXX: Need to feed response back to caller
-                is_known_alias = yield self.appservice_api.query_alias(
-                    alias_service, alias
-                )
-                if is_known_alias:
-                    # the alias exists now so don't query more ASes.
-                    break
-
         # Fork off pushes to these services - XXX First cut, best effort
         for service in services:
             self.appservice_api.push(service, event)
+
+
+    @defer.inlineCallbacks
+    def query_room_alias_exists(self, room_alias):
+        """Check if an application service knows this room alias exists.
+
+        Args:
+            room_alias(str): The room alias to query.
+        Returns:
+            namedtuple: with keys "room_id" and "servers" or None if no
+            association can be found.
+        """
+        alias_query_services = yield self._get_services_for_event(
+            event=None,
+            restrict_to=ApplicationService.NS_ALIASES,
+            alias_list=[room_alias]
+        )
+        for alias_service in alias_query_services:
+            is_known_alias = yield self.appservice_api.query_alias(
+                alias_service, room_alias
+            )
+            if is_known_alias:
+                # the alias exists now so don't query more ASes.
+                result = yield self.store.get_association_from_room_alias(
+                    room_alias
+                )
+                defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _get_services_for_event(self, event, restrict_to="", alias_list=None):
+        """Retrieve a list of application services interested in this event.
+
+        Args:
+            event(Event): The event to check. Can be None if alias_list is not.
+            restrict_to(str): The namespace to restrict regex tests to.
+            alias_list: A list of aliases to get services for. If None, this
+            list is obtained from the database.
+        Returns:
+            list<ApplicationService>: A list of services interested in this
+            event based on the service regex.
+        """
+        # We need to know the aliases associated with this event.room_id, if any
+        if not alias_list:
+            alias_list = yield self.store.get_aliases_for_room(event.room_id)
+
+        services = yield self.store.get_app_services()
+        interested_list = [
+            s for s in services if (
+                s.is_interested(event, restrict_to, alias_list)
+            )
+        ]
+        defer.returnValue(interested_list)
 
     @defer.inlineCallbacks
     def _is_unknown_user(self, user_id):
@@ -148,8 +161,6 @@ class ApplicationServicesHandler(object):
 
         user_info = yield self.store.get_user_by_id(user_id)
         defer.returnValue(len(user_info) == 0)
-
-
 
     def _generate_hs_token(self):
         return stringutils.random_string(24)

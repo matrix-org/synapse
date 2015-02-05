@@ -84,6 +84,13 @@ class DirectoryHandler(BaseHandler):
             if result:
                 room_id = result.room_id
                 servers = result.servers
+            else:
+                # Query AS to see if it exists
+                as_handler = self.hs.get_handlers().appservice_handler
+                result = yield as_handler.query_room_alias_exists(room_alias)
+                if result:
+                    room_id = result.room_id
+                    servers = result.servers
         else:
             try:
                 result = yield self.federation.make_query(
