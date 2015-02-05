@@ -65,6 +65,8 @@ class RegistrationHandler(BaseHandler):
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
 
+            yield self.check_user_id_is_valid(user_id)
+
             token = self._generate_token(user_id)
             yield self.store.register(
                 user_id=user_id,
@@ -83,6 +85,7 @@ class RegistrationHandler(BaseHandler):
                     localpart = self._generate_user_id()
                     user = UserID(localpart, self.hs.hostname)
                     user_id = user.to_string()
+                    yield self.check_user_id_is_valid(user_id)
 
                     token = self._generate_token(user_id)
                     yield self.store.register(
@@ -147,6 +150,19 @@ class RegistrationHandler(BaseHandler):
         for c in threepidCreds:
             # XXX: This should be a deferred list, shouldn't it?
             yield self._bind_threepid(c, user_id)
+
+    @defer.inlineCallbacks
+    def check_user_id_is_valid(self, user_id):
+        # valid user IDs must not clash with any user ID namespaces claimed by
+        # application services.
+        services = yield self.store.get_app_services()
+        interested_services = [
+            s for s in services if s.is_interested_in_user(user_id)
+        ]
+        if len(interested_services) > 0:
+            raise SynapseError(
+                400, "This user ID is reserved by an application service."
+            )
 
     def _generate_token(self, user_id):
         # urlsafe variant uses _ and - so use . as the separator and replace
