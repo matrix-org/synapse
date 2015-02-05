@@ -38,100 +38,9 @@ class PushRuleRestServlet(ClientV1RestServlet):
     SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR = (
         "Unrecognised request: You probably wanted a trailing slash")
 
-    def rule_spec_from_path(self, path):
-        if len(path) < 2:
-            raise UnrecognizedRequestError()
-        if path[0] != 'pushrules':
-            raise UnrecognizedRequestError()
-
-        scope = path[1]
-        path = path[2:]
-        if scope not in ['global', 'device']:
-            raise UnrecognizedRequestError()
-
-        device = None
-        if scope == 'device':
-            if len(path) == 0:
-                raise UnrecognizedRequestError()
-            device = path[0]
-            path = path[1:]
-
-        if len(path) == 0:
-            raise UnrecognizedRequestError()
-
-        template = path[0]
-        path = path[1:]
-
-        if len(path) == 0:
-            raise UnrecognizedRequestError()
-
-        rule_id = path[0]
-
-        spec = {
-            'scope': scope,
-            'template': template,
-            'rule_id': rule_id
-        }
-        if device:
-            spec['profile_tag'] = device
-        return spec
-
-    def rule_tuple_from_request_object(self, rule_template, rule_id, req_obj, device=None):
-        if rule_template in ['override', 'underride']:
-            if 'conditions' not in req_obj:
-                raise InvalidRuleException("Missing 'conditions'")
-            conditions = req_obj['conditions']
-            for c in conditions:
-                if 'kind' not in c:
-                    raise InvalidRuleException("Condition without 'kind'")
-        elif rule_template == 'room':
-            conditions = [{
-                'kind': 'event_match',
-                'key': 'room_id',
-                'pattern': rule_id
-            }]
-        elif rule_template == 'sender':
-            conditions = [{
-                'kind': 'event_match',
-                'key': 'user_id',
-                'pattern': rule_id
-            }]
-        elif rule_template == 'content':
-            if 'pattern' not in req_obj:
-                raise InvalidRuleException("Content rule missing 'pattern'")
-            pat = req_obj['pattern']
-
-            conditions = [{
-                'kind': 'event_match',
-                'key': 'content.body',
-                'pattern': pat
-            }]
-        else:
-            raise InvalidRuleException("Unknown rule template: %s" % (rule_template,))
-
-        if device:
-            conditions.append({
-                'kind': 'device',
-                'profile_tag': device
-            })
-
-        if 'actions' not in req_obj:
-            raise InvalidRuleException("No actions found")
-        actions = req_obj['actions']
-
-        for a in actions:
-            if a in ['notify', 'dont_notify', 'coalesce']:
-                pass
-            elif isinstance(a, dict) and 'set_sound' in a:
-                pass
-            else:
-                raise InvalidRuleException("Unrecognised action")
-
-        return conditions, actions
-
     @defer.inlineCallbacks
     def on_PUT(self, request):
-        spec = self.rule_spec_from_path(request.postpath)
+        spec = _rule_spec_from_path(request.postpath)
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
@@ -142,10 +51,13 @@ class PushRuleRestServlet(ClientV1RestServlet):
         if spec['template'] == 'default':
             raise SynapseError(403, "The default rules are immutable.")
 
+        if not spec['rule_id'].isalnum():
+            raise SynapseError(400, "rule_id may only contain alphanumeric characters")
+
         content = _parse_json(request)
 
         try:
-            (conditions, actions) = self.rule_tuple_from_request_object(
+            (conditions, actions) = _rule_tuple_from_request_object(
                 spec['template'],
                 spec['rule_id'],
                 content,
@@ -164,7 +76,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         try:
             yield self.hs.get_datastore().add_push_rule(
                 user_name=user.to_string(),
-                rule_id=spec['rule_id'],
+                rule_id=_namespaced_rule_id_from_spec(spec),
                 priority_class=priority_class,
                 conditions=conditions,
                 actions=actions,
@@ -180,7 +92,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, request):
-        spec = self.rule_spec_from_path(request.postpath)
+        spec = _rule_spec_from_path(request.postpath)
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
@@ -188,32 +100,18 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         user, _ = yield self.auth.get_user_by_req(request)
 
-        if 'profile_tag' in spec:
-            rules = yield self.hs.get_datastore().get_push_rules_for_user_name(
-                user.to_string()
-            )
+        namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
 
-            for r in rules:
-                conditions = json.loads(r['conditions'])
-                pt = _profile_tag_from_conditions(conditions)
-                if pt == spec['profile_tag'] and r['priority_class'] == priority_class:
-                    yield self.hs.get_datastore().delete_push_rule(
-                        user.to_string(), spec['rule_id']
-                    )
-                    defer.returnValue((200, {}))
-            raise NotFoundError()
-        else:
-            try:
-                yield self.hs.get_datastore().delete_push_rule(
-                    user.to_string(), spec['rule_id'],
-                    priority_class=priority_class
-                )
-                defer.returnValue((200, {}))
-            except StoreError as e:
-                if e.code == 404:
-                    raise NotFoundError()
-                else:
-                    raise
+        try:
+            yield self.hs.get_datastore().delete_push_rule(
+                user.to_string(), namespaced_rule_id
+            )
+            defer.returnValue((200, {}))
+        except StoreError as e:
+            if e.code == 404:
+                raise NotFoundError()
+            else:
+                raise
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -298,6 +196,99 @@ class PushRuleRestServlet(ClientV1RestServlet):
         return 200, {}
 
 
+def _rule_spec_from_path(path):
+    if len(path) < 2:
+        raise UnrecognizedRequestError()
+    if path[0] != 'pushrules':
+        raise UnrecognizedRequestError()
+
+    scope = path[1]
+    path = path[2:]
+    if scope not in ['global', 'device']:
+        raise UnrecognizedRequestError()
+
+    device = None
+    if scope == 'device':
+        if len(path) == 0:
+            raise UnrecognizedRequestError()
+        device = path[0]
+        path = path[1:]
+
+    if len(path) == 0:
+        raise UnrecognizedRequestError()
+
+    template = path[0]
+    path = path[1:]
+
+    if len(path) == 0:
+        raise UnrecognizedRequestError()
+
+    rule_id = path[0]
+
+    spec = {
+        'scope': scope,
+        'template': template,
+        'rule_id': rule_id
+    }
+    if device:
+        spec['profile_tag'] = device
+    return spec
+
+
+def _rule_tuple_from_request_object(rule_template, rule_id, req_obj, device=None):
+    if rule_template in ['override', 'underride']:
+        if 'conditions' not in req_obj:
+            raise InvalidRuleException("Missing 'conditions'")
+        conditions = req_obj['conditions']
+        for c in conditions:
+            if 'kind' not in c:
+                raise InvalidRuleException("Condition without 'kind'")
+    elif rule_template == 'room':
+        conditions = [{
+            'kind': 'event_match',
+            'key': 'room_id',
+            'pattern': rule_id
+        }]
+    elif rule_template == 'sender':
+        conditions = [{
+            'kind': 'event_match',
+            'key': 'user_id',
+            'pattern': rule_id
+        }]
+    elif rule_template == 'content':
+        if 'pattern' not in req_obj:
+            raise InvalidRuleException("Content rule missing 'pattern'")
+        pat = req_obj['pattern']
+
+        conditions = [{
+            'kind': 'event_match',
+            'key': 'content.body',
+            'pattern': pat
+        }]
+    else:
+        raise InvalidRuleException("Unknown rule template: %s" % (rule_template,))
+
+    if device:
+        conditions.append({
+            'kind': 'device',
+            'profile_tag': device
+        })
+
+    if 'actions' not in req_obj:
+        raise InvalidRuleException("No actions found")
+    actions = req_obj['actions']
+
+    for a in actions:
+        if a in ['notify', 'dont_notify', 'coalesce']:
+            pass
+        elif isinstance(a, dict) and 'set_sound' in a:
+            pass
+        else:
+            raise InvalidRuleException("Unrecognised action")
+
+    return conditions, actions
+
+
 def _add_empty_priority_class_arrays(d):
     for pc in PushRuleRestServlet.PRIORITY_CLASS_MAP.keys():
         d[pc] = []
@@ -361,20 +352,24 @@ def _priority_class_to_template_name(pc):
 
 
 def _rule_to_template(rule):
+    unscoped_rule_id = _rule_id_from_namespaced(rule['rule_id'])
+
     template_name = _priority_class_to_template_name(rule['priority_class'])
     if template_name in ['default']:
         return {k: rule[k] for k in ["conditions", "actions"]}
     elif template_name in ['override', 'underride']:
-        return {k: rule[k] for k in ["rule_id", "conditions", "actions"]}
+        ret = {k: rule[k] for k in ["conditions", "actions"]}
+        ret['rule_id'] = unscoped_rule_id
+        return ret
     elif template_name in ["sender", "room"]:
-        return {k: rule[k] for k in ["rule_id", "actions"]}
+        return {'rule_id': unscoped_rule_id, 'actions': rule['actions']}
     elif template_name == 'content':
         if len(rule["conditions"]) != 1:
             return None
         thecond = rule["conditions"][0]
         if "pattern" not in thecond:
             return None
-        ret = {k: rule[k] for k in ["rule_id", "actions"]}
+        ret = {'rule_id': unscoped_rule_id, 'actions': rule['actions']}
         ret["pattern"] = thecond["pattern"]
         return ret
 
@@ -385,6 +380,17 @@ def _strip_device_condition(rule):
             del rule['conditions'][i]
     return rule
 
+
+def _namespaced_rule_id_from_spec(spec):
+    if spec['scope'] == 'global':
+        scope = 'global'
+    else:
+        scope = 'device.%s' % (spec['profile_tag'])
+    return "%s.%s.%s" % (scope, spec['template'], spec['rule_id'])
+
+
+def _rule_id_from_namespaced(in_rule_id, spec):
+    return in_rule_id.split('.')[-1]
 
 class InvalidRuleException(Exception):
     pass
