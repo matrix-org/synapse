@@ -45,8 +45,6 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_alias):
-        user, client = yield self.auth.get_user_by_req(request)
-
         content = _parse_json(request)
         if not "room_id" in content:
             raise SynapseError(400, "Missing room_id key",
@@ -70,16 +68,25 @@ class ClientDirectoryServer(ClientV1RestServlet):
         dir_handler = self.handlers.directory_handler
 
         try:
-            user_id = user.to_string()
-            yield dir_handler.create_association(
-                user_id, room_alias, room_id, servers
+            # try to auth as a user
+            user, client = yield self.auth.get_user_by_req(request)
+            try:
+                user_id = user.to_string()
+                yield dir_handler.create_association(
+                    user_id, room_alias, room_id, servers
+                )
+                yield dir_handler.send_room_alias_update_event(user_id, room_id)
+            except SynapseError as e:
+                raise e
+            except:
+                logger.exception("Failed to create association")
+                raise
+        except AuthError:
+            # try to auth as an application service
+            service = yield self.auth.get_appservice_by_req(request)
+            yield dir_handler.create_appservice_association(
+                service, room_alias, room_id, servers
             )
-            yield dir_handler.send_room_alias_update_event(user_id, room_id)
-        except SynapseError as e:
-            raise e
-        except:
-            logger.exception("Failed to create association")
-            raise
 
         defer.returnValue((200, {}))
 

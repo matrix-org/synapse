@@ -37,24 +37,15 @@ class DirectoryHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def create_association(self, user_id, room_alias, room_id, servers=None):
-
-        # TODO(erikj): Do auth.
+    def _create_association(self, room_alias, room_id, servers=None):
+        # general association creation for both human users and app services
 
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
             # TODO(erikj): Change this.
 
         # TODO(erikj): Add transactions.
-
         # TODO(erikj): Check if there is a current association.
-
-        is_claimed = yield self.is_alias_exclusive_to_appservices(room_alias)
-        if is_claimed:
-            raise SynapseError(
-                400, "This alias is reserved by an application service."
-            )
-
         if not servers:
             servers = yield self.store.get_joined_hosts_for_room(room_id)
 
@@ -67,6 +58,33 @@ class DirectoryHandler(BaseHandler):
             servers
         )
 
+
+    @defer.inlineCallbacks
+    def create_association(self, user_id, room_alias, room_id, servers=None):
+        # association creation for human users
+        # TODO(erikj): Do user auth.
+
+        is_claimed = yield self.is_alias_exclusive_to_appservices(room_alias)
+        if is_claimed:
+            raise SynapseError(
+                400, "This alias is reserved by an application service.",
+                errcode=Codes.EXCLUSIVE
+            )
+        yield self._create_association(room_alias, room_id, servers)
+
+
+    @defer.inlineCallbacks
+    def create_appservice_association(self, service, room_alias, room_id,
+                                      servers=None):
+        if not service.is_interested_in_alias(room_alias.to_string()):
+            raise SynapseError(
+                400, "This application service has not reserved"
+                " this kind of alias.", errcode=Codes.EXCLUSIVE
+            )
+
+        # association creation for app services
+        yield self._create_association(room_alias, room_id, servers)
+
     @defer.inlineCallbacks
     def delete_association(self, user_id, room_alias):
         # TODO Check if server admin
@@ -77,7 +95,8 @@ class DirectoryHandler(BaseHandler):
         is_claimed = yield self.is_alias_exclusive_to_appservices(room_alias)
         if is_claimed:
             raise SynapseError(
-                400, "This alias is reserved by an application service."
+                400, "This alias is reserved by an application service.",
+                errcode=Codes.EXCLUSIVE
             )
 
         room_id = yield self.store.delete_room_alias(room_alias)

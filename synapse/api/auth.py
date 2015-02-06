@@ -380,6 +380,18 @@ class Auth(object):
             raise AuthError(403, "Unrecognised access token.",
                             errcode=Codes.UNKNOWN_TOKEN)
 
+    @defer.inlineCallbacks
+    def get_appservice_by_req(self, request):
+        try:
+            token = request.args["access_token"][0]
+            service = yield self.store.get_app_service_by_token(token)
+            if not service:
+                raise AuthError(403, "Unrecognised access token.",
+                                errcode=Codes.UNKNOWN_TOKEN)
+            defer.returnValue(service)
+        except KeyError:
+            raise AuthError(403, "Missing access token.")
+
     def is_server_admin(self, user):
         return self.store.is_server_admin(user)
 
