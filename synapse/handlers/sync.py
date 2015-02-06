@@ -298,15 +298,17 @@ class SyncHandler(BaseHandler):
         load_limit = max(sync_config.limit * filtering_factor, 100)
         max_repeat = 3  # Only try a few times per room, otherwise
         room_key = now_token.room_key
+        end_key = room_key
 
         while limited and len(recents) < sync_config.limit and max_repeat:
             events, keys = yield self.store.get_recent_events_for_room(
                 room_id,
                 limit=load_limit + 1,
                 from_token=since_token.room_key if since_token else None,
-                end_token=room_key,
+                end_token=end_key,
             )
             (room_key, _) = keys
+            end_key = "s" + room_key.split('-')[-1]
             loaded_recents = sync_config.filter.filter_room_events(events)
             loaded_recents.extend(recents)
             recents = loaded_recents
