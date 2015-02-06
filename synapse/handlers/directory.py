@@ -115,7 +115,7 @@ class DirectoryHandler(BaseHandler):
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
-        room_id = yield self.store.delete_room_alias(room_alias)
+        yield self.store.delete_room_alias(room_alias)
 
         # TODO - Looks like _update_room_alias_event has never been implemented
         # if room_id:
