@@ -332,8 +332,11 @@ class FederationHandler(BaseHandler):
 
             # Try the host we successfully got a response to /make_join/
             # request first.
-            target_hosts.remove(origin)
-            target_hosts.insert(0, origin)
+            try:
+                target_hosts.remove(origin)
+                target_hosts.insert(0, origin)
+            except ValueError:
+                pass
 
             ret = yield self.replication_layer.send_join(
                 target_hosts,
@@ -521,7 +524,7 @@ class FederationHandler(BaseHandler):
                     "Failed to get destination from event %s", s.event_id
                 )
 
-        destinations.remove(origin)
+        destinations.discard(origin)
 
         logger.debug(
             "on_send_join_request: Sending event: %s, signatures: %s",
@@ -1013,7 +1016,10 @@ class FederationHandler(BaseHandler):
         for e in missing_remotes:
             for e_id, _ in e.auth_events:
                 if e_id in missing_remote_ids:
-                    base_remote_rejected.remove(e)
+                    try:
+                        base_remote_rejected.remove(e)
+                    except ValueError:
+                        pass
 
         reason_map = {}
 
