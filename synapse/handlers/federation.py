@@ -130,7 +130,9 @@ class FederationHandler(BaseHandler):
         if auth_chain:
             event_ids |= {e.event_id for e in auth_chain}
 
-        seen_ids = (yield self.store.have_events(event_ids)).keys()
+        seen_ids = set(
+            (yield self.store.have_events(event_ids)).keys()
+        )
 
         if state and auth_chain is not None:
             # If we have any state or auth_chain given to us by the replication
