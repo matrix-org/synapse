@@ -87,10 +87,9 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def delete_association(self, user_id, room_alias):
-        # TODO Check if server admin
+        # association deletion for human users
 
-        if not self.hs.is_mine(room_alias):
-            raise SynapseError(400, "Room alias must be local")
+        # TODO Check if server admin
 
         is_claimed = yield self.is_alias_exclusive_to_appservices(room_alias)
         if is_claimed:
@@ -99,10 +98,29 @@ class DirectoryHandler(BaseHandler):
                 errcode=Codes.EXCLUSIVE
             )
 
+        yield self._delete_association(room_alias)
+
+    @defer.inlineCallbacks
+    def delete_appservice_association(self, service, room_alias):
+        if not service.is_interested_in_alias(room_alias.to_string()):
+            raise SynapseError(
+                400,
+                "This application service has not reserved this kind of alias",
+                errcode=Codes.EXCLUSIVE
+            )
+        yield self._delete_association(room_alias)
+
+    @defer.inlineCallbacks
+    def _delete_association(self, room_alias):
+        if not self.hs.is_mine(room_alias):
+            raise SynapseError(400, "Room alias must be local")
+
         room_id = yield self.store.delete_room_alias(room_alias)
 
-        if room_id:
-            yield self._update_room_alias_events(user_id, room_id)
+        # TODO - Looks like _update_room_alias_event has never been implemented
+        # if room_id:
+        #    yield self._update_room_alias_events(user_id, room_id)
+
 
     @defer.inlineCallbacks
     def get_association(self, room_alias):
