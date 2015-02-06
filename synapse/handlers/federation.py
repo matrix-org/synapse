@@ -860,9 +860,14 @@ class FederationHandler(BaseHandler):
             # Only do auth resolution if we have something new to say.
             # We can't rove an auth failure.
             do_resolution = False
+
+            provable = [
+                RejectedReason.NOT_ANCESTOR, RejectedReason.NOT_ANCESTOR,
+            ]
+
             for e_id in different_auth:
                 if e_id in have_events:
-                    if have_events[e_id] != RejectedReason.AUTH_ERROR:
+                    if have_events[e_id] in provable:
                         do_resolution = True
                         break
 
