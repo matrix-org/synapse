@@ -18,7 +18,8 @@ from twisted.internet import defer
 
 from synapse.types import UserID
 from synapse.api.errors import (
-    SynapseError, RegistrationError, InvalidCaptchaError, CodeMessageException
+    AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError,
+    CodeMessageException
 )
 from ._base import BaseHandler
 import synapse.util.stringutils as stringutils
@@ -111,10 +112,11 @@ class RegistrationHandler(BaseHandler):
         user_id = user.to_string()
         service = yield self.store.get_app_service_by_token(as_token)
         if not service:
-            raise SynapseError(403, "Invalid application service token.")
+            raise AuthError(403, "Invalid application service token.")
         if not service.is_interested_in_user(user_id):
             raise SynapseError(
-                400, "Invalid user localpart for this application service."
+                400, "Invalid user localpart for this application service.",
+                errcode=Codes.EXCLUSIVE
             )
         token = self._generate_token(user_id)
         yield self.store.register(
@@ -181,7 +183,8 @@ class RegistrationHandler(BaseHandler):
         ]
         if len(interested_services) > 0:
             raise SynapseError(
-                400, "This user ID is reserved by an application service."
+                400, "This user ID is reserved by an application service.",
+                errcode=Codes.EXCLUSIVE
             )
 
     def _generate_token(self, user_id):
