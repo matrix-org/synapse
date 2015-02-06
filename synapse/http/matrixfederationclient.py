@@ -169,8 +169,9 @@ class MatrixFederationHttpClient(object):
         else:
             # :'(
             # Update transactions table?
+            body = yield readBody(response)
             raise HttpResponseException(
-                response.code, response.phrase, response
+                response.code, response.phrase, body
             )
 
         defer.returnValue(response)
