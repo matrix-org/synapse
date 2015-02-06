@@ -43,13 +43,29 @@ AuthEventTypes = (
 )
 
 
+class _StateCacheEntry(object):
+    def __init__(self, state, state_group, ts):
+        self.state = state
+        self.state_group = state_group
+        self.ts = ts
+
+
 class StateHandler(object):
     """ Responsible for doing state conflict resolution.
     """
 
     def __init__(self, hs):
+        self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.hs = hs
+
+        # set of event_ids -> _StateCacheEntry.
+        self._state_cache = {}
+
+        def f():
+            self._prune_cache()
+
+        self.clock.looping_call(f, 10*1000)
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
@@ -69,6 +85,11 @@ class StateHandler(object):
             e_id
             for e_id, _, _ in events
         ]
+
+        cache = self._state_cache.get(set(event_ids), None)
+        if cache:
+            cache.ts = self.clock.time_msec()
+            defer.returnValue(cache.state_group, cache.state)
 
         res = yield self.resolve_state_groups(event_ids)
 
@@ -177,6 +198,11 @@ class StateHandler(object):
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
+        cache = self._state_cache.get(set(event_ids), None)
+        if cache and cache.state_group:
+            cache.ts = self.clock.time_msec()
+            defer.returnValue(cache.state_group, cache.state)
+
         state_groups = yield self.store.get_state_groups(
             event_ids
         )
@@ -199,6 +225,14 @@ class StateHandler(object):
                 prev_states = [prev_state]
             else:
                 prev_states = []
+
+            cache = _StateCacheEntry(
+                state=state,
+                state_group=name,
+                ts=self.clock.time_msec()
+            )
+
+            self._state_cache[set(event_ids)] = cache
 
             defer.returnValue((name, state, prev_states))
 
@@ -244,6 +278,14 @@ class StateHandler(object):
 
         new_state = unconflicted_state
         new_state.update(resolved_state)
+
+        cache = _StateCacheEntry(
+            state=new_state,
+            state_group=None,
+            ts=self.clock.time_msec()
+        )
+
+        self._state_cache[set(event_ids)] = cache
 
         defer.returnValue((None, new_state, prev_states))
 
@@ -328,3 +370,24 @@ class StateHandler(object):
             return -int(e.depth), hashlib.sha1(e.event_id).hexdigest()
 
         return sorted(events, key=key_func)
+
+    def _prune_cache(self):
+        now = self.clock.time_msec()
+
+        if len(self._state_cache) > 100:
+            sorted_entries = sorted(
+                self._state_cache.items(),
+                key=lambda k, v: v.ts,
+            )
+
+            for k, _ in sorted_entries[100:]:
+                self._state_cache.pop(k)
+
+        keys_to_delete = set()
+
+        for key, cache_entry in self._state_cache.items():
+            if now - cache_entry.ts > 60*1000:
+                keys_to_delete.add(key)
+
+        for k in keys_to_delete:
+            self._state_cache.pop(k)

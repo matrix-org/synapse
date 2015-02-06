@@ -15,7 +15,7 @@
 
 from synapse.util.logcontext import LoggingContext
 
-from twisted.internet import reactor
+from twisted.internet import reactor, task
 
 import time
 
@@ -34,6 +34,14 @@ class Clock(object):
     def time_msec(self):
         """Returns the current system time in miliseconds since epoch."""
         return self.time() * 1000
+
+    def looping_call(self, f, msec):
+        l = task.LoopingCall(f)
+        l.start(msec/1000.0, now=False)
+        return l
+
+    def looping_call(self, loop):
+        loop.stop()
 
     def call_later(self, delay, callback):
         current_context = LoggingContext.current_context()
