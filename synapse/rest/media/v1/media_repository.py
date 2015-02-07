@@ -34,6 +34,7 @@ class MediaRepositoryResource(Resource):
 
         => POST /_matrix/media/v1/upload HTTP/1.1
            Content-Type: <media-type>
+           Content-Length: <content-length>
 
            <media>
 
