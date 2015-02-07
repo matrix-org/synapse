@@ -99,6 +99,20 @@ class RegistrationHandler(BaseHandler):
                         raise RegistrationError(
                             500, "Cannot generate user ID.")
 
+        # create a default avatar for the user
+        # XXX: ideally clients would explicitly specify one, but given they don't
+        # and we want consistent and pretty identicons for random users, we'll
+        # do it here.
+        auth_user = UserID.from_string(user_id)
+        identicon_resource = self.hs.get_resource_for_media_repository().getChildWithDefault("identicon", None)
+        upload_resource = self.hs.get_resource_for_media_repository().getChildWithDefault("upload", None)
+        identicon_bytes = identicon_resource.generate_identicon(user_id, 320, 320)
+        content_uri = yield upload_resource.create_content(
+            "image/png", None, identicon_bytes, len(identicon_bytes), auth_user
+        )
+        profile_handler = self.hs.get_handlers().profile_handler
+        profile_handler.set_avatar_url(auth_user, auth_user, ("%s#auto" % content_uri))
+        
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
