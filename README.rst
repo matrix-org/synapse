@@ -154,29 +154,37 @@ On OSX, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
 will need to export CFLAGS=-Qunused-arguments.
 
 ArchLinux
---------------
-ArchLinux with the default installation of prerequisites, and your System itself. The installation may encounter a few Hiccups.
+---------
 
-python2.7 is Needed and I believe by default Arch uses Python3.
+Installation on ArchLinux may encounter a few hiccups as Arch defaults to
+python 3, but synapse currently assumes python 2.7 by default.
 
-pip is outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):
-    - $ sudo pip2.7 install --upgrade pip
+pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 )::
+
+    $ sudo pip2.7 install --upgrade pip
     
-You also may need to call 2.7 again during the install request:
-    - $ sudo pip2.7 install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+You also may need to explicitly specify python 2.7 again during the install
+request::
+
+    $ pip2.7 install --process-dependency-links \
+        https://github.com/matrix-org/synapse/tarball/master
     
-If you encounter an error with lib bcrypt Causing an Wrong Elf Class: ELFCLASS32 (x64 Systems):
-you need to remove py-bcrypt itself and then reinstall it to correctly compile under your architecture
-    - $ sudo pip2.7 uninstall py-bcrypt
-    - $ sudo pip2.7 install py-bcrypt
+If you encounter an error with lib bcrypt causing an Wrong ELF Class:
+ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
+compile it under the right architecture. (This should not be needed if
+installing under virtualenv)::
+
+    $ sudo pip2.7 uninstall py-bcrypt
+    $ sudo pip2.7 install py-bcrypt
     
-During setup of homeserver you need to call (depending) python2.7 directly again:
-    - $ sudo python2.7 -m synapse.app.homeserver \
+During setup of homeserver you need to call python2.7 directly again::
+
+    $ python2.7 -m synapse.app.homeserver \
       --server-name machine.my.domain.name \
       --config-path homeserver.yaml \
       --generate-config
         
-Substituting your host and domain name as appropriate.
+...substituting your host and domain name as appropriate.
 
 Windows Install
 ---------------
@@ -239,12 +247,12 @@ fix try re-installing from PyPI or directly from
 
 ArchLinux
 ---------
-If running $ synctl start , causes the following error
-  "subprocess.CalledProcessError: Command '['python', '-m', 'synapse.app.homeserver', '--daemonize', '-c', 'homeserver.yaml', '--pid-file', 'homeserver.pid']' returned non-zero exit status 1"
 
-You need to call 2.7 again by directly using
- - $ python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml --pid-file homeserver.pid
+If running `$ synctl start` fails wit 'returned non-zero exit status 1', you will need to explicitly call Python2.7 - either running as::
 
+    $ python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml --pid-file homeserver.pid
+    
+...or by editing synctl with the correct python executable.
 
 Homeserver Development
 ======================
