@@ -96,6 +96,11 @@ Installing prerequisites on Ubuntu or Debian::
     $ sudo apt-get install build-essential python2.7-dev libffi-dev \
                            python-pip python-setuptools sqlite3 \
                            libssl-dev python-virtualenv libjpeg-dev
+                           
+Installing prerequisites on ArchLinux::
+
+    $ sudo pacman -S base-devel python2 python-pip \
+                     python-setuptools python-virtualenv sqlite3
 
 Installing prerequisites on Mac OS X::
 
@@ -147,6 +152,31 @@ failing, e.g.::
 
 On OSX, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
 will need to export CFLAGS=-Qunused-arguments.
+
+ArchLinux
+--------------
+ArchLinux with the default installation of prerequisites, and your System itself. The installation may encounter a few Hiccups.
+
+python2.7 is Needed and I believe by default Arch uses Python3.
+
+pip is outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):
+    - $ sudo pip2.7 install --upgrade pip
+    
+You also may need to call 2.7 again during the install request:
+    - $ sudo pip2.7 install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+    
+If you encounter an error with lib bcrypt Causing an Wrong Elf Class: ELFCLASS32 (x64 Systems):
+you need to remove py-bcrypt itself and then reinstall it to correctly compile under your architecture
+    - $ sudo pip2.7 uninstall py-bcrypt
+    - $ sudo pip2.7 install py-bcrypt
+    
+During setup of homeserver you need to call (depending) python2.7 directly again:
+    - $ sudo python2.7 -m synapse.app.homeserver \
+      --server-name machine.my.domain.name \
+      --config-path homeserver.yaml \
+      --generate-config
+        
+Substituting your host and domain name as appropriate.
 
 Windows Install
 ---------------
@@ -206,6 +236,14 @@ fix try re-installing from PyPI or directly from
     $ pip install --user --upgrade --force pynacl
     $ # Install from github
     $ pip install --user https://github.com/pyca/pynacl/tarball/master
+
+ArchLinux
+---------
+If running $ synctl start , causes the following error
+  "subprocess.CalledProcessError: Command '['python', '-m', 'synapse.app.homeserver', '--daemonize', '-c', 'homeserver.yaml', '--pid-file', 'homeserver.pid']' returned non-zero exit status 1"
+
+You need to call 2.7 again by directly using
+ - $ python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml --pid-file homeserver.pid
 
 
 Homeserver Development
