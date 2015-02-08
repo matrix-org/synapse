@@ -132,7 +132,7 @@ class Pusher(object):
     @staticmethod
     def _glob_to_regexp(glob):
         r = re.escape(glob)
-        r = re.sub(r'\\\*', r'.*', r)
+        r = re.sub(r'\\\*', r'.*?', r)
         r = re.sub(r'\\\?', r'.', r)
 
         # handle [abc], [a-z] and [!a-z] style ranges.
