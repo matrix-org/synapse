@@ -50,8 +50,9 @@ class Config(object):
             )
         return cls.abspath(file_path)
 
-    @staticmethod
-    def ensure_directory(dir_path):
+    @classmethod
+    def ensure_directory(cls, dir_path):
+        dir_path = cls.abspath(dir_path)
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
         if not os.path.isdir(dir_path):
