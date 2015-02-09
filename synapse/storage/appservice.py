@@ -215,6 +215,7 @@ class ApplicationServiceStore(SQLBaseStore):
                     "url": res["url"],
                     "token": as_token,
                     "hs_token": res["hs_token"],
+                    "sender": res["sender"],
                     "namespaces": {
                         ApplicationService.NS_USERS: [],
                         ApplicationService.NS_ALIASES: [],
@@ -240,6 +241,7 @@ class ApplicationServiceStore(SQLBaseStore):
                 token=service["token"],
                 url=service["url"],
                 namespaces=service["namespaces"],
-                hs_token=service["hs_token"]
+                hs_token=service["hs_token"],
+                sender=service["sender"]
             ))
 

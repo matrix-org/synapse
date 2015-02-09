@@ -302,27 +302,26 @@ class Auth(object):
 
             # Check for application service tokens with a user_id override
             try:
-                if "user_id" not in request.args:
-                    # This has to be done like this rather than relying on it
-                    # natively throwing because tests use a Mock for the request
-                    # object which doesn't throw :/
-                    raise KeyError
-
-                masquerade_user_id = request.args["user_id"][0]
                 app_service = yield self.store.get_app_service_by_token(
                     access_token
                 )
                 if not app_service:
-                    raise AuthError(
-                        403, "Invalid application service access token"
-                    )
-                if not app_service.is_interested_in_user(masquerade_user_id):
-                    raise AuthError(
-                        403,
-                        "Application service cannot masquerade as this user."
-                    )
+                    raise KeyError
+
+                user_id = app_service.sender
+                if "user_id" in request.args:
+                    user_id = request.args["user_id"][0]
+                    if not app_service.is_interested_in_user(user_id):
+                        raise AuthError(
+                            403,
+                            "Application service cannot masquerade as this user."
+                        )
+
+                if not user_id:
+                    raise KeyError
+
                 defer.returnValue(
-                    (UserID.from_string(masquerade_user_id), ClientInfo("", ""))
+                    (UserID.from_string(user_id), ClientInfo("", ""))
                 )
                 return
             except KeyError:
@@ -366,8 +365,7 @@ class Auth(object):
         try:
             ret = yield self.store.get_user_by_token(token=token)
             if not ret:
-                raise StoreError()
-
+                raise StoreError(400, "Unknown token")
             user_info = {
                 "admin": bool(ret.get("admin", False)),
                 "device_id": ret.get("device_id"),

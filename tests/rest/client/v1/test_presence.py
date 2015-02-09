@@ -65,6 +65,7 @@ class PresenceStateTestCase(unittest.TestCase):
         hs.handlers = JustPresenceHandlers(hs)
 
         self.datastore = hs.get_datastore()
+        self.datastore.get_app_service_by_token = Mock(return_value=None)
 
         def get_presence_list(*a, **kw):
             return defer.succeed([])
@@ -154,6 +155,7 @@ class PresenceListTestCase(unittest.TestCase):
         hs.handlers = JustPresenceHandlers(hs)
 
         self.datastore = hs.get_datastore()
+        self.datastore.get_app_service_by_token = Mock(return_value=None)
 
         def has_presence_state(user_localpart):
             return defer.succeed(
@@ -303,6 +305,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         hs.handlers.room_member_handler.get_rooms_for_user = get_rooms_for_user
 
         self.mock_datastore = hs.get_datastore()
+        self.mock_datastore.get_app_service_by_token = Mock(return_value=None)
 
         def get_profile_displayname(user_id):
             return defer.succeed("Frank")

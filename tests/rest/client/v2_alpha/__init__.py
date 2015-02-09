@@ -59,6 +59,8 @@ class V2AlphaRestTestCase(unittest.TestCase):
             r.register_servlets(hs, self.mock_resource)
 
     def make_datastore_mock(self):
-        return Mock(spec=[
+        store =  Mock(spec=[
             "insert_client_ip",
         ])
+        store.get_app_service_by_token = Mock(return_value=None)
+        return store
