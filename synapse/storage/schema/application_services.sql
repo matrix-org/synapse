@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS application_services(
     url TEXT,
     token TEXT,
     hs_token TEXT,
+    sender TEXT,
     UNIQUE(token) ON CONFLICT ROLLBACK
 );
 

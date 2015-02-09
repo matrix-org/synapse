@@ -52,8 +52,14 @@ class ApplicationServicesHandler(object):
                 "Consult the home server admin.",
                 errcode=Codes.FORBIDDEN
             )
-        logger.info("Updating application service info...")
+
         app_service.hs_token = self._generate_hs_token()
+
+        # create a sender for this application service which is used when
+        # creating rooms, etc..
+        account = yield self.hs.get_handlers().registration_handler.register()
+        app_service.sender = account[0]
+
         yield self.store.update_app_service(app_service)
         defer.returnValue(app_service)
 

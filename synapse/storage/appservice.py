@@ -130,8 +130,9 @@ class ApplicationServiceStore(SQLBaseStore):
             return False
 
         txn.execute(
-            "UPDATE application_services SET url=?, hs_token=? WHERE id=?",
-            (service.url, service.hs_token, as_id,)
+            "UPDATE application_services SET url=?, hs_token=?, sender=? "
+            "WHERE id=?",
+            (service.url, service.hs_token, service.sender, as_id,)
         )
         # cleanup regex
         txn.execute(

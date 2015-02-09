@@ -35,10 +35,11 @@ class ApplicationService(object):
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
     def __init__(self, token, url=None, namespaces=None, hs_token=None,
-                 txn_id=None):
+                 sender=None, txn_id=None):
         self.token = token
         self.url = url
         self.hs_token = hs_token
+        self.sender = sender
         self.namespaces = self._check_namespaces(namespaces)
         self.txn_id = txn_id
 
