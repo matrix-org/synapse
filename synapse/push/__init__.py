@@ -147,7 +147,10 @@ class Pusher(object):
                 logger.warn("event_match condition with no pattern")
                 return False
             # XXX: optimisation: cache our pattern regexps
-            r = r'\b%s\b' % self._glob_to_regexp(condition['pattern'])
+            if condition['key'] == 'content.body':
+                r = r'\b%s\b' % self._glob_to_regexp(condition['pattern'])
+            else:
+                r = r'^%s$' % self._glob_to_regexp(condition['pattern'])
             val = _value_for_dotted_key(condition['key'], ev)
             if val is None:
                 return False
