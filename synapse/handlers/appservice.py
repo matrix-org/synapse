@@ -124,15 +124,15 @@ class ApplicationServicesHandler(object):
             namedtuple: with keys "room_id" and "servers" or None if no
             association can be found.
         """
-        room_alias = room_alias.to_string()
+        room_alias_str = room_alias.to_string()
         alias_query_services = yield self._get_services_for_event(
             event=None,
             restrict_to=ApplicationService.NS_ALIASES,
-            alias_list=[room_alias]
+            alias_list=[room_alias_str]
         )
         for alias_service in alias_query_services:
             is_known_alias = yield self.appservice_api.query_alias(
-                alias_service, room_alias
+                alias_service, room_alias_str
             )
             if is_known_alias:
                 # the alias exists now so don't query more ASes.

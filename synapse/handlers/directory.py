@@ -64,8 +64,11 @@ class DirectoryHandler(BaseHandler):
         # association creation for human users
         # TODO(erikj): Do user auth.
 
-        is_claimed = yield self.is_alias_exclusive_to_appservices(room_alias)
-        if is_claimed:
+        can_create = yield self.can_modify_alias(
+            room_alias,
+            user_id=user_id
+        )
+        if not can_create:
             raise SynapseError(
                 400, "This alias is reserved by an application service.",
                 errcode=Codes.EXCLUSIVE
@@ -91,8 +94,11 @@ class DirectoryHandler(BaseHandler):
 
         # TODO Check if server admin
 
-        is_claimed = yield self.is_alias_exclusive_to_appservices(room_alias)
-        if is_claimed:
+        can_delete = yield self.can_modify_alias(
+            room_alias,
+            user_id=user_id
+        )
+        if not can_delete:
             raise SynapseError(
                 400, "This alias is reserved by an application service.",
                 errcode=Codes.EXCLUSIVE
@@ -228,9 +234,14 @@ class DirectoryHandler(BaseHandler):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def is_alias_exclusive_to_appservices(self, alias):
+    def can_modify_alias(self, alias, user_id=None):
         services = yield self.store.get_app_services()
         interested_services = [
             s for s in services if s.is_interested_in_alias(alias.to_string())
         ]
-        defer.returnValue(len(interested_services) > 0)
+        for service in interested_services:
+            if user_id == service.sender:
+                # this user IS the app service
+                defer.returnValue(True)
+                return
+        defer.returnValue(len(interested_services) == 0)

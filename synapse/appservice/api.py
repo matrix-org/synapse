@@ -41,7 +41,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             response = yield self.get_json(uri, {
                 "access_token": service.hs_token
             })
-            if response:  # just an empty json object
+            if response is not None:  # just an empty json object
                 defer.returnValue(True)
         except CodeMessageException as e:
             if e.code == 404:
@@ -60,13 +60,13 @@ class ApplicationServiceApi(SimpleHttpClient):
             response = yield self.get_json(uri, {
                 "access_token": service.hs_token
             })
-            if response:  # just an empty json object
+            if response is not None:  # just an empty json object
                 defer.returnValue(True)
         except CodeMessageException as e:
+            logger.warning("query_alias to %s received %s", uri, e.code)
             if e.code == 404:
                 defer.returnValue(False)
                 return
-            logger.warning("query_alias to %s received %s", uri, e.code)
         except Exception as ex:
             logger.warning("query_alias to %s threw exception %s", uri, ex)
         defer.returnValue(False)
