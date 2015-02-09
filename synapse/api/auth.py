@@ -89,12 +89,19 @@ class Auth(object):
             raise
 
     @defer.inlineCallbacks
-    def check_joined_room(self, room_id, user_id):
-        member = yield self.state.get_current_state(
-            room_id=room_id,
-            event_type=EventTypes.Member,
-            state_key=user_id
-        )
+    def check_joined_room(self, room_id, user_id, current_state=None):
+        if current_state:
+            member = current_state.get(
+                (EventTypes.Member, user_id),
+                None
+            )
+        else:
+            member = yield self.state.get_current_state(
+                room_id=room_id,
+                event_type=EventTypes.Member,
+                state_key=user_id
+            )
+
         self._check_joined_room(member, user_id, room_id)
         defer.returnValue(member)
 
@@ -102,7 +109,7 @@ class Auth(object):
     def check_host_in_room(self, room_id, host):
         curr_state = yield self.state.get_current_state(room_id)
 
-        for event in curr_state:
+        for event in curr_state.values():
             if event.type == EventTypes.Member:
                 try:
                     if UserID.from_string(event.state_key).domain != host:
