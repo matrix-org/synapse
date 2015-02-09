@@ -103,7 +103,7 @@ class SQLBaseStore(object):
 
             ratio = (curr - prev)/(time_now - time_then)
 
-            logger.info("Total database time: %.3f%", ratio * 100)
+            logger.info("Total database time: %.3f%%", ratio * 100)
 
         self._clock.looping_call(loop, 10000)
 
