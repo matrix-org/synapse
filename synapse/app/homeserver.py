@@ -274,6 +274,8 @@ def setup():
 
     hs.get_pusherpool().start()
 
+    hs.get_datastore().start_profiling()
+
     if config.daemonize:
         print config.pid_file
         daemon = Daemonize(
