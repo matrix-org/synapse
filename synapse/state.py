@@ -76,7 +76,7 @@ class StateHandler(object):
             defer.returnValue(res[1].get((event_type, state_key)))
             return
 
-        defer.returnValue(res[1].values())
+        defer.returnValue(res[1])
 
     @defer.inlineCallbacks
     def compute_event_context(self, event, old_state=None):

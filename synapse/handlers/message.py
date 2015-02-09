@@ -35,6 +35,7 @@ class MessageHandler(BaseHandler):
     def __init__(self, hs):
         super(MessageHandler, self).__init__(hs)
         self.hs = hs
+        self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
 
@@ -225,7 +226,9 @@ class MessageHandler(BaseHandler):
         # TODO: This is duplicating logic from snapshot_all_rooms
         current_state = yield self.state_handler.get_current_state(room_id)
         now = self.clock.time_msec()
-        defer.returnValue([serialize_event(c, now) for c in current_state])
+        defer.returnValue(
+            [serialize_event(c, now) for c in current_state.values()]
+        )
 
     @defer.inlineCallbacks
     def snapshot_all_rooms(self, user_id=None, pagin_config=None,
@@ -313,7 +316,7 @@ class MessageHandler(BaseHandler):
                 )
                 d["state"] = [
                     serialize_event(c, time_now, as_client_event)
-                    for c in current_state
+                    for c in current_state.values()
                 ]
             except:
                 logger.exception("Failed to get snapshot")
@@ -329,7 +332,14 @@ class MessageHandler(BaseHandler):
     @defer.inlineCallbacks
     def room_initial_sync(self, user_id, room_id, pagin_config=None,
                           feedback=False):
-        yield self.auth.check_joined_room(room_id, user_id)
+        current_state = yield self.state.get_current_state(
+            room_id=room_id,
+        )
+
+        yield self.auth.check_joined_room(
+            room_id, user_id,
+            current_state=current_state
+        )
 
         # TODO(paul): I wish I was called with user objects not user_id
         #   strings...
@@ -337,13 +347,12 @@ class MessageHandler(BaseHandler):
 
         # TODO: These concurrently
         time_now = self.clock.time_msec()
-        state_tuples = yield self.state_handler.get_current_state(room_id)
-        state = [serialize_event(x, time_now) for x in state_tuples]
+        state = [
+            serialize_event(x, time_now)
+            for x in current_state.values()
+        ]
 
-        member_event = (yield self.store.get_room_member(
-            user_id=user_id,
-            room_id=room_id
-        ))
+        member_event = current_state.get((EventTypes.Member, user_id,))
 
         now_token = yield self.hs.get_event_sources().get_current_token()
 
@@ -360,7 +369,10 @@ class MessageHandler(BaseHandler):
         start_token = now_token.copy_and_replace("room_key", token[0])
         end_token = now_token.copy_and_replace("room_key", token[1])
 
-        room_members = yield self.store.get_room_members(room_id)
+        room_members = [
+            m for m in current_state.values()
+            if m.type == EventTypes.Member
+        ]
 
         presence_handler = self.hs.get_handlers().presence_handler
         presence = []
