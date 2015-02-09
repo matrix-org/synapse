@@ -15,11 +15,11 @@
 from tests import unittest
 from twisted.internet import defer
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 
 from synapse.api.auth import Auth
 from synapse.api.errors import AuthError
-from synapse.types import UserID
+
 
 class AuthTestCase(unittest.TestCase):
 
