@@ -38,6 +38,35 @@ class UploadResource(BaseMediaResource):
     def render_OPTIONS(self, request):
         respond_with_json(request, 200, {}, send_cors=True)
         return NOT_DONE_YET
+        
+    @defer.inlineCallbacks
+    def create_content(self, media_type, upload_name, content, content_length, auth_user):
+        media_id = random_string(24)
+
+        fname = self.filepaths.local_media_filepath(media_id)
+        self._makedirs(fname)
+
+        # This shouldn't block for very long because the content will have
+        # already been uploaded at this point.
+        with open(fname, "wb") as f:
+            f.write(content)
+
+        yield self.store.store_local_media(
+            media_id=media_id,
+            media_type=media_type,
+            time_now_ms=self.clock.time_msec(),
+            upload_name=upload_name,
+            media_length=content_length,
+            user_id=auth_user,
+        )
+        media_info = {
+            "media_type": media_type,
+            "media_length": content_length,
+        }
+
+        yield self._generate_local_thumbnails(media_id, media_info)
+        
+        defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
 
     @defer.inlineCallbacks
     def _async_render_POST(self, request):
@@ -70,32 +99,10 @@ class UploadResource(BaseMediaResource):
             #    disposition = headers.getRawHeaders("Content-Disposition")[0]
             # TODO(markjh): parse content-dispostion
 
-            media_id = random_string(24)
-
-            fname = self.filepaths.local_media_filepath(media_id)
-            self._makedirs(fname)
-
-            # This shouldn't block for very long because the content will have
-            # already been uploaded at this point.
-            with open(fname, "wb") as f:
-                f.write(request.content.read())
-
-            yield self.store.store_local_media(
-                media_id=media_id,
-                media_type=media_type,
-                time_now_ms=self.clock.time_msec(),
-                upload_name=None,
-                media_length=content_length,
-                user_id=auth_user,
+            content_uri = yield self.create_content(
+                media_type, None, request.content.read(),
+                content_length, auth_user
             )
-            media_info = {
-                "media_type": media_type,
-                "media_length": content_length,
-            }
-
-            yield self._generate_local_thumbnails(media_id, media_info)
-
-            content_uri = "mxc://%s/%s" % (self.server_name, media_id)
 
             respond_with_json(
                 request, 200, {"content_uri": content_uri}, send_cors=True

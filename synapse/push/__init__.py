@@ -22,7 +22,6 @@ import synapse.util.async
 import baserules
 
 import logging
-import fnmatch
 import json
 import re
 
@@ -130,26 +129,35 @@ class Pusher(object):
 
         defer.returnValue(Pusher.DEFAULT_ACTIONS)
 
+    @staticmethod
+    def _glob_to_regexp(glob):
+        r = re.escape(glob)
+        r = re.sub(r'\\\*', r'.*?', r)
+        r = re.sub(r'\\\?', r'.', r)
+
+        # handle [abc], [a-z] and [!a-z] style ranges.
+        r = re.sub(r'\\\[(\\\!|)(.*)\\\]',
+                   lambda x: ('[%s%s]' % (x.group(1) and '^' or '',
+                                          re.sub(r'\\\-', '-', x.group(2)))), r)
+        return r
+    
     def _event_fulfills_condition(self, ev, condition, display_name, room_member_count):
         if condition['kind'] == 'event_match':
             if 'pattern' not in condition:
                 logger.warn("event_match condition with no pattern")
                 return False
-            pat = condition['pattern']
-
-            if pat.strip("*?[]") == pat:
-                # no special glob characters so we assume the user means
-                # 'contains this string' rather than 'is this string'
-                pat = "*%s*" % (pat,)
-
+            # XXX: optimisation: cache our pattern regexps
+            r = r'\b%s\b' % self._glob_to_regexp(condition['pattern'])
             val = _value_for_dotted_key(condition['key'], ev)
             if val is None:
                 return False
-            return fnmatch.fnmatch(val.upper(), pat.upper())
+            return re.match(r, val, flags=re.IGNORECASE) != None
+
         elif condition['kind'] == 'device':
             if 'profile_tag' not in condition:
                 return True
             return condition['profile_tag'] == self.profile_tag
+
         elif condition['kind'] == 'contains_display_name':
             # This is special because display names can be different
             # between rooms and so you can't really hard code it in a rule.
@@ -159,9 +167,9 @@ class Pusher(object):
                 return False
             if not display_name:
                 return False
-            return fnmatch.fnmatch(
-                ev['content']['body'].upper(), "*%s*" % (display_name.upper(),)
-            )
+            return re.match("\b%s\b" % re.escape(display_name),
+                            ev['content']['body'], flags=re.IGNORECASE) != None
+
         elif condition['kind'] == 'room_member_count':
             if 'is' not in condition:
                 return False

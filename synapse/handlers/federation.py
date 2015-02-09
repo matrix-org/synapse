@@ -130,7 +130,9 @@ class FederationHandler(BaseHandler):
         if auth_chain:
             event_ids |= {e.event_id for e in auth_chain}
 
-        seen_ids = (yield self.store.have_events(event_ids)).keys()
+        seen_ids = set(
+            (yield self.store.have_events(event_ids)).keys()
+        )
 
         if state and auth_chain is not None:
             # If we have any state or auth_chain given to us by the replication
@@ -332,8 +334,11 @@ class FederationHandler(BaseHandler):
 
             # Try the host we successfully got a response to /make_join/
             # request first.
-            target_hosts.remove(origin)
-            target_hosts.insert(0, origin)
+            try:
+                target_hosts.remove(origin)
+                target_hosts.insert(0, origin)
+            except ValueError:
+                pass
 
             ret = yield self.replication_layer.send_join(
                 target_hosts,
@@ -521,7 +526,7 @@ class FederationHandler(BaseHandler):
                     "Failed to get destination from event %s", s.event_id
                 )
 
-        destinations.remove(origin)
+        destinations.discard(origin)
 
         logger.debug(
             "on_send_join_request: Sending event: %s, signatures: %s",
@@ -786,12 +791,12 @@ class FederationHandler(BaseHandler):
     @log_function
     def do_auth(self, origin, event, context, auth_events):
         # Check if we have all the auth events.
-        res = yield self.store.have_events(
+        have_events = yield self.store.have_events(
             [e_id for e_id, _ in event.auth_events]
         )
 
         event_auth_events = set(e_id for e_id, _ in event.auth_events)
-        seen_events = set(res.keys())
+        seen_events = set(have_events.keys())
 
         missing_auth = event_auth_events - seen_events
 
@@ -834,6 +839,11 @@ class FederationHandler(BaseHandler):
                             auth_events[(e.type, e.state_key)] = e
                     except AuthError:
                         pass
+
+                have_events = yield self.store.have_events(
+                    [e_id for e_id, _ in event.auth_events]
+                )
+                seen_events = set(have_events.keys())
             except:
                 # FIXME:
                 logger.exception("Failed to get auth chain")
@@ -847,64 +857,75 @@ class FederationHandler(BaseHandler):
             # Do auth conflict res.
             logger.debug("Different auth: %s", different_auth)
 
-            # 1. Get what we think is the auth chain.
-            auth_ids = self.auth.compute_auth_events(
-                event, context.current_state
-            )
-            local_auth_chain = yield self.store.get_auth_chain(auth_ids)
+            # Only do auth resolution if we have something new to say.
+            # We can't rove an auth failure.
+            do_resolution = False
+            for e_id in different_auth:
+                if e_id in have_events:
+                    if have_events[e_id] != RejectedReason.AUTH_ERROR:
+                        do_resolution = True
+                        break
 
-            try:
-                # 2. Get remote difference.
-                result = yield self.replication_layer.query_auth(
-                    origin,
-                    event.room_id,
-                    event.event_id,
-                    local_auth_chain,
+            if do_resolution:
+                # 1. Get what we think is the auth chain.
+                auth_ids = self.auth.compute_auth_events(
+                    event, context.current_state
                 )
+                local_auth_chain = yield self.store.get_auth_chain(auth_ids)
 
-                seen_remotes = yield self.store.have_events(
-                    [e.event_id for e in result["auth_chain"]]
-                )
+                try:
+                    # 2. Get remote difference.
+                    result = yield self.replication_layer.query_auth(
+                        origin,
+                        event.room_id,
+                        event.event_id,
+                        local_auth_chain,
+                    )
 
-                # 3. Process any remote auth chain events we haven't seen.
-                for ev in result["auth_chain"]:
-                    if ev.event_id in seen_remotes.keys():
-                        continue
+                    seen_remotes = yield self.store.have_events(
+                        [e.event_id for e in result["auth_chain"]]
+                    )
 
-                    if ev.event_id == event.event_id:
-                        continue
+                    # 3. Process any remote auth chain events we haven't seen.
+                    for ev in result["auth_chain"]:
+                        if ev.event_id in seen_remotes.keys():
+                            continue
 
-                    try:
-                        auth_ids = [e_id for e_id, _ in ev.auth_events]
-                        auth = {
-                            (e.type, e.state_key): e for e in result["auth_chain"]
-                            if e.event_id in auth_ids
-                        }
-                        ev.internal_metadata.outlier = True
+                        if ev.event_id == event.event_id:
+                            continue
 
-                        logger.debug(
-                            "do_auth %s different_auth: %s",
-                            event.event_id, e.event_id
-                        )
+                        try:
+                            auth_ids = [e_id for e_id, _ in ev.auth_events]
+                            auth = {
+                                (e.type, e.state_key): e
+                                for e in result["auth_chain"]
+                                if e.event_id in auth_ids
+                            }
+                            ev.internal_metadata.outlier = True
 
-                        yield self._handle_new_event(
-                            origin, ev, auth_events=auth
-                        )
+                            logger.debug(
+                                "do_auth %s different_auth: %s",
+                                event.event_id, e.event_id
+                            )
 
-                        if ev.event_id in event_auth_events:
-                            auth_events[(ev.type, ev.state_key)] = ev
-                    except AuthError:
-                        pass
+                            yield self._handle_new_event(
+                                origin, ev, auth_events=auth
+                            )
 
-            except:
-                # FIXME:
-                logger.exception("Failed to query auth chain")
+                            if ev.event_id in event_auth_events:
+                                auth_events[(ev.type, ev.state_key)] = ev
+                        except AuthError:
+                            pass
 
-            # 4. Look at rejects and their proofs.
-            # TODO.
+                except:
+                    # FIXME:
+                    logger.exception("Failed to query auth chain")
 
-            context.current_state.update(auth_events)
-            context.state_group = None
+                # 4. Look at rejects and their proofs.
+                # TODO.
+
+                context.current_state.update(auth_events)
+                context.state_group = None
 
         try:
             self.auth.check(event, auth_events=auth_events)
@@ -1013,16 +1034,19 @@ class FederationHandler(BaseHandler):
         for e in missing_remotes:
             for e_id, _ in e.auth_events:
                 if e_id in missing_remote_ids:
-                    base_remote_rejected.remove(e)
+                    try:
+                        base_remote_rejected.remove(e)
+                    except ValueError:
+                        pass
 
         reason_map = {}
 
         for e in base_remote_rejected:
             reason = yield self.store.get_rejection_reason(e.event_id)
             if reason is None:
-                # FIXME: ERRR?!
-                logger.warn("Could not find reason for %s", e.event_id)
-                raise RuntimeError("Could not find reason for %s" % e.event_id)
+                # TODO: e is not in the current state, so we should
+                # construct some proof of that.
+                continue
 
             reason_map[e.event_id] = reason
 
