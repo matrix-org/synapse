@@ -69,9 +69,10 @@ class JsonResource(HttpServer, resource.Resource):
 
     _PathEntry = collections.namedtuple("_PathEntry", ["pattern", "callback"])
 
-    def __init__(self):
+    def __init__(self, hs):
         resource.Resource.__init__(self)
 
+        self.clock = hs.get_clock()
         self.path_regexs = {}
 
     def register_path(self, method, path_pattern, callback):
@@ -111,6 +112,7 @@ class JsonResource(HttpServer, resource.Resource):
             This checks if anyone has registered a callback for that method and
             path.
         """
+        code = None
         try:
             # Just say yes to OPTIONS.
             if request.method == "OPTIONS":
@@ -130,6 +132,13 @@ class JsonResource(HttpServer, resource.Resource):
                         urllib.unquote(u).decode("UTF-8") for u in m.groups()
                     ]
 
+                    logger.info(
+                        "Received request: %s %s",
+                        request.method, request.path
+                    )
+
+                    start = self.clock.time_msec()
+
                     code, response = yield path_entry.callback(
                         request,
                         *args
@@ -145,9 +154,11 @@ class JsonResource(HttpServer, resource.Resource):
                 logger.info("%s SynapseError: %s - %s", request, e.code, e.msg)
             else:
                 logger.exception(e)
+
+            code = e.code
             self._send_response(
                 request,
-                e.code,
+                code,
                 cs_exception(e),
                 response_code_message=e.response_code_message
             )
@@ -157,6 +168,14 @@ class JsonResource(HttpServer, resource.Resource):
                 request,
                 500,
                 {"error": "Internal server error"}
+            )
+        finally:
+            code = str(code) if code else "-"
+
+            end = self.clock.time_msec()
+            logger.info(
+                "Processed request: %dms %s %s %s",
+                end-start, code, request.method, request.path
             )
 
     def _send_response(self, request, code, response_json_object,
