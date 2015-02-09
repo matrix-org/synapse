@@ -39,7 +39,6 @@ class LoggingTransaction(object):
     passed to the constructor. Adds logging to the .execute() method."""
     __slots__ = ["txn", "name"]
 
-
     def __init__(self, txn, name):
         object.__setattr__(self, "txn", txn)
         object.__setattr__(self, "name", name)
