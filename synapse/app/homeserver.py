@@ -67,7 +67,7 @@ class SynapseHomeServer(HomeServer):
         return ClientV2AlphaRestResource(self)
 
     def build_resource_for_federation(self):
-        return JsonResource()
+        return JsonResource(self)
 
     def build_resource_for_web_client(self):
         syweb_path = os.path.dirname(syweb.__file__)
