@@ -154,7 +154,7 @@ class Pusher(object):
             val = _value_for_dotted_key(condition['key'], ev)
             if val is None:
                 return False
-            return re.match(r, val, flags=re.IGNORECASE) != None
+            return re.search(r, val, flags=re.IGNORECASE) is not None
 
         elif condition['kind'] == 'device':
             if 'profile_tag' not in condition:
@@ -170,8 +170,8 @@ class Pusher(object):
                 return False
             if not display_name:
                 return False
-            return re.match("\b%s\b" % re.escape(display_name),
-                            ev['content']['body'], flags=re.IGNORECASE) != None
+            return re.search("\b%s\b" % re.escape(display_name),
+                            ev['content']['body'], flags=re.IGNORECASE) is not None
 
         elif condition['kind'] == 'room_member_count':
             if 'is' not in condition:
