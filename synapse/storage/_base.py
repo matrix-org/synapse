@@ -140,7 +140,7 @@ class SQLBaseStore(object):
             with LoggingContext("runInteraction") as context:
                 current_context.copy_to(context)
                 start = time.time() * 1000
-                txn_id = SQLBaseStore._TXN_ID
+                txn_id = self._TXN_ID
 
                 # We don't really need these to be unique, so lets stop it from
                 # growing really large.
@@ -163,10 +163,10 @@ class SQLBaseStore(object):
 
                     self._current_txn_total_time += end - start
 
-                    count, cum_time = self._txn_perf_counters.get(name, (0,0))
+                    count, cum_time = self._txn_perf_counters.get(desc, (0,0))
                     count += 1
                     cum_time += end - start
-                    self._txn_perf_counters[name] = (count, cum_time)
+                    self._txn_perf_counters[desc] = (count, cum_time)
 
         with PreserveLoggingContext():
             result = yield self._db_pool.runInteraction(
