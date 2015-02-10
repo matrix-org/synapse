@@ -48,7 +48,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
         user, client = yield self.auth.get_user_by_req(request)
 
         content = _parse_json(request)
-        if not "room_id" in content:
+        if "room_id" not in content:
             raise SynapseError(400, "Missing room_id key",
                                errcode=Codes.BAD_JSON)
 

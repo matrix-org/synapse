@@ -457,9 +457,9 @@ class PresenceHandler(BaseHandler):
         if state is None:
             state = yield self.store.get_presence_state(user.localpart)
         else:
-#            statuscache = self._get_or_make_usercache(user)
-#            self._user_cachemap_latest_serial += 1
-#            statuscache.update(state, self._user_cachemap_latest_serial)
+            # statuscache = self._get_or_make_usercache(user)
+            # self._user_cachemap_latest_serial += 1
+            # statuscache.update(state, self._user_cachemap_latest_serial)
             pass
 
         yield self.push_update_to_local_and_remote(
@@ -709,7 +709,7 @@ class PresenceHandler(BaseHandler):
 
             # TODO(paul) permissions checks
 
-            if not user in self._remote_sendmap:
+            if user not in self._remote_sendmap:
                 self._remote_sendmap[user] = set()
 
             self._remote_sendmap[user].add(origin)
