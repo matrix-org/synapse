@@ -32,3 +32,23 @@ def run_on_reactor():
     iteration of the main loop
     """
     return sleep(0)
+
+
+def time_bound_deferred(given_deferred, clock, time_out):
+    ret_deferred = defer.Deferred()
+
+    def timed_out():
+        if not given_deferred.called:
+            given_deferred.cancel()
+            ret_deferred.errback(RuntimeError("Timed out"))
+
+    timer = clock.call_later(time_out, timed_out)
+
+    def succeed(result):
+        clock.cancel_call_later(timer)
+        ret_deferred.callback(result)
+
+    given_deferred.addCallback(succeed)
+    given_deferred.addErrback(ret_deferred.errback)
+
+    return ret_deferred
