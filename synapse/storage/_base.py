@@ -582,6 +582,9 @@ class SQLBaseStore(object):
     def _get_event_txn(self, txn, event_id, check_redacted=True,
                        get_prev_content=False, allow_rejected=False):
 
+        start_time = time.time() * 1000
+        update_counter = self._get_event_counters.update
+
         try:
             try:
                 cache = self._get_event_cache[event_id]
@@ -592,6 +595,8 @@ class SQLBaseStore(object):
             return cache[(check_redacted, get_prev_content, allow_rejected)]
         except KeyError:
             pass
+        finally:
+            start_time = update_counter("event_cache", start_time)
 
         sql = (
             "SELECT e.internal_metadata, e.json, r.event_id, rej.reason "
@@ -602,7 +607,6 @@ class SQLBaseStore(object):
             "LIMIT 1 "
         )
 
-        start_time = time.time() * 1000
 
         txn.execute(sql, (event_id,))
 
@@ -613,7 +617,7 @@ class SQLBaseStore(object):
 
         internal_metadata, js, redacted, rejected_reason = res
 
-        self._get_event_counters.update("select_event", start_time)
+        start_time = update_counter("select_event", start_time)
 
         if allow_rejected or not rejected_reason:
             result = self._get_event_from_row_txn(
