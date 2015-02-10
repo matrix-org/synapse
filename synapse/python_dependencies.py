@@ -19,10 +19,11 @@ REQUIREMENTS = {
     "pydenticon": ["pydenticon"],
 }
 
+
 def github_link(project, version, egg):
     return "https://github.com/%s/tarball/%s/#egg=%s" % (project, version, egg)
 
-DEPENDENCY_LINKS=[
+DEPENDENCY_LINKS = [
     github_link(
         project="matrix-org/syutil",
         version="v0.0.2",
@@ -101,6 +102,7 @@ def check_requirements():
                         % (dependency, file_path, version, required_version)
                     )
 
+
 def list_requirements():
     result = []
     linked = []
@@ -111,7 +113,7 @@ def list_requirements():
     for requirement in REQUIREMENTS:
         is_linked = False
         for link in linked:
-            if requirement.replace('-','_').startswith(link):
+            if requirement.replace('-', '_').startswith(link):
                 is_linked = True
         if not is_linked:
             result.append(requirement)

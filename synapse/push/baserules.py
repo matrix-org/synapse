@@ -1,5 +1,6 @@
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 
+
 def list_with_base_rules(rawrules, user_name):
     ruleslist = []
 
@@ -9,9 +10,9 @@ def list_with_base_rules(rawrules, user_name):
         if r['priority_class'] < current_prio_class:
             while r['priority_class'] < current_prio_class:
                 ruleslist.extend(make_base_rules(
-                        user_name,
-                        PRIORITY_CLASS_INVERSE_MAP[current_prio_class])
-                    )
+                    user_name,
+                    PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
+                ))
                 current_prio_class -= 1
 
         ruleslist.append(r)
@@ -19,8 +20,8 @@ def list_with_base_rules(rawrules, user_name):
     while current_prio_class > 0:
         ruleslist.extend(make_base_rules(
             user_name,
-            PRIORITY_CLASS_INVERSE_MAP[current_prio_class])
-        )
+            PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
+        ))
         current_prio_class -= 1
 
     return ruleslist

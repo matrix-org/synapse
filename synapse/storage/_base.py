@@ -84,7 +84,7 @@ class PerformanceCounters(object):
 
     def update(self, key, start_time, end_time=None):
         if end_time is None:
-            end_time = time.time() * 1000;
+            end_time = time.time() * 1000
         duration = end_time - start_time
         count, cum_time = self.current_counters.get(key, (0, 0))
         count += 1
@@ -588,7 +588,7 @@ class SQLBaseStore(object):
             "LIMIT 1 "
         )
 
-        start_time = time.time() * 1000;
+        start_time = time.time() * 1000
 
         txn.execute(sql, (event_id,))
 
@@ -613,7 +613,7 @@ class SQLBaseStore(object):
     def _get_event_from_row_txn(self, txn, internal_metadata, js, redacted,
                                 check_redacted=True, get_prev_content=False):
 
-        start_time = time.time() * 1000;
+        start_time = time.time() * 1000
         update_counter = self._get_event_counters.update
 
         d = json.loads(js)

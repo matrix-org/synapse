@@ -658,7 +658,9 @@ class PresenceHandler(BaseHandler):
 
             observers = set(self._remote_recvmap.get(user, set()))
             if observers:
-                logger.debug(" | %d interested local observers %r", len(observers), observers)
+                logger.debug(
+                    " | %d interested local observers %r", len(observers), observers
+                )
 
             rm_handler = self.homeserver.get_handlers().room_member_handler
             room_ids = yield rm_handler.get_rooms_for_user(user)
