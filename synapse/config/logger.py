@@ -80,7 +80,8 @@ class LoggingConfig(Config):
             logger.addHandler(handler)
             logger.info("Test")
         else:
-            logging.config.dictConfig(yaml.load(self.log_config))
+            with open(self.log_config, 'r') as f:
+                logging.config.dictConfig(yaml.load(f))
 
         observer = PythonLoggingObserver()
         observer.start()
