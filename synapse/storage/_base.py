@@ -607,7 +607,6 @@ class SQLBaseStore(object):
             "LIMIT 1 "
         )
 
-
         txn.execute(sql, (event_id,))
 
         res = txn.fetchone()
