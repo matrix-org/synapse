@@ -25,6 +25,8 @@ from synapse.events import FrozenEvent
 
 from synapse.api.errors import FederationError, SynapseError
 
+from synapse.crypto.event_signing import compute_event_signature
+
 import logging
 
 
@@ -156,6 +158,15 @@ class FederationServer(FederationBase):
             auth_chain = yield self.store.get_auth_chain(
                 [pdu.event_id for pdu in pdus]
             )
+
+            for event in auth_chain:
+                event.signatures.update(
+                    compute_event_signature(
+                        event,
+                        self.hs.hostname,
+                        self.hs.config.signing_key[0]
+                    )
+                )
         else:
             raise NotImplementedError("Specify an event")
 
