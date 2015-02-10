@@ -306,13 +306,13 @@ class StateHandler(object):
         new_state = unconflicted_state
         new_state.update(resolved_state)
 
-        cache = _StateCacheEntry(
-            state=new_state,
-            state_group=None,
-            ts=self.clock.time_msec()
-        )
-
         if self._state_cache is not None:
+            cache = _StateCacheEntry(
+                state=new_state,
+                state_group=None,
+                ts=self.clock.time_msec()
+            )
+
             self._state_cache[frozenset(event_ids)] = cache
 
         defer.returnValue((None, new_state, prev_states))
