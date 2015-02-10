@@ -17,20 +17,6 @@
 import os
 from setuptools import setup, find_packages
 
-import setuptools.command.easy_install
-
-
-def no_easy_install(self, spec, *args, **kargs):
-    raise RuntimeError(
-        "Missing requirement %r. Please use pip to install this dependency."
-        " See README.rst for instructions."
-        % (spec,)
-    )
-
-# Patch the easy_install command to prevent people accidentally installing
-# depedencies using it.
-setuptools.command.easy_install.easy_install.easy_install = no_easy_install
-
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -60,6 +46,11 @@ setup(
     packages=find_packages(exclude=["tests", "tests.*"]),
     description="Reference Synapse Home Server",
     install_requires=dependencies["REQUIREMENTS"].keys(),
+    setup_requires=[
+        "Twisted==14.0.2", # Here to override setuptools_trial's dependency on Twisted>=2.4.0
+        "setuptools_trial",
+        "mock"
+    ],
     dependency_links=dependencies["DEPENDENCY_LINKS"],
     include_package_data=True,
     zip_safe=False,
