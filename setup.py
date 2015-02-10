@@ -21,18 +21,18 @@ from setuptools import setup, find_packages
 here = os.path.abspath(os.path.dirname(__file__))
 
 
-def read_file(path):
+def read_file(path_segments):
     """Read a file from the package. Takes a list of strings to join to
     make the path"""
-    file_path = os.path.join(here, *path)
+    file_path = os.path.join(here, *path_segments)
     with open(file_path) as f:
         return f.read()
 
 
-def exec_file(path):
+def exec_file(path_segments):
     """Execute a single python file to get the variables defined in it"""
     result = {}
-    code = read_file(path)
+    code = read_file(path_segments)
     exec(code, result)
     return result
 
