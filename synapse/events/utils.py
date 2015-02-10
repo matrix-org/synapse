@@ -45,12 +45,14 @@ def prune_event(event):
         "membership",
     ]
 
+    event_dict = event.get_dict()
+
     new_content = {}
 
     def add_fields(*fields):
         for field in fields:
             if field in event.content:
-                new_content[field] = event.content[field]
+                new_content[field] = event_dict["content"][field]
 
     if event_type == EventTypes.Member:
         add_fields("membership")
@@ -75,7 +77,7 @@ def prune_event(event):
 
     allowed_fields = {
         k: v
-        for k, v in event.get_dict().items()
+        for k, v in event_dict.items()
         if k in allowed_keys
     }
 
