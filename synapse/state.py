@@ -261,7 +261,7 @@ class StateHandler(object):
 
                 self._state_cache[frozenset(event_ids)] = cache
 
-                defer.returnValue((name, state, prev_states))
+            defer.returnValue((name, state, prev_states))
 
         state = {}
         for group, g_state in state_groups.items():
