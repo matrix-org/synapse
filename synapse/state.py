@@ -72,11 +72,7 @@ class StateHandler(object):
         self._state_cache = {}
 
         def f():
-            logger.debug("Pruning")
-            try:
-                self._prune_cache()
-            except:
-                logger.exception("Prune")
+            self._prune_cache()
 
         self.clock.looping_call(f, 5*1000)
 
@@ -400,7 +396,6 @@ class StateHandler(object):
         return sorted(events, key=key_func)
 
     def _prune_cache(self):
-        logger.debug("_prune_cache")
         logger.debug(
             "_prune_cache. before len: %d",
             len(self._state_cache.keys())
