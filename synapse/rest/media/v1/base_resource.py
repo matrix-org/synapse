@@ -82,7 +82,7 @@ class BaseMediaResource(Resource):
             raise SynapseError(
                 404,
                 "Invalid media id token %r" % (request.postpath,),
-                Codes.UNKKOWN,
+                Codes.UNKNOWN,
             )
 
     @staticmethod

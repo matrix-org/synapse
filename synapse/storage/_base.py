@@ -85,6 +85,52 @@ class SQLBaseStore(object):
         self._db_pool = hs.get_db_pool()
         self._clock = hs.get_clock()
 
+        self._previous_txn_total_time = 0
+        self._current_txn_total_time = 0
+        self._previous_loop_ts = 0
+        self._txn_perf_counters = {}
+        self._previous_txn_perf_counters = {}
+
+    def start_profiling(self):
+        self._previous_loop_ts = self._clock.time_msec()
+
+        def loop():
+            curr = self._current_txn_total_time
+            prev = self._previous_txn_total_time
+            self._previous_txn_total_time = curr
+
+            time_now = self._clock.time_msec()
+            time_then = self._previous_loop_ts
+            self._previous_loop_ts = time_now
+
+            ratio = (curr - prev)/(time_now - time_then)
+
+            txn_counters = []
+            for name, (count, cum_time) in self._txn_perf_counters.items():
+                prev_count, prev_time = self._previous_txn_perf_counters.get(
+                    name, (0,0)
+                )
+                txn_counters.append((
+                    (cum_time - prev_time) / (time_now - time_then),
+                    count - prev_count,
+                    name
+                ))
+
+            self._previous_txn_perf_counters = dict(self._txn_perf_counters)
+
+            txn_counters.sort(reverse=True)
+            top_three_counters = ", ".join(
+                "%s(%d): %.3f%%" % (name, count, 100 * ratio)
+                for ratio, count, name in txn_counters[:3]
+            )
+
+            logger.info(
+                "Total database time: %.3f%% {%s}",
+                ratio * 100, top_three_counters
+            )
+
+        self._clock.looping_call(loop, 10000)
+
     @defer.inlineCallbacks
     def runInteraction(self, desc, func, *args, **kwargs):
         """Wraps the .runInteraction() method on the underlying db_pool."""
@@ -94,7 +140,7 @@ class SQLBaseStore(object):
             with LoggingContext("runInteraction") as context:
                 current_context.copy_to(context)
                 start = time.time() * 1000
-                txn_id = SQLBaseStore._TXN_ID
+                txn_id = self._TXN_ID
 
                 # We don't really need these to be unique, so lets stop it from
                 # growing really large.
@@ -114,6 +160,14 @@ class SQLBaseStore(object):
                         "[TXN END] {%s} %f",
                         name, end - start
                     )
+
+                    self._current_txn_total_time += end - start
+
+                    count, cum_time = self._txn_perf_counters.get(desc, (0,0))
+                    count += 1
+                    cum_time += end - start
+                    self._txn_perf_counters[desc] = (count, cum_time)
+
         with PreserveLoggingContext():
             result = yield self._db_pool.runInteraction(
                 inner_func, *args, **kwargs

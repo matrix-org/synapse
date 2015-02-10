@@ -4,24 +4,24 @@ def list_with_base_rules(rawrules, user_name):
     ruleslist = []
 
     # shove the server default rules for each kind onto the end of each
-    current_prio_class = 1
+    current_prio_class = PRIORITY_CLASS_INVERSE_MAP.keys()[-1]
     for r in rawrules:
-        if r['priority_class'] > current_prio_class:
-            while current_prio_class < r['priority_class']:
+        if r['priority_class'] < current_prio_class:
+            while r['priority_class'] < current_prio_class:
                 ruleslist.extend(make_base_rules(
                         user_name,
                         PRIORITY_CLASS_INVERSE_MAP[current_prio_class])
                     )
-                current_prio_class += 1
+                current_prio_class -= 1
 
         ruleslist.append(r)
 
-    while current_prio_class <= PRIORITY_CLASS_INVERSE_MAP.keys()[-1]:
+    while current_prio_class > 0:
         ruleslist.extend(make_base_rules(
             user_name,
             PRIORITY_CLASS_INVERSE_MAP[current_prio_class])
         )
-        current_prio_class += 1
+        current_prio_class -= 1
 
     return ruleslist
 

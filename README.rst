@@ -96,6 +96,11 @@ Installing prerequisites on Ubuntu or Debian::
     $ sudo apt-get install build-essential python2.7-dev libffi-dev \
                            python-pip python-setuptools sqlite3 \
                            libssl-dev python-virtualenv libjpeg-dev
+                           
+Installing prerequisites on ArchLinux::
+
+    $ sudo pacman -S base-devel python2 python-pip \
+                     python-setuptools python-virtualenv sqlite3
 
 Installing prerequisites on Mac OS X::
 
@@ -147,6 +152,39 @@ failing, e.g.::
 
 On OSX, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
 will need to export CFLAGS=-Qunused-arguments.
+
+ArchLinux
+---------
+
+Installation on ArchLinux may encounter a few hiccups as Arch defaults to
+python 3, but synapse currently assumes python 2.7 by default.
+
+pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 )::
+
+    $ sudo pip2.7 install --upgrade pip
+    
+You also may need to explicitly specify python 2.7 again during the install
+request::
+
+    $ pip2.7 install --process-dependency-links \
+        https://github.com/matrix-org/synapse/tarball/master
+    
+If you encounter an error with lib bcrypt causing an Wrong ELF Class:
+ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
+compile it under the right architecture. (This should not be needed if
+installing under virtualenv)::
+
+    $ sudo pip2.7 uninstall py-bcrypt
+    $ sudo pip2.7 install py-bcrypt
+    
+During setup of homeserver you need to call python2.7 directly again::
+
+    $ python2.7 -m synapse.app.homeserver \
+      --server-name machine.my.domain.name \
+      --config-path homeserver.yaml \
+      --generate-config
+        
+...substituting your host and domain name as appropriate.
 
 Windows Install
 ---------------
@@ -207,6 +245,14 @@ fix try re-installing from PyPI or directly from
     $ # Install from github
     $ pip install --user https://github.com/pyca/pynacl/tarball/master
 
+ArchLinux
+---------
+
+If running `$ synctl start` fails wit 'returned non-zero exit status 1', you will need to explicitly call Python2.7 - either running as::
+
+    $ python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml --pid-file homeserver.pid
+    
+...or by editing synctl with the correct python executable.
 
 Homeserver Development
 ======================
