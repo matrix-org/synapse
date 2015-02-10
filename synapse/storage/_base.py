@@ -108,7 +108,7 @@ class PerformanceCounters(object):
 
         top_n_counters = ", ".join(
             "%s(%d): %.3f%%" % (name, count, 100 * ratio)
-            for ratio, count, name in txn_counters[:limit]
+            for ratio, count, name in counters[:limit]
         )
 
         return top_n_counters
@@ -151,8 +151,8 @@ class SQLBaseStore(object):
             )
 
             logger.info(
-                "Total database time: %.3f%% {%s}",
-                ratio * 100, top_three_counters
+                "Total database time: %.3f%% {%s} {%s}",
+                ratio * 100, top_three_counters, top_3_event_counters
             )
 
         self._clock.looping_call(loop, 10000)
