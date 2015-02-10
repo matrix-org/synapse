@@ -140,7 +140,7 @@ class Pusher(object):
                    lambda x: ('[%s%s]' % (x.group(1) and '^' or '',
                                           re.sub(r'\\\-', '-', x.group(2)))), r)
         return r
-    
+
     def _event_fulfills_condition(self, ev, condition, display_name, room_member_count):
         if condition['kind'] == 'event_match':
             if 'pattern' not in condition:
@@ -170,8 +170,10 @@ class Pusher(object):
                 return False
             if not display_name:
                 return False
-            return re.search("\b%s\b" % re.escape(display_name),
-                            ev['content']['body'], flags=re.IGNORECASE) is not None
+            return re.search(
+                "\b%s\b" % re.escape(display_name), ev['content']['body'],
+                flags=re.IGNORECASE
+            ) is not None
 
         elif condition['kind'] == 'room_member_count':
             if 'is' not in condition:

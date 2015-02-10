@@ -91,7 +91,9 @@ class PushRuleStore(SQLBaseStore):
         txn.execute(sql, (user_name, relative_to_rule))
         res = txn.fetchall()
         if not res:
-            raise RuleNotFoundException("before/after rule not found: %s" % (relative_to_rule))
+            raise RuleNotFoundException(
+                "before/after rule not found: %s" % (relative_to_rule,)
+            )
         priority_class, base_rule_priority = res[0]
 
         if 'priority_class' in kwargs and kwargs['priority_class'] != priority_class:

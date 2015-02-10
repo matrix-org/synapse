@@ -34,8 +34,8 @@ class PusherRestServlet(ClientV1RestServlet):
         pusher_pool = self.hs.get_pusherpool()
 
         if ('pushkey' in content and 'app_id' in content
-                    and 'kind' in content and
-                    content['kind'] is None):
+                and 'kind' in content and
+                content['kind'] is None):
             yield pusher_pool.remove_pusher(
                 content['app_id'], content['pushkey']
             )

@@ -157,14 +157,18 @@ class TransactionQueue(object):
             else:
                 logger.info("TX [%s] is ready for retry", destination)
 
-        logger.info("TX [%s] _attempt_new_transaction", destination)
-
         if destination in self.pending_transactions:
             # XXX: pending_transactions can get stuck on by a never-ending
             # request at which point pending_pdus_by_dest just keeps growing.
             # we need application-layer timeouts of some flavour of these
             # requests
+            logger.info(
+                "TX [%s] Transaction already in progress",
+                destination
+            )
             return
+
+        logger.info("TX [%s] _attempt_new_transaction", destination)
 
         # list of (pending_pdu, deferred, order)
         pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
@@ -176,6 +180,7 @@ class TransactionQueue(object):
                         destination, len(pending_pdus))
 
         if not pending_pdus and not pending_edus and not pending_failures:
+            logger.info("TX [%s] Nothing to send", destination)
             return
 
         logger.debug(

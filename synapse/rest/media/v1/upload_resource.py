@@ -38,9 +38,10 @@ class UploadResource(BaseMediaResource):
     def render_OPTIONS(self, request):
         respond_with_json(request, 200, {}, send_cors=True)
         return NOT_DONE_YET
-        
+
     @defer.inlineCallbacks
-    def create_content(self, media_type, upload_name, content, content_length, auth_user):
+    def create_content(self, media_type, upload_name, content, content_length,
+                       auth_user):
         media_id = random_string(24)
 
         fname = self.filepaths.local_media_filepath(media_id)
@@ -65,7 +66,7 @@ class UploadResource(BaseMediaResource):
         }
 
         yield self._generate_local_thumbnails(media_id, media_info)
-        
+
         defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
 
     @defer.inlineCallbacks
