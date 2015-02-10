@@ -75,7 +75,7 @@ class SynapseKeyClientProtocol(HTTPClient):
 
     def handleStatus(self, version, status, message):
         if status != b"200":
-            #logger.info("Non-200 response from %s: %s %s",
+            # logger.info("Non-200 response from %s: %s %s",
             #            self.transport.getHost(), status, message)
             self.transport.abortConnection()
 
@@ -83,7 +83,7 @@ class SynapseKeyClientProtocol(HTTPClient):
         try:
             json_response = json.loads(response_body_bytes)
         except ValueError:
-            #logger.info("Invalid JSON response from %s",
+            # logger.info("Invalid JSON response from %s",
             #            self.transport.getHost())
             self.transport.abortConnection()
             return

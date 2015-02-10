@@ -114,7 +114,7 @@ class SyncHandler(BaseHandler):
             if sync_config.gap:
                 return self.incremental_sync_with_gap(sync_config, since_token)
             else:
-                #TODO(mjark): Handle gapless sync
+                # TODO(mjark): Handle gapless sync
                 raise NotImplementedError()
 
     @defer.inlineCallbacks

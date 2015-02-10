@@ -96,8 +96,8 @@ class UploadResource(BaseMediaResource):
                     code=400,
                 )
 
-            #if headers.hasHeader("Content-Disposition"):
-            #    disposition = headers.getRawHeaders("Content-Disposition")[0]
+            # if headers.hasHeader("Content-Disposition"):
+            #     disposition = headers.getRawHeaders("Content-Disposition")[0]
             # TODO(markjh): parse content-dispostion
 
             content_uri = yield self.create_content(
