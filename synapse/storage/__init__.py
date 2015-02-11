@@ -44,7 +44,6 @@ from syutil.jsonutil import encode_canonical_json
 from synapse.crypto.event_signing import compute_event_reference_hash
 
 
-import simplejson as json
 import logging
 import os
 

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.frozenutils import freeze, unfreeze
+from synapse.util.frozenutils import freeze
 
 
 class _EventInternalMetadata(object):
