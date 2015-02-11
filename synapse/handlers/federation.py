@@ -23,6 +23,7 @@ from synapse.api.errors import (
 from synapse.api.constants import EventTypes, Membership, RejectedReason
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
+from synapse.util.frozenutils import unfreeze
 from synapse.crypto.event_signing import (
     compute_event_signature, add_hashes_and_signatures,
 )
@@ -311,8 +312,11 @@ class FederationHandler(BaseHandler):
         self.room_queues[room_id] = []
 
         builder = self.event_builder_factory.new(
-            event.get_pdu_json()
+            unfreeze(event.get_pdu_json())
         )
+
+        logger.info("Builder: %s", builder.get_pdu_json())
+        logger.info("Content: %s", content)
 
         handled_events = set()
 
@@ -324,13 +328,20 @@ class FederationHandler(BaseHandler):
             if not hasattr(event, "signatures"):
                 builder.signatures = {}
 
+            logger.info("Content befhahs: %s", builder.content)
+
             add_hashes_and_signatures(
                 builder,
                 self.hs.hostname,
                 self.hs.config.signing_key[0],
             )
 
+            logger.info("Content aftet hah: %s", builder.content)
+            logger.info("Content pdu json: %s", builder.get_pdu_json())
+
             new_event = builder.build()
+
+            logger.info("Content after build: %s", new_event.content)
 
             # Try the host we successfully got a response to /make_join/
             # request first.
@@ -340,6 +351,7 @@ class FederationHandler(BaseHandler):
             except ValueError:
                 pass
 
+            logger.info(new_event.content)
             ret = yield self.replication_layer.send_join(
                 target_hosts,
                 new_event
@@ -485,6 +497,7 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
+        logger.info(event.content)
         context = yield self._handle_new_event(origin, event)
 
         logger.debug(

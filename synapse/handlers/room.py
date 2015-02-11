@@ -403,7 +403,9 @@ class RoomMemberHandler(BaseHandler):
             "membership": Membership.JOIN,
             "content": content,
         })
+        logger.info("Before build: %s", builder.get_pdu_json())
         event, context = yield self._create_new_client_event(builder)
+        logger.info("After build: %s", event.get_dict())
 
         yield self._do_join(event, context, room_hosts=hosts, do_auth=True)
 
@@ -462,7 +464,7 @@ class RoomMemberHandler(BaseHandler):
                 room_hosts,
                 room_id,
                 event.user_id,
-                event.get_dict()["content"],  # FIXME To get a non-frozen dict
+                event.content,  # FIXME To get a non-frozen dict
                 context
             )
         else:

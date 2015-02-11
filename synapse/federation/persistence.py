@@ -23,7 +23,8 @@ from twisted.internet import defer
 
 from synapse.util.logutils import log_function
 
-import simplejson as json
+from syutil.jsonutil import encode_canonical_json
+
 import logging
 
 
@@ -70,7 +71,7 @@ class TransactionActions(object):
             transaction.transaction_id,
             transaction.origin,
             code,
-            json.dumps(response)
+            encode_canonical_json(response)
         )
 
     @defer.inlineCallbacks
@@ -100,5 +101,5 @@ class TransactionActions(object):
             transaction.transaction_id,
             transaction.destination,
             response_code,
-            json.dumps(response_dict)
+            encode_canonical_json(response_dict)
         )

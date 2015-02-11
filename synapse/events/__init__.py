@@ -140,10 +140,6 @@ class FrozenEvent(EventBase):
 
         return e
 
-    def get_dict(self):
-        # We need to unfreeze what we return
-        return unfreeze(super(FrozenEvent, self).get_dict())
-
     def __str__(self):
         return self.__repr__()
 
