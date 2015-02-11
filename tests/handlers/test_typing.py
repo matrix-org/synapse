@@ -27,6 +27,7 @@ from synapse.server import HomeServer
 from synapse.handlers.typing import TypingNotificationHandler
 
 from synapse.storage.transactions import DestinationsTable
+from synapse.types import UserID
 
 
 def _expect_edu(destination, edu_type, content, origin="test"):
@@ -153,11 +154,11 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.auth.check_joined_room = check_joined_room
 
         # Some local users to test with
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
+        self.u_apple = UserID.from_string("@apple:test")
+        self.u_banana = UserID.from_string("@banana:test")
 
         # Remote user
-        self.u_onion = hs.parse_userid("@onion:farm")
+        self.u_onion = UserID.from_string("@onion:farm")
 
     @defer.inlineCallbacks
     def test_started_typing_local(self):
@@ -349,6 +350,32 @@ class TypingNotificationsTestCase(unittest.TestCase):
                  "room_id": self.room_id,
                  "content": {
                      "user_ids": [],
+                }},
+            ]
+        )
+
+        # SYN-230 - see if we can still set after timeout
+
+        yield self.handler.started_typing(
+            target_user=self.u_apple,
+            auth_user=self.u_apple,
+            room_id=self.room_id,
+            timeout=10000,
+        )
+
+        self.on_new_user_event.assert_has_calls([
+            call(rooms=[self.room_id]),
+        ])
+        self.on_new_user_event.reset_mock()
+
+        self.assertEquals(self.event_source.get_current_key(), 3)
+        self.assertEquals(
+            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            [
+                {"type": "m.typing",
+                 "room_id": self.room_id,
+                 "content": {
+                     "user_ids": [self.u_apple.to_string()],
                 }},
             ]
         )

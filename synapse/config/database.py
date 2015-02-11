@@ -20,7 +20,10 @@ import os
 class DatabaseConfig(Config):
     def __init__(self, args):
         super(DatabaseConfig, self).__init__(args)
-        self.database_path = self.abspath(args.database_path)
+        if args.database_path == ":memory:":
+            self.database_path = ":memory:"
+        else:
+            self.database_path = self.abspath(args.database_path)
 
     @classmethod
     def add_arguments(cls, parser):

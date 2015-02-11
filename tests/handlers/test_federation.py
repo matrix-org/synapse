@@ -52,6 +52,7 @@ class FederationTestCase(unittest.TestCase):
                 "get_room",
                 "get_destination_retry_timings",
                 "set_destination_retry_timings",
+                "have_events",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
@@ -90,6 +91,10 @@ class FederationTestCase(unittest.TestCase):
         self.datastore.persist_event.return_value = defer.succeed(None)
         self.datastore.get_room.return_value = defer.succeed(True)
         self.auth.check_host_in_room.return_value = defer.succeed(True)
+
+        def have_events(event_ids):
+            return defer.succeed({})
+        self.datastore.have_events.side_effect = have_events
 
         def annotate(ev, old_state=None):
             context = Mock()
