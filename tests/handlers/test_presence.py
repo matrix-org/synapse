@@ -21,11 +21,9 @@ from mock import Mock, call, ANY, NonCallableMock
 import json
 
 from tests.utils import (
-    MockHttpResource, MockClock, DeferredMockCallable, SQLiteMemoryDbPool,
-    MockKey
+    MockHttpResource, MockClock, DeferredMockCallable, setup_test_homeserver
 )
 
-from synapse.server import HomeServer
 from synapse.api.constants import PresenceState
 from synapse.api.errors import SynapseError
 from synapse.handlers.presence import PresenceHandler, UserPresenceCache
@@ -66,30 +64,20 @@ class PresenceTestCase(unittest.TestCase):
     def setUp(self):
         self.clock = MockClock()
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
         self.mock_federation_resource = MockHttpResource()
 
         self.mock_http_client = Mock(spec=[])
         self.mock_http_client.put_json = DeferredMockCallable()
 
-        db_pool = None
         hs_kwargs = {}
-
         if hasattr(self, "make_datastore_mock"):
             hs_kwargs["datastore"] = self.make_datastore_mock()
-        else:
-            db_pool = SQLiteMemoryDbPool()
-            yield db_pool.prepare()
 
-        hs = HomeServer("test",
+        hs = yield setup_test_homeserver(
             clock=self.clock,
-            db_pool=db_pool,
             handlers=None,
             resource_for_federation=self.mock_federation_resource,
             http_client=self.mock_http_client,
-            config=self.mock_config,
             keyring=Mock(),
             **hs_kwargs
         )

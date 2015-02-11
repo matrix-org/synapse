@@ -19,10 +19,9 @@
 from twisted.internet import defer
 
 import synapse.rest.client.v1.room
-from synapse.server import HomeServer
 from synapse.types import UserID
 
-from ....utils import MockHttpResource, MockClock, SQLiteMemoryDbPool, MockKey
+from ....utils import MockHttpResource, MockClock, setup_test_homeserver
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
@@ -42,22 +41,14 @@ class RoomTypingTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             "red",
             clock=self.clock,
-            db_pool=db_pool,
             http_client=None,
             replication_layer=Mock(),
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=self.mock_config,
         )
         self.hs = hs
 

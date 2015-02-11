@@ -21,13 +21,12 @@ from twisted.internet import defer
 import synapse.rest.client.v1.room
 from synapse.api.constants import Membership
 
-from synapse.server import HomeServer
 from synapse.types import UserID
 
 import json
 import urllib
 
-from ....utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
+from ....utils import MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
@@ -44,21 +43,11 @@ class RoomPermissionsTestCase(RestTestCase):
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             "red",
-            db_pool=db_pool,
             http_client=None,
             replication_layer=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
-            config=self.mock_config,
+            ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -439,21 +428,11 @@ class RoomsMemberListTestCase(RestTestCase):
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             "red",
-            db_pool=db_pool,
             http_client=None,
             replication_layer=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
-            config=self.mock_config,
+            ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -531,21 +510,11 @@ class RoomsCreateTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             "red",
-            db_pool=db_pool,
             http_client=None,
             replication_layer=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
-            config=self.mock_config,
+            ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -634,21 +603,11 @@ class RoomTopicTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             "red",
-            db_pool=db_pool,
             http_client=None,
             replication_layer=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
-            config=self.mock_config,
+            ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -751,21 +710,11 @@ class RoomMemberStateTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             "red",
-            db_pool=db_pool,
             http_client=None,
             replication_layer=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
-            config=self.mock_config,
+            ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -888,21 +837,11 @@ class RoomMessagesTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             "red",
-            db_pool=db_pool,
             http_client=None,
             replication_layer=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
-            config=self.mock_config,
+            ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -993,21 +932,13 @@ class RoomInitialSyncTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.auth_user_id = self.user_id
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             "red",
-            db_pool=db_pool,
             http_client=None,
             replication_layer=Mock(),
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)

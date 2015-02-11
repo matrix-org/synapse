@@ -20,10 +20,11 @@ from twisted.internet import defer
 from mock import Mock, call, ANY
 import json
 
-from ..utils import MockHttpResource, MockClock, DeferredMockCallable, MockKey
+from ..utils import (
+    MockHttpResource, MockClock, DeferredMockCallable, setup_test_homeserver
+)
 
 from synapse.api.errors import AuthError
-from synapse.server import HomeServer
 from synapse.handlers.typing import TypingNotificationHandler
 
 from synapse.storage.transactions import DestinationsTable
@@ -56,6 +57,7 @@ class JustTypingNotificationHandlers(object):
 
 class TypingNotificationsTestCase(unittest.TestCase):
     """Tests typing notifications to rooms."""
+    @defer.inlineCallbacks
     def setUp(self):
         self.clock = MockClock()
 
@@ -64,34 +66,29 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.mock_federation_resource = MockHttpResource()
 
-        self.mock_config = Mock()
-        self.mock_config.signing_key = [MockKey()]
-
         mock_notifier = Mock(spec=["on_new_user_event"])
         self.on_new_user_event = mock_notifier.on_new_user_event
 
         self.auth = Mock(spec=[])
 
-        hs = HomeServer("test",
-                auth=self.auth,
-                clock=self.clock,
-                db_pool=None,
-                datastore=Mock(spec=[
-                    # Bits that Federation needs
-                    "prep_send_transaction",
-                    "delivered_txn",
-                    "get_received_txn_response",
-                    "set_received_txn_response",
-                    "get_destination_retry_timings",
-                ]),
-                handlers=None,
-                notifier=mock_notifier,
-                resource_for_client=Mock(),
-                resource_for_federation=self.mock_federation_resource,
-                http_client=self.mock_http_client,
-                config=self.mock_config,
-                keyring=Mock(),
-            )
+        hs = yield setup_test_homeserver(
+            auth=self.auth,
+            clock=self.clock,
+            datastore=Mock(spec=[
+                # Bits that Federation needs
+                "prep_send_transaction",
+                "delivered_txn",
+                "get_received_txn_response",
+                "set_received_txn_response",
+                "get_destination_retry_timings",
+            ]),
+            handlers=None,
+            notifier=mock_notifier,
+            resource_for_client=Mock(),
+            resource_for_federation=self.mock_federation_resource,
+            http_client=self.mock_http_client,
+            keyring=Mock(),
+        )
         hs.handlers = JustTypingNotificationHandlers(hs)
 
         self.handler = hs.get_handlers().typing_notification_handler

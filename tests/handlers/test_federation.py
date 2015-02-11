@@ -19,19 +19,16 @@ from tests import unittest
 from synapse.api.constants import EventTypes
 from synapse.events import FrozenEvent
 from synapse.handlers.federation import FederationHandler
-from synapse.server import HomeServer
 
 from mock import NonCallableMock, ANY, Mock
 
-from ..utils import MockKey
+from ..utils import setup_test_homeserver
 
 
 class FederationTestCase(unittest.TestCase):
 
+    @defer.inlineCallbacks
     def setUp(self):
-
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
 
         self.state_handler = NonCallableMock(spec_set=[
             "compute_event_context",
@@ -43,9 +40,8 @@ class FederationTestCase(unittest.TestCase):
         ])
 
         self.hostname = "test"
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             self.hostname,
-            db_pool=None,
             datastore=NonCallableMock(spec_set=[
                 "persist_event",
                 "store_room",
@@ -61,7 +57,6 @@ class FederationTestCase(unittest.TestCase):
                 "room_member_handler",
                 "federation_handler",
             ]),
-            config=self.mock_config,
             auth=self.auth,
             state_handler=self.state_handler,
             keyring=Mock(),
