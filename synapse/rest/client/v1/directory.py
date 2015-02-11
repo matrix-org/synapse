@@ -20,7 +20,7 @@ from synapse.api.errors import AuthError, SynapseError, Codes
 from synapse.types import RoomAlias
 from .base import ClientV1RestServlet, client_path_pattern
 
-import json
+import simplejson as json
 import logging
 
 

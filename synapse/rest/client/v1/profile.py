@@ -19,7 +19,7 @@ from twisted.internet import defer
 from .base import ClientV1RestServlet, client_path_pattern
 from synapse.types import UserID
 
-import json
+import simplejson as json
 
 
 class ProfileDisplaynameRestServlet(ClientV1RestServlet):

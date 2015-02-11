@@ -25,7 +25,7 @@ from twisted.web import server, resource
 from twisted.internet import defer
 
 import base64
-import json
+import simplejson as json
 import logging
 import os
 import re

@@ -19,7 +19,7 @@ from synapse.api.errors import SynapseError, Codes
 from synapse.push import PusherConfigException
 from .base import ClientV1RestServlet, client_path_pattern
 
-import json
+import simplejson as json
 
 
 class PusherRestServlet(ClientV1RestServlet):

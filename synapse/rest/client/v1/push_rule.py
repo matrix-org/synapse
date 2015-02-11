@@ -27,7 +27,7 @@ from synapse.push.rulekinds import (
     PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 )
 
-import json
+import simplejson as json
 
 
 class PushRuleRestServlet(ClientV1RestServlet):

@@ -22,7 +22,7 @@ import synapse.util.async
 import baserules
 
 import logging
-import json
+import simplejson as json
 import re
 
 logger = logging.getLogger(__name__)

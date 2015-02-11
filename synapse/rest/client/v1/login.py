@@ -19,7 +19,7 @@ from synapse.api.errors import SynapseError
 from synapse.types import UserID
 from base import ClientV1RestServlet, client_path_pattern
 
-import json
+import simplejson as json
 
 
 class LoginRestServlet(ClientV1RestServlet):

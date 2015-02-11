@@ -23,7 +23,7 @@ from twisted.internet import defer
 
 from synapse.util.logutils import log_function
 
-import json
+import simplejson as json
 import logging
 
 

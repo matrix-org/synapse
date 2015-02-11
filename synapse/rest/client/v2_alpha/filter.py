@@ -21,7 +21,7 @@ from synapse.types import UserID
 
 from ._base import client_v2_pattern
 
-import json
+import simplejson as json
 import logging
 
 
