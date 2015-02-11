@@ -15,7 +15,7 @@
 
 from synapse.util.logcontext import LoggingContext
 
-from twisted.internet import reactor
+from twisted.internet import defer, reactor
 
 import time
 
@@ -45,3 +45,22 @@ class Clock(object):
 
     def cancel_call_later(self, timer):
         timer.cancel()
+
+    def time_bound_deferred(self, given_deferred, time_out):
+        ret_deferred = defer.Deferred()
+
+        def timed_out():
+            if not given_deferred.called:
+                given_deferred.cancel()
+                ret_deferred.errback(RuntimeError("Timed out"))
+
+        timer = self.call_later(time_out, timed_out)
+
+        def succeed(result):
+            self.cancel_call_later(timer)
+            ret_deferred.callback(result)
+
+        given_deferred.addCallback(succeed)
+        given_deferred.addErrback(ret_deferred.errback)
+
+        return ret_deferred

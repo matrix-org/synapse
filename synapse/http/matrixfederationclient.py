@@ -22,7 +22,7 @@ from twisted.web._newclient import ResponseDone
 
 from synapse.http.agent_name import AGENT_NAME
 from synapse.http.endpoint import matrix_federation_endpoint
-from synapse.util.async import sleep, time_bound_deferred
+from synapse.util.async import sleep
 from synapse.util.logcontext import PreserveLoggingContext
 
 from syutil.jsonutil import encode_canonical_json
@@ -129,9 +129,8 @@ class MatrixFederationHttpClient(object):
                         producer
                     )
 
-                    response = yield time_bound_deferred(
+                    response = yield self.clock.time_bound_deferred(
                         request_deferred,
-                        clock=self.clock,
                         time_out=60,
                     )
 
