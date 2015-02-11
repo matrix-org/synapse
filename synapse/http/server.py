@@ -113,6 +113,7 @@ class JsonResource(HttpServer, resource.Resource):
             path.
         """
         code = None
+        start = self.clock.time_msec()
         try:
             # Just say yes to OPTIONS.
             if request.method == "OPTIONS":
@@ -136,8 +137,6 @@ class JsonResource(HttpServer, resource.Resource):
                         "Received request: %s %s",
                         request.method, request.path
                     )
-
-                    start = self.clock.time_msec()
 
                     code, response = yield path_entry.callback(
                         request,
