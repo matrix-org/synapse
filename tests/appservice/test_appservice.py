@@ -143,3 +143,28 @@ class ApplicationServiceTestCase(unittest.TestCase):
             restrict_to=ApplicationService.NS_USERS,
             aliases_for_event=["#xmpp_barfoo:matrix.org"]
         ))
+
+    def test_member_list_match(self):
+        self.service.namespaces[ApplicationService.NS_USERS].append(
+            "@irc_.*"
+        )
+        join_list = [
+            Mock(
+                type="m.room.member", room_id="!foo:bar", sender="@alice:here",
+                state_key="@alice:here"
+            ),
+            Mock(
+                type="m.room.member", room_id="!foo:bar", sender="@irc_fo:here",
+                state_key="@irc_fo:here"  # AS user
+            ),
+            Mock(
+                type="m.room.member", room_id="!foo:bar", sender="@bob:here",
+                state_key="@bob:here"
+            )
+        ]
+
+        self.event.sender = "@xmpp_foobar:matrix.org"
+        self.assertTrue(self.service.is_interested(
+            event=self.event,
+            member_list=join_list
+        ))

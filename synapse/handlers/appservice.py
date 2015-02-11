@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.types import UserID
@@ -154,14 +154,25 @@ class ApplicationServicesHandler(object):
             list<ApplicationService>: A list of services interested in this
             event based on the service regex.
         """
-        # We need to know the aliases associated with this event.room_id, if any
-        if not alias_list:
-            alias_list = yield self.store.get_aliases_for_room(event.room_id)
+        member_list = None
+        if hasattr(event, "room_id"):
+            # We need to know the aliases associated with this event.room_id,
+            # if any.
+            if not alias_list:
+                alias_list = yield self.store.get_aliases_for_room(
+                    event.room_id
+                )
+            # We need to know the members associated with this event.room_id,
+            # if any.
+            member_list = yield self.store.get_room_members(
+                room_id=event.room_id,
+                membership=Membership.JOIN
+            )
 
         services = yield self.store.get_app_services()
         interested_list = [
             s for s in services if (
-                s.is_interested(event, restrict_to, alias_list)
+                s.is_interested(event, restrict_to, alias_list, member_list)
             )
         ]
         defer.returnValue(interested_list)

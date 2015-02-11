@@ -74,7 +74,7 @@ class ApplicationService(object):
                 return True
         return False
 
-    def _matches_user(self, event):
+    def _matches_user(self, event, member_list):
         if (hasattr(event, "sender") and
                 self.is_interested_in_user(event.sender)):
             return True
@@ -83,6 +83,10 @@ class ApplicationService(object):
                 and hasattr(event, "state_key")
                 and self.is_interested_in_user(event.state_key)):
             return True
+        # check joined member events
+        for member in member_list:
+            if self.is_interested_in_user(member.state_key):
+                return True
         return False
 
     def _matches_room_id(self, event):
@@ -96,7 +100,8 @@ class ApplicationService(object):
                 return True
         return False
 
-    def is_interested(self, event, restrict_to=None, aliases_for_event=None):
+    def is_interested(self, event, restrict_to=None, aliases_for_event=None,
+                      member_list=None):
         """Check if this service is interested in this event.
 
         Args:
@@ -104,18 +109,22 @@ class ApplicationService(object):
             restrict_to(str): The namespace to restrict regex tests to.
             aliases_for_event(list): A list of all the known room aliases for
             this event.
+            member_list(list): A list of all joined room members in this room.
         Returns:
             bool: True if this service would like to know about this event.
         """
         if aliases_for_event is None:
             aliases_for_event = []
+        if member_list is None:
+            member_list = []
+
         if restrict_to and restrict_to not in ApplicationService.NS_LIST:
             # this is a programming error, so fail early and raise a general
             # exception
             raise Exception("Unexpected restrict_to value: %s". restrict_to)
 
         if not restrict_to:
-            return (self._matches_user(event)
+            return (self._matches_user(event, member_list)
                     or self._matches_aliases(event, aliases_for_event)
                     or self._matches_room_id(event))
         elif restrict_to == ApplicationService.NS_ALIASES:
@@ -123,7 +132,7 @@ class ApplicationService(object):
         elif restrict_to == ApplicationService.NS_ROOMS:
             return self._matches_room_id(event)
         elif restrict_to == ApplicationService.NS_USERS:
-            return self._matches_user(event)
+            return self._matches_user(event, member_list)
 
     def is_interested_in_user(self, user_id):
         return self._matches_regex(user_id, ApplicationService.NS_USERS)

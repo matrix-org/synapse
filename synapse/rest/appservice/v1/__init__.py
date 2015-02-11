@@ -21,7 +21,7 @@ class AppServiceRestResource(JsonResource):
     """A resource for version 1 of the matrix application service API."""
 
     def __init__(self, hs):
-        JsonResource.__init__(self)
+        JsonResource.__init__(self, hs)
         self.register_servlets(self, hs)
 
     @staticmethod
