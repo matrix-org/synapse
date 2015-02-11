@@ -264,6 +264,9 @@ class RoomMemberStore(SQLBaseStore):
             user_id, membership_list=[Membership.JOIN],
         )
 
+        # TODO(paul): Consider applying a maximum size; just evict things at
+        #   random, or consider LRU?
+
         self._user_rooms_cache[user_id] = rooms
         defer.returnValue(rooms)
 
