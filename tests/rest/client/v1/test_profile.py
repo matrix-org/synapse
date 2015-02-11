@@ -20,10 +20,9 @@ from twisted.internet import defer
 
 from mock import Mock, NonCallableMock
 
-from ....utils import MockHttpResource, MockKey
+from ....utils import MockHttpResource, setup_test_homeserver
 
 from synapse.api.errors import SynapseError, AuthError
-from synapse.server import HomeServer
 from synapse.types import UserID
 
 from synapse.rest.client.v1 import profile
@@ -35,6 +34,7 @@ PATH_PREFIX = "/_matrix/client/api/v1"
 class ProfileTestCase(unittest.TestCase):
     """ Tests profile management. """
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
         self.mock_handler = Mock(spec=[
@@ -44,17 +44,12 @@ class ProfileTestCase(unittest.TestCase):
             "set_avatar_url",
         ])
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer("test",
-            db_pool=None,
+        hs = yield setup_test_homeserver(
+            "test",
             http_client=None,
             resource_for_client=self.mock_resource,
             federation=Mock(),
             replication_layer=Mock(),
-            datastore=None,
-            config=self.mock_config,
         )
 
         def _get_user_by_req(request=None):

@@ -23,9 +23,8 @@ import synapse.rest.client.v1.events
 import synapse.rest.client.v1.register
 import synapse.rest.client.v1.room
 
-from synapse.server import HomeServer
 
-from ....utils import MockHttpResource, SQLiteMemoryDbPool, MockKey
+from ....utils import MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase
 
 from mock import Mock, NonCallableMock
@@ -113,15 +112,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer(
-            "test",
-            db_pool=db_pool,
+        hs = yield setup_test_homeserver(
             http_client=None,
             replication_layer=Mock(),
             clock=Mock(spec=[
@@ -133,7 +124,6 @@ class EventStreamPermissionsTestCase(RestTestCase):
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=self.mock_config,
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)

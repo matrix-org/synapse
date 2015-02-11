@@ -17,6 +17,7 @@ from synapse.http.server import HttpServer
 from synapse.api.errors import cs_error, CodeMessageException, StoreError
 from synapse.api.constants import EventTypes
 from synapse.storage import prepare_database
+from synapse.server import HomeServer
 
 from synapse.util.logcontext import LoggingContext
 
@@ -29,6 +30,29 @@ import urllib
 import urlparse
 
 from inspect import getcallargs
+
+
+@defer.inlineCallbacks
+def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
+    """Setup a homeserver suitable for running tests against. Keyword arguments
+    are passed to the Homeserver constructor. If no datastore is supplied a
+    datastore backed by an in-memory sqlite db will be given to the HS.
+    """
+    if config is None:
+        config = Mock()
+        config.signing_key = [MockKey()]
+        config.event_cache_size = 1
+
+    if datastore is None:
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+        hs = HomeServer(name, db_pool=db_pool, config=config, **kargs)
+    else:
+        hs = HomeServer(
+            name, db_pool=None, datastore=datastore, config=config, **kargs
+        )
+
+    defer.returnValue(hs)
 
 
 def get_mock_call_args(pattern_func, mock_func):

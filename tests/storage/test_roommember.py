@@ -17,11 +17,10 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.server import HomeServer
 from synapse.api.constants import EventTypes, Membership
 from synapse.types import UserID, RoomID
 
-from tests.utils import SQLiteMemoryDbPool, MockKey
+from tests.utils import setup_test_homeserver
 
 from mock import Mock
 
@@ -30,16 +29,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        self.mock_config = Mock()
-        self.mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer(
-            "test",
-            db_pool=db_pool,
-            config=self.mock_config,
+        hs = yield setup_test_homeserver(
             resource_for_federation=Mock(),
             http_client=None,
         )
