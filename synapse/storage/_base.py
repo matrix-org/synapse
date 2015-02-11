@@ -595,7 +595,6 @@ class SQLBaseStore(object):
         finally:
             start_time = update_counter("event_cache", start_time)
 
-
         sql = (
             "SELECT e.internal_metadata, e.json, r.event_id, rej.reason "
             "FROM event_json as e "
@@ -604,7 +603,6 @@ class SQLBaseStore(object):
             "WHERE e.event_id = ? "
             "LIMIT 1 "
         )
-
 
         txn.execute(sql, (event_id,))
 
