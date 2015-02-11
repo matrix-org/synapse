@@ -97,7 +97,6 @@ class ApplicationServiceStore(SQLBaseStore):
         # allocate new ASes. It relies on the server admin inserting the AS
         # token into the database manually.
 
-
         if not service.token or not service.url:
             raise StoreError(400, "Token and url must be specified.")
 
@@ -186,7 +185,6 @@ class ApplicationServiceStore(SQLBaseStore):
         # TODO: The from_cache=False impl
         # TODO: This should be JOINed with the application_services_regex table.
 
-
     @defer.inlineCallbacks
     def _populate_cache(self):
         """Populates the ApplicationServiceCache from the database."""
@@ -244,4 +242,3 @@ class ApplicationServiceStore(SQLBaseStore):
                 hs_token=service["hs_token"],
                 sender=service["sender"]
             ))
-

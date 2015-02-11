@@ -58,7 +58,6 @@ class DirectoryHandler(BaseHandler):
             servers
         )
 
-
     @defer.inlineCallbacks
     def create_association(self, user_id, room_alias, room_id, servers=None):
         # association creation for human users
@@ -74,7 +73,6 @@ class DirectoryHandler(BaseHandler):
                 errcode=Codes.EXCLUSIVE
             )
         yield self._create_association(room_alias, room_id, servers)
-
 
     @defer.inlineCallbacks
     def create_appservice_association(self, service, room_alias, room_id,
@@ -126,7 +124,6 @@ class DirectoryHandler(BaseHandler):
         # TODO - Looks like _update_room_alias_event has never been implemented
         # if room_id:
         #    yield self._update_room_alias_events(user_id, room_id)
-
 
     @defer.inlineCallbacks
     def get_association(self, room_alias):

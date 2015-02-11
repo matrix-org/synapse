@@ -65,7 +65,7 @@ class RegisterRestServlet(AppServiceRestServlet):
         hs_token = app_service.hs_token
 
         defer.returnValue((200, {
-          "hs_token": hs_token
+            "hs_token": hs_token
         }))
 
     def _parse_namespace(self, target_ns, origin_ns, ns):

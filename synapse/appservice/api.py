@@ -71,7 +71,6 @@ class ApplicationServiceApi(SimpleHttpClient):
             logger.warning("query_alias to %s threw exception %s", uri, ex)
         defer.returnValue(False)
 
-
     @defer.inlineCallbacks
     def push_bulk(self, service, events):
         events = self._serialize(events)
@@ -107,4 +106,3 @@ class ApplicationServiceApi(SimpleHttpClient):
         return [
             serialize_event(e, time_now, as_client_event=True) for e in events
         ]
-
