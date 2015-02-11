@@ -72,5 +72,7 @@ class ReplicationLayer(FederationClient, FederationServer):
 
         self._order = 0
 
+        self.hs = hs
+
     def __str__(self):
         return "<ReplicationLayer(%s)>" % self.server_name

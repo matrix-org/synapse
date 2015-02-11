@@ -79,6 +79,7 @@ class MatrixFederationHttpClient(object):
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
         self.agent = MatrixFederationHttpAgent(reactor)
+        self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
     def _create_request(self, destination, method, path_bytes,
@@ -118,7 +119,7 @@ class MatrixFederationHttpClient(object):
 
             try:
                 with PreserveLoggingContext():
-                    response = yield self.agent.request(
+                    request_deferred = self.agent.request(
                         destination,
                         endpoint,
                         method,
@@ -127,6 +128,11 @@ class MatrixFederationHttpClient(object):
                         query_bytes,
                         Headers(headers_dict),
                         producer
+                    )
+
+                    response = yield self.clock.time_bound_deferred(
+                        request_deferred,
+                        time_out=60,
                     )
 
                 logger.debug("Got response to %s", method)
