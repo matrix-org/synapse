@@ -15,6 +15,8 @@
 
 
 from synapse.http.agent_name import AGENT_NAME
+from syutil.jsonutil import encode_canonical_json
+
 from twisted.internet import defer, reactor
 from twisted.web.client import (
     Agent, readBody, FileBodyProducer, PartialDownloadError
@@ -64,7 +66,7 @@ class SimpleHttpClient(object):
 
     @defer.inlineCallbacks
     def post_json_get_json(self, uri, post_json):
-        json_str = json.dumps(post_json)
+        json_str = encode_canonical_json(post_json)
 
         logger.info("HTTP POST %s -> %s", json_str, uri)
 
