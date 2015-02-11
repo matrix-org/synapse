@@ -19,7 +19,7 @@ from twisted.internet.protocol import Factory
 from twisted.internet import defer, reactor
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util.logcontext import PreserveLoggingContext
-import json
+import simplejson as json
 import logging
 
 

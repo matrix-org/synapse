@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from ._base import SQLBaseStore
 
-import json
+import simplejson as json
 
 
 class FilteringStore(SQLBaseStore):

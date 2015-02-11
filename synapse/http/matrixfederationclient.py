@@ -33,7 +33,7 @@ from synapse.api.errors import (
 
 from syutil.crypto.jsonsign import sign_json
 
-import json
+import simplejson as json
 import logging
 import urllib
 import urlparse

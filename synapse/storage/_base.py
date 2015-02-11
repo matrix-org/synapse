@@ -24,7 +24,7 @@ from synapse.util.lrucache import LruCache
 from twisted.internet import defer
 
 import collections
-import json
+import simplejson as json
 import sys
 import time
 

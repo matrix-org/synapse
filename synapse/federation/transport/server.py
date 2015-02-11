@@ -20,7 +20,7 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.util.logutils import log_function
 
 import logging
-import json
+import simplejson as json
 import re
 
 

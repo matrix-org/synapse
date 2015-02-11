@@ -20,7 +20,7 @@ from httppusher import HttpPusher
 from synapse.push import PusherConfigException
 
 import logging
-import json
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 

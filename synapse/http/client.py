@@ -23,7 +23,7 @@ from twisted.web.http_headers import Headers
 
 from StringIO import StringIO
 
-import json
+import simplejson as json
 import logging
 import urllib
 

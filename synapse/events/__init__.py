@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.frozenutils import freeze, unfreeze
+from synapse.util.frozenutils import freeze
 
 
 class _EventInternalMetadata(object):
@@ -139,10 +139,6 @@ class FrozenEvent(EventBase):
         e.internal_metadata = event.internal_metadata
 
         return e
-
-    def get_dict(self):
-        # We need to unfreeze what we return
-        return unfreeze(super(FrozenEvent, self).get_dict())
 
     def __str__(self):
         return self.__repr__()

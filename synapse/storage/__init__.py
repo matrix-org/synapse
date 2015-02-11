@@ -44,7 +44,6 @@ from syutil.jsonutil import encode_canonical_json
 from synapse.crypto.event_signing import compute_event_reference_hash
 
 
-import json
 import logging
 import os
 
@@ -301,12 +300,16 @@ class DataStore(RoomMemberStore, RoomStore,
             or_replace=True,
         )
 
+        content = encode_canonical_json(
+            event.content
+        ).decode("UTF-8")
+
         vals = {
             "topological_ordering": event.depth,
             "event_id": event.event_id,
             "type": event.type,
             "room_id": event.room_id,
-            "content": json.dumps(event.get_dict()["content"]),
+            "content": content,
             "processed": True,
             "outlier": outlier,
             "depth": event.depth,
@@ -326,7 +329,10 @@ class DataStore(RoomMemberStore, RoomStore,
                 "prev_events",
             ]
         }
-        vals["unrecognized_keys"] = json.dumps(unrec)
+
+        vals["unrecognized_keys"] = encode_canonical_json(
+            unrec
+        ).decode("UTF-8")
 
         try:
             self._simple_insert_txn(

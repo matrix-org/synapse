@@ -21,7 +21,7 @@ from synapse.api.errors import SynapseError
 from synapse.types import UserID
 from .base import ClientV1RestServlet, client_path_pattern
 
-import json
+import simplejson as json
 import logging
 
 logger = logging.getLogger(__name__)

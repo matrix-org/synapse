@@ -462,7 +462,7 @@ class RoomMemberHandler(BaseHandler):
                 room_hosts,
                 room_id,
                 event.user_id,
-                event.get_dict()["content"],  # FIXME To get a non-frozen dict
+                event.content,  # FIXME To get a non-frozen dict
                 context
             )
         else:

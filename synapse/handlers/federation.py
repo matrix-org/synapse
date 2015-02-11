@@ -23,6 +23,7 @@ from synapse.api.errors import (
 from synapse.api.constants import EventTypes, Membership, RejectedReason
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
+from synapse.util.frozenutils import unfreeze
 from synapse.crypto.event_signing import (
     compute_event_signature, add_hashes_and_signatures,
 )
@@ -311,7 +312,7 @@ class FederationHandler(BaseHandler):
         self.room_queues[room_id] = []
 
         builder = self.event_builder_factory.new(
-            event.get_pdu_json()
+            unfreeze(event.get_pdu_json())
         )
 
         handled_events = set()

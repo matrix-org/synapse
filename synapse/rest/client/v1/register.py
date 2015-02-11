@@ -25,7 +25,7 @@ from synapse.util.async import run_on_reactor
 
 from hashlib import sha1
 import hmac
-import json
+import simplejson as json
 import logging
 import urllib
 

@@ -21,6 +21,9 @@ def freeze(o):
     if t is dict:
         return frozendict({k: freeze(v) for k, v in o.items()})
 
+    if t is frozendict:
+        return o
+
     if t is str or t is unicode:
         return o
 
@@ -33,10 +36,11 @@ def freeze(o):
 
 
 def unfreeze(o):
-    if isinstance(o, frozendict) or isinstance(o, dict):
+    t = type(o)
+    if t is dict or t is frozendict:
         return dict({k: unfreeze(v) for k, v in o.items()})
 
-    if isinstance(o, basestring):
+    if t is str or t is unicode:
         return o
 
     try:

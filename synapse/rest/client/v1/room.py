@@ -23,7 +23,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.types import UserID, RoomID, RoomAlias
 from synapse.events.utils import serialize_event
 
-import json
+import simplejson as json
 import logging
 import urllib
 

@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 import logging
 import copy
-import json
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 
