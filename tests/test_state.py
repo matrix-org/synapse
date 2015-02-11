@@ -21,6 +21,8 @@ from synapse.api.auth import Auth
 from synapse.api.constants import EventTypes, Membership
 from synapse.state import StateHandler
 
+from .utils import MockClock
+
 from mock import Mock
 
 
@@ -138,10 +140,13 @@ class StateTestCase(unittest.TestCase):
                 "add_event_hashes",
             ]
         )
-        hs = Mock(spec=["get_datastore", "get_auth", "get_state_handler"])
+        hs = Mock(spec=[
+            "get_datastore", "get_auth", "get_state_handler", "get_clock",
+        ])
         hs.get_datastore.return_value = self.store
         hs.get_state_handler.return_value = None
         hs.get_auth.return_value = Auth(hs)
+        hs.get_clock.return_value = MockClock()
 
         self.state = StateHandler(hs)
         self.event_id = 0

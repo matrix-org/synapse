@@ -274,6 +274,7 @@ def setup():
 
     hs.get_pusherpool().start()
 
+    hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
 
     if config.daemonize:
