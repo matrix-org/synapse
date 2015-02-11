@@ -164,6 +164,9 @@ class DataStore(RoomMemberStore, RoomStore,
                            stream_ordering=None, is_new_state=True,
                            current_state=None):
 
+        # Remove the any existing cache entries for the event_id
+        self._get_event_cache.pop(event.event_id)
+
         # We purposefully do this first since if we include a `current_state`
         # key, we *want* to update the `current_state_events` table
         if current_state:

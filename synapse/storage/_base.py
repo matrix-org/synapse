@@ -19,6 +19,7 @@ from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext, LoggingContext
+from synapse.util.lrucache import LruCache
 
 from twisted.internet import defer
 
@@ -127,6 +128,8 @@ class SQLBaseStore(object):
         self._previous_loop_ts = 0
         self._txn_perf_counters = PerformanceCounters()
         self._get_event_counters = PerformanceCounters()
+
+        self._get_event_cache = LruCache(hs.config.event_cache_size)
 
     def start_profiling(self):
         self._previous_loop_ts = self._clock.time_msec()
@@ -579,6 +582,20 @@ class SQLBaseStore(object):
 
     def _get_event_txn(self, txn, event_id, check_redacted=True,
                        get_prev_content=False, allow_rejected=False):
+
+        start_time = time.time() * 1000
+        update_counter = self._get_event_counters.update
+
+        try:
+            cache = self._get_event_cache.setdefault(event_id, {})
+            # Separate cache entries for each way to invoke _get_event_txn
+            return cache[(check_redacted, get_prev_content, allow_rejected)]
+        except KeyError:
+            pass
+        finally:
+            start_time = update_counter("event_cache", start_time)
+
+
         sql = (
             "SELECT e.internal_metadata, e.json, r.event_id, rej.reason "
             "FROM event_json as e "
@@ -588,7 +605,6 @@ class SQLBaseStore(object):
             "LIMIT 1 "
         )
 
-        start_time = time.time() * 1000
 
         txn.execute(sql, (event_id,))
 
@@ -599,14 +615,16 @@ class SQLBaseStore(object):
 
         internal_metadata, js, redacted, rejected_reason = res
 
-        self._get_event_counters.update("select_event", start_time)
+        start_time = update_counter("select_event", start_time)
 
         if allow_rejected or not rejected_reason:
-            return self._get_event_from_row_txn(
+            result = self._get_event_from_row_txn(
                 txn, internal_metadata, js, redacted,
                 check_redacted=check_redacted,
                 get_prev_content=get_prev_content,
             )
+            cache[(check_redacted, get_prev_content, allow_rejected)] = result
+            return result
         else:
             return None
 
