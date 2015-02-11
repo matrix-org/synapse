@@ -27,3 +27,4 @@ class AppServiceRestResource(JsonResource):
     @staticmethod
     def register_servlets(appservice_resource, hs):
         register.register_servlets(hs, appservice_resource)
+
