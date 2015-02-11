@@ -26,8 +26,8 @@ def github_link(project, version, egg):
 DEPENDENCY_LINKS = [
     github_link(
         project="matrix-org/syutil",
-        version="v0.0.2",
-        egg="syutil-0.0.2",
+        version="v0.0.3",
+        egg="syutil-0.0.3",
     ),
     github_link(
         project="matrix-org/matrix-angular-sdk",
