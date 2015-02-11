@@ -423,6 +423,8 @@ class DataStore(RoomMemberStore, RoomStore,
         )
 
     def _store_redaction(self, txn, event):
+        # invalidate the cache for the redacted event
+        self._get_event_cache.pop(event.redacts)
         txn.execute(
             "INSERT OR IGNORE INTO redactions "
             "(event_id, redacts) VALUES (?,?)",
