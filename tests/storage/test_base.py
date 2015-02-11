@@ -22,6 +22,7 @@ from mock import Mock, call
 from collections import OrderedDict
 
 from synapse.server import HomeServer
+
 from synapse.storage._base import SQLBaseStore
 
 
