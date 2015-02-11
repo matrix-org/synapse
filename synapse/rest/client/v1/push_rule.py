@@ -15,12 +15,17 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError, NotFoundError, \
-    StoreError
+from synapse.api.errors import (
+    SynapseError, Codes, UnrecognizedRequestError, NotFoundError, StoreError
+)
 from .base import ClientV1RestServlet, client_path_pattern
-from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
+from synapse.storage.push_rule import (
+    InconsistentRuleException, RuleNotFoundException
+)
 import synapse.push.baserules as baserules
-from synapse.push.rulekinds import PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
+from synapse.push.rulekinds import (
+    PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
+)
 
 import json
 
@@ -105,7 +110,9 @@ class PushRuleRestServlet(ClientV1RestServlet):
         # we build up the full structure and then decide which bits of it
         # to send which means doing unnecessary work sometimes but is
         # is probably not going to make a whole lot of difference
-        rawrules = yield self.hs.get_datastore().get_push_rules_for_user_name(user.to_string())
+        rawrules = yield self.hs.get_datastore().get_push_rules_for_user_name(
+            user.to_string()
+        )
 
         for r in rawrules:
             r["conditions"] = json.loads(r["conditions"])
@@ -382,6 +389,7 @@ def _namespaced_rule_id_from_spec(spec):
 
 def _rule_id_from_namespaced(in_rule_id):
     return in_rule_id.split('/')[-1]
+
 
 class InvalidRuleException(Exception):
     pass

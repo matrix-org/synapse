@@ -114,7 +114,7 @@ class SyncHandler(BaseHandler):
             if sync_config.gap:
                 return self.incremental_sync_with_gap(sync_config, since_token)
             else:
-                #TODO(mjark): Handle gapless sync
+                # TODO(mjark): Handle gapless sync
                 raise NotImplementedError()
 
     @defer.inlineCallbacks
@@ -175,9 +175,10 @@ class SyncHandler(BaseHandler):
             room_id, sync_config, now_token,
         )
 
-        current_state_events = yield self.state_handler.get_current_state(
+        current_state = yield self.state_handler.get_current_state(
             room_id
         )
+        current_state_events = current_state.values()
 
         defer.returnValue(RoomSyncResult(
             room_id=room_id,
@@ -347,9 +348,10 @@ class SyncHandler(BaseHandler):
 
         # TODO(mjark): This seems racy since this isn't being passed a
         # token to indicate what point in the stream this is
-        current_state_events = yield self.state_handler.get_current_state(
+        current_state = yield self.state_handler.get_current_state(
             room_id
         )
+        current_state_events = current_state.values()
 
         state_at_previous_sync = yield self.get_state_at_previous_sync(
             room_id, since_token=since_token
@@ -431,6 +433,7 @@ class SyncHandler(BaseHandler):
                     joined = True
 
         if joined:
-            state_delta = yield self.state_handler.get_current_state(room_id)
+            res = yield self.state_handler.get_current_state(room_id)
+            state_delta = res.values()
 
         defer.returnValue(state_delta)

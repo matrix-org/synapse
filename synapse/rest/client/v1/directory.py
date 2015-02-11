@@ -46,7 +46,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_alias):
         content = _parse_json(request)
-        if not "room_id" in content:
+        if "room_id" not in content:
             raise SynapseError(400, "Missing room_id key",
                                errcode=Codes.BAD_JSON)
 

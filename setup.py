@@ -18,51 +18,42 @@ import os
 from setuptools import setup, find_packages
 
 
-# Utility function to read the README file.
-# Used for the long_description.  It's nice, because now 1) we have a top level
-# README file and 2) it's easier to type in the README file than to put a raw
-# string in below ...
-def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+here = os.path.abspath(os.path.dirname(__file__))
+
+
+def read_file(path_segments):
+    """Read a file from the package. Takes a list of strings to join to
+    make the path"""
+    file_path = os.path.join(here, *path_segments)
+    with open(file_path) as f:
+        return f.read()
+
+
+def exec_file(path_segments):
+    """Execute a single python file to get the variables defined in it"""
+    result = {}
+    code = read_file(path_segments)
+    exec(code, result)
+    return result
+
+version = exec_file(("synapse", "__init__.py"))["__version__"]
+dependencies = exec_file(("synapse", "python_dependencies.py"))
+long_description = read_file(("README.rst",))
 
 setup(
     name="matrix-synapse",
-    version=read("VERSION").strip(),
+    version=version,
     packages=find_packages(exclude=["tests", "tests.*"]),
     description="Reference Synapse Home Server",
-    install_requires=[
-        "syutil==0.0.2",
-        "matrix_angular_sdk>=0.6.1",
-        "Twisted==14.0.2",
-        "service_identity>=1.0.0",
-        "pyopenssl>=0.14",
-        "pyyaml",
-        "pyasn1",
-        "pynacl",
-        "daemonize",
-        "py-bcrypt",
-        "frozendict>=0.4",
-        "pillow",
-        "pydenticon",
-    ],
-    dependency_links=[
-        "https://github.com/matrix-org/syutil/tarball/v0.0.2#egg=syutil-0.0.2",
-        "https://github.com/pyca/pynacl/tarball/d4d3175589b892f6ea7c22f466e0e223853516fa#egg=pynacl-0.3.0",
-        "https://github.com/matrix-org/matrix-angular-sdk/tarball/v0.6.1/#egg=matrix_angular_sdk-0.6.1",
-    ],
+    install_requires=dependencies["REQUIREMENTS"].keys(),
     setup_requires=[
         "Twisted==14.0.2", # Here to override setuptools_trial's dependency on Twisted>=2.4.0
         "setuptools_trial",
-        "setuptools>=1.0.0", # Needs setuptools that supports git+ssh.
-                             # TODO: Do we need this now? we don't use git+ssh.
         "mock"
     ],
+    dependency_links=dependencies["DEPENDENCY_LINKS"],
     include_package_data=True,
     zip_safe=False,
-    long_description=read("README.rst"),
-    entry_points="""
-    [console_scripts]
-    synctl=synapse.app.synctl:main
-    synapse-homeserver=synapse.app.homeserver:main
-    """
+    long_description=long_description,
+    scripts=["synctl"],
 )

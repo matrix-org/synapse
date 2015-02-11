@@ -140,18 +140,21 @@ class Pusher(object):
                    lambda x: ('[%s%s]' % (x.group(1) and '^' or '',
                                           re.sub(r'\\\-', '-', x.group(2)))), r)
         return r
-    
+
     def _event_fulfills_condition(self, ev, condition, display_name, room_member_count):
         if condition['kind'] == 'event_match':
             if 'pattern' not in condition:
                 logger.warn("event_match condition with no pattern")
                 return False
             # XXX: optimisation: cache our pattern regexps
-            r = r'\b%s\b' % self._glob_to_regexp(condition['pattern'])
+            if condition['key'] == 'content.body':
+                r = r'\b%s\b' % self._glob_to_regexp(condition['pattern'])
+            else:
+                r = r'^%s$' % self._glob_to_regexp(condition['pattern'])
             val = _value_for_dotted_key(condition['key'], ev)
             if val is None:
                 return False
-            return re.match(r, val, flags=re.IGNORECASE) != None
+            return re.search(r, val, flags=re.IGNORECASE) is not None
 
         elif condition['kind'] == 'device':
             if 'profile_tag' not in condition:
@@ -167,8 +170,10 @@ class Pusher(object):
                 return False
             if not display_name:
                 return False
-            return re.match("\b%s\b" % re.escape(display_name),
-                            ev['content']['body'], flags=re.IGNORECASE) != None
+            return re.search(
+                "\b%s\b" % re.escape(display_name), ev['content']['body'],
+                flags=re.IGNORECASE
+            ) is not None
 
         elif condition['kind'] == 'room_member_count':
             if 'is' not in condition:
