@@ -341,7 +341,6 @@ class FederationHandler(BaseHandler):
             except ValueError:
                 pass
 
-            logger.info(new_event.content)
             ret = yield self.replication_layer.send_join(
                 target_hosts,
                 new_event
@@ -487,7 +486,6 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
-        logger.info(event.content)
         context = yield self._handle_new_event(origin, event)
 
         logger.debug(
