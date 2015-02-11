@@ -240,28 +240,30 @@ class RoomMemberStore(SQLBaseStore):
         results = self._parse_events_txn(txn, rows)
         return results
 
+    @defer.inlineCallbacks
     def user_rooms_intersect(self, user_id_list):
         """ Checks whether all the users whose IDs are given in a list share a
         room.
+
+        This is a "hot path" function that's called a lot, e.g. by presence for
+        generating the event stream.
         """
-        def interaction(txn):
-            user_list_clause = " OR ".join(["m.user_id = ?"] * len(user_id_list))
-            sql = (
-                "SELECT m.room_id FROM room_memberships as m "
-                "INNER JOIN current_state_events as c "
-                "ON m.event_id = c.event_id "
-                "WHERE m.membership = 'join' "
-                "AND (%(clause)s) "
-                # TODO(paul): We've got duplicate rows in the database somewhere
-                #   so we have to DISTINCT m.user_id here
-                "GROUP BY m.room_id HAVING COUNT(DISTINCT m.user_id) = ?"
-            ) % {"clause": user_list_clause}
+        if len(user_id_list) < 2:
+            defer.returnValue(True)
 
-            args = list(user_id_list)
-            args.append(len(user_id_list))
+        deferreds = [
+            self.get_rooms_for_user_where_membership_is(
+                u, membership_list=[Membership.JOIN],
+            )
+            for u in user_id_list
+        ]
 
-            txn.execute(sql, args)
+        results = yield defer.DeferredList(deferreds)
 
-            return len(txn.fetchall()) > 0
+        # A list of sets of strings giving room IDs for each user
+        room_id_lists = [set([r.room_id for r in result[1]]) for result in results]
 
-        return self.runInteraction("user_rooms_intersect", interaction)
+        # There isn't a setintersection(*list_of_sets)
+        ret = len(room_id_lists.pop(0).intersection(*room_id_lists)) > 0
+
+        defer.returnValue(ret)
