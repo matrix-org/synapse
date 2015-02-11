@@ -28,6 +28,16 @@ class Config(object):
         pass
 
     @staticmethod
+    def parse_size(string):
+        sizes = {"K": 1024, "M": 1024 * 1024}
+        size = 1
+        suffix = string[-1]
+        if suffix in sizes:
+            string = string[:-1]
+            size = sizes[suffix]
+        return int(string) * size
+
+    @staticmethod
     def abspath(file_path):
         return os.path.abspath(file_path) if file_path else file_path
 
