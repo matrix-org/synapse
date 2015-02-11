@@ -19,6 +19,7 @@ from synapse.appservice import ApplicationService
 from synapse.server import HomeServer
 from synapse.storage.appservice import ApplicationServiceStore
 
+from mock import Mock
 from tests.utils import SQLiteMemoryDbPool, MockClock
 
 
@@ -28,7 +29,9 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
     def setUp(self):
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
-        hs = HomeServer("test", db_pool=db_pool, clock=MockClock())
+        hs = HomeServer(
+            "test", db_pool=db_pool, clock=MockClock(), config=Mock()
+        )
         self.as_token = "token1"
         db_pool.runQuery(
             "INSERT INTO application_services(token) VALUES(?)",
