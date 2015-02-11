@@ -17,22 +17,16 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.server import HomeServer
 from synapse.storage.registration import RegistrationStore
 
-from tests.utils import SQLiteMemoryDbPool
+from tests.utils import setup_test_homeserver
 
 
 class RegistrationStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer("test",
-            db_pool=db_pool,
-        )
+        hs = yield setup_test_homeserver()
 
         self.store = RegistrationStore(hs)
 
