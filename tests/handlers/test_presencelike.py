@@ -21,9 +21,8 @@ from twisted.internet import defer
 
 from mock import Mock, call, ANY, NonCallableMock
 
-from ..utils import MockClock, MockKey
+from ..utils import MockClock, setup_test_homeserver
 
-from synapse.server import HomeServer
 from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.profile import ProfileHandler
@@ -57,29 +56,23 @@ class PresenceAndProfileHandlers(object):
 
 class PresenceProfilelikeDataTestCase(unittest.TestCase):
 
+    @defer.inlineCallbacks
     def setUp(self):
-        self.mock_config = Mock()
-        self.mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer("test",
-                clock=MockClock(),
-                db_pool=None,
-                datastore=Mock(spec=[
-                    "set_presence_state",
-                    "is_presence_visible",
-
-                    "set_profile_displayname",
-
-                    "get_rooms_for_user_where_membership_is",
-                ]),
-                handlers=None,
-                resource_for_federation=Mock(),
-                http_client=None,
-                replication_layer=MockReplication(),
-                ratelimiter=NonCallableMock(spec_set=[
+        hs = yield setup_test_homeserver(
+            clock=MockClock(),
+            datastore=Mock(spec=[
+                "set_presence_state",
+                "is_presence_visible",
+                "set_profile_displayname",
+                "get_rooms_for_user_where_membership_is",
+            ]),
+            handlers=None,
+            resource_for_federation=Mock(),
+            http_client=None,
+            replication_layer=MockReplication(),
+            ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
-                ]),
-                config=self.mock_config
+            ]),
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)

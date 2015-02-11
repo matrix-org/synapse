@@ -17,23 +17,17 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.server import HomeServer
 from synapse.api.constants import EventTypes
 from synapse.types import UserID, RoomID, RoomAlias
 
-from tests.utils import SQLiteMemoryDbPool
+from tests.utils import setup_test_homeserver
 
 
 class RoomStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer("test",
-            db_pool=db_pool,
-        )
+        hs = yield setup_test_homeserver()
 
         # We can't test RoomStore on its own without the DirectoryStore, for
         # management of the 'room_aliases' table
@@ -86,12 +80,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer("test",
-            db_pool=db_pool,
-        )
+        hs = setup_test_homeserver()
 
         # Room events need the full datastore, for persist_event() and
         # get_room_state()

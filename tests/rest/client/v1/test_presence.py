@@ -20,11 +20,10 @@ from twisted.internet import defer
 
 from mock import Mock
 
-from ....utils import MockHttpResource, MockKey
+from ....utils import MockHttpResource, setup_test_homeserver
 
 from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler
-from synapse.server import HomeServer
 from synapse.rest.client.v1 import presence
 from synapse.rest.client.v1 import events
 from synapse.types import UserID
@@ -46,12 +45,10 @@ class JustPresenceHandlers(object):
 
 class PresenceStateTestCase(unittest.TestCase):
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
-        self.mock_config = Mock()
-        self.mock_config.signing_key = [MockKey()]
-        hs = HomeServer("test",
-            db_pool=None,
+        hs = yield setup_test_homeserver(
             datastore=Mock(spec=[
                 "get_presence_state",
                 "set_presence_state",
@@ -60,7 +57,6 @@ class PresenceStateTestCase(unittest.TestCase):
             http_client=None,
             resource_for_client=self.mock_resource,
             resource_for_federation=self.mock_resource,
-            config=self.mock_config,
         )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -129,13 +125,11 @@ class PresenceStateTestCase(unittest.TestCase):
 
 class PresenceListTestCase(unittest.TestCase):
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
-        self.mock_config = Mock()
-        self.mock_config.signing_key = [MockKey()]
 
-        hs = HomeServer("test",
-            db_pool=None,
+        hs = yield setup_test_homeserver(
             datastore=Mock(spec=[
                 "has_presence_state",
                 "get_presence_state",
@@ -150,7 +144,6 @@ class PresenceListTestCase(unittest.TestCase):
             http_client=None,
             resource_for_client=self.mock_resource,
             resource_for_federation=self.mock_resource,
-            config=self.mock_config,
         )
         hs.handlers = JustPresenceHandlers(hs)
 
@@ -244,11 +237,9 @@ class PresenceListTestCase(unittest.TestCase):
 
 
 class PresenceEventStreamTestCase(unittest.TestCase):
+    @defer.inlineCallbacks
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
-
-        self.mock_config = Mock()
-        self.mock_config.signing_key = [MockKey()]
 
         # HIDEOUS HACKERY
         # TODO(paul): This should be injected in via the HomeServer DI system
@@ -266,8 +257,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         }
         EventSources.SOURCE_TYPES["presence"] = PresenceEventSource
 
-        hs = HomeServer("test",
-            db_pool=None,
+        hs = yield setup_test_homeserver(
             http_client=None,
             resource_for_client=self.mock_resource,
             resource_for_federation=self.mock_resource,
@@ -280,7 +270,6 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 "cancel_call_later",
                 "time_msec",
             ]),
-            config=self.mock_config,
         )
 
         hs.get_clock().time_msec.return_value = 1000000

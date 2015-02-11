@@ -19,11 +19,9 @@ from twisted.internet import defer
 
 from mock import Mock, NonCallableMock
 from tests.utils import (
-    MockHttpResource, MockClock, DeferredMockCallable, SQLiteMemoryDbPool,
-    MockKey
+    MockHttpResource, DeferredMockCallable, setup_test_homeserver
 )
 
-from synapse.server import HomeServer
 from synapse.types import UserID
 from synapse.api.filtering import Filter
 
@@ -34,22 +32,14 @@ class FilteringTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
         self.mock_federation_resource = MockHttpResource()
 
         self.mock_http_client = Mock(spec=[])
         self.mock_http_client.put_json = DeferredMockCallable()
 
-        hs = HomeServer("test",
-            db_pool=db_pool,
+        hs = yield setup_test_homeserver(
             handlers=None,
             http_client=self.mock_http_client,
-            config=self.mock_config,
             keyring=Mock(),
         )
 

@@ -20,23 +20,19 @@ from .. import unittest
 from synapse.api.constants import EventTypes, Membership
 from synapse.handlers.room import RoomMemberHandler, RoomCreationHandler
 from synapse.handlers.profile import ProfileHandler
-from synapse.server import HomeServer
 from synapse.types import UserID
-from ..utils import MockKey
+from ..utils import setup_test_homeserver
 
 from mock import Mock, NonCallableMock
 
 
 class RoomMemberHandlerTestCase(unittest.TestCase):
 
+    @defer.inlineCallbacks
     def setUp(self):
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
         self.hostname = "red"
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             self.hostname,
-            db_pool=None,
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
@@ -64,7 +60,6 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "compute_event_context",
                 "get_current_state",
             ]),
-            config=self.mock_config,
         )
 
         self.federation = NonCallableMock(spec_set=[
@@ -319,15 +314,12 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
 class RoomCreationTest(unittest.TestCase):
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.hostname = "red"
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             self.hostname,
-            db_pool=None,
             datastore=NonCallableMock(spec_set=[
                 "store_room",
                 "snapshot_room",
@@ -344,7 +336,6 @@ class RoomCreationTest(unittest.TestCase):
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=self.mock_config,
         )
 
         self.federation = NonCallableMock(spec_set=[

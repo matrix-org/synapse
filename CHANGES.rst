@@ -2,6 +2,8 @@ Changes in develop
 ==================
 
  * pydenticon support -- adds dep on pydenticon
+ * pylru
+ * simplejson
 
 Changes in synapse 0.6.1 (2015-01-07)
 =====================================

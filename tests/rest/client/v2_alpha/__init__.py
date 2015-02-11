@@ -17,10 +17,11 @@ from tests import unittest
 
 from mock import Mock
 
-from ....utils import MockHttpResource, MockKey
+from ....utils import MockHttpResource, setup_test_homeserver
 
-from synapse.server import HomeServer
 from synapse.types import UserID
+
+from twisted.internet import defer
 
 
 PATH_PREFIX = "/_matrix/client/v2_alpha"
@@ -31,19 +32,15 @@ class V2AlphaRestTestCase(unittest.TestCase):
     #   USER_ID = <some string>
     #   TO_REGISTER = [<list of REST servlets to register>]
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
-        mock_config = Mock()
-        mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer("test",
-            db_pool=None,
+        hs = yield setup_test_homeserver(
             datastore=self.make_datastore_mock(),
             http_client=None,
             resource_for_client=self.mock_resource,
             resource_for_federation=self.mock_resource,
-            config=mock_config,
         )
 
         def _get_user_by_token(token=None):
