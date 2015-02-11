@@ -19,6 +19,8 @@ from twisted.internet import defer
 from httppusher import HttpPusher
 from synapse.push import PusherConfigException
 
+from syutil.jsonutil import encode_canonical_json
+
 import logging
 import simplejson as json
 
@@ -96,7 +98,7 @@ class PusherPool:
             pushkey=pushkey,
             pushkey_ts=self.hs.get_clock().time_msec(),
             lang=lang,
-            data=json.dumps(data)
+            data=encode_canonical_json(data).decode("UTF-8"),
         )
         self._refresh_pusher((app_id, pushkey))
 
