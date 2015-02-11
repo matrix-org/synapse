@@ -38,8 +38,9 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             return defer.succeed(func(self.mock_txn, *args, **kwargs))
         self.db_pool.runInteraction = runInteraction
 
-        hs = HomeServer("test",
-                db_pool=self.db_pool)
+        config = Mock()
+        config.event_cache_size = 1
+        hs = HomeServer("test", db_pool=self.db_pool, config=config)
 
         self.datastore = SQLBaseStore(hs)
 
