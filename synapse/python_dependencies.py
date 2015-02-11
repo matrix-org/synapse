@@ -4,7 +4,7 @@ from distutils.version import LooseVersion
 logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
-    "syutil==0.0.2": ["syutil"],
+    "syutil>=0.0.2": ["syutil"],
     "matrix_angular_sdk>=0.6.1": ["syweb>=0.6.1"],
     "Twisted==14.0.2": ["twisted==14.0.2"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
