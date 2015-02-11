@@ -72,7 +72,6 @@ class MatrixFederationHttpClient(object):
             requests.
     """
 
-
     def __init__(self, hs):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
