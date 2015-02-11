@@ -163,6 +163,9 @@ class DataStore(RoomMemberStore, RoomStore,
                            stream_ordering=None, is_new_state=True,
                            current_state=None):
 
+        # Remove the any existing cache entries for the event_id
+        self._get_event_cache.pop(event.event_id)
+
         # We purposefully do this first since if we include a `current_state`
         # key, we *want* to update the `current_state_events` table
         if current_state:
@@ -426,6 +429,8 @@ class DataStore(RoomMemberStore, RoomStore,
         )
 
     def _store_redaction(self, txn, event):
+        # invalidate the cache for the redacted event
+        self._get_event_cache.pop(event.redacts)
         txn.execute(
             "INSERT OR IGNORE INTO redactions "
             "(event_id, redacts) VALUES (?,?)",
