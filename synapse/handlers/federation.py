@@ -315,9 +315,6 @@ class FederationHandler(BaseHandler):
             unfreeze(event.get_pdu_json())
         )
 
-        logger.info("Builder: %s", builder.get_pdu_json())
-        logger.info("Content: %s", content)
-
         handled_events = set()
 
         try:
@@ -328,20 +325,13 @@ class FederationHandler(BaseHandler):
             if not hasattr(event, "signatures"):
                 builder.signatures = {}
 
-            logger.info("Content befhahs: %s", builder.content)
-
             add_hashes_and_signatures(
                 builder,
                 self.hs.hostname,
                 self.hs.config.signing_key[0],
             )
 
-            logger.info("Content aftet hah: %s", builder.content)
-            logger.info("Content pdu json: %s", builder.get_pdu_json())
-
             new_event = builder.build()
-
-            logger.info("Content after build: %s", new_event.content)
 
             # Try the host we successfully got a response to /make_join/
             # request first.
