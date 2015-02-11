@@ -80,11 +80,11 @@ class ApplicationServiceApi(SimpleHttpClient):
         response = None
         try:
             response = yield self.put_json(
-                uri,
-                {
+                uri=uri,
+                json_body={
                     "events": events
                 },
-                {
+                args={
                     "access_token": service.hs_token
                 })
             if response:  # just an empty json object

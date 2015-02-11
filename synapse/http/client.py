@@ -95,7 +95,8 @@ class SimpleHttpClient(object):
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
             HTTP body as JSON.
         Raises:
-            On a non-2xx HTTP response.
+            On a non-2xx HTTP response. The response body will be used as the
+            error message.
         """
         if len(args):
             query_bytes = urllib.urlencode(args, True)
