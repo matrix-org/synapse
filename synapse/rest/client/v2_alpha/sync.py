@@ -118,7 +118,7 @@ class SyncRestServlet(RestServlet):
         except:
             filter = Filter({})
         # filter = filter.apply_overrides(http_request)
-        #if filter.matches(event):
+        # if filter.matches(event):
         #   # stuff
 
         sync_config = SyncConfig(

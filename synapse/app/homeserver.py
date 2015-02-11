@@ -134,7 +134,7 @@ class SynapseHomeServer(HomeServer):
             logger.info("Attaching %s to path %s", resource, full_path)
             last_resource = self.root_resource
             for path_seg in full_path.split('/')[1:-1]:
-                if not path_seg in last_resource.listNames():
+                if path_seg not in last_resource.listNames():
                     # resource doesn't exist, so make a "dummy resource"
                     child_resource = Resource()
                     last_resource.putChild(path_seg, child_resource)
