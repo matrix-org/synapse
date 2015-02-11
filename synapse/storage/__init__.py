@@ -163,7 +163,9 @@ class DataStore(RoomMemberStore, RoomStore,
     def _persist_event_txn(self, txn, event, context, backfilled,
                            stream_ordering=None, is_new_state=True,
                            current_state=None):
-
+        # Remove the any existing cache entries for the event_id
+        if event.event_id in self._get_event_cache:
+            del self._get_event_cache[event.event_id]
         # We purposefully do this first since if we include a `current_state`
         # key, we *want* to update the `current_state_events` table
         if current_state:

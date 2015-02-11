@@ -17,6 +17,7 @@ REQUIREMENTS = {
     "frozendict>=0.4": ["frozendict"],
     "pillow": ["PIL"],
     "pydenticon": ["pydenticon"],
+    "pylru": ["pylru"],
 }
 
 
