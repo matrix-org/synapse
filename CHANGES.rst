@@ -1,9 +1,16 @@
 Changes in develop
 ==================
 
- * pydenticon support -- adds dep on pydenticon
- * pylru
- * simplejson
+ * Add initial implementation of the `query auth` fedeartion API, allowing
+   servers to agree on whether an event should be allowed or rejected.
+ * Persist events we have rejected from federation, fixing the bug where
+   servers would keep requesting the same events.
+ * Various performance improvements, including:
+    - Caching common queries such as fetching events and current state.
+    - Upgraded JSON library.
+ * Add default avatars to new user accounts using pydenticon library.
+ * Correctly time out federation requests.
+ * Retry federation requests against different servers.
 
 Changes in synapse 0.6.1 (2015-01-07)
 =====================================
