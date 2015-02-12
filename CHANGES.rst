@@ -6,8 +6,10 @@ Changes in develop
 * Persist events we have rejected from federation, fixing the bug where
   servers would keep requesting the same events.
 * Various performance improvements, including:
-    - Caching common queries such as fetching events and current state.
-    - Upgraded JSON library.
+
+  - Caching common queries such as fetching events and current state.
+  - Upgraded JSON library to improve parsing and serialization speeds.
+
 * Add default avatars to new user accounts using pydenticon library.
 * Correctly time out federation requests.
 * Retry federation requests against different servers.
