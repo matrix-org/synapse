@@ -17,30 +17,25 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.server import HomeServer
 from synapse.api.constants import EventTypes
+from synapse.types import UserID, RoomID, RoomAlias
 
-from tests.utils import SQLiteMemoryDbPool
+from tests.utils import setup_test_homeserver
 
 
 class RoomStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer("test",
-            db_pool=db_pool,
-        )
+        hs = yield setup_test_homeserver()
 
         # We can't test RoomStore on its own without the DirectoryStore, for
         # management of the 'room_aliases' table
         self.store = hs.get_datastore()
 
-        self.room = hs.parse_roomid("!abcde:test")
-        self.alias = hs.parse_roomalias("#a-room-name:test")
-        self.u_creator = hs.parse_userid("@creator:test")
+        self.room = RoomID.from_string("!abcde:test")
+        self.alias = RoomAlias.from_string("#a-room-name:test")
+        self.u_creator = UserID.from_string("@creator:test")
 
         yield self.store.store_room(self.room.to_string(),
             room_creator_user_id=self.u_creator.to_string(),
@@ -53,17 +48,6 @@ class RoomStoreTestCase(unittest.TestCase):
             {"room_id": self.room.to_string(),
              "creator": self.u_creator.to_string(),
              "is_public": True},
-            (yield self.store.get_room(self.room.to_string()))
-        )
-
-    @defer.inlineCallbacks
-    def test_store_room_config(self):
-        yield self.store.store_room_config(self.room.to_string(),
-            visibility=False
-        )
-
-        self.assertObjectHasAttributes(
-            {"is_public": False},
             (yield self.store.get_room(self.room.to_string()))
         )
 
@@ -96,19 +80,14 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer("test",
-            db_pool=db_pool,
-        )
+        hs = setup_test_homeserver()
 
         # Room events need the full datastore, for persist_event() and
         # get_room_state()
         self.store = hs.get_datastore()
         self.event_factory = hs.get_event_factory();
 
-        self.room = hs.parse_roomid("!abcde:test")
+        self.room = RoomID.from_string("!abcde:test")
 
         yield self.store.store_room(self.room.to_string(),
             room_creator_user_id="@creator:text",

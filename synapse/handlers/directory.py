@@ -19,6 +19,7 @@ from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError, Codes, CodeMessageException
 from synapse.api.constants import EventTypes
+from synapse.types import RoomAlias
 
 import logging
 
@@ -112,7 +113,16 @@ class DirectoryHandler(BaseHandler):
             )
 
         extra_servers = yield self.store.get_joined_hosts_for_room(room_id)
-        servers = list(set(extra_servers) | set(servers))
+        servers = set(extra_servers) | set(servers)
+
+        # If this server is in the list of servers, return it first.
+        if self.server_name in servers:
+            servers = (
+                [self.server_name]
+                + [s for s in servers if s != self.server_name]
+            )
+        else:
+            servers = list(servers)
 
         defer.returnValue({
             "room_id": room_id,
@@ -122,7 +132,7 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def on_directory_query(self, args):
-        room_alias = self.hs.parse_roomalias(args["room_alias"])
+        room_alias = RoomAlias.from_string(args["room_alias"])
         if not self.hs.is_mine(room_alias):
             raise SynapseError(
                 400, "Room Alias is not hosted on this Home Server"

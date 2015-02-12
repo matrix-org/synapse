@@ -19,6 +19,7 @@ from synapse.api.errors import LimitExceededError, SynapseError
 from synapse.util.async import run_on_reactor
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
+from synapse.types import UserID
 
 import logging
 
@@ -113,7 +114,7 @@ class BaseHandler(object):
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.INVITE:
-                invitee = self.hs.parse_userid(event.state_key)
+                invitee = UserID.from_string(event.state_key)
                 if not self.hs.is_mine(invitee):
                     # TODO: Can we add signature from remote server in a nicer
                     # way? If we have been invited by a remote server, we need
@@ -134,7 +135,7 @@ class BaseHandler(object):
                 if k[0] == EventTypes.Member:
                     if s.content["membership"] == Membership.JOIN:
                         destinations.add(
-                            self.hs.parse_userid(s.state_key).domain
+                            UserID.from_string(s.state_key).domain
                         )
             except SynapseError:
                 logger.warn(
@@ -144,7 +145,5 @@ class BaseHandler(object):
         yield self.notifier.on_new_room_event(event, extra_users=extra_users)
 
         yield federation_handler.handle_new_event(
-            event,
-            None,
-            destinations=destinations,
+            event, destinations=destinations,
         )

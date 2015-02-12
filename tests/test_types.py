@@ -42,12 +42,6 @@ class UserIDTestCase(unittest.TestCase):
         self.assertTrue(userA == userAagain)
         self.assertTrue(userA != userB)
 
-    def test_via_homeserver(self):
-        user = mock_homeserver.parse_userid("@3456ijkl:my.domain")
-
-        self.assertEquals("3456ijkl", user.localpart)
-        self.assertEquals("my.domain", user.domain)
-
 
 class RoomAliasTestCase(unittest.TestCase):
 
@@ -62,9 +56,3 @@ class RoomAliasTestCase(unittest.TestCase):
         room = RoomAlias("channel", "my.domain")
 
         self.assertEquals(room.to_string(), "#channel:my.domain")
-
-    def test_via_homeserver(self):
-        room = mock_homeserver.parse_roomalias("#elsewhere:my.domain")
-
-        self.assertEquals("elsewhere", room.localpart)
-        self.assertEquals("my.domain", room.domain)

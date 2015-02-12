@@ -74,3 +74,9 @@ class EventTypes(object):
     Message = "m.room.message"
     Topic = "m.room.topic"
     Name = "m.room.name"
+
+
+class RejectedReason(object):
+    AUTH_ERROR = "auth_error"
+    REPLACED = "replaced"
+    NOT_ANCESTOR = "not_ancestor"

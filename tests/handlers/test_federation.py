@@ -19,19 +19,16 @@ from tests import unittest
 from synapse.api.constants import EventTypes
 from synapse.events import FrozenEvent
 from synapse.handlers.federation import FederationHandler
-from synapse.server import HomeServer
 
 from mock import NonCallableMock, ANY, Mock
 
-from ..utils import MockKey
+from ..utils import setup_test_homeserver
 
 
 class FederationTestCase(unittest.TestCase):
 
+    @defer.inlineCallbacks
     def setUp(self):
-
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
 
         self.state_handler = NonCallableMock(spec_set=[
             "compute_event_context",
@@ -43,15 +40,15 @@ class FederationTestCase(unittest.TestCase):
         ])
 
         self.hostname = "test"
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             self.hostname,
-            db_pool=None,
             datastore=NonCallableMock(spec_set=[
                 "persist_event",
                 "store_room",
                 "get_room",
                 "get_destination_retry_timings",
                 "set_destination_retry_timings",
+                "have_events",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
@@ -60,7 +57,6 @@ class FederationTestCase(unittest.TestCase):
                 "room_member_handler",
                 "federation_handler",
             ]),
-            config=self.mock_config,
             auth=self.auth,
             state_handler=self.state_handler,
             keyring=Mock(),
@@ -90,6 +86,10 @@ class FederationTestCase(unittest.TestCase):
         self.datastore.persist_event.return_value = defer.succeed(None)
         self.datastore.get_room.return_value = defer.succeed(True)
         self.auth.check_host_in_room.return_value = defer.succeed(True)
+
+        def have_events(event_ids):
+            return defer.succeed({})
+        self.datastore.have_events.side_effect = have_events
 
         def annotate(ev, old_state=None):
             context = Mock()

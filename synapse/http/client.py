@@ -15,6 +15,8 @@
 
 
 from synapse.http.agent_name import AGENT_NAME
+from syutil.jsonutil import encode_canonical_json
+
 from twisted.internet import defer, reactor
 from twisted.web.client import (
     Agent, readBody, FileBodyProducer, PartialDownloadError
@@ -23,7 +25,7 @@ from twisted.web.http_headers import Headers
 
 from StringIO import StringIO
 
-import json
+import simplejson as json
 import logging
 import urllib
 
@@ -56,6 +58,25 @@ class SimpleHttpClient(object):
                 b"User-Agent": [AGENT_NAME],
             }),
             bodyProducer=FileBodyProducer(StringIO(query_bytes))
+        )
+
+        body = yield readBody(response)
+
+        defer.returnValue(json.loads(body))
+
+    @defer.inlineCallbacks
+    def post_json_get_json(self, uri, post_json):
+        json_str = encode_canonical_json(post_json)
+
+        logger.info("HTTP POST %s -> %s", json_str, uri)
+
+        response = yield self.agent.request(
+            "POST",
+            uri.encode("ascii"),
+            headers=Headers({
+                "Content-Type": ["application/json"]
+            }),
+            bodyProducer=FileBodyProducer(StringIO(json_str))
         )
 
         body = yield readBody(response)

@@ -28,6 +28,16 @@ class Config(object):
         pass
 
     @staticmethod
+    def parse_size(string):
+        sizes = {"K": 1024, "M": 1024 * 1024}
+        size = 1
+        suffix = string[-1]
+        if suffix in sizes:
+            string = string[:-1]
+            size = sizes[suffix]
+        return int(string) * size
+
+    @staticmethod
     def abspath(file_path):
         return os.path.abspath(file_path) if file_path else file_path
 
@@ -50,8 +60,9 @@ class Config(object):
             )
         return cls.abspath(file_path)
 
-    @staticmethod
-    def ensure_directory(dir_path):
+    @classmethod
+    def ensure_directory(cls, dir_path):
+        dir_path = cls.abspath(dir_path)
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
         if not os.path.isdir(dir_path):

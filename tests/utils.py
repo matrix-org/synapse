@@ -17,6 +17,7 @@ from synapse.http.server import HttpServer
 from synapse.api.errors import cs_error, CodeMessageException, StoreError
 from synapse.api.constants import EventTypes
 from synapse.storage import prepare_database
+from synapse.server import HomeServer
 
 from synapse.util.logcontext import LoggingContext
 
@@ -29,6 +30,29 @@ import urllib
 import urlparse
 
 from inspect import getcallargs
+
+
+@defer.inlineCallbacks
+def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
+    """Setup a homeserver suitable for running tests against. Keyword arguments
+    are passed to the Homeserver constructor. If no datastore is supplied a
+    datastore backed by an in-memory sqlite db will be given to the HS.
+    """
+    if config is None:
+        config = Mock()
+        config.signing_key = [MockKey()]
+        config.event_cache_size = 1
+
+    if datastore is None:
+        db_pool = SQLiteMemoryDbPool()
+        yield db_pool.prepare()
+        hs = HomeServer(name, db_pool=db_pool, config=config, **kargs)
+    else:
+        hs = HomeServer(
+            name, db_pool=None, datastore=datastore, config=config, **kargs
+        )
+
+    defer.returnValue(hs)
 
 
 def get_mock_call_args(pattern_func, mock_func):
@@ -138,7 +162,8 @@ class MockClock(object):
     now = 1000
 
     def __init__(self):
-        # list of tuples of (absolute_time, callback) in no particular order
+        # list of lists of [absolute_time, callback, expired] in no particular
+        # order
         self.timers = []
 
     def time(self):
@@ -154,11 +179,16 @@ class MockClock(object):
             LoggingContext.thread_local.current_context = current_context
             callback()
 
-        t = (self.now + delay, wrapped_callback)
+        t = [self.now + delay, wrapped_callback, False]
         self.timers.append(t)
+
         return t
 
     def cancel_call_later(self, timer):
+        if timer[2]:
+            raise Exception("Cannot cancel an expired timer")
+
+        timer[2] = True
         self.timers = [t for t in self.timers if t != timer]
 
     # For unit testing
@@ -168,11 +198,17 @@ class MockClock(object):
         timers = self.timers
         self.timers = []
 
-        for time, callback in timers:
+        for t in timers:
+            time, callback, expired = t
+
+            if expired:
+                raise Exception("Timer already expired")
+
             if self.now >= time:
+                t[2] = True
                 callback()
             else:
-                self.timers.append((time, callback))
+                self.timers.append(t)
 
 
 class SQLiteMemoryDbPool(ConnectionPool, object):

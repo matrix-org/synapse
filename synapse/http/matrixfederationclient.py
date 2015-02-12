@@ -27,11 +27,13 @@ from synapse.util.logcontext import PreserveLoggingContext
 
 from syutil.jsonutil import encode_canonical_json
 
-from synapse.api.errors import CodeMessageException, SynapseError, Codes
+from synapse.api.errors import (
+    SynapseError, Codes, HttpResponseException,
+)
 
 from syutil.crypto.jsonsign import sign_json
 
-import json
+import simplejson as json
 import logging
 import urllib
 import urlparse
@@ -72,12 +74,12 @@ class MatrixFederationHttpClient(object):
             requests.
     """
 
-
     def __init__(self, hs):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
         self.agent = MatrixFederationHttpAgent(reactor)
+        self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
     def _create_request(self, destination, method, path_bytes,
@@ -117,7 +119,7 @@ class MatrixFederationHttpClient(object):
 
             try:
                 with PreserveLoggingContext():
-                    response = yield self.agent.request(
+                    request_deferred = self.agent.request(
                         destination,
                         endpoint,
                         method,
@@ -126,6 +128,11 @@ class MatrixFederationHttpClient(object):
                         query_bytes,
                         Headers(headers_dict),
                         producer
+                    )
+
+                    response = yield self.clock.time_bound_deferred(
+                        request_deferred,
+                        time_out=60,
                     )
 
                 logger.debug("Got response to %s", method)
@@ -164,13 +171,13 @@ class MatrixFederationHttpClient(object):
         )
 
         if 200 <= response.code < 300:
-            # We need to update the transactions table to say it was sent?
             pass
         else:
             # :'(
             # Update transactions table?
-            raise CodeMessageException(
-                response.code, response.phrase
+            body = yield readBody(response)
+            raise HttpResponseException(
+                response.code, response.phrase, body
             )
 
         defer.returnValue(response)
@@ -239,11 +246,66 @@ class MatrixFederationHttpClient(object):
             headers_dict={"Content-Type": ["application/json"]},
         )
 
+        if 200 <= response.code < 300:
+            # We need to update the transactions table to say it was sent?
+            c_type = response.headers.getRawHeaders("Content-Type")
+
+            if "application/json" not in c_type:
+                raise RuntimeError(
+                    "Content-Type not application/json"
+                )
+
         logger.debug("Getting resp body")
         body = yield readBody(response)
         logger.debug("Got resp body")
 
-        defer.returnValue((response.code, body))
+        defer.returnValue(json.loads(body))
+
+    @defer.inlineCallbacks
+    def post_json(self, destination, path, data={}):
+        """ Sends the specifed json data using POST
+
+        Args:
+            destination (str): The remote server to send the HTTP request
+                to.
+            path (str): The HTTP path.
+            data (dict): A dict containing the data that will be used as
+                the request body. This will be encoded as JSON.
+
+        Returns:
+            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            will be the decoded JSON body. On a 4xx or 5xx error response a
+            CodeMessageException is raised.
+        """
+
+        def body_callback(method, url_bytes, headers_dict):
+            self.sign_request(
+                destination, method, url_bytes, headers_dict, data
+            )
+            return _JsonProducer(data)
+
+        response = yield self._create_request(
+            destination.encode("ascii"),
+            "POST",
+            path.encode("ascii"),
+            body_callback=body_callback,
+            headers_dict={"Content-Type": ["application/json"]},
+        )
+
+        if 200 <= response.code < 300:
+            # We need to update the transactions table to say it was sent?
+            c_type = response.headers.getRawHeaders("Content-Type")
+
+            if "application/json" not in c_type:
+                raise RuntimeError(
+                    "Content-Type not application/json"
+                )
+
+        logger.debug("Getting resp body")
+        body = yield readBody(response)
+        logger.debug("Got resp body")
+
+        defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
     def get_json(self, destination, path, args={}, retry_on_dns_fail=True):
@@ -285,7 +347,18 @@ class MatrixFederationHttpClient(object):
             retry_on_dns_fail=retry_on_dns_fail
         )
 
+        if 200 <= response.code < 300:
+            # We need to update the transactions table to say it was sent?
+            c_type = response.headers.getRawHeaders("Content-Type")
+
+            if "application/json" not in c_type:
+                raise RuntimeError(
+                    "Content-Type not application/json"
+                )
+
+        logger.debug("Getting resp body")
         body = yield readBody(response)
+        logger.debug("Got resp body")
 
         defer.returnValue(json.loads(body))
 

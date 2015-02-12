@@ -20,11 +20,10 @@ from twisted.internet import defer
 from mock import Mock, NonCallableMock
 
 from synapse.api.errors import AuthError
-from synapse.server import HomeServer
 from synapse.handlers.profile import ProfileHandler
-from synapse.api.constants import Membership
+from synapse.types import UserID
 
-from tests.utils import SQLiteMemoryDbPool, MockKey
+from tests.utils import setup_test_homeserver
 
 
 class ProfileHandlers(object):
@@ -46,23 +45,15 @@ class ProfileTestCase(unittest.TestCase):
             self.query_handlers[query_type] = handler
         self.mock_federation.register_query_handler = register_query_handler
 
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        self.mock_config = Mock()
-        self.mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer("test",
-                db_pool=db_pool,
-                http_client=None,
-                handlers=None,
-                resource_for_federation=Mock(),
-                replication_layer=self.mock_federation,
-                config=self.mock_config,
-                ratelimiter=NonCallableMock(spec_set=[
-                    "send_message",
-                ])
-            )
+        hs = yield setup_test_homeserver(
+            http_client=None,
+            handlers=None,
+            resource_for_federation=Mock(),
+            replication_layer=self.mock_federation,
+            ratelimiter=NonCallableMock(spec_set=[
+                "send_message",
+            ])
+        )
 
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -71,9 +62,9 @@ class ProfileTestCase(unittest.TestCase):
 
         self.store = hs.get_datastore()
 
-        self.frank = hs.parse_userid("@1234ABCD:test")
-        self.bob   = hs.parse_userid("@4567:test")
-        self.alice = hs.parse_userid("@alice:remote")
+        self.frank = UserID.from_string("@1234ABCD:test")
+        self.bob   = UserID.from_string("@4567:test")
+        self.alice = UserID.from_string("@alice:remote")
 
         yield self.store.create_profile(self.frank.localpart)
 

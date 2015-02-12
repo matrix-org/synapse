@@ -18,6 +18,7 @@ from synapse.util.logcontext import LoggingContextFilter
 from twisted.python.log import PythonLoggingObserver
 import logging
 import logging.config
+import yaml
 
 
 class LoggingConfig(Config):
@@ -66,7 +67,10 @@ class LoggingConfig(Config):
 
             formatter = logging.Formatter(log_format)
             if self.log_file:
-                handler = logging.FileHandler(self.log_file)
+                # TODO: Customisable file size / backup count
+                handler = logging.handlers.RotatingFileHandler(
+                    self.log_file, maxBytes=(1000 * 1000 * 100), backupCount=3
+                )
             else:
                 handler = logging.StreamHandler()
             handler.setFormatter(formatter)
@@ -76,7 +80,8 @@ class LoggingConfig(Config):
             logger.addHandler(handler)
             logger.info("Test")
         else:
-            logging.config.fileConfig(self.log_config)
+            with open(self.log_config, 'r') as f:
+                logging.config.dictConfig(yaml.load(f))
 
         observer = PythonLoggingObserver()
         observer.start()

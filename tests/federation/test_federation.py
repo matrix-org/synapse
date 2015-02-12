@@ -19,9 +19,8 @@ from tests import unittest
 # python imports
 from mock import Mock, ANY
 
-from ..utils import MockHttpResource, MockClock, MockKey
+from ..utils import MockHttpResource, MockClock, setup_test_homeserver
 
-from synapse.server import HomeServer
 from synapse.federation import initialize_http_replication
 from synapse.events import FrozenEvent
 
@@ -40,6 +39,7 @@ def make_pdu(prev_pdus=[], **kwargs):
 
 
 class FederationTestCase(unittest.TestCase):
+    @defer.inlineCallbacks
     def setUp(self):
         self.mock_resource = MockHttpResource()
         self.mock_http_client = Mock(spec=[
@@ -61,17 +61,12 @@ class FederationTestCase(unittest.TestCase):
             defer.succeed(DestinationsTable.EntryType("", 0, 0))
         )
         self.mock_persistence.get_auth_chain.return_value = []
-        self.mock_config = Mock()
-        self.mock_config.signing_key = [MockKey()]
         self.clock = MockClock()
-        hs = HomeServer(
-            "test",
+        hs = yield setup_test_homeserver(
             resource_for_federation=self.mock_resource,
             http_client=self.mock_http_client,
-            db_pool=None,
             datastore=self.mock_persistence,
             clock=self.clock,
-            config=self.mock_config,
             keyring=Mock(),
         )
         self.federation = initialize_http_replication(hs)

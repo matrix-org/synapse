@@ -20,7 +20,11 @@ import os
 class DatabaseConfig(Config):
     def __init__(self, args):
         super(DatabaseConfig, self).__init__(args)
-        self.database_path = self.abspath(args.database_path)
+        if args.database_path == ":memory:":
+            self.database_path = ":memory:"
+        else:
+            self.database_path = self.abspath(args.database_path)
+        self.event_cache_size = self.parse_size(args.event_cache_size)
 
     @classmethod
     def add_arguments(cls, parser):
@@ -29,6 +33,10 @@ class DatabaseConfig(Config):
         db_group.add_argument(
             "-d", "--database-path", default="homeserver.db",
             help="The database name."
+        )
+        db_group.add_argument(
+            "--event-cache-size", default="100K",
+            help="Number of events to cache in memory."
         )
 
     @classmethod

@@ -18,26 +18,32 @@ from synapse.storage import prepare_database, UpgradeDatabaseException
 
 from synapse.server import HomeServer
 
+from synapse.python_dependencies import check_requirements
+
 from twisted.internet import reactor
 from twisted.enterprise import adbapi
 from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
 from synapse.http.server import JsonResource, RootRedirect
-from synapse.media.v0.content_repository import ContentRepoResource
-from synapse.media.v1.media_repository import MediaRepositoryResource
+from synapse.rest.media.v0.content_repository import ContentRepoResource
+from synapse.rest.media.v1.media_repository import MediaRepositoryResource
 from synapse.http.server_key_resource import LocalKey
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX
+    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX,
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
+from synapse.rest.client.v1 import ClientV1RestResource
+from synapse.rest.client.v2_alpha import ClientV2AlphaRestResource
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
+
+import synapse
 
 import logging
 import os
@@ -55,10 +61,13 @@ class SynapseHomeServer(HomeServer):
         return MatrixFederationHttpClient(self)
 
     def build_resource_for_client(self):
-        return JsonResource()
+        return ClientV1RestResource(self)
+
+    def build_resource_for_client_v2_alpha(self):
+        return ClientV2AlphaRestResource(self)
 
     def build_resource_for_federation(self):
-        return JsonResource()
+        return JsonResource(self)
 
     def build_resource_for_web_client(self):
         syweb_path = os.path.dirname(syweb.__file__)
@@ -100,6 +109,7 @@ class SynapseHomeServer(HomeServer):
         # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
         desired_tree = [
             (CLIENT_PREFIX, self.get_resource_for_client()),
+            (CLIENT_V2_ALPHA_PREFIX, self.get_resource_for_client_v2_alpha()),
             (FEDERATION_PREFIX, self.get_resource_for_federation()),
             (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
@@ -124,7 +134,7 @@ class SynapseHomeServer(HomeServer):
             logger.info("Attaching %s to path %s", resource, full_path)
             last_resource = self.root_resource
             for path_seg in full_path.split('/')[1:-1]:
-                if not path_seg in last_resource.listNames():
+                if path_seg not in last_resource.listNames():
                     # resource doesn't exist, so make a "dummy resource"
                     child_resource = Resource()
                     last_resource.putChild(path_seg, child_resource)
@@ -198,7 +208,10 @@ def setup():
 
     config.setup_logging()
 
+    check_requirements()
+
     logger.info("Server hostname: %s", config.server_name)
+    logger.info("Server version: %s", synapse.__version__)
 
     if re.search(":[0-9]+$", config.server_name):
         domain_with_port = config.server_name
@@ -217,8 +230,6 @@ def setup():
         content_addr=config.content_addr,
     )
 
-    hs.register_servlets()
-
     hs.create_resource_tree(
         web_client=config.webclient,
         redirect_root_to_web_client=True,
@@ -234,13 +245,20 @@ def setup():
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"
-            "Have you checked for version specific instructions in UPGRADES.rst?\n"
+            "Have you checked for version specific instructions in"
+            " UPGRADES.rst?\n"
         )
         sys.exit(1)
 
     logger.info("Database prepared in %s.", db_name)
 
-    hs.get_db_pool()
+    db_pool = hs.get_db_pool()
+
+    if db_name == ":memory:":
+        # Memory databases will need to be setup each time they are opened.
+        reactor.callWhenRunning(
+            db_pool.runWithConnection, prepare_database
+        )
 
     if config.manhole:
         f = twisted.manhole.telnet.ShellFactory()
@@ -253,6 +271,11 @@ def setup():
     if config.no_tls:
         bind_port = None
     hs.start_listening(bind_port, config.unsecure_port)
+
+    hs.get_pusherpool().start()
+
+    hs.get_state_handler().start_caching()
+    hs.get_datastore().start_profiling()
 
     if config.daemonize:
         print config.pid_file
@@ -277,6 +300,7 @@ def run():
 
 def main():
     with LoggingContext("main"):
+        check_requirements()
         setup()
 
 

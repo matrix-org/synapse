@@ -23,21 +23,16 @@ import copy
 
 
 class EventBuilder(EventBase):
-    def __init__(self, key_values={}):
+    def __init__(self, key_values={}, internal_metadata_dict={}):
         signatures = copy.deepcopy(key_values.pop("signatures", {}))
         unsigned = copy.deepcopy(key_values.pop("unsigned", {}))
 
         super(EventBuilder, self).__init__(
             key_values,
             signatures=signatures,
-            unsigned=unsigned
+            unsigned=unsigned,
+            internal_metadata_dict=internal_metadata_dict,
         )
-
-    def update_event_key(self, key, value):
-        self._event_dict[key] = value
-
-    def update_event_keys(self, other_dict):
-        self._event_dict.update(other_dict)
 
     def build(self):
         return FrozenEvent.from_event(self)

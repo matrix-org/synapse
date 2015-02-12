@@ -15,27 +15,24 @@
 
 
 from twisted.internet import defer
-from tests import unittest
+from .. import unittest
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.handlers.room import RoomMemberHandler, RoomCreationHandler
 from synapse.handlers.profile import ProfileHandler
-from synapse.server import HomeServer
-from ..utils import MockKey
+from synapse.types import UserID
+from ..utils import setup_test_homeserver
 
 from mock import Mock, NonCallableMock
 
 
 class RoomMemberHandlerTestCase(unittest.TestCase):
 
+    @defer.inlineCallbacks
     def setUp(self):
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
         self.hostname = "red"
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             self.hostname,
-            db_pool=None,
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
@@ -63,7 +60,6 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "compute_event_context",
                 "get_current_state",
             ]),
-            config=self.mock_config,
         )
 
         self.federation = NonCallableMock(spec_set=[
@@ -164,7 +160,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             event, context=context,
         )
         self.notifier.on_new_room_event.assert_called_once_with(
-            event, extra_users=[self.hs.parse_userid(target_user_id)]
+            event, extra_users=[UserID.from_string(target_user_id)]
         )
         self.assertFalse(self.datastore.get_room.called)
         self.assertFalse(self.datastore.store_room.called)
@@ -174,7 +170,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
     def test_simple_join(self):
         room_id = "!foo:red"
         user_id = "@bob:red"
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         join_signal_observer = Mock()
         self.distributor.observe("user_joined_room", join_signal_observer)
@@ -223,7 +219,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         yield room_handler.change_membership(event, context)
 
         self.federation.handle_new_event.assert_called_once_with(
-            event, None, destinations=set()
+            event, destinations=set()
         )
 
         self.datastore.persist_event.assert_called_once_with(
@@ -252,7 +248,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
     def test_simple_leave(self):
         room_id = "!foo:red"
         user_id = "@bob:red"
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
 
         builder = self.hs.get_event_builder_factory().new({
             "type": EventTypes.Member,
@@ -301,7 +297,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         yield room_handler.change_membership(event, context)
 
         self.federation.handle_new_event.assert_called_once_with(
-            event, None, destinations=set(['red'])
+            event, destinations=set(['red'])
         )
 
         self.datastore.persist_event.assert_called_once_with(
@@ -318,15 +314,12 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
 class RoomCreationTest(unittest.TestCase):
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.hostname = "red"
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer(
+        hs = yield setup_test_homeserver(
             self.hostname,
-            db_pool=None,
             datastore=NonCallableMock(spec_set=[
                 "store_room",
                 "snapshot_room",
@@ -343,7 +336,6 @@ class RoomCreationTest(unittest.TestCase):
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
-            config=self.mock_config,
         )
 
         self.federation = NonCallableMock(spec_set=[

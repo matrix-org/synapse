@@ -17,20 +17,19 @@
 from tests import unittest
 from twisted.internet import defer, reactor
 
-from mock import Mock, call, ANY, NonCallableMock, patch
+from mock import Mock, call, ANY, NonCallableMock
 import json
 
 from tests.utils import (
-    MockHttpResource, MockClock, DeferredMockCallable, SQLiteMemoryDbPool,
-    MockKey
+    MockHttpResource, MockClock, DeferredMockCallable, setup_test_homeserver
 )
 
-from synapse.server import HomeServer
 from synapse.api.constants import PresenceState
 from synapse.api.errors import SynapseError
 from synapse.handlers.presence import PresenceHandler, UserPresenceCache
 from synapse.streams.config import SourcePaginationConfig
 from synapse.storage.transactions import DestinationsTable
+from synapse.types import UserID
 
 OFFLINE = PresenceState.OFFLINE
 UNAVAILABLE = PresenceState.UNAVAILABLE
@@ -59,68 +58,206 @@ class JustPresenceHandlers(object):
     def __init__(self, hs):
         self.presence_handler = PresenceHandler(hs)
 
-class PresenceStateTestCase(unittest.TestCase):
-    """ Tests presence management. """
 
+class PresenceTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
+        self.clock = MockClock()
 
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
+        self.mock_federation_resource = MockHttpResource()
 
-        hs = HomeServer("test",
-            clock=MockClock(),
-            db_pool=db_pool,
+        self.mock_http_client = Mock(spec=[])
+        self.mock_http_client.put_json = DeferredMockCallable()
+
+        hs_kwargs = {}
+        if hasattr(self, "make_datastore_mock"):
+            hs_kwargs["datastore"] = self.make_datastore_mock()
+
+        hs = yield setup_test_homeserver(
+            clock=self.clock,
             handlers=None,
-            resource_for_federation=Mock(),
-            http_client=None,
-            config=self.mock_config,
+            resource_for_federation=self.mock_federation_resource,
+            http_client=self.mock_http_client,
             keyring=Mock(),
+            **hs_kwargs
         )
         hs.handlers = JustPresenceHandlers(hs)
 
-        self.store = hs.get_datastore()
+        self.datastore = hs.get_datastore()
 
-        # Mock the RoomMemberHandler
-        room_member_handler = Mock(spec=[])
-        hs.handlers.room_member_handler = room_member_handler
-
-        # Some local users to test with
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
-        self.u_clementine = hs.parse_userid("@clementine:test")
-
-        yield self.store.create_presence(self.u_apple.localpart)
-        yield self.store.set_presence_state(
-            self.u_apple.localpart, {"state": ONLINE, "status_msg": "Online"}
-        )
+        self.setUp_roommemberhandler_mocks(hs.handlers)
 
         self.handler = hs.get_handlers().presence_handler
+        self.event_source = hs.get_event_sources().sources["presence"]
 
+        self.distributor = hs.get_distributor()
+        self.distributor.declare("user_joined_room")
+
+        yield self.setUp_users(hs)
+
+    def setUp_roommemberhandler_mocks(self, handlers):
+        self.room_id = "a-room"
         self.room_members = []
+
+        room_member_handler = handlers.room_member_handler = Mock(spec=[
+            "get_rooms_for_user",
+            "get_room_members",
+            "fetch_room_distributions_into",
+        ])
+        self.room_member_handler = room_member_handler
 
         def get_rooms_for_user(user):
             if user in self.room_members:
-                return defer.succeed(["a-room"])
+                return defer.succeed([self.room_id])
             else:
                 return defer.succeed([])
         room_member_handler.get_rooms_for_user = get_rooms_for_user
 
         def get_room_members(room_id):
-            if room_id == "a-room":
+            if room_id == self.room_id:
                 return defer.succeed(self.room_members)
             else:
                 return defer.succeed([])
         room_member_handler.get_room_members = get_room_members
+
+        @defer.inlineCallbacks
+        def fetch_room_distributions_into(room_id, localusers=None,
+                remotedomains=None, ignore_user=None):
+
+            members = yield get_room_members(room_id)
+            for member in members:
+                if ignore_user is not None and member == ignore_user:
+                    continue
+
+                if member.is_mine:
+                    if localusers is not None:
+                        localusers.add(member)
+                else:
+                    if remotedomains is not None:
+                        remotedomains.add(member.domain)
+        room_member_handler.fetch_room_distributions_into = (
+                fetch_room_distributions_into)
+
+        self.setUp_datastore_room_mocks(self.datastore)
+
+    def setUp_datastore_room_mocks(self, datastore):
+        def get_room_hosts(room_id):
+            if room_id == self.room_id:
+                hosts = set([u.domain for u in self.room_members])
+                return defer.succeed(hosts)
+            else:
+                return defer.succeed([])
+        datastore.get_joined_hosts_for_room = get_room_hosts
 
         def user_rooms_intersect(userlist):
             room_member_ids = map(lambda u: u.to_string(), self.room_members)
 
             shared = all(map(lambda i: i in room_member_ids, userlist))
             return defer.succeed(shared)
-        self.store.user_rooms_intersect = user_rooms_intersect
+        datastore.user_rooms_intersect = user_rooms_intersect
+
+    @defer.inlineCallbacks
+    def setUp_users(self, hs):
+        # Some local users to test with
+        self.u_apple = UserID.from_string("@apple:test")
+        self.u_banana = UserID.from_string("@banana:test")
+        self.u_clementine = UserID.from_string("@clementine:test")
+
+        for u in self.u_apple, self.u_banana, self.u_clementine:
+            yield self.datastore.create_presence(u.localpart)
+
+        yield self.datastore.set_presence_state(
+            self.u_apple.localpart, {"state": ONLINE, "status_msg": "Online"}
+        )
+
+        # ID of a local user that does not exist
+        self.u_durian = UserID.from_string("@durian:test")
+
+        # A remote user
+        self.u_cabbage = UserID.from_string("@cabbage:elsewhere")
+
+
+class MockedDatastorePresenceTestCase(PresenceTestCase):
+    def make_datastore_mock(self):
+        datastore = Mock(spec=[
+            # Bits that Federation needs
+            "prep_send_transaction",
+            "delivered_txn",
+            "get_received_txn_response",
+            "set_received_txn_response",
+            "get_destination_retry_timings",
+        ])
+
+        self.setUp_datastore_federation_mocks(datastore)
+        self.setUp_datastore_presence_mocks(datastore)
+
+        return datastore
+
+    def setUp_datastore_federation_mocks(self, datastore):
+        datastore.get_destination_retry_timings.return_value = (
+            defer.succeed(DestinationsTable.EntryType("", 0, 0))
+        )
+
+        def get_received_txn_response(*args):
+            return defer.succeed(None)
+        datastore.get_received_txn_response = get_received_txn_response
+
+    def setUp_datastore_presence_mocks(self, datastore):
+        self.current_user_state = {
+            "apple": OFFLINE,
+            "banana": OFFLINE,
+            "clementine": OFFLINE,
+            "fig": OFFLINE,
+        }
+
+        def get_presence_state(user_localpart):
+            return defer.succeed(
+                    {"state": self.current_user_state[user_localpart],
+                     "status_msg": None,
+                     "mtime": 123456000}
+            )
+        datastore.get_presence_state = get_presence_state
+
+        def set_presence_state(user_localpart, new_state):
+            was = self.current_user_state[user_localpart]
+            self.current_user_state[user_localpart] = new_state["state"]
+            return defer.succeed({"state": was})
+        datastore.set_presence_state = set_presence_state
+
+        def get_presence_list(user_localpart, accepted):
+            if not user_localpart in self.PRESENCE_LIST:
+                return defer.succeed([])
+            return defer.succeed([
+                {"observed_user_id": u} for u in
+                self.PRESENCE_LIST[user_localpart]])
+        datastore.get_presence_list = get_presence_list
+
+        def is_presence_visible(observed_localpart, observer_userid):
+            return True
+        datastore.is_presence_visible = is_presence_visible
+
+    @defer.inlineCallbacks
+    def setUp_users(self, hs):
+        # Some local users to test with
+        self.u_apple = UserID.from_string("@apple:test")
+        self.u_banana = UserID.from_string("@banana:test")
+        self.u_clementine = UserID.from_string("@clementine:test")
+        self.u_durian = UserID.from_string("@durian:test")
+        self.u_elderberry = UserID.from_string("@elderberry:test")
+        self.u_fig = UserID.from_string("@fig:test")
+
+        # Remote user
+        self.u_onion = UserID.from_string("@onion:farm")
+        self.u_potato = UserID.from_string("@potato:remote")
+
+        yield
+
+
+class PresenceStateTestCase(PresenceTestCase):
+    """ Tests presence management. """
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield super(PresenceStateTestCase, self).setUp()
 
         self.mock_start = Mock()
         self.mock_stop = Mock()
@@ -141,7 +278,7 @@ class PresenceStateTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_allowed_state(self):
-        yield self.store.allow_presence_visible(
+        yield self.datastore.allow_presence_visible(
             observed_localpart=self.u_apple.localpart,
             observer_userid=self.u_banana.to_string(),
         )
@@ -189,7 +326,7 @@ class PresenceStateTestCase(unittest.TestCase):
             {"state": UNAVAILABLE,
              "status_msg": "Away",
              "mtime": 1000000},
-            (yield self.store.get_presence_state(self.u_apple.localpart))
+            (yield self.datastore.get_presence_state(self.u_apple.localpart))
         )
 
         self.mock_start.assert_called_with(self.u_apple,
@@ -206,49 +343,11 @@ class PresenceStateTestCase(unittest.TestCase):
         self.mock_stop.assert_called_with(self.u_apple)
 
 
-class PresenceInvitesTestCase(unittest.TestCase):
+class PresenceInvitesTestCase(PresenceTestCase):
     """ Tests presence management. """
-
     @defer.inlineCallbacks
     def setUp(self):
-        self.mock_http_client = Mock(spec=[])
-        self.mock_http_client.put_json = DeferredMockCallable()
-
-        self.mock_federation_resource = MockHttpResource()
-
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer("test",
-            clock=MockClock(),
-            db_pool=db_pool,
-            handlers=None,
-            resource_for_client=Mock(),
-            resource_for_federation=self.mock_federation_resource,
-            http_client=self.mock_http_client,
-            config=self.mock_config,
-            keyring=Mock(),
-        )
-        hs.handlers = JustPresenceHandlers(hs)
-
-        self.store = hs.get_datastore()
-
-        # Some local users to test with
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
-        yield self.store.create_presence(self.u_apple.localpart)
-        yield self.store.create_presence(self.u_banana.localpart)
-
-        # ID of a local user that does not exist
-        self.u_durian = hs.parse_userid("@durian:test")
-
-        # A remote user
-        self.u_cabbage = hs.parse_userid("@cabbage:elsewhere")
-
-        self.handler = hs.get_handlers().presence_handler
+        yield super(PresenceInvitesTestCase, self).setUp()
 
         self.mock_start = Mock()
         self.mock_stop = Mock()
@@ -266,10 +365,10 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
         self.assertEquals(
             [{"observed_user_id": "@banana:test", "accepted": 1}],
-            (yield self.store.get_presence_list(self.u_apple.localpart))
+            (yield self.datastore.get_presence_list(self.u_apple.localpart))
         )
         self.assertTrue(
-            (yield self.store.is_presence_visible(
+            (yield self.datastore.is_presence_visible(
                 observed_localpart=self.u_banana.localpart,
                 observer_userid=self.u_apple.to_string(),
             ))
@@ -285,7 +384,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
         self.assertEquals(
             [],
-            (yield self.store.get_presence_list(self.u_apple.localpart))
+            (yield self.datastore.get_presence_list(self.u_apple.localpart))
         )
 
     @defer.inlineCallbacks
@@ -310,7 +409,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
         self.assertEquals(
             [{"observed_user_id": "@cabbage:elsewhere", "accepted": 0}],
-            (yield self.store.get_presence_list(self.u_apple.localpart))
+            (yield self.datastore.get_presence_list(self.u_apple.localpart))
         )
 
         yield put_json.await_calls()
@@ -345,7 +444,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         )
 
         self.assertTrue(
-            (yield self.store.is_presence_visible(
+            (yield self.datastore.is_presence_visible(
                 observed_localpart=self.u_apple.localpart,
                 observer_userid=self.u_cabbage.to_string(),
             ))
@@ -384,7 +483,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_accepted_remote(self):
-        yield self.store.add_presence_list_pending(
+        yield self.datastore.add_presence_list_pending(
             observer_localpart=self.u_apple.localpart,
             observed_userid=self.u_cabbage.to_string(),
         )
@@ -401,7 +500,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
         self.assertEquals(
             [{"observed_user_id": "@cabbage:elsewhere", "accepted": 1}],
-            (yield self.store.get_presence_list(self.u_apple.localpart))
+            (yield self.datastore.get_presence_list(self.u_apple.localpart))
         )
 
         self.mock_start.assert_called_with(
@@ -409,7 +508,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_denied_remote(self):
-        yield self.store.add_presence_list_pending(
+        yield self.datastore.add_presence_list_pending(
             observer_localpart=self.u_apple.localpart,
             observed_userid="@eggplant:elsewhere",
         )
@@ -426,16 +525,16 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
         self.assertEquals(
             [],
-            (yield self.store.get_presence_list(self.u_apple.localpart))
+            (yield self.datastore.get_presence_list(self.u_apple.localpart))
         )
 
     @defer.inlineCallbacks
     def test_drop_local(self):
-        yield self.store.add_presence_list_pending(
+        yield self.datastore.add_presence_list_pending(
             observer_localpart=self.u_apple.localpart,
             observed_userid=self.u_banana.to_string(),
         )
-        yield self.store.set_presence_list_accepted(
+        yield self.datastore.set_presence_list_accepted(
             observer_localpart=self.u_apple.localpart,
             observed_userid=self.u_banana.to_string(),
         )
@@ -447,7 +546,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
         self.assertEquals(
             [],
-            (yield self.store.get_presence_list(self.u_apple.localpart))
+            (yield self.datastore.get_presence_list(self.u_apple.localpart))
         )
 
         self.mock_stop.assert_called_with(
@@ -455,11 +554,11 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_drop_remote(self):
-        yield self.store.add_presence_list_pending(
+        yield self.datastore.add_presence_list_pending(
             observer_localpart=self.u_apple.localpart,
             observed_userid=self.u_cabbage.to_string(),
         )
-        yield self.store.set_presence_list_accepted(
+        yield self.datastore.set_presence_list_accepted(
             observer_localpart=self.u_apple.localpart,
             observed_userid=self.u_cabbage.to_string(),
         )
@@ -471,16 +570,16 @@ class PresenceInvitesTestCase(unittest.TestCase):
 
         self.assertEquals(
             [],
-            (yield self.store.get_presence_list(self.u_apple.localpart))
+            (yield self.datastore.get_presence_list(self.u_apple.localpart))
         )
 
     @defer.inlineCallbacks
     def test_get_presence_list(self):
-        yield self.store.add_presence_list_pending(
+        yield self.datastore.add_presence_list_pending(
             observer_localpart=self.u_apple.localpart,
             observed_userid=self.u_banana.to_string(),
         )
-        yield self.store.set_presence_list_accepted(
+        yield self.datastore.set_presence_list_accepted(
             observer_localpart=self.u_apple.localpart,
             observed_userid=self.u_banana.to_string(),
         )
@@ -495,7 +594,7 @@ class PresenceInvitesTestCase(unittest.TestCase):
         ], presence)
 
 
-class PresencePushTestCase(unittest.TestCase):
+class PresencePushTestCase(MockedDatastorePresenceTestCase):
     """ Tests steady-state presence status updates.
 
     They assert that presence state update messages are pushed around the place
@@ -505,138 +604,9 @@ class PresencePushTestCase(unittest.TestCase):
     presence handler; namely the _local_pushmap and _remote_recvmap.
     BE WARNED...
     """
-    def setUp(self):
-        self.clock = MockClock()
-
-        self.mock_http_client = Mock(spec=[])
-        self.mock_http_client.put_json = DeferredMockCallable()
-
-        self.mock_federation_resource = MockHttpResource()
-
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer("test",
-                clock=self.clock,
-                db_pool=None,
-                datastore=Mock(spec=[
-                    "set_presence_state",
-                    "get_joined_hosts_for_room",
-
-                    # Bits that Federation needs
-                    "prep_send_transaction",
-                    "delivered_txn",
-                    "get_received_txn_response",
-                    "set_received_txn_response",
-                    "get_destination_retry_timings",
-                ]),
-                handlers=None,
-                resource_for_client=Mock(),
-                resource_for_federation=self.mock_federation_resource,
-                http_client=self.mock_http_client,
-                config=self.mock_config,
-                keyring=Mock(),
-            )
-        hs.handlers = JustPresenceHandlers(hs)
-
-        self.datastore = hs.get_datastore()
-        self.datastore.get_destination_retry_timings.return_value = (
-            defer.succeed(DestinationsTable.EntryType("", 0, 0))
-        )
-
-        def get_received_txn_response(*args):
-            return defer.succeed(None)
-        self.datastore.get_received_txn_response = get_received_txn_response
-
-        self.handler = hs.get_handlers().presence_handler
-        self.event_source = hs.get_event_sources().sources["presence"]
-
-        # Mock the RoomMemberHandler
-        hs.handlers.room_member_handler = Mock(spec=[
-            "get_rooms_for_user",
-            "get_room_members",
-        ])
-        self.room_member_handler = hs.handlers.room_member_handler
-
-        self.room_members = []
-
-        def get_rooms_for_user(user):
-            if user in self.room_members:
-                return defer.succeed(["a-room"])
-            else:
-                return defer.succeed([])
-        self.room_member_handler.get_rooms_for_user = get_rooms_for_user
-
-        def get_room_members(room_id):
-            if room_id == "a-room":
-                return defer.succeed(self.room_members)
-            else:
-                return defer.succeed([])
-        self.room_member_handler.get_room_members = get_room_members
-
-        def get_room_hosts(room_id):
-            if room_id == "a-room":
-                hosts = set([u.domain for u in self.room_members])
-                return defer.succeed(hosts)
-            else:
-                return defer.succeed([])
-        self.datastore.get_joined_hosts_for_room = get_room_hosts
-
-        def user_rooms_intersect(userlist):
-            room_member_ids = map(lambda u: u.to_string(), self.room_members)
-
-            shared = all(map(lambda i: i in room_member_ids, userlist))
-            return defer.succeed(shared)
-        self.datastore.user_rooms_intersect = user_rooms_intersect
-
-        @defer.inlineCallbacks
-        def fetch_room_distributions_into(room_id, localusers=None,
-                remotedomains=None, ignore_user=None):
-
-            members = yield get_room_members(room_id)
-            for member in members:
-                if ignore_user is not None and member == ignore_user:
-                    continue
-
-                if member.is_mine:
-                    if localusers is not None:
-                        localusers.add(member)
-                else:
-                    if remotedomains is not None:
-                        remotedomains.add(member.domain)
-        self.room_member_handler.fetch_room_distributions_into = (
-                fetch_room_distributions_into)
-
-        def get_presence_list(user_localpart, accepted=None):
-            if user_localpart == "apple":
-                return defer.succeed([
-                    {"observed_user_id": "@banana:test"},
-                    {"observed_user_id": "@clementine:test"},
-                ])
-            else:
-                return defer.succeed([])
-        self.datastore.get_presence_list = get_presence_list
-
-        def is_presence_visible(observer_userid, observed_localpart):
-            if (observed_localpart == "clementine" and
-                observer_userid == "@banana:test"):
-                return False
-            return False
-        self.datastore.is_presence_visible = is_presence_visible
-
-        self.distributor = hs.get_distributor()
-        self.distributor.declare("user_joined_room")
-
-        # Some local users to test with
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
-        self.u_clementine = hs.parse_userid("@clementine:test")
-        self.u_durian = hs.parse_userid("@durian:test")
-        self.u_elderberry = hs.parse_userid("@elderberry:test")
-
-        # Remote user
-        self.u_onion = hs.parse_userid("@onion:farm")
-        self.u_potato = hs.parse_userid("@potato:remote")
+    PRESENCE_LIST = {
+            'apple': [ "@banana:test", "@clementine:test" ],
+    }
 
     @defer.inlineCallbacks
     def test_push_local(self):
@@ -911,7 +881,7 @@ class PresencePushTestCase(unittest.TestCase):
         )
 
         yield self.distributor.fire("user_joined_room", self.u_clementine,
-            "a-room"
+            self.room_id
         )
 
         self.room_members.append(self.u_clementine)
@@ -974,7 +944,7 @@ class PresencePushTestCase(unittest.TestCase):
         self.room_members = [self.u_apple, self.u_banana]
 
         yield self.distributor.fire("user_joined_room", self.u_potato,
-            "a-room"
+            self.room_id
         )
 
         yield put_json.await_calls()
@@ -1003,13 +973,13 @@ class PresencePushTestCase(unittest.TestCase):
         self.room_members.append(self.u_potato)
 
         yield self.distributor.fire("user_joined_room", self.u_clementine,
-            "a-room"
+            self.room_id
         )
 
         put_json.await_calls()
 
 
-class PresencePollingTestCase(unittest.TestCase):
+class PresencePollingTestCase(MockedDatastorePresenceTestCase):
     """ Tests presence status polling. """
 
     # For this test, we have three local users; apple is watching and is
@@ -1022,105 +992,17 @@ class PresencePollingTestCase(unittest.TestCase):
             'fig': [ "@potato:remote" ],
     }
 
-
+    @defer.inlineCallbacks
     def setUp(self):
-        self.mock_http_client = Mock(spec=[])
-        self.mock_http_client.put_json = DeferredMockCallable()
-
-        self.mock_federation_resource = MockHttpResource()
-
-        self.mock_config = NonCallableMock()
-        self.mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer("test",
-                clock=MockClock(),
-                db_pool=None,
-                datastore=Mock(spec=[
-                    # Bits that Federation needs
-                    "prep_send_transaction",
-                    "delivered_txn",
-                    "get_received_txn_response",
-                    "set_received_txn_response",
-                    "get_destination_retry_timings",
-                ]),
-                handlers=None,
-                resource_for_client=Mock(),
-                resource_for_federation=self.mock_federation_resource,
-                http_client=self.mock_http_client,
-                config=self.mock_config,
-                keyring=Mock(),
-            )
-        hs.handlers = JustPresenceHandlers(hs)
-
-        self.datastore = hs.get_datastore()
-        self.datastore.get_destination_retry_timings.return_value = (
-            defer.succeed(DestinationsTable.EntryType("", 0, 0))
-        )
-
-        def get_received_txn_response(*args):
-            return defer.succeed(None)
-        self.datastore.get_received_txn_response = get_received_txn_response
+        yield super(PresencePollingTestCase, self).setUp()
 
         self.mock_update_client = Mock()
 
         def update(*args,**kwargs):
-            # print "mock_update_client: Args=%s, kwargs=%s" %(args, kwargs,)
             return defer.succeed(None)
-
         self.mock_update_client.side_effect = update
 
-        self.handler = hs.get_handlers().presence_handler
         self.handler.push_update_to_clients = self.mock_update_client
-
-        hs.handlers.room_member_handler = Mock(spec=[
-            "get_rooms_for_user",
-        ])
-        # For this test no users are ever in rooms
-        def get_rooms_for_user(user):
-            return defer.succeed([])
-        hs.handlers.room_member_handler.get_rooms_for_user = get_rooms_for_user
-
-        # Mocked database state
-        # Local users always start offline
-        self.current_user_state = {
-            "apple": OFFLINE,
-            "banana": OFFLINE,
-            "clementine": OFFLINE,
-            "fig": OFFLINE,
-        }
-
-        def get_presence_state(user_localpart):
-            return defer.succeed(
-                    {"state": self.current_user_state[user_localpart],
-                     "status_msg": None,
-                     "mtime": 123456000}
-            )
-        self.datastore.get_presence_state = get_presence_state
-
-        def set_presence_state(user_localpart, new_state):
-            was = self.current_user_state[user_localpart]
-            self.current_user_state[user_localpart] = new_state["state"]
-            return defer.succeed({"state": was})
-        self.datastore.set_presence_state = set_presence_state
-
-        def get_presence_list(user_localpart, accepted):
-            return defer.succeed([
-                {"observed_user_id": u} for u in
-                self.PRESENCE_LIST[user_localpart]])
-        self.datastore.get_presence_list = get_presence_list
-
-        def is_presence_visible(observed_localpart, observer_userid):
-            return True
-        self.datastore.is_presence_visible = is_presence_visible
-
-        # Local users
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
-        self.u_clementine = hs.parse_userid("@clementine:test")
-        self.u_fig = hs.parse_userid("@fig:test")
-
-        # Remote users
-        self.u_potato = hs.parse_userid("@potato:remote")
 
     @defer.inlineCallbacks
     def test_push_local(self):

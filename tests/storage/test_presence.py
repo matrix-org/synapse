@@ -17,28 +17,22 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.server import HomeServer
 from synapse.storage.presence import PresenceStore
+from synapse.types import UserID
 
-from tests.utils import SQLiteMemoryDbPool, MockClock
+from tests.utils import setup_test_homeserver, MockClock
 
 
 class PresenceStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer("test",
-            clock=MockClock(),
-            db_pool=db_pool,
-        )
+        hs = yield setup_test_homeserver(clock=MockClock())
 
         self.store = PresenceStore(hs)
 
-        self.u_apple = hs.parse_userid("@apple:test")
-        self.u_banana = hs.parse_userid("@banana:test")
+        self.u_apple = UserID.from_string("@apple:test")
+        self.u_banana = UserID.from_string("@banana:test")
 
     @defer.inlineCallbacks
     def test_state(self):

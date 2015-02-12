@@ -19,7 +19,7 @@ from twisted.internet.protocol import Factory
 from twisted.internet import defer, reactor
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util.logcontext import PreserveLoggingContext
-import json
+import simplejson as json
 import logging
 
 
@@ -61,9 +61,11 @@ class SynapseKeyClientProtocol(HTTPClient):
 
     def __init__(self):
         self.remote_key = defer.Deferred()
+        self.host = None
 
     def connectionMade(self):
-        logger.debug("Connected to %s", self.transport.getHost())
+        self.host = self.transport.getHost()
+        logger.debug("Connected to %s", self.host)
         self.sendCommand(b"GET", b"/_matrix/key/v1/")
         self.endHeaders()
         self.timer = reactor.callLater(
@@ -73,7 +75,7 @@ class SynapseKeyClientProtocol(HTTPClient):
 
     def handleStatus(self, version, status, message):
         if status != b"200":
-            #logger.info("Non-200 response from %s: %s %s",
+            # logger.info("Non-200 response from %s: %s %s",
             #            self.transport.getHost(), status, message)
             self.transport.abortConnection()
 
@@ -81,7 +83,7 @@ class SynapseKeyClientProtocol(HTTPClient):
         try:
             json_response = json.loads(response_body_bytes)
         except ValueError:
-            #logger.info("Invalid JSON response from %s",
+            # logger.info("Invalid JSON response from %s",
             #            self.transport.getHost())
             self.transport.abortConnection()
             return
@@ -92,8 +94,7 @@ class SynapseKeyClientProtocol(HTTPClient):
         self.timer.cancel()
 
     def on_timeout(self):
-        logger.debug("Timeout waiting for response from %s",
-                     self.transport.getHost())
+        logger.debug("Timeout waiting for response from %s", self.host)
         self.remote_key.errback(IOError("Timeout waiting for response"))
         self.transport.abortConnection()
 

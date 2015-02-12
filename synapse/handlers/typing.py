@@ -18,6 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError, AuthError
+from synapse.types import UserID
 
 import logging
 
@@ -83,9 +84,15 @@ class TypingNotificationHandler(BaseHandler):
         if member in self._member_typing_timer:
             self.clock.cancel_call_later(self._member_typing_timer[member])
 
+        def _cb():
+            logger.debug(
+                "%s has timed out in %s", target_user.to_string(), room_id
+            )
+            self._stopped_typing(member)
+
         self._member_typing_until[member] = until
         self._member_typing_timer[member] = self.clock.call_later(
-            timeout / 1000, lambda: self._stopped_typing(member)
+            timeout / 1000.0, _cb
         )
 
         if was_present:
@@ -114,6 +121,10 @@ class TypingNotificationHandler(BaseHandler):
 
         member = RoomMember(room_id=room_id, user=target_user)
 
+        if member in self._member_typing_timer:
+            self.clock.cancel_call_later(self._member_typing_timer[member])
+            del self._member_typing_timer[member]
+
         yield self._stopped_typing(member)
 
     @defer.inlineCallbacks
@@ -136,8 +147,10 @@ class TypingNotificationHandler(BaseHandler):
 
         del self._member_typing_until[member]
 
-        self.clock.cancel_call_later(self._member_typing_timer[member])
-        del self._member_typing_timer[member]
+        if member in self._member_typing_timer:
+            # Don't cancel it - either it already expired, or the real
+            # stopped_typing() will cancel it
+            del self._member_typing_timer[member]
 
     @defer.inlineCallbacks
     def _push_update(self, room_id, user, typing):
@@ -173,7 +186,7 @@ class TypingNotificationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _recv_edu(self, origin, content):
         room_id = content["room_id"]
-        user = self.homeserver.parse_userid(content["user_id"])
+        user = UserID.from_string(content["user_id"])
 
         localusers = set()
 

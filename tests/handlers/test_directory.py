@@ -19,10 +19,10 @@ from twisted.internet import defer
 
 from mock import Mock
 
-from synapse.server import HomeServer
 from synapse.handlers.directory import DirectoryHandler
+from synapse.types import RoomAlias
 
-from tests.utils import SQLiteMemoryDbPool, MockKey
+from tests.utils import setup_test_homeserver
 
 
 class DirectoryHandlers(object):
@@ -45,19 +45,10 @@ class DirectoryTestCase(unittest.TestCase):
             self.query_handlers[query_type] = handler
         self.mock_federation.register_query_handler = register_query_handler
 
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        self.mock_config = Mock()
-        self.mock_config.signing_key = [MockKey()]
-
-        hs = HomeServer(
-            "test",
-            db_pool=db_pool,
+        hs = yield setup_test_homeserver(
             http_client=None,
             resource_for_federation=Mock(),
             replication_layer=self.mock_federation,
-            config=self.mock_config,
         )
         hs.handlers = DirectoryHandlers(hs)
 
@@ -65,9 +56,9 @@ class DirectoryTestCase(unittest.TestCase):
 
         self.store = hs.get_datastore()
 
-        self.my_room = hs.parse_roomalias("#my-room:test")
-        self.your_room = hs.parse_roomalias("#your-room:test")
-        self.remote_room = hs.parse_roomalias("#another:remote")
+        self.my_room = RoomAlias.from_string("#my-room:test")
+        self.your_room = RoomAlias.from_string("#your-room:test")
+        self.remote_room = RoomAlias.from_string("#another:remote")
 
     @defer.inlineCallbacks
     def test_get_local_association(self):
