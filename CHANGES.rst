@@ -7,7 +7,13 @@ Changes in synapse v0.7.0 (2015-02-12)
   servers would keep requesting the same events.
 * Various federation performance improvements, including:
 
-  - Caching common queries such as fetching events and current state.
+  - Add in memory caches on queries such as:
+
+     * Computing the state of a room at a point in time, used for
+       authorization on federation requests.
+     * Fetching events from the database.
+     * User's room membership, used for authorizing presence updates.
+
   - Upgraded JSON library to improve parsing and serialisation speeds.
 
 * Add default avatars to new user accounts using pydenticon library.
