@@ -789,18 +789,6 @@ class FederationHandler(BaseHandler):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def trigger_query_auth(self, destination, event_id):
-        local_auth_chain = yield self.store.get_auth_chain([event_id])
-
-        result = yield self.replication_layer.query_auth(
-            destination,
-            event.room_id,
-            event.event_id,
-            local_auth_chain,
-        )
-
-
-    @defer.inlineCallbacks
     @log_function
     def do_auth(self, origin, event, context, auth_events):
         # Check if we have all the auth events.
