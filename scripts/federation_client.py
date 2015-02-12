@@ -97,8 +97,11 @@ def lookup(destination, path):
     if ":" in destination:
         return "https://%s%s" % (destination, path)
     else:
-        srv = srvlookup.lookup("matrix", "tcp", destination)[0]
-        return "https://%s:%d%s" % (srv.host, srv.port, path)
+        try:
+            srv = srvlookup.lookup("matrix", "tcp", destination)[0]
+            return "https://%s:%d%s" % (srv.host, srv.port, path)
+        except:
+            return "https://%s:%d%s" % (destination, 8448, path)
 
 def get_json(origin_name, origin_key, destination, path):
     request_json = {
