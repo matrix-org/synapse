@@ -1,11 +1,11 @@
 Changes in synapse v0.7.0 (2015-02-12)
 ======================================
 
-* Add initial implementation of the `query auth` federation API, allowing
+* Add initial implementation of the query auth federation API, allowing
   servers to agree on whether an event should be allowed or rejected.
 * Persist events we have rejected from federation, fixing the bug where
   servers would keep requesting the same events.
-* Various performance improvements, including:
+* Various federation performance improvements, including:
 
   - Caching common queries such as fetching events and current state.
   - Upgraded JSON library to improve parsing and serialisation speeds.
@@ -14,6 +14,7 @@ Changes in synapse v0.7.0 (2015-02-12)
 * Correctly time out federation requests.
 * Retry federation requests against different servers.
 * Add support for push and push rules.
+* Add alpha versions of proposed new CSv2 APIs, including ``/sync`` API.
 
 Changes in synapse 0.6.1 (2015-01-07)
 =====================================
