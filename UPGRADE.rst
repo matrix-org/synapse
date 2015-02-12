@@ -3,10 +3,10 @@ Upgrading to v0.7.0
 
 New dependencies are:
 
-  - pydenticon
-  - simplejson
-  - syutil
-  - matrix-angular-sdk
+- pydenticon
+- simplejson
+- syutil
+- matrix-angular-sdk
 
 To pull in these dependencies in a virtual env, run::
 
