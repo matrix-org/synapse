@@ -13,6 +13,7 @@ Changes in synapse v0.7.0 (2015-02-12)
 * Add default avatars to new user accounts using pydenticon library.
 * Correctly time out federation requests.
 * Retry federation requests against different servers.
+* Add support for push and push rules.
 
 Changes in synapse 0.6.1 (2015-01-07)
 =====================================
