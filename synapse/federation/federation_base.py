@@ -61,7 +61,8 @@ class FederationBase(object):
                 # Check local db.
                 new_pdu = yield self.store.get_event(
                     pdu.event_id,
-                    allow_rejected=True
+                    allow_rejected=True,
+                    allow_none=True,
                 )
                 if new_pdu:
                     signed_pdus.append(new_pdu)
@@ -69,15 +70,18 @@ class FederationBase(object):
 
                 # Check pdu.origin
                 if pdu.origin != origin:
-                    new_pdu = yield self.get_pdu(
-                        destinations=[pdu.origin],
-                        event_id=pdu.event_id,
-                        outlier=outlier,
-                    )
+                    try:
+                        new_pdu = yield self.get_pdu(
+                            destinations=[pdu.origin],
+                            event_id=pdu.event_id,
+                            outlier=outlier,
+                        )
 
-                    if new_pdu:
-                        signed_pdus.append(new_pdu)
-                        continue
+                        if new_pdu:
+                            signed_pdus.append(new_pdu)
+                            continue
+                    except:
+                        pass
 
                 logger.warn("Failed to find copy of %s with valid signature")
 
