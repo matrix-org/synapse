@@ -385,7 +385,7 @@ class MessageHandler(BaseHandler):
                     as_event=True,
                 )
                 presence.append(member_presence)
-            except SynapseError as e:
+            except SynapseError:
                 logger.exception(
                     "Failed to get member presence of %r", m.user_id
                 )
