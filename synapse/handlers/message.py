@@ -372,6 +372,7 @@ class MessageHandler(BaseHandler):
         room_members = [
             m for m in current_state.values()
             if m.type == EventTypes.Member
+                and m.content["membership"] == Membership.JOIN
         ]
 
         presence_handler = self.hs.get_handlers().presence_handler
