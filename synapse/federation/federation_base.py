@@ -86,7 +86,10 @@ class FederationBase(object):
                     except:
                         pass
 
-                logger.warn("Failed to find copy of %s with valid signature")
+                logger.warn(
+                    "Failed to find copy of %s with valid signature",
+                    pdu.event_id,
+                )
 
         yield defer.gatherResults(
             [do(pdu) for pdu in pdus],
