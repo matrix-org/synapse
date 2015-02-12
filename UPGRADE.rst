@@ -1,3 +1,17 @@
+Upgrading to v0.7.0
+===================
+
+New dependencies are:
+
+  - pydenticon
+  - simplejson
+  - syutil
+  - matrix-angular-sdk
+
+To pull in these dependencies in a virtual env, run::
+
+    python synapse/python_dependencies.py | xargs -n 1 pip install
+
 Upgrading to v0.6.0
 ===================
 
