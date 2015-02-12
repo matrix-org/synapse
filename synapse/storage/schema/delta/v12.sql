@@ -63,3 +63,5 @@ CREATE TABLE IF NOT EXISTS user_filters(
 CREATE INDEX IF NOT EXISTS user_filters_by_user_id_filter_id ON user_filters(
   user_id, filter_id
 );
+
+PRAGMA user_version = 12;
