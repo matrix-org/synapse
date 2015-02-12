@@ -50,8 +50,11 @@ class FederationBase(object):
         Returns:
             Deferred : A list of PDUs that have valid signatures and hashes.
         """
+
         signed_pdus = []
-        for pdu in pdus:
+
+        @defer.inlineCallbacks
+        def do(pdu):
             try:
                 new_pdu = yield self._check_sigs_and_hash(pdu)
                 signed_pdus.append(new_pdu)
@@ -66,7 +69,7 @@ class FederationBase(object):
                 )
                 if new_pdu:
                     signed_pdus.append(new_pdu)
-                    continue
+                    return
 
                 # Check pdu.origin
                 if pdu.origin != origin:
@@ -79,11 +82,16 @@ class FederationBase(object):
 
                         if new_pdu:
                             signed_pdus.append(new_pdu)
-                            continue
+                            return
                     except:
                         pass
 
                 logger.warn("Failed to find copy of %s with valid signature")
+
+        yield defer.gatherResults(
+            [do(pdu) for pdu in pdus],
+            consumeErrors=True
+        )
 
         defer.returnValue(signed_pdus)
 
