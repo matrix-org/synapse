@@ -1,5 +1,5 @@
-Changes in v0.7.0
-=================
+Changes in synapse v0.7.0 (2015-02-12)
+======================================
 
 * Add initial implementation of the `query auth` fedeartion API, allowing
   servers to agree on whether an event should be allowed or rejected.
