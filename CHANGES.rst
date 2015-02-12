@@ -1,5 +1,5 @@
-Changes in develop
-==================
+Changes in v0.7.0
+=================
 
 * Add initial implementation of the `query auth` fedeartion API, allowing
   servers to agree on whether an event should be allowed or rejected.
