@@ -1,14 +1,14 @@
 Changes in synapse v0.7.0 (2015-02-12)
 ======================================
 
-* Add initial implementation of the `query auth` fedeartion API, allowing
+* Add initial implementation of the `query auth` federation API, allowing
   servers to agree on whether an event should be allowed or rejected.
 * Persist events we have rejected from federation, fixing the bug where
   servers would keep requesting the same events.
 * Various performance improvements, including:
 
   - Caching common queries such as fetching events and current state.
-  - Upgraded JSON library to improve parsing and serialization speeds.
+  - Upgraded JSON library to improve parsing and serialisation speeds.
 
 * Add default avatars to new user accounts using pydenticon library.
 * Correctly time out federation requests.
