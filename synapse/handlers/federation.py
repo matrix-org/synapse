@@ -878,7 +878,7 @@ class FederationHandler(BaseHandler):
                     (d.type, d.state_key) for d in different_events
                 })
 
-                new_state, _ = self.state.resolve_events(
+                new_state, prev_state = self.state.resolve_events(
                     [local_view, remote_view],
                     event
                 )
