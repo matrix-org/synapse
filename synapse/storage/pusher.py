@@ -126,27 +126,27 @@ class PusherStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def update_pusher_last_token(self, user_name, pushkey, last_token):
+    def update_pusher_last_token(self, app_id, pushkey, last_token):
         yield self._simple_update_one(
             PushersTable.table_name,
-            {'user_name': user_name, 'pushkey': pushkey},
+            {'app_id': app_id, 'pushkey': pushkey},
             {'last_token': last_token}
         )
 
     @defer.inlineCallbacks
-    def update_pusher_last_token_and_success(self, user_name, pushkey,
+    def update_pusher_last_token_and_success(self, app_id, pushkey,
                                              last_token, last_success):
         yield self._simple_update_one(
             PushersTable.table_name,
-            {'user_name': user_name, 'pushkey': pushkey},
+            {'app_id': app_id, 'pushkey': pushkey},
             {'last_token': last_token, 'last_success': last_success}
         )
 
     @defer.inlineCallbacks
-    def update_pusher_failing_since(self, user_name, pushkey, failing_since):
+    def update_pusher_failing_since(self, app_id, pushkey, failing_since):
         yield self._simple_update_one(
             PushersTable.table_name,
-            {'user_name': user_name, 'pushkey': pushkey},
+            {'app_id': app_id, 'pushkey': pushkey},
             {'failing_since': failing_since}
         )
 
