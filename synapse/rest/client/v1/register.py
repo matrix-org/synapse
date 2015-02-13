@@ -110,7 +110,8 @@ class RegisterRestServlet(ClientV1RestServlet):
             stages = {
                 LoginType.RECAPTCHA: self._do_recaptcha,
                 LoginType.PASSWORD: self._do_password,
-                LoginType.EMAIL_IDENTITY: self._do_email_identity
+                LoginType.EMAIL_IDENTITY: self._do_email_identity,
+                LoginType.APPLICATION_SERVICE: self._do_app_service
             }
 
             session_info = self._get_session_info(request, session)
@@ -275,6 +276,27 @@ class RegisterRestServlet(ClientV1RestServlet):
         }
         self._remove_session(session)
         defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _do_app_service(self, request, register_json, session):
+        if "access_token" not in request.args:
+            raise SynapseError(400, "Expected application service token.")
+        if "user" not in register_json:
+            raise SynapseError(400, "Expected 'user' key.")
+
+        as_token = request.args["access_token"][0]
+        user_localpart = register_json["user"].encode("utf-8")
+
+        handler = self.handlers.registration_handler
+        (user_id, token) = yield handler.appservice_register(
+            user_localpart, as_token
+        )
+        self._remove_session(session)
+        defer.returnValue({
+            "user_id": user_id,
+            "access_token": token,
+            "home_server": self.hs.hostname,
+        })
 
 
 def _parse_json(request):

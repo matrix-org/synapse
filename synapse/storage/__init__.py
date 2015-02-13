@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.util.logutils import log_function
 from synapse.api.constants import EventTypes
 
+from .appservice import ApplicationServiceStore
 from .directory import DirectoryStore
 from .feedback import FeedbackStore
 from .presence import PresenceStore
@@ -65,6 +66,7 @@ SCHEMAS = [
     "event_signatures",
     "pusher",
     "media_repository",
+    "application_services",
     "filtering",
     "rejections",
 ]
@@ -86,6 +88,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, TransactionStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
+                ApplicationServiceStore,
                 EventFederationStore,
                 MediaRepositoryStore,
                 RejectionsStore,

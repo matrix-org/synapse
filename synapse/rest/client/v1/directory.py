@@ -45,8 +45,6 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_alias):
-        user, client = yield self.auth.get_user_by_req(request)
-
         content = _parse_json(request)
         if "room_id" not in content:
             raise SynapseError(400, "Missing room_id key",
@@ -70,33 +68,69 @@ class ClientDirectoryServer(ClientV1RestServlet):
         dir_handler = self.handlers.directory_handler
 
         try:
-            user_id = user.to_string()
-            yield dir_handler.create_association(
-                user_id, room_alias, room_id, servers
+            # try to auth as a user
+            user, client = yield self.auth.get_user_by_req(request)
+            try:
+                user_id = user.to_string()
+                yield dir_handler.create_association(
+                    user_id, room_alias, room_id, servers
+                )
+                yield dir_handler.send_room_alias_update_event(user_id, room_id)
+            except SynapseError as e:
+                raise e
+            except:
+                logger.exception("Failed to create association")
+                raise
+        except AuthError:
+            # try to auth as an application service
+            service = yield self.auth.get_appservice_by_req(request)
+            yield dir_handler.create_appservice_association(
+                service, room_alias, room_id, servers
             )
-            yield dir_handler.send_room_alias_update_event(user_id, room_id)
-        except SynapseError as e:
-            raise e
-        except:
-            logger.exception("Failed to create association")
-            raise
+            logger.info(
+                "Application service at %s created alias %s pointing to %s",
+                service.url,
+                room_alias.to_string(),
+                room_id
+            )
 
         defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, room_alias):
+        dir_handler = self.handlers.directory_handler
+
+        try:
+            service = yield self.auth.get_appservice_by_req(request)
+            room_alias = RoomAlias.from_string(room_alias)
+            yield dir_handler.delete_appservice_association(
+                service, room_alias
+            )
+            logger.info(
+                "Application service at %s deleted alias %s",
+                service.url,
+                room_alias.to_string()
+            )
+            defer.returnValue((200, {}))
+        except AuthError:
+            # fallback to default user behaviour if they aren't an AS
+            pass
+
         user, client = yield self.auth.get_user_by_req(request)
 
         is_admin = yield self.auth.is_server_admin(user)
         if not is_admin:
             raise AuthError(403, "You need to be a server admin")
 
-        dir_handler = self.handlers.directory_handler
-
         room_alias = RoomAlias.from_string(room_alias)
 
         yield dir_handler.delete_association(
             user.to_string(), room_alias
+        )
+        logger.info(
+            "User %s deleted alias %s",
+            user.to_string(),
+            room_alias.to_string()
         )
 
         defer.returnValue((200, {}))
