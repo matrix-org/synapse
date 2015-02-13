@@ -385,17 +385,10 @@ class MessageHandler(BaseHandler):
                     as_event=True,
                 )
                 presence.append(member_presence)
-            except SynapseError as e:
-                if e.code == 404:
-                    # FIXME: We are doing this as a warn since this gets hit a
-                    # lot and spams the logs. Why is this happening?
-                    logger.warn(
-                        "Failed to get member presence of %r", m.user_id
-                    )
-                else:
-                    logger.exception(
-                        "Failed to get member presence of %r", m.user_id
-                    )
+            except SynapseError:
+                logger.exception(
+                    "Failed to get member presence of %r", m.user_id
+                )
 
         time_now = self.clock.time_msec()
 

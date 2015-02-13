@@ -858,6 +858,40 @@ class FederationHandler(BaseHandler):
             # Do auth conflict res.
             logger.debug("Different auth: %s", different_auth)
 
+            different_events = yield defer.gatherResults(
+                [
+                    self.store.get_event(
+                        d,
+                        allow_none=True,
+                        allow_rejected=False,
+                    )
+                    for d in different_auth
+                    if d in have_events and not have_events[d]
+                ],
+                consumeErrors=True
+            )
+
+            if different_events:
+                local_view = dict(auth_events)
+                remote_view = dict(auth_events)
+                remote_view.update({
+                    (d.type, d.state_key) for d in different_events
+                })
+
+                new_state, prev_state = self.state.resolve_events(
+                    [local_view, remote_view],
+                    event
+                )
+
+                auth_events.update(new_state)
+
+                current_state = set(e.event_id for e in auth_events.values())
+                different_auth = event_auth_events - current_state
+
+                context.current_state.update(auth_events)
+                context.state_group = None
+
+        if different_auth and not event.internal_metadata.is_outlier():
             # Only do auth resolution if we have something new to say.
             # We can't rove an auth failure.
             do_resolution = False
