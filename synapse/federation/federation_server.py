@@ -411,9 +411,12 @@ class FederationServer(FederationBase):
                 "_handle_new_pdu getting state for %s",
                 pdu.room_id
             )
-            state, auth_chain = yield self.get_state_for_room(
-                origin, pdu.room_id, pdu.event_id,
-            )
+            try:
+                state, auth_chain = yield self.get_state_for_room(
+                    origin, pdu.room_id, pdu.event_id,
+                )
+            except:
+                logger.warn("Failed to get state for event: %s", pdu.event_id)
 
         ret = yield self.handler.on_receive_pdu(
             origin,

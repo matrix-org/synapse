@@ -50,8 +50,11 @@ class FederationBase(object):
         Returns:
             Deferred : A list of PDUs that have valid signatures and hashes.
         """
+
         signed_pdus = []
-        for pdu in pdus:
+
+        @defer.inlineCallbacks
+        def do(pdu):
             try:
                 new_pdu = yield self._check_sigs_and_hash(pdu)
                 signed_pdus.append(new_pdu)
@@ -61,25 +64,37 @@ class FederationBase(object):
                 # Check local db.
                 new_pdu = yield self.store.get_event(
                     pdu.event_id,
-                    allow_rejected=True
+                    allow_rejected=True,
+                    allow_none=True,
                 )
                 if new_pdu:
                     signed_pdus.append(new_pdu)
-                    continue
+                    return
 
                 # Check pdu.origin
                 if pdu.origin != origin:
-                    new_pdu = yield self.get_pdu(
-                        destinations=[pdu.origin],
-                        event_id=pdu.event_id,
-                        outlier=outlier,
-                    )
+                    try:
+                        new_pdu = yield self.get_pdu(
+                            destinations=[pdu.origin],
+                            event_id=pdu.event_id,
+                            outlier=outlier,
+                        )
 
-                    if new_pdu:
-                        signed_pdus.append(new_pdu)
-                        continue
+                        if new_pdu:
+                            signed_pdus.append(new_pdu)
+                            return
+                    except:
+                        pass
 
-                logger.warn("Failed to find copy of %s with valid signature")
+                logger.warn(
+                    "Failed to find copy of %s with valid signature",
+                    pdu.event_id,
+                )
+
+        yield defer.gatherResults(
+            [do(pdu) for pdu in pdus],
+            consumeErrors=True
+        )
 
         defer.returnValue(signed_pdus)
 
