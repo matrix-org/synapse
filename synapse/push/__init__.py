@@ -237,7 +237,7 @@ class Pusher(object):
                 self.user_name, config, timeout=0)
             self.last_token = chunk['end']
             self.store.update_pusher_last_token(
-                self.user_name, self.pushkey, self.last_token)
+                self.app_id, self.pushkey, self.last_token)
             logger.info("Pusher %s for user %s starting from token %s",
                         self.pushkey, self.user_name, self.last_token)
 
@@ -308,7 +308,7 @@ class Pusher(object):
                 self.backoff_delay = Pusher.INITIAL_BACKOFF
                 self.last_token = chunk['end']
                 self.store.update_pusher_last_token_and_success(
-                    self.user_name,
+                    self.app_id,
                     self.pushkey,
                     self.last_token,
                     self.clock.time_msec()
@@ -316,14 +316,14 @@ class Pusher(object):
                 if self.failing_since:
                     self.failing_since = None
                     self.store.update_pusher_failing_since(
-                        self.user_name,
+                        self.app_id,
                         self.pushkey,
                         self.failing_since)
             else:
                 if not self.failing_since:
                     self.failing_since = self.clock.time_msec()
                     self.store.update_pusher_failing_since(
-                        self.user_name,
+                        self.app_id,
                         self.pushkey,
                         self.failing_since
                     )
@@ -340,14 +340,14 @@ class Pusher(object):
                     self.backoff_delay = Pusher.INITIAL_BACKOFF
                     self.last_token = chunk['end']
                     self.store.update_pusher_last_token(
-                        self.user_name,
+                        self.app_id,
                         self.pushkey,
                         self.last_token
                     )
 
                     self.failing_since = None
                     self.store.update_pusher_failing_since(
-                        self.user_name,
+                        self.app_id,
                         self.pushkey,
                         self.failing_since
                     )
