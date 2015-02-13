@@ -637,10 +637,13 @@ def prepare_database(db_conn):
                 c.executescript(sql_script)
 
             db_conn.commit()
+        else:
+            logger.info("Database is at version %r", user_version)
 
     else:
         sql_script = "BEGIN TRANSACTION;\n"
         for sql_loc in SCHEMAS:
+            logger.debug("Applying schema %r", sql_loc)
             sql_script += read_schema(sql_loc)
             sql_script += "\n"
         sql_script += "COMMIT TRANSACTION;"

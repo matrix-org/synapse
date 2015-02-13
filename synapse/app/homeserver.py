@@ -90,7 +90,9 @@ class SynapseHomeServer(HomeServer):
             "sqlite3", self.get_db_name(),
             check_same_thread=False,
             cp_min=1,
-            cp_max=1
+            cp_max=1,
+            cp_openfun=prepare_database,  # Prepare the database for each conn
+                                          # so that :memory: sqlite works
         )
 
     def create_resource_tree(self, web_client, redirect_root_to_web_client):
@@ -252,14 +254,6 @@ def setup():
 
     logger.info("Database prepared in %s.", db_name)
 
-    db_pool = hs.get_db_pool()
-
-    if db_name == ":memory:":
-        # Memory databases will need to be setup each time they are opened.
-        reactor.callWhenRunning(
-            db_pool.runWithConnection, prepare_database
-        )
-
     if config.manhole:
         f = twisted.manhole.telnet.ShellFactory()
         f.username = "matrix"
@@ -270,10 +264,10 @@ def setup():
     bind_port = config.bind_port
     if config.no_tls:
         bind_port = None
+
     hs.start_listening(bind_port, config.unsecure_port)
 
     hs.get_pusherpool().start()
-
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
 
