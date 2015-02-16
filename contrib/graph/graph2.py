@@ -21,6 +21,7 @@ import datetime
 import argparse
 
 from synapse.events import FrozenEvent
+from synapse.util.frozenutils import unfreeze
 
 
 def make_graph(db_name, room_id, file_prefix, limit):
@@ -70,7 +71,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
             float(event.origin_server_ts) / 1000
         ).strftime('%Y-%m-%d %H:%M:%S,%f')
 
-        content = json.dumps(event.get_dict()["content"])
+        content = json.dumps(unfreeze(event.get_dict()["content"]))
 
         label = (
             "<"
