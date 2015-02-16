@@ -366,7 +366,13 @@ class FederationServer(FederationBase):
                 pdu.room_id, min_depth
             )
 
-            if min_depth and pdu.depth > min_depth and max_recursion > 0:
+            if min_depth and pdu.depth < min_depth:
+                # This is so that we don't notify the user about this
+                # message, to work around the fact that some events will
+                # reference really really old events we really don't want to
+                # send to the clients.
+                pdu.internal_metadata.outlier = True
+            elif min_depth and pdu.depth > min_depth and max_recursion > 0:
                 for event_id, hashes in pdu.prev_events:
                     if event_id not in have_seen:
                         logger.debug(
