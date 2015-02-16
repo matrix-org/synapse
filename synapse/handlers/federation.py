@@ -879,7 +879,7 @@ class FederationHandler(BaseHandler):
                 })
 
                 new_state, prev_state = self.state_handler.resolve_events(
-                    [local_view, remote_view],
+                    [local_view.values(), remote_view.values()],
                     event
                 )
 
