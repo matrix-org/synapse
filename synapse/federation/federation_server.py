@@ -331,7 +331,6 @@ class FederationServer(FederationBase):
         )
         if already_seen:
             logger.debug("Already seen pdu %s", pdu.event_id)
-            defer.returnValue({})
             return
 
         # Check signature.
@@ -418,15 +417,13 @@ class FederationServer(FederationBase):
             except:
                 logger.warn("Failed to get state for event: %s", pdu.event_id)
 
-        ret = yield self.handler.on_receive_pdu(
+        yield self.handler.on_receive_pdu(
             origin,
             pdu,
             backfilled=False,
             state=state,
             auth_chain=auth_chain,
         )
-
-        defer.returnValue(ret)
 
     def __str__(self):
         return "<ReplicationLayer(%s)>" % self.server_name
