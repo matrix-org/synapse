@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+sys.dont_write_bytecode = True
+
 from synapse.storage import prepare_database, UpgradeDatabaseException
 
 from synapse.server import HomeServer
@@ -49,7 +52,6 @@ import synapse
 import logging
 import os
 import re
-import sys
 import sqlite3
 import syweb
 

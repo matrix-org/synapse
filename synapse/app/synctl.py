@@ -19,7 +19,7 @@ import os
 import subprocess
 import signal
 
-SYNAPSE = ["python", "-m", "synapse.app.homeserver"]
+SYNAPSE = ["python", "-B", "-m", "synapse.app.homeserver"]
 
 CONFIGFILE = "homeserver.yaml"
 PIDFILE = "homeserver.pid"
