@@ -361,13 +361,6 @@ class FederationServer(FederationBase):
                 affected=pdu.event_id,
             )
 
-        raise FederationError(
-            "ERROR",
-            403,
-            "Forbidden",
-            affected=pdu.event_id,
-        )
-
         state = None
 
         auth_chain = []
