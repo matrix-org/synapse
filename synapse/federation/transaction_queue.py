@@ -167,15 +167,6 @@ class TransactionQueue(object):
             logger.info("TX [%s] Nothing to send", destination)
             return
 
-        logger.debug(
-            "TX [%s] Attempting new transaction"
-            " (pdus: %d, edus: %d, failures: %d)",
-            destination,
-            len(pending_pdus),
-            len(pending_edus),
-            len(pending_failures)
-        )
-
         # Sort based on the order field
         pending_pdus.sort(key=lambda t: t[2])
 
@@ -194,32 +185,41 @@ class TransactionQueue(object):
                 self.store,
             )
 
+            logger.debug(
+                "TX [%s] Attempting new transaction"
+                " (pdus: %d, edus: %d, failures: %d)",
+                destination,
+                len(pending_pdus),
+                len(pending_edus),
+                len(pending_failures)
+            )
+
+            self.pending_transactions[destination] = 1
+
+            logger.debug("TX [%s] Persisting transaction...", destination)
+
+            transaction = Transaction.create_new(
+                origin_server_ts=int(self._clock.time_msec()),
+                transaction_id=str(self._next_txn_id),
+                origin=self.server_name,
+                destination=destination,
+                pdus=pdus,
+                edus=edus,
+                pdu_failures=failures,
+            )
+
+            self._next_txn_id += 1
+
+            yield self.transaction_actions.prepare_to_send(transaction)
+
+            logger.debug("TX [%s] Persisted transaction", destination)
+            logger.info(
+                "TX [%s] Sending transaction [%s]",
+                destination,
+                transaction.transaction_id,
+            )
+
             with limiter:
-                self.pending_transactions[destination] = 1
-
-                logger.debug("TX [%s] Persisting transaction...", destination)
-
-                transaction = Transaction.create_new(
-                    origin_server_ts=int(self._clock.time_msec()),
-                    transaction_id=str(self._next_txn_id),
-                    origin=self.server_name,
-                    destination=destination,
-                    pdus=pdus,
-                    edus=edus,
-                    pdu_failures=failures,
-                )
-
-                self._next_txn_id += 1
-
-                yield self.transaction_actions.prepare_to_send(transaction)
-
-                logger.debug("TX [%s] Persisted transaction", destination)
-                logger.info(
-                    "TX [%s] Sending transaction [%s]",
-                    destination,
-                    transaction.transaction_id,
-                )
-
                 # Actually send the transaction
 
                 # FIXME (erikj): This is a bit of a hack to make the Pdu age
@@ -249,11 +249,11 @@ class TransactionQueue(object):
                 logger.debug("TX [%s] Sent transaction", destination)
                 logger.debug("TX [%s] Marking as delivered...", destination)
 
-                yield self.transaction_actions.delivered(
-                    transaction, code, response
-                )
+            yield self.transaction_actions.delivered(
+                transaction, code, response
+            )
 
-                logger.debug("TX [%s] Marked as delivered", destination)
+            logger.debug("TX [%s] Marked as delivered", destination)
 
             logger.debug("TX [%s] Yielding to callbacks...", destination)
 

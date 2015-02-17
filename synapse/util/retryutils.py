@@ -15,6 +15,8 @@
 
 from twisted.internet import defer
 
+from synapse.api.errors import CodeMessageException
+
 import logging
 
 
@@ -67,7 +69,7 @@ def get_retry_limiter(destination, clock, store, **kwargs):
 class RetryDestinationLimiter(object):
     def __init__(self, destination, clock, store, retry_interval,
                  min_retry_interval=20000, max_retry_interval=60 * 60 * 1000,
-                 multiplier_retry_interval=2):
+                 multiplier_retry_interval=2,):
         self.clock = clock
         self.store = store
         self.destination = destination
@@ -87,7 +89,11 @@ class RetryDestinationLimiter(object):
                 failure.value
             )
 
-        if exc_type is None and exc_val is None and exc_tb is None:
+        valid_err_code = False
+        if exc_type is CodeMessageException:
+            valid_err_code = 0 <= exc_val.code < 500
+
+        if exc_type is None or valid_err_code:
             # We connected successfully.
             if not self.retry_interval:
                 return
