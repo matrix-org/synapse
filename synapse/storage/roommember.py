@@ -288,7 +288,7 @@ class RoomMemberStore(SQLBaseStore):
 
         deferreds = [self.get_rooms_for_user(u) for u in user_id_list]
 
-        results = yield defer.DeferredList(deferreds)
+        results = yield defer.DeferredList(deferreds, consumeErrors=True)
 
         # A list of sets of strings giving room IDs for each user
         room_id_lists = [set([r.room_id for r in result[1]]) for result in results]

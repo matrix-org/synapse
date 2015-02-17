@@ -141,7 +141,8 @@ class Notifier(object):
 
         with PreserveLoggingContext():
             yield defer.DeferredList(
-                [notify(l).addErrback(eb) for l in listeners]
+                [notify(l).addErrback(eb) for l in listeners],
+                consumeErrors=True,
             )
 
     @defer.inlineCallbacks
@@ -209,7 +210,8 @@ class Notifier(object):
 
         with PreserveLoggingContext():
             yield defer.DeferredList(
-                [notify(l).addErrback(eb) for l in listeners]
+                [notify(l).addErrback(eb) for l in listeners],
+                consumeErrors=True,
             )
 
     @defer.inlineCallbacks
