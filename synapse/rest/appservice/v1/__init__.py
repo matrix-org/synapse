@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from . import register
 
-"""Contains the URL paths to prefix various aspects of the server with. """
+from synapse.http.server import JsonResource
 
-CLIENT_PREFIX = "/_matrix/client/api/v1"
-CLIENT_V2_ALPHA_PREFIX = "/_matrix/client/v2_alpha"
-FEDERATION_PREFIX = "/_matrix/federation/v1"
-WEB_CLIENT_PREFIX = "/_matrix/client"
-CONTENT_REPO_PREFIX = "/_matrix/content"
-SERVER_KEY_PREFIX = "/_matrix/key/v1"
-MEDIA_PREFIX = "/_matrix/media/v1"
-APP_SERVICE_PREFIX = "/_matrix/appservice/v1"
+
+class AppServiceRestResource(JsonResource):
+    """A resource for version 1 of the matrix application service API."""
+
+    def __init__(self, hs):
+        JsonResource.__init__(self, hs)
+        self.register_servlets(self, hs)
+
+    @staticmethod
+    def register_servlets(appservice_resource, hs):
+        register.register_servlets(hs, appservice_resource)

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+from synapse.api.errors import CodeMessageException
 from synapse.http.agent_name import AGENT_NAME
 from syutil.jsonutil import encode_canonical_json
 
@@ -85,7 +85,7 @@ class SimpleHttpClient(object):
 
     @defer.inlineCallbacks
     def get_json(self, uri, args={}):
-        """ Get's some json from the given host and path
+        """ Gets some json from the given URI.
 
         Args:
             uri (str): The URI to request, not including query parameters
@@ -93,15 +93,13 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-
         Returns:
-            Deferred: Succeeds when we get *any* HTTP response.
-
-            The result of the deferred is a tuple of `(code, response)`,
-            where `response` is a dict representing the decoded JSON body.
+            Deferred: Succeeds when we get *any* 2xx HTTP response, with the
+            HTTP body as JSON.
+        Raises:
+            On a non-2xx HTTP response. The response body will be used as the
+            error message.
         """
-
-        yield
         if len(args):
             query_bytes = urllib.urlencode(args, True)
             uri = "%s?%s" % (uri, query_bytes)
@@ -116,7 +114,56 @@ class SimpleHttpClient(object):
 
         body = yield readBody(response)
 
-        defer.returnValue(json.loads(body))
+        if 200 <= response.code < 300:
+            defer.returnValue(json.loads(body))
+        else:
+            # NB: This is explicitly not json.loads(body)'d because the contract
+            # of CodeMessageException is a *string* message. Callers can always
+            # load it into JSON if they want.
+            raise CodeMessageException(response.code, body)
+
+    @defer.inlineCallbacks
+    def put_json(self, uri, json_body, args={}):
+        """ Puts some json to the given URI.
+
+        Args:
+            uri (str): The URI to request, not including query parameters
+            json_body (dict): The JSON to put in the HTTP body,
+            args (dict): A dictionary used to create query strings, defaults to
+                None.
+                **Note**: The value of each key is assumed to be an iterable
+                and *not* a string.
+        Returns:
+            Deferred: Succeeds when we get *any* 2xx HTTP response, with the
+            HTTP body as JSON.
+        Raises:
+            On a non-2xx HTTP response.
+        """
+        if len(args):
+            query_bytes = urllib.urlencode(args, True)
+            uri = "%s?%s" % (uri, query_bytes)
+
+        json_str = json.dumps(json_body)
+
+        response = yield self.agent.request(
+            "PUT",
+            uri.encode("ascii"),
+            headers=Headers({
+                b"User-Agent": [AGENT_NAME],
+                "Content-Type": ["application/json"]
+            }),
+            bodyProducer=FileBodyProducer(StringIO(json_str))
+        )
+
+        body = yield readBody(response)
+
+        if 200 <= response.code < 300:
+            defer.returnValue(json.loads(body))
+        else:
+            # NB: This is explicitly not json.loads(body)'d because the contract
+            # of CodeMessageException is a *string* message. Callers can always
+            # load it into JSON if they want.
+            raise CodeMessageException(response.code, body)
 
 
 class CaptchaServerHttpClient(SimpleHttpClient):

@@ -26,13 +26,14 @@ from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
 from synapse.http.server import JsonResource, RootRedirect
+from synapse.rest.appservice.v1 import AppServiceRestResource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
 from synapse.http.server_key_resource import LocalKey
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX,
+    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX, APP_SERVICE_PREFIX
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -69,6 +70,9 @@ class SynapseHomeServer(HomeServer):
     def build_resource_for_federation(self):
         return JsonResource(self)
 
+    def build_resource_for_app_services(self):
+        return AppServiceRestResource(self)
+
     def build_resource_for_web_client(self):
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
@@ -90,7 +94,9 @@ class SynapseHomeServer(HomeServer):
             "sqlite3", self.get_db_name(),
             check_same_thread=False,
             cp_min=1,
-            cp_max=1
+            cp_max=1,
+            cp_openfun=prepare_database,  # Prepare the database for each conn
+                                          # so that :memory: sqlite works
         )
 
     def create_resource_tree(self, web_client, redirect_root_to_web_client):
@@ -114,6 +120,7 @@ class SynapseHomeServer(HomeServer):
             (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
             (MEDIA_PREFIX, self.get_resource_for_media_repository()),
+            (APP_SERVICE_PREFIX, self.get_resource_for_app_services()),
         ]
         if web_client:
             logger.info("Adding the web client.")
@@ -252,14 +259,6 @@ def setup():
 
     logger.info("Database prepared in %s.", db_name)
 
-    db_pool = hs.get_db_pool()
-
-    if db_name == ":memory:":
-        # Memory databases will need to be setup each time they are opened.
-        reactor.callWhenRunning(
-            db_pool.runWithConnection, prepare_database
-        )
-
     if config.manhole:
         f = twisted.manhole.telnet.ShellFactory()
         f.username = "matrix"
@@ -270,10 +269,10 @@ def setup():
     bind_port = config.bind_port
     if config.no_tls:
         bind_port = None
+
     hs.start_listening(bind_port, config.unsecure_port)
 
     hs.get_pusherpool().start()
-
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
 

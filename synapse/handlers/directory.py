@@ -37,18 +37,15 @@ class DirectoryHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def create_association(self, user_id, room_alias, room_id, servers=None):
-
-        # TODO(erikj): Do auth.
+    def _create_association(self, room_alias, room_id, servers=None):
+        # general association creation for both human users and app services
 
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
             # TODO(erikj): Change this.
 
         # TODO(erikj): Add transactions.
-
         # TODO(erikj): Check if there is a current association.
-
         if not servers:
             servers = yield self.store.get_joined_hosts_for_room(room_id)
 
@@ -62,22 +59,77 @@ class DirectoryHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
+    def create_association(self, user_id, room_alias, room_id, servers=None):
+        # association creation for human users
+        # TODO(erikj): Do user auth.
+
+        can_create = yield self.can_modify_alias(
+            room_alias,
+            user_id=user_id
+        )
+        if not can_create:
+            raise SynapseError(
+                400, "This alias is reserved by an application service.",
+                errcode=Codes.EXCLUSIVE
+            )
+        yield self._create_association(room_alias, room_id, servers)
+
+    @defer.inlineCallbacks
+    def create_appservice_association(self, service, room_alias, room_id,
+                                      servers=None):
+        if not service.is_interested_in_alias(room_alias.to_string()):
+            raise SynapseError(
+                400, "This application service has not reserved"
+                " this kind of alias.", errcode=Codes.EXCLUSIVE
+            )
+
+        # association creation for app services
+        yield self._create_association(room_alias, room_id, servers)
+
+    @defer.inlineCallbacks
     def delete_association(self, user_id, room_alias):
+        # association deletion for human users
+
         # TODO Check if server admin
 
+        can_delete = yield self.can_modify_alias(
+            room_alias,
+            user_id=user_id
+        )
+        if not can_delete:
+            raise SynapseError(
+                400, "This alias is reserved by an application service.",
+                errcode=Codes.EXCLUSIVE
+            )
+
+        yield self._delete_association(room_alias)
+
+    @defer.inlineCallbacks
+    def delete_appservice_association(self, service, room_alias):
+        if not service.is_interested_in_alias(room_alias.to_string()):
+            raise SynapseError(
+                400,
+                "This application service has not reserved this kind of alias",
+                errcode=Codes.EXCLUSIVE
+            )
+        yield self._delete_association(room_alias)
+
+    @defer.inlineCallbacks
+    def _delete_association(self, room_alias):
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
-        room_id = yield self.store.delete_room_alias(room_alias)
+        yield self.store.delete_room_alias(room_alias)
 
-        if room_id:
-            yield self._update_room_alias_events(user_id, room_id)
+        # TODO - Looks like _update_room_alias_event has never been implemented
+        # if room_id:
+        #    yield self._update_room_alias_events(user_id, room_id)
 
     @defer.inlineCallbacks
     def get_association(self, room_alias):
         room_id = None
         if self.hs.is_mine(room_alias):
-            result = yield self.store.get_association_from_room_alias(
+            result = yield self.get_association_from_room_alias(
                 room_alias
             )
 
@@ -138,7 +190,7 @@ class DirectoryHandler(BaseHandler):
                 400, "Room Alias is not hosted on this Home Server"
             )
 
-        result = yield self.store.get_association_from_room_alias(
+        result = yield self.get_association_from_room_alias(
             room_alias
         )
 
@@ -166,3 +218,27 @@ class DirectoryHandler(BaseHandler):
             "sender": user_id,
             "content": {"aliases": aliases},
         }, ratelimit=False)
+
+    @defer.inlineCallbacks
+    def get_association_from_room_alias(self, room_alias):
+        result = yield self.store.get_association_from_room_alias(
+            room_alias
+        )
+        if not result:
+            # Query AS to see if it exists
+            as_handler = self.hs.get_handlers().appservice_handler
+            result = yield as_handler.query_room_alias_exists(room_alias)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def can_modify_alias(self, alias, user_id=None):
+        services = yield self.store.get_app_services()
+        interested_services = [
+            s for s in services if s.is_interested_in_alias(alias.to_string())
+        ]
+        for service in interested_services:
+            if user_id == service.sender:
+                # this user IS the app service
+                defer.returnValue(True)
+                return
+        defer.returnValue(len(interested_services) == 0)

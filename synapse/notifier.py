@@ -99,6 +99,12 @@ class Notifier(object):
         `extra_users` param.
         """
         yield run_on_reactor()
+
+        # poke any interested application service.
+        self.hs.get_handlers().appservice_handler.notify_interested_services(
+            event
+        )
+
         room_id = event.room_id
 
         room_source = self.event_sources.sources["room"]
