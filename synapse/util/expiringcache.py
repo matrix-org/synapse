@@ -85,7 +85,7 @@ class ExpiringCache(object):
         except KeyError:
             return default
 
-    def _purge_cache(self):
+    def _prune_cache(self):
         if not self._expiry_ms:
             # zero expiry time means don't expire. This should never get called
             # since we have this check in start too.
