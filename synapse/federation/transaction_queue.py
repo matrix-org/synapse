@@ -98,7 +98,7 @@ class TransactionQueue(object):
 
             deferreds.append(deferred)
 
-        yield defer.DeferredList(deferreds)
+        yield defer.DeferredList(deferreds, consumeErrors=True)
 
     # NO inlineCallbacks
     def enqueue_edu(self, edu):

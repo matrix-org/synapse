@@ -124,7 +124,7 @@ class FederationServer(FederationBase):
                         edu.content
                     )
 
-            results = yield defer.DeferredList(dl)
+            results = yield defer.DeferredList(dl, consumeErrors=True)
 
         ret = []
         for r in results:
