@@ -87,69 +87,85 @@ class Keyring(object):
             return
 
         # Try to fetch the key from the remote server.
-        # TODO(markjh): Ratelimit requests to a given server.
 
-        (response, tls_certificate) = yield fetch_server_key(
-            server_name, self.hs.tls_context_factory
+        retry_last_ts, retry_interval = (0, 0)
+        retry_timings = yield self.store.get_destination_retry_timings(
+            server_name
         )
+        if retry_timings:
+            retry_last_ts, retry_interval = (
+                retry_timings.retry_last_ts, retry_timings.retry_interval
+            )
+            if retry_last_ts + retry_interval > int(self.clock.time_msec()):
+                logger.info("%s not ready for retry", server_name)
+                raise ValueError("No verification key found for given key ids")
 
-        # Check the response.
-
-        x509_certificate_bytes = crypto.dump_certificate(
-            crypto.FILETYPE_ASN1, tls_certificate
-        )
-
-        if ("signatures" not in response
-                or server_name not in response["signatures"]):
-            raise ValueError("Key response not signed by remote server")
-
-        if "tls_certificate" not in response:
-            raise ValueError("Key response missing TLS certificate")
-
-        tls_certificate_b64 = response["tls_certificate"]
-
-        if encode_base64(x509_certificate_bytes) != tls_certificate_b64:
-            raise ValueError("TLS certificate doesn't match")
-
-        verify_keys = {}
-        for key_id, key_base64 in response["verify_keys"].items():
-            if is_signing_algorithm_supported(key_id):
-                key_bytes = decode_base64(key_base64)
-                verify_key = decode_verify_key_bytes(key_id, key_bytes)
-                verify_keys[key_id] = verify_key
-
-        for key_id in response["signatures"][server_name]:
-            if key_id not in response["verify_keys"]:
-                raise ValueError(
-                    "Key response must include verification keys for all"
-                    " signatures"
-                )
-            if key_id in verify_keys:
-                verify_signed_json(
-                    response,
-                    server_name,
-                    verify_keys[key_id]
-                )
-
-        # Cache the result in the datastore.
-
-        time_now_ms = self.clock.time_msec()
-
-        yield self.store.store_server_certificate(
-            server_name,
-            server_name,
-            time_now_ms,
-            tls_certificate,
-        )
-
-        for key_id, key in verify_keys.items():
-            yield self.store.store_server_verify_key(
-                server_name, server_name, time_now_ms, key
+        try:
+            (response, tls_certificate) = yield fetch_server_key(
+                server_name, self.hs.tls_context_factory
             )
 
-        for key_id in key_ids:
-            if key_id in verify_keys:
-                defer.returnValue(verify_keys[key_id])
-                return
+            # Check the response.
 
-        raise ValueError("No verification key found for given key ids")
+            x509_certificate_bytes = crypto.dump_certificate(
+                crypto.FILETYPE_ASN1, tls_certificate
+            )
+
+            if ("signatures" not in response
+                    or server_name not in response["signatures"]):
+                raise ValueError("Key response not signed by remote server")
+
+            if "tls_certificate" not in response:
+                raise ValueError("Key response missing TLS certificate")
+
+            tls_certificate_b64 = response["tls_certificate"]
+
+            if encode_base64(x509_certificate_bytes) != tls_certificate_b64:
+                raise ValueError("TLS certificate doesn't match")
+
+            verify_keys = {}
+            for key_id, key_base64 in response["verify_keys"].items():
+                if is_signing_algorithm_supported(key_id):
+                    key_bytes = decode_base64(key_base64)
+                    verify_key = decode_verify_key_bytes(key_id, key_bytes)
+                    verify_keys[key_id] = verify_key
+
+            for key_id in response["signatures"][server_name]:
+                if key_id not in response["verify_keys"]:
+                    raise ValueError(
+                        "Key response must include verification keys for all"
+                        " signatures"
+                    )
+                if key_id in verify_keys:
+                    verify_signed_json(
+                        response,
+                        server_name,
+                        verify_keys[key_id]
+                    )
+
+            # Cache the result in the datastore.
+
+            time_now_ms = self.clock.time_msec()
+
+            yield self.store.store_server_certificate(
+                server_name,
+                server_name,
+                time_now_ms,
+                tls_certificate,
+            )
+
+            for key_id, key in verify_keys.items():
+                yield self.store.store_server_verify_key(
+                    server_name, server_name, time_now_ms, key
+                )
+
+            for key_id in key_ids:
+                if key_id in verify_keys:
+                    defer.returnValue(verify_keys[key_id])
+                    return
+
+            raise ValueError("No verification key found for given key ids")
+
+        except:
+            self.set_retrying(server_name, retry_interval)
+            raise
