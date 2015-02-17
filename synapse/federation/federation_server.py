@@ -331,7 +331,6 @@ class FederationServer(FederationBase):
         )
         if already_seen:
             logger.debug("Already seen pdu %s", pdu.event_id)
-            defer.returnValue({})
             return
 
         # Check signature.
@@ -367,7 +366,13 @@ class FederationServer(FederationBase):
                 pdu.room_id, min_depth
             )
 
-            if min_depth and pdu.depth > min_depth and max_recursion > 0:
+            if min_depth and pdu.depth < min_depth:
+                # This is so that we don't notify the user about this
+                # message, to work around the fact that some events will
+                # reference really really old events we really don't want to
+                # send to the clients.
+                pdu.internal_metadata.outlier = True
+            elif min_depth and pdu.depth > min_depth and max_recursion > 0:
                 for event_id, hashes in pdu.prev_events:
                     if event_id not in have_seen:
                         logger.debug(
@@ -418,15 +423,13 @@ class FederationServer(FederationBase):
             except:
                 logger.warn("Failed to get state for event: %s", pdu.event_id)
 
-        ret = yield self.handler.on_receive_pdu(
+        yield self.handler.on_receive_pdu(
             origin,
             pdu,
             backfilled=False,
             state=state,
             auth_chain=auth_chain,
         )
-
-        defer.returnValue(ret)
 
     def __str__(self):
         return "<ReplicationLayer(%s)>" % self.server_name
