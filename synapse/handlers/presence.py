@@ -492,7 +492,7 @@ class PresenceHandler(BaseHandler):
                 user, domain, remoteusers
             ))
 
-        yield defer.DeferredList(deferreds)
+        yield defer.DeferredList(deferreds, consumeErrors=True)
 
     def _start_polling_local(self, user, target_user):
         target_localpart = target_user.localpart
@@ -548,7 +548,7 @@ class PresenceHandler(BaseHandler):
                 self._stop_polling_remote(user, domain, remoteusers)
             )
 
-        return defer.DeferredList(deferreds)
+        return defer.DeferredList(deferreds, consumeErrors=True)
 
     def _stop_polling_local(self, user, target_user):
         for localpart in self._local_pushmap.keys():
@@ -729,7 +729,7 @@ class PresenceHandler(BaseHandler):
                     del self._remote_sendmap[user]
 
         with PreserveLoggingContext():
-            yield defer.DeferredList(deferreds)
+            yield defer.DeferredList(deferreds, consumeErrors=True)
 
     @defer.inlineCallbacks
     def push_update_to_local_and_remote(self, observed_user, statuscache,
@@ -768,7 +768,7 @@ class PresenceHandler(BaseHandler):
                 )
             )
 
-        yield defer.DeferredList(deferreds)
+        yield defer.DeferredList(deferreds, consumeErrors=True)
 
         defer.returnValue((localusers, remote_domains))
 
