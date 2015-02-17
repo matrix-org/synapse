@@ -91,7 +91,7 @@ class TransactionQueue(object):
                 if not deferred.called:
                     deferred.errback(failure)
                 else:
-                    logger.warn("Failed to send pdu", failure)
+                    logger.warn("Failed to send pdu", failure.value)
 
             with PreserveLoggingContext():
                 self._attempt_new_transaction(destination).addErrback(eb)
@@ -116,7 +116,7 @@ class TransactionQueue(object):
             if not deferred.called:
                 deferred.errback(failure)
             else:
-                logger.warn("Failed to send edu", failure)
+                logger.warn("Failed to send edu", failure.value)
 
         with PreserveLoggingContext():
             self._attempt_new_transaction(destination).addErrback(eb)
@@ -132,6 +132,15 @@ class TransactionQueue(object):
         ).append(
             (failure, deferred)
         )
+
+        def eb(failure):
+            if not deferred.called:
+                deferred.errback(failure)
+            else:
+                logger.warn("Failed to send failure", failure.value)
+
+        with PreserveLoggingContext():
+            self._attempt_new_transaction(destination).addErrback(eb)
 
         yield deferred
 
@@ -249,6 +258,15 @@ class TransactionQueue(object):
                     transaction, json_data_cb
                 )
                 code = 200
+
+                if response:
+                    for e_id, r in getattr(response, "pdus", {}).items():
+                        if "error" in r:
+                            logger.warn(
+                                "Transaction returned error for %s: %s",
+                                e_id, r,
+                            )
+
             except HttpResponseException as e:
                 code = e.code
                 response = e.response

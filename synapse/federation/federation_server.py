@@ -118,7 +118,7 @@ class FederationServer(FederationBase):
 
                 def handle_failure(failure):
                     failure.trap(FederationError)
-                    self.enqueue_failure(failure.value, transaction.origin)
+                    self.send_failure(failure.value, transaction.origin)
 
                 d.addErrback(handle_failure)
 
@@ -132,7 +132,7 @@ class FederationServer(FederationBase):
                         edu.content
                     )
 
-            for failure in getattr(transaction, "failures", []):
+            for failure in getattr(transaction, "pdu_failures", []):
                 logger.info("Got failure %r", failure)
 
             results = yield defer.DeferredList(dl, consumeErrors=True)
@@ -143,11 +143,15 @@ class FederationServer(FederationBase):
                 ret.append({})
             else:
                 logger.exception(r[1])
-                ret.append({"error": str(r[1])})
+                ret.append({"error": str(r[1].value)})
 
         logger.debug("Returning: %s", str(ret))
 
-        response = ret
+        response = {
+            "pdus": dict(zip(
+                (p.event_id for p in pdu_list), ret
+            )),
+        }
 
         yield self.transaction_actions.set_response(
             transaction,
@@ -357,6 +361,13 @@ class FederationServer(FederationBase):
                 e.msg,
                 affected=pdu.event_id,
             )
+
+        raise FederationError(
+            "ERROR",
+            403,
+            "Forbidden",
+            affected=pdu.event_id,
+        )
 
         state = None
 
