@@ -76,6 +76,8 @@ SCHEMAS = [
 # database schema files, so the users will be informed on server restarts.
 SCHEMA_VERSION = 13
 
+dir_path = os.path.abspath(os.path.dirname(__file__))
+
 
 class _RollbackButIsFineException(Exception):
     """ This exception is used to rollback a transaction without implying
@@ -583,7 +585,6 @@ def schema_path(schema):
         A filesystem path pointing at a ".sql" file.
 
     """
-    dir_path = os.path.dirname(__file__)
     schemaPath = os.path.join(dir_path, "schema", schema + ".sql")
     return schemaPath
 
