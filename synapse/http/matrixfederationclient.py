@@ -16,7 +16,6 @@
 
 from twisted.internet import defer, reactor, protocol
 from twisted.internet.error import DNSLookupError
-from twisted.python.failure import Failure
 from twisted.web.client import readBody, _AgentBase, _URI
 from twisted.web.http_headers import Headers
 from twisted.web._newclient import ResponseDone
