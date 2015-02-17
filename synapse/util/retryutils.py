@@ -89,6 +89,9 @@ class RetryDestinationLimiter(object):
 
         if exc_type is None and exc_val is None and exc_tb is None:
             # We connected successfully.
+            if not self.retry_interval:
+                return
+
             retry_last_ts = 0
             self.retry_interval = 0
         else:
