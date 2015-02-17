@@ -81,7 +81,7 @@ class RetryDestinationLimiter(object):
         pass
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        def err(self, failure):
+        def err(failure):
             logger.exception(
                 "Failed to store set_destination_retry_timings",
                 failure.value
