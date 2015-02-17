@@ -147,6 +147,8 @@ class FederationServer(FederationBase):
 
         logger.debug("Returning: %s", str(ret))
 
+        response = ret
+
         yield self.transaction_actions.set_response(
             transaction,
             200, response
