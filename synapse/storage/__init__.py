@@ -74,7 +74,7 @@ SCHEMAS = [
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 
 class _RollbackButIsFineException(Exception):
