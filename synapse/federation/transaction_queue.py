@@ -22,6 +22,9 @@ from .units import Transaction
 from synapse.api.errors import HttpResponseException
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.retryutils import (
+    get_retry_limiter, NotRetryingDestination,
+)
 
 import logging
 
@@ -138,25 +141,6 @@ class TransactionQueue(object):
     @defer.inlineCallbacks
     @log_function
     def _attempt_new_transaction(self, destination):
-
-        (retry_last_ts, retry_interval) = (0, 0)
-        retry_timings = yield self.store.get_destination_retry_timings(
-            destination
-        )
-        if retry_timings:
-            (retry_last_ts, retry_interval) = (
-                retry_timings.retry_last_ts, retry_timings.retry_interval
-            )
-            if retry_last_ts + retry_interval > int(self._clock.time_msec()):
-                logger.info(
-                    "TX [%s] not ready for retry yet - "
-                    "dropping transaction for now",
-                    destination,
-                )
-                return
-            else:
-                logger.info("TX [%s] is ready for retry", destination)
-
         if destination in self.pending_transactions:
             # XXX: pending_transactions can get stuck on by a never-ending
             # request at which point pending_pdus_by_dest just keeps growing.
@@ -204,77 +188,79 @@ class TransactionQueue(object):
         ]
 
         try:
-            self.pending_transactions[destination] = 1
-
-            logger.debug("TX [%s] Persisting transaction...", destination)
-
-            transaction = Transaction.create_new(
-                origin_server_ts=int(self._clock.time_msec()),
-                transaction_id=str(self._next_txn_id),
-                origin=self.server_name,
-                destination=destination,
-                pdus=pdus,
-                edus=edus,
-                pdu_failures=failures,
-            )
-
-            self._next_txn_id += 1
-
-            yield self.transaction_actions.prepare_to_send(transaction)
-
-            logger.debug("TX [%s] Persisted transaction", destination)
-            logger.info(
-                "TX [%s] Sending transaction [%s]",
+            limiter = yield get_retry_limiter(
                 destination,
-                transaction.transaction_id,
+                self._clock,
+                self.store,
             )
 
-            # Actually send the transaction
+            with limiter:
+                self.pending_transactions[destination] = 1
 
-            # FIXME (erikj): This is a bit of a hack to make the Pdu age
-            # keys work
-            def json_data_cb():
-                data = transaction.get_dict()
-                now = int(self._clock.time_msec())
-                if "pdus" in data:
-                    for p in data["pdus"]:
-                        if "age_ts" in p:
-                            unsigned = p.setdefault("unsigned", {})
-                            unsigned["age"] = now - int(p["age_ts"])
-                            del p["age_ts"]
-                return data
+                logger.debug("TX [%s] Persisting transaction...", destination)
 
-            try:
-                response = yield self.transport_layer.send_transaction(
-                    transaction, json_data_cb
+                transaction = Transaction.create_new(
+                    origin_server_ts=int(self._clock.time_msec()),
+                    transaction_id=str(self._next_txn_id),
+                    origin=self.server_name,
+                    destination=destination,
+                    pdus=pdus,
+                    edus=edus,
+                    pdu_failures=failures,
                 )
-                code = 200
-            except HttpResponseException as e:
-                code = e.code
-                response = e.response
 
-            logger.info("TX [%s] got %d response", destination, code)
+                self._next_txn_id += 1
 
-            logger.debug("TX [%s] Sent transaction", destination)
-            logger.debug("TX [%s] Marking as delivered...", destination)
+                yield self.transaction_actions.prepare_to_send(transaction)
 
-            yield self.transaction_actions.delivered(
-                transaction, code, response
-            )
+                logger.debug("TX [%s] Persisted transaction", destination)
+                logger.info(
+                    "TX [%s] Sending transaction [%s]",
+                    destination,
+                    transaction.transaction_id,
+                )
 
-            logger.debug("TX [%s] Marked as delivered", destination)
+                # Actually send the transaction
+
+                # FIXME (erikj): This is a bit of a hack to make the Pdu age
+                # keys work
+                def json_data_cb():
+                    data = transaction.get_dict()
+                    now = int(self._clock.time_msec())
+                    if "pdus" in data:
+                        for p in data["pdus"]:
+                            if "age_ts" in p:
+                                unsigned = p.setdefault("unsigned", {})
+                                unsigned["age"] = now - int(p["age_ts"])
+                                del p["age_ts"]
+                    return data
+
+                try:
+                    response = yield self.transport_layer.send_transaction(
+                        transaction, json_data_cb
+                    )
+                    code = 200
+                except HttpResponseException as e:
+                    code = e.code
+                    response = e.response
+
+                logger.info("TX [%s] got %d response", destination, code)
+
+                logger.debug("TX [%s] Sent transaction", destination)
+                logger.debug("TX [%s] Marking as delivered...", destination)
+
+                yield self.transaction_actions.delivered(
+                    transaction, code, response
+                )
+
+                logger.debug("TX [%s] Marked as delivered", destination)
+
             logger.debug("TX [%s] Yielding to callbacks...", destination)
 
             for deferred in deferreds:
                 if code == 200:
-                    if retry_last_ts:
-                        # this host is alive! reset retry schedule
-                        yield self.store.set_destination_retry_timings(
-                            destination, 0, 0
-                        )
                     deferred.callback(None)
                 else:
-                    self.set_retrying(destination, retry_interval)
                     deferred.errback(RuntimeError("Got status %d" % code))
 
                 # Ensures we don't continue until all callbacks on that
@@ -285,6 +271,12 @@ class TransactionQueue(object):
                     pass
 
             logger.debug("TX [%s] Yielded to callbacks", destination)
+        except NotRetryingDestination:
+            logger.info(
+                "TX [%s] not ready for retry yet - "
+                "dropping transaction for now",
+                destination,
+            )
         except RuntimeError as e:
             # We capture this here as there as nothing actually listens
             # for this finishing functions deferred.
@@ -302,8 +294,6 @@ class TransactionQueue(object):
                 e,
             )
 
-            self.set_retrying(destination, retry_interval)
-
             for deferred in deferreds:
                 if not deferred.called:
                     deferred.errback(e)
@@ -314,22 +304,3 @@ class TransactionQueue(object):
 
             # Check to see if there is anything else to send.
             self._attempt_new_transaction(destination)
-
-    @defer.inlineCallbacks
-    def set_retrying(self, destination, retry_interval):
-        # track that this destination is having problems and we should
-        # give it a chance to recover before trying it again
-
-        if retry_interval:
-            retry_interval *= 2
-            # plateau at hourly retries for now
-            if retry_interval >= 60 * 60 * 1000:
-                retry_interval = 60 * 60 * 1000
-        else:
-            retry_interval = 2000  # try again at first after 2 seconds
-
-        yield self.store.set_destination_retry_timings(
-            destination,
-            int(self._clock.time_msec()),
-            retry_interval
-        )

@@ -23,6 +23,8 @@ from synapse.api.errors import CodeMessageException
 from synapse.util.logutils import log_function
 from synapse.events import FrozenEvent
 
+from synapse.util.retryutils import get_retry_limiter, NotRetryingDestination
+
 import logging
 
 
@@ -163,24 +165,34 @@ class FederationClient(FederationBase):
         pdu = None
         for destination in destinations:
             try:
-                transaction_data = yield self.transport_layer.get_event(
-                    destination, event_id
+                limiter = yield get_retry_limiter(
+                    destination,
+                    self._clock,
+                    self.store,
                 )
 
-                logger.debug("transaction_data %r", transaction_data)
+                with limiter:
+                    transaction_data = yield self.transport_layer.get_event(
+                        destination, event_id
+                    )
 
-                pdu_list = [
-                    self.event_from_pdu_json(p, outlier=outlier)
-                    for p in transaction_data["pdus"]
-                ]
+                    logger.debug("transaction_data %r", transaction_data)
 
-                if pdu_list:
-                    pdu = pdu_list[0]
+                    pdu_list = [
+                        self.event_from_pdu_json(p, outlier=outlier)
+                        for p in transaction_data["pdus"]
+                    ]
 
-                    # Check signatures are correct.
-                    pdu = yield self._check_sigs_and_hash(pdu)
+                    if pdu_list:
+                        pdu = pdu_list[0]
 
-                    break
+                        # Check signatures are correct.
+                        pdu = yield self._check_sigs_and_hash(pdu)
+
+                        break
+            except NotRetryingDestination as e:
+                logger.info(e.message)
+                continue
             except CodeMessageException:
                 raise
             except Exception as e:

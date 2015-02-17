@@ -22,6 +22,8 @@ from syutil.crypto.signing_key import (
 from syutil.base64util import decode_base64, encode_base64
 from synapse.api.errors import SynapseError, Codes
 
+from synapse.util.retryutils import get_retry_limiter
+
 from OpenSSL import crypto
 
 import logging
@@ -88,19 +90,13 @@ class Keyring(object):
 
         # Try to fetch the key from the remote server.
 
-        retry_last_ts, retry_interval = (0, 0)
-        retry_timings = yield self.store.get_destination_retry_timings(
-            server_name
+        limiter = yield get_retry_limiter(
+            server_name,
+            self.clock,
+            self.store,
         )
-        if retry_timings:
-            retry_last_ts, retry_interval = (
-                retry_timings.retry_last_ts, retry_timings.retry_interval
-            )
-            if retry_last_ts + retry_interval > int(self.clock.time_msec()):
-                logger.info("%s not ready for retry", server_name)
-                raise ValueError("No verification key found for given key ids")
 
-        try:
+        with limiter:
             (response, tls_certificate) = yield fetch_server_key(
                 server_name, self.hs.tls_context_factory
             )
@@ -165,7 +161,3 @@ class Keyring(object):
                     return
 
             raise ValueError("No verification key found for given key ids")
-
-        except:
-            self.set_retrying(server_name, retry_interval)
-            raise
