@@ -52,6 +52,7 @@ import synapse
 import logging
 import os
 import re
+import subprocess
 import sqlite3
 import syweb
 
@@ -208,6 +209,61 @@ class SynapseHomeServer(HomeServer):
             logger.info("Synapse now listening on port %d", unsecure_port)
 
 
+def get_version_string():
+    null = open(os.devnull, 'w')
+    try:
+        git_branch = subprocess.check_output(
+            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+            stderr=null,
+        ).strip()
+        git_branch = "b=" + git_branch
+    except subprocess.CalledProcessError:
+        git_branch = ""
+
+    try:
+        git_tag = subprocess.check_output(
+            ['git', 'describe', '--exact-match'],
+            stderr=null,
+        ).strip()
+        git_tag = "t=" + git_tag
+    except subprocess.CalledProcessError:
+        git_tag = ""
+
+    try:
+        git_commit = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            stderr=null,
+        ).strip()
+    except subprocess.CalledProcessError:
+        git_commit = ""
+
+    try:
+        dirty_string = "-this_is_a_dirty_checkout"
+        is_dirty = subprocess.check_output(
+            ['git', 'describe', '--dirty=' + dirty_string],
+            stderr=null,
+        ).strip().endswith(dirty_string)
+
+        git_dirty = "dirty" if is_dirty else ""
+    except subprocess.CalledProcessError:
+        git_dirty = ""
+
+    if git_branch or git_tag or git_commit or git_dirty:
+        git_version = ",".join(
+            s for s in
+            (git_branch, git_tag, git_commit, git_dirty,)
+            if s
+        )
+
+        return (
+            "Synapse/v=%s,%s" % (
+                synapse.__version__, git_version,
+            )
+        ).encode("ascii")
+
+    return ("Synapse/%s" % (synapse.__version__,)).encode("ascii")
+
+
 def setup():
     config = HomeServerConfig.load_config(
         "Synapse Homeserver",
@@ -219,8 +275,10 @@ def setup():
 
     check_requirements()
 
+    version_string = get_version_string()
+
     logger.info("Server hostname: %s", config.server_name)
-    logger.info("Server version: %s", synapse.__version__)
+    logger.info("Server version: %s", version_string)
 
     if re.search(":[0-9]+$", config.server_name):
         domain_with_port = config.server_name
@@ -228,6 +286,7 @@ def setup():
         domain_with_port = "%s:%s" % (config.server_name, config.bind_port)
 
     tls_context_factory = context_factory.ServerContextFactory(config)
+
 
     hs = SynapseHomeServer(
         config.server_name,
@@ -237,6 +296,7 @@ def setup():
         tls_context_factory=tls_context_factory,
         config=config,
         content_addr=config.content_addr,
+        version_string=version_string,
     )
 
     hs.create_resource_tree(
