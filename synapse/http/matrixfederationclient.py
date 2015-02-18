@@ -144,7 +144,7 @@ class MatrixFederationHttpClient(object):
                         destination,
                         e
                     )
-                    raise SynapseError(400, "Domain specified not found.")
+                    raise
 
                 logger.warn(
                     "Sending request failed to %s: %s %s: %s - %s",
