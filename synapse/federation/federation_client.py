@@ -19,7 +19,8 @@ from twisted.internet import defer
 from .federation_base import FederationBase
 from .units import Edu
 
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import CodeMessageException, SynapseError
+from synapse.util.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
 from synapse.events import FrozenEvent
 
@@ -30,6 +31,20 @@ logger = logging.getLogger(__name__)
 
 
 class FederationClient(FederationBase):
+    def __init__(self):
+        self._get_pdu_cache = None
+
+    def start_get_pdu_cache(self):
+        self._get_pdu_cache = ExpiringCache(
+            cache_name="get_pdu_cache",
+            clock=self._clock,
+            max_len=1000,
+            expiry_ms=120*1000,
+            reset_expiry_on_get=False,
+        )
+
+        self._get_pdu_cache.start()
+
     @log_function
     def send_pdu(self, pdu, destinations):
         """Informs the replication layer about a new PDU generated within the
@@ -160,6 +175,11 @@ class FederationClient(FederationBase):
 
         # TODO: Rate limit the number of times we try and get the same event.
 
+        if self._get_pdu_cache:
+            e = self._get_pdu_cache.get(event_id)
+            if e:
+                defer.returnValue(e)
+
         pdu = None
         for destination in destinations:
             try:
@@ -181,14 +201,30 @@ class FederationClient(FederationBase):
                     pdu = yield self._check_sigs_and_hash(pdu)
 
                     break
-            except CodeMessageException:
-                raise
+            except SynapseError:
+                logger.info(
+                    "Failed to get PDU %s from %s because %s",
+                    event_id, destination, e,
+                )
+                continue
+            except CodeMessageException as e:
+                if 400 <= e.code < 500:
+                    raise
+
+                logger.info(
+                    "Failed to get PDU %s from %s because %s",
+                    event_id, destination, e,
+                )
+                continue
             except Exception as e:
                 logger.info(
                     "Failed to get PDU %s from %s because %s",
                     event_id, destination, e,
                 )
                 continue
+
+        if self._get_pdu_cache is not None:
+            self._get_pdu_cache[event_id] = pdu
 
         defer.returnValue(pdu)
 
