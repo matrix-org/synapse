@@ -17,8 +17,6 @@ from twisted.internet import defer
 
 from synapse.api.errors import CodeMessageException
 
-from synapse.util.async import run_on_reactor
-
 import logging
 
 
