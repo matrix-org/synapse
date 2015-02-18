@@ -266,7 +266,6 @@ class TransactionQueue(object):
                 logger.debug("TX [%s] Sent transaction", destination)
                 logger.debug("TX [%s] Marking as delivered...", destination)
 
-
             yield self.transaction_actions.delivered(
                 transaction, code, response
             )
