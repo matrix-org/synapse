@@ -20,7 +20,6 @@ from twisted.web.client import readBody, _AgentBase, _URI
 from twisted.web.http_headers import Headers
 from twisted.web._newclient import ResponseDone
 
-from synapse.http.agent_name import AGENT_NAME
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util.async import sleep
 from synapse.util.logcontext import PreserveLoggingContext
@@ -80,6 +79,7 @@ class MatrixFederationHttpClient(object):
         self.server_name = hs.hostname
         self.agent = MatrixFederationHttpAgent(reactor)
         self.clock = hs.get_clock()
+        self.version_string = hs.version_string
 
     @defer.inlineCallbacks
     def _create_request(self, destination, method, path_bytes,
@@ -87,7 +87,7 @@ class MatrixFederationHttpClient(object):
                         query_bytes=b"", retry_on_dns_fail=True):
         """ Creates and sends a request to the given url
         """
-        headers_dict[b"User-Agent"] = [AGENT_NAME]
+        headers_dict[b"User-Agent"] = [self.version_string]
         headers_dict[b"Host"] = [destination]
 
         url_bytes = urlparse.urlunparse(

@@ -14,7 +14,6 @@
 # limitations under the License.
 
 
-from synapse.http.agent_name import AGENT_NAME
 from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError
 )
@@ -74,6 +73,7 @@ class JsonResource(HttpServer, resource.Resource):
 
         self.clock = hs.get_clock()
         self.path_regexs = {}
+        self.version_string = hs.version_string
 
     def register_path(self, method, path_pattern, callback):
         self.path_regexs.setdefault(method, []).append(
@@ -189,9 +189,13 @@ class JsonResource(HttpServer, resource.Resource):
             return
 
         # TODO: Only enable CORS for the requests that need it.
-        respond_with_json(request, code, response_json_object, send_cors=True,
-                          response_code_message=response_code_message,
-                          pretty_print=self._request_user_agent_is_curl)
+        respond_with_json(
+            request, code, response_json_object,
+            send_cors=True,
+            response_code_message=response_code_message,
+            pretty_print=self._request_user_agent_is_curl,
+            version_string=self.version_string,
+        )
 
     @staticmethod
     def _request_user_agent_is_curl(request):
@@ -221,18 +225,23 @@ class RootRedirect(resource.Resource):
 
 
 def respond_with_json(request, code, json_object, send_cors=False,
-                      response_code_message=None, pretty_print=False):
+                      response_code_message=None, pretty_print=False,
+                      version_string=""):
     if not pretty_print:
         json_bytes = encode_pretty_printed_json(json_object)
     else:
         json_bytes = encode_canonical_json(json_object)
 
-    return respond_with_json_bytes(request, code, json_bytes, send_cors,
-                                   response_code_message=response_code_message)
+    return respond_with_json_bytes(
+        request, code, json_bytes,
+        send_cors=send_cors,
+        response_code_message=response_code_message,
+        version_string=version_string
+    )
 
 
 def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
-                            response_code_message=None):
+                            version_string="", response_code_message=None):
     """Sends encoded JSON in response to the given request.
 
     Args:
@@ -246,7 +255,7 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
 
     request.setResponseCode(code, message=response_code_message)
     request.setHeader(b"Content-Type", b"application/json")
-    request.setHeader(b"Server", AGENT_NAME)
+    request.setHeader(b"Server", version_string)
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
 
     if send_cors:

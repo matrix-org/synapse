@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
     "syutil>=0.0.3": ["syutil"],
-    "matrix_angular_sdk>=0.6.2": ["syweb>=0.6.2"],
+    "matrix_angular_sdk>=0.6.3": ["syweb>=0.6.3"],
     "Twisted==14.0.2": ["twisted==14.0.2"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
@@ -36,8 +36,8 @@ DEPENDENCY_LINKS = [
     ),
     github_link(
         project="matrix-org/matrix-angular-sdk",
-        version="v0.6.2",
-        egg="matrix_angular_sdk-0.6.2",
+        version="v0.6.3",
+        egg="matrix_angular_sdk-0.6.3",
     ),
 ]
 
