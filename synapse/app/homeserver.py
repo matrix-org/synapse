@@ -277,6 +277,7 @@ def setup():
     hs.get_pusherpool().start()
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
+    hs.get_replication_layer().start_get_pdu_cache()
 
     if config.daemonize:
         print config.pid_file

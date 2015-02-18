@@ -146,14 +146,22 @@ class MatrixFederationHttpClient(object):
                     )
                     raise SynapseError(400, "Domain specified not found.")
 
+                if hasattr(e, "reasons"):
+                    reasons = ", ".join(
+                        f.value.message
+                        for f in e.reasons
+                    )
+                else:
+                    reasons = e.message
+
                 logger.warn(
-                    "Sending request failed to %s: %s %s : %s",
+                    "Sending request failed to %s: %s %s: %s - %s",
                     destination,
                     method,
                     url_bytes,
-                    e
+                    type(e). __name__,
+                    reasons,
                 )
-                _print_ex(e)
 
                 if retries_left:
                     yield sleep(2 ** (5 - retries_left))
@@ -445,14 +453,6 @@ def _readBodyToFile(response, stream, max_size):
     d = defer.Deferred()
     response.deliverBody(_ReadBodyToFileProtocol(stream, d, max_size))
     return d
-
-
-def _print_ex(e):
-    if hasattr(e, "reasons") and e.reasons:
-        for ex in e.reasons:
-            _print_ex(ex)
-    else:
-        logger.warn(e)
 
 
 class _JsonProducer(object):
