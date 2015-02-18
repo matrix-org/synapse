@@ -90,14 +90,17 @@ class TransactionQueue(object):
                 (pdu, deferred, order)
             )
 
-            def eb(failure):
+            def chain(failure):
                 if not deferred.called:
                     deferred.errback(failure)
-                else:
-                    logger.warn("Failed to send pdu", failure.value)
+
+            def log_failure(failure):
+                logger.warn("Failed to send pdu", failure.value)
+
+            deferred.addErrback(log_failure)
 
             with PreserveLoggingContext():
-                self._attempt_new_transaction(destination).addErrback(eb)
+                self._attempt_new_transaction(destination).addErrback(chain)
 
             deferreds.append(deferred)
 
@@ -115,14 +118,17 @@ class TransactionQueue(object):
             (edu, deferred)
         )
 
-        def eb(failure):
+        def chain(failure):
             if not deferred.called:
                 deferred.errback(failure)
-            else:
-                logger.warn("Failed to send edu", failure.value)
+
+        def log_failure(failure):
+            logger.warn("Failed to send pdu", failure.value)
+
+        deferred.addErrback(log_failure)
 
         with PreserveLoggingContext():
-            self._attempt_new_transaction(destination).addErrback(eb)
+            self._attempt_new_transaction(destination).addErrback(chain)
 
         return deferred
 
@@ -139,14 +145,17 @@ class TransactionQueue(object):
             (failure, deferred)
         )
 
-        def eb(failure):
+        def chain(f):
             if not deferred.called:
-                deferred.errback(failure)
-            else:
-                logger.warn("Failed to send failure", failure.value)
+                deferred.errback(f)
+
+        def log_failure(f):
+            logger.warn("Failed to send pdu", f.value)
+
+        deferred.addErrback(log_failure)
 
         with PreserveLoggingContext():
-            self._attempt_new_transaction(destination).addErrback(eb)
+            self._attempt_new_transaction(destination).addErrback(chain)
 
         yield deferred
 
@@ -308,7 +317,7 @@ class TransactionQueue(object):
         except Exception as e:
             # We capture this here as there as nothing actually listens
             # for this finishing functions deferred.
-            logger.exception(
+            logger.warn(
                 "TX [%s] Problem in _attempt_transaction: %s",
                 destination,
                 e,
