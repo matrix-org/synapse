@@ -46,10 +46,16 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
     if datastore is None:
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
-        hs = HomeServer(name, db_pool=db_pool, config=config, **kargs)
+        hs = HomeServer(
+            name, db_pool=db_pool, config=config,
+            version_string="Synapse/tests",
+            **kargs
+        )
     else:
         hs = HomeServer(
-            name, db_pool=None, datastore=datastore, config=config, **kargs
+            name, db_pool=None, datastore=datastore, config=config,
+            version_string="Synapse/tests",
+            **kargs
         )
 
     defer.returnValue(hs)

@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from synapse.api.errors import CodeMessageException
-from synapse.http.agent_name import AGENT_NAME
 from syutil.jsonutil import encode_canonical_json
 
 from twisted.internet import defer, reactor
@@ -44,6 +43,7 @@ class SimpleHttpClient(object):
         # BrowserLikePolicyForHTTPS which will do regular cert validation
         # 'like a browser'
         self.agent = Agent(reactor)
+        self.version_string = hs.version_string
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}):
@@ -55,7 +55,7 @@ class SimpleHttpClient(object):
             uri.encode("ascii"),
             headers=Headers({
                 b"Content-Type": [b"application/x-www-form-urlencoded"],
-                b"User-Agent": [AGENT_NAME],
+                b"User-Agent": [self.version_string],
             }),
             bodyProducer=FileBodyProducer(StringIO(query_bytes))
         )
@@ -108,7 +108,7 @@ class SimpleHttpClient(object):
             "GET",
             uri.encode("ascii"),
             headers=Headers({
-                b"User-Agent": [AGENT_NAME],
+                b"User-Agent": [self.version_string],
             })
         )
 
@@ -149,7 +149,7 @@ class SimpleHttpClient(object):
             "PUT",
             uri.encode("ascii"),
             headers=Headers({
-                b"User-Agent": [AGENT_NAME],
+                b"User-Agent": [self.version_string],
                 "Content-Type": ["application/json"]
             }),
             bodyProducer=FileBodyProducer(StringIO(json_str))
@@ -182,7 +182,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
             bodyProducer=FileBodyProducer(StringIO(query_bytes)),
             headers=Headers({
                 b"Content-Type": [b"application/x-www-form-urlencoded"],
-                b"User-Agent": [AGENT_NAME],
+                b"User-Agent": [self.version_string],
             })
         )
 
