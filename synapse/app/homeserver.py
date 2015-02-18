@@ -292,7 +292,6 @@ def setup():
 
     tls_context_factory = context_factory.ServerContextFactory(config)
 
-
     hs = SynapseHomeServer(
         config.server_name,
         domain_with_port=domain_with_port,
