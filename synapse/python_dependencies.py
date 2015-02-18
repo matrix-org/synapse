@@ -28,7 +28,7 @@ DEPENDENCY_LINKS = [
         project="pyca/pynacl",
         version="d4d3175589b892f6ea7c22f466e0e223853516fa",
         egg="pynacl-0.3.0",
-    )
+    ),
     github_link(
         project="matrix-org/syutil",
         version="v0.0.3",
