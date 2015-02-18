@@ -146,21 +146,13 @@ class MatrixFederationHttpClient(object):
                     )
                     raise SynapseError(400, "Domain specified not found.")
 
-                if hasattr(e, "reasons"):
-                    reasons = ", ".join(
-                        str(f.value.message)
-                        for f in e.reasons
-                    )
-                else:
-                    reasons = e.message
-
                 logger.warn(
                     "Sending request failed to %s: %s %s: %s - %s",
                     destination,
                     method,
                     url_bytes,
                     type(e). __name__,
-                    reasons,
+                    _flatten_response_never_received(e),
                 )
 
                 if retries_left:
@@ -474,3 +466,13 @@ class _JsonProducer(object):
 
     def stopProducing(self):
         pass
+
+
+def _flatten_response_never_received(e):
+    if hasattr(e, "reasons"):
+        return ", ".join(
+            _flatten_response_never_received(f.value)
+            for f in e.reasons
+        )
+    else:
+        return "%s: %s" % (type(e), e.message,)
