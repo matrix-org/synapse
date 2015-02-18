@@ -128,6 +128,9 @@ class TransactionQueue(object):
 
     @defer.inlineCallbacks
     def enqueue_failure(self, failure, destination):
+        if destination == self.server_name:
+            return
+
         deferred = defer.Deferred()
 
         self.pending_failures_by_dest.setdefault(
