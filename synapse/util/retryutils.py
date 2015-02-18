@@ -87,7 +87,11 @@ class RetryDestinationLimiter(object):
     def __init__(self, destination, clock, store, retry_interval,
                  min_retry_interval=5000, max_retry_interval=60 * 60 * 1000,
                  multiplier_retry_interval=2,):
-        """
+        """Marks the destination as "down" if an exception is thrown in the
+        context, except for CodeMessageException with code < 500.
+
+        If no exception is raised, marks the destination as "up".
+
         Args:
             destination (str)
             clock (Clock)
