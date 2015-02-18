@@ -35,6 +35,23 @@ class NotRetryingDestination(Exception):
 
 @defer.inlineCallbacks
 def get_retry_limiter(destination, clock, store, **kwargs):
+    """For a given destination check if we have previously failed to
+    send a request there and are waiting before retrying the destination.
+    If we are not ready to retry the destination, this will raise a
+    NotRetryingDestination exception. Otherwise, will return a Context Manager
+    that will mark the destination as down if an exception is thrown (excluding
+    CodeMessageException with code < 500)
+
+    Example usage:
+
+        try:
+            limiter = yield get_retry_limiter(destination, clock, store)
+            with limiter:
+                response = yield do_request()
+        except NotRetryingDestination:
+            # We aren't ready to retry that destination.
+            raise
+    """
     retry_last_ts, retry_interval = (0, 0)
 
     retry_timings = yield store.get_destination_retry_timings(
@@ -68,8 +85,23 @@ def get_retry_limiter(destination, clock, store, **kwargs):
 
 class RetryDestinationLimiter(object):
     def __init__(self, destination, clock, store, retry_interval,
-                 min_retry_interval=20000, max_retry_interval=60 * 60 * 1000,
+                 min_retry_interval=5000, max_retry_interval=60 * 60 * 1000,
                  multiplier_retry_interval=2,):
+        """
+        Args:
+            destination (str)
+            clock (Clock)
+            store (DataStore)
+            retry_interval (int): The next retry interval taken from the
+                database in milliseconds, or zero if the last request was
+                successful.
+            min_retry_interval (int): The minimum retry interval to use after
+                a failed request, in milliseconds.
+            max_retry_interval (int): The maximum retry interval to use after
+                a failed request, in milliseconds.
+            multiplier_retry_interval (int): The multiplier to use to increase
+                the retry interval after a failed request.
+        """
         self.clock = clock
         self.store = store
         self.destination = destination
