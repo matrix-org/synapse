@@ -54,7 +54,6 @@ def get_retry_limiter(destination, clock, store, **kwargs):
             # We aren't ready to retry that destination.
             raise
     """
-    yield run_on_reactor()
     retry_last_ts, retry_interval = (0, 0)
 
     retry_timings = yield store.get_destination_retry_timings(
@@ -149,7 +148,7 @@ class RetryDestinationLimiter(object):
             else:
                 self.retry_interval = self.min_retry_interval
 
-            retry_last_ts = int(self.clock.time_msec()),
+            retry_last_ts = int(self.clock.time_msec())
 
         self.store.set_destination_retry_timings(
             self.destination, retry_last_ts, self.retry_interval
