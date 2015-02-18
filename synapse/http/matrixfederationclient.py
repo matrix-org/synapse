@@ -148,7 +148,7 @@ class MatrixFederationHttpClient(object):
 
                 if hasattr(e, "reasons"):
                     reasons = ", ".join(
-                        f.value.message
+                        str(f.value.message)
                         for f in e.reasons
                     )
                 else:
