@@ -146,7 +146,7 @@ class RetryDestinationLimiter(object):
             else:
                 self.retry_interval = self.min_retry_interval
 
-            retry_last_ts = int(self._clock.time_msec()),
+            retry_last_ts = int(self.clock.time_msec()),
 
         self.store.set_destination_retry_timings(
             self.destination, retry_last_ts, self.retry_interval
