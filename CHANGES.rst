@@ -1,3 +1,14 @@
+Changes in synapse v0.7.1 (2015-02-18)
+======================================
+
+* Add cache when fetching events from remote servers to stop repeatedly
+  fetching events with bad signatures.
+* Respect the per remote server retry scheme when fetching both events and
+  server keys to reduce the number of times we send requests to dead servers.
+* Inform remote servers when the local server fails to handle a received event.
+* Turn off python bytecode generation due to problems experienced when
+  upgrading from previous versions.
+
 Changes in synapse v0.7.0 (2015-02-12)
 ======================================
 
