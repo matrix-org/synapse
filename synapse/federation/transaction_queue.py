@@ -107,7 +107,7 @@ class TransactionQueue(object):
     def enqueue_edu(self, edu):
         destination = edu.destination
 
-        if destination == self.server_name:
+        if destination == self.server_name or destination == "localhost":
             return
 
         deferred = defer.Deferred()
@@ -128,7 +128,7 @@ class TransactionQueue(object):
 
     @defer.inlineCallbacks
     def enqueue_failure(self, failure, destination):
-        if destination == self.server_name:
+        if destination == self.server_name or destination == "localhost":
             return
 
         deferred = defer.Deferred()
