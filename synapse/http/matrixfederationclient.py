@@ -151,7 +151,7 @@ class MatrixFederationHttpClient(object):
                     destination,
                     method,
                     url_bytes,
-                    type(e). __name__,
+                    type(e).__name__,
                     _flatten_response_never_received(e),
                 )
 
@@ -475,4 +475,4 @@ def _flatten_response_never_received(e):
             for f in e.reasons
         )
     else:
-        return "%s: %s" % (type(e), e.message,)
+        return "%s: %s" % (type(e).__name__, e.message,)
