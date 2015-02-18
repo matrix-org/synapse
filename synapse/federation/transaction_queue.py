@@ -66,6 +66,26 @@ class TransactionQueue(object):
         # HACK to get unique tx id
         self._next_txn_id = int(self._clock.time_msec())
 
+    def can_send_to(self, destination):
+        """Can we send messages to the given server?
+
+        We can't send messages to ourselves. If we are running on localhost
+        then we can only federation with other servers running on localhost.
+        Otherwise we only federate with servers on a public domain.
+
+        Args:
+            destination(str): The server we are possibly trying to send to.
+        Returns:
+            bool: True if we can send to the server.
+        """
+
+        if destination == self.server_name:
+            return False
+        if self.server_name.startswith("localhost"):
+            return destination.startswith("localhost")
+        else:
+            return not destination.startswith("localhost")
+
     @defer.inlineCallbacks
     @log_function
     def enqueue_pdu(self, pdu, destinations, order):
@@ -74,8 +94,9 @@ class TransactionQueue(object):
         # table and we'll get back to it later.
 
         destinations = set(destinations)
-        destinations.discard(self.server_name)
-        destinations.discard("localhost")
+        destinations = set(
+            dest for dest in destinations if self.can_send_to(dest)
+        )
 
         logger.debug("Sending to: %s", str(destinations))
 
@@ -110,7 +131,7 @@ class TransactionQueue(object):
     def enqueue_edu(self, edu):
         destination = edu.destination
 
-        if destination == self.server_name or destination == "localhost":
+        if not self.can_send_to(destination):
             return
 
         deferred = defer.Deferred()
@@ -138,6 +159,9 @@ class TransactionQueue(object):
             return
 
         deferred = defer.Deferred()
+
+        if not self.can_send_to(destination):
+            return
 
         self.pending_failures_by_dest.setdefault(
             destination, []

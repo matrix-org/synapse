@@ -54,7 +54,7 @@ class BaseMediaResource(Resource):
             try:
                 yield request_handler(self, request)
             except CodeMessageException as e:
-                logger.exception(e)
+                logger.info("Responding with error: %r", e)
                 respond_with_json(
                     request, e.code, cs_exception(e), send_cors=True
                 )
