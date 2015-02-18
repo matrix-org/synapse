@@ -261,7 +261,7 @@ def get_version_string():
         )
 
         return (
-            "Synapse/%s/(%s)" % (
+            "Synapse/%s (%s)" % (
                 synapse.__version__, git_version,
             )
         ).encode("ascii")
