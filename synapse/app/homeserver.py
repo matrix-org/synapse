@@ -211,10 +211,12 @@ class SynapseHomeServer(HomeServer):
 
 def get_version_string():
     null = open(os.devnull, 'w')
+    cwd = os.path.dirname(os.path.abspath(__file__))
     try:
         git_branch = subprocess.check_output(
             ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
             stderr=null,
+            cwd=cwd,
         ).strip()
         git_branch = "b=" + git_branch
     except subprocess.CalledProcessError:
@@ -224,6 +226,7 @@ def get_version_string():
         git_tag = subprocess.check_output(
             ['git', 'describe', '--exact-match'],
             stderr=null,
+            cwd=cwd,
         ).strip()
         git_tag = "t=" + git_tag
     except subprocess.CalledProcessError:
@@ -233,6 +236,7 @@ def get_version_string():
         git_commit = subprocess.check_output(
             ['git', 'rev-parse', '--short', 'HEAD'],
             stderr=null,
+            cwd=cwd,
         ).strip()
     except subprocess.CalledProcessError:
         git_commit = ""
@@ -242,6 +246,7 @@ def get_version_string():
         is_dirty = subprocess.check_output(
             ['git', 'describe', '--dirty=' + dirty_string],
             stderr=null,
+            cwd=cwd,
         ).strip().endswith(dirty_string)
 
         git_dirty = "dirty" if is_dirty else ""
