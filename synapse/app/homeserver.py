@@ -52,6 +52,7 @@ import synapse
 import logging
 import os
 import re
+import resource
 import subprocess
 import sqlite3
 import syweb
@@ -269,6 +270,15 @@ def get_version_string():
     return ("Synapse/%s" % (synapse.__version__,)).encode("ascii")
 
 
+def change_resource_limit(soft_file_no):
+    try:
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (soft_file_no, hard))
+        logger.info("Set file limit to: %d", soft_file_no)
+    except (ValueError, resource.error) as e:
+        logger.warn("Failed to set file limit: %s", e)
+
+
 def setup():
     config = HomeServerConfig.load_config(
         "Synapse Homeserver",
@@ -345,10 +355,11 @@ def setup():
 
     if config.daemonize:
         print config.pid_file
+
         daemon = Daemonize(
             app="synapse-homeserver",
             pid=config.pid_file,
-            action=run,
+            action=lambda: run(config),
             auto_close_fds=False,
             verbose=True,
             logger=logger,
@@ -356,11 +367,14 @@ def setup():
 
         daemon.start()
     else:
-        reactor.run()
+        run(config)
 
 
-def run():
+def run(config):
     with LoggingContext("run"):
+        if config.soft_file_limit:
+            change_resource_limit(config.soft_file_limit)
+
         reactor.run()
 
 
