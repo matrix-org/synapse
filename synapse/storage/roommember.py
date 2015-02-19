@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from collections import namedtuple
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, cached
 
 from synapse.api.constants import Membership
 from synapse.types import UserID
@@ -31,32 +31,6 @@ RoomsForUser = namedtuple(
     "RoomsForUser",
     ("room_id", "sender", "membership")
 )
-
-
-# TODO(paul):
-#  * Move this somewhere higher-level, shared;
-#  * more generic key management
-#  * export monitoring stats
-#  * maximum size; just evict things at random, or consider LRU?
-def cached(orig):
-    cache = {}
-
-    @defer.inlineCallbacks
-    def wrapped(self, key):
-        if key in cache:
-            defer.returnValue(cache[key])
-
-        ret = yield orig(self, key)
-
-        cache[key] = ret;
-        defer.returnValue(ret)
-
-    def invalidate(key):
-        if key in cache:
-            del cache[key]
-
-    wrapped.invalidate = invalidate
-    return wrapped
 
 
 class RoomMemberStore(SQLBaseStore):

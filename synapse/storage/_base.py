@@ -35,6 +35,41 @@ sql_logger = logging.getLogger("synapse.storage.SQL")
 transaction_logger = logging.getLogger("synapse.storage.txn")
 
 
+# TODO(paul):
+#  * Move this somewhere higher-level, shared;
+#  * more generic key management
+#  * export monitoring stats
+#  * maximum size; just evict things at random, or consider LRU?
+def cached(orig):
+    """ A method decorator that applies a memoizing cache around the function.
+
+    The function is presumed to take one additional argument, which is used as
+    the key for the cache. Cache hits are served directly from the cache;
+    misses use the function body to generate the value.
+
+    The wrapped function has an additional member, a callable called
+    "invalidate". This can be used to remove individual entries from the cache.
+    """
+    cache = {}
+
+    @defer.inlineCallbacks
+    def wrapped(self, key):
+        if key in cache:
+            defer.returnValue(cache[key])
+
+        ret = yield orig(self, key)
+
+        cache[key] = ret;
+        defer.returnValue(ret)
+
+    def invalidate(key):
+        if key in cache:
+            del cache[key]
+
+    wrapped.invalidate = invalidate
+    return wrapped
+
+
 class LoggingTransaction(object):
     """An object that almost-transparently proxies for the 'txn' object
     passed to the constructor. Adds logging to the .execute() method."""
