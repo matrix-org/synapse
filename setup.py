@@ -36,6 +36,21 @@ def exec_file(path_segments):
     exec(code, result)
     return result
 
+def setup_git_version():
+    """Replace DEVELOPERVERSION in __init__ with the commit id or 0"""
+    commit = "0"
+    if os.path.exists(os.path.join(here, ".git")):
+        head = read_file([".git", "HEAD"])
+        ref = head.split(" ")[1].strip()
+        commit = read_file([".git", ref]).strip()
+
+    init_content = read_file(["synapse", "__init__.py"])
+    init_content = init_content.replace("DEVELVERSION", commit)
+    with open("synapse/__init__.py", "w") as fout:
+        for line in init_content:
+            fout.write(line)
+
+setup_git_version()
 version = exec_file(("synapse", "__init__.py"))["__version__"]
 dependencies = exec_file(("synapse", "python_dependencies.py"))
 long_description = read_file(("README.rst",))
