@@ -36,7 +36,6 @@ transaction_logger = logging.getLogger("synapse.storage.txn")
 
 
 # TODO(paul):
-#  * Move this somewhere higher-level, shared;
 #  * more generic key management
 #  * export monitoring stats
 #  * consider other eviction strategies - LRU?
