@@ -39,8 +39,8 @@ transaction_logger = logging.getLogger("synapse.storage.txn")
 #  * Move this somewhere higher-level, shared;
 #  * more generic key management
 #  * export monitoring stats
-#  * maximum size; just evict things at random, or consider LRU?
-def cached(orig):
+#  * consider other eviction strategies - LRU?
+def cached(max_entries=1000):
     """ A method decorator that applies a memoizing cache around the function.
 
     The function is presumed to take one additional argument, which is used as
@@ -50,24 +50,33 @@ def cached(orig):
     The wrapped function has an additional member, a callable called
     "invalidate". This can be used to remove individual entries from the cache.
     """
-    cache = {}
+    def wrap(orig):
+        cache = {}
 
-    @defer.inlineCallbacks
-    def wrapped(self, key):
-        if key in cache:
-            defer.returnValue(cache[key])
+        @defer.inlineCallbacks
+        def wrapped(self, key):
+            if key in cache:
+                defer.returnValue(cache[key])
 
-        ret = yield orig(self, key)
+            ret = yield orig(self, key)
 
-        cache[key] = ret;
-        defer.returnValue(ret)
+            while len(cache) > max_entries:
+                # TODO(paul): This feels too biased. However, a random index
+                #   would be a bit inefficient, walking the list of keys just
+                #   to ignore most of them?
+                del cache[cache.keys()[0]]
 
-    def invalidate(key):
-        if key in cache:
-            del cache[key]
+            cache[key] = ret;
+            defer.returnValue(ret)
 
-    wrapped.invalidate = invalidate
-    return wrapped
+        def invalidate(key):
+            if key in cache:
+                del cache[key]
+
+        wrapped.invalidate = invalidate
+        return wrapped
+
+    return wrap
 
 
 class LoggingTransaction(object):
