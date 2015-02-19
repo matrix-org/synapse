@@ -66,6 +66,7 @@ class HttpPusher(Pusher):
         d = {
             'notification': {
                 'id': event['event_id'],
+                'room_id': event['room_id'],
                 'type': event['type'],
                 'sender': event['user_id'],
                 'counts': {  # -- we don't mark messages as read yet so
