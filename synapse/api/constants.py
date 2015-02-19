@@ -59,6 +59,7 @@ class LoginType(object):
     EMAIL_URL = u"m.login.email.url"
     EMAIL_IDENTITY = u"m.login.email.identity"
     RECAPTCHA = u"m.login.recaptcha"
+    APPLICATION_SERVICE = u"m.login.application_service"
 
 
 class EventTypes(object):

@@ -802,7 +802,7 @@ class FederationHandler(BaseHandler):
         missing_auth = event_auth_events - seen_events
 
         if missing_auth:
-            logger.debug("Missing auth: %s", missing_auth)
+            logger.info("Missing auth: %s", missing_auth)
             # If we don't have all the auth events, we need to get them.
             try:
                 remote_auth_chain = yield self.replication_layer.get_event_auth(
@@ -856,7 +856,7 @@ class FederationHandler(BaseHandler):
 
         if different_auth and not event.internal_metadata.is_outlier():
             # Do auth conflict res.
-            logger.debug("Different auth: %s", different_auth)
+            logger.info("Different auth: %s", different_auth)
 
             different_events = yield defer.gatherResults(
                 [
@@ -892,6 +892,8 @@ class FederationHandler(BaseHandler):
                 context.state_group = None
 
         if different_auth and not event.internal_metadata.is_outlier():
+            logger.info("Different auth after resolution: %s", different_auth)
+
             # Only do auth resolution if we have something new to say.
             # We can't rove an auth failure.
             do_resolution = False

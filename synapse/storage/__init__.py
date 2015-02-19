@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.util.logutils import log_function
 from synapse.api.constants import EventTypes
 
+from .appservice import ApplicationServiceStore
 from .directory import DirectoryStore
 from .feedback import FeedbackStore
 from .presence import PresenceStore
@@ -65,6 +66,7 @@ SCHEMAS = [
     "event_signatures",
     "pusher",
     "media_repository",
+    "application_services",
     "filtering",
     "rejections",
 ]
@@ -72,7 +74,9 @@ SCHEMAS = [
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
+
+dir_path = os.path.abspath(os.path.dirname(__file__))
 
 
 class _RollbackButIsFineException(Exception):
@@ -86,6 +90,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore, FeedbackStore,
                 PresenceStore, TransactionStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
+                ApplicationServiceStore,
                 EventFederationStore,
                 MediaRepositoryStore,
                 RejectionsStore,
@@ -580,7 +585,6 @@ def schema_path(schema):
         A filesystem path pointing at a ".sql" file.
 
     """
-    dir_path = os.path.dirname(__file__)
     schemaPath = os.path.join(dir_path, "schema", schema + ".sql")
     return schemaPath
 
@@ -637,10 +641,13 @@ def prepare_database(db_conn):
                 c.executescript(sql_script)
 
             db_conn.commit()
+        else:
+            logger.info("Database is at version %r", user_version)
 
     else:
         sql_script = "BEGIN TRANSACTION;\n"
         for sql_loc in SCHEMAS:
+            logger.debug("Applying schema %r", sql_loc)
             sql_script += read_schema(sql_loc)
             sql_script += "\n"
         sql_script += "COMMIT TRANSACTION;"

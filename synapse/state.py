@@ -18,6 +18,7 @@ from twisted.internet import defer
 
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
+from synapse.util.expiringcache import ExpiringCache
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.events.snapshot import EventContext
@@ -51,7 +52,6 @@ class _StateCacheEntry(object):
     def __init__(self, state, state_group, ts):
         self.state = state
         self.state_group = state_group
-        self.ts = ts
 
 
 class StateHandler(object):
@@ -69,12 +69,15 @@ class StateHandler(object):
     def start_caching(self):
         logger.debug("start_caching")
 
-        self._state_cache = {}
+        self._state_cache = ExpiringCache(
+            cache_name="state_cache",
+            clock=self.clock,
+            max_len=SIZE_OF_CACHE,
+            expiry_ms=EVICTION_TIMEOUT_SECONDS*1000,
+            reset_expiry_on_get=True,
+        )
 
-        def f():
-            self._prune_cache()
-
-        self.clock.looping_call(f, 5*1000)
+        self._state_cache.start()
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
@@ -409,34 +412,3 @@ class StateHandler(object):
             return -int(e.depth), hashlib.sha1(e.event_id).hexdigest()
 
         return sorted(events, key=key_func)
-
-    def _prune_cache(self):
-        logger.debug(
-            "_prune_cache. before len: %d",
-            len(self._state_cache.keys())
-        )
-
-        now = self.clock.time_msec()
-
-        if len(self._state_cache.keys()) > SIZE_OF_CACHE:
-            sorted_entries = sorted(
-                self._state_cache.items(),
-                key=lambda k, v: v.ts,
-            )
-
-            for k, _ in sorted_entries[SIZE_OF_CACHE:]:
-                self._state_cache.pop(k)
-
-        keys_to_delete = set()
-
-        for key, cache_entry in self._state_cache.items():
-            if now - cache_entry.ts > EVICTION_TIMEOUT_SECONDS*1000:
-                keys_to_delete.add(key)
-
-        for k in keys_to_delete:
-            self._state_cache.pop(k)
-
-        logger.debug(
-            "_prune_cache. after len: %d",
-            len(self._state_cache.keys())
-        )

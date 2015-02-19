@@ -99,6 +99,12 @@ class Notifier(object):
         `extra_users` param.
         """
         yield run_on_reactor()
+
+        # poke any interested application service.
+        self.hs.get_handlers().appservice_handler.notify_interested_services(
+            event
+        )
+
         room_id = event.room_id
 
         room_source = self.event_sources.sources["room"]
@@ -135,7 +141,8 @@ class Notifier(object):
 
         with PreserveLoggingContext():
             yield defer.DeferredList(
-                [notify(l).addErrback(eb) for l in listeners]
+                [notify(l).addErrback(eb) for l in listeners],
+                consumeErrors=True,
             )
 
     @defer.inlineCallbacks
@@ -203,7 +210,8 @@ class Notifier(object):
 
         with PreserveLoggingContext():
             yield defer.DeferredList(
-                [notify(l).addErrback(eb) for l in listeners]
+                [notify(l).addErrback(eb) for l in listeners],
+                consumeErrors=True,
             )
 
     @defer.inlineCallbacks

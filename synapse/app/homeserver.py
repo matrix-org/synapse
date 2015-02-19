@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+sys.dont_write_bytecode = True
+
 from synapse.storage import prepare_database, UpgradeDatabaseException
 
 from synapse.server import HomeServer
@@ -26,13 +29,14 @@ from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
 from synapse.http.server import JsonResource, RootRedirect
+from synapse.rest.appservice.v1 import AppServiceRestResource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
 from synapse.http.server_key_resource import LocalKey
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX,
+    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX, APP_SERVICE_PREFIX
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -48,7 +52,7 @@ import synapse
 import logging
 import os
 import re
-import sys
+import subprocess
 import sqlite3
 import syweb
 
@@ -68,6 +72,9 @@ class SynapseHomeServer(HomeServer):
 
     def build_resource_for_federation(self):
         return JsonResource(self)
+
+    def build_resource_for_app_services(self):
+        return AppServiceRestResource(self)
 
     def build_resource_for_web_client(self):
         syweb_path = os.path.dirname(syweb.__file__)
@@ -90,7 +97,9 @@ class SynapseHomeServer(HomeServer):
             "sqlite3", self.get_db_name(),
             check_same_thread=False,
             cp_min=1,
-            cp_max=1
+            cp_max=1,
+            cp_openfun=prepare_database,  # Prepare the database for each conn
+                                          # so that :memory: sqlite works
         )
 
     def create_resource_tree(self, web_client, redirect_root_to_web_client):
@@ -114,6 +123,7 @@ class SynapseHomeServer(HomeServer):
             (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
             (MEDIA_PREFIX, self.get_resource_for_media_repository()),
+            (APP_SERVICE_PREFIX, self.get_resource_for_app_services()),
         ]
         if web_client:
             logger.info("Adding the web client.")
@@ -199,6 +209,66 @@ class SynapseHomeServer(HomeServer):
             logger.info("Synapse now listening on port %d", unsecure_port)
 
 
+def get_version_string():
+    null = open(os.devnull, 'w')
+    cwd = os.path.dirname(os.path.abspath(__file__))
+    try:
+        git_branch = subprocess.check_output(
+            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+            stderr=null,
+            cwd=cwd,
+        ).strip()
+        git_branch = "b=" + git_branch
+    except subprocess.CalledProcessError:
+        git_branch = ""
+
+    try:
+        git_tag = subprocess.check_output(
+            ['git', 'describe', '--exact-match'],
+            stderr=null,
+            cwd=cwd,
+        ).strip()
+        git_tag = "t=" + git_tag
+    except subprocess.CalledProcessError:
+        git_tag = ""
+
+    try:
+        git_commit = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            stderr=null,
+            cwd=cwd,
+        ).strip()
+    except subprocess.CalledProcessError:
+        git_commit = ""
+
+    try:
+        dirty_string = "-this_is_a_dirty_checkout"
+        is_dirty = subprocess.check_output(
+            ['git', 'describe', '--dirty=' + dirty_string],
+            stderr=null,
+            cwd=cwd,
+        ).strip().endswith(dirty_string)
+
+        git_dirty = "dirty" if is_dirty else ""
+    except subprocess.CalledProcessError:
+        git_dirty = ""
+
+    if git_branch or git_tag or git_commit or git_dirty:
+        git_version = ",".join(
+            s for s in
+            (git_branch, git_tag, git_commit, git_dirty,)
+            if s
+        )
+
+        return (
+            "Synapse/%s (%s)" % (
+                synapse.__version__, git_version,
+            )
+        ).encode("ascii")
+
+    return ("Synapse/%s" % (synapse.__version__,)).encode("ascii")
+
+
 def setup():
     config = HomeServerConfig.load_config(
         "Synapse Homeserver",
@@ -210,8 +280,10 @@ def setup():
 
     check_requirements()
 
+    version_string = get_version_string()
+
     logger.info("Server hostname: %s", config.server_name)
-    logger.info("Server version: %s", synapse.__version__)
+    logger.info("Server version: %s", version_string)
 
     if re.search(":[0-9]+$", config.server_name):
         domain_with_port = config.server_name
@@ -228,6 +300,7 @@ def setup():
         tls_context_factory=tls_context_factory,
         config=config,
         content_addr=config.content_addr,
+        version_string=version_string,
     )
 
     hs.create_resource_tree(
@@ -252,14 +325,6 @@ def setup():
 
     logger.info("Database prepared in %s.", db_name)
 
-    db_pool = hs.get_db_pool()
-
-    if db_name == ":memory:":
-        # Memory databases will need to be setup each time they are opened.
-        reactor.callWhenRunning(
-            db_pool.runWithConnection, prepare_database
-        )
-
     if config.manhole:
         f = twisted.manhole.telnet.ShellFactory()
         f.username = "matrix"
@@ -270,12 +335,13 @@ def setup():
     bind_port = config.bind_port
     if config.no_tls:
         bind_port = None
+
     hs.start_listening(bind_port, config.unsecure_port)
 
     hs.get_pusherpool().start()
-
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
+    hs.get_replication_layer().start_get_pdu_cache()
 
     if config.daemonize:
         print config.pid_file

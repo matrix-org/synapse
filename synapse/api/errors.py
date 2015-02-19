@@ -36,7 +36,8 @@ class Codes(object):
     CAPTCHA_NEEDED = "M_CAPTCHA_NEEDED"
     CAPTCHA_INVALID = "M_CAPTCHA_INVALID"
     MISSING_PARAM = "M_MISSING_PARAM",
-    TOO_LARGE = "M_TOO_LARGE"
+    TOO_LARGE = "M_TOO_LARGE",
+    EXCLUSIVE = "M_EXCLUSIVE"
 
 
 class CodeMessageException(RuntimeError):

@@ -20,7 +20,6 @@ from twisted.web.client import readBody, _AgentBase, _URI
 from twisted.web.http_headers import Headers
 from twisted.web._newclient import ResponseDone
 
-from synapse.http.agent_name import AGENT_NAME
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util.async import sleep
 from synapse.util.logcontext import PreserveLoggingContext
@@ -80,6 +79,7 @@ class MatrixFederationHttpClient(object):
         self.server_name = hs.hostname
         self.agent = MatrixFederationHttpAgent(reactor)
         self.clock = hs.get_clock()
+        self.version_string = hs.version_string
 
     @defer.inlineCallbacks
     def _create_request(self, destination, method, path_bytes,
@@ -87,7 +87,7 @@ class MatrixFederationHttpClient(object):
                         query_bytes=b"", retry_on_dns_fail=True):
         """ Creates and sends a request to the given url
         """
-        headers_dict[b"User-Agent"] = [AGENT_NAME]
+        headers_dict[b"User-Agent"] = [self.version_string]
         headers_dict[b"Host"] = [destination]
 
         url_bytes = urlparse.urlunparse(
@@ -144,16 +144,16 @@ class MatrixFederationHttpClient(object):
                         destination,
                         e
                     )
-                    raise SynapseError(400, "Domain specified not found.")
+                    raise
 
                 logger.warn(
-                    "Sending request failed to %s: %s %s : %s",
+                    "Sending request failed to %s: %s %s: %s - %s",
                     destination,
                     method,
                     url_bytes,
-                    e
+                    type(e).__name__,
+                    _flatten_response_never_received(e),
                 )
-                _print_ex(e)
 
                 if retries_left:
                     yield sleep(2 ** (5 - retries_left))
@@ -447,14 +447,6 @@ def _readBodyToFile(response, stream, max_size):
     return d
 
 
-def _print_ex(e):
-    if hasattr(e, "reasons") and e.reasons:
-        for ex in e.reasons:
-            _print_ex(ex)
-    else:
-        logger.warn(e)
-
-
 class _JsonProducer(object):
     """ Used by the twisted http client to create the HTTP body from json
     """
@@ -474,3 +466,13 @@ class _JsonProducer(object):
 
     def stopProducing(self):
         pass
+
+
+def _flatten_response_never_received(e):
+    if hasattr(e, "reasons"):
+        return ", ".join(
+            _flatten_response_never_received(f.value)
+            for f in e.reasons
+        )
+    else:
+        return "%s: %s" % (type(e).__name__, e.message,)

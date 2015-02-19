@@ -18,7 +18,8 @@ from twisted.internet import defer
 
 from synapse.types import UserID
 from synapse.api.errors import (
-    SynapseError, RegistrationError, InvalidCaptchaError
+    AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError,
+    CodeMessageException
 )
 from ._base import BaseHandler
 import synapse.util.stringutils as stringutils
@@ -28,6 +29,7 @@ from synapse.http.client import CaptchaServerHttpClient
 
 import base64
 import bcrypt
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -64,6 +66,8 @@ class RegistrationHandler(BaseHandler):
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
 
+            yield self.check_user_id_is_valid(user_id)
+
             token = self._generate_token(user_id)
             yield self.store.register(
                 user_id=user_id,
@@ -82,6 +86,7 @@ class RegistrationHandler(BaseHandler):
                     localpart = self._generate_user_id()
                     user = UserID(localpart, self.hs.hostname)
                     user_id = user.to_string()
+                    yield self.check_user_id_is_valid(user_id)
 
                     token = self._generate_token(user_id)
                     yield self.store.register(
@@ -119,6 +124,27 @@ class RegistrationHandler(BaseHandler):
         except NotImplementedError:
             pass  # make tests pass without messing around creating default avatars
 
+        defer.returnValue((user_id, token))
+
+    @defer.inlineCallbacks
+    def appservice_register(self, user_localpart, as_token):
+        user = UserID(user_localpart, self.hs.hostname)
+        user_id = user.to_string()
+        service = yield self.store.get_app_service_by_token(as_token)
+        if not service:
+            raise AuthError(403, "Invalid application service token.")
+        if not service.is_interested_in_user(user_id):
+            raise SynapseError(
+                400, "Invalid user localpart for this application service.",
+                errcode=Codes.EXCLUSIVE
+            )
+        token = self._generate_token(user_id)
+        yield self.store.register(
+            user_id=user_id,
+            token=token,
+            password_hash=""
+        )
+        self.distributor.fire("registered_user", user)
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
@@ -167,6 +193,20 @@ class RegistrationHandler(BaseHandler):
             # XXX: This should be a deferred list, shouldn't it?
             yield self._bind_threepid(c, user_id)
 
+    @defer.inlineCallbacks
+    def check_user_id_is_valid(self, user_id):
+        # valid user IDs must not clash with any user ID namespaces claimed by
+        # application services.
+        services = yield self.store.get_app_services()
+        interested_services = [
+            s for s in services if s.is_interested_in_user(user_id)
+        ]
+        if len(interested_services) > 0:
+            raise SynapseError(
+                400, "This user ID is reserved by an application service.",
+                errcode=Codes.EXCLUSIVE
+            )
+
     def _generate_token(self, user_id):
         # urlsafe variant uses _ and - so use . as the separator and replace
         # all =s with .s so http clients don't quote =s when it is used as
@@ -181,21 +221,26 @@ class RegistrationHandler(BaseHandler):
     def _threepid_from_creds(self, creds):
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
-        httpCli = SimpleHttpClient(self.hs)
+        http_client = SimpleHttpClient(self.hs)
         # XXX: make this configurable!
         trustedIdServers = ['matrix.org:8090', 'matrix.org']
         if not creds['idServer'] in trustedIdServers:
             logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
                         'credentials', creds['idServer'])
             defer.returnValue(None)
-        data = yield httpCli.get_json(
-            # XXX: This should be HTTPS
-            "http://%s%s" % (
-                creds['idServer'],
-                "/_matrix/identity/api/v1/3pid/getValidated3pid"
-            ),
-            {'sid': creds['sid'], 'clientSecret': creds['clientSecret']}
-        )
+
+        data = {}
+        try:
+            data = yield http_client.get_json(
+                # XXX: This should be HTTPS
+                "http://%s%s" % (
+                    creds['idServer'],
+                    "/_matrix/identity/api/v1/3pid/getValidated3pid"
+                ),
+                {'sid': creds['sid'], 'clientSecret': creds['clientSecret']}
+            )
+        except CodeMessageException as e:
+            data = json.loads(e.msg)
 
         if 'medium' in data:
             defer.returnValue(data)
@@ -205,19 +250,23 @@ class RegistrationHandler(BaseHandler):
     def _bind_threepid(self, creds, mxid):
         yield
         logger.debug("binding threepid")
-        httpCli = SimpleHttpClient(self.hs)
-        data = yield httpCli.post_urlencoded_get_json(
-            # XXX: Change when ID servers are all HTTPS
-            "http://%s%s" % (
-                creds['idServer'], "/_matrix/identity/api/v1/3pid/bind"
-            ),
-            {
-                'sid': creds['sid'],
-                'clientSecret': creds['clientSecret'],
-                'mxid': mxid,
-            }
-        )
-        logger.debug("bound threepid")
+        http_client = SimpleHttpClient(self.hs)
+        data = None
+        try:
+            data = yield http_client.post_urlencoded_get_json(
+                # XXX: Change when ID servers are all HTTPS
+                "http://%s%s" % (
+                    creds['idServer'], "/_matrix/identity/api/v1/3pid/bind"
+                ),
+                {
+                    'sid': creds['sid'],
+                    'clientSecret': creds['clientSecret'],
+                    'mxid': mxid,
+                }
+            )
+            logger.debug("bound threepid")
+        except CodeMessageException as e:
+            data = json.loads(e.msg)
         defer.returnValue(data)
 
     @defer.inlineCallbacks

@@ -306,6 +306,34 @@ class Auth(object):
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
             access_token = request.args["access_token"][0]
+
+            # Check for application service tokens with a user_id override
+            try:
+                app_service = yield self.store.get_app_service_by_token(
+                    access_token
+                )
+                if not app_service:
+                    raise KeyError
+
+                user_id = app_service.sender
+                if "user_id" in request.args:
+                    user_id = request.args["user_id"][0]
+                    if not app_service.is_interested_in_user(user_id):
+                        raise AuthError(
+                            403,
+                            "Application service cannot masquerade as this user."
+                        )
+
+                if not user_id:
+                    raise KeyError
+
+                defer.returnValue(
+                    (UserID.from_string(user_id), ClientInfo("", ""))
+                )
+                return
+            except KeyError:
+                pass  # normal users won't have this query parameter set
+
             user_info = yield self.get_user_by_token(access_token)
             user = user_info["user"]
             device_id = user_info["device_id"]
@@ -344,8 +372,7 @@ class Auth(object):
         try:
             ret = yield self.store.get_user_by_token(token=token)
             if not ret:
-                raise StoreError()
-
+                raise StoreError(400, "Unknown token")
             user_info = {
                 "admin": bool(ret.get("admin", False)),
                 "device_id": ret.get("device_id"),
@@ -357,6 +384,18 @@ class Auth(object):
         except StoreError:
             raise AuthError(403, "Unrecognised access token.",
                             errcode=Codes.UNKNOWN_TOKEN)
+
+    @defer.inlineCallbacks
+    def get_appservice_by_req(self, request):
+        try:
+            token = request.args["access_token"][0]
+            service = yield self.store.get_app_service_by_token(token)
+            if not service:
+                raise AuthError(403, "Unrecognised access token.",
+                                errcode=Codes.UNKNOWN_TOKEN)
+            defer.returnValue(service)
+        except KeyError:
+            raise AuthError(403, "Missing access token.")
 
     def is_server_admin(self, user):
         return self.store.is_server_admin(user)

@@ -181,7 +181,7 @@ class TypingNotificationHandler(BaseHandler):
                 },
             ))
 
-        yield defer.DeferredList(deferreds, consumeErrors=False)
+        yield defer.DeferredList(deferreds, consumeErrors=True)
 
     @defer.inlineCallbacks
     def _recv_edu(self, origin, content):

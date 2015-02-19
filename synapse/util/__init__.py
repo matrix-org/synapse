@@ -99,8 +99,6 @@ class Clock(object):
             except:
                 pass
 
-            return res
-
         given_deferred.addCallbacks(callback=sucess, errback=err)
 
         timer = self.call_later(time_out, timed_out_fn)
