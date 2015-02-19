@@ -59,6 +59,7 @@ class RegisterRestServlet(ClientV1RestServlet):
         # }
         # TODO: persistent storage
         self.sessions = {}
+        self.disable_registration = hs.config.disable_registration
 
     def on_GET(self, request):
         if self.hs.config.enable_registration_captcha:
@@ -97,6 +98,9 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        if self.disable_registration:
+            raise SynapseError(403, "Registration has been disabled")
+
         register_json = _parse_json(request)
 
         session = (register_json["session"]
