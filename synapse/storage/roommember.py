@@ -33,6 +33,32 @@ RoomsForUser = namedtuple(
 )
 
 
+# TODO(paul):
+#  * Move this somewhere higher-level, shared;
+#  * more generic key management
+#  * export monitoring stats
+#  * maximum size; just evict things at random, or consider LRU?
+def cached(orig):
+    cache = {}
+
+    @defer.inlineCallbacks
+    def wrapped(self, key):
+        if key in cache:
+            defer.returnValue(cache[key])
+
+        ret = yield orig(self, key)
+
+        cache[key] = ret;
+        defer.returnValue(ret)
+
+    def invalidate(key):
+        if key in cache:
+            del cache[key]
+
+    wrapped.invalidate = invalidate
+    return wrapped
+
+
 class RoomMemberStore(SQLBaseStore):
 
     def __init__(self, *args, **kw):
@@ -103,7 +129,7 @@ class RoomMemberStore(SQLBaseStore):
 
                 txn.execute(sql, (event.room_id, domain))
 
-        self.invalidate_rooms_for_user(target_user_id)
+        self.get_rooms_for_user.invalidate(target_user_id)
 
     @defer.inlineCallbacks
     def get_room_member(self, user_id, room_id):
@@ -247,32 +273,11 @@ class RoomMemberStore(SQLBaseStore):
         results = self._parse_events_txn(txn, rows)
         return results
 
-    # TODO(paul): Create a nice @cached decorator to do this
-    #    @cached
-    #    def get_foo(...)
-    #        ...
-    #    invalidate_foo = get_foo.invalidator
-
-    @defer.inlineCallbacks
+    @cached
     def get_rooms_for_user(self, user_id):
-        # TODO(paul): put some performance counters in here so we can easily
-        #   track what impact this cache is having
-        if user_id in self._user_rooms_cache:
-            defer.returnValue(self._user_rooms_cache[user_id])
-
-        rooms = yield self.get_rooms_for_user_where_membership_is(
+        return self.get_rooms_for_user_where_membership_is(
             user_id, membership_list=[Membership.JOIN],
         )
-
-        # TODO(paul): Consider applying a maximum size; just evict things at
-        #   random, or consider LRU?
-
-        self._user_rooms_cache[user_id] = rooms
-        defer.returnValue(rooms)
-
-    def invalidate_rooms_for_user(self, user_id):
-        if user_id in self._user_rooms_cache:
-            del self._user_rooms_cache[user_id]
 
     @defer.inlineCallbacks
     def user_rooms_intersect(self, user_id_list):
