@@ -1,4 +1,4 @@
-Changes in synapse v0.7.1 (2015-02-18)
+Changes in synapse v0.7.1 (2015-02-19)
 ======================================
 
 * Add cache when fetching events from remote servers to stop repeatedly
