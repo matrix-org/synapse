@@ -305,6 +305,78 @@ class FederationServer(FederationBase):
             (200, send_content)
         )
 
+    @defer.inlineCallbacks
+    def get_missing_events(self, origin, room_id, earliest_events,
+                           latest_events, limit, min_depth):
+        limit = max(limit, 50)
+        min_depth = max(min_depth, 0)
+
+        missing_events = yield self.store.get_missing_events(
+            room_id=room_id,
+            earliest_events=earliest_events,
+            latest_events=latest_events,
+            limit=limit,
+            min_depth=min_depth,
+        )
+
+        known_ids = {e.event_id for e in missing_events} | {earliest_events}
+
+        back_edges = {
+            e for e in missing_events
+            if {i for i, h in e.prev_events.items()} <= known_ids
+        }
+
+        decoded_auth_events = set()
+        state = {}
+        auth_events = set()
+        auth_and_state = {}
+        for event in back_edges:
+            state_pdus = yield self.handler.get_state_for_pdu(
+                origin, room_id, event.event_id,
+                do_auth=False,
+            )
+
+            state[event.event_id] = [s.event_id for s in state_pdus]
+
+            auth_and_state.update({
+                s.event_id: s for s in state_pdus
+            })
+
+            state_ids = {pdu.event_id for pdu in state_pdus}
+            prev_ids = {i for i, h in event.prev_events.items()}
+            partial_auth_chain = yield self.store.get_auth_chain(
+                state_ids | prev_ids, have_ids=decoded_auth_events.keys()
+            )
+
+            for p in partial_auth_chain:
+                p.signatures.update(
+                    compute_event_signature(
+                        p,
+                        self.hs.hostname,
+                        self.hs.config.signing_key[0]
+                    )
+                )
+
+            auth_events.update(
+                a.event_id for a in partial_auth_chain
+            )
+
+            auth_and_state.update({
+                a.event_id: a for a in partial_auth_chain
+            })
+
+        time_now = self._clock.time_msec()
+
+        defer.returnValue({
+            "events": [ev.get_pdu_json(time_now) for ev in missing_events],
+            "state_for_events": state,
+            "auth_events": auth_events,
+            "event_map": {
+                k: ev.get_pdu_json(time_now)
+                for k, ev in auth_and_state.items()
+            },
+        })
+
     @log_function
     def _get_persisted_pdu(self, origin, event_id, do_auth=True):
         """ Get a PDU from the database with given origin and id.
