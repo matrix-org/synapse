@@ -141,8 +141,8 @@ class SynapseHomeServer(HomeServer):
         # instead, we'll store a copy of this mapping so we can actually add
         # extra resources to existing nodes. See self._resource_id for the key.
         resource_mappings = {}
-        for (full_path, resource) in desired_tree:
-            logger.info("Attaching %s to path %s", resource, full_path)
+        for full_path, res in desired_tree:
+            logger.info("Attaching %s to path %s", res, full_path)
             last_resource = self.root_resource
             for path_seg in full_path.split('/')[1:-1]:
                 if path_seg not in last_resource.listNames():
@@ -173,12 +173,12 @@ class SynapseHomeServer(HomeServer):
                                                      child_name)
                     child_resource = resource_mappings[child_res_id]
                     # steal the children
-                    resource.putChild(child_name, child_resource)
+                    res.putChild(child_name, child_resource)
 
             # finally, insert the desired resource in the right place
-            last_resource.putChild(last_path_seg, resource)
+            last_resource.putChild(last_path_seg, res)
             res_id = self._resource_id(last_resource, last_path_seg)
-            resource_mappings[res_id] = resource
+            resource_mappings[res_id] = res
 
         return self.root_resource
 
