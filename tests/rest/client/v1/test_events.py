@@ -128,6 +128,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
         hs.config.enable_registration_captcha = False
+        hs.config.disable_registration = False
 
         hs.get_handlers().federation_handler = Mock()
 
