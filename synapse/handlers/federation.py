@@ -875,7 +875,7 @@ class FederationHandler(BaseHandler):
                 local_view = dict(auth_events)
                 remote_view = dict(auth_events)
                 remote_view.update({
-                    (d.type, d.state_key) for d in different_events
+                    (d.type, d.state_key): d for d in different_events
                 })
 
                 new_state, prev_state = self.state_handler.resolve_events(
