@@ -79,11 +79,11 @@ class ServerConfig(Config):
         server_group.add_argument("--no-tls", action='store_true',
                                   help="Don't bind to the https port.")
         server_group.add_argument("--soft-file-limit", type=int, default=0,
-                                  help="Set the limit on the number of file "
-                                       "descriptors synapse can use. Zero "
-                                       "is used to indicate synapse should "
-                                       "not change the limit from system "
-                                       "default.")
+                                  help="Set the soft limit on the number of "
+                                       "file descriptors synapse can use. "
+                                       "Zero is used to indicate synapse "
+                                       "should set the soft limit to the hard"
+                                       "limit.")
 
     def read_signing_key(self, signing_key_path):
         signing_keys = self.read_file(signing_key_path, "signing_key")

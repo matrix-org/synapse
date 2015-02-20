@@ -273,7 +273,12 @@ def get_version_string():
 def change_resource_limit(soft_file_no):
     try:
         soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+
+        if not soft_file_no:
+            soft_file_no = hard
+
         resource.setrlimit(resource.RLIMIT_NOFILE, (soft_file_no, hard))
+
         logger.info("Set file limit to: %d", soft_file_no)
     except (ValueError, resource.error) as e:
         logger.warn("Failed to set file limit: %s", e)
@@ -372,8 +377,7 @@ def setup():
 
 def run(config):
     with LoggingContext("run"):
-        if config.soft_file_limit:
-            change_resource_limit(config.soft_file_limit)
+        change_resource_limit(config.soft_file_limit)
 
         reactor.run()
 
