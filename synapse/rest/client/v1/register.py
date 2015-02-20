@@ -98,9 +98,6 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.disable_registration:
-            raise SynapseError(403, "Registration has been disabled")
-
         register_json = _parse_json(request)
 
         session = (register_json["session"]
@@ -111,6 +108,11 @@ class RegisterRestServlet(ClientV1RestServlet):
 
         try:
             login_type = register_json["type"]
+
+            is_application_server = login_type == LoginType.APPLICATION_SERVICE
+            if self.disable_registration and not is_application_server:
+                raise SynapseError(403, "Registration has been disabled")
+
             stages = {
                 LoginType.RECAPTCHA: self._do_recaptcha,
                 LoginType.PASSWORD: self._do_password,
