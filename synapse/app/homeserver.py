@@ -125,6 +125,8 @@ class SynapseHomeServer(HomeServer):
             (MEDIA_PREFIX, self.get_resource_for_media_repository()),
             (APP_SERVICE_PREFIX, self.get_resource_for_app_services()),
         ]
+        desired_tree += self.get_resource_for_client().get_extra_resources(self)
+
         if web_client:
             logger.info("Adding the web client.")
             desired_tree.append((WEB_CLIENT_PREFIX,
