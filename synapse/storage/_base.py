@@ -79,7 +79,7 @@ def cached(max_entries=1000):
                 del cache[key]
 
         wrapped.invalidate = invalidate
-        wrapped.prefill    = prefill
+        wrapped.prefill = prefill
         return wrapped
 
     return wrap
