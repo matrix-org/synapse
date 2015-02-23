@@ -23,23 +23,11 @@ from ._base import SQLBaseStore
 logger = logging.getLogger(__name__)
 
 
-class ApplicationServiceCache(object):
-    """Caches ApplicationServices and provides utility functions on top.
-
-    This class is designed to be invoked on incoming events in order to avoid
-    hammering the database every time to extract a list of application service
-    regexes.
-    """
-
-    def __init__(self):
-        self.services = []
-
-
 class ApplicationServiceStore(SQLBaseStore):
 
     def __init__(self, hs):
         super(ApplicationServiceStore, self).__init__(hs)
-        self.cache = ApplicationServiceCache()
+        self.services_cache = []
         self.cache_defer = self._populate_cache()
 
     @defer.inlineCallbacks
@@ -56,7 +44,7 @@ class ApplicationServiceStore(SQLBaseStore):
             token,
         )
         # update cache TODO: Should this be in the txn?
-        for service in self.cache.services:
+        for service in self.services_cache:
             if service.token == token:
                 service.url = None
                 service.namespaces = None
@@ -110,13 +98,13 @@ class ApplicationServiceStore(SQLBaseStore):
         )
 
         # update cache TODO: Should this be in the txn?
-        for (index, cache_service) in enumerate(self.cache.services):
+        for (index, cache_service) in enumerate(self.services_cache):
             if service.token == cache_service.token:
-                self.cache.services[index] = service
+                self.services_cache[index] = service
                 logger.info("Updated: %s", service)
                 return
         # new entry
-        self.cache.services.append(service)
+        self.services_cache.append(service)
         logger.info("Updated(new): %s", service)
 
     def _update_app_service_txn(self, txn, service):
@@ -160,7 +148,7 @@ class ApplicationServiceStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_app_services(self):
         yield self.cache_defer  # make sure the cache is ready
-        defer.returnValue(self.cache.services)
+        defer.returnValue(self.services_cache)
 
     @defer.inlineCallbacks
     def get_app_service_by_token(self, token, from_cache=True):
@@ -176,7 +164,7 @@ class ApplicationServiceStore(SQLBaseStore):
         yield self.cache_defer  # make sure the cache is ready
 
         if from_cache:
-            for service in self.cache.services:
+            for service in self.services_cache:
                 if service.token == token:
                     defer.returnValue(service)
                     return
@@ -235,7 +223,7 @@ class ApplicationServiceStore(SQLBaseStore):
         # TODO get last successful txn id f.e. service
         for service in services.values():
             logger.info("Found application service: %s", service)
-            self.cache.services.append(ApplicationService(
+            self.services_cache.append(ApplicationService(
                 token=service["token"],
                 url=service["url"],
                 namespaces=service["namespaces"],
