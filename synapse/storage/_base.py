@@ -636,8 +636,9 @@ class SQLBaseStore(object):
         start_time = time.time() * 1000
         update_counter = self._get_event_counters.update
 
+        cache = self._get_event_cache.setdefault(event_id, {})
+
         try:
-            cache = self._get_event_cache.setdefault(event_id, {})
             # Separate cache entries for each way to invoke _get_event_txn
             return cache[(check_redacted, get_prev_content, allow_rejected)]
         except KeyError:
