@@ -48,9 +48,22 @@ def cached(max_entries=1000):
 
     The wrapped function has an additional member, a callable called
     "invalidate". This can be used to remove individual entries from the cache.
+
+    The wrapped function has another additional callable, called "prefill",
+    which can be used to insert values into the cache specifically, without
+    calling the calculation function.
     """
     def wrap(orig):
         cache = {}
+
+        def prefill(key, value):
+            while len(cache) > max_entries:
+                # TODO(paul): This feels too biased. However, a random index
+                #   would be a bit inefficient, walking the list of keys just
+                #   to ignore most of them?
+                del cache[cache.keys()[0]]
+
+            cache[key] = value
 
         @defer.inlineCallbacks
         def wrapped(self, key):
@@ -58,14 +71,7 @@ def cached(max_entries=1000):
                 defer.returnValue(cache[key])
 
             ret = yield orig(self, key)
-
-            while len(cache) > max_entries:
-                # TODO(paul): This feels too biased. However, a random index
-                #   would be a bit inefficient, walking the list of keys just
-                #   to ignore most of them?
-                del cache[cache.keys()[0]]
-
-            cache[key] = ret;
+            prefill(key, ret)
             defer.returnValue(ret)
 
         def invalidate(key):
@@ -73,6 +79,7 @@ def cached(max_entries=1000):
                 del cache[key]
 
         wrapped.invalidate = invalidate
+        wrapped.prefill    = prefill
         return wrapped
 
     return wrap

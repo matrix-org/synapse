@@ -87,3 +87,17 @@ class CacheDecoratorTestCase(unittest.TestCase):
 
         self.assertTrue(callcount[0] >= 14,
             msg="Expected callcount >= 14, got %d" % (callcount[0]))
+
+    @defer.inlineCallbacks
+    def test_prefill(self):
+        callcount = [0]
+
+        @cached()
+        def func(self, key):
+            callcount[0] += 1
+            return key
+
+        func.prefill("foo", 123)
+
+        self.assertEquals((yield func(self, "foo")), 123)
+        self.assertEquals(callcount[0], 0)
