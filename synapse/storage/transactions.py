@@ -17,8 +17,6 @@ from ._base import SQLBaseStore, Table, cached
 
 from collections import namedtuple
 
-from twisted.internet import defer
-
 import logging
 
 logger = logging.getLogger(__name__)
