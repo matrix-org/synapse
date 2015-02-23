@@ -66,6 +66,13 @@ class CacheDecoratorTestCase(unittest.TestCase):
 
         self.assertEquals(callcount[0], 2)
 
+    def test_invalidate_missing(self):
+        @cached()
+        def func(self, key):
+            return key
+
+        func.invalidate("what")
+
     @defer.inlineCallbacks
     def test_max_entries(self):
         callcount = [0]

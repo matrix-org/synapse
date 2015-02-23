@@ -75,8 +75,7 @@ def cached(max_entries=1000):
             defer.returnValue(ret)
 
         def invalidate(key):
-            if key in cache:
-                del cache[key]
+            cache.pop(key, None)
 
         wrapped.invalidate = invalidate
         wrapped.prefill = prefill
