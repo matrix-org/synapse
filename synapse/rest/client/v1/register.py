@@ -18,12 +18,10 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.api.constants import LoginType
-from synapse.api.urls import STATIC_PREFIX
 from base import ClientV1RestServlet, client_path_pattern
 import synapse.util.stringutils as stringutils
 
 from synapse.util.async import run_on_reactor
-from twisted.web.resource import Resource
 
 from hashlib import sha1
 import hmac
@@ -307,16 +305,6 @@ class RegisterRestServlet(ClientV1RestServlet):
         })
 
 
-class RegisterFallbackResource(Resource):
-
-    def __init__(self, hs):
-        Resource.__init__(self)  # Resource is an old-style class :(
-        self.hs = hs
-
-    def render_GET(self, request):
-        return "NOT_YET_IMPLEMENTED"
-
-
 def _parse_json(request):
     try:
         content = json.loads(request.content.read())
@@ -325,15 +313,6 @@ def _parse_json(request):
         return content
     except ValueError:
         raise SynapseError(400, "Content not JSON.")
-
-
-def get_prefixes_and_resources(hs):
-    return [
-        (
-            STATIC_PREFIX + "/client/register",
-            RegisterFallbackResource(hs)
-        )
-    ]
 
 
 def register_servlets(hs, http_server):

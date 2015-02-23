@@ -73,6 +73,7 @@ class BaseHomeServer(object):
         'resource_for_client',
         'resource_for_client_v2_alpha',
         'resource_for_federation',
+        'resource_for_static_content',
         'resource_for_web_client',
         'resource_for_content_repo',
         'resource_for_server_key',

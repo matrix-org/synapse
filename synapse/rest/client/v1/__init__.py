@@ -28,14 +28,6 @@ class ClientV1RestResource(JsonResource):
         JsonResource.__init__(self, hs)
         self.register_servlets(self, hs)
 
-    def get_extra_resources(self, hs):
-        # some parts of client v1 need to produce HTML as the output (e.g.
-        # fallback pages) but we can only produce JSON output. In an effort to
-        # keep similar logic close together, we'll call through to any servlet
-        # which requires HTML output.
-        register_resources = register.get_prefixes_and_resources(hs)
-        return register_resources
-
     @staticmethod
     def register_servlets(client_resource, hs):
         room.register_servlets(hs, client_resource)
