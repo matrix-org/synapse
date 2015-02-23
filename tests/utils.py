@@ -42,6 +42,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config = Mock()
         config.signing_key = [MockKey()]
         config.event_cache_size = 1
+        config.disable_registration = False
 
     if datastore is None:
         db_pool = SQLiteMemoryDbPool()
