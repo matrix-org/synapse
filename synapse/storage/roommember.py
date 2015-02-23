@@ -35,11 +35,6 @@ RoomsForUser = namedtuple(
 
 class RoomMemberStore(SQLBaseStore):
 
-    def __init__(self, *args, **kw):
-        super(RoomMemberStore, self).__init__(*args, **kw)
-
-        self._user_rooms_cache = {}
-
     def _store_room_member_txn(self, txn, event):
         """Store a room member in the database.
         """
