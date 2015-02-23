@@ -23,7 +23,7 @@ from synapse.util.lrucache import LruCache
 
 from twisted.internet import defer
 
-import collections
+from collections import namedtuple, OrderedDict
 import simplejson as json
 import sys
 import time
@@ -54,14 +54,11 @@ def cached(max_entries=1000):
     calling the calculation function.
     """
     def wrap(orig):
-        cache = {}
+        cache = OrderedDict()
 
         def prefill(key, value):
             while len(cache) > max_entries:
-                # TODO(paul): This feels too biased. However, a random index
-                #   would be a bit inefficient, walking the list of keys just
-                #   to ignore most of them?
-                del cache[cache.keys()[0]]
+                cache.popitem(last=False)
 
             cache[key] = value
 
@@ -836,7 +833,7 @@ class JoinHelper(object):
         for table in self.tables:
             res += [f for f in table.fields if f not in res]
 
-        self.EntryType = collections.namedtuple("JoinHelperEntry", res)
+        self.EntryType = namedtuple("JoinHelperEntry", res)
 
     def get_fields(self, **prefixes):
         """Get a string representing a list of fields for use in SELECT
