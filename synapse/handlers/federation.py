@@ -790,6 +790,29 @@ class FederationHandler(BaseHandler):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
+    def on_get_missing_events(self, origin, room_id, earliest_events,
+                              latest_events, limit, min_depth):
+        in_room = yield self.auth.check_host_in_room(
+            room_id,
+            origin
+        )
+        if not in_room:
+            raise AuthError(403, "Host not in room.")
+
+        limit = min(limit, 20)
+        min_depth = max(min_depth, 0)
+
+        missing_events = yield self.store.get_missing_events(
+            room_id=room_id,
+            earliest_events=earliest_events,
+            latest_events=latest_events,
+            limit=limit,
+            min_depth=min_depth,
+        )
+
+        defer.returnValue(missing_events)
+
+    @defer.inlineCallbacks
     @log_function
     def do_auth(self, origin, event, context, auth_events):
         # Check if we have all the auth events.

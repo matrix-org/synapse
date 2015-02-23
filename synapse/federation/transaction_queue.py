@@ -287,7 +287,7 @@ class TransactionQueue(object):
                     code = 200
 
                     if response:
-                        for e_id, r in getattr(response, "pdus", {}).items():
+                        for e_id, r in response.get("pdus", {}).items():
                             if "error" in r:
                                 logger.warn(
                                     "Transaction returned error for %s: %s",
