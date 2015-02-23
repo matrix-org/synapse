@@ -32,15 +32,15 @@ class EventFederationStore(SQLBaseStore):
     and backfilling from another server respectively.
     """
 
-    def get_auth_chain(self, event_ids, have_ids=set()):
+    def get_auth_chain(self, event_ids):
         return self.runInteraction(
             "get_auth_chain",
             self._get_auth_chain_txn,
-            event_ids, have_ids
+            event_ids
         )
 
-    def _get_auth_chain_txn(self, txn, event_ids, have_ids):
-        results = self._get_auth_chain_ids_txn(txn, event_ids, have_ids)
+    def _get_auth_chain_txn(self, txn, event_ids):
+        results = self._get_auth_chain_ids_txn(txn, event_ids)
 
         return self._get_events_txn(txn, results)
 
@@ -51,9 +51,8 @@ class EventFederationStore(SQLBaseStore):
             event_ids
         )
 
-    def _get_auth_chain_ids_txn(self, txn, event_ids, have_ids):
+    def _get_auth_chain_ids_txn(self, txn, event_ids):
         results = set()
-        have_ids = set(have_ids)
 
         base_sql = (
             "SELECT auth_id FROM event_auth WHERE event_id = ?"
@@ -67,7 +66,6 @@ class EventFederationStore(SQLBaseStore):
                 new_front.update([r[0] for r in txn.fetchall()])
 
             new_front -= results
-            new_front -= have_ids
 
             front = new_front
             results.update(front)
