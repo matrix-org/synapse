@@ -22,11 +22,12 @@ from .repository import ContentRepositoryConfig
 from .captcha import CaptchaConfig
 from .email import EmailConfig
 from .voip import VoipConfig
+from .registration import RegistrationConfig
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
-                       EmailConfig, VoipConfig):
+                       EmailConfig, VoipConfig, RegistrationConfig,):
     pass
 
 
