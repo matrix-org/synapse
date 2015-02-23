@@ -128,7 +128,7 @@ class SynapseHomeServer(HomeServer):
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
             (MEDIA_PREFIX, self.get_resource_for_media_repository()),
             (APP_SERVICE_PREFIX, self.get_resource_for_app_services()),
-            (STATIC_PREFIX, self.get_resource_for_static_content())
+            (STATIC_PREFIX, self.get_resource_for_static_content()),
         ]
 
         if web_client:
