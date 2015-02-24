@@ -23,6 +23,7 @@ var setupCaptcha = function() {
         var public_key = window.matrixRegistrationConfig.recaptcha_public_key;
         if (public_key === undefined) {
             console.error("No public key defined for captcha!");
+            setFeedbackString("Misconfigured captcha for server. Contact server admin.");
             return;
         }
         Recaptcha.create(public_key,
