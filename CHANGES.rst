@@ -1,3 +1,10 @@
+Changes in synapse vx.x.x (x-x-x)
+=================================
+
+* Add support for registration fallback. This is a page hosted on the server
+  which allows a user to register for an account, regardless of what client
+  they are using (e.g. mobile devices).
+
 Changes in synapse v0.7.1 (2015-02-19)
 ======================================
 
