@@ -37,8 +37,6 @@ logger = logging.getLogger(__name__)
 
 
 class FederationClient(FederationBase):
-    def __init__(self):
-        self._get_pdu_cache = None
 
     def start_get_pdu_cache(self):
         self._get_pdu_cache = ExpiringCache(
