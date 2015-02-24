@@ -45,12 +45,17 @@ class SimpleHttpClient(object):
         self.agent = Agent(reactor)
         self.version_string = hs.version_string
 
+    def request(self, method, *args, **kwargs):
+        # A small wrapper around self.agent.request() so we can easily attach
+        # counters to it
+        return self.agent.request(method, *args, **kwargs)
+
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}):
         logger.debug("post_urlencoded_get_json args: %s", args)
         query_bytes = urllib.urlencode(args, True)
 
-        response = yield self.agent.request(
+        response = yield self.request(
             "POST",
             uri.encode("ascii"),
             headers=Headers({
@@ -70,7 +75,7 @@ class SimpleHttpClient(object):
 
         logger.info("HTTP POST %s -> %s", json_str, uri)
 
-        response = yield self.agent.request(
+        response = yield self.request(
             "POST",
             uri.encode("ascii"),
             headers=Headers({
@@ -104,7 +109,7 @@ class SimpleHttpClient(object):
             query_bytes = urllib.urlencode(args, True)
             uri = "%s?%s" % (uri, query_bytes)
 
-        response = yield self.agent.request(
+        response = yield self.request(
             "GET",
             uri.encode("ascii"),
             headers=Headers({
@@ -145,7 +150,7 @@ class SimpleHttpClient(object):
 
         json_str = encode_canonical_json(json_body)
 
-        response = yield self.agent.request(
+        response = yield self.request(
             "PUT",
             uri.encode("ascii"),
             headers=Headers({
@@ -176,7 +181,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
     def post_urlencoded_get_raw(self, url, args={}):
         query_bytes = urllib.urlencode(args, True)
 
-        response = yield self.agent.request(
+        response = yield self.request(
             "POST",
             url.encode("ascii"),
             bodyProducer=FileBodyProducer(StringIO(query_bytes)),
