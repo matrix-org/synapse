@@ -147,6 +147,13 @@ class SynapseHomeServer(HomeServer):
         else:
             self.root_resource = Resource()
 
+        if self.get_config().enable_metrics:
+            from synapse.metrics.resource import (
+                MetricsResource, METRICS_PREFIX
+            )
+
+            desired_tree.append((METRICS_PREFIX, MetricsResource(self)))
+
         # ideally we'd just use getChild and putChild but getChild doesn't work
         # unless you give it a Request object IN ADDITION to the name :/ So
         # instead, we'll store a copy of this mapping so we can actually add
