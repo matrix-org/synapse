@@ -16,6 +16,8 @@
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
+import synapse.metrics
+
 
 METRICS_PREFIX = "/_synapse/metrics"
 
@@ -29,7 +31,7 @@ class MetricsResource(Resource):
         self.hs = hs
 
     def render_GET(self, request):
-        response = "Hello, world!"
+        response = synapse.metrics.render_all()
 
         request.setHeader("Content-Type", "text/plain")
         request.setHeader("Content-Length", str(len(response)))
