@@ -36,7 +36,8 @@ from synapse.http.server_key_resource import LocalKey
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX, APP_SERVICE_PREFIX
+    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX, APP_SERVICE_PREFIX,
+    STATIC_PREFIX
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -81,6 +82,9 @@ class SynapseHomeServer(HomeServer):
         webclient_path = os.path.join(syweb_path, "webclient")
         return File(webclient_path)  # TODO configurable?
 
+    def build_resource_for_static_content(self):
+        return File("static")
+
     def build_resource_for_content_repo(self):
         return ContentRepoResource(
             self, self.upload_dir, self.auth, self.content_addr
@@ -124,7 +128,9 @@ class SynapseHomeServer(HomeServer):
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
             (MEDIA_PREFIX, self.get_resource_for_media_repository()),
             (APP_SERVICE_PREFIX, self.get_resource_for_app_services()),
+            (STATIC_PREFIX, self.get_resource_for_static_content()),
         ]
+
         if web_client:
             logger.info("Adding the web client.")
             desired_tree.append((WEB_CLIENT_PREFIX,
