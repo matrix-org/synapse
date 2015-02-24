@@ -110,7 +110,7 @@ class SynapseHomeServer(HomeServer):
                                           # so that :memory: sqlite works
         )
 
-    def create_resource_tree(self, web_client, redirect_root_to_web_client):
+    def create_resource_tree(self, redirect_root_to_web_client):
         """Create the resource tree for this Home Server.
 
         This in unduly complicated because Twisted does not support putting
@@ -122,6 +122,8 @@ class SynapseHomeServer(HomeServer):
             location of the web client. This does nothing if web_client is not
             True.
         """
+        web_client = self.get_config().webclient
+
         # list containing (path_str, Resource) e.g:
         # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
         desired_tree = [
@@ -340,7 +342,6 @@ def setup(config_options):
     )
 
     hs.create_resource_tree(
-        web_client=config.webclient,
         redirect_root_to_web_client=True,
     )
 
