@@ -9,12 +9,12 @@
 <script src="js/register.js"></script>
 </head>
 <body onload="matrixRegistration.onLoad()">
-<form id="registrationForm">
+<form id="registrationForm" onsubmit="matrixRegistration.signUp(); return false;">
 	<div>
         Create account:<br/>
         
         <div style="text-align: center">
-        	<input id="desired_user_id" size="32" type="text" placeholder="Matrix ID (e.g. bob)"/>
+       	    <input id="desired_user_id" size="32" type="text" placeholder="Matrix ID (e.g. bob)" autocapitalize="off" autocorrect="off" />
         	<br/>
         	<input id="pwd1" size="32" type="password" placeholder="Type a password"/>
         	<br/>
@@ -24,7 +24,7 @@
             <br/>
         	<div id="regcaptcha"></div>
 
-        	<button type="button" style="margin: 10px" onclick="matrixRegistration.signUp()">Sign up</button>
+            <button type="submit" style="margin: 10px">Sign up</button>
         </div>
     </div>
 </form>
