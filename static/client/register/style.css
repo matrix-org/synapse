@@ -18,6 +18,10 @@ a:visited { color: #666; }
 a:hover   { color: #000; }
 a:active  { color: #000; }
 
+input {
+   width: 100%
+}
+
 textarea, input {
    font-family: inherit;
    font-size: inherit;
