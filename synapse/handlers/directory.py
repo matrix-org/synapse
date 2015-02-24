@@ -160,7 +160,7 @@ class DirectoryHandler(BaseHandler):
         if not room_id:
             raise SynapseError(
                 404,
-                "Room alias %r not found" % (room_alias.to_string(),),
+                "Room alias %s not found" % (room_alias.to_string(),),
                 Codes.NOT_FOUND
             )
 
