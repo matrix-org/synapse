@@ -10,19 +10,19 @@
 </head>
 <body onload="matrixRegistration.onLoad()">
 <form id="registrationForm" onsubmit="matrixRegistration.signUp(); return false;">
-	<div>
+    <div>
         Create account:<br/>
         
         <div style="text-align: center">
-       	    <input id="desired_user_id" size="32" type="text" placeholder="Matrix ID (e.g. bob)" autocapitalize="off" autocorrect="off" />
-        	<br/>
-        	<input id="pwd1" size="32" type="password" placeholder="Type a password"/>
-        	<br/>
-        	<input id="pwd2" size="32" type="password" placeholder="Confirm your password"/>
-        	<br/>
+            <input id="desired_user_id" size="32" type="text" placeholder="Matrix ID (e.g. bob)" autocapitalize="off" autocorrect="off" />
+            <br/>
+            <input id="pwd1" size="32" type="password" placeholder="Type a password"/>
+            <br/>
+            <input id="pwd2" size="32" type="password" placeholder="Confirm your password"/>
+            <br/>
             <span id="feedback" style="color: #f00"></span>
             <br/>
-        	<div id="regcaptcha"></div>
+            <div id="regcaptcha"></div>
 
             <button type="submit" style="margin: 10px">Sign up</button>
         </div>
