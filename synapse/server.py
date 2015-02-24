@@ -56,6 +56,7 @@ class BaseHomeServer(object):
     """
 
     DEPENDENCIES = [
+        'config',
         'clock',
         'http_client',
         'db_name',
