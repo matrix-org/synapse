@@ -22,6 +22,7 @@ from .units import Transaction, Edu
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
 from synapse.events import FrozenEvent
+import synapse.metrics
 
 from synapse.api.errors import FederationError, SynapseError
 
@@ -31,6 +32,8 @@ import logging
 
 
 logger = logging.getLogger(__name__)
+
+metrics = synapse.metrics.get_metrics_for(__name__)
 
 
 class FederationServer(FederationBase):
@@ -72,6 +75,7 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
+    @metrics.counted
     def on_backfill_request(self, origin, room_id, versions, limit):
         pdus = yield self.handler.on_backfill_request(
             origin, room_id, versions, limit
@@ -81,6 +85,7 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
+    @metrics.counted
     def on_incoming_transaction(self, transaction_data):
         transaction = Transaction(**transaction_data)
 
@@ -160,6 +165,7 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
+    @metrics.counted
     def on_context_state_request(self, origin, room_id, event_id):
         if event_id:
             pdus = yield self.handler.get_state_for_pdu(
@@ -187,6 +193,7 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
+    @metrics.counted
     def on_pdu_request(self, origin, event_id):
         pdu = yield self._get_persisted_pdu(origin, event_id)
 
@@ -199,10 +206,12 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
+    @metrics.counted
     def on_pull_request(self, origin, versions):
         raise NotImplementedError("Pull transactions not implemented")
 
     @defer.inlineCallbacks
+    @metrics.counted
     def on_query_request(self, query_type, args):
         if query_type in self.query_handlers:
             response = yield self.query_handlers[query_type](args)
@@ -213,12 +222,14 @@ class FederationServer(FederationBase):
             )
 
     @defer.inlineCallbacks
+    @metrics.counted
     def on_make_join_request(self, room_id, user_id):
         pdu = yield self.handler.on_make_join_request(room_id, user_id)
         time_now = self._clock.time_msec()
         defer.returnValue({"event": pdu.get_pdu_json(time_now)})
 
     @defer.inlineCallbacks
+    @metrics.counted
     def on_invite_request(self, origin, content):
         pdu = self.event_from_pdu_json(content)
         ret_pdu = yield self.handler.on_invite_request(origin, pdu)
@@ -226,6 +237,7 @@ class FederationServer(FederationBase):
         defer.returnValue((200, {"event": ret_pdu.get_pdu_json(time_now)}))
 
     @defer.inlineCallbacks
+    @metrics.counted
     def on_send_join_request(self, origin, content):
         logger.debug("on_send_join_request: content: %s", content)
         pdu = self.event_from_pdu_json(content)
@@ -240,6 +252,7 @@ class FederationServer(FederationBase):
         }))
 
     @defer.inlineCallbacks
+    @metrics.counted
     def on_event_auth(self, origin, room_id, event_id):
         time_now = self._clock.time_msec()
         auth_pdus = yield self.handler.on_event_auth(event_id)
@@ -248,6 +261,7 @@ class FederationServer(FederationBase):
         }))
 
     @defer.inlineCallbacks
+    @metrics.counted
     def on_query_auth_request(self, origin, content, event_id):
         """
         Content is a dict with keys::

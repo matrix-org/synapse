@@ -25,6 +25,7 @@ from synapse.api.errors import (
 from synapse.util.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
 from synapse.events import FrozenEvent
+import synapse.metrics
 
 from synapse.util.retryutils import get_retry_limiter, NotRetryingDestination
 
@@ -34,6 +35,8 @@ import random
 
 
 logger = logging.getLogger(__name__)
+
+metrics = synapse.metrics.get_metrics_for(__name__)
 
 
 class FederationClient(FederationBase):
@@ -50,6 +53,7 @@ class FederationClient(FederationBase):
         self._get_pdu_cache.start()
 
     @log_function
+    @metrics.counted
     def send_pdu(self, pdu, destinations):
         """Informs the replication layer about a new PDU generated within the
         home server that should be transmitted to others.
@@ -77,6 +81,7 @@ class FederationClient(FederationBase):
         )
 
     @log_function
+    @metrics.counted
     def send_edu(self, destination, edu_type, content):
         edu = Edu(
             origin=self.server_name,
@@ -90,11 +95,13 @@ class FederationClient(FederationBase):
         return defer.succeed(None)
 
     @log_function
+    @metrics.counted
     def send_failure(self, failure, destination):
         self._transaction_queue.enqueue_failure(failure, destination)
         return defer.succeed(None)
 
     @log_function
+    @metrics.counted
     def make_query(self, destination, query_type, args,
                    retry_on_dns_fail=True):
         """Sends a federation Query to a remote homeserver of the given type
@@ -156,6 +163,7 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
+    @metrics.counted
     def get_pdu(self, destinations, event_id, outlier=False):
         """Requests the PDU with given origin and ID from the remote home
         servers.
@@ -245,6 +253,7 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
+    @metrics.counted
     def get_state_for_room(self, destination, room_id, event_id):
         """Requests all of the `current` state PDUs for a given room from
         a remote home server.
@@ -285,6 +294,7 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
+    @metrics.counted
     def get_event_auth(self, destination, room_id, event_id):
         res = yield self.transport_layer.get_event_auth(
             destination, room_id, event_id,
@@ -304,6 +314,7 @@ class FederationClient(FederationBase):
         defer.returnValue(signed_auth)
 
     @defer.inlineCallbacks
+    @metrics.counted
     def make_join(self, destinations, room_id, user_id):
         for destination in destinations:
             try:
@@ -330,6 +341,7 @@ class FederationClient(FederationBase):
         raise RuntimeError("Failed to send to any server.")
 
     @defer.inlineCallbacks
+    @metrics.counted
     def send_join(self, destinations, pdu):
         for destination in destinations:
             try:
@@ -379,6 +391,7 @@ class FederationClient(FederationBase):
         raise RuntimeError("Failed to send to any server.")
 
     @defer.inlineCallbacks
+    @metrics.counted
     def send_invite(self, destination, room_id, event_id, pdu):
         time_now = self._clock.time_msec()
         code, content = yield self.transport_layer.send_invite(
@@ -402,6 +415,7 @@ class FederationClient(FederationBase):
         defer.returnValue(pdu)
 
     @defer.inlineCallbacks
+    @metrics.counted
     def query_auth(self, destination, room_id, event_id, local_auth):
         """
         Params:
