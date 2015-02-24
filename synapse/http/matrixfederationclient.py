@@ -23,6 +23,7 @@ from twisted.web._newclient import ResponseDone
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util.async import sleep
 from synapse.util.logcontext import PreserveLoggingContext
+import synapse.metrics
 
 from syutil.jsonutil import encode_canonical_json
 
@@ -40,6 +41,15 @@ import urlparse
 
 logger = logging.getLogger(__name__)
 
+metrics = synapse.metrics.get_metrics_for(__name__)
+
+outgoing_requests_counter = metrics.register_counter("outgoing_requests",
+    keys=["method"],
+)
+incoming_responses_counter = metrics.register_counter("incoming_responses",
+    keys=["method","code"],
+)
+
 
 class MatrixFederationHttpAgent(_AgentBase):
 
@@ -48,6 +58,8 @@ class MatrixFederationHttpAgent(_AgentBase):
 
     def request(self, destination, endpoint, method, path, params, query,
                 headers, body_producer):
+
+        outgoing_requests_counter.inc(method)
 
         host = b""
         port = 0
@@ -59,9 +71,19 @@ class MatrixFederationHttpAgent(_AgentBase):
         # Set the connection pool key to be the destination.
         key = destination
 
-        return self._requestWithEndpoint(key, endpoint, method, parsed_URI,
-                                         headers, body_producer,
-                                         parsed_URI.originForm)
+        d = self._requestWithEndpoint(key, endpoint, method, parsed_URI,
+                                      headers, body_producer,
+                                      parsed_URI.originForm)
+
+        def _cb(response):
+            incoming_responses_counter.inc(method, response.code)
+            return response
+        def _eb(failure):
+            incoming_responses_counter.inc(method, "ERR")
+            return failure
+        d.addCallbacks(_cb, _eb)
+
+        return d
 
 
 class MatrixFederationHttpClient(object):

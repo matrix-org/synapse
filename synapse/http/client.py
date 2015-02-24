@@ -15,6 +15,7 @@
 
 from synapse.api.errors import CodeMessageException
 from syutil.jsonutil import encode_canonical_json
+import synapse.metrics
 
 from twisted.internet import defer, reactor
 from twisted.web.client import (
@@ -30,6 +31,15 @@ import urllib
 
 
 logger = logging.getLogger(__name__)
+
+metrics = synapse.metrics.get_metrics_for(__name__)
+
+outgoing_requests_counter = metrics.register_counter("outgoing_requests",
+    keys=["method"],
+)
+incoming_responses_counter = metrics.register_counter("incoming_responses",
+    keys=["method","code"],
+)
 
 
 class SimpleHttpClient(object):
@@ -48,7 +58,18 @@ class SimpleHttpClient(object):
     def request(self, method, *args, **kwargs):
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
-        return self.agent.request(method, *args, **kwargs)
+        outgoing_requests_counter.inc(method)
+        d = self.agent.request(method, *args, **kwargs)
+
+        def _cb(response):
+            incoming_responses_counter.inc(method, response.code)
+            return response
+        def _eb(failure):
+            incoming_responses_counter.inc(method, "ERR")
+            return failure
+        d.addCallbacks(_cb, _eb)
+
+        return d
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}):

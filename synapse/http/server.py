@@ -18,6 +18,7 @@ from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError
 )
 from synapse.util.logcontext import LoggingContext
+import synapse.metrics
 
 from syutil.jsonutil import (
     encode_canonical_json, encode_pretty_printed_json
@@ -33,6 +34,15 @@ import logging
 import urllib
 
 logger = logging.getLogger(__name__)
+
+metrics = synapse.metrics.get_metrics_for(__name__)
+
+incoming_requests_counter = metrics.register_counter("incoming_requests",
+    keys=["method"],
+)
+outgoing_responses_counter = metrics.register_counter("outgoing_responses",
+    keys=["method","code"],
+)
 
 
 class HttpServer(object):
@@ -112,6 +122,8 @@ class JsonResource(HttpServer, resource.Resource):
             This checks if anyone has registered a callback for that method and
             path.
         """
+        incoming_requests_counter.inc(request.method)
+
         code = None
         start = self.clock.time_msec()
         try:
@@ -189,6 +201,8 @@ class JsonResource(HttpServer, resource.Resource):
                 "Not sending response to request %s, already disconnected.",
                 request)
             return
+
+        outgoing_responses_counter.inc(request.method, str(code))
 
         # TODO: Only enable CORS for the requests that need it.
         respond_with_json(
