@@ -127,6 +127,27 @@ class _StreamToken(namedtuple("_StreamToken", "topological stream")):
 
 
 class StreamStore(SQLBaseStore):
+
+    def get_appservice_room_stream(self, service, from_key, to_key, limit=0):
+        # NB this lives here instead of appservice.py so we can reuse the
+        # 'private' StreamToken class in this file.
+        logger.info("get_appservice_room_stream -> %s", service)
+
+        if limit:
+            limit = max(limit, MAX_STREAM_SIZE)
+        else:
+            limit = MAX_STREAM_SIZE
+
+        # From and to keys should be integers from ordering.
+        from_id = _StreamToken.parse_stream_token(from_key)
+        to_id = _StreamToken.parse_stream_token(to_key)
+
+        if from_key == to_key:
+            return defer.succeed(([], to_key))
+
+        # TODO stub
+        return defer.succeed(([], to_key))
+
     @log_function
     def get_room_events_stream(self, user_id, from_key, to_key, room_id,
                                limit=0, with_feedback=False):

@@ -17,6 +17,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.appservice import ApplicationService
+from synapse.storage.roommember import RoomsForUser
 from ._base import SQLBaseStore
 
 
@@ -151,6 +152,16 @@ class ApplicationServiceStore(SQLBaseStore):
         defer.returnValue(self.services_cache)
 
     @defer.inlineCallbacks
+    def get_app_service_by_user_id(self, user_id):
+        yield self.cache_defer  # make sure the cache is ready
+
+        for service in self.services_cache:
+            if service.sender == user_id:
+                defer.returnValue(service)
+                return
+        defer.returnValue(None)
+
+    @defer.inlineCallbacks
     def get_app_service_by_token(self, token, from_cache=True):
         """Get the application service with the given token.
 
@@ -172,6 +183,14 @@ class ApplicationServiceStore(SQLBaseStore):
 
         # TODO: The from_cache=False impl
         # TODO: This should be JOINed with the application_services_regex table.
+
+    @defer.inlineCallbacks
+    def get_app_service_rooms(self, service):
+        logger.info("get_app_service_rooms -> %s", service)
+
+        # TODO stub
+        yield self.cache_defer
+        defer.returnValue([RoomsForUser("!foo:bar", service.sender, "join")])
 
     @defer.inlineCallbacks
     def _populate_cache(self):
