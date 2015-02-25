@@ -46,6 +46,17 @@ class PushRuleStore(SQLBaseStore):
         defer.returnValue(dicts)
 
     @defer.inlineCallbacks
+    def get_push_rules_enabled_for_user_name(self, user_name):
+        results = yield self._simple_select_list(
+            PushRuleEnableTable.table_name,
+            {'user_name': user_name},
+            PushRuleEnableTable.fields
+        )
+        defer.returnValue(
+            {r['rule_id']: False if r['enabled'] == 0 else True for r in results}
+        )
+
+    @defer.inlineCallbacks
     def add_push_rule(self, before, after, **kwargs):
         vals = copy.copy(kwargs)
         if 'conditions' in vals:
@@ -216,3 +227,12 @@ class PushRuleTable(Table):
     ]
 
     EntryType = collections.namedtuple("PushRuleEntry", fields)
+
+class PushRuleEnableTable(Table):
+    table_name = "push_rules_enable"
+
+    fields = [
+        "user_name",
+        "rule_id",
+        "enabled"
+    ]

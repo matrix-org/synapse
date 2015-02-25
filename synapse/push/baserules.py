@@ -45,6 +45,7 @@ def make_base_rules(user, kind):
 def make_base_content_rules(user):
     return [
         {
+            'rule_id': '.m.rule.contains_user_name',
             'conditions': [
                 {
                     'kind': 'event_match',
@@ -66,6 +67,7 @@ def make_base_content_rules(user):
 def make_base_override_rules():
     return [
         {
+            'rule_id': '.m.rule.contains_display_name',
             'conditions': [
                 {
                     'kind': 'contains_display_name'
@@ -80,6 +82,7 @@ def make_base_override_rules():
             ]
         },
         {
+            'rule_id': '.m.rule.room_two_members',
             'conditions': [
                 {
                     'kind': 'room_member_count',

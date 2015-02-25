@@ -82,6 +82,8 @@ class Pusher(object):
             r['conditions'] = json.loads(r['conditions'])
             r['actions'] = json.loads(r['actions'])
 
+        enabled_map = yield self.store.get_push_rules_enabled_for_user_name(self.user_name)
+
         user = UserID.from_string(self.user_name)
 
         rules = baserules.list_with_base_rules(rawrules, user)
@@ -107,6 +109,8 @@ class Pusher(object):
             room_member_count += 1
 
         for r in rules:
+            if r['rule_id'] in enabled_map and not enabled_map[r['rule_id']]:
+                continue
             matches = True
 
             conditions = r['conditions']
