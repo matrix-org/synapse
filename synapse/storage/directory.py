@@ -134,6 +134,29 @@ class DirectoryStore(SQLBaseStore):
 
         return room_id
 
+    @defer.inlineCallbacks
+    def get_all_associations(self):
+        """Retrieve the entire list of room alias -> room ID pairings.
+
+        Returns:
+            A list of RoomAliasMappings.
+        """
+        results = self._simple_select_list(
+            "room_aliases",
+            None,
+            ["room_alias", "room_id"]
+        )
+        # TODO(kegan): It feels wrong to be specifying no servers here, but
+        # equally this function isn't required to obtain all servers so
+        # retrieving them "just for the sake of it" also seems wrong, but we
+        # want to conform to passing Objects around and not dicts..
+        return [
+            RoomAliasMapping(
+                room_id=r["room_id"], room_alias=r["room_alias"], servers=""
+            ) for r in results
+        ]
+
+
     def get_aliases_for_room(self, room_id):
         return self._simple_select_onecol(
             "room_aliases",
