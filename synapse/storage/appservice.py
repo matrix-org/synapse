@@ -229,12 +229,10 @@ class ApplicationServiceStore(SQLBaseStore):
             r.room_id for r in room_alias_mappings if
             service.is_interested_in_alias(r.room_alias)
         ]
+        logging.debug(matching_alias_list)
+        logging.debug(matching_room_id_list)
 
-        # get all rooms for every user for this AS.
-
-        # TODO stub
-        yield self.cache_defer
-
+        # TODO get all rooms for every user for this AS.
 
         defer.returnValue([RoomsForUser("!foo:bar", service.sender, "join")])
 
