@@ -32,7 +32,7 @@ class Pusher(object):
     INITIAL_BACKOFF = 1000
     MAX_BACKOFF = 60 * 60 * 1000
     GIVE_UP_AFTER = 24 * 60 * 60 * 1000
-    DEFAULT_ACTIONS = ['notify']
+    DEFAULT_ACTIONS = ['dont-notify']
 
     INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
