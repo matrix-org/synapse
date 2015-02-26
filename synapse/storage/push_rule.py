@@ -228,6 +228,7 @@ class PushRuleTable(Table):
 
     EntryType = collections.namedtuple("PushRuleEntry", fields)
 
+
 class PushRuleEnableTable(Table):
     table_name = "push_rules_enable"
 
