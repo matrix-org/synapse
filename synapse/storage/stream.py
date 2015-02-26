@@ -36,12 +36,14 @@ what sort order was used:
 from twisted.internet import defer
 
 from ._base import SQLBaseStore
+from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.util.logutils import log_function
 
 from collections import namedtuple
 
 import logging
+import simplejson
 
 
 logger = logging.getLogger(__name__)
@@ -159,12 +161,29 @@ class StreamStore(SQLBaseStore):
 
         # select all the events between from/to with a sensible limit
         sql = (
-            "SELECT e.event_id, e.room_id, e.stream_ordering FROM events AS e "
+            "SELECT e.event_id, e.room_id, e.type, e.unrecognized_keys, "
+            "e.stream_ordering FROM events AS e "
             "WHERE e.stream_ordering > ? AND e.stream_ordering <= ? "
             "ORDER BY stream_ordering ASC LIMIT %(limit)d "
         ) % {
             "limit": limit
         }
+
+
+        def app_service_interested(row):
+            if row["room_id"] in room_ids_for_as:
+                return True
+
+            if row["type"] == EventTypes.Member:
+                # load up the content to inspect if some user the AS is
+                # interested in was invited to a room. We'll be passing this
+                # through _get_events_txn later, so ignore the fact that this
+                # may be a redacted event.
+                event_content = simplejson.loads(row["unrecognized_keys"])
+                if (service.is_interested_in_user(
+                        event_content.get("state_key"))):
+                    return True
+            return False
 
         def f(txn):
             txn.execute(sql, (from_id.stream, to_id.stream,))
@@ -176,7 +195,7 @@ class StreamStore(SQLBaseStore):
                 # apply the filter on the room id list
                 [
                     r["event_id"] for r in rows
-                    if r["room_id"] in room_ids_for_as
+                    if app_service_interested(r)
                 ],
                 get_prev_content=True
             )
