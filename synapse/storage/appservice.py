@@ -213,8 +213,9 @@ class ApplicationServiceStore(SQLBaseStore):
             A list of RoomsForUser.
         """
         # FIXME: This is assuming that this store has methods from
-        # RoomStore, DirectoryStore, which is a bad assumption to
-        # make as it makes testing trickier and coupling less obvious.
+        # RoomStore, DirectoryStore, RegistrationStore, RoomMemberStore which is
+        # a bad assumption to make as it makes testing trickier and coupling
+        # less obvious.
 
         # get all rooms matching the room ID regex.
         room_entries = yield self.get_all_rooms()  # RoomEntry list
@@ -229,12 +230,34 @@ class ApplicationServiceStore(SQLBaseStore):
             r.room_id for r in room_alias_mappings if
             service.is_interested_in_alias(r.room_alias)
         ]
-        logging.debug(matching_alias_list)
-        logging.debug(matching_room_id_list)
+        room_ids_matching_alias_or_id = set(
+            matching_room_id_list + matching_alias_list
+        )
 
-        # TODO get all rooms for every user for this AS.
+        # get all rooms for every user for this AS. This is scoped to users on
+        # this HS only.
+        user_list = yield self.get_all_users()
+        user_list = [
+            u["name"] for u in user_list if
+            service.is_interested_in_user(u["name"])
+        ]
+        rooms_for_user_matching_user_id = []  # RoomsForUser list
+        for user_id in user_list:
+            rooms_for_user = yield self.get_rooms_for_user(user_id)
+            rooms_for_user_matching_user_id += rooms_for_user
+        rooms_for_user_matching_user_id = set(rooms_for_user_matching_user_id)
 
-        defer.returnValue([RoomsForUser("!foo:bar", service.sender, "join")])
+        # make RoomsForUser tuples for room ids and aliases which are not in the
+        # main rooms_for_user_list - e.g. they are rooms which do not have AS
+        # registered users in it.
+        known_room_ids = [r.room_id for r in rooms_for_user_matching_user_id]
+        missing_rooms_for_user = [
+            RoomsForUser(r, service.sender, "join") for r in
+            room_ids_matching_alias_or_id if r not in known_room_ids
+        ]
+        rooms_for_user_matching_user_id |= set(missing_rooms_for_user)
+
+        defer.returnValue(rooms_for_user_matching_user_id)
 
     @defer.inlineCallbacks
     def _populate_cache(self):
