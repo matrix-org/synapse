@@ -57,6 +57,17 @@ class PushRuleStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
+    def get_push_rule_enabled_by_user_name_rule_id(self, user_name, rule_id):
+        results = yield self._simple_select_list(
+            PushRuleEnableTable.table_name,
+            {'user_name': user_name, 'rule_id': rule_id},
+            ['enabled']
+        )
+        if len(results) == 0:
+            defer.returnValue(True)
+        defer.returnValue(results[0])
+
+    @defer.inlineCallbacks
     def add_push_rule(self, before, after, **kwargs):
         vals = copy.copy(kwargs)
         if 'conditions' in vals:
@@ -204,6 +215,19 @@ class PushRuleStore(SQLBaseStore):
             {'user_name': user_name, 'rule_id': rule_id}
         )
 
+    @defer.inlineCallbacks
+    def set_push_rule_enabled(self, user_name, rule_id, enabled):
+        if enabled:
+            yield self._simple_delete_one(
+                PushRuleEnableTable.table_name,
+                {'user_name': user_name, 'rule_id': rule_id}
+            )
+        else:
+            yield self._simple_upsert(
+                PushRuleEnableTable.table_name,
+                {'user_name': user_name, 'rule_id': rule_id},
+                {'enabled': False}
+            )
 
 class RuleNotFoundException(Exception):
     pass

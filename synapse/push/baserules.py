@@ -37,7 +37,7 @@ def make_base_rules(user, kind):
 
     for r in rules:
         r['priority_class'] = PRIORITY_CLASS_MAP[kind]
-        r['default'] = True
+        r['default'] = True  # Deprecated, left for backwards compat
 
     return rules
 
@@ -45,7 +45,7 @@ def make_base_rules(user, kind):
 def make_base_content_rules(user):
     return [
         {
-            'rule_id': '.m.rule.contains_user_name',
+            'rule_id': 'global/content/.m.rule.contains_user_name',
             'conditions': [
                 {
                     'kind': 'event_match',
@@ -67,7 +67,7 @@ def make_base_content_rules(user):
 def make_base_override_rules():
     return [
         {
-            'rule_id': '.m.rule.contains_display_name',
+            'rule_id': 'global/override/.m.rule.contains_display_name',
             'conditions': [
                 {
                     'kind': 'contains_display_name'
@@ -82,7 +82,7 @@ def make_base_override_rules():
             ]
         },
         {
-            'rule_id': '.m.rule.room_two_members',
+            'rule_id': 'global/override/.m.rule.room_two_members',
             'conditions': [
                 {
                     'kind': 'room_member_count',
