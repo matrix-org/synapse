@@ -566,7 +566,9 @@ class RoomEventSource(object):
 
         to_key = yield self.get_current_key()
 
-        app_service = self.store.get_app_service_by_user_id(user.to_string())
+        app_service = yield self.store.get_app_service_by_user_id(
+            user.to_string()
+        )
         if app_service:
             events, end_key = yield self.store.get_appservice_room_stream(
                 service=app_service,
