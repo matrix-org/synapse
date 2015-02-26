@@ -21,7 +21,7 @@ support HTTPS), however individual pairings of servers may decide to
 communicate over a different (albeit still reliable) protocol.
 """
 
-from .server import TransportLayerServer
+from .server import TransportLayerServer, FederationRateLimiter
 from .client import TransportLayerClient
 
 
@@ -55,8 +55,18 @@ class TransportLayer(TransportLayerServer, TransportLayerClient):
                 send requests
         """
         self.keyring = homeserver.get_keyring()
+        self.clock = homeserver.get_clock()
         self.server_name = server_name
         self.server = server
         self.client = client
         self.request_handler = None
         self.received_handler = None
+
+        self.ratelimiter = FederationRateLimiter(
+            self.clock,
+            window_size=10000,
+            sleep_limit=10,
+            sleep_msec=500,
+            reject_limit=50,
+            concurrent_requests=3,
+        )
