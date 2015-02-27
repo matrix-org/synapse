@@ -21,8 +21,10 @@ support HTTPS), however individual pairings of servers may decide to
 communicate over a different (albeit still reliable) protocol.
 """
 
-from .server import TransportLayerServer, FederationRateLimiter
+from .server import TransportLayerServer
 from .client import TransportLayerClient
+
+from synapse.util.ratelimitutils import FederationRateLimiter
 
 
 class TransportLayer(TransportLayerServer, TransportLayerClient):
