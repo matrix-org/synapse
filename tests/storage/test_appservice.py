@@ -54,7 +54,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             {"regex": "@foobar_.*:matrix.org", "exclusive": True}
         ]
         alias_regex = [
-            {"regex": "#foobar_.*:matrix.org", "exclusive": True}
+            {"regex": "#foobar_.*:matrix.org", "exclusive": False}
         ]
         room_regex = [
 
