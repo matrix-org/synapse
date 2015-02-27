@@ -309,7 +309,7 @@ def _rule_tuple_from_request_object(rule_template, rule_id, req_obj, device=None
     for a in actions:
         if a in ['notify', 'dont_notify', 'coalesce']:
             pass
-        elif isinstance(a, dict) and 'set_sound' in a:
+        elif isinstance(a, dict) and 'set_tweak' in a:
             pass
         else:
             raise InvalidRuleException("Unrecognised action")
