@@ -73,7 +73,7 @@ class ApplicationService(object):
                     )
         return namespaces
 
-    def _matches_regex(self, test_string, namespace_key):
+    def _matches_regex(self, test_string, namespace_key, return_obj=False):
         if not isinstance(test_string, basestring):
             logger.error(
                 "Expected a string to test regex against, but got %s",
@@ -81,9 +81,17 @@ class ApplicationService(object):
             )
             return False
 
-        for regex in self.namespaces[namespace_key]:
-            if re.match(regex, test_string):
+        for regex_obj in self.namespaces[namespace_key]:
+            if re.match(regex_obj["regex"], test_string):
+                if return_obj:
+                    return regex_obj
                 return True
+        return False
+
+    def _is_exclusive(self, ns_key, test_string):
+        regex_obj = self._matches_regex(test_string, ns_key, return_obj=True)
+        if regex_obj:
+            return regex_obj["exclusive"]
         return False
 
     def _matches_user(self, event, member_list):
@@ -154,6 +162,15 @@ class ApplicationService(object):
 
     def is_interested_in_room(self, room_id):
         return self._matches_regex(room_id, ApplicationService.NS_ROOMS)
+
+    def is_exclusive_user(self, user_id):
+        return self._is_exclusive(ApplicationService.NS_USERS, user_id)
+
+    def is_exclusive_alias(self, alias):
+        return self._is_exclusive(ApplicationService.NS_ALIASES, alias)
+
+    def is_exclusive_room(self, room_id):
+        return self._is_exclusive(ApplicationService.NS_ROOMS, room_id)
 
     def __str__(self):
         return "ApplicationService: %s" % (self.__dict__,)
