@@ -46,19 +46,31 @@ class ApplicationService(object):
     def _check_namespaces(self, namespaces):
         # Sanity check that it is of the form:
         # {
-        #   users: ["regex",...],
-        #   aliases: ["regex",...],
-        #   rooms: ["regex",...],
+        #   users: [ {regex: "[A-z]+.*", exclusive: true}, ...],
+        #   aliases: [ {regex: "[A-z]+.*", exclusive: true}, ...],
+        #   rooms: [ {regex: "[A-z]+.*", exclusive: true}, ...],
         # }
         if not namespaces:
             return None
 
         for ns in ApplicationService.NS_LIST:
+            if ns not in namespaces:
+                namespaces[ns] = []
+                continue
+
             if type(namespaces[ns]) != list:
-                raise ValueError("Bad namespace value for '%s'", ns)
-            for regex in namespaces[ns]:
-                if not isinstance(regex, basestring):
-                    raise ValueError("Expected string regex for ns '%s'", ns)
+                raise ValueError("Bad namespace value for '%s'" % ns)
+            for regex_obj in namespaces[ns]:
+                if not isinstance(regex_obj, dict):
+                    raise ValueError("Expected dict regex for ns '%s'" % ns)
+                if not isinstance(regex_obj.get("exclusive"), bool):
+                    raise ValueError(
+                        "Expected bool for 'exclusive' in ns '%s'" % ns
+                    )
+                if not isinstance(regex_obj.get("regex"), basestring):
+                    raise ValueError(
+                        "Expected string for 'regex' in ns '%s'" % ns
+                    )
         return namespaces
 
     def _matches_regex(self, test_string, namespace_key):

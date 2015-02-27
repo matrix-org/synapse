@@ -48,18 +48,12 @@ class RegisterRestServlet(AppServiceRestServlet):
                 400, "Missed required keys: as_token(str) / url(str)."
             )
 
-        namespaces = {
-            "users": [],
-            "rooms": [],
-            "aliases": []
-        }
-
-        if "namespaces" in params:
-            self._parse_namespace(namespaces, params["namespaces"], "users")
-            self._parse_namespace(namespaces, params["namespaces"], "rooms")
-            self._parse_namespace(namespaces, params["namespaces"], "aliases")
-
-        app_service = ApplicationService(as_token, as_url, namespaces)
+        try:
+            app_service = ApplicationService(
+                as_token, as_url, params["namespaces"]
+            )
+        except ValueError as e:
+            raise SynapseError(400, e.message)
 
         app_service = yield self.handler.register(app_service)
         hs_token = app_service.hs_token
@@ -67,23 +61,6 @@ class RegisterRestServlet(AppServiceRestServlet):
         defer.returnValue((200, {
             "hs_token": hs_token
         }))
-
-    def _parse_namespace(self, target_ns, origin_ns, ns):
-        if ns not in target_ns or ns not in origin_ns:
-            return  # nothing to parse / map through to.
-
-        possible_regex_list = origin_ns[ns]
-        if not type(possible_regex_list) == list:
-            raise SynapseError(400, "Namespace %s isn't an array." % ns)
-
-        for regex in possible_regex_list:
-            if not isinstance(regex, basestring):
-                raise SynapseError(
-                    400, "Regex '%s' isn't a string in namespace %s" %
-                    (regex, ns)
-                )
-
-        target_ns[ns] = origin_ns[ns]
 
 
 class UnregisterRestServlet(AppServiceRestServlet):
