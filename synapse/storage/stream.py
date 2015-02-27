@@ -169,7 +169,6 @@ class StreamStore(SQLBaseStore):
             "limit": limit
         }
 
-
         def app_service_interested(row):
             if row["room_id"] in room_ids_for_as:
                 return True
