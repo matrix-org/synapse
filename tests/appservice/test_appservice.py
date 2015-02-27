@@ -18,6 +18,13 @@ from mock import Mock, PropertyMock
 from tests import unittest
 
 
+def _regex(regex, exclusive=True):
+    return {
+        "regex": regex,
+        exclusive: exclusive
+    }
+
+
 class ApplicationServiceTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -36,21 +43,21 @@ class ApplicationServiceTestCase(unittest.TestCase):
 
     def test_regex_user_id_prefix_match(self):
         self.service.namespaces[ApplicationService.NS_USERS].append(
-            "@irc_.*"
+            _regex("@irc_.*")
         )
         self.event.sender = "@irc_foobar:matrix.org"
         self.assertTrue(self.service.is_interested(self.event))
 
     def test_regex_user_id_prefix_no_match(self):
         self.service.namespaces[ApplicationService.NS_USERS].append(
-            "@irc_.*"
+            _regex("@irc_.*")
         )
         self.event.sender = "@someone_else:matrix.org"
         self.assertFalse(self.service.is_interested(self.event))
 
     def test_regex_room_member_is_checked(self):
         self.service.namespaces[ApplicationService.NS_USERS].append(
-            "@irc_.*"
+            _regex("@irc_.*")
         )
         self.event.sender = "@someone_else:matrix.org"
         self.event.type = "m.room.member"
@@ -59,21 +66,21 @@ class ApplicationServiceTestCase(unittest.TestCase):
 
     def test_regex_room_id_match(self):
         self.service.namespaces[ApplicationService.NS_ROOMS].append(
-            "!some_prefix.*some_suffix:matrix.org"
+            _regex("!some_prefix.*some_suffix:matrix.org")
         )
         self.event.room_id = "!some_prefixs0m3th1nGsome_suffix:matrix.org"
         self.assertTrue(self.service.is_interested(self.event))
 
     def test_regex_room_id_no_match(self):
         self.service.namespaces[ApplicationService.NS_ROOMS].append(
-            "!some_prefix.*some_suffix:matrix.org"
+            _regex("!some_prefix.*some_suffix:matrix.org")
         )
         self.event.room_id = "!XqBunHwQIXUiqCaoxq:matrix.org"
         self.assertFalse(self.service.is_interested(self.event))
 
     def test_regex_alias_match(self):
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
-            "#irc_.*:matrix.org"
+            _regex("#irc_.*:matrix.org")
         )
         self.assertTrue(self.service.is_interested(
             self.event,
@@ -82,7 +89,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
 
     def test_regex_alias_no_match(self):
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
-            "#irc_.*:matrix.org"
+            _regex("#irc_.*:matrix.org")
         )
         self.assertFalse(self.service.is_interested(
             self.event,
@@ -91,10 +98,10 @@ class ApplicationServiceTestCase(unittest.TestCase):
 
     def test_regex_multiple_matches(self):
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
-            "#irc_.*:matrix.org"
+            _regex("#irc_.*:matrix.org")
         )
         self.service.namespaces[ApplicationService.NS_USERS].append(
-            "@irc_.*"
+            _regex("@irc_.*")
         )
         self.event.sender = "@irc_foobar:matrix.org"
         self.assertTrue(self.service.is_interested(
@@ -104,10 +111,10 @@ class ApplicationServiceTestCase(unittest.TestCase):
 
     def test_restrict_to_rooms(self):
         self.service.namespaces[ApplicationService.NS_ROOMS].append(
-            "!flibble_.*:matrix.org"
+            _regex("!flibble_.*:matrix.org")
         )
         self.service.namespaces[ApplicationService.NS_USERS].append(
-            "@irc_.*"
+            _regex("@irc_.*")
         )
         self.event.sender = "@irc_foobar:matrix.org"
         self.event.room_id = "!wibblewoo:matrix.org"
@@ -118,10 +125,10 @@ class ApplicationServiceTestCase(unittest.TestCase):
 
     def test_restrict_to_aliases(self):
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
-            "#xmpp_.*:matrix.org"
+            _regex("#xmpp_.*:matrix.org")
         )
         self.service.namespaces[ApplicationService.NS_USERS].append(
-            "@irc_.*"
+            _regex("@irc_.*")
         )
         self.event.sender = "@irc_foobar:matrix.org"
         self.assertFalse(self.service.is_interested(
@@ -132,10 +139,10 @@ class ApplicationServiceTestCase(unittest.TestCase):
 
     def test_restrict_to_senders(self):
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
-            "#xmpp_.*:matrix.org"
+            _regex("#xmpp_.*:matrix.org")
         )
         self.service.namespaces[ApplicationService.NS_USERS].append(
-            "@irc_.*"
+            _regex("@irc_.*")
         )
         self.event.sender = "@xmpp_foobar:matrix.org"
         self.assertFalse(self.service.is_interested(
@@ -146,7 +153,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
 
     def test_member_list_match(self):
         self.service.namespaces[ApplicationService.NS_USERS].append(
-            "@irc_.*"
+            _regex("@irc_.*")
         )
         join_list = [
             Mock(
