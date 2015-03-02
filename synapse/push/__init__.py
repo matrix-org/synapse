@@ -76,13 +76,13 @@ class Pusher(object):
             if ev['state_key'] != self.user_name:
                 defer.returnValue(['dont_notify'])
 
-        rawrules = yield self.store.get_push_rules_for_user_name(self.user_name)
+        rawrules = yield self.store.get_push_rules_for_user(self.user_name)
 
         for r in rawrules:
             r['conditions'] = json.loads(r['conditions'])
             r['actions'] = json.loads(r['actions'])
 
-        enabled_map = yield self.store.get_push_rules_enabled_for_user_name(self.user_name)
+        enabled_map = yield self.store.get_push_rules_enabled_for_user(self.user_name)
 
         user = UserID.from_string(self.user_name)
 

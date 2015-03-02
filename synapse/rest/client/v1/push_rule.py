@@ -114,7 +114,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         # we build up the full structure and then decide which bits of it
         # to send which means doing unnecessary work sometimes but is
         # is probably not going to make a whole lot of difference
-        rawrules = yield self.hs.get_datastore().get_push_rules_for_user_name(
+        rawrules = yield self.hs.get_datastore().get_push_rules_for_user(
             user.to_string()
         )
 
@@ -129,7 +129,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         rules['global'] = _add_empty_priority_class_arrays(rules['global'])
 
         enabled_map = yield self.hs.get_datastore().\
-            get_push_rules_enabled_for_user_name(user.to_string())
+            get_push_rules_enabled_for_user(user.to_string())
 
         for r in ruleslist:
             rulearray = None
@@ -212,7 +212,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
     def get_rule_attr(self, user_name, namespaced_rule_id, attr):
         if attr == 'enabled':
-            return self.hs.get_datastore().get_push_rule_enabled_by_user_name_rule_id(
+            return self.hs.get_datastore().get_push_rule_enabled_by_user_rule_id(
                 user_name, namespaced_rule_id
             )
         else:

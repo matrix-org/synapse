@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 class PushRuleStore(SQLBaseStore):
     @defer.inlineCallbacks
-    def get_push_rules_for_user_name(self, user_name):
+    def get_push_rules_for_user(self, user_name):
         sql = (
             "SELECT "+",".join(PushRuleTable.fields)+" "
             "FROM "+PushRuleTable.table_name+" "
@@ -46,7 +46,7 @@ class PushRuleStore(SQLBaseStore):
         defer.returnValue(dicts)
 
     @defer.inlineCallbacks
-    def get_push_rules_enabled_for_user_name(self, user_name):
+    def get_push_rules_enabled_for_user(self, user_name):
         results = yield self._simple_select_list(
             PushRuleEnableTable.table_name,
             {'user_name': user_name},
@@ -57,7 +57,7 @@ class PushRuleStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_push_rule_enabled_by_user_name_rule_id(self, user_name, rule_id):
+    def get_push_rule_enabled_by_user_rule_id(self, user_name, rule_id):
         results = yield self._simple_select_list(
             PushRuleEnableTable.table_name,
             {'user_name': user_name, 'rule_id': rule_id},
