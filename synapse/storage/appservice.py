@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import simplejson
+from simplejson import JSONDecodeError
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
@@ -25,12 +27,18 @@ from ._base import SQLBaseStore
 logger = logging.getLogger(__name__)
 
 
+def log_failure(failure):
+    logger.error("Failed to detect application services: %s", failure.value)
+    logger.error(failure.getTraceback())
+
+
 class ApplicationServiceStore(SQLBaseStore):
 
     def __init__(self, hs):
         super(ApplicationServiceStore, self).__init__(hs)
         self.services_cache = []
         self.cache_defer = self._populate_cache()
+        self.cache_defer.addErrback(log_failure)
 
     @defer.inlineCallbacks
     def unregister_app_service(self, token):
@@ -130,11 +138,11 @@ class ApplicationServiceStore(SQLBaseStore):
         )
         for (ns_int, ns_str) in enumerate(ApplicationService.NS_LIST):
             if ns_str in service.namespaces:
-                for regex in service.namespaces[ns_str]:
+                for regex_obj in service.namespaces[ns_str]:
                     txn.execute(
                         "INSERT INTO application_services_regex("
                         "as_id, namespace, regex) values(?,?,?)",
-                        (as_id, ns_int, regex)
+                        (as_id, ns_int, simplejson.dumps(regex_obj))
                     )
         return True
 
@@ -311,10 +319,12 @@ class ApplicationServiceStore(SQLBaseStore):
             try:
                 services[as_token]["namespaces"][
                     ApplicationService.NS_LIST[ns_int]].append(
-                    res["regex"]
+                    simplejson.loads(res["regex"])
                 )
             except IndexError:
                 logger.error("Bad namespace enum '%s'. %s", ns_int, res)
+            except JSONDecodeError:
+                logger.error("Bad regex object '%s'", res["regex"])
 
         # TODO get last successful txn id f.e. service
         for service in services.values():
