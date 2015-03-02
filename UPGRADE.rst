@@ -13,8 +13,8 @@ This is required in order to support registration fallback (typically used on
 mobile devices).
 
 The format of stored application services has changed in Synapse. You will need
-to run ``python upgrade_appservice_db.py <database file path>`` to convert to 
-the new format.
+to run ``PYTHONPATH=. python scripts/upgrade_appservice_db.py <database file path>``
+to convert to the new format.
 
 Upgrading to v0.7.0
 ===================
