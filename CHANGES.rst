@@ -4,6 +4,8 @@ Changes in synapse vx.x.x (x-x-x)
 * Add support for registration fallback. This is a page hosted on the server
   which allows a user to register for an account, regardless of what client
   they are using (e.g. mobile devices).
+* Application services can now poll on the CS API ``/events`` for their events,
+  by providing their application service ``access_token``.
 
 Changes in synapse v0.7.1 (2015-02-19)
 ======================================
