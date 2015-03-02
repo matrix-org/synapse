@@ -112,17 +112,23 @@ class FederationServer(FederationBase):
         logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
         with PreserveLoggingContext():
-            dl = []
+            results = []
+
             for pdu in pdu_list:
                 d = self._handle_new_pdu(transaction.origin, pdu)
 
                 def handle_failure(failure):
                     failure.trap(FederationError)
                     self.send_failure(failure.value, transaction.origin)
+                    return failure
 
                 d.addErrback(handle_failure)
 
-                dl.append(d)
+                try:
+                    yield d
+                    results.append({})
+                except Exception as e:
+                    results.append({"error": str(e)})
 
             if hasattr(transaction, "edus"):
                 for edu in [Edu(**x) for x in transaction.edus]:
@@ -135,21 +141,11 @@ class FederationServer(FederationBase):
             for failure in getattr(transaction, "pdu_failures", []):
                 logger.info("Got failure %r", failure)
 
-            results = yield defer.DeferredList(dl, consumeErrors=True)
-
-        ret = []
-        for r in results:
-            if r[0]:
-                ret.append({})
-            else:
-                logger.exception(r[1])
-                ret.append({"error": str(r[1].value)})
-
-        logger.debug("Returning: %s", str(ret))
+        logger.debug("Returning: %s", str(results))
 
         response = {
             "pdus": dict(zip(
-                (p.event_id for p in pdu_list), ret
+                (p.event_id for p in pdu_list), results
             )),
         }
 
