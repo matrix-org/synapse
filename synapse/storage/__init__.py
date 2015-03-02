@@ -633,7 +633,7 @@ def prepare_database(db_conn):
 
             # Run every version since after the current version.
             for v in range(user_version + 1, SCHEMA_VERSION + 1):
-                if v == 10:
+                if v in (10, 14,):
                     raise UpgradeDatabaseException(
                         "No delta for version 10"
                     )
