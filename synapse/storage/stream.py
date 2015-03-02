@@ -146,18 +146,6 @@ class StreamStore(SQLBaseStore):
             defer.returnValue(([], to_key))
             return
 
-        # Logic:
-        #  - We want ALL events which match the AS room_id regex
-        #  - We want ALL events which match the rooms represented by the AS
-        #    room_alias regex
-        #  - We want ALL events for rooms that AS users have joined.
-        # This is currently supported via get_app_service_rooms (which is used
-        # for the Notifier listener rooms). We can't reasonably make a SQL
-        # query for these room IDs, so we'll pull all the events between from/to
-        # and filter in python.
-        rooms_for_as = yield self.get_app_service_rooms(service)
-        room_ids_for_as = [r.room_id for r in rooms_for_as]
-
         # select all the events between from/to with a sensible limit
         sql = (
             "SELECT e.event_id, e.room_id, e.type, s.state_key, "
@@ -169,19 +157,31 @@ class StreamStore(SQLBaseStore):
             "limit": limit
         }
 
-        def app_service_interested(row):
-            if row["room_id"] in room_ids_for_as:
-                return True
-
-            if row["type"] == EventTypes.Member:
-                if service.is_interested_in_user(row.get("state_key")):
-                    return True
-            return False
-
         def f(txn):
+            # pull out all the events between the tokens
             txn.execute(sql, (from_id.stream, to_id.stream,))
-
             rows = self.cursor_to_dict(txn)
+
+            # Logic:
+            #  - We want ALL events which match the AS room_id regex
+            #  - We want ALL events which match the rooms represented by the AS
+            #    room_alias regex
+            #  - We want ALL events for rooms that AS users have joined.
+            # This is currently supported via get_app_service_rooms (which is
+            # used for the Notifier listener rooms). We can't reasonably make a
+            # SQL query for these room IDs, so we'll pull all the events between
+            # from/to and filter in python.
+            rooms_for_as = self._get_app_service_rooms_txn(txn, service)
+            room_ids_for_as = [r.room_id for r in rooms_for_as]
+
+            def app_service_interested(row):
+                if row["room_id"] in room_ids_for_as:
+                    return True
+
+                if row["type"] == EventTypes.Member:
+                    if service.is_interested_in_user(row.get("state_key")):
+                        return True
+                return False
 
             ret = self._get_events_txn(
                 txn,
@@ -197,7 +197,6 @@ class StreamStore(SQLBaseStore):
 
             if rows:
                 key = "s%d" % max(r["stream_ordering"] for r in rows)
-
             else:
                 # Assume we didn't get anything because there was nothing to
                 # get.
@@ -266,7 +265,6 @@ class StreamStore(SQLBaseStore):
 
             if rows:
                 key = "s%d" % max(r["stream_ordering"] for r in rows)
-
             else:
                 # Assume we didn't get anything because there was nothing to
                 # get.

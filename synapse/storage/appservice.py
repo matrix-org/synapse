@@ -15,6 +15,7 @@
 import logging
 from twisted.internet import defer
 
+from synapse.api.constants import Membership
 from synapse.api.errors import StoreError
 from synapse.appservice import ApplicationService
 from synapse.storage.roommember import RoomsForUser
@@ -197,7 +198,6 @@ class ApplicationServiceStore(SQLBaseStore):
         # TODO: The from_cache=False impl
         # TODO: This should be JOINed with the application_services_regex table.
 
-    @defer.inlineCallbacks
     def get_app_service_rooms(self, service):
         """Get a list of RoomsForUser for this application service.
 
@@ -212,35 +212,49 @@ class ApplicationServiceStore(SQLBaseStore):
         Returns:
             A list of RoomsForUser.
         """
-        # FIXME: This is assuming that this store has methods from
-        # RoomStore, DirectoryStore, RegistrationStore, RoomMemberStore which is
-        # a bad assumption to make as it makes testing trickier and coupling
-        # less obvious.
+        return self.runInteraction(
+            "get_app_service_rooms",
+            self._get_app_service_rooms_txn,
+            service,
+        )
 
+    def _get_app_service_rooms_txn(self, txn, service):
         # get all rooms matching the room ID regex.
-        room_entries = yield self.get_all_rooms()
+        room_entries = self._simple_select_list_txn(
+            txn=txn, table="rooms", keyvalues=None, retcols=["room_id"]
+        )
         matching_room_list = set([
             r["room_id"] for r in room_entries if
             service.is_interested_in_room(r["room_id"])
         ])
 
         # resolve room IDs for matching room alias regex.
-        room_alias_mappings = yield self.get_all_associations()
+        room_alias_mappings = self._simple_select_list_txn(
+            txn=txn, table="room_aliases", keyvalues=None,
+            retcols=["room_id", "room_alias"]
+        )
         matching_room_list |= set([
-            r.room_id for r in room_alias_mappings if
-            service.is_interested_in_alias(r.room_alias)
+            r["room_id"] for r in room_alias_mappings if
+            service.is_interested_in_alias(r["room_alias"])
         ])
 
         # get all rooms for every user for this AS. This is scoped to users on
         # this HS only.
-        user_list = yield self.get_all_users()
+        user_list = self._simple_select_list_txn(
+            txn=txn, table="users", keyvalues=None, retcols=["name"]
+        )
         user_list = [
             u["name"] for u in user_list if
             service.is_interested_in_user(u["name"])
         ]
         rooms_for_user_matching_user_id = set()  # RoomsForUser list
         for user_id in user_list:
-            rooms_for_user = yield self.get_rooms_for_user(user_id)
+            # FIXME: This assumes this store is linked with RoomMemberStore :(
+            rooms_for_user = self._get_rooms_for_user_where_membership_is_txn(
+                txn=txn,
+                user_id=user_id,
+                membership_list=[Membership.JOIN]
+            )
             rooms_for_user_matching_user_id |= set(rooms_for_user)
 
         # make RoomsForUser tuples for room ids and aliases which are not in the
@@ -253,7 +267,7 @@ class ApplicationServiceStore(SQLBaseStore):
         ]
         rooms_for_user_matching_user_id |= set(missing_rooms_for_user)
 
-        defer.returnValue(rooms_for_user_matching_user_id)
+        return rooms_for_user_matching_user_id
 
     @defer.inlineCallbacks
     def _populate_cache(self):

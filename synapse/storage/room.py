@@ -71,16 +71,6 @@ class RoomStore(SQLBaseStore):
             RoomsTable.decode_single_result, query, room_id,
         )
 
-    def get_all_rooms(self):
-        """Retrieve all the rooms.
-
-        Returns:
-            A list of namedtuples containing the room information.
-        """
-        return self._simple_select_list(
-            table="rooms", keyvalues=None, retcols=["room_id"]
-        )
-
     @defer.inlineCallbacks
     def get_rooms(self, is_public):
         """Retrieve a list of all public rooms.

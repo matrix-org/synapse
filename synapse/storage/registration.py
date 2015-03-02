@@ -92,10 +92,6 @@ class RegistrationStore(SQLBaseStore):
             query, user_id
         )
 
-    def get_all_users(self):
-        return self._simple_select_list(
-            table="users", keyvalues=None, retcols=["name"])
-
     def get_user_by_token(self, token):
         """Get a user from the given access token.
 
