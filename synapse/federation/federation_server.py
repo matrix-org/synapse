@@ -117,16 +117,12 @@ class FederationServer(FederationBase):
             for pdu in pdu_list:
                 d = self._handle_new_pdu(transaction.origin, pdu)
 
-                def handle_failure(failure):
-                    failure.trap(FederationError)
-                    self.send_failure(failure.value, transaction.origin)
-                    return failure
-
-                d.addErrback(handle_failure)
-
                 try:
                     yield d
                     results.append({})
+                except FederationError as e:
+                    self.send_failure(e, transaction.origin)
+                    results.append({"error": str(e)})
                 except Exception as e:
                     results.append({"error": str(e)})
 
