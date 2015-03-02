@@ -15,8 +15,10 @@
 import logging
 from twisted.internet import defer
 
+from synapse.api.constants import Membership
 from synapse.api.errors import StoreError
 from synapse.appservice import ApplicationService
+from synapse.storage.roommember import RoomsForUser
 from ._base import SQLBaseStore
 
 
@@ -151,8 +153,31 @@ class ApplicationServiceStore(SQLBaseStore):
         defer.returnValue(self.services_cache)
 
     @defer.inlineCallbacks
+    def get_app_service_by_user_id(self, user_id):
+        """Retrieve an application service from their user ID.
+
+        All application services have associated with them a particular user ID.
+        There is no distinguishing feature on the user ID which indicates it
+        represents an application service. This function allows you to map from
+        a user ID to an application service.
+
+        Args:
+            user_id(str): The user ID to see if it is an application service.
+        Returns:
+            synapse.appservice.ApplicationService or None.
+        """
+
+        yield self.cache_defer  # make sure the cache is ready
+
+        for service in self.services_cache:
+            if service.sender == user_id:
+                defer.returnValue(service)
+                return
+        defer.returnValue(None)
+
+    @defer.inlineCallbacks
     def get_app_service_by_token(self, token, from_cache=True):
-        """Get the application service with the given token.
+        """Get the application service with the given appservice token.
 
         Args:
             token (str): The application service token.
@@ -172,6 +197,77 @@ class ApplicationServiceStore(SQLBaseStore):
 
         # TODO: The from_cache=False impl
         # TODO: This should be JOINed with the application_services_regex table.
+
+    def get_app_service_rooms(self, service):
+        """Get a list of RoomsForUser for this application service.
+
+        Application services may be "interested" in lots of rooms depending on
+        the room ID, the room aliases, or the members in the room. This function
+        takes all of these into account and returns a list of RoomsForUser which
+        represent the entire list of room IDs that this application service
+        wants to know about.
+
+        Args:
+            service: The application service to get a room list for.
+        Returns:
+            A list of RoomsForUser.
+        """
+        return self.runInteraction(
+            "get_app_service_rooms",
+            self._get_app_service_rooms_txn,
+            service,
+        )
+
+    def _get_app_service_rooms_txn(self, txn, service):
+        # get all rooms matching the room ID regex.
+        room_entries = self._simple_select_list_txn(
+            txn=txn, table="rooms", keyvalues=None, retcols=["room_id"]
+        )
+        matching_room_list = set([
+            r["room_id"] for r in room_entries if
+            service.is_interested_in_room(r["room_id"])
+        ])
+
+        # resolve room IDs for matching room alias regex.
+        room_alias_mappings = self._simple_select_list_txn(
+            txn=txn, table="room_aliases", keyvalues=None,
+            retcols=["room_id", "room_alias"]
+        )
+        matching_room_list |= set([
+            r["room_id"] for r in room_alias_mappings if
+            service.is_interested_in_alias(r["room_alias"])
+        ])
+
+        # get all rooms for every user for this AS. This is scoped to users on
+        # this HS only.
+        user_list = self._simple_select_list_txn(
+            txn=txn, table="users", keyvalues=None, retcols=["name"]
+        )
+        user_list = [
+            u["name"] for u in user_list if
+            service.is_interested_in_user(u["name"])
+        ]
+        rooms_for_user_matching_user_id = set()  # RoomsForUser list
+        for user_id in user_list:
+            # FIXME: This assumes this store is linked with RoomMemberStore :(
+            rooms_for_user = self._get_rooms_for_user_where_membership_is_txn(
+                txn=txn,
+                user_id=user_id,
+                membership_list=[Membership.JOIN]
+            )
+            rooms_for_user_matching_user_id |= set(rooms_for_user)
+
+        # make RoomsForUser tuples for room ids and aliases which are not in the
+        # main rooms_for_user_list - e.g. they are rooms which do not have AS
+        # registered users in it.
+        known_room_ids = [r.room_id for r in rooms_for_user_matching_user_id]
+        missing_rooms_for_user = [
+            RoomsForUser(r, service.sender, "join") for r in
+            matching_room_list if r not in known_room_ids
+        ]
+        rooms_for_user_matching_user_id |= set(missing_rooms_for_user)
+
+        return rooms_for_user_matching_user_id
 
     @defer.inlineCallbacks
     def _populate_cache(self):
