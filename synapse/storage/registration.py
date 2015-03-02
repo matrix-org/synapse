@@ -93,7 +93,7 @@ class RegistrationStore(SQLBaseStore):
         )
 
     def get_all_users(self):
-        query = ("SELECT users.name FROM users")
+        query = "SELECT users.name FROM users"
         return self._execute(
             self.cursor_to_dict,
             query

@@ -43,7 +43,7 @@ from synapse.util.logutils import log_function
 from collections import namedtuple
 
 import logging
-import simplejson
+import simplejson as json
 
 
 logger = logging.getLogger(__name__)
@@ -178,7 +178,7 @@ class StreamStore(SQLBaseStore):
                 # interested in was invited to a room. We'll be passing this
                 # through _get_events_txn later, so ignore the fact that this
                 # may be a redacted event.
-                event_content = simplejson.loads(row["unrecognized_keys"])
+                event_content = json.loads(row["unrecognized_keys"])
                 if (service.is_interested_in_user(
                         event_content.get("state_key"))):
                     return True
@@ -202,7 +202,7 @@ class StreamStore(SQLBaseStore):
             self._set_before_and_after(ret, rows)
 
             if rows:
-                key = "s%d" % max([r["stream_ordering"] for r in rows])
+                key = "s%d" % max(r["stream_ordering"] for r in rows)
 
             else:
                 # Assume we didn't get anything because there was nothing to
@@ -271,7 +271,7 @@ class StreamStore(SQLBaseStore):
             self._set_before_and_after(ret, rows)
 
             if rows:
-                key = "s%d" % max([r["stream_ordering"] for r in rows])
+                key = "s%d" % max(r["stream_ordering"] for r in rows)
 
             else:
                 # Assume we didn't get anything because there was nothing to

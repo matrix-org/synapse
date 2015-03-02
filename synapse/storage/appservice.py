@@ -219,20 +219,17 @@ class ApplicationServiceStore(SQLBaseStore):
 
         # get all rooms matching the room ID regex.
         room_entries = yield self.get_all_rooms()  # RoomEntry list
-        matching_room_id_list = [
+        matching_room_list = set([
             r.room_id for r in room_entries if
             service.is_interested_in_room(r.room_id)
-        ]
+        ])
 
         # resolve room IDs for matching room alias regex.
         room_alias_mappings = yield self.get_all_associations()
-        matching_alias_list = [
+        matching_room_list |= set([
             r.room_id for r in room_alias_mappings if
             service.is_interested_in_alias(r.room_alias)
-        ]
-        room_ids_matching_alias_or_id = set(
-            matching_room_id_list + matching_alias_list
-        )
+        ])
 
         # get all rooms for every user for this AS. This is scoped to users on
         # this HS only.
@@ -241,11 +238,10 @@ class ApplicationServiceStore(SQLBaseStore):
             u["name"] for u in user_list if
             service.is_interested_in_user(u["name"])
         ]
-        rooms_for_user_matching_user_id = []  # RoomsForUser list
+        rooms_for_user_matching_user_id = set()  # RoomsForUser list
         for user_id in user_list:
             rooms_for_user = yield self.get_rooms_for_user(user_id)
-            rooms_for_user_matching_user_id += rooms_for_user
-        rooms_for_user_matching_user_id = set(rooms_for_user_matching_user_id)
+            rooms_for_user_matching_user_id |= set(rooms_for_user)
 
         # make RoomsForUser tuples for room ids and aliases which are not in the
         # main rooms_for_user_list - e.g. they are rooms which do not have AS
@@ -253,7 +249,7 @@ class ApplicationServiceStore(SQLBaseStore):
         known_room_ids = [r.room_id for r in rooms_for_user_matching_user_id]
         missing_rooms_for_user = [
             RoomsForUser(r, service.sender, "join") for r in
-            room_ids_matching_alias_or_id if r not in known_room_ids
+            matching_room_list if r not in known_room_ids
         ]
         rooms_for_user_matching_user_id |= set(missing_rooms_for_user)
 
