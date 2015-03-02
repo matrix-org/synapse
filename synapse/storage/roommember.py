@@ -187,7 +187,7 @@ class RoomMemberStore(SQLBaseStore):
         )
 
     def _get_rooms_for_user_where_membership_is_txn(self, txn, user_id,
-                                                   membership_list):
+                                                    membership_list):
         where_clause = "user_id = ? AND (%s)" % (
             " OR ".join(["membership = ?" for _ in membership_list]),
         )
