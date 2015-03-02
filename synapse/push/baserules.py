@@ -84,7 +84,7 @@ def make_base_override_rules():
             ]
         },
         {
-            'rule_id': 'global/override/.m.rule.room_two_members',
+            'rule_id': 'global/override/.m.rule.room_one_to_one',
             'conditions': [
                 {
                     'kind': 'room_member_count',
