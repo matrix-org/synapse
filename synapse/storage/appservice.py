@@ -220,8 +220,8 @@ class ApplicationServiceStore(SQLBaseStore):
         # get all rooms matching the room ID regex.
         room_entries = yield self.get_all_rooms()  # RoomEntry list
         matching_room_list = set([
-            r.room_id for r in room_entries if
-            service.is_interested_in_room(r.room_id)
+            r["room_id"] for r in room_entries if
+            service.is_interested_in_room(r["room_id"])
         ])
 
         # resolve room IDs for matching room alias regex.

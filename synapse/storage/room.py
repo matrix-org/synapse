@@ -77,9 +77,8 @@ class RoomStore(SQLBaseStore):
         Returns:
             A list of namedtuples containing the room information.
         """
-        query = RoomsTable.select_statement()
-        return self._execute(
-            RoomsTable.decode_results, query,
+        return self._simple_select_list(
+            table="rooms", keyvalues=None, retcols=["room_id"]
         )
 
     @defer.inlineCallbacks
