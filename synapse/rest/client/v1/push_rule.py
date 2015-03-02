@@ -387,7 +387,7 @@ def _priority_class_from_spec(spec):
 def _priority_class_to_template_name(pc):
     if pc > PRIORITY_CLASS_MAP['override']:
         # per-device
-        prio_class_index = pc - len(PushRuleRestServlet.PRIORITY_CLASS_MAP)
+        prio_class_index = pc - len(PRIORITY_CLASS_MAP)
         return PRIORITY_CLASS_INVERSE_MAP[prio_class_index]
     else:
         return PRIORITY_CLASS_INVERSE_MAP[pc]
