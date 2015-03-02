@@ -218,6 +218,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         else:
             raise UnrecognizedRequestError()
 
+
 def _rule_spec_from_path(path):
     if len(path) < 2:
         raise UnrecognizedRequestError()

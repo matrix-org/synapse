@@ -229,6 +229,7 @@ class PushRuleStore(SQLBaseStore):
                 {'enabled': False}
             )
 
+
 class RuleNotFoundException(Exception):
     pass
 
