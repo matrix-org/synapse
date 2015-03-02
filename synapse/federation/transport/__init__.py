@@ -66,9 +66,9 @@ class TransportLayer(TransportLayerServer, TransportLayerClient):
 
         self.ratelimiter = FederationRateLimiter(
             self.clock,
-            window_size=10000,
-            sleep_limit=10,
-            sleep_msec=500,
-            reject_limit=50,
-            concurrent_requests=3,
+            window_size=homeserver.config.federation_rc_window_size,
+            sleep_limit=homeserver.config.federation_rc_sleep_limit,
+            sleep_msec=homeserver.config.federation_rc_sleep_delay,
+            reject_limit=homeserver.config.federation_rc_reject_limit,
+            concurrent_requests=homeserver.config.federation_rc_concurrent,
         )
