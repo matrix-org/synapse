@@ -13,11 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore, Table
+from ._base import SQLBaseStore, Table, cached
 
 from collections import namedtuple
-
-from twisted.internet import defer
 
 import logging
 
@@ -27,10 +25,6 @@ logger = logging.getLogger(__name__)
 class TransactionStore(SQLBaseStore):
     """A collection of queries for handling PDUs.
     """
-
-    # a write-through cache of DestinationsTable.EntryType indexed by
-    # destination string
-    destination_retry_cache = {}
 
     def get_received_txn_response(self, transaction_id, origin):
         """For an incoming transaction from a given origin, check if we have
@@ -211,6 +205,7 @@ class TransactionStore(SQLBaseStore):
 
         return ReceivedTransactionsTable.decode_results(txn.fetchall())
 
+    @cached()
     def get_destination_retry_timings(self, destination):
         """Gets the current retry timings (if any) for a given destination.
 
@@ -221,9 +216,6 @@ class TransactionStore(SQLBaseStore):
             None if not retrying
             Otherwise a DestinationsTable.EntryType for the retry scheme
         """
-        if destination in self.destination_retry_cache:
-            return defer.succeed(self.destination_retry_cache[destination])
-
         return self.runInteraction(
             "get_destination_retry_timings",
             self._get_destination_retry_timings, destination)
@@ -250,7 +242,9 @@ class TransactionStore(SQLBaseStore):
             retry_interval (int) - how long until next retry in ms
         """
 
-        self.destination_retry_cache[destination] = (
+        # As this is the new value, we might as well prefill the cache
+        self.get_destination_retry_timings.prefill(
+            destination,
             DestinationsTable.EntryType(
                 destination,
                 retry_last_ts,

@@ -112,17 +112,20 @@ class FederationServer(FederationBase):
         logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
         with PreserveLoggingContext():
-            dl = []
+            results = []
+
             for pdu in pdu_list:
                 d = self._handle_new_pdu(transaction.origin, pdu)
 
-                def handle_failure(failure):
-                    failure.trap(FederationError)
-                    self.send_failure(failure.value, transaction.origin)
-
-                d.addErrback(handle_failure)
-
-                dl.append(d)
+                try:
+                    yield d
+                    results.append({})
+                except FederationError as e:
+                    self.send_failure(e, transaction.origin)
+                    results.append({"error": str(e)})
+                except Exception as e:
+                    results.append({"error": str(e)})
+                    logger.exception("Failed to handle PDU")
 
             if hasattr(transaction, "edus"):
                 for edu in [Edu(**x) for x in transaction.edus]:
@@ -135,29 +138,11 @@ class FederationServer(FederationBase):
             for failure in getattr(transaction, "pdu_failures", []):
                 logger.info("Got failure %r", failure)
 
-            results = yield defer.DeferredList(dl, consumeErrors=True)
-
-        ret = []
-        for r in results:
-            if r[0]:
-                ret.append({})
-            else:
-                failure = r[1]
-                logger.error(
-                    "Failed to handle PDU",
-                    exc_info=(
-                        failure.type,
-                        failure.value,
-                        failure.getTracebackObject()
-                    )
-                )
-                ret.append({"error": str(r[1].value)})
-
-        logger.debug("Returning: %s", str(ret))
+        logger.debug("Returning: %s", str(results))
 
         response = {
             "pdus": dict(zip(
-                (p.event_id for p in pdu_list), ret
+                (p.event_id for p in pdu_list), results
             )),
         }
 

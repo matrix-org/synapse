@@ -214,7 +214,7 @@ def _rule_spec_from_path(path):
     template = path[0]
     path = path[1:]
 
-    if len(path) == 0:
+    if len(path) == 0 or len(path[0]) == 0:
         raise UnrecognizedRequestError()
 
     rule_id = path[0]
