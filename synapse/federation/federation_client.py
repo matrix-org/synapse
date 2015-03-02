@@ -439,6 +439,25 @@ class FederationClient(FederationBase):
 
         defer.returnValue(ret)
 
+    @defer.inlineCallbacks
+    def get_missing_events(self, destination, room_id, earliest_events,
+                           latest_events, limit, min_depth):
+        content = yield self.transport_layer.get_missing_events(
+            destination, room_id, earliest_events, latest_events, limit,
+            min_depth,
+        )
+
+        events = [
+            self.event_from_pdu_json(e)
+            for e in content.get("events", [])
+        ]
+
+        signed_events = yield self._check_sigs_and_hash_and_fetch(
+            destination, events, outlier=True
+        )
+
+        defer.returnValue(signed_events)
+
     def event_from_pdu_json(self, pdu_json, outlier=False):
         event = FrozenEvent(
             pdu_json
