@@ -637,7 +637,7 @@ def prepare_database(db_conn):
                     raise UpgradeDatabaseException(
                         "No delta for version 10"
                     )
-                sql_script = read_schema("delta/v%d" % (v))
+                sql_script = read_schema("delta/v%d" % (v,))
                 c.executescript(sql_script)
 
             db_conn.commit()
