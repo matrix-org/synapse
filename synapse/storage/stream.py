@@ -43,7 +43,6 @@ from synapse.util.logutils import log_function
 from collections import namedtuple
 
 import logging
-import simplejson as json
 
 
 logger = logging.getLogger(__name__)
@@ -161,8 +160,9 @@ class StreamStore(SQLBaseStore):
 
         # select all the events between from/to with a sensible limit
         sql = (
-            "SELECT e.event_id, e.room_id, e.type, e.unrecognized_keys, "
-            "e.stream_ordering FROM events AS e "
+            "SELECT e.event_id, e.room_id, e.type, s.state_key, "
+            "e.stream_ordering FROM events AS e LEFT JOIN state_events as s ON "
+            "e.event_id = s.event_id "
             "WHERE e.stream_ordering > ? AND e.stream_ordering <= ? "
             "ORDER BY stream_ordering ASC LIMIT %(limit)d "
         ) % {
@@ -174,13 +174,7 @@ class StreamStore(SQLBaseStore):
                 return True
 
             if row["type"] == EventTypes.Member:
-                # load up the content to inspect if some user the AS is
-                # interested in was invited to a room. We'll be passing this
-                # through _get_events_txn later, so ignore the fact that this
-                # may be a redacted event.
-                event_content = json.loads(row["unrecognized_keys"])
-                if (service.is_interested_in_user(
-                        event_content.get("state_key"))):
+                if service.is_interested_in_user(row.get("state_key")):
                     return True
             return False
 
