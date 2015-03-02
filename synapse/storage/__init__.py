@@ -74,7 +74,7 @@ SCHEMAS = [
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
