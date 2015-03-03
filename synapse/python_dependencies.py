@@ -36,8 +36,8 @@ DEPENDENCY_LINKS = [
     ),
     github_link(
         project="matrix-org/matrix-angular-sdk",
-        version="v0.6.3",
-        egg="matrix_angular_sdk-0.6.3",
+        version="v0.6.4",
+        egg="matrix_angular_sdk-0.6.4",
     ),
 ]
 
