@@ -691,6 +691,10 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
     even if there has been no version bump. This is useful for development
     where orthogonal schema changes may happen on separate branches.
 
+    Different delta files for the same version *must* be orthogonal and give
+    the same result when applied in any order. No guarantees are made on the
+    order of execution of these scripts.
+
     This is a no-op of current_version == SCHEMA_VERSION.
 
     Example directory structure:
