@@ -13,7 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from .metric import CounterMetric, CallbackMetric, CacheCounterMetric
+
+
+logger = logging.getLogger(__name__)
 
 
 # We'll keep all the available metrics in a single toplevel dict, one shared
@@ -82,6 +87,10 @@ def render_all():
     strs = []
 
     for name in sorted(all_metrics.keys()):
-        strs += all_metrics[name].render()
+        try:
+            strs += all_metrics[name].render()
+        except Exception as e:
+            strs += ["# FAILED to render %s" % name]
+            logger.exception("Failed to render %s metric", name)
 
     return "\n".join(strs)
