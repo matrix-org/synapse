@@ -608,10 +608,27 @@ def _setup_new_database(cur):
 
     The "full_schemas" directory has subdirectories named after versions. This
     function searches for the highest version less than or equal to
-    `SCHEMA_VERSION` and excutes all .sql files in that directory.
+    `SCHEMA_VERSION` and executes all .sql files in that directory.
 
     The function will then apply all deltas for all versions after the base
     version.
+
+    Example directory structure:
+
+        schema/
+            delta/
+                ...
+            full_schemas/
+                3/
+                    test.sql
+                    ...
+                11/
+                    foo.sql
+                    bar.sql
+                ...
+
+    In the example foo.sql and bar.sql would be run, and then any delta files
+    for versions strictly greater than 11.
     """
     current_dir = os.path.join(dir_path, "schema", "full_schemas")
     directory_entries = os.listdir(current_dir)
@@ -674,6 +691,24 @@ def _upgrade_existing_database(cur, current_version, delta_files, upgraded):
     where orthogonal schema changes may happen on separate branches.
 
     This is a no-op of current_version == SCHEMA_VERSION.
+
+    Example directory structure:
+
+        schema/
+            delta/
+                11/
+                    foo.sql
+                    ...
+                12/
+                    foo.sql
+                    bar.py
+                ...
+            full_schemas/
+                ...
+
+    In the example, if current_version is 11, then foo.sql will be run if and
+    only if `upgraded` is True. Then `foo.sql` and `bar.py` would be run in
+    some arbitrary order.
 
     Args:
         cur (Cursor)
