@@ -16,7 +16,7 @@
 from tests import unittest
 
 from synapse.metrics.metric import (
-    CounterMetric, CallbackMetric, CacheMetric
+    CounterMetric, CallbackMetric, TimerMetric, CacheMetric
 )
 
 
@@ -94,6 +94,40 @@ class CallbackMetricTestCase(unittest.TestCase):
         self.assertEquals(metric.render(), [
             "values{type=bar} 2",
             "values{type=foo} 1",
+        ])
+
+
+class TimerMetricTestCase(unittest.TestCase):
+
+    def test_scalar(self):
+        metric = TimerMetric("thing")
+
+        self.assertEquals(metric.render(), [
+            "thing:count 0",
+            "thing:msec 0",
+        ])
+
+        metric.inc_time(500)
+
+        self.assertEquals(metric.render(), [
+            "thing:count 1",
+            "thing:msec 500",
+        ])
+
+    def test_vector(self):
+        metric = TimerMetric("queries", keys=["verb"])
+
+        self.assertEquals(metric.render(), [])
+
+        metric.inc_time(300, "SELECT")
+        metric.inc_time(200, "SELECT")
+        metric.inc_time(800, "INSERT")
+
+        self.assertEquals(metric.render(), [
+            "queries{verb=INSERT}:count 1",
+            "queries{verb=INSERT}:msec 800",
+            "queries{verb=SELECT}:count 2",
+            "queries{verb=SELECT}:msec 500",
         ])
 
 

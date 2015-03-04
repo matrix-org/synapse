@@ -14,6 +14,15 @@
 # limitations under the License.
 
 
+from itertools import chain
+
+
+# TODO(paul): I can't believe Python doesn't have one of these
+def map_concat(func, items):
+    # flatten a list-of-lists
+    return list(chain.from_iterable(map(func, items)))
+
+
 class BaseMetric(object):
 
     def __init__(self, name, keys=[]):
@@ -86,6 +95,45 @@ class CallbackMetric(BaseMetric):
 
         return ["%s{%s} %d" % (self.name, self._render_key(k), value[k])
                 for k in sorted(value.keys())]
+
+
+class TimerMetric(CounterMetric):
+    """A combination of an event counter and a time accumulator, which counts
+    both the number of events and how long each one takes.
+
+    TODO(paul): Try to export some heatmap-style stats?
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(TimerMetric, self).__init__(*args, **kwargs)
+
+        self.times = {}
+
+        # Scalar metrics are never empty
+        if self.is_scalar():
+            self.times[()] = 0
+
+    def inc_time(self, msec, *values):
+        self.inc(*values)
+
+        if values not in self.times:
+            self.times[values] = msec
+        else:
+            self.times[values] += msec
+
+    def render(self):
+        if self.is_scalar():
+            return ["%s:count %d" % (self.name, self.counts[()]),
+                    "%s:msec %d" % (self.name, self.times[()])]
+
+        def render_item(k):
+            keystr = self._render_key(k)
+
+            return ["%s{%s}:count %d" % (self.name, keystr, self.counts[k]),
+                    "%s{%s}:msec %d" % (self.name, keystr, self.times[k])]
+
+        return map_concat(render_item, sorted(self.counts.keys()))
+
 
 class CacheMetric(object):
     """A combination of two CounterMetrics, one to count cache hits and one to
