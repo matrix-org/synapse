@@ -1,11 +1,14 @@
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def run_upgrade(cur):
     cur.execute("SELECT id, regex FROM application_services_regex")
     for row in cur.fetchall():
         try:
-            print "checking %s..." % row[0]
+            logger.debug("Checking %s..." % row[0])
             json.loads(row[1])
         except ValueError:
             # row isn't in json, make it so.
