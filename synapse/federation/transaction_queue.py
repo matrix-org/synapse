@@ -25,11 +25,14 @@ from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.retryutils import (
     get_retry_limiter, NotRetryingDestination,
 )
+import synapse.metrics
 
 import logging
 
 
 logger = logging.getLogger(__name__)
+
+metrics = synapse.metrics.get_metrics_for(__name__)
 
 
 class TransactionQueue(object):
@@ -56,15 +59,24 @@ class TransactionQueue(object):
 
         # Is a mapping from destination -> list of
         # tuple(pending pdus, deferred, order)
-        self.pending_pdus_by_dest = {}
+        self.pending_pdus_by_dest = pdus = {}
         # destination -> list of tuple(edu, deferred)
-        self.pending_edus_by_dest = {}
+        self.pending_edus_by_dest = edus = {}
 
         # destination -> list of tuple(failure, deferred)
         self.pending_failures_by_dest = {}
 
         # HACK to get unique tx id
         self._next_txn_id = int(self._clock.time_msec())
+
+        metrics.register_callback("pending_pdus",
+            lambda: {(dest,): len(pdus[dest]) for dest in pdus.keys()},
+            keys=["dest"],
+        )
+        metrics.register_callback("pending_edus",
+            lambda: {(dest,): len(edus[dest]) for dest in edus.keys()},
+            keys=["dest"],
+        )
 
     def can_send_to(self, destination):
         """Can we send messages to the given server?
