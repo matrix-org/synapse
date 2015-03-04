@@ -59,7 +59,7 @@ def cached(max_entries=1000):
     def wrap(orig):
         cache = OrderedDict()
 
-        counter = metrics.register_cachecounter(orig.__name__)
+        counter = metrics.register_cache(orig.__name__, lambda: len(cache))
 
         def prefill(key, value):
             while len(cache) > max_entries:
@@ -183,8 +183,8 @@ class SQLBaseStore(object):
         self._get_event_counters = PerformanceCounters()
 
         self._get_event_cache = LruCache(hs.config.event_cache_size)
-        self._get_event_cache_counter = metrics.register_cachecounter(
-            "get_event"
+        self._get_event_cache_counter = metrics.register_cache("get_event",
+            size_callback=lambda: len(self._get_event_cache),
         )
 
     def start_profiling(self):

@@ -16,7 +16,7 @@
 from tests import unittest
 
 from synapse.metrics.metric import (
-    CounterMetric, CallbackMetric, CacheCounterMetric
+    CounterMetric, CallbackMetric, CacheMetric
 )
 
 
@@ -81,26 +81,32 @@ class CallbackMetricTestCase(unittest.TestCase):
         ])
 
 
-class CacheCounterMetricTestCase(unittest.TestCase):
+class CacheMetricTestCase(unittest.TestCase):
 
-    def test_cachecounter(self):
-        counter = CacheCounterMetric("cache")
+    def test_cache(self):
+        d = dict()
 
-        self.assertEquals(counter.render(), [
+        metric = CacheMetric("cache", lambda: len(d))
+
+        self.assertEquals(metric.render(), [
             "cache:hits 0",
             "cache:misses 0",
+            "cache:size 0",
         ])
 
-        counter.inc_misses()
+        metric.inc_misses()
+        d["key"] = "value"
 
-        self.assertEquals(counter.render(), [
+        self.assertEquals(metric.render(), [
             "cache:hits 0",
             "cache:misses 1",
+            "cache:size 1",
         ])
 
-        counter.inc_hits()
+        metric.inc_hits()
 
-        self.assertEquals(counter.render(), [
+        self.assertEquals(metric.render(), [
             "cache:hits 1",
             "cache:misses 1",
+            "cache:size 1",
         ])

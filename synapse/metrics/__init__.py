@@ -15,7 +15,7 @@
 
 import logging
 
-from .metric import CounterMetric, CallbackMetric, CacheCounterMetric
+from .metric import CounterMetric, CallbackMetric, CacheMetric
 
 
 logger = logging.getLogger(__name__)
@@ -57,10 +57,10 @@ class Metrics(object):
 
         return metric
 
-    def register_cachecounter(self, name, *args, **kwargs):
+    def register_cache(self, name, *args, **kwargs):
         full_name = "%s.%s" % (self.name_prefix, name)
 
-        metric = CacheCounterMetric(full_name, *args, **kwargs)
+        metric = CacheMetric(full_name, *args, **kwargs)
 
         self._register(metric)
 

@@ -76,18 +76,23 @@ class CallbackMetric(BaseMetric):
         # TODO(paul): work out something we can do with keys and vectors
         return ["%s %d" % (self.name, self.callback())]
 
-class CacheCounterMetric(object):
+class CacheMetric(object):
     """A combination of two CounterMetrics, one to count cache hits and one to
-    count misses.
+    count misses, and a callback metric to yield the current size.
 
     This metric generates standard metric name pairs, so that monitoring rules
     can easily be applied to measure hit ratio."""
 
-    def __init__(self, name, keys=[]):
+    def __init__(self, name, size_callback, keys=[]):
         self.name = name
 
         self.hits   = CounterMetric(name + ":hits",   keys=keys)
         self.misses = CounterMetric(name + ":misses", keys=keys)
+
+        self.size = CallbackMetric(name + ":size",
+            callback=size_callback,
+            keys=keys,
+        )
 
     def inc_hits(self, *values):
         self.hits.inc(*values)
@@ -96,4 +101,4 @@ class CacheCounterMetric(object):
         self.misses.inc(*values)
 
     def render(self):
-        return self.hits.render() + self.misses.render()
+        return self.hits.render() + self.misses.render() + self.size.render()
