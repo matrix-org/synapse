@@ -583,7 +583,7 @@ def prepare_database(db_conn):
     """Prepares a database for usage. Will either create all necessary tables
     or upgrade from an older schema version.
     """
-    with db_conn:
+    try:
         cur = db_conn.cursor()
         version_info = _get_or_create_schema_state(cur)
 
@@ -596,6 +596,10 @@ def prepare_database(db_conn):
         cur.execute("PRAGMA user_version = %d" % (SCHEMA_VERSION,))
 
         cur.close()
+        db_conn.commit()
+    except:
+        db_conn.rollback()
+        raise
 
 
 def _setup_new_database(cur):
