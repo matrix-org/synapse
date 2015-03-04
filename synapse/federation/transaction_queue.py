@@ -224,6 +224,8 @@ class TransactionQueue(object):
         ]
 
         try:
+            self.pending_transactions[destination] = 1
+
             limiter = yield get_retry_limiter(
                 destination,
                 self._clock,
@@ -238,8 +240,6 @@ class TransactionQueue(object):
                 len(pending_edus),
                 len(pending_failures)
             )
-
-            self.pending_transactions[destination] = 1
 
             logger.debug("TX [%s] Persisting transaction...", destination)
 
@@ -287,7 +287,7 @@ class TransactionQueue(object):
                     code = 200
 
                     if response:
-                        for e_id, r in getattr(response, "pdus", {}).items():
+                        for e_id, r in response.get("pdus", {}).items():
                             if "error" in r:
                                 logger.warn(
                                     "Transaction returned error for %s: %s",

@@ -74,7 +74,7 @@ SCHEMAS = [
 
 # Remember to update this number every time an incompatible change is made to
 # database schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -633,11 +633,11 @@ def prepare_database(db_conn):
 
             # Run every version since after the current version.
             for v in range(user_version + 1, SCHEMA_VERSION + 1):
-                if v == 10:
+                if v in (10, 14,):
                     raise UpgradeDatabaseException(
                         "No delta for version 10"
                     )
-                sql_script = read_schema("delta/v%d" % (v))
+                sql_script = read_schema("delta/v%d" % (v,))
                 c.executescript(sql_script)
 
             db_conn.commit()

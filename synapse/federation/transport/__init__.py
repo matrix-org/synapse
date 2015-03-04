@@ -24,6 +24,8 @@ communicate over a different (albeit still reliable) protocol.
 from .server import TransportLayerServer
 from .client import TransportLayerClient
 
+from synapse.util.ratelimitutils import FederationRateLimiter
+
 
 class TransportLayer(TransportLayerServer, TransportLayerClient):
     """This is a basic implementation of the transport layer that translates
@@ -55,8 +57,18 @@ class TransportLayer(TransportLayerServer, TransportLayerClient):
                 send requests
         """
         self.keyring = homeserver.get_keyring()
+        self.clock = homeserver.get_clock()
         self.server_name = server_name
         self.server = server
         self.client = client
         self.request_handler = None
         self.received_handler = None
+
+        self.ratelimiter = FederationRateLimiter(
+            self.clock,
+            window_size=homeserver.config.federation_rc_window_size,
+            sleep_limit=homeserver.config.federation_rc_sleep_limit,
+            sleep_msec=homeserver.config.federation_rc_sleep_delay,
+            reject_limit=homeserver.config.federation_rc_reject_limit,
+            concurrent_requests=homeserver.config.federation_rc_concurrent,
+        )

@@ -69,9 +69,6 @@ class EventStreamHandler(BaseHandler):
                         )
                 self._streams_per_user[auth_user] += 1
 
-            if pagin_config.from_token is None:
-                pagin_config.from_token = None
-
             rm_handler = self.hs.get_handlers().room_member_handler
             room_ids = yield rm_handler.get_rooms_for_user(auth_user)
 
