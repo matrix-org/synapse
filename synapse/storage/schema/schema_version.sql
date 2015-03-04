@@ -21,10 +21,10 @@ CREATE TABLE IF NOT EXISTS schema_version(
     CONSTRAINT schema_version_lock_uniq UNIQUE (Lock)
 );
 
-CREATE TABLE IF NOT EXISTS schema_deltas(
+CREATE TABLE IF NOT EXISTS applied_schema_deltas(
     version INTEGER NOT NULL,
     file TEXT NOT NULL,
     CONSTRAINT schema_deltas_ver_file UNIQUE (version, file) ON CONFLICT IGNORE
 );
 
-CREATE INDEX IF NOT EXISTS schema_deltas_ver ON schema_deltas(version);
+CREATE INDEX IF NOT EXISTS schema_deltas_ver ON applied_schema_deltas(version);
