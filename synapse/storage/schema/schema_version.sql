@@ -13,9 +13,17 @@
  * limitations under the License.
  */
 
-CREATE TABLE IF NOT EXISTS rejections(
-    event_id TEXT NOT NULL,
-    reason TEXT NOT NULL,
-    last_check TEXT NOT NULL,
-    CONSTRAINT ev_id UNIQUE (event_id) ON CONFLICT REPLACE
+CREATE TABLE IF NOT EXISTS schema_version(
+    Lock char(1) NOT NULL DEFAULT 'X',  -- Makes sure this table only has one row.
+    version INTEGER NOT NULL,
+    upgraded BOOL NOT NULL,  -- Whether we reached this version from an upgrade or an initial schema.
+    CONSTRAINT schema_version_lock CHECK (Lock='X') ON CONFLICT REPLACE
 );
+
+CREATE TABLE IF NOT EXISTS schema_deltas(
+    version INTEGER NOT NULL,
+    file TEXT NOT NULL,
+    CONSTRAINT schema_deltas_ver_file UNIQUE (version, file) ON CONFLICT IGNORE
+);
+
+CREATE INDEX IF NOT EXISTS schema_deltas_ver ON schema_deltas(version);
