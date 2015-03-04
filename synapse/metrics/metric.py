@@ -62,6 +62,20 @@ class CounterMetric(BaseMetric):
                 for k in sorted(self.counts.keys())]
 
 
+class CallbackMetric(BaseMetric):
+    """A metric that returns the numeric value returned by a callback whenever
+    it is rendered. Typically this is used to implement gauges that yield the
+    size or other state of some in-memory object by actively querying it."""
+
+    def __init__(self, name, callback, keys=[]):
+        super(CallbackMetric, self).__init__(name, keys=keys)
+
+        self.callback = callback
+
+    def render(self):
+        # TODO(paul): work out something we can do with keys and vectors
+        return ["%s %d" % (self.name, self.callback())]
+
 class CacheCounterMetric(object):
     """A combination of two CounterMetrics, one to count cache hits and one to
     count misses.

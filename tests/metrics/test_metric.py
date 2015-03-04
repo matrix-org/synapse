@@ -15,7 +15,9 @@
 
 from tests import unittest
 
-from synapse.metrics.metric import CounterMetric, CacheCounterMetric
+from synapse.metrics.metric import (
+    CounterMetric, CallbackMetric, CacheCounterMetric
+)
 
 
 class CounterMetricTestCase(unittest.TestCase):
@@ -58,6 +60,24 @@ class CounterMetricTestCase(unittest.TestCase):
         self.assertEquals(counter.render(), [
             "vector{method=GET} 2",
             "vector{method=PUT} 1",
+        ])
+
+
+class CallbackMetricTestCase(unittest.TestCase):
+
+    def test_callback(self):
+        d = dict()
+
+        metric = CallbackMetric("size", lambda: len(d))
+
+        self.assertEquals(metric.render(), [
+            "size 0",
+        ])
+
+        d["key"] = "value"
+
+        self.assertEquals(metric.render(), [
+            "size 1",
         ])
 
 
