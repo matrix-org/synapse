@@ -88,11 +88,15 @@ class LruCache(object):
             else:
                 return default
 
+        def cache_len():
+            return len(cache)
+
         self.sentinel = object()
         self.get = cache_get
         self.set = cache_set
         self.setdefault = cache_set_default
         self.pop = cache_pop
+        self.len = cache_len
 
     def __getitem__(self, key):
         result = self.get(key, self.sentinel)
@@ -108,3 +112,6 @@ class LruCache(object):
         result = self.pop(key, self.sentinel)
         if result is self.sentinel:
             raise KeyError()
+
+    def __len__(self):
+        return self.len()
