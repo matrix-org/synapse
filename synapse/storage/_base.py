@@ -40,7 +40,6 @@ transaction_logger = logging.getLogger("synapse.storage.txn")
 
 # TODO(paul):
 #  * more generic key management
-#  * export monitoring stats
 #  * consider other eviction strategies - LRU?
 def cached(max_entries=1000):
     """ A method decorator that applies a memoizing cache around the function.
