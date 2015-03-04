@@ -17,7 +17,9 @@
 import sys
 sys.dont_write_bytecode = True
 
-from synapse.storage import prepare_database, UpgradeDatabaseException
+from synapse.storage import (
+    prepare_database, prepare_sqlite3_database, UpgradeDatabaseException,
+)
 
 from synapse.server import HomeServer
 
@@ -335,6 +337,7 @@ def setup():
 
     try:
         with sqlite3.connect(db_name) as db_conn:
+            prepare_sqlite3_database(db_conn)
             prepare_database(db_conn)
     except UpgradeDatabaseException:
         sys.stderr.write(
