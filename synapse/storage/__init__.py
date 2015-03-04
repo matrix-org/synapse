@@ -659,7 +659,7 @@ def _setup_new_database(cur):
     sql_script = "BEGIN TRANSACTION;\n"
     for filename in fnmatch.filter(directory_entries, "*.sql"):
         sql_loc = os.path.join(sql_dir, filename)
-        logger.debug("Applying schema %r", sql_loc)
+        logger.debug("Applying schema %s", sql_loc)
         sql_script += read_schema(sql_loc)
         sql_script += "\n"
     sql_script += "COMMIT TRANSACTION;"
