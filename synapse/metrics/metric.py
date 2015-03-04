@@ -20,6 +20,12 @@ class BaseMetric(object):
         self.name = name
         self.keys = keys # OK not to clone as we never write it
 
+    def dimension(self):
+        return len(self.keys)
+
+    def is_scalar(self):
+        return not len(self.keys)
+
     def _render_key(self, values):
         # TODO: some kind of value escape
         return ",".join(["%s=%s" % kv for kv in zip(self.keys, values)])
@@ -35,13 +41,13 @@ class CounterMetric(BaseMetric):
         self.counts = {}
 
         # Scalar metrics are never empty
-        if not len(self.keys):
+        if self.is_scalar():
             self.counts[()] = 0
 
     def inc(self, *values):
-        if len(values) != len(self.keys):
+        if len(values) != self.dimension():
             raise ValueError("Expected as many values to inc() as keys (%d)" %
-                (len(self.keys))
+                (self.dimension())
             )
 
         # TODO: should assert that the tag values are all strings
@@ -55,7 +61,7 @@ class CounterMetric(BaseMetric):
         return dict(self.counts)
 
     def render(self):
-        if not len(self.keys):
+        if self.is_scalar():
             return ["%s %d" % (self.name, self.counts[()])]
 
         return ["%s{%s} %d" % (self.name, self._render_key(k), self.counts[k])
@@ -75,6 +81,7 @@ class CallbackMetric(BaseMetric):
     def render(self):
         # TODO(paul): work out something we can do with keys and vectors
         return ["%s %d" % (self.name, self.callback())]
+
 
 class CacheMetric(object):
     """A combination of two CounterMetrics, one to count cache hits and one to
