@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS schema_version(
     Lock char(1) NOT NULL DEFAULT 'X',  -- Makes sure this table only has one row.
     version INTEGER NOT NULL,
     upgraded BOOL NOT NULL,  -- Whether we reached this version from an upgrade or an initial schema.
-    CONSTRAINT schema_version_lock CHECK (Lock='X') ON CONFLICT REPLACE
+    CONSTRAINT schema_version_lock_x CHECK (Lock='X')
+    CONSTRAINT schema_version_lock_uniq UNIQUE (Lock)
 );
 
 CREATE TABLE IF NOT EXISTS schema_deltas(

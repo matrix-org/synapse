@@ -645,7 +645,7 @@ def _setup_new_database(cur):
     cur.executescript(sql_script)
 
     cur.execute(
-        "INSERT INTO schema_version (version, upgraded)"
+        "INSERT OR REPLACE INTO schema_version (version, upgraded)"
         " VALUES (?,?)",
         (max_current_ver, False)
     )
@@ -748,7 +748,7 @@ def _upgrade_existing_database(cur, current_version, delta_files, upgraded):
             )
 
             cur.execute(
-                "INSERT INTO schema_version (version, upgraded)"
+                "INSERT OR REPLACE INTO schema_version (version, upgraded)"
                 " VALUES (?,?)",
                 (v, True)
             )
@@ -803,7 +803,7 @@ def prepare_sqlite3_database(db_conn):
 
             if row and row[0]:
                 db_conn.execute(
-                    "INSERT INTO schema_version (version, upgraded)"
+                    "INSERT OR REPLACE INTO schema_version (version, upgraded)"
                     " VALUES (?,?)",
                     (row[0], False)
                 )
