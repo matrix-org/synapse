@@ -15,7 +15,7 @@
 
 import logging
 
-from .metric import CounterMetric, CallbackMetric, CacheMetric
+from .metric import CounterMetric, CallbackMetric, TimerMetric, CacheMetric
 
 
 logger = logging.getLogger(__name__)
@@ -36,35 +36,25 @@ class Metrics(object):
     def __init__(self, name):
         self.name_prefix = name
 
-    def _register(self, metric):
-        all_metrics[metric.name] = metric
-
-    def register_counter(self, name, *args, **kwargs):
+    def _register(self, metric_class, name, *args, **kwargs):
         full_name = "%s.%s" % (self.name_prefix, name)
 
-        metric = CounterMetric(full_name, *args, **kwargs)
+        metric = metric_class(full_name, *args, **kwargs)
 
-        self._register(metric)
-
+        all_metrics[full_name] = metric
         return metric
 
-    def register_callback(self, name, callback, *args, **kwargs):
-        full_name = "%s.%s" % (self.name_prefix, name)
+    def register_counter(self, *args, **kwargs):
+        return self._register(CounterMetric, *args, **kwargs)
 
-        metric = CallbackMetric(full_name, *args, callback=callback, **kwargs)
+    def register_callback(self, *args, **kwargs):
+        return self._register(CallbackMetric, *args, **kwargs)
 
-        self._register(metric)
+    def register_timer(self, *args, **kwargs):
+        return self._register(TimerMetric, *args, **kwargs)
 
-        return metric
-
-    def register_cache(self, name, *args, **kwargs):
-        full_name = "%s.%s" % (self.name_prefix, name)
-
-        metric = CacheMetric(full_name, *args, **kwargs)
-
-        self._register(metric)
-
-        return metric
+    def register_cache(self, *args, **kwargs):
+        return self._register(CacheMetric, *args, **kwargs)
 
     def counted(self, func):
         """ A method decorator that registers a counter, to count invocations
