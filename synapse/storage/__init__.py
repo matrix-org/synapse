@@ -55,7 +55,7 @@ import re
 logger = logging.getLogger(__name__)
 
 
-# Remember to update this number every time an change is made to database
+# Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
 SCHEMA_VERSION = 14
 
@@ -583,19 +583,19 @@ def prepare_database(db_conn):
     """Prepares a database for usage. Will either create all necessary tables
     or upgrade from an older schema version.
     """
-    cur = db_conn.cursor()
-    version_info = _get_or_create_schema_state(cur)
+    with db_conn:
+        cur = db_conn.cursor()
+        version_info = _get_or_create_schema_state(cur)
 
-    if version_info:
-        user_version, delta_files, upgraded = version_info
-        _upgrade_existing_database(cur, user_version, delta_files, upgraded)
-    else:
-        _setup_new_database(cur)
+        if version_info:
+            user_version, delta_files, upgraded = version_info
+            _upgrade_existing_database(cur, user_version, delta_files, upgraded)
+        else:
+            _setup_new_database(cur)
 
-    cur.execute("PRAGMA user_version = %d" % (SCHEMA_VERSION,))
-    db_conn.commit()
+        cur.execute("PRAGMA user_version = %d" % (SCHEMA_VERSION,))
 
-    cur.close()
+        cur.close()
 
 
 def _setup_new_database(cur):
