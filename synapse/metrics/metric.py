@@ -36,8 +36,15 @@ class BaseMetric(object):
         return not len(self.keys)
 
     def _render_key(self, values):
+        if self.is_scalar():
+            return ""
         # TODO: some kind of value escape
-        return ",".join(["%s=%s" % kv for kv in zip(self.keys, values)])
+        return "{%s}" % (
+            ",".join(["%s=%s" % kv for kv in zip(self.keys, values)])
+        )
+
+    def render(self):
+        return map_concat(self.render_item, sorted(self.counts.keys()))
 
 
 class CounterMetric(BaseMetric):
@@ -69,12 +76,8 @@ class CounterMetric(BaseMetric):
     def fetch(self):
         return dict(self.counts)
 
-    def render(self):
-        if self.is_scalar():
-            return ["%s %d" % (self.name, self.counts[()])]
-
-        return ["%s{%s} %d" % (self.name, self._render_key(k), self.counts[k])
-                for k in sorted(self.counts.keys())]
+    def render_item(self, k):
+        return ["%s%s %d" % (self.name, self._render_key(k), self.counts[k])]
 
 
 class CallbackMetric(BaseMetric):
@@ -93,7 +96,7 @@ class CallbackMetric(BaseMetric):
         if self.is_scalar():
             return ["%s %d" % (self.name, value)]
 
-        return ["%s{%s} %d" % (self.name, self._render_key(k), value[k])
+        return ["%s%s %d" % (self.name, self._render_key(k), value[k])
                 for k in sorted(value.keys())]
 
 
@@ -121,18 +124,12 @@ class TimerMetric(CounterMetric):
         else:
             self.times[values] += msec
 
-    def render(self):
-        if self.is_scalar():
-            return ["%s:count %d" % (self.name, self.counts[()]),
-                    "%s:msec %d" % (self.name, self.times[()])]
+    def render_item(self, k):
+        keystr = self._render_key(k)
 
-        def render_item(k):
-            keystr = self._render_key(k)
+        return ["%s%s:count %d" % (self.name, keystr, self.counts[k]),
+                "%s%s:msec %d" % (self.name, keystr, self.times[k])]
 
-            return ["%s{%s}:count %d" % (self.name, keystr, self.counts[k]),
-                    "%s{%s}:msec %d" % (self.name, keystr, self.times[k])]
-
-        return map_concat(render_item, sorted(self.counts.keys()))
 
 
 class CacheMetric(object):
