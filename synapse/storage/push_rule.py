@@ -63,7 +63,7 @@ class PushRuleStore(SQLBaseStore):
             {'user_name': user_name, 'rule_id': rule_id},
             ['enabled']
         )
-        if len(results) == 0:
+        if not results:
             defer.returnValue(True)
         defer.returnValue(results[0])
 
