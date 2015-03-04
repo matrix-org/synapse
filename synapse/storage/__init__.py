@@ -613,7 +613,7 @@ def _setup_new_database(cur):
                 valid_dirs.append((ver, abs_path))
 
     if not valid_dirs:
-        raise RuntimeError("Could not find a suitable current.sql")
+        raise PrepareDatabaseException("Could not find a suitable current.sql")
 
     max_current_ver, sql_dir = max(valid_dirs, key=lambda x: x[0])
 
@@ -684,7 +684,9 @@ def _upgrade_existing_database(cur, current_version, delta_files, upgraded):
             directory_entries = os.listdir(delta_dir)
         except OSError:
             logger.exception("Could not open delta dir for version %d", v)
-            raise
+            raise UpgradeDatabaseException(
+                "Could not open delta dir for version %d" % (v,)
+            )
 
         directory_entries.sort()
         for file_name in directory_entries:
@@ -697,18 +699,20 @@ def _upgrade_existing_database(cur, current_version, delta_files, upgraded):
             )
             root_name, ext = os.path.splitext(file_name)
             if ext == ".py":
+                # This is a python upgrade module. We need to import into some
+                # package and then execute its `run_upgrade` function.
                 module_name = "synapse.storage.v%d_%s" % (
                     v, root_name
                 )
-                with open(absolute_path) as schema_file:
+                with open(absolute_path) as python_file:
                     module = imp.load_source(
-                        module_name, absolute_path, schema_file
+                        module_name, absolute_path, python_file
                     )
                 logger.debug("Running script %s", relative_path)
                 module.run_upgrade(cur)
             elif ext == ".sql":
-                with open(absolute_path) as schema_file:
-                    delta_schema = schema_file.read()
+                # A plain old .sql file, just read and execute it
+                delta_schema = read_schema(absolute_path)
                 logger.debug("Applying schema %s", relative_path)
                 cur.executescript(delta_schema)
             else:
@@ -751,7 +755,6 @@ def get_or_create_schema_state(txn):
             "SELECT file FROM schema_deltas WHERE version >= ?",
             (current_version,)
         )
-        res = txn.fetchall()
         return current_version, txn.fetchall(), upgraded
 
     return None
@@ -783,7 +786,6 @@ def prepare_sqlite3_database(db_conn):
             c.close()
 
             if row and row[0]:
-                ver = row[0]
                 db_conn.execute(
                     "INSERT INTO schema_version (version, upgraded)"
                     " VALUES (?,?)",
