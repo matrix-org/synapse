@@ -20,6 +20,7 @@ from synapse.events.utils import prune_event
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext, LoggingContext
 from synapse.util.lrucache import LruCache
+import synapse.metrics
 
 from twisted.internet import defer
 
@@ -30,6 +31,8 @@ import time
 
 
 logger = logging.getLogger(__name__)
+
+metrics = synapse.metrics.get_metrics_for("synapse.storage")
 
 sql_logger = logging.getLogger("synapse.storage.SQL")
 transaction_logger = logging.getLogger("synapse.storage.txn")
@@ -56,6 +59,8 @@ def cached(max_entries=1000):
     def wrap(orig):
         cache = OrderedDict()
 
+        counter = metrics.register_cachecounter(orig.__name__)
+
         def prefill(key, value):
             while len(cache) > max_entries:
                 cache.popitem(last=False)
@@ -65,8 +70,10 @@ def cached(max_entries=1000):
         @defer.inlineCallbacks
         def wrapped(self, key):
             if key in cache:
+                counter.inc_hits()
                 defer.returnValue(cache[key])
 
+            counter.inc_misses()
             ret = yield orig(self, key)
             prefill(key, ret)
             defer.returnValue(ret)
@@ -176,6 +183,9 @@ class SQLBaseStore(object):
         self._get_event_counters = PerformanceCounters()
 
         self._get_event_cache = LruCache(hs.config.event_cache_size)
+        self._get_event_cache_counter = metrics.register_cachecounter(
+            "get_event"
+        )
 
     def start_profiling(self):
         self._previous_loop_ts = self._clock.time_msec()
@@ -644,8 +654,12 @@ class SQLBaseStore(object):
 
         try:
             # Separate cache entries for each way to invoke _get_event_txn
-            return cache[(check_redacted, get_prev_content, allow_rejected)]
+            ret = cache[(check_redacted, get_prev_content, allow_rejected)]
+
+            self._get_event_cache_counter.inc_hits()
+            return ret
         except KeyError:
+            self._get_event_cache_counter.inc_misses()
             pass
         finally:
             start_time = update_counter("event_cache", start_time)
