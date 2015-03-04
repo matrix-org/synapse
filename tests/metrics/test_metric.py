@@ -65,7 +65,7 @@ class CounterMetricTestCase(unittest.TestCase):
 
 class CallbackMetricTestCase(unittest.TestCase):
 
-    def test_callback(self):
+    def test_scalar(self):
         d = dict()
 
         metric = CallbackMetric("size", lambda: len(d))
@@ -78,6 +78,22 @@ class CallbackMetricTestCase(unittest.TestCase):
 
         self.assertEquals(metric.render(), [
             "size 1",
+        ])
+
+    def test_vector(self):
+        vals = dict()
+
+        metric = CallbackMetric("values", lambda: vals, keys=["type"])
+
+        self.assertEquals(metric.render(), [])
+
+        # Keys have to be tuples, even if they're 1-element
+        vals[("foo",)] = 1
+        vals[("bar",)] = 2
+
+        self.assertEquals(metric.render(), [
+            "values{type=bar} 2",
+            "values{type=foo} 1",
         ])
 
 

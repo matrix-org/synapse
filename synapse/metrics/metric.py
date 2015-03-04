@@ -79,9 +79,13 @@ class CallbackMetric(BaseMetric):
         self.callback = callback
 
     def render(self):
-        # TODO(paul): work out something we can do with keys and vectors
-        return ["%s %d" % (self.name, self.callback())]
+        value = self.callback()
 
+        if self.is_scalar():
+            return ["%s %d" % (self.name, value)]
+
+        return ["%s{%s} %d" % (self.name, self._render_key(k), value[k])
+                for k in sorted(value.keys())]
 
 class CacheMetric(object):
     """A combination of two CounterMetrics, one to count cache hits and one to
