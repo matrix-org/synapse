@@ -55,8 +55,8 @@ import re
 logger = logging.getLogger(__name__)
 
 
-# Remember to update this number every time an incompatible change is made to
-# database schema files, so the users will be informed on server restarts.
+# Remember to update this number every time an change is made to database
+# schema files, so the users will be informed on server restarts.
 SCHEMA_VERSION = 14
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
@@ -584,7 +584,7 @@ def prepare_database(db_conn):
     or upgrade from an older schema version.
     """
     cur = db_conn.cursor()
-    version_info = get_or_create_schema_state(cur)
+    version_info = _get_or_create_schema_state(cur)
 
     if version_info:
         user_version, delta_files, upgraded = version_info
@@ -599,7 +599,17 @@ def prepare_database(db_conn):
 
 
 def _setup_new_database(cur):
-    current_dir = os.path.join(dir_path, "schema", "current")
+    """Sets up the database by finding a base set of "full schemas" and then
+    applying any necessary deltas.
+
+    The "full_schemas" directory has subdirectories named after versions. This
+    function searches for the highest version less than or equal to
+    `SCHEMA_VERSION` and excutes all .sql files in that directory.
+
+    The function will then apply all deltas for all versions after the base
+    version.
+    """
+    current_dir = os.path.join(dir_path, "schema", "full_schemas")
     directory_entries = os.listdir(current_dir)
 
     valid_dirs = []
@@ -609,11 +619,15 @@ def _setup_new_database(cur):
         abs_path = os.path.join(current_dir, filename)
         if match and os.path.isdir(abs_path):
             ver = int(match.group(0))
-            if ver < SCHEMA_VERSION:
+            if ver <= SCHEMA_VERSION:
                 valid_dirs.append((ver, abs_path))
+        else:
+            logger.warn("Unexpected entry in 'full_schemas': %s", filename)
 
     if not valid_dirs:
-        raise PrepareDatabaseException("Could not find a suitable current.sql")
+        raise PrepareDatabaseException(
+            "Could not find a suitable base set of full schemas"
+        )
 
     max_current_ver, sql_dir = max(valid_dirs, key=lambda x: x[0])
 
@@ -654,6 +668,8 @@ def _upgrade_existing_database(cur, current_version, delta_files, upgraded):
     which delta files have been applied, and will apply any that haven't been
     even if there has been no version bump. This is useful for development
     where orthogonal schema changes may happen on separate branches.
+
+    This is a no-op of current_version == SCHEMA_VERSION.
 
     Args:
         cur (Cursor)
@@ -738,7 +754,7 @@ def _upgrade_existing_database(cur, current_version, delta_files, upgraded):
             )
 
 
-def get_or_create_schema_state(txn):
+def _get_or_create_schema_state(txn):
     schema_path = os.path.join(
         dir_path, "schema", "schema_version.sql",
     )
