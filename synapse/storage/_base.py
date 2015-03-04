@@ -32,10 +32,13 @@ import time
 
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for("synapse.storage")
-
 sql_logger = logging.getLogger("synapse.storage.SQL")
 transaction_logger = logging.getLogger("synapse.storage.txn")
+
+
+metrics = synapse.metrics.get_metrics_for("synapse.storage")
+
+sql_query_timer = metrics.register_timer("queries", keys=["verb"])
 
 
 # TODO(paul):
@@ -89,7 +92,8 @@ def cached(max_entries=1000):
 
 class LoggingTransaction(object):
     """An object that almost-transparently proxies for the 'txn' object
-    passed to the constructor. Adds logging to the .execute() method."""
+    passed to the constructor. Adds logging and metrics to the .execute()
+    method."""
     __slots__ = ["txn", "name"]
 
     def __init__(self, txn, name):
@@ -105,6 +109,7 @@ class LoggingTransaction(object):
     def execute(self, sql, *args, **kwargs):
         # TODO(paul): Maybe use 'info' and 'debug' for values?
         sql_logger.debug("[SQL] {%s} %s", self.name, sql)
+
         try:
             if args and args[0]:
                 values = args[0]
@@ -126,8 +131,9 @@ class LoggingTransaction(object):
                 logger.exception("[SQL FAIL] {%s}", self.name)
                 raise
         finally:
-            end = time.time() * 1000
-            sql_logger.debug("[SQL time] {%s} %f", self.name, end - start)
+            msecs = (time.time() * 1000) - start
+            sql_logger.debug("[SQL time] {%s} %f", self.name, msecs)
+            sql_query_timer.inc_time(msecs, sql.split()[0])
 
 
 class PerformanceCounters(object):
