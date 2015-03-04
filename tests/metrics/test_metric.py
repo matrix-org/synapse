@@ -15,7 +15,7 @@
 
 from tests import unittest
 
-from synapse.metrics.metric import CounterMetric
+from synapse.metrics.metric import CounterMetric, CacheCounterMetric
 
 
 class CounterMetricTestCase(unittest.TestCase):
@@ -58,4 +58,29 @@ class CounterMetricTestCase(unittest.TestCase):
         self.assertEquals(counter.render(), [
             "vector{method=GET} 2",
             "vector{method=PUT} 1",
+        ])
+
+
+class CacheCounterMetricTestCase(unittest.TestCase):
+
+    def test_cachecounter(self):
+        counter = CacheCounterMetric("cache")
+
+        self.assertEquals(counter.render(), [
+            "cache:hits 0",
+            "cache:misses 0",
+        ])
+
+        counter.inc_misses()
+
+        self.assertEquals(counter.render(), [
+            "cache:hits 0",
+            "cache:misses 1",
+        ])
+
+        counter.inc_hits()
+
+        self.assertEquals(counter.render(), [
+            "cache:hits 1",
+            "cache:misses 1",
         ])

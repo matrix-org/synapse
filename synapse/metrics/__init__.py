@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .metric import CounterMetric
+from .metric import CounterMetric, CacheCounterMetric
 
 
 # We'll keep all the available metrics in a single toplevel dict, one shared
@@ -38,6 +38,15 @@ class Metrics(object):
         full_name = "%s.%s" % (self.name_prefix, name)
 
         metric = CounterMetric(full_name, *args, **kwargs)
+
+        self._register(metric)
+
+        return metric
+
+    def register_cachecounter(self, name, *args, **kwargs):
+        full_name = "%s.%s" % (self.name_prefix, name)
+
+        metric = CacheCounterMetric(full_name, *args, **kwargs)
 
         self._register(metric)
 
