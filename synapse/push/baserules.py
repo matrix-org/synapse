@@ -105,6 +105,19 @@ def make_base_override_rules():
 def make_base_underride_rules():
     return [
         {
+            'rule_id': 'global/underride/.m.rule.suppress_notices',
+            'conditions': [
+                {
+                    'kind': 'event_match',
+                    'key': 'content.msgtype',
+                    'pattern': 'm.notice',
+                }
+            ],
+            'actions': [
+                'dont-notify',
+            ]
+        },
+        {
             'rule_id': 'global/underride/.m.rule.fallback',
             'conditions': [
             ],
