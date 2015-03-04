@@ -36,4 +36,5 @@ class MetricsResource(Resource):
         request.setHeader("Content-Type", "text/plain")
         request.setHeader("Content-Length", str(len(response)))
 
-        return response
+        # Encode as UTF-8 (default)
+        return response.encode()
