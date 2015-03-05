@@ -446,6 +446,20 @@ class FederationClient(FederationBase):
     @defer.inlineCallbacks
     def get_missing_events(self, destination, room_id, earliest_events_ids,
                            latest_events, limit, min_depth):
+        """Tries to fetch events we are missing. This is called when we receive
+        an event without having received all of its ancestors.
+
+        Args:
+            destination (str)
+            room_id (str)
+            earliest_events_ids (list): List of event ids. Effectively the
+                events we expected to receive, but haven't. `get_missing_events`
+                should only return events that didn't happen before these.
+            latest_events (list): List of events we have received that we don't
+                have all previous events for.
+            limit (int): Maximum number of events to return.
+            min_depth (int): Minimum depth of events tor return.
+        """
         try:
             content = yield self.transport_layer.get_missing_events(
                 destination=destination,
@@ -470,6 +484,8 @@ class FederationClient(FederationBase):
             if not e.code == 400:
                 raise
 
+            # We are probably hitting an old server that doesn't support
+            # get_missing_events
             signed_events = []
             have_gotten_all_from_destination = False
 
