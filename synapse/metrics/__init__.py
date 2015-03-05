@@ -13,7 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Because otherwise 'resource' collides with synapse.metrics.resource
+from __future__ import absolute_import
+
 import logging
+from resource import getrusage, getpagesize, RUSAGE_SELF
 
 from .metric import CounterMetric, CallbackMetric, TimerMetric, CacheMetric
 
@@ -76,6 +80,9 @@ def get_metrics_for(name):
 def render_all():
     strs = []
 
+    # TODO(paul): Internal hack
+    update_resource_metrics()
+
     for name in sorted(all_metrics.keys()):
         try:
             strs += all_metrics[name].render()
@@ -84,3 +91,23 @@ def render_all():
             logger.exception("Failed to render %s metric", name)
 
     return "\n".join(strs)
+
+
+# Now register some standard process-wide state metrics, to give indications of
+# process resource usage
+
+rusage = None
+PAGE_SIZE = getpagesize()
+
+def update_resource_metrics():
+    global rusage
+    rusage = getrusage(RUSAGE_SELF)
+
+resource_metrics = get_metrics_for("process.resource")
+
+# msecs
+resource_metrics.register_callback("utime", lambda: rusage.ru_utime * 1000)
+resource_metrics.register_callback("stime", lambda: rusage.ru_stime * 1000)
+
+# pages
+resource_metrics.register_callback("maxrss", lambda: rusage.ru_maxrss * PAGE_SIZE)
