@@ -63,7 +63,7 @@ class _NotificationListener(object):
             pass
 
         for room in self.rooms:
-            lst = notifier.rooms_to_listeners.get(room, set())
+            lst = notifier.room_to_listeners.get(room, set())
             lst.discard(self)
 
         notifier.user_to_listeners.get(self.user, set()).discard(self)
@@ -83,7 +83,7 @@ class Notifier(object):
     def __init__(self, hs):
         self.hs = hs
 
-        self.rooms_to_listeners = {}
+        self.room_to_listeners = {}
         self.user_to_listeners = {}
         self.appservice_to_listeners = {}
 
@@ -116,17 +116,17 @@ class Notifier(object):
 
         room_source = self.event_sources.sources["room"]
 
-        listeners = self.rooms_to_listeners.get(room_id, set()).copy()
+        listeners = self.room_to_listeners.get(room_id, set()).copy()
 
         for user in extra_users:
             listeners |= self.user_to_listeners.get(user, set()).copy()
 
         for appservice in self.appservice_to_listeners:
             # TODO (kegan): Redundant appservice listener checks?
-            # App services will already be in the rooms_to_listeners set, but
+            # App services will already be in the room_to_listeners set, but
             # that isn't enough. They need to be checked here in order to
             # receive *invites* for users they are interested in. Does this
-            # make the rooms_to_listeners check somewhat obselete?
+            # make the room_to_listeners check somewhat obselete?
             if appservice.is_interested(event):
                 listeners |= self.appservice_to_listeners.get(
                     appservice, set()
@@ -184,7 +184,7 @@ class Notifier(object):
             listeners |= self.user_to_listeners.get(user, set()).copy()
 
         for room in rooms:
-            listeners |= self.rooms_to_listeners.get(room, set()).copy()
+            listeners |= self.room_to_listeners.get(room, set()).copy()
 
         @defer.inlineCallbacks
         def notify(listener):
@@ -337,7 +337,7 @@ class Notifier(object):
     @log_function
     def _register_with_keys(self, listener):
         for room in listener.rooms:
-            s = self.rooms_to_listeners.setdefault(room, set())
+            s = self.room_to_listeners.setdefault(room, set())
             s.add(listener)
 
         self.user_to_listeners.setdefault(listener.user, set()).add(listener)
@@ -380,5 +380,5 @@ class Notifier(object):
     def _user_joined_room(self, user, room_id):
         new_listeners = self.user_to_listeners.get(user, set())
 
-        listeners = self.rooms_to_listeners.setdefault(room_id, set())
+        listeners = self.room_to_listeners.setdefault(room_id, set())
         listeners |= new_listeners
