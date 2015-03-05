@@ -161,7 +161,7 @@ class BaseFederationServlet(object):
         return new_code
 
     def register(self, server):
-        pattern = re.compile("^" + PREFIX + self.PATH)
+        pattern = re.compile("^" + PREFIX + self.PATH + "$")
 
         for method in ("GET", "PUT", "POST"):
             code = getattr(self, "on_%s" % (method), None)
@@ -172,7 +172,7 @@ class BaseFederationServlet(object):
 
 
 class FederationSendServlet(BaseFederationServlet):
-    PATH = "/send/([^/]*)/$"
+    PATH = "/send/([^/]*)/"
 
     def __init__(self, handler, server_name, **kwargs):
         super(FederationSendServlet, self).__init__(handler, **kwargs)
@@ -229,7 +229,7 @@ class FederationSendServlet(BaseFederationServlet):
 
 
 class FederationPullServlet(BaseFederationServlet):
-    PATH = "/pull/$"
+    PATH = "/pull/"
 
     # This is for when someone asks us for everything since version X
     def on_GET(self, origin, content, query):
@@ -237,7 +237,7 @@ class FederationPullServlet(BaseFederationServlet):
 
 
 class FederationEventServlet(BaseFederationServlet):
-    PATH = "/event/([^/]*)/$"
+    PATH = "/event/([^/]*)/"
 
     # This is when someone asks for a data item for a given server data_id pair.
     def on_GET(self, origin, content, query, event_id):
@@ -245,7 +245,7 @@ class FederationEventServlet(BaseFederationServlet):
 
 
 class FederationStateServlet(BaseFederationServlet):
-    PATH = "/state/([^/]*)/$"
+    PATH = "/state/([^/]*)/"
 
     # This is when someone asks for all data for a given context.
     def on_GET(self, origin, content, query, context):
@@ -255,7 +255,7 @@ class FederationStateServlet(BaseFederationServlet):
 
 
 class FederationBackfillServlet(BaseFederationServlet):
-    PATH = "/backfill/([^/]*)/$"
+    PATH = "/backfill/([^/]*)/"
 
     def on_GET(self, origin, content, query, context):
         versions = query["v"]
@@ -270,7 +270,7 @@ class FederationBackfillServlet(BaseFederationServlet):
 
 
 class FederationQueryServlet(BaseFederationServlet):
-    PATH = "/query/([^/]*)$"
+    PATH = "/query/([^/]*)"
 
     # This is when we receive a server-server Query
     def on_GET(self, origin, content, query, query_type):
@@ -280,7 +280,7 @@ class FederationQueryServlet(BaseFederationServlet):
 
 
 class FederationMakeJoinServlet(BaseFederationServlet):
-    PATH = "/make_join/([^/]*)/([^/]*)$"
+    PATH = "/make_join/([^/]*)/([^/]*)"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, context, user_id):
@@ -289,14 +289,14 @@ class FederationMakeJoinServlet(BaseFederationServlet):
 
 
 class FederationEventAuthServlet(BaseFederationServlet):
-    PATH = "/event_auth/([^/]*)/([^/]*)$"
+    PATH = "/event_auth/([^/]*)/([^/]*)"
 
     def on_GET(self, origin, content, query, context, event_id):
         return self.handler.on_event_auth(origin, context, event_id)
 
 
 class FederationSendJoinServlet(BaseFederationServlet):
-    PATH = "/send_join/([^/]*)/([^/]*)$"
+    PATH = "/send_join/([^/]*)/([^/]*)"
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, context, event_id):
@@ -307,7 +307,7 @@ class FederationSendJoinServlet(BaseFederationServlet):
 
 
 class FederationInviteServlet(BaseFederationServlet):
-    PATH = "/invite/([^/]*)/([^/]*)$"
+    PATH = "/invite/([^/]*)/([^/]*)"
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, context, event_id):
@@ -318,7 +318,7 @@ class FederationInviteServlet(BaseFederationServlet):
 
 
 class FederationQueryAuthServlet(BaseFederationServlet):
-    PATH = "/query_auth/([^/]*)/([^/]*)$"
+    PATH = "/query_auth/([^/]*)/([^/]*)"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, context, event_id):
@@ -330,7 +330,8 @@ class FederationQueryAuthServlet(BaseFederationServlet):
 
 
 class FederationGetMissingEventsServlet(BaseFederationServlet):
-    PATH = "/get_missing_events/([^/]*)/?$"
+    # TODO(paul): Why does this path alone end with "/?" optional?
+    PATH = "/get_missing_events/([^/]*)/?"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, room_id):
