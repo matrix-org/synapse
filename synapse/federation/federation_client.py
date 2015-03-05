@@ -507,10 +507,12 @@ class FederationClient(FederationBase):
 
             missing_events = {}
             for e in itertools.chain(latest_events, signed_events):
-                missing_events.update({
-                    e_id: e.depth for e_id, _ in e.prev_events
-                    if e_id not in seen_events and e_id not in failed_to_fetch
-                })
+                if e.depth > min_depth:
+                    missing_events.update({
+                        e_id: e.depth for e_id, _ in e.prev_events
+                        if e_id not in seen_events
+                        and e_id not in failed_to_fetch
+                    })
 
             if not missing_events:
                 break
