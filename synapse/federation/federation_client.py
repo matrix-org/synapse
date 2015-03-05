@@ -544,18 +544,12 @@ class FederationClient(FederationBase):
                 for e_id, depth in ordered_missing[:limit - len(signed_events)]
             ]
 
-            got_a_new_event = False
-
             res = yield defer.DeferredList(deferreds, consumeErrors=True)
             for (result, val), (e_id, _) in zip(res, ordered_missing):
                 if result:
                     signed_events.append(val)
-                    got_a_new_event = True
                 else:
                     failed_to_fetch.add(e_id)
-
-            if not got_a_new_event:
-                break
 
         defer.returnValue(signed_events)
 
