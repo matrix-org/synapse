@@ -39,6 +39,8 @@ transaction_logger = logging.getLogger("synapse.storage.txn")
 metrics = synapse.metrics.get_metrics_for("synapse.storage")
 
 sql_query_timer = metrics.register_timer("queries", keys=["verb"])
+sql_txn_timer = metrics.register_timer("transactions", keys=["desc"])
+sql_getevents_timer = metrics.register_timer("get_events", keys=["desc"])
 
 
 # TODO(paul):
@@ -184,11 +186,16 @@ class SQLBaseStore(object):
         self._previous_txn_total_time = 0
         self._current_txn_total_time = 0
         self._previous_loop_ts = 0
+
+        # TODO(paul): These can eventually be removed once the metrics code
+        #   is running in mainline, and we have some nice monitoring frontends
+        #   to watch it
         self._txn_perf_counters = PerformanceCounters()
         self._get_event_counters = PerformanceCounters()
 
         self._get_event_cache = LruCache(hs.config.event_cache_size)
-        self._get_event_cache_counter = metrics.register_cache("get_event",
+        self._get_event_cache_counter = metrics.register_cache(
+            "get_event_cache",
             size_callback=lambda: len(self._get_event_cache),
         )
 
@@ -253,6 +260,8 @@ class SQLBaseStore(object):
 
                     self._current_txn_total_time += end - start
                     self._txn_perf_counters.update(desc, start, end)
+
+                    sql_txn_timer.inc_time(self._current_txn_total_time, desc)
 
         with PreserveLoggingContext():
             result = yield self._db_pool.runInteraction(
@@ -653,7 +662,11 @@ class SQLBaseStore(object):
                        get_prev_content=False, allow_rejected=False):
 
         start_time = time.time() * 1000
-        update_counter = self._get_event_counters.update
+
+        def update_counter(desc, last_time):
+            curr_time = self._get_event_counters.update(desc, last_time)
+            sql_getevents_timer.inc_time(curr_time - last_time, desc)
+            return curr_time
 
         cache = self._get_event_cache.setdefault(event_id, {})
 
@@ -704,7 +717,11 @@ class SQLBaseStore(object):
                                 check_redacted=True, get_prev_content=False):
 
         start_time = time.time() * 1000
-        update_counter = self._get_event_counters.update
+
+        def update_counter(desc, last_time):
+            curr_time = self._get_event_counters.update(desc, last_time)
+            sql_getevents_timer.inc_time(curr_time - last_time, desc)
+            return curr_time
 
         d = json.loads(js)
         start_time = update_counter("decode_json", start_time)
