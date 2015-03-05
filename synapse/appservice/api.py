@@ -72,11 +72,16 @@ class ApplicationServiceApi(SimpleHttpClient):
         defer.returnValue(False)
 
     @defer.inlineCallbacks
-    def push_bulk(self, service, events):
+    def push_bulk(self, service, events, txn_id=None):
         events = self._serialize(events)
 
+        if txn_id is None:
+            logger.warning("push_bulk: Missing txn ID sending events to %s",
+                           service.url)
+            txn_id = str(0)
+
         uri = service.url + ("/transactions/%s" %
-                             urllib.quote(str(0)))  # TODO txn_ids
+                             urllib.quote(txn_id))
         response = None
         try:
             response = yield self.put_json(
@@ -97,8 +102,8 @@ class ApplicationServiceApi(SimpleHttpClient):
         defer.returnValue(False)
 
     @defer.inlineCallbacks
-    def push(self, service, event):
-        response = yield self.push_bulk(service, [event])
+    def push(self, service, event, txn_id=None):
+        response = yield self.push_bulk(service, [event], txn_id)
         defer.returnValue(response)
 
     def _serialize(self, events):
