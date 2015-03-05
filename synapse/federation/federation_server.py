@@ -419,6 +419,8 @@ class FederationServer(FederationBase):
                         min_depth=min_depth,
                     )
 
+                    # We want to sort these by depth so we process them and
+                    # tell clients about them in order.
                     missing_events.sort(key=lambda x: x.depth)
 
                     for e in missing_events:
