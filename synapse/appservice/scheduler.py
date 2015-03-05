@@ -49,6 +49,7 @@ UP & quit           +---------- YES                      SUCCESS
     |               |                                        |
     NO <--- Have more txns? <------ Mark txn success & nuke -+
                                       from db; incr AS pos.
+                                         Reset backoff.
 
 This is all tied together by the AppServiceScheduler which DIs the required
 components.
@@ -77,7 +78,7 @@ class AppServiceScheduler(object):
     def store_event(self, event):  # event_pool
         self.event_pool.append(event)
 
-    def get_events(self):  # event_pool
+    def drain_events(self):  # event_pool
         return self.event_pool
 
 
@@ -90,11 +91,11 @@ class AppServiceTransaction(object):
         self.events = events
 
     def send(self, as_api):
-        # sends this transaction using this as_api
+        # TODO sends this transaction using this as_api
         pass
 
     def complete(self, store):
-        # increment txn id on AS and nuke txn contents from db
+        # TODO increment txn id on AS and nuke txn contents from db
         pass
 
 
@@ -106,14 +107,14 @@ class _EventSorter(object):
         self.services = services
 
     def start_polling(self):
-        events = self.event_pool.get_events()
+        events = self.event_pool.drain_events()
         if events:
             self._process(events)
-        # repoll later on
+        # TODO repoll later on
 
     def _process(self, events):
-        # sort events
-        # f.e. (AS, events) => poke transaction controller
+        # TODO sort events
+        # TODO fe (AS, events) => poke transaction controller on_receive_events
         pass
 
 
@@ -153,6 +154,7 @@ class _Recoverer(object):
         if txn:
             if txn.send(self.as_api):
                 txn.complete(self.store)
+                self.backoff_counter = 1
             else:
                 self.backoff_counter += 1
                 self.recover(self.service)
