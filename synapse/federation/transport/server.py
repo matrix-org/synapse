@@ -109,12 +109,6 @@ class TransportLayerServer(object):
             defer.returnValue(response)
         return new_handler
 
-    def rate_limit_origin(self, handler):
-        def new_handler(origin, *args, **kwargs):
-            response = yield handler(origin, *args, **kwargs)
-            defer.returnValue(response)
-        return new_handler()
-
     @log_function
     def register_received_handler(self, handler):
         """ Register a handler that will be fired when we receive data.
