@@ -43,7 +43,7 @@ class CounterMetricTestCase(unittest.TestCase):
         ])
 
     def test_vector(self):
-        counter = CounterMetric("vector", keys=["method"])
+        counter = CounterMetric("vector", labels=["method"])
 
         # Empty counter doesn't yet know what values it has
         self.assertEquals(counter.render(), [])
@@ -83,7 +83,7 @@ class CallbackMetricTestCase(unittest.TestCase):
     def test_vector(self):
         vals = dict()
 
-        metric = CallbackMetric("values", lambda: vals, keys=["type"])
+        metric = CallbackMetric("values", lambda: vals, labels=["type"])
 
         self.assertEquals(metric.render(), [])
 
@@ -115,7 +115,7 @@ class TimerMetricTestCase(unittest.TestCase):
         ])
 
     def test_vector(self):
-        metric = TimerMetric("queries", keys=["verb"])
+        metric = TimerMetric("queries", labels=["verb"])
 
         self.assertEquals(metric.render(), [])
 

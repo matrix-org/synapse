@@ -25,22 +25,22 @@ def map_concat(func, items):
 
 class BaseMetric(object):
 
-    def __init__(self, name, keys=[]):
+    def __init__(self, name, labels=[]):
         self.name = name
-        self.keys = keys # OK not to clone as we never write it
+        self.labels = labels # OK not to clone as we never write it
 
     def dimension(self):
-        return len(self.keys)
+        return len(self.labels)
 
     def is_scalar(self):
-        return not len(self.keys)
+        return not len(self.labels)
 
     def _render_key(self, values):
         if self.is_scalar():
             return ""
         # TODO: some kind of value escape
         return "{%s}" % (
-            ",".join(["%s=%s" % kv for kv in zip(self.keys, values)])
+            ",".join(["%s=%s" % kv for kv in zip(self.labels, values)])
         )
 
     def render(self):
@@ -62,7 +62,7 @@ class CounterMetric(BaseMetric):
 
     def inc(self, *values):
         if len(values) != self.dimension():
-            raise ValueError("Expected as many values to inc() as keys (%d)" %
+            raise ValueError("Expected as many values to inc() as labels (%d)" %
                 (self.dimension())
             )
 
@@ -85,8 +85,8 @@ class CallbackMetric(BaseMetric):
     it is rendered. Typically this is used to implement gauges that yield the
     size or other state of some in-memory object by actively querying it."""
 
-    def __init__(self, name, callback, keys=[]):
-        super(CallbackMetric, self).__init__(name, keys=keys)
+    def __init__(self, name, callback, labels=[]):
+        super(CallbackMetric, self).__init__(name, labels=labels)
 
         self.callback = callback
 
@@ -139,15 +139,15 @@ class CacheMetric(object):
     This metric generates standard metric name pairs, so that monitoring rules
     can easily be applied to measure hit ratio."""
 
-    def __init__(self, name, size_callback, keys=[]):
+    def __init__(self, name, size_callback, labels=[]):
         self.name = name
 
-        self.hits   = CounterMetric(name + ":hits",   keys=keys)
-        self.misses = CounterMetric(name + ":misses", keys=keys)
+        self.hits   = CounterMetric(name + ":hits",   labels=labels)
+        self.misses = CounterMetric(name + ":misses", labels=labels)
 
         self.size = CallbackMetric(name + ":size",
             callback=size_callback,
-            keys=keys,
+            labels=labels,
         )
 
     def inc_hits(self, *values):

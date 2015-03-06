@@ -71,11 +71,11 @@ class TransactionQueue(object):
 
         metrics.register_callback("pending_pdus",
             lambda: {(dest,): len(pdus[dest]) for dest in pdus.keys()},
-            keys=["dest"],
+            labels=["dest"],
         )
         metrics.register_callback("pending_edus",
             lambda: {(dest,): len(edus[dest]) for dest in edus.keys()},
-            keys=["dest"],
+            labels=["dest"],
         )
 
     def can_send_to(self, destination):
