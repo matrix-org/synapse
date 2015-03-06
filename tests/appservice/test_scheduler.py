@@ -14,7 +14,7 @@
 # limitations under the License.
 from synapse.appservice import ApplicationServiceState, AppServiceTransaction
 from synapse.appservice.scheduler import (
-    AppServiceScheduler, _EventGrouper, _TransactionController, _Recoverer
+    _EventGrouper, _TransactionController, _Recoverer
 )
 from twisted.internet import defer
 from ..utils import MockClock

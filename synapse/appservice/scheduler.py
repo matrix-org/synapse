@@ -224,5 +224,5 @@ class _Recoverer(object):
 
     @defer.inlineCallbacks
     def _get_oldest_txn(self):
-        txn = yield self.store.get_oldest_txn(self.service)
+        txn = yield self.store.get_oldest_unsent_txn(self.service)
         defer.returnValue(txn)

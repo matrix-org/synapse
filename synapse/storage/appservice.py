@@ -383,7 +383,7 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             service(ApplicationService): The service who the transaction is for.
             events(list<Event>): A list of events to put in the transaction.
         Returns:
-            ApplicationServiceTransaction: A new transaction.
+            AppServiceTransaction: A new transaction.
         """
         pass
 
@@ -397,5 +397,17 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         Returns:
             A Deferred which resolves to True if this transaction was completed
             successfully.
+        """
+        pass
+
+    def get_oldest_unsent_txn(self, service):
+        """Get the oldest transaction which has not been sent for this
+        service.
+
+        Args:
+            service(ApplicationService): The app service to get the oldest txn.
+        Returns:
+            A Deferred which resolves to an AppServiceTransaction or
+            None.
         """
         pass
