@@ -72,10 +72,6 @@ class Pusher(object):
             # let's assume you probably know about messages you sent yourself
             defer.returnValue(['dont_notify'])
 
-        if ev['type'] == 'm.room.member':
-            if ev['state_key'] != self.user_name:
-                defer.returnValue(['dont_notify'])
-
         rawrules = yield self.store.get_push_rules_for_user(self.user_name)
 
         for r in rawrules:
@@ -121,6 +117,10 @@ class Pusher(object):
                     ev, c, display_name=my_display_name,
                     room_member_count=room_member_count
                 )
+            logger.debug(
+                "Rule %s %s",
+                r['rule_id'], "matches" if matches else "doesn't match"
+            )
             # ignore rules with no actions (we have an explict 'dont_notify')
             if len(actions) == 0:
                 logger.warn(

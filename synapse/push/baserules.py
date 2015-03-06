@@ -33,7 +33,7 @@ def make_base_rules(user, kind):
     if kind == 'override':
         rules = make_base_override_rules()
     elif kind == 'underride':
-        rules = make_base_underride_rules()
+        rules = make_base_underride_rules(user)
     elif kind == 'content':
         rules = make_base_content_rules(user)
 
@@ -119,8 +119,78 @@ def make_base_override_rules():
     ]
 
 
-def make_base_underride_rules():
+def make_base_underride_rules(user):
     return [
+        {
+            'rule_id': 'global/underride/.m.rule.invite_for_me',
+            'conditions': [
+                {
+                    'kind': 'event_match',
+                    'key': 'type',
+                    'pattern': 'm.room.member',
+                },
+                {
+                    'kind': 'event_match',
+                    'key': 'content.membership',
+                    'pattern': 'invite',
+                },
+                {
+                    'kind': 'event_match',
+                    'key': 'state_key',
+                    'pattern': user.to_string(),
+                },
+            ],
+            'actions': [
+                'notify',
+                {
+                    'set_tweak': 'sound',
+                    'value': 'default'
+                }
+            ]
+        },
+        {
+            'rule_id': 'global/underride/.m.rule.member_event',
+            'conditions': [
+                {
+                    'kind': 'event_match',
+                    'key': 'type',
+                    'pattern': 'm.room.member',
+                }
+            ],
+            'actions': [
+                'notify',
+            ]
+        },
+        {
+            'rule_id': 'global/underride/.m.rule.message',
+            'conditions': [
+                {
+                    'kind': 'event_match',
+                    'key': 'type',
+                    'pattern': 'm.room.message',
+                }
+            ],
+            'actions': [
+                'notify',
+            ]
+        },
+        {
+            'rule_id': 'global/underride/.m.rule.call',
+            'conditions': [
+                {
+                    'kind': 'event_match',
+                    'key': 'type',
+                    'pattern': 'm.call.invite',
+                }
+            ],
+            'actions': [
+                'notify',
+                {
+                    'set_tweak': 'sound',
+                    'value': 'ring'
+                }
+            ]
+        },
         {
             'rule_id': 'global/underride/.m.rule.fallback',
             'conditions': [
