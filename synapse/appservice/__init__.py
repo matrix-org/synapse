@@ -79,13 +79,13 @@ class ApplicationService(object):
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
     def __init__(self, token, url=None, namespaces=None, hs_token=None,
-                 sender=None, txn_id=None):
+                 sender=None, id=None):
         self.token = token
         self.url = url
         self.hs_token = hs_token
         self.sender = sender
         self.namespaces = self._check_namespaces(namespaces)
-        self.txn_id = txn_id
+        self.id = id
 
     def _check_namespaces(self, namespaces):
         # Sanity check that it is of the form:

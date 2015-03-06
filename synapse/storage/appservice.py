@@ -302,6 +302,7 @@ class ApplicationServiceStore(SQLBaseStore):
             if as_token not in services:
                 # add the service
                 services[as_token] = {
+                    "id": res["as_id"],
                     "url": res["url"],
                     "token": as_token,
                     "hs_token": res["hs_token"],
@@ -326,7 +327,6 @@ class ApplicationServiceStore(SQLBaseStore):
             except JSONDecodeError:
                 logger.error("Bad regex object '%s'", res["regex"])
 
-        # TODO get last successful txn id f.e. service
         for service in services.values():
             logger.info("Found application service: %s", service)
             self.services_cache.append(ApplicationService(
@@ -334,7 +334,8 @@ class ApplicationServiceStore(SQLBaseStore):
                 url=service["url"],
                 namespaces=service["namespaces"],
                 hs_token=service["hs_token"],
-                sender=service["sender"]
+                sender=service["sender"],
+                id=service["id"]
             ))
 
 
