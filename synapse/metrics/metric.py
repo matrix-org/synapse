@@ -73,9 +73,6 @@ class CounterMetric(BaseMetric):
         else:
             self.counts[values] += 1
 
-    def fetch(self):
-        return dict(self.counts)
-
     def render_item(self, k):
         return ["%s%s %d" % (self.name, self._render_key(k), self.counts[k])]
 
