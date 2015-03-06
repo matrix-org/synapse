@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 from OpenSSL import crypto
 import subprocess
@@ -28,9 +28,16 @@ class TlsConfig(Config):
         self.tls_certificate = self.read_tls_certificate(
             args.tls_certificate_path
         )
-        self.tls_private_key = self.read_tls_private_key(
-            args.tls_private_key_path
-        )
+
+        self.no_tls = args.no_tls
+
+        if self.no_tls:
+            self.tls_private_key = None
+        else:
+            self.tls_private_key = self.read_tls_private_key(
+                args.tls_private_key_path
+            )
+
         self.tls_dh_params_path = self.check_file(
             args.tls_dh_params_path, "tls_dh_params"
         )
@@ -45,6 +52,8 @@ class TlsConfig(Config):
                                help="PEM encoded private key for TLS")
         tls_group.add_argument("--tls-dh-params-path",
                                help="PEM dh parameters for ephemeral keys")
+        tls_group.add_argument("--no-tls", action='store_true',
+                               help="Don't bind to the https port.")
 
     def read_tls_certificate(self, cert_path):
         cert_pem = self.read_file(cert_path, "tls_certificate")
