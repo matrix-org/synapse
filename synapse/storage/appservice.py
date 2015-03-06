@@ -385,6 +385,8 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         Returns:
             AppServiceTransaction: A new transaction.
         """
+        # TODO: work out txn id (highest txn id for this service += 1)
+        # TODO: Within same db transaction, Insert new txn into txn table
         pass
 
     def complete_appservice_txn(self, txn_id, service):
@@ -398,6 +400,8 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             A Deferred which resolves to True if this transaction was completed
             successfully.
         """
+        # TODO: Set current txn_id for AS to 'txn_id'
+        # TODO: Delete txn contents
         pass
 
     def get_oldest_unsent_txn(self, service):
@@ -410,4 +414,6 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             A Deferred which resolves to an AppServiceTransaction or
             None.
         """
+        # TODO: Monotonically increasing txn ids, so just select the smallest
+        # one in the txns table (we delete them when they are sent)
         pass
