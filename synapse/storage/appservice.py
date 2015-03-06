@@ -336,3 +336,31 @@ class ApplicationServiceStore(SQLBaseStore):
                 hs_token=service["hs_token"],
                 sender=service["sender"]
             ))
+
+
+class ApplicationServiceTransactionStore(SQLBaseStore):
+
+    def __init__(self, hs):
+        super(ApplicationServiceTransactionStore, self).__init__(hs)
+
+    def get_failing_appservices(self):
+        """Get a list of application services which are down.
+
+        Returns:
+            A Deferred which resolves to a list of ApplicationServices, which
+            may be empty.
+        """
+        pass
+
+    def complete_appservice_txn(self, txn_id, service):
+        """Completes an application service transaction.
+
+        Args:
+            txn_id(str): The transaction ID being completed.
+            service(ApplicationService): The application service which was sent
+            this transaction.
+        Returns:
+            A Deferred which resolves to True if this transaction was completed
+            successfully.
+        """
+        pass
