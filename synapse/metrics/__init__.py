@@ -41,7 +41,12 @@ class Metrics(object):
         self.name_prefix = name
 
     def _register(self, metric_class, name, *args, **kwargs):
-        full_name = "%s.%s" % (self.name_prefix, name)
+        if "_" in name:
+            raise ValueError("Metric names %s is invalid as it cannot contain an underscore"
+                % (name)
+            )
+
+        full_name = "%s_%s" % (self.name_prefix, name)
 
         metric = metric_class(full_name, *args, **kwargs)
 
@@ -78,10 +83,13 @@ class Metrics(object):
         return wrapped
 
 
-def get_metrics_for(name):
+def get_metrics_for(pkg_name):
     """ Returns a Metrics instance for conveniently creating metrics
     namespaced with the given name prefix. """
-    return Metrics(name)
+
+    # Convert a "package.name" to "package_name" because Prometheus doesn't
+    # let us use . in metric names
+    return Metrics(pkg_name.replace(".", "_"))
 
 
 def render_all():

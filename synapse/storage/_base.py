@@ -40,7 +40,14 @@ metrics = synapse.metrics.get_metrics_for("synapse.storage")
 
 sql_query_timer = metrics.register_timer("queries", labels=["verb"])
 sql_txn_timer = metrics.register_timer("transactions", labels=["desc"])
-sql_getevents_timer = metrics.register_timer("get_events", labels=["desc"])
+sql_getevents_timer = metrics.register_timer("getEvents", labels=["desc"])
+
+caches_by_name = {}
+cache_counter = metrics.register_cache(
+    "cache",
+    lambda: {(name,): len(caches_by_name[name]) for name in caches_by_name.keys()},
+    labels=["name"],
+)
 
 
 # TODO(paul):
@@ -62,8 +69,9 @@ def cached(max_entries=1000):
     """
     def wrap(orig):
         cache = OrderedDict()
+        name = orig.__name__
 
-        counter = metrics.register_cache(orig.__name__, lambda: len(cache))
+        caches_by_name[name] = cache
 
         def prefill(key, value):
             while len(cache) > max_entries:
@@ -74,10 +82,10 @@ def cached(max_entries=1000):
         @defer.inlineCallbacks
         def wrapped(self, key):
             if key in cache:
-                counter.inc_hits()
+                cache_counter.inc_hits(name)
                 defer.returnValue(cache[key])
 
-            counter.inc_misses()
+            cache_counter.inc_misses(name)
             ret = yield orig(self, key)
             prefill(key, ret)
             defer.returnValue(ret)
@@ -195,7 +203,7 @@ class SQLBaseStore(object):
 
         self._get_event_cache = LruCache(hs.config.event_cache_size)
         self._get_event_cache_counter = metrics.register_cache(
-            "get_event_cache",
+            "getEventCache",
             size_callback=lambda: len(self._get_event_cache),
         )
 

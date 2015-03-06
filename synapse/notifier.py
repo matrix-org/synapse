@@ -122,7 +122,7 @@ class Notifier(object):
                 all_listeners |= x
 
             return len(all_listeners)
-        metrics.register_callback("all_listeners", count_listeners)
+        metrics.register_callback("listeners", count_listeners)
 
         metrics.register_callback("rooms",
             lambda: count(bool, self.room_to_listeners.values())

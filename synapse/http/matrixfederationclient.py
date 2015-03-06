@@ -43,10 +43,10 @@ logger = logging.getLogger(__name__)
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
-outgoing_requests_counter = metrics.register_counter("outgoing_requests",
+outgoing_requests_counter = metrics.register_counter("requests",
     labels=["method"],
 )
-incoming_responses_counter = metrics.register_counter("incoming_responses",
+incoming_responses_counter = metrics.register_counter("responses",
     labels=["method","code"],
 )
 

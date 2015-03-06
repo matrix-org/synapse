@@ -136,7 +136,7 @@ class PresenceHandler(BaseHandler):
         self._user_cachemap = {}
         self._user_cachemap_latest_serial = 0
 
-        metrics.register_callback("user_cachemap:size",
+        metrics.register_callback("userCachemap:size",
             lambda: len(self._user_cachemap)
         )
 

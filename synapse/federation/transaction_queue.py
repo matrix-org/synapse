@@ -69,11 +69,11 @@ class TransactionQueue(object):
         # HACK to get unique tx id
         self._next_txn_id = int(self._clock.time_msec())
 
-        metrics.register_callback("pending_pdus",
+        metrics.register_callback("pendingPdus",
             lambda: {(dest,): len(pdus[dest]) for dest in pdus.keys()},
             labels=["dest"],
         )
-        metrics.register_callback("pending_edus",
+        metrics.register_callback("pendingEdus",
             lambda: {(dest,): len(edus[dest]) for dest in edus.keys()},
             labels=["dest"],
         )
