@@ -374,7 +374,11 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         Returns:
             A Deferred which resolves to True if the state was set successfully.
         """
-        pass
+        return self._simple_upsert(
+            "application_services_state",
+            dict(as_id=service.id),
+            dict(state=state)
+        )
 
     def create_appservice_txn(self, service, events):
         """Atomically creates a new transaction for this application service
