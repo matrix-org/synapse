@@ -174,7 +174,7 @@ class _Recoverer(object):
         self.backoff_counter = 1
 
     def recover(self):
-        self.clock.call_later(2000 ** self.backoff_counter, self.retry)
+        self.clock.call_later(1000 * (2 ** self.backoff_counter), self.retry)
 
     @defer.inlineCallbacks
     def retry(self):
@@ -184,7 +184,7 @@ class _Recoverer(object):
                 txn.complete(self.store)
                 # reset the backoff counter and retry immediately
                 self.backoff_counter = 1
-                self.retry()
+                yield self.retry()
             else:
                 self.backoff_counter += 1
                 self.recover()
