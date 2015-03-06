@@ -71,7 +71,27 @@ def make_base_content_rules(user):
 def make_base_override_rules():
     return [
         {
-            'rule_id': 'global/underride/.m.rule.suppress_notices',
+            'rule_id': 'global/override/.m.rule.call',
+            'conditions': [
+                {
+                    'kind': 'event_match',
+                    'key': 'type',
+                    'pattern': 'm.call.invite',
+                }
+            ],
+            'actions': [
+                'notify',
+                {
+                    'set_tweak': 'sound',
+                    'value': 'ring'
+                }, {
+                    'set_tweak': 'highlight',
+                    'value': 'false'
+                }
+            ]
+        },
+        {
+            'rule_id': 'global/override/.m.rule.suppress_notices',
             'conditions': [
                 {
                     'kind': 'event_match',
@@ -181,26 +201,6 @@ def make_base_underride_rules(user):
             ],
             'actions': [
                 'notify', {
-                    'set_tweak': 'highlight',
-                    'value': 'false'
-                }
-            ]
-        },
-        {
-            'rule_id': 'global/underride/.m.rule.call',
-            'conditions': [
-                {
-                    'kind': 'event_match',
-                    'key': 'type',
-                    'pattern': 'm.call.invite',
-                }
-            ],
-            'actions': [
-                'notify',
-                {
-                    'set_tweak': 'sound',
-                    'value': 'ring'
-                }, {
                     'set_tweak': 'highlight',
                     'value': 'false'
                 }
