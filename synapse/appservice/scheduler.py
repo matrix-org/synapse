@@ -214,7 +214,9 @@ class _Recoverer(object):
                 self.backoff_counter = 1
                 yield self.retry()
             else:
-                self.backoff_counter += 1
+                # cap the backoff to be around 18h => (2^16) = 65536 secs
+                if self.backoff_counter < 16:
+                    self.backoff_counter += 1
                 self.recover()
         else:
             self._set_service_recovered()
