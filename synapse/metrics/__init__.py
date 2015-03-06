@@ -63,10 +63,17 @@ class Metrics(object):
     def counted(self, func):
         """ A method decorator that registers a counter, to count invocations
         of this method. """
-        counter = self.register_counter(func.__name__)
+        if not hasattr(self, "method_counter"):
+            self.method_counter = self.register_counter(
+                "calls",
+                labels=["method"]
+            )
+
+        counter = self.method_counter
+        name = func.__name__
 
         def wrapped(*args, **kwargs):
-            counter.inc()
+            counter.inc(name)
             return func(*args, **kwargs)
         return wrapped
 
