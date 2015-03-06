@@ -60,6 +60,8 @@ def make_base_content_rules(user):
                 {
                     'set_tweak': 'sound',
                     'value': 'default',
+                }, {
+                    'set_tweak': 'highlight'
                 }
             ]
         },
@@ -80,6 +82,8 @@ def make_base_override_rules():
                 {
                     'set_tweak': 'sound',
                     'value': 'default'
+                }, {
+                    'set_tweak': 'highlight'
                 }
             ]
         },
