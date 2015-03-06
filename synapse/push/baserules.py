@@ -113,6 +113,9 @@ def make_base_override_rules():
                 {
                     'set_tweak': 'sound',
                     'value': 'default'
+                }, {
+                    'set_tweak': 'highlight',
+                    'value': 'false'
                 }
             ]
         }
@@ -145,6 +148,9 @@ def make_base_underride_rules(user):
                 {
                     'set_tweak': 'sound',
                     'value': 'default'
+                }, {
+                    'set_tweak': 'highlight',
+                    'value': 'false'
                 }
             ]
         },
@@ -158,7 +164,10 @@ def make_base_underride_rules(user):
                 }
             ],
             'actions': [
-                'notify',
+                'notify', {
+                    'set_tweak': 'highlight',
+                    'value': 'false'
+                }
             ]
         },
         {
@@ -171,7 +180,10 @@ def make_base_underride_rules(user):
                 }
             ],
             'actions': [
-                'notify',
+                'notify', {
+                    'set_tweak': 'highlight',
+                    'value': 'false'
+                }
             ]
         },
         {
@@ -188,6 +200,9 @@ def make_base_underride_rules(user):
                 {
                     'set_tweak': 'sound',
                     'value': 'ring'
+                }, {
+                    'set_tweak': 'highlight',
+                    'value': 'false'
                 }
             ]
         }
