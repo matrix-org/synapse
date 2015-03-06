@@ -155,18 +155,18 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
 
         def take_txn(*args, **kwargs):
             return defer.succeed(txns.pop(0))
-        self.store.get_oldest_txn = Mock(side_effect=take_txn)
+        self.store.get_oldest_unsent_txn = Mock(side_effect=take_txn)
 
         self.recoverer.recover()
         # shouldn't have called anything prior to waiting for exp backoff
-        self.assertEquals(0, self.store.get_oldest_txn.call_count)
+        self.assertEquals(0, self.store.get_oldest_unsent_txn.call_count)
         txn.send = Mock(return_value=True)
         # wait for exp backoff
         self.clock.advance_time(2000)
         self.assertEquals(1, txn.send.call_count)
         self.assertEquals(1, txn.complete.call_count)
         # 2 because it needs to get None to know there are no more txns
-        self.assertEquals(2, self.store.get_oldest_txn.call_count)
+        self.assertEquals(2, self.store.get_oldest_unsent_txn.call_count)
         self.callback.assert_called_once_with(self.recoverer)
         self.assertEquals(self.recoverer.service, self.service)
 
@@ -180,10 +180,10 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
                 return defer.succeed(txns.pop(0))
             else:
                 return defer.succeed(txn)
-        self.store.get_oldest_txn = Mock(side_effect=take_txn)
+        self.store.get_oldest_unsent_txn = Mock(side_effect=take_txn)
 
         self.recoverer.recover()
-        self.assertEquals(0, self.store.get_oldest_txn.call_count)
+        self.assertEquals(0, self.store.get_oldest_unsent_txn.call_count)
         txn.send = Mock(return_value=False)
         self.clock.advance_time(2000)
         self.assertEquals(1, txn.send.call_count)
