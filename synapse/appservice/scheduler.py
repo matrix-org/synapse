@@ -49,7 +49,11 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 
+from synapse.appservice import ApplicationServiceState
 from twisted.internet import defer
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AppServiceScheduler(object):
@@ -162,21 +166,36 @@ class _TransactionController(object):
                 if txn.send(self.as_api):
                     txn.complete(self.store)
                 else:
-                    # TODO mark AS as down
                     self._start_recoverer(service)
         self.clock.call_later(1000, self.start_polling)
 
-    def on_recovered(self, service):
-        # TODO mark AS as UP
-        pass
+    @defer.inlineCallbacks
+    def on_recovered(self, recoverer):
+        applied_state = yield self.store.set_appservice_state(
+            recoverer.service,
+            ApplicationServiceState.UP
+        )
+        if not applied_state:
+            logger.error("Failed to apply appservice state UP to service %s",
+                         recoverer.service)
 
     def add_recoverers(self, recoverers):
         for r in recoverers:
             self.recoverers.append(r)
 
+    @defer.inlineCallbacks
     def _start_recoverer(self, service):
-        recoverer = self.recoverer_fn(service, self.on_recovered)
-        recoverer.recover()
+        applied_state = yield self.store.set_appservice_state(
+            service,
+            ApplicationServiceState.DOWN
+        )
+        if applied_state:
+            recoverer = self.recoverer_fn(service, self.on_recovered)
+            self.add_recoverers([recoverer])
+            recoverer.recover()
+        else:
+            logger.error("Failed to apply appservice state DOWN to service %s",
+                         service)
 
     def _is_service_up(self, service):
         pass
@@ -193,7 +212,9 @@ class _Recoverer(object):
     @staticmethod
     @defer.inlineCallbacks
     def start(clock, store, as_api, callback):
-        services = yield store.get_failing_appservices()
+        services = yield store.get_appservices_by_state(
+            ApplicationServiceState.DOWN
+        )
         recoverers = [
             _Recoverer(clock, store, as_api, s, callback) for s in services
         ]
@@ -228,7 +249,7 @@ class _Recoverer(object):
             self._set_service_recovered()
 
     def _set_service_recovered(self):
-        self.callback(self.service)
+        self.callback(self)
 
     @defer.inlineCallbacks
     def _get_oldest_txn(self):

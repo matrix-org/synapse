@@ -57,7 +57,8 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.assertEquals(1, txn.complete.call_count)
         # 2 because it needs to get None to know there are no more txns
         self.assertEquals(2, self.store.get_oldest_txn.call_count)
-        self.assertEquals(1, self.callback.call_count)
+        self.callback.assert_called_once_with(self.recoverer)
+        self.assertEquals(self.recoverer.service, self.service)
 
     def test_recover_retry_txn(self):
         txn = Mock()
@@ -91,7 +92,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.clock.advance_time(16000)
         self.assertEquals(1, txn.send.call_count)  # new mock reset call count
         self.assertEquals(1, txn.complete.call_count)
-        self.assertEquals(1, self.callback.call_count)
+        self.callback.assert_called_once_with(self.recoverer)
 
 class ApplicationServiceSchedulerEventGrouperTestCase(unittest.TestCase):
 

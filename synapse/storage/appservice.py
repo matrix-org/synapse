@@ -343,12 +343,25 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
     def __init__(self, hs):
         super(ApplicationServiceTransactionStore, self).__init__(hs)
 
-    def get_failing_appservices(self):
-        """Get a list of application services which are down.
+    def get_appservices_by_state(self, state):
+        """Get a list of application services based on their state.
 
+        Args:
+            state(ApplicationServiceState): The state to filter on.
         Returns:
             A Deferred which resolves to a list of ApplicationServices, which
             may be empty.
+        """
+        pass
+
+    def set_appservice_state(self, service, state):
+        """Set the application service state.
+
+        Args:
+            service(ApplicationService): The service whose state to set.
+            state(ApplicationServiceState): The connectivity state to apply.
+        Returns:
+            A Deferred which resolves to True if the state was set successfully.
         """
         pass
 

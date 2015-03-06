@@ -20,6 +20,11 @@ import re
 logger = logging.getLogger(__name__)
 
 
+class ApplicationServiceState(object):
+    DOWN = "down"
+    UP = "up"
+
+
 class ApplicationService(object):
     """Defines an application service. This definition is mostly what is
     provided to the /register AS API.
