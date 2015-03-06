@@ -26,20 +26,20 @@ class CounterMetricTestCase(unittest.TestCase):
         counter = CounterMetric("scalar")
 
         self.assertEquals(counter.render(), [
-            "scalar 0",
+            'scalar 0',
         ])
 
         counter.inc()
 
         self.assertEquals(counter.render(), [
-            "scalar 1",
+            'scalar 1',
         ])
 
         counter.inc()
         counter.inc()
 
         self.assertEquals(counter.render(), [
-            "scalar 3"
+            'scalar 3'
         ])
 
     def test_vector(self):
@@ -51,15 +51,15 @@ class CounterMetricTestCase(unittest.TestCase):
         counter.inc("GET")
 
         self.assertEquals(counter.render(), [
-            "vector{method=GET} 1",
+            'vector{method="GET"} 1',
         ])
 
         counter.inc("GET")
         counter.inc("PUT")
 
         self.assertEquals(counter.render(), [
-            "vector{method=GET} 2",
-            "vector{method=PUT} 1",
+            'vector{method="GET"} 2',
+            'vector{method="PUT"} 1',
         ])
 
 
@@ -71,13 +71,13 @@ class CallbackMetricTestCase(unittest.TestCase):
         metric = CallbackMetric("size", lambda: len(d))
 
         self.assertEquals(metric.render(), [
-            "size 0",
+            'size 0',
         ])
 
         d["key"] = "value"
 
         self.assertEquals(metric.render(), [
-            "size 1",
+            'size 1',
         ])
 
     def test_vector(self):
@@ -92,8 +92,8 @@ class CallbackMetricTestCase(unittest.TestCase):
         vals[("bar",)] = 2
 
         self.assertEquals(metric.render(), [
-            "values{type=bar} 2",
-            "values{type=foo} 1",
+            'values{type="bar"} 2',
+            'values{type="foo"} 1',
         ])
 
 
@@ -103,15 +103,15 @@ class TimerMetricTestCase(unittest.TestCase):
         metric = TimerMetric("thing")
 
         self.assertEquals(metric.render(), [
-            "thing:count 0",
-            "thing:msec 0",
+            'thing:count 0',
+            'thing:msec 0',
         ])
 
         metric.inc_time(500)
 
         self.assertEquals(metric.render(), [
-            "thing:count 1",
-            "thing:msec 500",
+            'thing:count 1',
+            'thing:msec 500',
         ])
 
     def test_vector(self):
@@ -124,10 +124,10 @@ class TimerMetricTestCase(unittest.TestCase):
         metric.inc_time(800, "INSERT")
 
         self.assertEquals(metric.render(), [
-            "queries:count{verb=INSERT} 1",
-            "queries:msec{verb=INSERT} 800",
-            "queries:count{verb=SELECT} 2",
-            "queries:msec{verb=SELECT} 500",
+            'queries:count{verb="INSERT"} 1',
+            'queries:msec{verb="INSERT"} 800',
+            'queries:count{verb="SELECT"} 2',
+            'queries:msec{verb="SELECT"} 500',
         ])
 
 
@@ -139,24 +139,24 @@ class CacheMetricTestCase(unittest.TestCase):
         metric = CacheMetric("cache", lambda: len(d))
 
         self.assertEquals(metric.render(), [
-            "cache:hits 0",
-            "cache:misses 0",
-            "cache:size 0",
+            'cache:hits 0',
+            'cache:misses 0',
+            'cache:size 0',
         ])
 
         metric.inc_misses()
         d["key"] = "value"
 
         self.assertEquals(metric.render(), [
-            "cache:hits 0",
-            "cache:misses 1",
-            "cache:size 1",
+            'cache:hits 0',
+            'cache:misses 1',
+            'cache:size 1',
         ])
 
         metric.inc_hits()
 
         self.assertEquals(metric.render(), [
-            "cache:hits 1",
-            "cache:misses 1",
-            "cache:size 1",
+            'cache:hits 1',
+            'cache:misses 1',
+            'cache:size 1',
         ])

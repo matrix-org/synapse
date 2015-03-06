@@ -35,12 +35,16 @@ class BaseMetric(object):
     def is_scalar(self):
         return not len(self.labels)
 
+    def _render_labelvalue(self, value):
+        # TODO: some kind of value escape
+        return '"%s"' % (value)
+
     def _render_key(self, values):
         if self.is_scalar():
             return ""
-        # TODO: some kind of value escape
         return "{%s}" % (
-            ",".join(["%s=%s" % kv for kv in zip(self.labels, values)])
+            ",".join(["%s=%s" % (k, self._render_labelvalue(v))
+                      for k, v in zip(self.labels, values)])
         )
 
     def render(self):
