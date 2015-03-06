@@ -12,14 +12,124 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from synapse.appservice import ApplicationServiceState, AppServiceTransaction
 from synapse.appservice.scheduler import (
-    AppServiceScheduler, AppServiceTransaction, _EventGrouper,
-    _TransactionController, _Recoverer
+    AppServiceScheduler, _EventGrouper, _TransactionController, _Recoverer
 )
 from twisted.internet import defer
 from ..utils import MockClock
 from mock import Mock
 from tests import unittest
+
+
+class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.clock = MockClock()
+        self.store = Mock()
+        self.as_api = Mock()
+        self.event_grouper = Mock()
+        self.recoverer = Mock()
+        self.recoverer_fn = Mock(return_value=self.recoverer)
+        self.txnctrl = _TransactionController(
+            clock=self.clock, store=self.store, as_api=self.as_api,
+            event_grouper=self.event_grouper, recoverer_fn=self.recoverer_fn
+        )
+
+    def test_poll_single_group_service_up(self):
+        # Test: The AS is up and the txn is successfully sent.
+        service = Mock()
+        events = [Mock(), Mock()]
+        groups = {}
+        groups[service] = events
+        txn_id = "foobar"
+        txn = Mock(id=txn_id, service=service, events=events)
+
+        # mock methods
+        self.event_grouper.drain_groups = Mock(return_value=groups)
+        self.store.get_appservice_state = Mock(
+            return_value=defer.succeed(ApplicationServiceState.UP)
+        )
+        txn.send = Mock(return_value=defer.succeed(True))
+        self.store.create_appservice_txn = Mock(
+            return_value=defer.succeed(txn)
+        )
+
+        # actual call
+        self.txnctrl.start_polling()
+
+        self.store.create_appservice_txn.assert_called_once_with(
+            service=service, events=events  # txn made and saved
+        )
+        self.assertEquals(0, len(self.txnctrl.recoverers))  # no recoverer made
+        txn.complete.assert_called_once_with(self.store)  # txn completed
+
+    def test_poll_single_group_service_down(self):
+        # Test: The AS is down so it shouldn't push; Recoverers will do it.
+        # It should still make a transaction though.
+        service = Mock()
+        events = [Mock(), Mock()]
+        groups = {}
+        groups[service] = events
+
+        self.event_grouper.drain_groups = Mock(return_value=groups)
+        txn = Mock(id="idhere", service=service, events=events)
+        self.store.get_appservice_state = Mock(
+            return_value=defer.succeed(ApplicationServiceState.DOWN)
+        )
+        self.store.create_appservice_txn = Mock(
+            return_value=defer.succeed(txn)
+        )
+
+        # actual call
+        self.txnctrl.start_polling()
+
+        self.store.create_appservice_txn.assert_called_once_with(
+            service=service, events=events  # txn made and saved
+        )
+        self.assertEquals(0, txn.send.call_count)  # txn not sent though
+        self.assertEquals(0, txn.complete.call_count)  # or completed
+
+    def test_poll_single_group_service_up(self):
+        # Test: The AS is up and the txn is not sent. A Recoverer is made and
+        # started.
+        service = Mock()
+        events = [Mock(), Mock()]
+        groups = {}
+        groups[service] = events
+        txn_id = "foobar"
+        txn = Mock(id=txn_id, service=service, events=events)
+
+        # mock methods
+        self.event_grouper.drain_groups = Mock(return_value=groups)
+        self.store.get_appservice_state = Mock(
+            return_value=defer.succeed(ApplicationServiceState.UP)
+        )
+        self.store.set_appservice_state = Mock(return_value=defer.succeed(True))
+        txn.send = Mock(return_value=defer.succeed(False))  # fails to send
+        self.store.create_appservice_txn = Mock(
+            return_value=defer.succeed(txn)
+        )
+
+        # actual call
+        self.txnctrl.start_polling()
+
+        self.store.create_appservice_txn.assert_called_once_with(
+            service=service, events=events
+        )
+        self.assertEquals(1, self.recoverer_fn.call_count)  # recoverer made
+        self.assertEquals(1, self.recoverer.recover.call_count)  # and invoked
+        self.assertEquals(1, len(self.txnctrl.recoverers))  # and stored
+        self.assertEquals(0, txn.complete.call_count)  # txn not completed
+        self.store.set_appservice_state.assert_called_once_with(
+            service, ApplicationServiceState.DOWN  # service marked as down
+        )
+
+    def test_poll_no_groups(self):
+        self.as_api.push_bulk = Mock()
+        self.event_grouper.drain_groups = Mock(return_value={})
+        self.txnctrl.start_polling()
+        self.assertEquals(0, self.as_api.push_bulk.call_count)
 
 
 class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
@@ -93,6 +203,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.assertEquals(1, txn.send.call_count)  # new mock reset call count
         self.assertEquals(1, txn.complete.call_count)
         self.callback.assert_called_once_with(self.recoverer)
+
 
 class ApplicationServiceSchedulerEventGrouperTestCase(unittest.TestCase):
 

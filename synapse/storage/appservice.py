@@ -354,6 +354,16 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         """
         pass
 
+    def get_appservice_state(self, service):
+        """Get the application service state.
+
+        Args:
+            service(ApplicationService): The service whose state to set.
+        Returns:
+            A Deferred which resolves to ApplicationServiceState.
+        """
+        pass
+
     def set_appservice_state(self, service, state):
         """Set the application service state.
 
@@ -362,6 +372,18 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             state(ApplicationServiceState): The connectivity state to apply.
         Returns:
             A Deferred which resolves to True if the state was set successfully.
+        """
+        pass
+
+    def create_appservice_txn(self, service, events):
+        """Atomically creates a new transaction for this application service
+        with the given list of events.
+
+        Args:
+            service(ApplicationService): The service who the transaction is for.
+            events(list<Event>): A list of events to put in the transaction.
+        Returns:
+            ApplicationServiceTransaction: A new transaction.
         """
         pass
 

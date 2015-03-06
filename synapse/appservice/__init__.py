@@ -25,6 +25,45 @@ class ApplicationServiceState(object):
     UP = "up"
 
 
+class AppServiceTransaction(object):
+    """Represents an application service transaction."""
+
+    def __init__(self, service, id, events):
+        self.service = service
+        self.id = id
+        self.events = events
+
+    def send(self, as_api):
+        """Sends this transaction using the provided AS API interface.
+
+        Args:
+            as_api(ApplicationServiceApi): The API to use to send.
+        Returns:
+            A Deferred which resolves to True if the transaction was sent.
+        """
+        return as_api.push_bulk(
+            service=self.service,
+            events=self.events,
+            txn_id=self.id
+        )
+
+    def complete(self, store):
+        """Completes this transaction as successful.
+
+        Marks this transaction ID on the application service and removes the
+        transaction contents from the database.
+
+        Args:
+            store: The database store to operate on.
+        Returns:
+            A Deferred which resolves to True if the transaction was completed.
+        """
+        return store.complete_appservice_txn(
+            service=self.service,
+            txn_id=self.id
+        )
+
+
 class ApplicationService(object):
     """Defines an application service. This definition is mostly what is
     provided to the /register AS API.
