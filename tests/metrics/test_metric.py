@@ -124,10 +124,10 @@ class TimerMetricTestCase(unittest.TestCase):
         metric.inc_time(800, "INSERT")
 
         self.assertEquals(metric.render(), [
-            "queries{verb=INSERT}:count 1",
-            "queries{verb=INSERT}:msec 800",
-            "queries{verb=SELECT}:count 2",
-            "queries{verb=SELECT}:msec 500",
+            "queries:count{verb=INSERT} 1",
+            "queries:msec{verb=INSERT} 800",
+            "queries:count{verb=SELECT} 2",
+            "queries:msec{verb=SELECT} 500",
         ])
 
 

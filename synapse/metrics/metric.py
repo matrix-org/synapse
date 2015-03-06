@@ -127,9 +127,8 @@ class TimerMetric(CounterMetric):
     def render_item(self, k):
         keystr = self._render_key(k)
 
-        return ["%s%s:count %d" % (self.name, keystr, self.counts[k]),
-                "%s%s:msec %d" % (self.name, keystr, self.times[k])]
-
+        return ["%s:count%s %d" % (self.name, keystr, self.counts[k]),
+                "%s:msec%s %d" % (self.name, keystr, self.times[k])]
 
 
 class CacheMetric(object):
