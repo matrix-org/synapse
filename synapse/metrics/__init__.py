@@ -105,6 +105,8 @@ def render_all():
             strs += ["# FAILED to render %s" % name]
             logger.exception("Failed to render %s metric", name)
 
+    strs.append("") # to generate a final CRLF
+
     return "\n".join(strs)
 
 
