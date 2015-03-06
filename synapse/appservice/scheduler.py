@@ -171,6 +171,10 @@ class _TransactionController(object):
 
     @defer.inlineCallbacks
     def on_recovered(self, recoverer):
+        self.recoverers.remove(recoverer)
+        logger.info("Successfully recovered application service: %s",
+                    recoverer.service)
+        logger.info("Active recoverers: %s", len(self.recoverers))
         applied_state = yield self.store.set_appservice_state(
             recoverer.service,
             ApplicationServiceState.UP
@@ -182,6 +186,8 @@ class _TransactionController(object):
     def add_recoverers(self, recoverers):
         for r in recoverers:
             self.recoverers.append(r)
+        if len(recoverers) > 0:
+            logger.info("Active recoverers: %s", len(self.recoverers))
 
     @defer.inlineCallbacks
     def _start_recoverer(self, service):
@@ -190,6 +196,10 @@ class _TransactionController(object):
             ApplicationServiceState.DOWN
         )
         if applied_state:
+            logger.info(
+                "Application service falling behind. Starting recoverer. %s",
+                service
+            )
             recoverer = self.recoverer_fn(service, self.on_recovered)
             self.add_recoverers([recoverer])
             recoverer.recover()
