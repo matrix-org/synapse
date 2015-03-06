@@ -190,13 +190,5 @@ def make_base_underride_rules(user):
                     'value': 'ring'
                 }
             ]
-        },
-        {
-            'rule_id': 'global/underride/.m.rule.fallback',
-            'conditions': [
-            ],
-            'actions': [
-                'notify',
-            ]
-        },
+        }
     ]
