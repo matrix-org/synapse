@@ -49,6 +49,8 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 
+from twisted.internet import defer
+
 
 class AppServiceScheduler(object):
     """ Public facing API for this module. Does the required DI to tie the
@@ -105,11 +107,14 @@ class _EventGrouper(object):
         self.groups = {}  # dict of {service: [events]}
 
     def on_receive(self, service, event):
-        # TODO group this
-        pass
+        if service not in self.groups:
+            self.groups[service] = []
+        self.groups[service].append(event)
 
     def drain_groups(self):
-        return self.groups
+        groups = self.groups
+        self.groups = {}
+        return groups
 
 
 class _TransactionController(object):
@@ -134,7 +139,6 @@ class _TransactionController(object):
                     # TODO mark AS as down
                     self._start_recoverer(service)
         self.clock.call_later(1000, self.start_polling)
-
 
     def on_recovered(self, service):
         # TODO mark AS as UP
@@ -172,26 +176,25 @@ class _Recoverer(object):
     def recover(self):
         self.clock.call_later(2000 ** self.backoff_counter, self.retry)
 
+    @defer.inlineCallbacks
     def retry(self):
-        txn = self._get_oldest_txn()
+        txn = yield self._get_oldest_txn()
         if txn:
             if txn.send(self.as_api):
                 txn.complete(self.store)
                 # reset the backoff counter and retry immediately
                 self.backoff_counter = 1
                 self.retry()
-                return
             else:
                 self.backoff_counter += 1
                 self.recover()
-                return
         else:
             self._set_service_recovered()
 
     def _set_service_recovered(self):
         self.callback(self.service)
 
+    @defer.inlineCallbacks
     def _get_oldest_txn(self):
-        pass  # returns AppServiceTransaction
-
-
+        txn = yield self.store.get_oldest_txn(self.service)
+        defer.returnValue(txn)
