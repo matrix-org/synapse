@@ -121,7 +121,7 @@ class Pusher(object):
                     ev, c, display_name=my_display_name,
                     room_member_count=room_member_count
                 )
-            # ignore rules with no actions (we have an explict 'dont_notify'
+            # ignore rules with no actions (we have an explict 'dont_notify')
             if len(actions) == 0:
                 logger.warn(
                     "Ignoring rule id %s with no actions for user %s" %
