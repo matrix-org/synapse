@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 class PushRuleStore(SQLBaseStore):
     @defer.inlineCallbacks
-    def get_push_rules_for_user_name(self, user_name):
+    def get_push_rules_for_user(self, user_name):
         sql = (
             "SELECT "+",".join(PushRuleTable.fields)+" "
             "FROM "+PushRuleTable.table_name+" "
@@ -44,6 +44,28 @@ class PushRuleStore(SQLBaseStore):
             dicts.append(d)
 
         defer.returnValue(dicts)
+
+    @defer.inlineCallbacks
+    def get_push_rules_enabled_for_user(self, user_name):
+        results = yield self._simple_select_list(
+            PushRuleEnableTable.table_name,
+            {'user_name': user_name},
+            PushRuleEnableTable.fields
+        )
+        defer.returnValue(
+            {r['rule_id']: False if r['enabled'] == 0 else True for r in results}
+        )
+
+    @defer.inlineCallbacks
+    def get_push_rule_enabled_by_user_rule_id(self, user_name, rule_id):
+        results = yield self._simple_select_list(
+            PushRuleEnableTable.table_name,
+            {'user_name': user_name, 'rule_id': rule_id},
+            ['enabled']
+        )
+        if not results:
+            defer.returnValue(True)
+        defer.returnValue(results[0])
 
     @defer.inlineCallbacks
     def add_push_rule(self, before, after, **kwargs):
@@ -193,6 +215,20 @@ class PushRuleStore(SQLBaseStore):
             {'user_name': user_name, 'rule_id': rule_id}
         )
 
+    @defer.inlineCallbacks
+    def set_push_rule_enabled(self, user_name, rule_id, enabled):
+        if enabled:
+            yield self._simple_delete_one(
+                PushRuleEnableTable.table_name,
+                {'user_name': user_name, 'rule_id': rule_id}
+            )
+        else:
+            yield self._simple_upsert(
+                PushRuleEnableTable.table_name,
+                {'user_name': user_name, 'rule_id': rule_id},
+                {'enabled': False}
+            )
+
 
 class RuleNotFoundException(Exception):
     pass
@@ -216,3 +252,13 @@ class PushRuleTable(Table):
     ]
 
     EntryType = collections.namedtuple("PushRuleEntry", fields)
+
+
+class PushRuleEnableTable(Table):
+    table_name = "push_rules_enable"
+
+    fields = [
+        "user_name",
+        "rule_id",
+        "enabled"
+    ]

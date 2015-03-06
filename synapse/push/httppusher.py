@@ -88,6 +88,7 @@ class HttpPusher(Pusher):
         }
         if event['type'] == 'm.room.member':
             d['notification']['membership'] = event['content']['membership']
+            d['notification']['user_is_target'] = event['state_key'] == self.user_name
         if 'content' in event:
             d['notification']['content'] = event['content']
 

@@ -50,18 +50,27 @@ class Keyring(object):
             )
         try:
             verify_key = yield self.get_server_verify_key(server_name, key_ids)
-        except IOError:
+        except IOError as e:
+            logger.warn(
+                "Got IOError when downloading keys for %s: %s %s",
+                server_name, type(e).__name__, str(e.message),
+            )
             raise SynapseError(
                 502,
                 "Error downloading keys for %s" % (server_name,),
                 Codes.UNAUTHORIZED,
             )
-        except:
+        except Exception as e:
+            logger.warn(
+                "Got Exception when downloading keys for %s: %s %s",
+                server_name, type(e).__name__, str(e.message),
+            )
             raise SynapseError(
                 401,
                 "No key for %s with id %s" % (server_name, key_ids),
                 Codes.UNAUTHORIZED,
             )
+
         try:
             verify_signed_json(json_object, server_name, verify_key)
         except:

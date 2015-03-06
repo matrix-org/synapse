@@ -413,11 +413,15 @@ class FederationServer(FederationBase):
                     missing_events = yield self.get_missing_events(
                         origin,
                         pdu.room_id,
-                        earliest_events=list(latest),
-                        latest_events=[pdu.event_id],
+                        earliest_events_ids=list(latest),
+                        latest_events=[pdu],
                         limit=10,
                         min_depth=min_depth,
                     )
+
+                    # We want to sort these by depth so we process them and
+                    # tell clients about them in order.
+                    missing_events.sort(key=lambda x: x.depth)
 
                     for e in missing_events:
                         yield self._handle_new_pdu(

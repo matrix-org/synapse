@@ -1,11 +1,40 @@
-Changes in synapse vx.x.x (x-x-x)
-=================================
+Changes in synapse v0.8.0 (2015-03-06)
+======================================
+
+General:
 
 * Add support for registration fallback. This is a page hosted on the server
   which allows a user to register for an account, regardless of what client
   they are using (e.g. mobile devices).
+
+* Added new default push rules and made them configurable by clients:
+
+  * Suppress all notice messages.
+  * Notify when invited to a new room.
+  * Notify for messages that don't match any rule.
+  * Notify on incoming call.
+  * Notify if there were no matching rules.
+
+Federation:
+
+* Added per host server side rate-limiting of incoming federation requests.
+* Added a ``/get_missing_events/`` API to federation to reduce number of
+  ``/events/`` requests.
+
+Configuration:
+
+* Added configuration option to disable registration:
+  ``disable_registration``.
+* Added configuration option to change soft limit of number of open file
+  descriptors: ``soft_file_limit``.
+* Make ``tls_private_key_path`` optional when running with ``no_tls``.
+
+Application services:
+
 * Application services can now poll on the CS API ``/events`` for their events,
   by providing their application service ``access_token``.
+* Added exclusive namespace support to application services API.
+
 
 Changes in synapse v0.7.1 (2015-02-19)
 ======================================

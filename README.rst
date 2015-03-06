@@ -118,6 +118,7 @@ environment under ``~/.synapse``.
 
 To set up your homeserver, run (in your virtualenv, as before)::
 
+    $ cd ~/.synapse
     $ python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
         --config-path homeserver.yaml \
@@ -179,6 +180,7 @@ installing under virtualenv)::
     
 During setup of homeserver you need to call python2.7 directly again::
 
+    $ cd ~/.synapse
     $ python2.7 -m synapse.app.homeserver \
       --server-name machine.my.domain.name \
       --config-path homeserver.yaml \
