@@ -79,13 +79,13 @@ class PresenceStateTestCase(unittest.TestCase):
 
         room_member_handler = hs.handlers.room_member_handler = Mock(
             spec=[
-                "get_rooms_for_user",
+                "get_joined_rooms_for_user",
             ]
         )
 
         def get_rooms_for_user(user):
             return defer.succeed([])
-        room_member_handler.get_rooms_for_user = get_rooms_for_user
+        room_member_handler.get_joined_rooms_for_user = get_rooms_for_user
 
         presence.register_servlets(hs, self.mock_resource)
 
@@ -166,7 +166,7 @@ class PresenceListTestCase(unittest.TestCase):
 
         hs.handlers.room_member_handler = Mock(
             spec=[
-                "get_rooms_for_user",
+                "get_joined_rooms_for_user",
             ]
         )
 
@@ -291,7 +291,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 return ["a-room"]
             else:
                 return []
-        hs.handlers.room_member_handler.get_rooms_for_user = get_rooms_for_user
+        hs.handlers.room_member_handler.get_joined_rooms_for_user = get_rooms_for_user
 
         self.mock_datastore = hs.get_datastore()
         self.mock_datastore.get_app_service_by_token = Mock(return_value=None)
