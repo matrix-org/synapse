@@ -17,7 +17,6 @@ from simplejson import JSONDecodeError
 import simplejson as json
 from twisted.internet import defer
 
-from syutil.jsonutil import encode_canonical_json
 from synapse.api.constants import Membership
 from synapse.api.errors import StoreError
 from synapse.appservice import ApplicationService, AppServiceTransaction
