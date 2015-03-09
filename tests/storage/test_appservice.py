@@ -15,9 +15,11 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.appservice import ApplicationService
+from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.server import HomeServer
-from synapse.storage.appservice import ApplicationServiceStore
+from synapse.storage.appservice import (
+    ApplicationServiceStore, ApplicationServiceTransactionStore
+)
 
 from mock import Mock
 from tests.utils import SQLiteMemoryDbPool, MockClock
@@ -114,3 +116,168 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
     def test_retrieval_of_all_services(self):
         services = yield self.store.get_app_services()
         self.assertEquals(len(services), 3)
+
+
+class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        self.db_pool = SQLiteMemoryDbPool()
+        yield self.db_pool.prepare()
+        hs = HomeServer(
+            "test", db_pool=self.db_pool, clock=MockClock(), config=Mock()
+        )
+        self.as_list = [
+            {
+                "token": "token1",
+                "url": "https://matrix-as.org",
+                "id": 3
+            },
+            {
+                "token": "alpha_tok",
+                "url": "https://alpha.com",
+                "id": 5
+            },
+            {
+                "token": "beta_tok",
+                "url": "https://beta.com",
+                "id": 6
+            },
+            {
+                "token": "delta_tok",
+                "url": "https://delta.com",
+                "id": 7
+            },
+        ]
+        for s in self.as_list:
+            yield self._add_service(s["id"], s["url"], s["token"])
+        self.store = TestTransactionStore(hs)
+
+    def _add_service(self, as_id, url, token):
+        return self.db_pool.runQuery(
+            "INSERT INTO application_services(id, url, token) VALUES(?,?,?)",
+            (as_id, url, token)
+        )
+
+    def _set_state(self, id, state, txn=None):
+        return self.db_pool.runQuery(
+            "INSERT INTO application_services_state(as_id, state, last_txn) "
+            "VALUES(?,?,?)",
+            (id, state, txn)
+        )
+
+    @defer.inlineCallbacks
+    def test_get_appservice_state_none(self):
+        service = Mock(id=999)
+        state = yield self.store.get_appservice_state(service)
+        self.assertEquals(None, state)
+
+    @defer.inlineCallbacks
+    def test_get_appservice_state_up(self):
+        yield self._set_state(
+            self.as_list[0]["id"], ApplicationServiceState.UP
+        )
+        service = Mock(id=self.as_list[0]["id"])
+        state = yield self.store.get_appservice_state(service)
+        self.assertEquals(ApplicationServiceState.UP, state)
+
+    @defer.inlineCallbacks
+    def test_get_appservice_state_down(self):
+        yield self._set_state(
+            self.as_list[0]["id"], ApplicationServiceState.UP
+        )
+        yield self._set_state(
+            self.as_list[1]["id"], ApplicationServiceState.DOWN
+        )
+        yield self._set_state(
+            self.as_list[2]["id"], ApplicationServiceState.DOWN
+        )
+        service = Mock(id=self.as_list[1]["id"])
+        state = yield self.store.get_appservice_state(service)
+        self.assertEquals(ApplicationServiceState.DOWN, state)
+
+    @defer.inlineCallbacks
+    def test_get_appservices_by_state_none(self):
+        services = yield self.store.get_appservices_by_state(
+            ApplicationServiceState.DOWN
+        )
+        self.assertEquals(0, len(services))
+
+    @defer.inlineCallbacks
+    def test_set_appservices_state_down(self):
+        service = Mock(id=self.as_list[1]["id"])
+        yield self.store.set_appservice_state(
+            service,
+            ApplicationServiceState.DOWN
+        )
+        rows = yield self.db_pool.runQuery(
+            "SELECT as_id FROM application_services_state WHERE state=?",
+            (ApplicationServiceState.DOWN,)
+        )
+        self.assertEquals(service.id, rows[0][0])
+
+    @defer.inlineCallbacks
+    def test_set_appservices_state_multiple_up(self):
+        service = Mock(id=self.as_list[1]["id"])
+        yield self.store.set_appservice_state(
+            service,
+            ApplicationServiceState.UP
+        )
+        yield self.store.set_appservice_state(
+            service,
+            ApplicationServiceState.DOWN
+        )
+        yield self.store.set_appservice_state(
+            service,
+            ApplicationServiceState.UP
+        )
+        rows = yield self.db_pool.runQuery(
+            "SELECT as_id FROM application_services_state WHERE state=?",
+            (ApplicationServiceState.UP,)
+        )
+        self.assertEquals(service.id, rows[0][0])
+
+    @defer.inlineCallbacks
+    def test_get_appservices_by_state_single(self):
+        yield self._set_state(
+            self.as_list[0]["id"], ApplicationServiceState.DOWN
+        )
+        yield self._set_state(
+            self.as_list[1]["id"], ApplicationServiceState.UP
+        )
+
+        services = yield self.store.get_appservices_by_state(
+            ApplicationServiceState.DOWN
+        )
+        self.assertEquals(1, len(services))
+        self.assertEquals(self.as_list[0]["id"], services[0].id)
+
+    @defer.inlineCallbacks
+    def test_get_appservices_by_state_multiple(self):
+        yield self._set_state(
+            self.as_list[0]["id"], ApplicationServiceState.DOWN
+        )
+        yield self._set_state(
+            self.as_list[1]["id"], ApplicationServiceState.UP
+        )
+        yield self._set_state(
+            self.as_list[2]["id"], ApplicationServiceState.DOWN
+        )
+        yield self._set_state(
+            self.as_list[3]["id"], ApplicationServiceState.UP
+        )
+
+        services = yield self.store.get_appservices_by_state(
+            ApplicationServiceState.DOWN
+        )
+        self.assertEquals(2, len(services))
+        self.assertEquals(self.as_list[2]["id"], services[0].id)
+        self.assertEquals(self.as_list[0]["id"], services[1].id)
+
+
+# required for ApplicationServiceTransactionStoreTestCase tests
+class TestTransactionStore(ApplicationServiceTransactionStore,
+                           ApplicationServiceStore):
+
+    def __init__(self, hs):
+        super(TestTransactionStore, self).__init__(hs)
