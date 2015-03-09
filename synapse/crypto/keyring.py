@@ -22,6 +22,8 @@ from syutil.crypto.signing_key import (
 from syutil.base64util import decode_base64, encode_base64
 from synapse.api.errors import SynapseError, Codes
 
+from synapse.util.retryutils import get_retry_limiter
+
 from OpenSSL import crypto
 
 import logging
@@ -48,18 +50,27 @@ class Keyring(object):
             )
         try:
             verify_key = yield self.get_server_verify_key(server_name, key_ids)
-        except IOError:
+        except IOError as e:
+            logger.warn(
+                "Got IOError when downloading keys for %s: %s %s",
+                server_name, type(e).__name__, str(e.message),
+            )
             raise SynapseError(
                 502,
                 "Error downloading keys for %s" % (server_name,),
                 Codes.UNAUTHORIZED,
             )
-        except:
+        except Exception as e:
+            logger.warn(
+                "Got Exception when downloading keys for %s: %s %s",
+                server_name, type(e).__name__, str(e.message),
+            )
             raise SynapseError(
                 401,
                 "No key for %s with id %s" % (server_name, key_ids),
                 Codes.UNAUTHORIZED,
             )
+
         try:
             verify_signed_json(json_object, server_name, verify_key)
         except:
@@ -87,11 +98,17 @@ class Keyring(object):
             return
 
         # Try to fetch the key from the remote server.
-        # TODO(markjh): Ratelimit requests to a given server.
 
-        (response, tls_certificate) = yield fetch_server_key(
-            server_name, self.hs.tls_context_factory
+        limiter = yield get_retry_limiter(
+            server_name,
+            self.clock,
+            self.store,
         )
+
+        with limiter:
+            (response, tls_certificate) = yield fetch_server_key(
+                server_name, self.hs.tls_context_factory
+            )
 
         # Check the response.
 

@@ -28,7 +28,7 @@ class VoipConfig(Config):
         super(VoipConfig, cls).add_arguments(parser)
         group = parser.add_argument_group("voip")
         group.add_argument(
-            "--turn-uris", type=str, default=None,
+            "--turn-uris", type=str, default=None, action='append',
             help="The public URIs of the TURN server to give to clients"
         )
         group.add_argument(

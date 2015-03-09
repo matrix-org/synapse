@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.frozenutils import freeze, unfreeze
+from synapse.util.frozenutils import freeze
 
 
 class _EventInternalMetadata(object):
     def __init__(self, internal_metadata_dict):
-        self.__dict__ = internal_metadata_dict
+        self.__dict__ = dict(internal_metadata_dict)
 
     def get_dict(self):
         return dict(self.__dict__)
@@ -77,7 +77,7 @@ class EventBase(object):
         return self.content["membership"]
 
     def is_state(self):
-        return hasattr(self, "state_key")
+        return hasattr(self, "state_key") and self.state_key is not None
 
     def get_dict(self):
         d = dict(self._event_dict)
@@ -139,10 +139,6 @@ class FrozenEvent(EventBase):
         e.internal_metadata = event.internal_metadata
 
         return e
-
-    def get_dict(self):
-        # We need to unfreeze what we return
-        return unfreeze(super(FrozenEvent, self).get_dict())
 
     def __str__(self):
         return self.__repr__()

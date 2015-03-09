@@ -16,12 +16,14 @@
 """Contains functions for performing events on rooms."""
 from twisted.internet import defer
 
+from ._base import BaseHandler
+
 from synapse.types import UserID, RoomAlias, RoomID
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import StoreError, SynapseError
 from synapse.util import stringutils
 from synapse.util.async import run_on_reactor
-from ._base import BaseHandler
+from synapse.events.utils import serialize_event
 
 import logging
 
@@ -64,7 +66,7 @@ class RoomCreationHandler(BaseHandler):
         invite_list = config.get("invite", [])
         for i in invite_list:
             try:
-                self.hs.parse_userid(i)
+                UserID.from_string(i)
             except:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
 
@@ -114,7 +116,7 @@ class RoomCreationHandler(BaseHandler):
                 servers=[self.hs.hostname],
             )
 
-        user = self.hs.parse_userid(user_id)
+        user = UserID.from_string(user_id)
         creation_events = self._create_events_for_new_room(
             user, room_id, is_public=is_public
         )
@@ -246,11 +248,9 @@ class RoomMemberHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_room_members(self, room_id):
-        hs = self.hs
-
         users = yield self.store.get_users_in_room(room_id)
 
-        defer.returnValue([hs.parse_userid(u) for u in users])
+        defer.returnValue([UserID.from_string(u) for u in users])
 
     @defer.inlineCallbacks
     def fetch_room_distributions_into(self, room_id, localusers=None,
@@ -295,8 +295,9 @@ class RoomMemberHandler(BaseHandler):
         yield self.auth.check_joined_room(room_id, user_id)
 
         member_list = yield self.store.get_room_members(room_id=room_id)
+        time_now = self.clock.time_msec()
         event_list = [
-            self.hs.serialize_event(entry)
+            serialize_event(entry, time_now)
             for entry in member_list
         ]
         chunk_data = {
@@ -368,7 +369,7 @@ class RoomMemberHandler(BaseHandler):
             )
 
             if prev_state and prev_state.membership == Membership.JOIN:
-                user = self.hs.parse_userid(event.user_id)
+                user = UserID.from_string(event.user_id)
                 self.distributor.fire(
                     "user_left_room", user=user, room_id=event.room_id
                 )
@@ -388,8 +389,6 @@ class RoomMemberHandler(BaseHandler):
         if not hosts:
             raise SynapseError(404, "No known servers")
 
-        host = hosts[0]
-
         # If event doesn't include a display name, add one.
         yield self.distributor.fire(
             "collect_presencelike_data", joinee, content
@@ -406,13 +405,13 @@ class RoomMemberHandler(BaseHandler):
         })
         event, context = yield self._create_new_client_event(builder)
 
-        yield self._do_join(event, context, room_host=host, do_auth=True)
+        yield self._do_join(event, context, room_hosts=hosts, do_auth=True)
 
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def _do_join(self, event, context, room_host=None, do_auth=True):
-        joinee = self.hs.parse_userid(event.state_key)
+    def _do_join(self, event, context, room_hosts=None, do_auth=True):
+        joinee = UserID.from_string(event.state_key)
         # room_id = RoomID.from_string(event.room_id, self.hs)
         room_id = event.room_id
 
@@ -440,7 +439,7 @@ class RoomMemberHandler(BaseHandler):
 
         if is_host_in_room:
             should_do_dance = False
-        elif room_host:  # TODO: Shouldn't this be remote_room_host?
+        elif room_hosts:  # TODO: Shouldn't this be remote_room_host?
             should_do_dance = True
         else:
             # TODO(markjh): get prev_state from snapshot
@@ -452,7 +451,7 @@ class RoomMemberHandler(BaseHandler):
                 inviter = UserID.from_string(prev_state.user_id)
 
                 should_do_dance = not self.hs.is_mine(inviter)
-                room_host = inviter.domain
+                room_hosts = [inviter.domain]
             else:
                 # return the same error as join_room_alias does
                 raise SynapseError(404, "No known servers")
@@ -460,10 +459,10 @@ class RoomMemberHandler(BaseHandler):
         if should_do_dance:
             handler = self.hs.get_handlers().federation_handler
             yield handler.do_invite_join(
-                room_host,
+                room_hosts,
                 room_id,
                 event.user_id,
-                event.get_dict()["content"],  # FIXME To get a non-frozen dict
+                event.content,  # FIXME To get a non-frozen dict
                 context
             )
         else:
@@ -476,7 +475,7 @@ class RoomMemberHandler(BaseHandler):
                 do_auth=do_auth,
             )
 
-        user = self.hs.parse_userid(event.user_id)
+        user = UserID.from_string(event.user_id)
         yield self.distributor.fire(
             "user_joined_room", user=user, room_id=room_id
         )
@@ -511,9 +510,16 @@ class RoomMemberHandler(BaseHandler):
     def get_rooms_for_user(self, user, membership_list=[Membership.JOIN]):
         """Returns a list of roomids that the user has any of the given
         membership states in."""
-        rooms = yield self.store.get_rooms_for_user_where_membership_is(
-            user_id=user.to_string(), membership_list=membership_list
+
+        app_service = yield self.store.get_app_service_by_user_id(
+            user.to_string()
         )
+        if app_service:
+            rooms = yield self.store.get_app_service_rooms(app_service)
+        else:
+            rooms = yield self.store.get_rooms_for_user_where_membership_is(
+                user_id=user.to_string(), membership_list=membership_list
+            )
 
         # For some reason the list of events contains duplicates
         # TODO(paul): work out why because I really don't think it should
@@ -526,7 +532,7 @@ class RoomMemberHandler(BaseHandler):
                                     do_auth):
         yield run_on_reactor()
 
-        target_user = self.hs.parse_userid(event.state_key)
+        target_user = UserID.from_string(event.state_key)
 
         yield self.handle_new_client_event(
             event,
@@ -560,13 +566,24 @@ class RoomEventSource(object):
 
         to_key = yield self.get_current_key()
 
-        events, end_key = yield self.store.get_room_events_stream(
-            user_id=user.to_string(),
-            from_key=from_key,
-            to_key=to_key,
-            room_id=None,
-            limit=limit,
+        app_service = yield self.store.get_app_service_by_user_id(
+            user.to_string()
         )
+        if app_service:
+            events, end_key = yield self.store.get_appservice_room_stream(
+                service=app_service,
+                from_key=from_key,
+                to_key=to_key,
+                limit=limit,
+            )
+        else:
+            events, end_key = yield self.store.get_room_events_stream(
+                user_id=user.to_string(),
+                from_key=from_key,
+                to_key=to_key,
+                room_id=None,
+                limit=limit,
+            )
 
         defer.returnValue((events, end_key))
 

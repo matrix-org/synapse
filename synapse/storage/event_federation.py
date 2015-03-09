@@ -55,17 +55,19 @@ class EventFederationStore(SQLBaseStore):
         results = set()
 
         base_sql = (
-            "SELECT auth_id FROM event_auth WHERE %s"
+            "SELECT auth_id FROM event_auth WHERE event_id = ?"
         )
 
         front = set(event_ids)
         while front:
-            sql = base_sql % (
-                " OR ".join(["event_id=?"] * len(front)),
-            )
+            new_front = set()
+            for f in front:
+                txn.execute(base_sql, (f,))
+                new_front.update([r[0] for r in txn.fetchall()])
 
-            txn.execute(sql, list(front))
-            front = [r[0] for r in txn.fetchall()]
+            new_front -= results
+
+            front = new_front
             results.update(front)
 
         return list(results)
@@ -379,3 +381,51 @@ class EventFederationStore(SQLBaseStore):
             event_results += new_front
 
         return self._get_events_txn(txn, event_results)
+
+    def get_missing_events(self, room_id, earliest_events, latest_events,
+                           limit, min_depth):
+        return self.runInteraction(
+            "get_missing_events",
+            self._get_missing_events,
+            room_id, earliest_events, latest_events, limit, min_depth
+        )
+
+    def _get_missing_events(self, txn, room_id, earliest_events, latest_events,
+                            limit, min_depth):
+
+        earliest_events = set(earliest_events)
+        front = set(latest_events) - earliest_events
+
+        event_results = set()
+
+        query = (
+            "SELECT prev_event_id FROM event_edges "
+            "WHERE room_id = ? AND event_id = ? AND is_state = 0 "
+            "LIMIT ?"
+        )
+
+        while front and len(event_results) < limit:
+            new_front = set()
+            for event_id in front:
+                txn.execute(
+                    query,
+                    (room_id, event_id, limit - len(event_results))
+                )
+
+                for e_id, in txn.fetchall():
+                    new_front.add(e_id)
+
+            new_front -= earliest_events
+            new_front -= event_results
+
+            front = new_front
+            event_results |= new_front
+
+        events = self._get_events_txn(txn, event_results)
+
+        events = sorted(
+            [ev for ev in events if ev.depth >= min_depth],
+            key=lambda e: e.depth,
+        )
+
+        return events[:limit]

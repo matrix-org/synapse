@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.appservice.api import ApplicationServiceApi
 from .register import RegistrationHandler
 from .room import (
     RoomCreationHandler, RoomMemberHandler, RoomListHandler
@@ -26,6 +27,8 @@ from .presence import PresenceHandler
 from .directory import DirectoryHandler
 from .typing import TypingNotificationHandler
 from .admin import AdminHandler
+from .appservice import ApplicationServicesHandler
+from .sync import SyncHandler
 
 
 class Handlers(object):
@@ -51,3 +54,7 @@ class Handlers(object):
         self.directory_handler = DirectoryHandler(hs)
         self.typing_notification_handler = TypingNotificationHandler(hs)
         self.admin_handler = AdminHandler(hs)
+        self.appservice_handler = ApplicationServicesHandler(
+            hs, ApplicationServiceApi(hs)
+        )
+        self.sync_handler = SyncHandler(hs)

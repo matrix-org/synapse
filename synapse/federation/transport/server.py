@@ -20,7 +20,7 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.util.logutils import log_function
 
 import logging
-import json
+import simplejson as json
 import re
 
 
@@ -42,7 +42,7 @@ class TransportLayerServer(object):
         content = None
         origin = None
 
-        if request.method == "PUT":
+        if request.method in ["PUT", "POST"]:
             # TODO: Handle other method types? other content types?
             try:
                 content_bytes = request.content.read()
@@ -98,14 +98,22 @@ class TransportLayerServer(object):
         def new_handler(request, *args, **kwargs):
             try:
                 (origin, content) = yield self._authenticate_request(request)
-                response = yield handler(
-                    origin, content, request.args, *args, **kwargs
-                )
+                with self.ratelimiter.ratelimit(origin) as d:
+                    yield d
+                    response = yield handler(
+                        origin, content, request.args, *args, **kwargs
+                    )
             except:
                 logger.exception("_authenticate_request failed")
                 raise
             defer.returnValue(response)
         return new_handler
+
+    def rate_limit_origin(self, handler):
+        def new_handler(origin, *args, **kwargs):
+            response = yield handler(origin, *args, **kwargs)
+            defer.returnValue(response)
+        return new_handler()
 
     @log_function
     def register_received_handler(self, handler):
@@ -235,6 +243,28 @@ class TransportLayerServer(object):
             )
         )
 
+        self.server.register_path(
+            "POST",
+            re.compile("^" + PREFIX + "/query_auth/([^/]*)/([^/]*)$"),
+            self._with_authentication(
+                lambda origin, content, query, context, event_id:
+                self._on_query_auth_request(
+                    origin, content, event_id,
+                )
+            )
+        )
+
+        self.server.register_path(
+            "POST",
+            re.compile("^" + PREFIX + "/get_missing_events/([^/]*)/?$"),
+            self._with_authentication(
+                lambda origin, content, query, room_id:
+                self._get_missing_events(
+                    origin, content, room_id,
+                )
+            )
+        )
+
     @defer.inlineCallbacks
     @log_function
     def _on_send_request(self, origin, content, query, transaction_id):
@@ -322,6 +352,34 @@ class TransportLayerServer(object):
     def _on_invite_request(self, origin, content, query):
         content = yield self.request_handler.on_invite_request(
             origin, content,
+        )
+
+        defer.returnValue((200, content))
+
+    @defer.inlineCallbacks
+    @log_function
+    def _on_query_auth_request(self, origin, content, event_id):
+        new_content = yield self.request_handler.on_query_auth_request(
+            origin, content, event_id
+        )
+
+        defer.returnValue((200, new_content))
+
+    @defer.inlineCallbacks
+    @log_function
+    def _get_missing_events(self, origin, content, room_id):
+        limit = int(content.get("limit", 10))
+        min_depth = int(content.get("min_depth", 0))
+        earliest_events = content.get("earliest_events", [])
+        latest_events = content.get("latest_events", [])
+
+        content = yield self.request_handler.on_get_missing_events(
+            origin,
+            room_id=room_id,
+            earliest_events=earliest_events,
+            latest_events=latest_events,
+            min_depth=min_depth,
+            limit=limit,
         )
 
         defer.returnValue((200, content))

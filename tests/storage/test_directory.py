@@ -17,28 +17,22 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.server import HomeServer
 from synapse.storage.directory import DirectoryStore
+from synapse.types import RoomID, RoomAlias
 
-from tests.utils import SQLiteMemoryDbPool
+from tests.utils import setup_test_homeserver
 
 
 class DirectoryStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer(
-            "test",
-            db_pool=db_pool,
-        )
+        hs = yield setup_test_homeserver()
 
         self.store = DirectoryStore(hs)
 
-        self.room = hs.parse_roomid("!abcde:test")
-        self.alias = hs.parse_roomalias("#my-room:test")
+        self.room = RoomID.from_string("!abcde:test")
+        self.alias = RoomAlias.from_string("#my-room:test")
 
     @defer.inlineCallbacks
     def test_room_to_alias(self):

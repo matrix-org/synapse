@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
 from synapse.api.constants import EventTypes, Membership
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.types import UserID
 
 from ._base import BaseHandler
 
@@ -169,7 +170,7 @@ class ProfileHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def on_profile_query(self, args):
-        user = self.hs.parse_userid(args["user_id"])
+        user = UserID.from_string(args["user_id"])
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
@@ -211,10 +212,16 @@ class ProfileHandler(BaseHandler):
             )
 
             msg_handler = self.hs.get_handlers().message_handler
-            yield msg_handler.create_and_send_event({
-                "type": EventTypes.Member,
-                "room_id": j.room_id,
-                "state_key": user.to_string(),
-                "content": content,
-                "sender": user.to_string()
-            }, ratelimit=False)
+            try:
+                yield msg_handler.create_and_send_event({
+                    "type": EventTypes.Member,
+                    "room_id": j.room_id,
+                    "state_key": user.to_string(),
+                    "content": content,
+                    "sender": user.to_string()
+                }, ratelimit=False)
+            except Exception as e:
+                logger.warn(
+                    "Failed to update join event for room %s - %s",
+                    j.room_id, str(e.message)
+                )

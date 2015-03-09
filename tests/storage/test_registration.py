@@ -17,22 +17,16 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.server import HomeServer
 from synapse.storage.registration import RegistrationStore
 
-from tests.utils import SQLiteMemoryDbPool
+from tests.utils import setup_test_homeserver
 
 
 class RegistrationStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-
-        hs = HomeServer("test",
-            db_pool=db_pool,
-        )
+        hs = yield setup_test_homeserver()
 
         self.store = RegistrationStore(hs)
 
@@ -53,7 +47,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            {"admin": 0, "device_id": None, "name": self.user_id},
+            {"admin": 0,
+             "device_id": None,
+             "name": self.user_id,
+             "token_id": 1},
             (yield self.store.get_user_by_token(self.tokens[0]))
         )
 
@@ -63,7 +60,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
         yield self.store.add_access_token_to_user(self.user_id, self.tokens[1])
 
         self.assertEquals(
-            {"admin": 0, "device_id": None, "name": self.user_id},
+            {"admin": 0,
+             "device_id": None,
+             "name": self.user_id,
+             "token_id": 2},
             (yield self.store.get_user_by_token(self.tokens[1]))
         )
 

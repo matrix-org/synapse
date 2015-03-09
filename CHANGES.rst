@@ -1,54 +1,135 @@
+Changes in synapse v0.8.0 (2015-03-06)
+======================================
+
+General:
+
+* Add support for registration fallback. This is a page hosted on the server
+  which allows a user to register for an account, regardless of what client
+  they are using (e.g. mobile devices).
+
+* Added new default push rules and made them configurable by clients:
+
+  * Suppress all notice messages.
+  * Notify when invited to a new room.
+  * Notify for messages that don't match any rule.
+  * Notify on incoming call.
+
+Federation:
+
+* Added per host server side rate-limiting of incoming federation requests.
+* Added a ``/get_missing_events/`` API to federation to reduce number of
+  ``/events/`` requests.
+
+Configuration:
+
+* Added configuration option to disable registration:
+  ``disable_registration``.
+* Added configuration option to change soft limit of number of open file
+  descriptors: ``soft_file_limit``.
+* Make ``tls_private_key_path`` optional when running with ``no_tls``.
+
+Application services:
+
+* Application services can now poll on the CS API ``/events`` for their events,
+  by providing their application service ``access_token``.
+* Added exclusive namespace support to application services API.
+
+
+Changes in synapse v0.7.1 (2015-02-19)
+======================================
+
+* Initial alpha implementation of parts of the Application Services API.
+  Including:
+
+  - AS Registration / Unregistration
+  - User Query API
+  - Room Alias Query API
+  - Push transport for receiving events.
+  - User/Alias namespace admin control
+
+* Add cache when fetching events from remote servers to stop repeatedly
+  fetching events with bad signatures.
+* Respect the per remote server retry scheme when fetching both events and
+  server keys to reduce the number of times we send requests to dead servers.
+* Inform remote servers when the local server fails to handle a received event.
+* Turn off python bytecode generation due to problems experienced when
+  upgrading from previous versions.
+
+Changes in synapse v0.7.0 (2015-02-12)
+======================================
+
+* Add initial implementation of the query auth federation API, allowing
+  servers to agree on whether an event should be allowed or rejected.
+* Persist events we have rejected from federation, fixing the bug where
+  servers would keep requesting the same events.
+* Various federation performance improvements, including:
+
+  - Add in memory caches on queries such as:
+
+     * Computing the state of a room at a point in time, used for
+       authorization on federation requests.
+     * Fetching events from the database.
+     * User's room membership, used for authorizing presence updates.
+
+  - Upgraded JSON library to improve parsing and serialisation speeds.
+
+* Add default avatars to new user accounts using pydenticon library.
+* Correctly time out federation requests.
+* Retry federation requests against different servers.
+* Add support for push and push rules.
+* Add alpha versions of proposed new CSv2 APIs, including ``/sync`` API.
+
 Changes in synapse 0.6.1 (2015-01-07)
 =====================================
 
- * Major optimizations to improve performance of initial sync and event sending
-   in large rooms (by up to 10x)
- * Media repository now includes a Content-Length header on media downloads.
- * Improve quality of thumbnails by changing resizing algorithm.
+* Major optimizations to improve performance of initial sync and event sending
+  in large rooms (by up to 10x)
+* Media repository now includes a Content-Length header on media downloads.
+* Improve quality of thumbnails by changing resizing algorithm.
 
 Changes in synapse 0.6.0 (2014-12-16)
 =====================================
 
- * Add new API for media upload and download that supports thumbnailing.
- * Replicate media uploads over multiple homeservers so media is always served
-   to clients from their local homeserver.  This obsoletes the
-   --content-addr parameter and confusion over accessing content directly
-   from remote homeservers.
- * Implement exponential backoff when retrying federation requests when
-   sending to remote homeservers which are offline.
- * Implement typing notifications.
- * Fix bugs where we sent events with invalid signatures due to bugs where
-   we incorrectly persisted events.
- * Improve performance of database queries involving retrieving events.
+* Add new API for media upload and download that supports thumbnailing.
+* Replicate media uploads over multiple homeservers so media is always served
+  to clients from their local homeserver.  This obsoletes the
+  --content-addr parameter and confusion over accessing content directly
+  from remote homeservers.
+* Implement exponential backoff when retrying federation requests when
+  sending to remote homeservers which are offline.
+* Implement typing notifications.
+* Fix bugs where we sent events with invalid signatures due to bugs where
+  we incorrectly persisted events.
+* Improve performance of database queries involving retrieving events.
 
 Changes in synapse 0.5.4a (2014-12-13)
 ======================================
 
- * Fix bug while generating the error message when a file path specified in
-   the config doesn't exist.
+* Fix bug while generating the error message when a file path specified in
+  the config doesn't exist.
 
 Changes in synapse 0.5.4 (2014-12-03)
 =====================================
 
- * Fix presence bug where some rooms did not display presence updates for
-   remote users.
- * Do not log SQL timing log lines when started with "-v"
- * Fix potential memory leak.
+* Fix presence bug where some rooms did not display presence updates for
+  remote users.
+* Do not log SQL timing log lines when started with "-v"
+* Fix potential memory leak.
 
 Changes in synapse 0.5.3c (2014-12-02)
 ======================================
 
- * Change the default value for the `content_addr` option to use the HTTP
-   listener, as by default the HTTPS listener will be using a self-signed
-   certificate.
+* Change the default value for the `content_addr` option to use the HTTP
+  listener, as by default the HTTPS listener will be using a self-signed
+  certificate.
 
 Changes in synapse 0.5.3 (2014-11-27)
 =====================================
 
- * Fix bug that caused joining a remote room to fail if a single event was not
-   signed correctly.
- * Fix bug which caused servers to continuously try and fetch events from other
-   servers.
+* Fix bug that caused joining a remote room to fail if a single event was not
+  signed correctly.
+* Fix bug which caused servers to continuously try and fetch events from other
+  servers.
 
 Changes in synapse 0.5.2 (2014-11-26)
 =====================================

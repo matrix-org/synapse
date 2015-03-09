@@ -1,3 +1,32 @@
+Upgrading to v0.8.0
+===================
+
+Servers which use captchas will need to add their public key to::
+
+  static/client/register/register_config.js
+
+    window.matrixRegistrationConfig = {
+        recaptcha_public_key: "YOUR_PUBLIC_KEY"
+    };
+
+This is required in order to support registration fallback (typically used on
+mobile devices).
+
+
+Upgrading to v0.7.0
+===================
+
+New dependencies are:
+
+- pydenticon
+- simplejson
+- syutil
+- matrix-angular-sdk
+
+To pull in these dependencies in a virtual env, run::
+
+    python synapse/python_dependencies.py | xargs -n 1 pip install
+
 Upgrading to v0.6.0
 ===================
 

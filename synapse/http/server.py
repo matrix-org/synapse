@@ -14,9 +14,8 @@
 # limitations under the License.
 
 
-from synapse.http.agent_name import AGENT_NAME
 from synapse.api.errors import (
-    cs_exception, SynapseError, CodeMessageException
+    cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError
 )
 from synapse.util.logcontext import LoggingContext
 
@@ -69,10 +68,12 @@ class JsonResource(HttpServer, resource.Resource):
 
     _PathEntry = collections.namedtuple("_PathEntry", ["pattern", "callback"])
 
-    def __init__(self):
+    def __init__(self, hs):
         resource.Resource.__init__(self)
 
+        self.clock = hs.get_clock()
         self.path_regexs = {}
+        self.version_string = hs.version_string
 
     def register_path(self, method, path_pattern, callback):
         self.path_regexs.setdefault(method, []).append(
@@ -111,6 +112,8 @@ class JsonResource(HttpServer, resource.Resource):
             This checks if anyone has registered a callback for that method and
             path.
         """
+        code = None
+        start = self.clock.time_msec()
         try:
             # Just say yes to OPTIONS.
             if request.method == "OPTIONS":
@@ -121,37 +124,42 @@ class JsonResource(HttpServer, resource.Resource):
             # and path regex match
             for path_entry in self.path_regexs.get(request.method, []):
                 m = path_entry.pattern.match(request.path)
-                if m:
-                    # We found a match! Trigger callback and then return the
-                    # returned response. We pass both the request and any
-                    # matched groups from the regex to the callback.
+                if not m:
+                    continue
 
-                    args = [
-                        urllib.unquote(u).decode("UTF-8") for u in m.groups()
-                    ]
+                # We found a match! Trigger callback and then return the
+                # returned response. We pass both the request and any
+                # matched groups from the regex to the callback.
 
-                    code, response = yield path_entry.callback(
-                        request,
-                        *args
-                    )
+                args = [
+                    urllib.unquote(u).decode("UTF-8") for u in m.groups()
+                ]
 
-                    self._send_response(request, code, response)
-                    return
+                logger.info(
+                    "Received request: %s %s",
+                    request.method, request.path
+                )
+
+                code, response = yield path_entry.callback(
+                    request,
+                    *args
+                )
+
+                self._send_response(request, code, response)
+                return
 
             # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-            self._send_response(
-                request,
-                400,
-                {"error": "Unrecognized request"}
-            )
+            raise UnrecognizedRequestError()
         except CodeMessageException as e:
             if isinstance(e, SynapseError):
                 logger.info("%s SynapseError: %s - %s", request, e.code, e.msg)
             else:
                 logger.exception(e)
+
+            code = e.code
             self._send_response(
                 request,
-                e.code,
+                code,
                 cs_exception(e),
                 response_code_message=e.response_code_message
             )
@@ -161,6 +169,14 @@ class JsonResource(HttpServer, resource.Resource):
                 request,
                 500,
                 {"error": "Internal server error"}
+            )
+        finally:
+            code = str(code) if code else "-"
+
+            end = self.clock.time_msec()
+            logger.info(
+                "Processed request: %dms %s %s %s",
+                end-start, code, request.method, request.path
             )
 
     def _send_response(self, request, code, response_json_object,
@@ -175,9 +191,13 @@ class JsonResource(HttpServer, resource.Resource):
             return
 
         # TODO: Only enable CORS for the requests that need it.
-        respond_with_json(request, code, response_json_object, send_cors=True,
-                          response_code_message=response_code_message,
-                          pretty_print=self._request_user_agent_is_curl)
+        respond_with_json(
+            request, code, response_json_object,
+            send_cors=True,
+            response_code_message=response_code_message,
+            pretty_print=self._request_user_agent_is_curl,
+            version_string=self.version_string,
+        )
 
     @staticmethod
     def _request_user_agent_is_curl(request):
@@ -207,18 +227,23 @@ class RootRedirect(resource.Resource):
 
 
 def respond_with_json(request, code, json_object, send_cors=False,
-                      response_code_message=None, pretty_print=False):
+                      response_code_message=None, pretty_print=False,
+                      version_string=""):
     if not pretty_print:
         json_bytes = encode_pretty_printed_json(json_object)
     else:
         json_bytes = encode_canonical_json(json_object)
 
-    return respond_with_json_bytes(request, code, json_bytes, send_cors,
-                                   response_code_message=response_code_message)
+    return respond_with_json_bytes(
+        request, code, json_bytes,
+        send_cors=send_cors,
+        response_code_message=response_code_message,
+        version_string=version_string
+    )
 
 
 def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
-                            response_code_message=None):
+                            version_string="", response_code_message=None):
     """Sends encoded JSON in response to the given request.
 
     Args:
@@ -232,7 +257,7 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
 
     request.setResponseCode(code, message=response_code_message)
     request.setHeader(b"Content-Type", b"application/json")
-    request.setHeader(b"Server", AGENT_NAME)
+    request.setHeader(b"Server", version_string)
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
 
     if send_cors:

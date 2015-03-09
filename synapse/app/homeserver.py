@@ -14,7 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage import prepare_database, UpgradeDatabaseException
+import sys
+sys.dont_write_bytecode = True
+
+from synapse.storage import (
+    prepare_database, prepare_sqlite3_database, UpgradeDatabaseException,
+)
 
 from synapse.server import HomeServer
 
@@ -27,17 +32,21 @@ from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
 from synapse.http.server import JsonResource, RootRedirect
-from synapse.media.v0.content_repository import ContentRepoResource
-from synapse.media.v1.media_repository import MediaRepositoryResource
+from synapse.rest.appservice.v1 import AppServiceRestResource
+from synapse.rest.media.v0.content_repository import ContentRepoResource
+from synapse.rest.media.v1.media_repository import MediaRepositoryResource
 from synapse.http.server_key_resource import LocalKey
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX
+    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX, APP_SERVICE_PREFIX,
+    STATIC_PREFIX
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
+from synapse.rest.client.v1 import ClientV1RestResource
+from synapse.rest.client.v2_alpha import ClientV2AlphaRestResource
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
@@ -47,7 +56,8 @@ import synapse
 import logging
 import os
 import re
-import sys
+import resource
+import subprocess
 import sqlite3
 import syweb
 
@@ -60,15 +70,24 @@ class SynapseHomeServer(HomeServer):
         return MatrixFederationHttpClient(self)
 
     def build_resource_for_client(self):
-        return JsonResource()
+        return ClientV1RestResource(self)
+
+    def build_resource_for_client_v2_alpha(self):
+        return ClientV2AlphaRestResource(self)
 
     def build_resource_for_federation(self):
-        return JsonResource()
+        return JsonResource(self)
+
+    def build_resource_for_app_services(self):
+        return AppServiceRestResource(self)
 
     def build_resource_for_web_client(self):
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
         return File(webclient_path)  # TODO configurable?
+
+    def build_resource_for_static_content(self):
+        return File("static")
 
     def build_resource_for_content_repo(self):
         return ContentRepoResource(
@@ -86,7 +105,9 @@ class SynapseHomeServer(HomeServer):
             "sqlite3", self.get_db_name(),
             check_same_thread=False,
             cp_min=1,
-            cp_max=1
+            cp_max=1,
+            cp_openfun=prepare_database,  # Prepare the database for each conn
+                                          # so that :memory: sqlite works
         )
 
     def create_resource_tree(self, web_client, redirect_root_to_web_client):
@@ -105,11 +126,15 @@ class SynapseHomeServer(HomeServer):
         # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
         desired_tree = [
             (CLIENT_PREFIX, self.get_resource_for_client()),
+            (CLIENT_V2_ALPHA_PREFIX, self.get_resource_for_client_v2_alpha()),
             (FEDERATION_PREFIX, self.get_resource_for_federation()),
             (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
             (MEDIA_PREFIX, self.get_resource_for_media_repository()),
+            (APP_SERVICE_PREFIX, self.get_resource_for_app_services()),
+            (STATIC_PREFIX, self.get_resource_for_static_content()),
         ]
+
         if web_client:
             logger.info("Adding the web client.")
             desired_tree.append((WEB_CLIENT_PREFIX,
@@ -125,11 +150,11 @@ class SynapseHomeServer(HomeServer):
         # instead, we'll store a copy of this mapping so we can actually add
         # extra resources to existing nodes. See self._resource_id for the key.
         resource_mappings = {}
-        for (full_path, resource) in desired_tree:
-            logger.info("Attaching %s to path %s", resource, full_path)
+        for full_path, res in desired_tree:
+            logger.info("Attaching %s to path %s", res, full_path)
             last_resource = self.root_resource
             for path_seg in full_path.split('/')[1:-1]:
-                if not path_seg in last_resource.listNames():
+                if path_seg not in last_resource.listNames():
                     # resource doesn't exist, so make a "dummy resource"
                     child_resource = Resource()
                     last_resource.putChild(path_seg, child_resource)
@@ -157,12 +182,12 @@ class SynapseHomeServer(HomeServer):
                                                      child_name)
                     child_resource = resource_mappings[child_res_id]
                     # steal the children
-                    resource.putChild(child_name, child_resource)
+                    res.putChild(child_name, child_resource)
 
             # finally, insert the desired resource in the right place
-            last_resource.putChild(last_path_seg, resource)
+            last_resource.putChild(last_path_seg, res)
             res_id = self._resource_id(last_resource, last_path_seg)
-            resource_mappings[res_id] = resource
+            resource_mappings[res_id] = res
 
         return self.root_resource
 
@@ -194,6 +219,83 @@ class SynapseHomeServer(HomeServer):
             logger.info("Synapse now listening on port %d", unsecure_port)
 
 
+def get_version_string():
+    try:
+        null = open(os.devnull, 'w')
+        cwd = os.path.dirname(os.path.abspath(__file__))
+        try:
+            git_branch = subprocess.check_output(
+                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                stderr=null,
+                cwd=cwd,
+            ).strip()
+            git_branch = "b=" + git_branch
+        except subprocess.CalledProcessError:
+            git_branch = ""
+
+        try:
+            git_tag = subprocess.check_output(
+                ['git', 'describe', '--exact-match'],
+                stderr=null,
+                cwd=cwd,
+            ).strip()
+            git_tag = "t=" + git_tag
+        except subprocess.CalledProcessError:
+            git_tag = ""
+
+        try:
+            git_commit = subprocess.check_output(
+                ['git', 'rev-parse', '--short', 'HEAD'],
+                stderr=null,
+                cwd=cwd,
+            ).strip()
+        except subprocess.CalledProcessError:
+            git_commit = ""
+
+        try:
+            dirty_string = "-this_is_a_dirty_checkout"
+            is_dirty = subprocess.check_output(
+                ['git', 'describe', '--dirty=' + dirty_string],
+                stderr=null,
+                cwd=cwd,
+            ).strip().endswith(dirty_string)
+
+            git_dirty = "dirty" if is_dirty else ""
+        except subprocess.CalledProcessError:
+            git_dirty = ""
+
+        if git_branch or git_tag or git_commit or git_dirty:
+            git_version = ",".join(
+                s for s in
+                (git_branch, git_tag, git_commit, git_dirty,)
+                if s
+            )
+
+            return (
+                "Synapse/%s (%s)" % (
+                    synapse.__version__, git_version,
+                )
+            ).encode("ascii")
+    except Exception as e:
+        logger.warn("Failed to check for git repository: %s", e)
+
+    return ("Synapse/%s" % (synapse.__version__,)).encode("ascii")
+
+
+def change_resource_limit(soft_file_no):
+    try:
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+
+        if not soft_file_no:
+            soft_file_no = hard
+
+        resource.setrlimit(resource.RLIMIT_NOFILE, (soft_file_no, hard))
+
+        logger.info("Set file limit to: %d", soft_file_no)
+    except (ValueError, resource.error) as e:
+        logger.warn("Failed to set file limit: %s", e)
+
+
 def setup(config_options, should_run=True):
     config = HomeServerConfig.load_config(
         "Synapse Homeserver",
@@ -205,8 +307,10 @@ def setup(config_options, should_run=True):
 
     check_requirements()
 
+    version_string = get_version_string()
+
     logger.info("Server hostname: %s", config.server_name)
-    logger.info("Server version: %s", synapse.__version__)
+    logger.info("Server version: %s", version_string)
 
     if re.search(":[0-9]+$", config.server_name):
         domain_with_port = config.server_name
@@ -223,9 +327,8 @@ def setup(config_options, should_run=True):
         tls_context_factory=tls_context_factory,
         config=config,
         content_addr=config.content_addr,
+        version_string=version_string,
     )
-
-    hs.register_servlets()
 
     hs.create_resource_tree(
         web_client=config.webclient,
@@ -238,6 +341,7 @@ def setup(config_options, should_run=True):
 
     try:
         with sqlite3.connect(db_name) as db_conn:
+            prepare_sqlite3_database(db_conn)
             prepare_database(db_conn)
     except UpgradeDatabaseException:
         sys.stderr.write(
@@ -249,14 +353,6 @@ def setup(config_options, should_run=True):
 
     logger.info("Database prepared in %s.", db_name)
 
-    db_pool = hs.get_db_pool()
-
-    if db_name == ":memory:":
-        # Memory databases will need to be setup each time they are opened.
-        reactor.callWhenRunning(
-            db_pool.runWithConnection, prepare_database
-        )
-
     if config.manhole:
         f = twisted.manhole.telnet.ShellFactory()
         f.username = "matrix"
@@ -267,17 +363,24 @@ def setup(config_options, should_run=True):
     bind_port = config.bind_port
     if config.no_tls:
         bind_port = None
+
     hs.start_listening(bind_port, config.unsecure_port)
+
+    hs.get_pusherpool().start()
+    hs.get_state_handler().start_caching()
+    hs.get_datastore().start_profiling()
+    hs.get_replication_layer().start_get_pdu_cache()
 
     if not should_run:
         return
 
     if config.daemonize:
         print config.pid_file
+
         daemon = Daemonize(
             app="synapse-homeserver",
             pid=config.pid_file,
-            action=run,
+            action=lambda: run(config),
             auto_close_fds=False,
             verbose=True,
             logger=logger,
@@ -285,7 +388,7 @@ def setup(config_options, should_run=True):
 
         daemon.start()
     else:
-        reactor.run()
+        run(config)
 
 
 class SynapseService(service.Service):
@@ -299,8 +402,10 @@ class SynapseService(service.Service):
         return self._port.stopListening()
 
 
-def run():
+def run(config):
     with LoggingContext("run"):
+        change_resource_limit(config.soft_file_limit)
+
         reactor.run()
 
 

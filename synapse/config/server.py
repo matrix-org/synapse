@@ -30,7 +30,7 @@ class ServerConfig(Config):
         self.pid_file = self.abspath(args.pid_file)
         self.webclient = True
         self.manhole = args.manhole
-        self.no_tls = args.no_tls
+        self.soft_file_limit = args.soft_file_limit
 
         if not args.content_addr:
             host = args.server_name
@@ -75,8 +75,12 @@ class ServerConfig(Config):
         server_group.add_argument("--content-addr", default=None,
                                   help="The host and scheme to use for the "
                                   "content repository")
-        server_group.add_argument("--no-tls", action='store_true',
-                                  help="Don't bind to the https port.")
+        server_group.add_argument("--soft-file-limit", type=int, default=0,
+                                  help="Set the soft limit on the number of "
+                                       "file descriptors synapse can use. "
+                                       "Zero is used to indicate synapse "
+                                       "should set the soft limit to the hard"
+                                       "limit.")
 
     def read_signing_key(self, signing_key_path):
         signing_keys = self.read_file(signing_key_path, "signing_key")

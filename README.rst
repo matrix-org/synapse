@@ -6,7 +6,7 @@ VoIP.  The basics you need to know to get up and running are:
 
 - Everything in Matrix happens in a room.  Rooms are distributed and do not
   exist on any single server.  Rooms can be located using convenience aliases 
-  like ``#matrix:matrix.org`` or ``#test:localhost:8008``.
+  like ``#matrix:matrix.org`` or ``#test:localhost:8448``.
 
 - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
   you will normally refer to yourself and others using a 3PID: email
@@ -95,27 +95,36 @@ Installing prerequisites on Ubuntu or Debian::
 
     $ sudo apt-get install build-essential python2.7-dev libffi-dev \
                            python-pip python-setuptools sqlite3 \
-                           libssl-dev
+                           libssl-dev python-virtualenv libjpeg-dev
+                           
+Installing prerequisites on ArchLinux::
+
+    $ sudo pacman -S base-devel python2 python-pip \
+                     python-setuptools python-virtualenv sqlite3
 
 Installing prerequisites on Mac OS X::
 
     $ xcode-select --install
+    $ sudo pip install virtualenv
     
 To install the synapse homeserver run::
 
-    $ pip install --user --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+    $ virtualenv ~/.synapse
+    $ source ~/.synapse/bin/activate
+    $ pip install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
 
-This installs synapse, along with the libraries it uses, into
-``$HOME/.local/lib/`` on Linux or ``$HOME/Library/Python/2.7/lib/`` on OSX.
+This installs synapse, along with the libraries it uses, into a virtual
+environment under ``~/.synapse``.
 
-Your python may not give priority to locally installed libraries over system
-libraries, in which case you must add your local packages to your python path::
+To set up your homeserver, run (in your virtualenv, as before)::
 
-    $ # on Linux:
-    $ export PYTHONPATH=$HOME/.local/lib/python2.7/site-packages:$PYTHONPATH
+    $ cd ~/.synapse
+    $ python -m synapse.app.homeserver \
+        --server-name machine.my.domain.name \
+        --config-path homeserver.yaml \
+        --generate-config
 
-    $ # on OSX:
-    $ export PYTHONPATH=$HOME/Library/Python/2.7/lib/python/site-packages:$PYTHONPATH
+Substituting your host and domain name as appropriate.
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See docs/turn-howto.rst for details.
@@ -128,22 +137,56 @@ you get errors about ``error: no such option: --process-dependency-links`` you
 may need to manually upgrade it::
 
     $ sudo pip install --upgrade pip
-    
+
 If pip crashes mid-installation for reason (e.g. lost terminal), pip may
 refuse to run until you remove the temporary installation directory it
 created. To reset the installation::
 
     $ rm -rf /tmp/pip_install_matrix
-    
+
 pip seems to leak *lots* of memory during installation.  For instance, a Linux 
 host with 512MB of RAM may run out of memory whilst installing Twisted.  If this 
 happens, you will have to individually install the dependencies which are 
 failing, e.g.::
 
-    $ pip install --user twisted
+    $ pip install twisted
 
 On OSX, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
 will need to export CFLAGS=-Qunused-arguments.
+
+ArchLinux
+---------
+
+Installation on ArchLinux may encounter a few hiccups as Arch defaults to
+python 3, but synapse currently assumes python 2.7 by default.
+
+pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 )::
+
+    $ sudo pip2.7 install --upgrade pip
+    
+You also may need to explicitly specify python 2.7 again during the install
+request::
+
+    $ pip2.7 install --process-dependency-links \
+        https://github.com/matrix-org/synapse/tarball/master
+    
+If you encounter an error with lib bcrypt causing an Wrong ELF Class:
+ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
+compile it under the right architecture. (This should not be needed if
+installing under virtualenv)::
+
+    $ sudo pip2.7 uninstall py-bcrypt
+    $ sudo pip2.7 install py-bcrypt
+    
+During setup of homeserver you need to call python2.7 directly again::
+
+    $ cd ~/.synapse
+    $ python2.7 -m synapse.app.homeserver \
+      --server-name machine.my.domain.name \
+      --config-path homeserver.yaml \
+      --generate-config
+        
+...substituting your host and domain name as appropriate.
 
 Windows Install
 ---------------
@@ -155,7 +198,7 @@ Synapse can be installed on Cygwin. It requires the following Cygwin packages:
  - openssl (and openssl-devel, python-openssl)
  - python
  - python-setuptools
- 
+
 The content repository requires additional packages and will be unable to process
 uploads without them:
  - libjpeg8
@@ -182,22 +225,12 @@ Running Your Homeserver
 To actually run your new homeserver, pick a working directory for Synapse to run 
 (e.g. ``~/.synapse``), and::
 
-    $ mkdir ~/.synapse
     $ cd ~/.synapse
-    
-    $ # on Linux
-    $ ~/.local/bin/synctl start
-    
-    $ # on OSX
-    $ ~/Library/Python/2.7/bin/synctl start
+    $ source ./bin/activate
+    $ synctl start
 
 Troubleshooting Running
 -----------------------
-
-If ``synctl`` fails with ``pkg_resources.DistributionNotFound`` errors you may 
-need a newer version of setuptools than that provided by your OS.::
-
-    $ sudo pip install setuptools --upgrade
 
 If synapse fails with ``missing "sodium.h"`` crypto errors, you may need 
 to manually upgrade PyNaCL, as synapse uses NaCl (http://nacl.cr.yp.to/) for 
@@ -214,6 +247,14 @@ fix try re-installing from PyPI or directly from
     $ # Install from github
     $ pip install --user https://github.com/pyca/pynacl/tarball/master
 
+ArchLinux
+---------
+
+If running `$ synctl start` fails wit 'returned non-zero exit status 1', you will need to explicitly call Python2.7 - either running as::
+
+    $ python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml --pid-file homeserver.pid
+    
+...or by editing synctl with the correct python executable.
 
 Homeserver Development
 ======================
@@ -225,13 +266,15 @@ directory of your choice::
     $ cd synapse
 
 The homeserver has a number of external dependencies, that are easiest
-to install by making setup.py do so, in --user mode::
+to install using pip and a virtualenv::
 
-    $ python setup.py develop --user
+    $ virtualenv env
+    $ source env/bin/activate
+    $ python synapse/python_dependencies.py | xargs -n1 pip install
+    $ pip install setuptools_trial mock
 
-This will run a process of downloading and installing into your
-user's .local/lib directory all of the required dependencies that are
-missing.
+This will run a process of downloading and installing all the needed
+dependencies into a virtual env.
 
 Once this is done, you may wish to run the homeserver's unit tests, to
 check that everything is installed as it should be::
@@ -252,7 +295,7 @@ IMPORTANT: Before upgrading an existing homeserver to a new version, please
 refer to UPGRADE.rst for any additional instructions.
 
 Otherwise, simply re-install the new codebase over the current one - e.g.
-by ``pip install --user --process-dependency-links
+by ``pip install --process-dependency-links
 https://github.com/matrix-org/synapse/tarball/master``
 if using pip, or by ``git pull`` if running off a git working copy.
 
@@ -279,9 +322,9 @@ For the first form, simply pass the required hostname (of the machine) as the
 
     $ python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
-        --config-path homeserver.config \
+        --config-path homeserver.yaml \
         --generate-config
-    $ python -m synapse.app.homeserver --config-path homeserver.config
+    $ python -m synapse.app.homeserver --config-path homeserver.yaml
 
 Alternatively, you can run ``synctl start`` to guide you through the process.
 
@@ -301,9 +344,9 @@ SRV record, as that is the name other machines will expect it to have::
     $ python -m synapse.app.homeserver \
         --server-name YOURDOMAIN \
         --bind-port 8448 \
-        --config-path homeserver.config \
+        --config-path homeserver.yaml \
         --generate-config
-    $ python -m synapse.app.homeserver --config-path homeserver.config
+    $ python -m synapse.app.homeserver --config-path homeserver.yaml
 
 
 You may additionally want to pass one or more "-v" options, in order to

@@ -18,7 +18,9 @@ from twisted.internet import defer
 
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
+from synapse.util.expiringcache import ExpiringCache
 from synapse.api.constants import EventTypes
+from synapse.api.errors import AuthError
 from synapse.events.snapshot import EventContext
 
 from collections import namedtuple
@@ -36,12 +38,46 @@ def _get_state_key_from_event(event):
 KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 
 
+AuthEventTypes = (
+    EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,
+    EventTypes.JoinRules,
+)
+
+
+SIZE_OF_CACHE = 1000
+EVICTION_TIMEOUT_SECONDS = 20
+
+
+class _StateCacheEntry(object):
+    def __init__(self, state, state_group, ts):
+        self.state = state
+        self.state_group = state_group
+
+
 class StateHandler(object):
     """ Responsible for doing state conflict resolution.
     """
 
     def __init__(self, hs):
+        self.clock = hs.get_clock()
         self.store = hs.get_datastore()
+        self.hs = hs
+
+        # dict of set of event_ids -> _StateCacheEntry.
+        self._state_cache = None
+
+    def start_caching(self):
+        logger.debug("start_caching")
+
+        self._state_cache = ExpiringCache(
+            cache_name="state_cache",
+            clock=self.clock,
+            max_len=SIZE_OF_CACHE,
+            expiry_ms=EVICTION_TIMEOUT_SECONDS*1000,
+            reset_expiry_on_get=True,
+        )
+
+        self._state_cache.start()
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
@@ -62,13 +98,22 @@ class StateHandler(object):
             for e_id, _, _ in events
         ]
 
-        res = yield self.resolve_state_groups(event_ids)
+        cache = None
+        if self._state_cache is not None:
+            cache = self._state_cache.get(frozenset(event_ids), None)
+
+        if cache:
+            cache.ts = self.clock.time_msec()
+            state = cache.state
+        else:
+            res = yield self.resolve_state_groups(event_ids)
+            state = res[1]
 
         if event_type:
-            defer.returnValue(res[1].get((event_type, state_key)))
+            defer.returnValue(state.get((event_type, state_key)))
             return
 
-        defer.returnValue(res[1].values())
+        defer.returnValue(state)
 
     @defer.inlineCallbacks
     def compute_event_context(self, event, old_state=None):
@@ -95,7 +140,9 @@ class StateHandler(object):
             context.state_group = None
 
             if hasattr(event, "auth_events") and event.auth_events:
-                auth_ids = zip(*event.auth_events)[0]
+                auth_ids = self.hs.get_auth().compute_auth_events(
+                    event, context.current_state
+                )
                 context.auth_events = {
                     k: v
                     for k, v in context.current_state.items()
@@ -141,7 +188,9 @@ class StateHandler(object):
                 event.unsigned["replaces_state"] = replaces.event_id
 
         if hasattr(event, "auth_events") and event.auth_events:
-            auth_ids = zip(*event.auth_events)[0]
+            auth_ids = self.hs.get_auth().compute_auth_events(
+                event, context.current_state
+            )
             context.auth_events = {
                 k: v
                 for k, v in context.current_state.items()
@@ -163,8 +212,29 @@ class StateHandler(object):
         first is the name of a state group if one and only one is involved,
         otherwise `None`.
         """
+        logger.debug("resolve_state_groups event_ids %s", event_ids)
+
+        if self._state_cache is not None:
+            cache = self._state_cache.get(frozenset(event_ids), None)
+            if cache and cache.state_group:
+                cache.ts = self.clock.time_msec()
+                prev_state = cache.state.get((event_type, state_key), None)
+                if prev_state:
+                    prev_state = prev_state.event_id
+                    prev_states = [prev_state]
+                else:
+                    prev_states = []
+                defer.returnValue(
+                    (cache.state_group, cache.state, prev_states)
+                )
+
         state_groups = yield self.store.get_state_groups(
             event_ids
+        )
+
+        logger.debug(
+            "resolve_state_groups state_groups %s",
+            state_groups.keys()
         )
 
         group_names = set(state_groups.keys())
@@ -181,15 +251,48 @@ class StateHandler(object):
             else:
                 prev_states = []
 
+            if self._state_cache is not None:
+                cache = _StateCacheEntry(
+                    state=state,
+                    state_group=name,
+                    ts=self.clock.time_msec()
+                )
+
+                self._state_cache[frozenset(event_ids)] = cache
+
             defer.returnValue((name, state, prev_states))
 
+        new_state, prev_states = self._resolve_events(
+            state_groups.values(), event_type, state_key
+        )
+
+        if self._state_cache is not None:
+            cache = _StateCacheEntry(
+                state=new_state,
+                state_group=None,
+                ts=self.clock.time_msec()
+            )
+
+            self._state_cache[frozenset(event_ids)] = cache
+
+        defer.returnValue((None, new_state, prev_states))
+
+    def resolve_events(self, state_sets, event):
+        if event.is_state():
+            return self._resolve_events(
+                state_sets, event.type, event.state_key
+            )
+        else:
+            return self._resolve_events(state_sets)
+
+    def _resolve_events(self, state_sets, event_type=None, state_key=""):
         state = {}
-        for group, g_state in state_groups.items():
-            for s in g_state:
+        for st in state_sets:
+            for e in st:
                 state.setdefault(
-                    (s.type, s.state_key),
+                    (e.type, e.state_key),
                     {}
-                )[s.event_id] = s
+                )[e.event_id] = e
 
         unconflicted_state = {
             k: v.values()[0] for k, v in state.items()
@@ -210,64 +313,102 @@ class StateHandler(object):
         else:
             prev_states = []
 
+        auth_events = {
+            k: e for k, e in unconflicted_state.items()
+            if k[0] in AuthEventTypes
+        }
+
         try:
-            new_state = {}
-            new_state.update(unconflicted_state)
-            for key, events in conflicted_state.items():
-                new_state[key] = self._resolve_state_events(events)
+            resolved_state = self._resolve_state_events(
+                conflicted_state, auth_events
+            )
         except:
             logger.exception("Failed to resolve state")
             raise
 
-        defer.returnValue((None, new_state, prev_states))
+        new_state = unconflicted_state
+        new_state.update(resolved_state)
 
-    def _get_power_level_from_event_state(self, event, user_id):
-        if hasattr(event, "old_state_events") and event.old_state_events:
-            key = (EventTypes.PowerLevels, "", )
-            power_level_event = event.old_state_events.get(key)
-            level = None
-            if power_level_event:
-                level = power_level_event.content.get("users", {}).get(
-                    user_id
-                )
-                if not level:
-                    level = power_level_event.content.get("users_default", 0)
-
-            return level
-        else:
-            return 0
+        return new_state, prev_states
 
     @log_function
-    def _resolve_state_events(self, events):
-        curr_events = events
+    def _resolve_state_events(self, conflicted_state, auth_events):
+        """ This is where we actually decide which of the conflicted state to
+        use.
 
-        new_powers = [
-            self._get_power_level_from_event_state(e, e.user_id)
-            for e in curr_events
-        ]
+        We resolve conflicts in the following order:
+            1. power levels
+            2. memberships
+            3. other events.
+        """
+        resolved_state = {}
+        power_key = (EventTypes.PowerLevels, "")
+        if power_key in conflicted_state.items():
+            power_levels = conflicted_state[power_key]
+            resolved_state[power_key] = self._resolve_auth_events(power_levels)
 
-        new_powers = [
-            int(p) if p else 0 for p in new_powers
-        ]
+        auth_events.update(resolved_state)
 
-        max_power = max(new_powers)
+        for key, events in conflicted_state.items():
+            if key[0] == EventTypes.JoinRules:
+                resolved_state[key] = self._resolve_auth_events(
+                    events,
+                    auth_events
+                )
 
-        curr_events = [
-            z[0] for z in zip(curr_events, new_powers)
-            if z[1] == max_power
-        ]
+        auth_events.update(resolved_state)
 
-        if not curr_events:
-            raise RuntimeError("Max didn't get a max?")
-        elif len(curr_events) == 1:
-            return curr_events[0]
+        for key, events in conflicted_state.items():
+            if key[0] == EventTypes.Member:
+                resolved_state[key] = self._resolve_auth_events(
+                    events,
+                    auth_events
+                )
 
-        # TODO: For now, just choose the one with the largest event_id.
-        return (
-            sorted(
-                curr_events,
-                key=lambda e: hashlib.sha1(
-                    e.event_id + e.user_id + e.room_id + e.type
-                ).hexdigest()
-            )[0]
-        )
+        auth_events.update(resolved_state)
+
+        for key, events in conflicted_state.items():
+            if key not in resolved_state:
+                resolved_state[key] = self._resolve_normal_events(
+                    events, auth_events
+                )
+
+        return resolved_state
+
+    def _resolve_auth_events(self, events, auth_events):
+        reverse = [i for i in reversed(self._ordered_events(events))]
+
+        auth_events = dict(auth_events)
+
+        prev_event = reverse[0]
+        for event in reverse[1:]:
+            auth_events[(prev_event.type, prev_event.state_key)] = prev_event
+            try:
+                # FIXME: hs.get_auth() is bad style, but we need to do it to
+                # get around circular deps.
+                self.hs.get_auth().check(event, auth_events)
+                prev_event = event
+            except AuthError:
+                return prev_event
+
+        return event
+
+    def _resolve_normal_events(self, events, auth_events):
+        for event in self._ordered_events(events):
+            try:
+                # FIXME: hs.get_auth() is bad style, but we need to do it to
+                # get around circular deps.
+                self.hs.get_auth().check(event, auth_events)
+                return event
+            except AuthError:
+                pass
+
+        # Use the last event (the one with the least depth) if they all fail
+        # the auth check.
+        return event
+
+    def _ordered_events(self, events):
+        def key_func(e):
+            return -int(e.depth), hashlib.sha1(e.event_id).hexdigest()
+
+        return sorted(events, key=key_func)

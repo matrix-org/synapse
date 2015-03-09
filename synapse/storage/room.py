@@ -82,38 +82,45 @@ class RoomStore(SQLBaseStore):
             "topic" key if one is set, and a "name" key if one is set
         """
 
-        topic_subquery = (
-            "SELECT topics.event_id as event_id, "
-            "topics.room_id as room_id, topic "
-            "FROM topics "
-            "INNER JOIN current_state_events as c "
-            "ON c.event_id = topics.event_id "
+        def f(txn):
+            topic_subquery = (
+                "SELECT topics.event_id as event_id, "
+                "topics.room_id as room_id, topic "
+                "FROM topics "
+                "INNER JOIN current_state_events as c "
+                "ON c.event_id = topics.event_id "
+            )
+
+            name_subquery = (
+                "SELECT room_names.event_id as event_id, "
+                "room_names.room_id as room_id, name "
+                "FROM room_names "
+                "INNER JOIN current_state_events as c "
+                "ON c.event_id = room_names.event_id "
+            )
+
+            # We use non printing ascii character US () as a seperator
+            sql = (
+                "SELECT r.room_id, n.name, t.topic, "
+                "group_concat(a.room_alias, '') "
+                "FROM rooms AS r "
+                "LEFT JOIN (%(topic)s) AS t ON t.room_id = r.room_id "
+                "LEFT JOIN (%(name)s) AS n ON n.room_id = r.room_id "
+                "INNER JOIN room_aliases AS a ON a.room_id = r.room_id "
+                "WHERE r.is_public = ? "
+                "GROUP BY r.room_id "
+            ) % {
+                "topic": topic_subquery,
+                "name": name_subquery,
+            }
+
+            c = txn.execute(sql, (is_public,))
+
+            return c.fetchall()
+
+        rows = yield self.runInteraction(
+            "get_rooms", f
         )
-
-        name_subquery = (
-            "SELECT room_names.event_id as event_id, "
-            "room_names.room_id as room_id, name "
-            "FROM room_names "
-            "INNER JOIN current_state_events as c "
-            "ON c.event_id = room_names.event_id "
-        )
-
-        # We use non printing ascii character US () as a seperator
-        sql = (
-            "SELECT r.room_id, n.name, t.topic, "
-            "group_concat(a.room_alias, '') "
-            "FROM rooms AS r "
-            "LEFT JOIN (%(topic)s) AS t ON t.room_id = r.room_id "
-            "LEFT JOIN (%(name)s) AS n ON n.room_id = r.room_id "
-            "INNER JOIN room_aliases AS a ON a.room_id = r.room_id "
-            "WHERE r.is_public = ? "
-            "GROUP BY r.room_id "
-        ) % {
-            "topic": topic_subquery,
-            "name": name_subquery,
-        }
-
-        rows = yield self._execute(None, sql, is_public)
 
         ret = [
             {
