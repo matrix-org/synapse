@@ -452,7 +452,7 @@ class PresenceHandler(BaseHandler):
             # Also include people in all my rooms
 
             rm_handler = self.homeserver.get_handlers().room_member_handler
-            room_ids = yield rm_handler.get_rooms_for_user(user)
+            room_ids = yield rm_handler.get_joined_rooms_for_user(user)
 
         if state is None:
             state = yield self.store.get_presence_state(user.localpart)
@@ -596,7 +596,7 @@ class PresenceHandler(BaseHandler):
         localusers.add(user)
 
         rm_handler = self.homeserver.get_handlers().room_member_handler
-        room_ids = yield rm_handler.get_rooms_for_user(user)
+        room_ids = yield rm_handler.get_joined_rooms_for_user(user)
 
         if not localusers and not room_ids:
             defer.returnValue(None)
@@ -663,7 +663,7 @@ class PresenceHandler(BaseHandler):
                 )
 
             rm_handler = self.homeserver.get_handlers().room_member_handler
-            room_ids = yield rm_handler.get_rooms_for_user(user)
+            room_ids = yield rm_handler.get_joined_rooms_for_user(user)
             if room_ids:
                 logger.debug(" | %d interested room IDs %r", len(room_ids), room_ids)
 

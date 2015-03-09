@@ -507,7 +507,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue((is_remote_invite_join, room_host))
 
     @defer.inlineCallbacks
-    def get_rooms_for_user(self, user, membership_list=[Membership.JOIN]):
+    def get_joined_rooms_for_user(self, user):
         """Returns a list of roomids that the user has any of the given
         membership states in."""
 
@@ -517,8 +517,8 @@ class RoomMemberHandler(BaseHandler):
         if app_service:
             rooms = yield self.store.get_app_service_rooms(app_service)
         else:
-            rooms = yield self.store.get_rooms_for_user_where_membership_is(
-                user_id=user.to_string(), membership_list=membership_list
+            rooms = yield self.store.get_rooms_for_user(
+                user.to_string(),
             )
 
         # For some reason the list of events contains duplicates
