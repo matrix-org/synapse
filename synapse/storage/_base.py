@@ -202,10 +202,9 @@ class SQLBaseStore(object):
         self._get_event_counters = PerformanceCounters()
 
         self._get_event_cache = LruCache(hs.config.event_cache_size)
-        self._get_event_cache_counter = metrics.register_cache(
-            "getEventCache",
-            size_callback=lambda: len(self._get_event_cache),
-        )
+
+        # Pretend the getEventCache is just another named cache
+        caches_by_name["*getEvent*"] = self._get_event_cache
 
     def start_profiling(self):
         self._previous_loop_ts = self._clock.time_msec()
@@ -682,10 +681,10 @@ class SQLBaseStore(object):
             # Separate cache entries for each way to invoke _get_event_txn
             ret = cache[(check_redacted, get_prev_content, allow_rejected)]
 
-            self._get_event_cache_counter.inc_hits()
+            cache_counter.inc_hits("*getEvent*")
             return ret
         except KeyError:
-            self._get_event_cache_counter.inc_misses()
+            cache_counter.inc_misses("*getEvent*")
             pass
         finally:
             start_time = update_counter("event_cache", start_time)
