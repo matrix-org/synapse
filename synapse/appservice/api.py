@@ -79,6 +79,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             logger.warning("push_bulk: Missing txn ID sending events to %s",
                            service.url)
             txn_id = str(0)
+        txn_id = str(txn_id)
 
         uri = service.url + ("/transactions/%s" %
                              urllib.quote(txn_id))

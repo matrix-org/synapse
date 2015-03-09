@@ -175,7 +175,7 @@ class _TransactionController(object):
     @defer.inlineCallbacks
     def _is_service_up(self, service):
         state = yield self.store.get_appservice_state(service)
-        defer.returnValue(state == ApplicationServiceState.UP)
+        defer.returnValue(state == ApplicationServiceState.UP or state is None)
 
 
 class _Recoverer(object):
@@ -208,6 +208,8 @@ class _Recoverer(object):
     def retry(self):
         txn = yield self._get_oldest_txn()
         if txn:
+            logger.info("Retrying transaction %s for service %s",
+                        txn.id, txn.service)
             if txn.send(self.as_api):
                 txn.complete(self.store)
                 # reset the backoff counter and retry immediately

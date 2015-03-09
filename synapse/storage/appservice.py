@@ -337,9 +337,8 @@ class ApplicationServiceStore(SQLBaseStore):
     @defer.inlineCallbacks
     def _populate_cache(self):
         """Populates the ApplicationServiceCache from the database."""
-        sql = ("SELECT * FROM application_services LEFT JOIN "
-               "application_services_regex ON application_services.id = "
-               "application_services_regex.as_id")
+        sql = ("SELECT r.*, a.* FROM application_services AS a LEFT JOIN "
+               "application_services_regex AS r ON a.id = r.as_id")
 
         results = yield self._execute_and_decode(sql)
         services = self._parse_services_dict(results)
@@ -528,7 +527,7 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             return None
 
         event_ids = json.loads(entry["event_ids"])
-        events = self._get_events_txn(event_ids)
+        events = self._get_events_txn(txn, event_ids)
 
         return AppServiceTransaction(
             service=service, id=entry["txn_id"], events=events
@@ -540,7 +539,7 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             (service_id,)
         )
         last_txn_id = result.fetchone()
-        if last_txn_id is None:  # no row exists
+        if last_txn_id is None or last_txn_id[0] is None:  # no row exists
             return 0
         else:
             return int(last_txn_id[0])  # select 'last_txn' col
