@@ -140,7 +140,7 @@ class CacheMetricTestCase(unittest.TestCase):
 
         self.assertEquals(metric.render(), [
             'cache:hits 0',
-            'cache:misses 0',
+            'cache:total 0',
             'cache:size 0',
         ])
 
@@ -149,7 +149,7 @@ class CacheMetricTestCase(unittest.TestCase):
 
         self.assertEquals(metric.render(), [
             'cache:hits 0',
-            'cache:misses 1',
+            'cache:total 1',
             'cache:size 1',
         ])
 
@@ -157,6 +157,6 @@ class CacheMetricTestCase(unittest.TestCase):
 
         self.assertEquals(metric.render(), [
             'cache:hits 1',
-            'cache:misses 1',
+            'cache:total 2',
             'cache:size 1',
         ])

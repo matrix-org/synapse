@@ -134,7 +134,7 @@ class TimerMetric(CounterMetric):
 
 class CacheMetric(object):
     """A combination of two CounterMetrics, one to count cache hits and one to
-    count misses, and a callback metric to yield the current size.
+    count a total, and a callback metric to yield the current size.
 
     This metric generates standard metric name pairs, so that monitoring rules
     can easily be applied to measure hit ratio."""
@@ -142,8 +142,8 @@ class CacheMetric(object):
     def __init__(self, name, size_callback, labels=[]):
         self.name = name
 
-        self.hits   = CounterMetric(name + ":hits",   labels=labels)
-        self.misses = CounterMetric(name + ":misses", labels=labels)
+        self.hits  = CounterMetric(name + ":hits",  labels=labels)
+        self.total = CounterMetric(name + ":total", labels=labels)
 
         self.size = CallbackMetric(name + ":size",
             callback=size_callback,
@@ -152,9 +152,10 @@ class CacheMetric(object):
 
     def inc_hits(self, *values):
         self.hits.inc(*values)
+        self.total.inc(*values)
 
     def inc_misses(self, *values):
-        self.misses.inc(*values)
+        self.total.inc(*values)
 
     def render(self):
-        return self.hits.render() + self.misses.render() + self.size.render()
+        return self.hits.render() + self.total.render() + self.size.render()
