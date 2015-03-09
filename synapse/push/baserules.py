@@ -100,7 +100,7 @@ def make_base_override_rules():
                 }
             ],
             'actions': [
-                'dont-notify',
+                'dont_notify',
             ]
         },
         {
