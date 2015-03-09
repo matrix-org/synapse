@@ -358,7 +358,7 @@ class StreamStore(SQLBaseStore):
             sql = (
                 "SELECT stream_ordering, topological_ordering, event_id"
                 " FROM events"
-                " WHERE room_id = ? AND stream_ordering <= ? AND outlier = 0"
+                " WHERE room_id = ? AND outlier = 0"
                 " ORDER BY topological_ordering DESC, stream_ordering DESC"
                 " LIMIT ?"
             )
@@ -368,20 +368,28 @@ class StreamStore(SQLBaseStore):
                 "SELECT stream_ordering, topological_ordering, event_id"
                 " FROM events"
                 " WHERE room_id = ? AND stream_ordering > ?"
-                " AND stream_ordering <= ? AND outlier = 0"
+                " AND outlier = 0"
                 " ORDER BY topological_ordering DESC, stream_ordering DESC"
                 " LIMIT ?"
             )
 
         def get_recent_events_for_room_txn(txn):
             if from_token is None:
-                txn.execute(sql, (room_id, end_token.stream, limit,))
+                txn.execute(sql, (room_id, limit*2,))
             else:
                 txn.execute(sql, (
-                    room_id, from_token.stream, end_token.stream, limit
+                    room_id, from_token.stream, limit*2
                 ))
 
             rows = self.cursor_to_dict(txn)
+
+            rows[:] = [
+                r
+                for r in rows
+                if r["stream_ordering"] <= end_token.stream
+            ]
+
+            rows[:] = rows[:int(limit)]
 
             rows.reverse()  # As we selected with reverse ordering
 
