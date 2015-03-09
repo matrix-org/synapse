@@ -167,11 +167,11 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             (id, state, txn)
         )
 
-    def _insert_txn(self, as_id, txn_id, content):
+    def _insert_txn(self, as_id, txn_id, events):
         return self.db_pool.runQuery(
-            "INSERT INTO application_services_txns(as_id, txn_id, content) "
+            "INSERT INTO application_services_txns(as_id, txn_id, event_ids) "
             "VALUES(?,?,?)",
-            (as_id, txn_id, json.dumps(content))
+            (as_id, txn_id, json.dumps([e.event_id for e in events]))
         )
 
     def _set_last_txn(self, as_id, txn_id):
@@ -255,7 +255,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_create_appservice_txn_first(self):
         service = Mock(id=self.as_list[0]["id"])
-        events = [{"type": "nothing"}, {"type": "here"}]
+        events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn = yield self.store.create_appservice_txn(service, events)
         self.assertEquals(txn.id, 1)
         self.assertEquals(txn.events, events)
@@ -264,7 +264,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_create_appservice_txn_older_last_txn(self):
         service = Mock(id=self.as_list[0]["id"])
-        events = [{"type": "nothing"}, {"type": "here"}]
+        events = [Mock(event_id="e1"), Mock(event_id="e2")]
         yield self._set_last_txn(service.id, 9643)  # AS is falling behind
         yield self._insert_txn(service.id, 9644, events)
         yield self._insert_txn(service.id, 9645, events)
@@ -276,7 +276,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_create_appservice_txn_up_to_date_last_txn(self):
         service = Mock(id=self.as_list[0]["id"])
-        events = [{"type": "nothing"}, {"type": "here"}]
+        events = [Mock(event_id="e1"), Mock(event_id="e2")]
         yield self._set_last_txn(service.id, 9643)
         txn = yield self.store.create_appservice_txn(service, events)
         self.assertEquals(txn.id, 9644)
@@ -286,7 +286,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_create_appservice_txn_up_fuzzing(self):
         service = Mock(id=self.as_list[0]["id"])
-        events = [{"type": "nothing"}, {"type": "here"}]
+        events = [Mock(event_id="e1"), Mock(event_id="e2")]
         yield self._set_last_txn(service.id, 9643)
 
         # dump in rows with higher IDs to make sure the queries aren't wrong.
@@ -307,7 +307,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_complete_appservice_txn_first_txn(self):
         service = Mock(id=self.as_list[0]["id"])
-        events = [{"foo": "bar"}]
+        events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn_id = 1
 
         yield self._insert_txn(service.id, txn_id, events)
@@ -329,7 +329,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_complete_appservice_txn_existing_in_state_table(self):
         service = Mock(id=self.as_list[0]["id"])
-        events = [{"foo": "bar"}]
+        events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn_id = 5
         yield self._set_last_txn(service.id, 4)
         yield self._insert_txn(service.id, txn_id, events)
@@ -360,12 +360,16 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_oldest_unsent_txn(self):
         service = Mock(id=self.as_list[0]["id"])
-        events = [{"type": "nothing"}, {"type": "here"}]
+        events = [Mock(event_id="e1"), Mock(event_id="e2")]
+        other_events = [Mock(event_id="e5"), Mock(event_id="e6")]
 
-        yield self._insert_txn(self.as_list[1]["id"], 9, {"badger": "mushroom"})
+        # we aren't testing store._base stuff here, so mock this out
+        self.store._get_events_txn = Mock(return_value=events)
+
+        yield self._insert_txn(self.as_list[1]["id"], 9, other_events)
         yield self._insert_txn(service.id, 10, events)
-        yield self._insert_txn(service.id, 11, [{"foo":"bar"}])
-        yield self._insert_txn(service.id, 12, [{"argh":"bargh"}])
+        yield self._insert_txn(service.id, 11, other_events)
+        yield self._insert_txn(service.id, 12, other_events)
 
         txn = yield self.store.get_oldest_unsent_txn(service)
         self.assertEquals(service, txn.service)

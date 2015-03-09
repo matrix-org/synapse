@@ -442,10 +442,11 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         new_txn_id = max(highest_txn_id, last_txn_id) + 1
 
         # Insert new txn into txn table
+        event_ids = [e.event_id for e in events]
         txn.execute(
-            "INSERT INTO application_services_txns(as_id, txn_id, content) "
+            "INSERT INTO application_services_txns(as_id, txn_id, event_ids) "
             "VALUES(?,?,?)",
-            (service.id, new_txn_id, encode_canonical_json(events))
+            (service.id, new_txn_id, json.dumps(event_ids))
         )
         return AppServiceTransaction(
             service=service, id=new_txn_id, events=events
@@ -491,7 +492,7 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             dict(last_txn=txn_id)
         )
 
-        # Delete txn contents
+        # Delete txn
         self._simple_delete_txn(
             txn, "application_services_txns",
             dict(txn_id=txn_id, as_id=service.id)
@@ -526,10 +527,11 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             # the min(txn_id) part will force a row, so entry may not be None
             return None
 
+        event_ids = json.loads(entry["event_ids"])
+        events = self._get_events_txn(event_ids)
+
         return AppServiceTransaction(
-            service=service, id=entry["txn_id"], events=json.loads(
-                entry["content"]
-            )
+            service=service, id=entry["txn_id"], events=events
         )
 
     def _get_last_txn(self, txn, service_id):

@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS application_services_state(
 CREATE TABLE IF NOT EXISTS application_services_txns(
     as_id INTEGER NOT NULL,
     txn_id INTEGER NOT NULL,
-    content TEXT NOT NULL,
+    event_ids TEXT NOT NULL,
     UNIQUE(as_id, txn_id) ON CONFLICT ROLLBACK
 );
 
