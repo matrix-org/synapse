@@ -124,27 +124,29 @@ class JsonResource(HttpServer, resource.Resource):
             # and path regex match
             for path_entry in self.path_regexs.get(request.method, []):
                 m = path_entry.pattern.match(request.path)
-                if m:
-                    # We found a match! Trigger callback and then return the
-                    # returned response. We pass both the request and any
-                    # matched groups from the regex to the callback.
+                if not m:
+                    continue
 
-                    args = [
-                        urllib.unquote(u).decode("UTF-8") for u in m.groups()
-                    ]
+                # We found a match! Trigger callback and then return the
+                # returned response. We pass both the request and any
+                # matched groups from the regex to the callback.
 
-                    logger.info(
-                        "Received request: %s %s",
-                        request.method, request.path
-                    )
+                args = [
+                    urllib.unquote(u).decode("UTF-8") for u in m.groups()
+                ]
 
-                    code, response = yield path_entry.callback(
-                        request,
-                        *args
-                    )
+                logger.info(
+                    "Received request: %s %s",
+                    request.method, request.path
+                )
 
-                    self._send_response(request, code, response)
-                    return
+                code, response = yield path_entry.callback(
+                    request,
+                    *args
+                )
+
+                self._send_response(request, code, response)
+                return
 
             # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
             raise UnrecognizedRequestError()

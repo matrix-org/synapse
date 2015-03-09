@@ -201,11 +201,12 @@ class RegistrationHandler(BaseHandler):
         interested_services = [
             s for s in services if s.is_interested_in_user(user_id)
         ]
-        if len(interested_services) > 0:
-            raise SynapseError(
-                400, "This user ID is reserved by an application service.",
-                errcode=Codes.EXCLUSIVE
-            )
+        for service in interested_services:
+            if service.is_exclusive_user(user_id):
+                raise SynapseError(
+                    400, "This user ID is reserved by an application service.",
+                    errcode=Codes.EXCLUSIVE
+                )
 
     def _generate_token(self, user_id):
         # urlsafe variant uses _ and - so use . as the separator and replace

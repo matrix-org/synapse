@@ -23,6 +23,7 @@ from synapse.events.utils import serialize_event
 from ._base import BaseHandler
 
 import logging
+import random
 
 
 logger = logging.getLogger(__name__)
@@ -69,11 +70,16 @@ class EventStreamHandler(BaseHandler):
                         )
                 self._streams_per_user[auth_user] += 1
 
-            if pagin_config.from_token is None:
-                pagin_config.from_token = None
-
             rm_handler = self.hs.get_handlers().room_member_handler
             room_ids = yield rm_handler.get_rooms_for_user(auth_user)
+
+            if timeout:
+                # If they've set a timeout set a minimum limit.
+                timeout = max(timeout, 500)
+
+                # Add some randomness to this value to try and mitigate against
+                # thundering herds on restart.
+                timeout = random.randint(int(timeout*0.9), int(timeout*1.1))
 
             with PreserveLoggingContext():
                 events, tokens = yield self.notifier.get_events_for(

@@ -32,7 +32,7 @@ class Pusher(object):
     INITIAL_BACKOFF = 1000
     MAX_BACKOFF = 60 * 60 * 1000
     GIVE_UP_AFTER = 24 * 60 * 60 * 1000
-    DEFAULT_ACTIONS = ['notify']
+    DEFAULT_ACTIONS = ['dont-notify']
 
     INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
@@ -72,15 +72,13 @@ class Pusher(object):
             # let's assume you probably know about messages you sent yourself
             defer.returnValue(['dont_notify'])
 
-        if ev['type'] == 'm.room.member':
-            if ev['state_key'] != self.user_name:
-                defer.returnValue(['dont_notify'])
-
-        rawrules = yield self.store.get_push_rules_for_user_name(self.user_name)
+        rawrules = yield self.store.get_push_rules_for_user(self.user_name)
 
         for r in rawrules:
             r['conditions'] = json.loads(r['conditions'])
             r['actions'] = json.loads(r['actions'])
+
+        enabled_map = yield self.store.get_push_rules_enabled_for_user(self.user_name)
 
         user = UserID.from_string(self.user_name)
 
@@ -107,6 +105,8 @@ class Pusher(object):
             room_member_count += 1
 
         for r in rules:
+            if r['rule_id'] in enabled_map and not enabled_map[r['rule_id']]:
+                continue
             matches = True
 
             conditions = r['conditions']
@@ -117,7 +117,11 @@ class Pusher(object):
                     ev, c, display_name=my_display_name,
                     room_member_count=room_member_count
                 )
-            # ignore rules with no actions (we have an explict 'dont_notify'
+            logger.debug(
+                "Rule %s %s",
+                r['rule_id'], "matches" if matches else "doesn't match"
+            )
+            # ignore rules with no actions (we have an explict 'dont_notify')
             if len(actions) == 0:
                 logger.warn(
                     "Ignoring rule id %s with no actions for user %s" %

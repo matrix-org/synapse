@@ -59,6 +59,7 @@ class RegisterRestServlet(ClientV1RestServlet):
         # }
         # TODO: persistent storage
         self.sessions = {}
+        self.disable_registration = hs.config.disable_registration
 
     def on_GET(self, request):
         if self.hs.config.enable_registration_captcha:
@@ -107,6 +108,11 @@ class RegisterRestServlet(ClientV1RestServlet):
 
         try:
             login_type = register_json["type"]
+
+            is_application_server = login_type == LoginType.APPLICATION_SERVICE
+            if self.disable_registration and not is_application_server:
+                raise SynapseError(403, "Registration has been disabled")
+
             stages = {
                 LoginType.RECAPTCHA: self._do_recaptcha,
                 LoginType.PASSWORD: self._do_password,

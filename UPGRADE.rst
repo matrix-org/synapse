@@ -1,3 +1,18 @@
+Upgrading to v0.8.0
+===================
+
+Servers which use captchas will need to add their public key to::
+
+  static/client/register/register_config.js
+
+    window.matrixRegistrationConfig = {
+        recaptcha_public_key: "YOUR_PUBLIC_KEY"
+    };
+
+This is required in order to support registration fallback (typically used on
+mobile devices).
+
+
 Upgrading to v0.7.0
 ===================
 

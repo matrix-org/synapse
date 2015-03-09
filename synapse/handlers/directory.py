@@ -160,7 +160,7 @@ class DirectoryHandler(BaseHandler):
         if not room_id:
             raise SynapseError(
                 404,
-                "Room alias %r not found" % (room_alias.to_string(),),
+                "Room alias %s not found" % (room_alias.to_string(),),
                 Codes.NOT_FOUND
             )
 
@@ -232,13 +232,23 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def can_modify_alias(self, alias, user_id=None):
+        # Any application service "interested" in an alias they are regexing on
+        # can modify the alias.
+        # Users can only modify the alias if ALL the interested services have
+        # non-exclusive locks on the alias (or there are no interested services)
         services = yield self.store.get_app_services()
         interested_services = [
             s for s in services if s.is_interested_in_alias(alias.to_string())
         ]
+
         for service in interested_services:
             if user_id == service.sender:
-                # this user IS the app service
+                # this user IS the app service so they can do whatever they like
                 defer.returnValue(True)
                 return
-        defer.returnValue(len(interested_services) == 0)
+            elif service.is_exclusive_alias(alias.to_string()):
+                # another service has an exclusive lock on this alias.
+                defer.returnValue(False)
+                return
+        # either no interested services, or no service with an exclusive lock
+        defer.returnValue(True)

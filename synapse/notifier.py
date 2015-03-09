@@ -36,8 +36,10 @@ class _NotificationListener(object):
     so that it can remove itself from the indexes in the Notifier class.
     """
 
-    def __init__(self, user, rooms, from_token, limit, timeout, deferred):
+    def __init__(self, user, rooms, from_token, limit, timeout, deferred,
+                 appservice=None):
         self.user = user
+        self.appservice = appservice
         self.from_token = from_token
         self.limit = limit
         self.timeout = timeout
@@ -61,10 +63,14 @@ class _NotificationListener(object):
             pass
 
         for room in self.rooms:
-            lst = notifier.rooms_to_listeners.get(room, set())
+            lst = notifier.room_to_listeners.get(room, set())
             lst.discard(self)
 
         notifier.user_to_listeners.get(self.user, set()).discard(self)
+        if self.appservice:
+            notifier.appservice_to_listeners.get(
+                self.appservice, set()
+            ).discard(self)
 
 
 class Notifier(object):
@@ -77,8 +83,9 @@ class Notifier(object):
     def __init__(self, hs):
         self.hs = hs
 
-        self.rooms_to_listeners = {}
+        self.room_to_listeners = {}
         self.user_to_listeners = {}
+        self.appservice_to_listeners = {}
 
         self.event_sources = hs.get_event_sources()
 
@@ -109,10 +116,21 @@ class Notifier(object):
 
         room_source = self.event_sources.sources["room"]
 
-        listeners = self.rooms_to_listeners.get(room_id, set()).copy()
+        listeners = self.room_to_listeners.get(room_id, set()).copy()
 
         for user in extra_users:
             listeners |= self.user_to_listeners.get(user, set()).copy()
+
+        for appservice in self.appservice_to_listeners:
+            # TODO (kegan): Redundant appservice listener checks?
+            # App services will already be in the room_to_listeners set, but
+            # that isn't enough. They need to be checked here in order to
+            # receive *invites* for users they are interested in. Does this
+            # make the room_to_listeners check somewhat obselete?
+            if appservice.is_interested(event):
+                listeners |= self.appservice_to_listeners.get(
+                    appservice, set()
+                ).copy()
 
         logger.debug("on_new_room_event listeners %s", listeners)
 
@@ -166,7 +184,7 @@ class Notifier(object):
             listeners |= self.user_to_listeners.get(user, set()).copy()
 
         for room in rooms:
-            listeners |= self.rooms_to_listeners.get(room, set()).copy()
+            listeners |= self.room_to_listeners.get(room, set()).copy()
 
         @defer.inlineCallbacks
         def notify(listener):
@@ -280,6 +298,10 @@ class Notifier(object):
         if not from_token:
             from_token = yield self.event_sources.get_current_token()
 
+        appservice = yield self.hs.get_datastore().get_app_service_by_user_id(
+            user.to_string()
+        )
+
         listener = _NotificationListener(
             user,
             rooms,
@@ -287,6 +309,7 @@ class Notifier(object):
             limit,
             timeout,
             deferred,
+            appservice=appservice
         )
 
         def _timeout_listener():
@@ -314,10 +337,15 @@ class Notifier(object):
     @log_function
     def _register_with_keys(self, listener):
         for room in listener.rooms:
-            s = self.rooms_to_listeners.setdefault(room, set())
+            s = self.room_to_listeners.setdefault(room, set())
             s.add(listener)
 
         self.user_to_listeners.setdefault(listener.user, set()).add(listener)
+
+        if listener.appservice:
+            self.appservice_to_listeners.setdefault(
+                listener.appservice, set()
+            ).add(listener)
 
     @defer.inlineCallbacks
     @log_function
@@ -352,5 +380,5 @@ class Notifier(object):
     def _user_joined_room(self, user, room_id):
         new_listeners = self.user_to_listeners.get(user, set())
 
-        listeners = self.rooms_to_listeners.setdefault(room_id, set())
+        listeners = self.room_to_listeners.setdefault(room_id, set())
         listeners |= new_listeners

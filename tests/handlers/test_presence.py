@@ -389,14 +389,18 @@ class PresenceInvitesTestCase(PresenceTestCase):
 
     @defer.inlineCallbacks
     def test_invite_remote(self):
+        # Use a different destination, otherwise retry logic might fail the
+        # request
+        u_rocket = UserID.from_string("@rocket:there")
+
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
-            call("elsewhere",
+            call("there",
                 path="/_matrix/federation/v1/send/1000000/",
-                data=_expect_edu("elsewhere", "m.presence_invite",
+                data=_expect_edu("there", "m.presence_invite",
                     content={
                         "observer_user": "@apple:test",
-                        "observed_user": "@cabbage:elsewhere",
+                        "observed_user": "@rocket:there",
                     }
                 ),
                 json_data_callback=ANY,
@@ -405,10 +409,10 @@ class PresenceInvitesTestCase(PresenceTestCase):
         )
 
         yield self.handler.send_invite(
-                observer_user=self.u_apple, observed_user=self.u_cabbage)
+                observer_user=self.u_apple, observed_user=u_rocket)
 
         self.assertEquals(
-            [{"observed_user_id": "@cabbage:elsewhere", "accepted": 0}],
+            [{"observed_user_id": "@rocket:there", "accepted": 0}],
             (yield self.datastore.get_presence_list(self.u_apple.localpart))
         )
 
@@ -418,13 +422,18 @@ class PresenceInvitesTestCase(PresenceTestCase):
     def test_accept_remote(self):
         # TODO(paul): This test will likely break if/when real auth permissions
         # are added; for now the HS will always accept any invite
+
+        # Use a different destination, otherwise retry logic might fail the
+        # request
+        u_rocket = UserID.from_string("@rocket:moon")
+
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
-            call("elsewhere",
+            call("moon",
                 path="/_matrix/federation/v1/send/1000000/",
-                data=_expect_edu("elsewhere", "m.presence_accept",
+                data=_expect_edu("moon", "m.presence_accept",
                     content={
-                        "observer_user": "@cabbage:elsewhere",
+                        "observer_user": "@rocket:moon",
                         "observed_user": "@apple:test",
                     }
                 ),
@@ -437,7 +446,7 @@ class PresenceInvitesTestCase(PresenceTestCase):
             "/_matrix/federation/v1/send/1000000/",
             _make_edu_json("elsewhere", "m.presence_invite",
                 content={
-                    "observer_user": "@cabbage:elsewhere",
+                    "observer_user": "@rocket:moon",
                     "observed_user": "@apple:test",
                 }
             )
@@ -446,7 +455,7 @@ class PresenceInvitesTestCase(PresenceTestCase):
         self.assertTrue(
             (yield self.datastore.is_presence_visible(
                 observed_localpart=self.u_apple.localpart,
-                observer_userid=self.u_cabbage.to_string(),
+                observer_userid=u_rocket.to_string(),
             ))
         )
 
@@ -454,13 +463,17 @@ class PresenceInvitesTestCase(PresenceTestCase):
 
     @defer.inlineCallbacks
     def test_invited_remote_nonexistant(self):
+        # Use a different destination, otherwise retry logic might fail the
+        # request
+        u_rocket = UserID.from_string("@rocket:sun")
+
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
-            call("elsewhere",
+            call("sun",
                 path="/_matrix/federation/v1/send/1000000/",
-                data=_expect_edu("elsewhere", "m.presence_deny",
+                data=_expect_edu("sun", "m.presence_deny",
                     content={
-                        "observer_user": "@cabbage:elsewhere",
+                        "observer_user": "@rocket:sun",
                         "observed_user": "@durian:test",
                     }
                 ),
@@ -471,9 +484,9 @@ class PresenceInvitesTestCase(PresenceTestCase):
 
         yield self.mock_federation_resource.trigger("PUT",
             "/_matrix/federation/v1/send/1000000/",
-            _make_edu_json("elsewhere", "m.presence_invite",
+            _make_edu_json("sun", "m.presence_invite",
                 content={
-                    "observer_user": "@cabbage:elsewhere",
+                    "observer_user": "@rocket:sun",
                     "observed_user": "@durian:test",
                 }
             )

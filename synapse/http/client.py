@@ -143,7 +143,7 @@ class SimpleHttpClient(object):
             query_bytes = urllib.urlencode(args, True)
             uri = "%s?%s" % (uri, query_bytes)
 
-        json_str = json.dumps(json_body)
+        json_str = encode_canonical_json(json_body)
 
         response = yield self.agent.request(
             "PUT",
