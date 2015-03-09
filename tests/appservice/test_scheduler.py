@@ -162,7 +162,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.assertEquals(0, self.store.get_oldest_unsent_txn.call_count)
         txn.send = Mock(return_value=True)
         # wait for exp backoff
-        self.clock.advance_time(2000)
+        self.clock.advance_time(2)
         self.assertEquals(1, txn.send.call_count)
         self.assertEquals(1, txn.complete.call_count)
         # 2 because it needs to get None to know there are no more txns
@@ -185,21 +185,21 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.recoverer.recover()
         self.assertEquals(0, self.store.get_oldest_unsent_txn.call_count)
         txn.send = Mock(return_value=False)
-        self.clock.advance_time(2000)
+        self.clock.advance_time(2)
         self.assertEquals(1, txn.send.call_count)
         self.assertEquals(0, txn.complete.call_count)
         self.assertEquals(0, self.callback.call_count)
-        self.clock.advance_time(4000)
+        self.clock.advance_time(4)
         self.assertEquals(2, txn.send.call_count)
         self.assertEquals(0, txn.complete.call_count)
         self.assertEquals(0, self.callback.call_count)
-        self.clock.advance_time(8000)
+        self.clock.advance_time(8)
         self.assertEquals(3, txn.send.call_count)
         self.assertEquals(0, txn.complete.call_count)
         self.assertEquals(0, self.callback.call_count)
         txn.send = Mock(return_value=True)  # successfully send the txn
         pop_txn = True  # returns the txn the first time, then no more.
-        self.clock.advance_time(16000)
+        self.clock.advance_time(16)
         self.assertEquals(1, txn.send.call_count)  # new mock reset call count
         self.assertEquals(1, txn.complete.call_count)
         self.callback.assert_called_once_with(self.recoverer)

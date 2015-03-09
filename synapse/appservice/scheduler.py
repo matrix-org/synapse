@@ -132,7 +132,7 @@ class _TransactionController(object):
                     txn.complete(self.store)
                 else:
                     self._start_recoverer(service)
-        self.clock.call_later(1000, self.start_polling)
+        self.clock.call_later(1, self.start_polling)
 
     @defer.inlineCallbacks
     def on_recovered(self, recoverer):
@@ -202,7 +202,7 @@ class _Recoverer(object):
         self.backoff_counter = 1
 
     def recover(self):
-        self.clock.call_later(1000 * (2 ** self.backoff_counter), self.retry)
+        self.clock.call_later((2 ** self.backoff_counter), self.retry)
 
     @defer.inlineCallbacks
     def retry(self):
