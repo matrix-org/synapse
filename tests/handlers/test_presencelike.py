@@ -64,7 +64,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 "set_presence_state",
                 "is_presence_visible",
                 "set_profile_displayname",
-                "get_rooms_for_user_where_membership_is",
+                "get_rooms_for_user",
             ]),
             handlers=None,
             resource_for_federation=Mock(),
@@ -124,9 +124,9 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 self.mock_update_client)
 
         hs.handlers.room_member_handler = Mock(spec=[
-            "get_rooms_for_user",
+            "get_joined_rooms_for_user",
         ])
-        hs.handlers.room_member_handler.get_rooms_for_user = (
+        hs.handlers.room_member_handler.get_joined_rooms_for_user = (
                 lambda u: defer.succeed([]))
 
         # Some local users to test with
@@ -138,7 +138,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         self.u_potato = UserID.from_string("@potato:remote")
 
         self.mock_get_joined = (
-            self.datastore.get_rooms_for_user_where_membership_is
+            self.datastore.get_rooms_for_user
         )
 
     @defer.inlineCallbacks
