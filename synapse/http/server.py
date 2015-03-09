@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 metrics = synapse.metrics.get_metrics_for(__name__)
 
 incoming_requests_counter = metrics.register_counter("requests",
-    labels=["method"],
+    labels=["method", "servlet"],
 )
 outgoing_responses_counter = metrics.register_counter("responses",
     labels=["method","code"],
@@ -122,8 +122,6 @@ class JsonResource(HttpServer, resource.Resource):
             This checks if anyone has registered a callback for that method and
             path.
         """
-        incoming_requests_counter.inc(request.method)
-
         code = None
         start = self.clock.time_msec()
         try:
@@ -143,6 +141,15 @@ class JsonResource(HttpServer, resource.Resource):
                 # returned response. We pass both the request and any
                 # matched groups from the regex to the callback.
 
+                callback = path_entry.callback
+
+                servlet_instance = getattr(callback, "__self__", None)
+                if servlet_instance is not None:
+                    servlet_classname = servlet_instance.__class__.__name__
+                else:
+                    servlet_classname = "%r" % callback
+                incoming_requests_counter.inc(request.method, servlet_classname)
+
                 args = [
                     urllib.unquote(u).decode("UTF-8") for u in m.groups()
                 ]
@@ -152,10 +159,7 @@ class JsonResource(HttpServer, resource.Resource):
                     request.method, request.path
                 )
 
-                code, response = yield path_entry.callback(
-                    request,
-                    *args
-                )
+                code, response = yield callback(request, *args)
 
                 self._send_response(request, code, response)
                 return
