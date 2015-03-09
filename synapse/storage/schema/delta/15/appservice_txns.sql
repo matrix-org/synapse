@@ -15,7 +15,7 @@
 
 CREATE TABLE IF NOT EXISTS application_services_state(
     as_id INTEGER PRIMARY KEY,
-    state TEXT NOT NULL,
+    state TEXT,
     last_txn TEXT,
     FOREIGN KEY(as_id) REFERENCES application_services(id)
 );

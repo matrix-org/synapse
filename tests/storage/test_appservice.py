@@ -305,6 +305,74 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(txn.service, service)
 
     @defer.inlineCallbacks
+    def test_complete_appservice_txn_first_txn(self):
+        service = Mock(id=self.as_list[0]["id"])
+        events = [{"foo": "bar"}]
+        txn_id = 1
+
+        yield self._insert_txn(service.id, txn_id, events)
+        yield self.store.complete_appservice_txn(txn_id=txn_id, service=service)
+
+        res = yield self.db_pool.runQuery(
+            "SELECT last_txn FROM application_services_state WHERE as_id=?",
+            (service.id,)
+        )
+        self.assertEquals(1, len(res))
+        self.assertEquals(str(txn_id), res[0][0])
+
+        res = yield self.db_pool.runQuery(
+            "SELECT * FROM application_services_txns WHERE txn_id=?",
+            (txn_id,)
+        )
+        self.assertEquals(0, len(res))
+
+    @defer.inlineCallbacks
+    def test_complete_appservice_txn_existing_in_state_table(self):
+        service = Mock(id=self.as_list[0]["id"])
+        events = [{"foo": "bar"}]
+        txn_id = 5
+        yield self._set_last_txn(service.id, 4)
+        yield self._insert_txn(service.id, txn_id, events)
+        yield self.store.complete_appservice_txn(txn_id=txn_id, service=service)
+
+        res = yield self.db_pool.runQuery(
+            "SELECT last_txn, state FROM application_services_state WHERE "
+            "as_id=?",
+            (service.id,)
+        )
+        self.assertEquals(1, len(res))
+        self.assertEquals(str(txn_id), res[0][0])
+        self.assertEquals(ApplicationServiceState.UP, res[0][1])
+
+        res = yield self.db_pool.runQuery(
+            "SELECT * FROM application_services_txns WHERE txn_id=?",
+            (txn_id,)
+        )
+        self.assertEquals(0, len(res))
+
+    @defer.inlineCallbacks
+    def test_get_oldest_unsent_txn_none(self):
+        service = Mock(id=self.as_list[0]["id"])
+
+        txn = yield self.store.get_oldest_unsent_txn(service)
+        self.assertEquals(None, txn)
+
+    @defer.inlineCallbacks
+    def test_get_oldest_unsent_txn(self):
+        service = Mock(id=self.as_list[0]["id"])
+        events = [{"type": "nothing"}, {"type": "here"}]
+
+        yield self._insert_txn(self.as_list[1]["id"], 9, {"badger": "mushroom"})
+        yield self._insert_txn(service.id, 10, events)
+        yield self._insert_txn(service.id, 11, [{"foo":"bar"}])
+        yield self._insert_txn(service.id, 12, [{"argh":"bargh"}])
+
+        txn = yield self.store.get_oldest_unsent_txn(service)
+        self.assertEquals(service, txn.service)
+        self.assertEquals(10, txn.id)
+        self.assertEquals(events, txn.events)
+
+    @defer.inlineCallbacks
     def test_get_appservices_by_state_single(self):
         yield self._set_state(
             self.as_list[0]["id"], ApplicationServiceState.DOWN
