@@ -21,6 +21,7 @@ from synapse.storage.appservice import (
     ApplicationServiceStore, ApplicationServiceTransactionStore
 )
 
+import json
 from mock import Mock
 from tests.utils import SQLiteMemoryDbPool, MockClock
 
@@ -166,6 +167,20 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             (id, state, txn)
         )
 
+    def _insert_txn(self, as_id, txn_id, content):
+        return self.db_pool.runQuery(
+            "INSERT INTO application_services_txns(as_id, txn_id, content) "
+            "VALUES(?,?,?)",
+            (as_id, txn_id, json.dumps(content))
+        )
+
+    def _set_last_txn(self, as_id, txn_id):
+        return self.db_pool.runQuery(
+            "INSERT INTO application_services_state(as_id, last_txn, state) "
+            "VALUES(?,?,?)",
+            (as_id, txn_id, ApplicationServiceState.UP)
+        )
+
     @defer.inlineCallbacks
     def test_get_appservice_state_none(self):
         service = Mock(id=999)
@@ -236,6 +251,58 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             (ApplicationServiceState.UP,)
         )
         self.assertEquals(service.id, rows[0][0])
+
+    @defer.inlineCallbacks
+    def test_create_appservice_txn_first(self):
+        service = Mock(id=self.as_list[0]["id"])
+        events = [{"type": "nothing"}, {"type": "here"}]
+        txn = yield self.store.create_appservice_txn(service, events)
+        self.assertEquals(txn.id, 1)
+        self.assertEquals(txn.events, events)
+        self.assertEquals(txn.service, service)
+
+    @defer.inlineCallbacks
+    def test_create_appservice_txn_older_last_txn(self):
+        service = Mock(id=self.as_list[0]["id"])
+        events = [{"type": "nothing"}, {"type": "here"}]
+        yield self._set_last_txn(service.id, 9643)  # AS is falling behind
+        yield self._insert_txn(service.id, 9644, events)
+        yield self._insert_txn(service.id, 9645, events)
+        txn = yield self.store.create_appservice_txn(service, events)
+        self.assertEquals(txn.id, 9646)
+        self.assertEquals(txn.events, events)
+        self.assertEquals(txn.service, service)
+
+    @defer.inlineCallbacks
+    def test_create_appservice_txn_up_to_date_last_txn(self):
+        service = Mock(id=self.as_list[0]["id"])
+        events = [{"type": "nothing"}, {"type": "here"}]
+        yield self._set_last_txn(service.id, 9643)
+        txn = yield self.store.create_appservice_txn(service, events)
+        self.assertEquals(txn.id, 9644)
+        self.assertEquals(txn.events, events)
+        self.assertEquals(txn.service, service)
+
+    @defer.inlineCallbacks
+    def test_create_appservice_txn_up_fuzzing(self):
+        service = Mock(id=self.as_list[0]["id"])
+        events = [{"type": "nothing"}, {"type": "here"}]
+        yield self._set_last_txn(service.id, 9643)
+
+        # dump in rows with higher IDs to make sure the queries aren't wrong.
+        yield self._set_last_txn(self.as_list[1]["id"], 119643)
+        yield self._set_last_txn(self.as_list[2]["id"], 9)
+        yield self._set_last_txn(self.as_list[3]["id"], 9643)
+        yield self._insert_txn(self.as_list[1]["id"], 119644, events)
+        yield self._insert_txn(self.as_list[1]["id"], 119645, events)
+        yield self._insert_txn(self.as_list[1]["id"], 119646, events)
+        yield self._insert_txn(self.as_list[2]["id"], 10, events)
+        yield self._insert_txn(self.as_list[3]["id"], 9643, events)
+
+        txn = yield self.store.create_appservice_txn(service, events)
+        self.assertEquals(txn.id, 9644)
+        self.assertEquals(txn.events, events)
+        self.assertEquals(txn.service, service)
 
     @defer.inlineCallbacks
     def test_get_appservices_by_state_single(self):
