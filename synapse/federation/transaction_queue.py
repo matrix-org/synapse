@@ -144,7 +144,7 @@ class TransactionQueue(object):
                 deferred.errback(failure)
 
         def log_failure(failure):
-            logger.warn("Failed to send pdu", failure.value)
+            logger.warn("Failed to send pdu: %s", failure.value)
 
         deferred.addErrback(log_failure)
 
