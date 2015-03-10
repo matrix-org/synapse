@@ -115,8 +115,8 @@ class TransactionQueue(object):
                 if not deferred.called:
                     deferred.errback(failure)
 
-            def log_failure(failure):
-                logger.warn("Failed to send pdu", failure.value)
+            def log_failure(f):
+                logger.warn("Failed to send pdu to %s: %s", destination, f.value)
 
             deferred.addErrback(log_failure)
 
@@ -143,8 +143,8 @@ class TransactionQueue(object):
             if not deferred.called:
                 deferred.errback(failure)
 
-        def log_failure(failure):
-            logger.warn("Failed to send pdu: %s", failure.value)
+        def log_failure(f):
+            logger.warn("Failed to send edu to %s: %s", destination, f.value)
 
         deferred.addErrback(log_failure)
 
@@ -174,7 +174,7 @@ class TransactionQueue(object):
                 deferred.errback(f)
 
         def log_failure(f):
-            logger.warn("Failed to send pdu", f.value)
+            logger.warn("Failed to send failure to %s: %s", destination, f.value)
 
         deferred.addErrback(log_failure)
 
