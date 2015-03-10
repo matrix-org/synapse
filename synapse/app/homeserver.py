@@ -296,7 +296,7 @@ def change_resource_limit(soft_file_no):
         logger.warn("Failed to set file limit: %s", e)
 
 
-def setup(config_options, should_run=True):
+def setup(config_options):
     """
     Args:
         config_options_options: The options passed to Synapse. Usually
@@ -380,25 +380,6 @@ def setup(config_options, should_run=True):
     hs.get_datastore().start_profiling()
     hs.get_replication_layer().start_get_pdu_cache()
 
-    if not should_run:
-        return hs
-
-    if config.daemonize:
-        print config.pid_file
-
-        daemon = Daemonize(
-            app="synapse-homeserver",
-            pid=config.pid_file,
-            action=lambda: run(config),
-            auto_close_fds=False,
-            verbose=True,
-            logger=logger,
-        )
-
-        daemon.start()
-    else:
-        run(config)
-
     return hs
 
 
@@ -410,24 +391,44 @@ class SynapseService(service.Service):
         self.config = config
 
     def startService(self):
-        hs = setup(self.config, should_run=False)
+        hs = setup(self.config)
         change_resource_limit(hs.config.soft_file_limit)
 
     def stopService(self):
         return self._port.stopListening()
 
 
-def run(config):
-    with LoggingContext("run"):
-        change_resource_limit(config.soft_file_limit)
+def run(hs):
 
-        reactor.run()
+    def in_thread():
+        with LoggingContext("run"):
+            change_resource_limit(hs.config.soft_file_limit)
+
+            reactor.run()
+
+    if hs.config.daemonize:
+
+        print hs.config.pid_file
+
+        daemon = Daemonize(
+            app="synapse-homeserver",
+            pid=hs.config.pid_file,
+            action=lambda: in_thread(),
+            auto_close_fds=False,
+            verbose=True,
+            logger=logger,
+        )
+
+        daemon.start()
+    else:
+        in_thread(hs.config)
 
 
 def main():
     with LoggingContext("main"):
         check_requirements()
-        setup(sys.argv[1:])
+        hs = setup(sys.argv[1:])
+        run(hs)
 
 
 if __name__ == '__main__':
