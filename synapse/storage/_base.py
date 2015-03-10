@@ -38,9 +38,9 @@ transaction_logger = logging.getLogger("synapse.storage.txn")
 
 metrics = synapse.metrics.get_metrics_for("synapse.storage")
 
-sql_query_timer = metrics.register_distribution("queries", labels=["verb"])
-sql_txn_timer = metrics.register_distribution("transactions", labels=["desc"])
-sql_getevents_timer = metrics.register_distribution("getEvents", labels=["desc"])
+sql_query_timer = metrics.register_distribution("query_time", labels=["verb"])
+sql_txn_timer = metrics.register_distribution("transaction_time", labels=["desc"])
+sql_getevents_timer = metrics.register_distribution("getEvents_time", labels=["desc"])
 
 caches_by_name = {}
 cache_counter = metrics.register_cache(
