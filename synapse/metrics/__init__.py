@@ -62,23 +62,6 @@ class Metrics(object):
     def register_cache(self, *args, **kwargs):
         return self._register(CacheMetric, *args, **kwargs)
 
-    def counted(self, func):
-        """ A method decorator that registers a counter, to count invocations
-        of this method. """
-        if not hasattr(self, "method_counter"):
-            self.method_counter = self.register_counter(
-                "calls",
-                labels=["method"]
-            )
-
-        counter = self.method_counter
-        name = func.__name__
-
-        def wrapped(*args, **kwargs):
-            counter.inc(name)
-            return func(*args, **kwargs)
-        return wrapped
-
 
 def get_metrics_for(pkg_name):
     """ Returns a Metrics instance for conveniently creating metrics
