@@ -57,26 +57,28 @@ class TransactionQueue(object):
         # done
         self.pending_transactions = {}
 
+        metrics.register_callback("pending_destinations",
+            lambda: len(self.pending_transactions),
+        )
+
         # Is a mapping from destination -> list of
         # tuple(pending pdus, deferred, order)
         self.pending_pdus_by_dest = pdus = {}
         # destination -> list of tuple(edu, deferred)
         self.pending_edus_by_dest = edus = {}
 
+        metrics.register_callback("pending_pdus",
+            lambda: sum(map(len, pdus.values())),
+        )
+        metrics.register_callback("pending_edus",
+            lambda: sum(map(len, edus.values())),
+        )
+
         # destination -> list of tuple(failure, deferred)
         self.pending_failures_by_dest = {}
 
         # HACK to get unique tx id
         self._next_txn_id = int(self._clock.time_msec())
-
-        metrics.register_callback("pendingPdus",
-            lambda: {(dest,): len(pdus[dest]) for dest in pdus.keys()},
-            labels=["dest"],
-        )
-        metrics.register_callback("pendingEdus",
-            lambda: {(dest,): len(edus[dest]) for dest in edus.keys()},
-            labels=["dest"],
-        )
 
     def can_send_to(self, destination):
         """Can we send messages to the given server?
