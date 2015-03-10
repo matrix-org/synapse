@@ -297,6 +297,15 @@ def change_resource_limit(soft_file_no):
 
 
 def setup(config_options, should_run=True):
+    """
+    Args:
+        config_options_options: The options passed to Synapse. Usually
+            `sys.argv[1:]`.
+        should_run (bool): Whether to start the reactor.
+
+    Returns:
+        HomeServer
+    """
     config = HomeServerConfig.load_config(
         "Synapse Homeserver",
         config_options,
@@ -372,7 +381,7 @@ def setup(config_options, should_run=True):
     hs.get_replication_layer().start_get_pdu_cache()
 
     if not should_run:
-        return
+        return hs
 
     if config.daemonize:
         print config.pid_file
@@ -390,13 +399,19 @@ def setup(config_options, should_run=True):
     else:
         run(config)
 
+    return hs
+
 
 class SynapseService(service.Service):
+    """A twisted Service class that will start synapse. Used to run synapse
+    via twistd and a .tac.
+    """
     def __init__(self, config):
         self.config = config
 
     def startService(self):
-        setup(self.config, should_run=False)
+        hs = setup(self.config, should_run=False)
+        change_resource_limit(hs.config.soft_file_limit)
 
     def stopService(self):
         return self._port.stopListening()
