@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
+notified_events_counter = metrics.register_counter("notified_events")
+
 
 # TODO(paul): Should be shared somewhere
 def count(func, l):
@@ -72,6 +74,7 @@ class _NotificationListener(object):
 
         try:
             self.deferred.callback(result)
+            notified_events_counter.inc_by(len(events))
         except defer.AlreadyCalledError:
             pass
 
