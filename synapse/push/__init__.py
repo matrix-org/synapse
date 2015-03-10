@@ -105,7 +105,11 @@ class Pusher(object):
             room_member_count += 1
 
         for r in rules:
-            if r['rule_id'] in enabled_map and not enabled_map[r['rule_id']]:
+            if r['rule_id'] in enabled_map:
+                r['enabled'] = enabled_map[r['rule_id']]
+            elif 'enabled' not in r:
+                r['enabled'] = True
+            if not r['enabled']:
                 continue
             matches = True
 
