@@ -484,9 +484,11 @@ class DataStore(RoomMemberStore, RoomStore,
 
         for e in events:
             if e.type == 'm.room.name':
-                name = e.content['name']
+                if 'name' in e.content:
+                    name = e.content['name']
             elif e.type == 'm.room.aliases':
-                aliases.extend(e.content['aliases'])
+                if 'aliases' in e.content:
+                    aliases.extend(e.content['aliases'])
 
         defer.returnValue((name, aliases))
 
