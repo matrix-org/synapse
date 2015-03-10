@@ -64,7 +64,7 @@ class CounterMetric(BaseMetric):
         if self.is_scalar():
             self.counts[()] = 0
 
-    def inc(self, *values):
+    def inc_by(self, incr, *values):
         if len(values) != self.dimension():
             raise ValueError("Expected as many values to inc() as labels (%d)" %
                 (self.dimension())
@@ -73,9 +73,12 @@ class CounterMetric(BaseMetric):
         # TODO: should assert that the tag values are all strings
 
         if values not in self.counts:
-            self.counts[values] = 1
+            self.counts[values] = incr
         else:
-            self.counts[values] += 1
+            self.counts[values] += incr
+
+    def inc(self, *values):
+        self.inc_by(1, *values)
 
     def render_item(self, k):
         return ["%s%s %d" % (self.name, self._render_key(k), self.counts[k])]
@@ -101,7 +104,7 @@ class CallbackMetric(BaseMetric):
                 for k in sorted(value.keys())]
 
 
-class DistributionMetric(CounterMetric):
+class DistributionMetric(object):
     """A combination of an event counter and an accumulator, which counts
     both the number of events and accumulates the total value. Typically this
     could be used to keep track of method-running times, or other distributions
@@ -110,28 +113,16 @@ class DistributionMetric(CounterMetric):
     TODO(paul): Try to export some heatmap-style stats?
     """
 
-    def __init__(self, *args, **kwargs):
-        super(DistributionMetric, self).__init__(*args, **kwargs)
-
-        self.totals = {}
-
-        # Scalar metrics are never empty
-        if self.is_scalar():
-            self.totals[()] = 0
+    def __init__(self, name, *args, **kwargs):
+        self.counts = CounterMetric(name + ":count", **kwargs)
+        self.totals = CounterMetric(name + ":total", **kwargs)
 
     def inc_by(self, inc, *values):
-        self.inc(*values)
+        self.counts.inc(*values)
+        self.totals.inc_by(inc, *values)
 
-        if values not in self.totals:
-            self.totals[values] = inc
-        else:
-            self.totals[values] += inc
-
-    def render_item(self, k):
-        keystr = self._render_key(k)
-
-        return ["%s:count%s %d" % (self.name, keystr, self.counts[k]),
-                "%s:total%s %d" % (self.name, keystr, self.totals[k])]
+    def render(self):
+        return self.counts.render() + self.totals.render()
 
 
 class CacheMetric(object):

@@ -35,8 +35,7 @@ class CounterMetricTestCase(unittest.TestCase):
             'scalar 1',
         ])
 
-        counter.inc()
-        counter.inc()
+        counter.inc_by(2)
 
         self.assertEquals(counter.render(), [
             'scalar 3'
@@ -125,8 +124,8 @@ class DistributionMetricTestCase(unittest.TestCase):
 
         self.assertEquals(metric.render(), [
             'queries:count{verb="INSERT"} 1',
-            'queries:total{verb="INSERT"} 800',
             'queries:count{verb="SELECT"} 2',
+            'queries:total{verb="INSERT"} 800',
             'queries:total{verb="SELECT"} 500',
         ])
 
