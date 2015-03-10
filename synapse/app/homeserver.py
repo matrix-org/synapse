@@ -26,6 +26,7 @@ from synapse.server import HomeServer
 from synapse.python_dependencies import check_requirements
 
 from twisted.internet import reactor
+from twisted.application import service
 from twisted.enterprise import adbapi
 from twisted.web.resource import Resource
 from twisted.web.static import File
@@ -295,10 +296,19 @@ def change_resource_limit(soft_file_no):
         logger.warn("Failed to set file limit: %s", e)
 
 
-def setup():
+def setup(config_options):
+    """
+    Args:
+        config_options_options: The options passed to Synapse. Usually
+            `sys.argv[1:]`.
+        should_run (bool): Whether to start the reactor.
+
+    Returns:
+        HomeServer
+    """
     config = HomeServerConfig.load_config(
         "Synapse Homeserver",
-        sys.argv[1:],
+        config_options,
         generate_section="Homeserver"
     )
 
@@ -370,13 +380,40 @@ def setup():
     hs.get_datastore().start_profiling()
     hs.get_replication_layer().start_get_pdu_cache()
 
-    if config.daemonize:
-        print config.pid_file
+    return hs
+
+
+class SynapseService(service.Service):
+    """A twisted Service class that will start synapse. Used to run synapse
+    via twistd and a .tac.
+    """
+    def __init__(self, config):
+        self.config = config
+
+    def startService(self):
+        hs = setup(self.config)
+        change_resource_limit(hs.config.soft_file_limit)
+
+    def stopService(self):
+        return self._port.stopListening()
+
+
+def run(hs):
+
+    def in_thread():
+        with LoggingContext("run"):
+            change_resource_limit(hs.config.soft_file_limit)
+
+            reactor.run()
+
+    if hs.config.daemonize:
+
+        print hs.config.pid_file
 
         daemon = Daemonize(
             app="synapse-homeserver",
-            pid=config.pid_file,
-            action=lambda: run(config),
+            pid=hs.config.pid_file,
+            action=lambda: in_thread(),
             auto_close_fds=False,
             verbose=True,
             logger=logger,
@@ -384,20 +421,14 @@ def setup():
 
         daemon.start()
     else:
-        run(config)
-
-
-def run(config):
-    with LoggingContext("run"):
-        change_resource_limit(config.soft_file_limit)
-
-        reactor.run()
+        in_thread(hs.config)
 
 
 def main():
     with LoggingContext("main"):
         check_requirements()
-        setup()
+        hs = setup(sys.argv[1:])
+        run(hs)
 
 
 if __name__ == '__main__':
