@@ -83,9 +83,8 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         uri = service.url + ("/transactions/%s" %
                              urllib.quote(txn_id))
-        response = None
         try:
-            response = yield self.put_json(
+            yield self.put_json(
                 uri=uri,
                 json_body={
                     "events": events
@@ -93,9 +92,8 @@ class ApplicationServiceApi(SimpleHttpClient):
                 args={
                     "access_token": service.hs_token
                 })
-            if response:  # just an empty json object
-                # TODO: Mark txn as sent successfully
-                defer.returnValue(True)
+            defer.returnValue(True)
+            return
         except CodeMessageException as e:
             logger.warning("push_bulk to %s received %s", uri, e.code)
         except Exception as ex:

@@ -293,6 +293,8 @@ class ApplicationServiceStore(SQLBaseStore):
         services = {}
         for res in results:
             as_token = res["token"]
+            if as_token is None:
+                continue
             if as_token not in services:
                 # add the service
                 services[as_token] = {
@@ -516,11 +518,10 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         # Monotonically increasing txn ids, so just select the smallest
         # one in the txns table (we delete them when they are sent)
         result = txn.execute(
-            "SELECT *,MIN(txn_id) FROM application_services_txns WHERE as_id=?",
+            "SELECT MIN(txn_id), * FROM application_services_txns WHERE as_id=?",
             (service.id,)
         )
         entry = self.cursor_to_dict(result)[0]
-
         if not entry or entry["txn_id"] is None:
             # the min(txn_id) part will force a row, so entry may not be None
             return None
