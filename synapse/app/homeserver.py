@@ -421,7 +421,7 @@ def run(hs):
 
         daemon.start()
     else:
-        in_thread(hs.config)
+        in_thread()
 
 
 def main():
