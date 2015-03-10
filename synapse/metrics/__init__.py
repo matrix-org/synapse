@@ -43,11 +43,6 @@ class Metrics(object):
         self.name_prefix = name
 
     def _register(self, metric_class, name, *args, **kwargs):
-        if "_" in name:
-            raise ValueError("Metric names %s is invalid as it cannot contain an underscore"
-                % (name)
-            )
-
         full_name = "%s_%s" % (self.name_prefix, name)
 
         metric = metric_class(full_name, *args, **kwargs)
