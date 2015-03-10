@@ -101,35 +101,37 @@ class CallbackMetric(BaseMetric):
                 for k in sorted(value.keys())]
 
 
-class TimerMetric(CounterMetric):
-    """A combination of an event counter and a time accumulator, which counts
-    both the number of events and how long each one takes.
+class DistributionMetric(CounterMetric):
+    """A combination of an event counter and an accumulator, which counts
+    both the number of events and accumulates the total value. Typically this
+    could be used to keep track of method-running times, or other distributions
+    of values that occur in discrete occurances.
 
     TODO(paul): Try to export some heatmap-style stats?
     """
 
     def __init__(self, *args, **kwargs):
-        super(TimerMetric, self).__init__(*args, **kwargs)
+        super(DistributionMetric, self).__init__(*args, **kwargs)
 
-        self.times = {}
+        self.totals = {}
 
         # Scalar metrics are never empty
         if self.is_scalar():
-            self.times[()] = 0
+            self.totals[()] = 0
 
-    def inc_time(self, msec, *values):
+    def inc_by(self, inc, *values):
         self.inc(*values)
 
-        if values not in self.times:
-            self.times[values] = msec
+        if values not in self.totals:
+            self.totals[values] = inc
         else:
-            self.times[values] += msec
+            self.totals[values] += inc
 
     def render_item(self, k):
         keystr = self._render_key(k)
 
         return ["%s:count%s %d" % (self.name, keystr, self.counts[k]),
-                "%s:msec%s %d" % (self.name, keystr, self.times[k])]
+                "%s:total%s %d" % (self.name, keystr, self.totals[k])]
 
 
 class CacheMetric(object):

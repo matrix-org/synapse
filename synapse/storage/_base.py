@@ -38,9 +38,9 @@ transaction_logger = logging.getLogger("synapse.storage.txn")
 
 metrics = synapse.metrics.get_metrics_for("synapse.storage")
 
-sql_query_timer = metrics.register_timer("queries", labels=["verb"])
-sql_txn_timer = metrics.register_timer("transactions", labels=["desc"])
-sql_getevents_timer = metrics.register_timer("getEvents", labels=["desc"])
+sql_query_timer = metrics.register_distribution("queries", labels=["verb"])
+sql_txn_timer = metrics.register_distribution("transactions", labels=["desc"])
+sql_getevents_timer = metrics.register_distribution("getEvents", labels=["desc"])
 
 caches_by_name = {}
 cache_counter = metrics.register_cache(
@@ -143,7 +143,7 @@ class LoggingTransaction(object):
         finally:
             msecs = (time.time() * 1000) - start
             sql_logger.debug("[SQL time] {%s} %f", self.name, msecs)
-            sql_query_timer.inc_time(msecs, sql.split()[0])
+            sql_query_timer.inc_by(msecs, sql.split()[0])
 
 
 class PerformanceCounters(object):
@@ -268,7 +268,7 @@ class SQLBaseStore(object):
                     self._current_txn_total_time += end - start
                     self._txn_perf_counters.update(desc, start, end)
 
-                    sql_txn_timer.inc_time(self._current_txn_total_time, desc)
+                    sql_txn_timer.inc_by(self._current_txn_total_time, desc)
 
         with PreserveLoggingContext():
             result = yield self._db_pool.runInteraction(
@@ -672,7 +672,7 @@ class SQLBaseStore(object):
 
         def update_counter(desc, last_time):
             curr_time = self._get_event_counters.update(desc, last_time)
-            sql_getevents_timer.inc_time(curr_time - last_time, desc)
+            sql_getevents_timer.inc_by(curr_time - last_time, desc)
             return curr_time
 
         cache = self._get_event_cache.setdefault(event_id, {})
@@ -727,7 +727,7 @@ class SQLBaseStore(object):
 
         def update_counter(desc, last_time):
             curr_time = self._get_event_counters.update(desc, last_time)
-            sql_getevents_timer.inc_time(curr_time - last_time, desc)
+            sql_getevents_timer.inc_by(curr_time - last_time, desc)
             return curr_time
 
         d = json.loads(js)

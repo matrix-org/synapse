@@ -19,7 +19,9 @@ from __future__ import absolute_import
 import logging
 from resource import getrusage, getpagesize, RUSAGE_SELF
 
-from .metric import CounterMetric, CallbackMetric, TimerMetric, CacheMetric
+from .metric import (
+    CounterMetric, CallbackMetric, DistributionMetric, CacheMetric
+)
 
 
 logger = logging.getLogger(__name__)
@@ -59,8 +61,8 @@ class Metrics(object):
     def register_callback(self, *args, **kwargs):
         return self._register(CallbackMetric, *args, **kwargs)
 
-    def register_timer(self, *args, **kwargs):
-        return self._register(TimerMetric, *args, **kwargs)
+    def register_distribution(self, *args, **kwargs):
+        return self._register(DistributionMetric, *args, **kwargs)
 
     def register_cache(self, *args, **kwargs):
         return self._register(CacheMetric, *args, **kwargs)

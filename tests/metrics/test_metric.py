@@ -16,7 +16,7 @@
 from tests import unittest
 
 from synapse.metrics.metric import (
-    CounterMetric, CallbackMetric, TimerMetric, CacheMetric
+    CounterMetric, CallbackMetric, DistributionMetric, CacheMetric
 )
 
 
@@ -97,37 +97,37 @@ class CallbackMetricTestCase(unittest.TestCase):
         ])
 
 
-class TimerMetricTestCase(unittest.TestCase):
+class DistributionMetricTestCase(unittest.TestCase):
 
     def test_scalar(self):
-        metric = TimerMetric("thing")
+        metric = DistributionMetric("thing")
 
         self.assertEquals(metric.render(), [
             'thing:count 0',
-            'thing:msec 0',
+            'thing:total 0',
         ])
 
-        metric.inc_time(500)
+        metric.inc_by(500)
 
         self.assertEquals(metric.render(), [
             'thing:count 1',
-            'thing:msec 500',
+            'thing:total 500',
         ])
 
     def test_vector(self):
-        metric = TimerMetric("queries", labels=["verb"])
+        metric = DistributionMetric("queries", labels=["verb"])
 
         self.assertEquals(metric.render(), [])
 
-        metric.inc_time(300, "SELECT")
-        metric.inc_time(200, "SELECT")
-        metric.inc_time(800, "INSERT")
+        metric.inc_by(300, "SELECT")
+        metric.inc_by(200, "SELECT")
+        metric.inc_by(800, "INSERT")
 
         self.assertEquals(metric.render(), [
             'queries:count{verb="INSERT"} 1',
-            'queries:msec{verb="INSERT"} 800',
+            'queries:total{verb="INSERT"} 800',
             'queries:count{verb="SELECT"} 2',
-            'queries:msec{verb="SELECT"} 500',
+            'queries:total{verb="SELECT"} 500',
         ])
 
 
