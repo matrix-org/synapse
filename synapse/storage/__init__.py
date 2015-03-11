@@ -450,7 +450,7 @@ class DataStore(RoomMemberStore, RoomStore,
         else:
             args = (room_id, )
 
-        results = yield self._execute_and_decode(sql, *args)
+        results = yield self._execute_and_decode("get_current_state", sql, *args)
 
         events = yield self._parse_events(results)
         defer.returnValue(events)
@@ -475,7 +475,7 @@ class DataStore(RoomMemberStore, RoomStore,
         sql += " OR s.type = 'm.room.aliases')"
         args = (room_id,)
 
-        results = yield self._execute_and_decode(sql, *args)
+        results = yield self._execute_and_decode("get_current_state", sql, *args)
 
         events = yield self._parse_events(results)
 
@@ -495,8 +495,7 @@ class DataStore(RoomMemberStore, RoomStore,
     @defer.inlineCallbacks
     def _get_min_token(self):
         row = yield self._execute(
-            None,
-            "SELECT MIN(stream_ordering) FROM events"
+            "_get_min_token", None, "SELECT MIN(stream_ordering) FROM events"
         )
 
         self.min_token = row[0][0] if row and row[0] and row[0][0] else -1

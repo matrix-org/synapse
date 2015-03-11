@@ -296,7 +296,7 @@ class ApplicationServiceStore(SQLBaseStore):
         #   }
         # ]
         services = {}
-        results = yield self._execute_and_decode(sql)
+        results = yield self._execute_and_decode("_populate_cache", sql)
         for res in results:
             as_token = res["token"]
             if as_token not in services:
