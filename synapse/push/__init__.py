@@ -128,13 +128,15 @@ class Pusher(object):
             # ignore rules with no actions (we have an explict 'dont_notify')
             if len(actions) == 0:
                 logger.warn(
-                    "Ignoring rule id %s with no actions for user %s" %
-                    (r['rule_id'], r['user_name'])
+                    "Ignoring rule id %s with no actions for user %s",
+                    r['rule_id'], self.user_name
                 )
                 continue
             if matches:
+                logger.info("%s matches for user %s, event %s", r['rule_id'], self.user_name, ev['event_id'])
                 defer.returnValue(actions)
 
+        logger.info("No rules match for user %s, event %s", self.user_name, ev['event_id'])
         defer.returnValue(Pusher.DEFAULT_ACTIONS)
 
     @staticmethod
