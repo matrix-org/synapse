@@ -260,15 +260,13 @@ class SQLBaseStore(object):
                     raise
                 finally:
                     end = time.time() * 1000
-                    transaction_logger.debug(
-                        "[TXN END] {%s} %f",
-                        name, end - start
-                    )
+                    duration = end - start
 
-                    self._current_txn_total_time += end - start
+                    transaction_logger.debug("[TXN END] {%s} %f", name, duration)
+
+                    self._current_txn_total_time += duration
                     self._txn_perf_counters.update(desc, start, end)
-
-                    sql_txn_timer.inc_by(self._current_txn_total_time, desc)
+                    sql_txn_timer.inc_by(duration, desc)
 
         with PreserveLoggingContext():
             result = yield self._db_pool.runInteraction(
