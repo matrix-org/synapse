@@ -85,8 +85,8 @@ class KeyStore(SQLBaseStore):
             " AND key_id in (" + ",".join("?" for key_id in key_ids) + ")"
         )
 
-        rows = yield self._execute_and_decode("get_server_verify_keys", sql,
-            server_name, *key_ids
+        rows = yield self._execute_and_decode(
+            "get_server_verify_keys", sql, server_name, *key_ids
         )
 
         keys = []
