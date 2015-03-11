@@ -259,7 +259,7 @@ class SQLBaseStore(object):
         )
         return results
 
-    def _execute(self, decoder, query, *args):
+    def _execute(self, desc, decoder, query, *args):
         """Runs a single query for a result set.
 
         Args:
@@ -277,11 +277,10 @@ class SQLBaseStore(object):
             else:
                 return cursor.fetchall()
 
-        return self.runInteraction("_execute", interaction)
+        return self.runInteraction(desc, interaction)
 
     def _execute_and_decode(self, desc, query, *args):
-        # TODO: for now ignore desc
-        return self._execute(self.cursor_to_dict, query, *args)
+        return self._execute(desc, self.cursor_to_dict, query, *args)
 
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.

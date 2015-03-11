@@ -68,7 +68,7 @@ class RoomStore(SQLBaseStore):
         """
         query = RoomsTable.select_statement("room_id=?")
         return self._execute(
-            RoomsTable.decode_single_result, query, room_id,
+            "get_room", RoomsTable.decode_single_result, query, room_id,
         )
 
     @defer.inlineCallbacks

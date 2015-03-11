@@ -34,7 +34,7 @@ class PushRuleStore(SQLBaseStore):
             "WHERE user_name = ? "
             "ORDER BY priority_class DESC, priority DESC"
         )
-        rows = yield self._execute(None, sql, user_name)
+        rows = yield self._execute("get_push_rules_for_user", None, sql, user_name)
 
         dicts = []
         for r in rows:
