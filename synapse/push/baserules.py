@@ -58,6 +58,7 @@ def make_base_append_rules(user, kind):
 
     return rules
 
+
 def make_base_prepend_rules(user, kind):
     rules = []
 
