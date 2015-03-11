@@ -127,7 +127,7 @@ def make_base_append_override_rules():
                     'value': 'ring'
                 }, {
                     'set_tweak': 'highlight',
-                    'value': 'false'
+                    'value': False
                 }
             ]
         },
@@ -176,7 +176,7 @@ def make_base_append_override_rules():
                     'value': 'default'
                 }, {
                     'set_tweak': 'highlight',
-                    'value': 'false'
+                    'value': False
                 }
             ]
         }
@@ -211,7 +211,7 @@ def make_base_append_underride_rules(user):
                     'value': 'default'
                 }, {
                     'set_tweak': 'highlight',
-                    'value': 'false'
+                    'value': False
                 }
             ]
         },
@@ -227,7 +227,7 @@ def make_base_append_underride_rules(user):
             'actions': [
                 'notify', {
                     'set_tweak': 'highlight',
-                    'value': 'false'
+                    'value': False
                 }
             ]
         },
@@ -243,7 +243,7 @@ def make_base_append_underride_rules(user):
             'actions': [
                 'notify', {
                     'set_tweak': 'highlight',
-                    'value': 'false'
+                    'value': False
                 }
             ]
         }
