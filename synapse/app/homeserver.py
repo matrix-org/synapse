@@ -219,17 +219,20 @@ class SynapseHomeServer(HomeServer):
         """
         return "%s-%s" % (resource, path_seg)
 
-    def start_listening(self, secure_port, unsecure_port):
-        if secure_port is not None:
+    def start_listening(self):
+        config = self.get_config()
+
+        if not config.no_tls and config.bind_port is not None:
             reactor.listenSSL(
-                secure_port, Site(self.root_resource), self.tls_context_factory
+                config.bind_port, Site(self.root_resource), self.tls_context_factory
             )
-            logger.info("Synapse now listening on port %d", secure_port)
-        if unsecure_port is not None:
+            logger.info("Synapse now listening on port %d", config.bind_port)
+
+        if config.unsecure_port is not None:
             reactor.listenTCP(
-                unsecure_port, Site(self.root_resource)
+                config.unsecure_port, Site(self.root_resource)
             )
-            logger.info("Synapse now listening on port %d", unsecure_port)
+            logger.info("Synapse now listening on port %d", config.unsecure_port)
 
 
 def get_version_string():
@@ -381,11 +384,7 @@ def setup(config_options):
         f.namespace['hs'] = hs
         reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
 
-    bind_port = config.bind_port
-    if config.no_tls:
-        bind_port = None
-
-    hs.start_listening(bind_port, config.unsecure_port)
+    hs.start_listening()
 
     hs.get_pusherpool().start()
     hs.get_state_handler().start_caching()
