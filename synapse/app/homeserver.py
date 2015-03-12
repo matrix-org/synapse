@@ -129,7 +129,8 @@ class SynapseHomeServer(HomeServer):
             location of the web client. This does nothing if web_client is not
             True.
         """
-        web_client = self.get_config().webclient
+        config = self.get_config()
+        web_client = config.webclient
 
         # list containing (path_str, Resource) e.g:
         # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
@@ -155,7 +156,7 @@ class SynapseHomeServer(HomeServer):
             self.root_resource = Resource()
 
         metrics_resource = self.get_resource_for_metrics()
-        if metrics_resource is not None:
+        if config.metrics_port is None and metrics_resource is not None:
             desired_tree.append((METRICS_PREFIX, metrics_resource))
 
         # ideally we'd just use getChild and putChild but getChild doesn't work
@@ -233,6 +234,13 @@ class SynapseHomeServer(HomeServer):
                 config.unsecure_port, Site(self.root_resource)
             )
             logger.info("Synapse now listening on port %d", config.unsecure_port)
+
+        metrics_resource = self.get_resource_for_metrics()
+        if metrics_resource and config.metrics_port is not None:
+            reactor.listenTCP(
+                config.metrics_port, Site(metrics_resource), interface="127.0.0.1",
+            )
+            logger.info("Metrics now running on 127.0.0.1 port %d", config.metrics_port)
 
 
 def get_version_string():

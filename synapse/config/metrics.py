@@ -20,6 +20,7 @@ class MetricsConfig(Config):
     def __init__(self, args):
         super(MetricsConfig, self).__init__(args)
         self.enable_metrics = args.enable_metrics
+        self.metrics_port = args.metrics_port
 
     @classmethod
     def add_arguments(cls, parser):
@@ -28,4 +29,8 @@ class MetricsConfig(Config):
         metrics_group.add_argument(
             '--enable-metrics', dest="enable_metrics", action="store_true",
             help="Enable collection and rendering of performance metrics"
+        )
+        metrics_group.add_argument(
+            '--metrics-port', metavar="PORT", type=int,
+            help="Separate port to accept metrics requests on (on localhost)"
         )
