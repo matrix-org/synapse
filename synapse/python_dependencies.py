@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
     "syutil>=0.0.3": ["syutil"],
-    "matrix_angular_sdk>=0.6.4": ["syweb>=0.6.4"],
+    "matrix_angular_sdk>=0.6.5": ["syweb>=0.6.5"],
     "Twisted==14.0.2": ["twisted==14.0.2"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
