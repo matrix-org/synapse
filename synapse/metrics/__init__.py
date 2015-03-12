@@ -81,7 +81,7 @@ def render_all():
     for name in sorted(all_metrics.keys()):
         try:
             strs += all_metrics[name].render()
-        except Exception as e:
+        except Exception:
             strs += ["# FAILED to render %s" % name]
             logger.exception("Failed to render %s metric", name)
 
