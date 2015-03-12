@@ -47,6 +47,7 @@ from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
 from synapse.rest.client.v1 import ClientV1RestResource
 from synapse.rest.client.v2_alpha import ClientV2AlphaRestResource
+from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
@@ -100,6 +101,12 @@ class SynapseHomeServer(HomeServer):
     def build_resource_for_server_key(self):
         return LocalKey(self)
 
+    def build_resource_for_metrics(self):
+        if self.get_config().enable_metrics:
+            return MetricsResource(self)
+        else:
+            return None
+
     def build_db_pool(self):
         return adbapi.ConnectionPool(
             "sqlite3", self.get_db_name(),
@@ -147,12 +154,9 @@ class SynapseHomeServer(HomeServer):
         else:
             self.root_resource = Resource()
 
-        if self.get_config().enable_metrics:
-            from synapse.metrics.resource import (
-                MetricsResource, METRICS_PREFIX
-            )
-
-            desired_tree.append((METRICS_PREFIX, MetricsResource(self)))
+        metrics_resource = self.get_resource_for_metrics()
+        if metrics_resource is not None:
+            desired_tree.append((METRICS_PREFIX, metrics_resource))
 
         # ideally we'd just use getChild and putChild but getChild doesn't work
         # unless you give it a Request object IN ADDITION to the name :/ So
