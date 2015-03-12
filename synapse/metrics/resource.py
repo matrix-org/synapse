@@ -26,7 +26,7 @@ class MetricsResource(Resource):
     isLeaf = True
 
     def __init__(self, hs):
-        Resource.__init__(self) # Resource is old-style, so no super()
+        Resource.__init__(self)  # Resource is old-style, so no super()
 
         self.hs = hs
 

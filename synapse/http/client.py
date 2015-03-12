@@ -34,11 +34,13 @@ logger = logging.getLogger(__name__)
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
-outgoing_requests_counter = metrics.register_counter("requests",
+outgoing_requests_counter = metrics.register_counter(
+    "requests",
     labels=["method"],
 )
-incoming_responses_counter = metrics.register_counter("responses",
-    labels=["method","code"],
+incoming_responses_counter = metrics.register_counter(
+    "responses",
+    labels=["method", "code"],
 )
 
 
@@ -64,9 +66,11 @@ class SimpleHttpClient(object):
         def _cb(response):
             incoming_responses_counter.inc(method, response.code)
             return response
+
         def _eb(failure):
             incoming_responses_counter.inc(method, "ERR")
             return failure
+
         d.addCallbacks(_cb, _eb)
 
         return d

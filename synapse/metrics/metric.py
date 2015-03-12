@@ -27,7 +27,7 @@ class BaseMetric(object):
 
     def __init__(self, name, labels=[]):
         self.name = name
-        self.labels = labels # OK not to clone as we never write it
+        self.labels = labels  # OK not to clone as we never write it
 
     def dimension(self):
         return len(self.labels)
@@ -66,8 +66,8 @@ class CounterMetric(BaseMetric):
 
     def inc_by(self, incr, *values):
         if len(values) != self.dimension():
-            raise ValueError("Expected as many values to inc() as labels (%d)" %
-                (self.dimension())
+            raise ValueError(
+                "Expected as many values to inc() as labels (%d)" % (self.dimension())
             )
 
         # TODO: should assert that the tag values are all strings
@@ -135,10 +135,11 @@ class CacheMetric(object):
     def __init__(self, name, size_callback, labels=[]):
         self.name = name
 
-        self.hits  = CounterMetric(name + ":hits",  labels=labels)
+        self.hits = CounterMetric(name + ":hits", labels=labels)
         self.total = CounterMetric(name + ":total", labels=labels)
 
-        self.size = CallbackMetric(name + ":size",
+        self.size = CallbackMetric(
+            name + ":size",
             callback=size_callback,
             labels=labels,
         )

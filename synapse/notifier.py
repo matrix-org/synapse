@@ -127,14 +127,17 @@ class Notifier(object):
             return len(all_listeners)
         metrics.register_callback("listeners", count_listeners)
 
-        metrics.register_callback("rooms",
-            lambda: count(bool, self.room_to_listeners.values())
+        metrics.register_callback(
+            "rooms",
+            lambda: count(bool, self.room_to_listeners.values()),
         )
-        metrics.register_callback("users",
-            lambda: count(bool, self.user_to_listeners.values())
+        metrics.register_callback(
+            "users",
+            lambda: count(bool, self.user_to_listeners.values()),
         )
-        metrics.register_callback("appservices",
-            lambda: count(bool, self.appservice_to_listeners.values())
+        metrics.register_callback(
+            "appservices",
+            lambda: count(bool, self.appservice_to_listeners.values()),
         )
 
     @log_function

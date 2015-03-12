@@ -57,7 +57,8 @@ class TransactionQueue(object):
         # done
         self.pending_transactions = {}
 
-        metrics.register_callback("pending_destinations",
+        metrics.register_callback(
+            "pending_destinations",
             lambda: len(self.pending_transactions),
         )
 
@@ -67,10 +68,12 @@ class TransactionQueue(object):
         # destination -> list of tuple(edu, deferred)
         self.pending_edus_by_dest = edus = {}
 
-        metrics.register_callback("pending_pdus",
+        metrics.register_callback(
+            "pending_pdus",
             lambda: sum(map(len, pdus.values())),
         )
-        metrics.register_callback("pending_edus",
+        metrics.register_callback(
+            "pending_edus",
             lambda: sum(map(len, edus.values())),
         )
 
