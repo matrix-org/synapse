@@ -133,10 +133,16 @@ class Pusher(object):
                 )
                 continue
             if matches:
-                logger.info("%s matches for user %s, event %s", r['rule_id'], self.user_name, ev['event_id'])
+                logger.info(
+                    "%s matches for user %s, event %s",
+                    r['rule_id'], self.user_name, ev['event_id']
+                )
                 defer.returnValue(actions)
 
-        logger.info("No rules match for user %s, event %s", self.user_name, ev['event_id'])
+        logger.info(
+            "No rules match for user %s, event %s",
+            self.user_name, ev['event_id']
+        )
         defer.returnValue(Pusher.DEFAULT_ACTIONS)
 
     @staticmethod
