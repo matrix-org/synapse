@@ -73,7 +73,6 @@ class FederationHandler(BaseHandler):
         # When joining a room we need to queue any events for that room up
         self.room_queues = {}
 
-    @log_function
     @defer.inlineCallbacks
     def handle_new_event(self, event, destinations):
         """ Takes in an event from the client to server side, that has already

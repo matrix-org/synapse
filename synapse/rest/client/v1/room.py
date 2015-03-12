@@ -165,6 +165,12 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
+def trace(f):
+    f.should_trace = True
+    f.root_trace = True
+    return f
+
+
 # TODO: Needs unit testing for generic events + feedback
 class RoomSendEventRestServlet(ClientV1RestServlet):
 
@@ -175,7 +181,11 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_type, txn_id=None):
+        import inspect
+        frame = inspect.currentframe()
+        logger.info("Frame: %s", id(frame))
         user, client = yield self.auth.get_user_by_req(request)
+        logger.info("Frame: %s", id(inspect.currentframe()))
         content = _parse_json(request)
 
         msg_handler = self.handlers.message_handler
@@ -189,12 +199,14 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
             client=client,
             txn_id=txn_id,
         )
+        logger.info("Frame: %s", id(inspect.currentframe()))
 
         defer.returnValue((200, {"event_id": event.event_id}))
 
     def on_GET(self, request, room_id, event_type, txn_id):
         return (200, "Not implemented")
 
+    @trace
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, txn_id):
         try:

@@ -51,6 +51,8 @@ from synapse.rest.client.v2_alpha import ClientV2AlphaRestResource
 from daemonize import Daemonize
 import twisted.manhole.telnet
 
+from synapse.util.traceutil import Tracer
+
 import synapse
 
 import logging
@@ -60,6 +62,7 @@ import resource
 import subprocess
 import sqlite3
 import syweb
+
 
 logger = logging.getLogger(__name__)
 
@@ -399,8 +402,13 @@ class SynapseService(service.Service):
 
 
 def run(hs):
-
     def in_thread():
+        try:
+            tracer = Tracer()
+            sys.settrace(tracer.process)
+        except Exception:
+            logger.exception("Failed to start tracer")
+
         with LoggingContext("run"):
             change_resource_limit(hs.config.soft_file_limit)
 
