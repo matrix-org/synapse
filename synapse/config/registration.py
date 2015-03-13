@@ -31,3 +31,7 @@ class RegistrationConfig(Config):
             action='store_true',
             help="Disable registration of new users."
         )
+
+    @classmethod
+    def generate_config(cls, args, config_dir_path):
+        args.disable_registration = True
