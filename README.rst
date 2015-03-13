@@ -126,6 +126,17 @@ To set up your homeserver, run (in your virtualenv, as before)::
 
 Substituting your host and domain name as appropriate.
 
+By default, registration of new users is disabled. You can either enable
+registration in the config (it is then recommended to also set up CAPTCHA), or
+you can use the command line to register new users::
+
+    $ source ~/.synapse/bin/activate
+    $ register_new_matrix_user -c homeserver.yaml https://localhost:8448
+    New user localpart: erikj
+    Password:
+    Confirm password:
+    Success!
+
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See docs/turn-howto.rst for details.
 
