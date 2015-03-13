@@ -129,10 +129,10 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "server_url",
-        default="https://localhost:8480",
+        default="https://localhost:8448",
         nargs='?',
         help="URL to use to talk to the home server. Defaults to "
-             " 'https://localhost:8480'.",
+             " 'https://localhost:8448'.",
     )
 
     args = parser.parse_args()
