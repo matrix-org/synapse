@@ -55,5 +55,5 @@ setup(
     include_package_data=True,
     zip_safe=False,
     long_description=long_description,
-    scripts=["synctl", "register_new_user"],
+    scripts=["synctl", "register_new_matrix_user"],
 )
