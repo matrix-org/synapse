@@ -25,11 +25,14 @@ from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.retryutils import (
     get_retry_limiter, NotRetryingDestination,
 )
+import synapse.metrics
 
 import logging
 
 
 logger = logging.getLogger(__name__)
+
+metrics = synapse.metrics.get_metrics_for(__name__)
 
 
 class TransactionQueue(object):
@@ -54,11 +57,25 @@ class TransactionQueue(object):
         # done
         self.pending_transactions = {}
 
+        metrics.register_callback(
+            "pending_destinations",
+            lambda: len(self.pending_transactions),
+        )
+
         # Is a mapping from destination -> list of
         # tuple(pending pdus, deferred, order)
-        self.pending_pdus_by_dest = {}
+        self.pending_pdus_by_dest = pdus = {}
         # destination -> list of tuple(edu, deferred)
-        self.pending_edus_by_dest = {}
+        self.pending_edus_by_dest = edus = {}
+
+        metrics.register_callback(
+            "pending_pdus",
+            lambda: sum(map(len, pdus.values())),
+        )
+        metrics.register_callback(
+            "pending_edus",
+            lambda: sum(map(len, edus.values())),
+        )
 
         # destination -> list of tuple(failure, deferred)
         self.pending_failures_by_dest = {}

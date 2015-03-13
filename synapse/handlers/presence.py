@@ -21,6 +21,7 @@ from synapse.api.constants import PresenceState
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
 from synapse.types import UserID
+import synapse.metrics
 
 from ._base import BaseHandler
 
@@ -28,6 +29,8 @@ import logging
 
 
 logger = logging.getLogger(__name__)
+
+metrics = synapse.metrics.get_metrics_for(__name__)
 
 
 # TODO(paul): Maybe there's one of these I can steal from somewhere
@@ -132,6 +135,11 @@ class PresenceHandler(BaseHandler):
         # map any user to a UserPresenceCache
         self._user_cachemap = {}
         self._user_cachemap_latest_serial = 0
+
+        metrics.register_callback(
+            "userCachemap:size",
+            lambda: len(self._user_cachemap),
+        )
 
     def _get_or_make_usercache(self, user):
         """If the cache entry doesn't exist, initialise a new one."""

@@ -148,6 +148,10 @@ class BaseFederationServlet(object):
                 logger.exception("authenticate_request failed")
                 raise
             defer.returnValue(response)
+
+        # Extra logic that functools.wraps() doesn't finish
+        new_code.__self__ = code.__self__
+
         return new_code
 
     def register(self, server):

@@ -15,6 +15,7 @@
 
 from synapse.api.errors import CodeMessageException
 from syutil.jsonutil import encode_canonical_json
+import synapse.metrics
 
 from twisted.internet import defer, reactor
 from twisted.web.client import (
@@ -31,6 +32,17 @@ import urllib
 
 logger = logging.getLogger(__name__)
 
+metrics = synapse.metrics.get_metrics_for(__name__)
+
+outgoing_requests_counter = metrics.register_counter(
+    "requests",
+    labels=["method"],
+)
+incoming_responses_counter = metrics.register_counter(
+    "responses",
+    labels=["method", "code"],
+)
+
 
 class SimpleHttpClient(object):
     """
@@ -45,12 +57,30 @@ class SimpleHttpClient(object):
         self.agent = Agent(reactor)
         self.version_string = hs.version_string
 
+    def request(self, method, *args, **kwargs):
+        # A small wrapper around self.agent.request() so we can easily attach
+        # counters to it
+        outgoing_requests_counter.inc(method)
+        d = self.agent.request(method, *args, **kwargs)
+
+        def _cb(response):
+            incoming_responses_counter.inc(method, response.code)
+            return response
+
+        def _eb(failure):
+            incoming_responses_counter.inc(method, "ERR")
+            return failure
+
+        d.addCallbacks(_cb, _eb)
+
+        return d
+
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}):
         logger.debug("post_urlencoded_get_json args: %s", args)
         query_bytes = urllib.urlencode(args, True)
 
-        response = yield self.agent.request(
+        response = yield self.request(
             "POST",
             uri.encode("ascii"),
             headers=Headers({
@@ -70,7 +100,7 @@ class SimpleHttpClient(object):
 
         logger.info("HTTP POST %s -> %s", json_str, uri)
 
-        response = yield self.agent.request(
+        response = yield self.request(
             "POST",
             uri.encode("ascii"),
             headers=Headers({
@@ -104,7 +134,7 @@ class SimpleHttpClient(object):
             query_bytes = urllib.urlencode(args, True)
             uri = "%s?%s" % (uri, query_bytes)
 
-        response = yield self.agent.request(
+        response = yield self.request(
             "GET",
             uri.encode("ascii"),
             headers=Headers({
@@ -145,7 +175,7 @@ class SimpleHttpClient(object):
 
         json_str = encode_canonical_json(json_body)
 
-        response = yield self.agent.request(
+        response = yield self.request(
             "PUT",
             uri.encode("ascii"),
             headers=Headers({
@@ -176,7 +206,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
     def post_urlencoded_get_raw(self, url, args={}):
         query_bytes = urllib.urlencode(args, True)
 
-        response = yield self.agent.request(
+        response = yield self.request(
             "POST",
             url.encode("ascii"),
             bodyProducer=FileBodyProducer(StringIO(query_bytes)),

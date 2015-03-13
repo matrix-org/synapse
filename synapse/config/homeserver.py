@@ -23,11 +23,13 @@ from .captcha import CaptchaConfig
 from .email import EmailConfig
 from .voip import VoipConfig
 from .registration import RegistrationConfig
+from .metrics import MetricsConfig
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
-                       EmailConfig, VoipConfig, RegistrationConfig,):
+                       EmailConfig, VoipConfig, RegistrationConfig,
+                       MetricsConfig,):
     pass
 
 
