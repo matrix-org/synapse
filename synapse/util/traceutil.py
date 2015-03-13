@@ -29,6 +29,7 @@ class Tracer(object):
 
         self.next_id = 1
 
+        self.deferred_frames = {}
         self.deferred_to_current_frames = {}
 
     def process(self, frame, event, arg):
@@ -44,9 +45,14 @@ class Tracer(object):
             trace_id = self.get_next_id()
             deferred.syn_trace_defer_id = trace_id
             logger.info(
-                "%s named Deferred %s",
+                "%s named %s",
                 trace_id,
                 self.get_name_for_frame(generator.gi_frame)
+            )
+
+            logger.info(
+                "%s is deferred",
+                trace_id,
             )
 
             logger.info("%s start %d", trace_id, int(time.time() * 1000))
