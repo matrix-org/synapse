@@ -17,12 +17,17 @@ from ._base import Config
 
 from synapse.util.stringutils import random_string_with_symbols
 
+import distutils.util
+
 
 class RegistrationConfig(Config):
 
     def __init__(self, args):
         super(RegistrationConfig, self).__init__(args)
-        self.disable_registration = args.disable_registration
+
+        self.disable_registration = bool(
+            distutils.util.strtobool(str(args.disable_registration))
+        )
         self.registration_shared_secret = args.registration_shared_secret
 
     @classmethod
@@ -32,8 +37,9 @@ class RegistrationConfig(Config):
 
         reg_group.add_argument(
             "--disable-registration",
-            action='store_const',
             const=True,
+            default=True,
+            nargs='?',
             help="Disable registration of new users.",
         )
         reg_group.add_argument(
