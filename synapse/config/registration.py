@@ -48,4 +48,4 @@ class RegistrationConfig(Config):
             args.disable_registration = True
 
         if args.registration_shared_secret is None:
-            args.registration_shared_secret= random_string_with_symbols(50)
+            args.registration_shared_secret = random_string_with_symbols(50)
