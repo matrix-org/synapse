@@ -225,13 +225,18 @@ class SynapseHomeServer(HomeServer):
 
         if not config.no_tls and config.bind_port is not None:
             reactor.listenSSL(
-                config.bind_port, Site(self.root_resource), self.tls_context_factory
+                config.bind_port,
+                Site(self.root_resource),
+                self.tls_context_factory,
+                interface=config.bind_host
             )
             logger.info("Synapse now listening on port %d", config.bind_port)
 
         if config.unsecure_port is not None:
             reactor.listenTCP(
-                config.unsecure_port, Site(self.root_resource)
+                config.unsecure_port,
+                Site(self.root_resource),
+                interface=config.bind_host
             )
             logger.info("Synapse now listening on port %d", config.unsecure_port)
 

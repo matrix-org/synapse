@@ -86,6 +86,7 @@ class JsonResource(HttpServer, resource.Resource):
         self.clock = hs.get_clock()
         self.path_regexs = {}
         self.version_string = hs.version_string
+        self.hs = hs
 
     def register_path(self, method, path_pattern, callback):
         self.path_regexs.setdefault(method, []).append(
@@ -99,7 +100,11 @@ class JsonResource(HttpServer, resource.Resource):
             port (int): The port to listen on.
 
         """
-        reactor.listenTCP(port, server.Site(self))
+        reactor.listenTCP(
+            port,
+            server.Site(self),
+            interface=self.hs.config.bind_host
+        )
 
     # Gets called by twisted
     def render(self, request):
