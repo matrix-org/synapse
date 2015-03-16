@@ -142,7 +142,16 @@ class BaseHandler(object):
                     "Failed to get destination from event %s", s.event_id
                 )
 
-        yield self.notifier.on_new_room_event(event, extra_users=extra_users)
+        # Don't block waiting on waking up all the listeners.
+        d = self.notifier.on_new_room_event(event, extra_users=extra_users)
+
+        def log_failure(f):
+            logger.warn(
+                "Failed to notify about %s: %s",
+                event.event_id, f.value
+            )
+
+        d.addErrback(log_failure)
 
         yield federation_handler.handle_new_event(
             event, destinations=destinations,
