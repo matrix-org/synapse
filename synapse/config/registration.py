@@ -25,6 +25,9 @@ class RegistrationConfig(Config):
     def __init__(self, args):
         super(RegistrationConfig, self).__init__(args)
 
+        # `args.disable_registration` may either be a bool or a string depending
+        # on if the option was given a value (e.g. --disable-registration=false
+        # would set `args.disable_registration` to "false" not False.)
         self.disable_registration = bool(
             distutils.util.strtobool(str(args.disable_registration))
         )
