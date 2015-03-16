@@ -175,13 +175,12 @@ sub on_room_message
 my $verto_connecting = $loop->new_future;
 $bot_verto->connect(
     %{ $CONFIG{"verto-bot"} },
-    on_connected => sub {
-        warn("[Verto] connected to websocket");
-        $verto_connecting->done($bot_verto) if not $verto_connecting->is_done;
-    },
     on_connect_error => sub { die "Cannot connect to verto - $_[-1]" },
     on_resolve_error => sub { die "Cannot resolve to verto - $_[-1]" },        
-);
+)->then( sub { 
+    warn("[Verto] connected to websocket");
+    $verto_connecting->done($bot_verto) if not $verto_connecting->is_done;
+});
 
 Future->needs_all(
     $bot_matrix->login( %{ $CONFIG{"matrix-bot"} } )->then( sub {

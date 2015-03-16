@@ -86,7 +86,7 @@ sub create_virtual_user
     "user": "$localpart"
 }
 EOT
-    )->get;    
+    )->get;
     warn $response->as_string if ($response->code != 200);
 }
     
@@ -266,17 +266,21 @@ my $as_url = $CONFIG{"matrix-bot"}->{as_url};
 
 Future->needs_all(
     $http->do_request(
-        method => "POST",
-        uri => URI->new( $CONFIG{"matrix"}->{server}."/_matrix/appservice/v1/register" ),
-        content_type => "application/json",
-        content => <<EOT
+            method => "POST",
+            uri => URI->new( $CONFIG{"matrix"}->{server}."/_matrix/appservice/v1/register" ),
+            content_type => "application/json",
+            content => <<EOT
 {
     "as_token": "$as_token",
     "url": "$as_url",
-    "namespaces": { "users": ["\@\\\\+.*"] }
+    "namespaces": { "users": [ { "regex": "\@\\\\+.*", "exclusive": false } ] }
 }
 EOT
-    ),
+    )->then( sub{
+        my ($response) = (@_);
+        warn $response->as_string if ($response->code != 200);
+        return Future->done;
+    }),
     $verto_connecting,
 )->get;
 

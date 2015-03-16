@@ -88,8 +88,7 @@ class RegistrationStore(SQLBaseStore):
         query = ("SELECT users.name, users.password_hash FROM users"
                  " WHERE users.name = ?")
         return self._execute(
-            self.cursor_to_dict,
-            query, user_id
+            "get_user_by_id", self.cursor_to_dict, query, user_id
         )
 
     def get_user_by_token(self, token):

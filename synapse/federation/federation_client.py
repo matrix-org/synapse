@@ -25,6 +25,7 @@ from synapse.api.errors import (
 from synapse.util.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
 from synapse.events import FrozenEvent
+import synapse.metrics
 
 from synapse.util.retryutils import get_retry_limiter, NotRetryingDestination
 
@@ -36,9 +37,17 @@ import random
 logger = logging.getLogger(__name__)
 
 
+# synapse.federation.federation_client is a silly name
+metrics = synapse.metrics.get_metrics_for("synapse.federation.client")
+
+sent_pdus_destination_dist = metrics.register_distribution("sent_pdu_destinations")
+
+sent_edus_counter = metrics.register_counter("sent_edus")
+
+sent_queries_counter = metrics.register_counter("sent_queries", labels=["type"])
+
+
 class FederationClient(FederationBase):
-    def __init__(self):
-        self._get_pdu_cache = None
 
     def start_get_pdu_cache(self):
         self._get_pdu_cache = ExpiringCache(
@@ -68,6 +77,8 @@ class FederationClient(FederationBase):
         order = self._order
         self._order += 1
 
+        sent_pdus_destination_dist.inc_by(len(destinations))
+
         logger.debug("[%s] transaction_layer.enqueue_pdu... ", pdu.event_id)
 
         # TODO, add errback, etc.
@@ -86,6 +97,8 @@ class FederationClient(FederationBase):
             edu_type=edu_type,
             content=content,
         )
+
+        sent_edus_counter.inc()
 
         # TODO, add errback, etc.
         self._transaction_queue.enqueue_edu(edu)
@@ -113,6 +126,8 @@ class FederationClient(FederationBase):
             a Deferred which will eventually yield a JSON object from the
             response
         """
+        sent_queries_counter.inc(query_type)
+
         return self.transport_layer.make_query(
             destination, query_type, args, retry_on_dns_fail=retry_on_dns_fail
         )

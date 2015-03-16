@@ -156,9 +156,12 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
             template_rule = _rule_to_template(r)
             if template_rule:
-                template_rule['enabled'] = True
                 if r['rule_id'] in enabled_map:
                     template_rule['enabled'] = enabled_map[r['rule_id']]
+                elif 'enabled' in r:
+                    template_rule['enabled'] = r['enabled']
+                else:
+                    template_rule['enabled'] = True
                 rulearray.append(template_rule)
 
         path = request.postpath[1:]

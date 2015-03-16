@@ -341,7 +341,7 @@ class ApplicationServiceStore(SQLBaseStore):
         sql = ("SELECT r.*, a.* FROM application_services AS a LEFT JOIN "
                "application_services_regex AS r ON a.id = r.as_id")
 
-        results = yield self._execute_and_decode(sql)
+        results = yield self._execute_and_decode("appservice_cache", sql)
         services = self._parse_services_dict(results)
 
         for service in services:
@@ -369,7 +369,9 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             "application_services AS a ON a.id=s.as_id LEFT JOIN "
             "application_services_regex AS r ON r.as_id=a.id WHERE state = ?"
         )
-        results = yield self._execute_and_decode(sql, state)
+        results = yield self._execute_and_decode(
+            "get_appservices_by_state", sql, state
+        )
         # NB: This assumes this class is linked with ApplicationServiceStore
         defer.returnValue(self._parse_services_dict(results))
 

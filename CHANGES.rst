@@ -13,7 +13,6 @@ General:
   * Notify when invited to a new room.
   * Notify for messages that don't match any rule.
   * Notify on incoming call.
-  * Notify if there were no matching rules.
 
 Federation:
 

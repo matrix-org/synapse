@@ -96,7 +96,9 @@ class SyncHandler(BaseHandler):
                 return self.current_sync_for_user(sync_config, since_token)
 
             rm_handler = self.hs.get_handlers().room_member_handler
-            room_ids = yield rm_handler.get_rooms_for_user(sync_config.user)
+            room_ids = yield rm_handler.get_joined_rooms_for_user(
+                sync_config.user
+            )
             result = yield self.notifier.wait_for_events(
                 sync_config.user, room_ids,
                 sync_config.filter, timeout, current_sync_callback
@@ -227,7 +229,7 @@ class SyncHandler(BaseHandler):
         logger.debug("Typing %r", typing_by_room)
 
         rm_handler = self.hs.get_handlers().room_member_handler
-        room_ids = yield rm_handler.get_rooms_for_user(sync_config.user)
+        room_ids = yield rm_handler.get_joined_rooms_for_user(sync_config.user)
 
         # TODO (mjark): Does public mean "published"?
         published_rooms = yield self.store.get_rooms(is_public=True)

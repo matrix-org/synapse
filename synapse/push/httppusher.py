@@ -109,7 +109,7 @@ class HttpPusher(Pusher):
         try:
             resp = yield self.httpCli.post_json_get_json(self.url, notification_dict)
         except:
-            logger.exception("Failed to push %s ", self.url)
+            logger.warn("Failed to push %s ", self.url)
             defer.returnValue(False)
         rejected = []
         if 'rejected' in resp:

@@ -197,9 +197,8 @@ class ProfileHandler(BaseHandler):
 
         self.ratelimit(user.to_string())
 
-        joins = yield self.store.get_rooms_for_user_where_membership_is(
+        joins = yield self.store.get_rooms_for_user(
             user.to_string(),
-            [Membership.JOIN],
         )
 
         for j in joins:

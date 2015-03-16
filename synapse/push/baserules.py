@@ -6,36 +6,51 @@ def list_with_base_rules(rawrules, user_name):
 
     # shove the server default rules for each kind onto the end of each
     current_prio_class = PRIORITY_CLASS_INVERSE_MAP.keys()[-1]
+
+    ruleslist.extend(make_base_prepend_rules(
+        user_name, PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
+    ))
+
     for r in rawrules:
         if r['priority_class'] < current_prio_class:
             while r['priority_class'] < current_prio_class:
-                ruleslist.extend(make_base_rules(
+                ruleslist.extend(make_base_append_rules(
                     user_name,
                     PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
                 ))
                 current_prio_class -= 1
+                if current_prio_class > 0:
+                    ruleslist.extend(make_base_prepend_rules(
+                        user_name,
+                        PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
+                    ))
 
         ruleslist.append(r)
 
     while current_prio_class > 0:
-        ruleslist.extend(make_base_rules(
+        ruleslist.extend(make_base_append_rules(
             user_name,
             PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
         ))
         current_prio_class -= 1
+        if current_prio_class > 0:
+            ruleslist.extend(make_base_prepend_rules(
+                user_name,
+                PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
+            ))
 
     return ruleslist
 
 
-def make_base_rules(user, kind):
+def make_base_append_rules(user, kind):
     rules = []
 
     if kind == 'override':
-        rules = make_base_override_rules()
+        rules = make_base_append_override_rules()
     elif kind == 'underride':
-        rules = make_base_underride_rules(user)
+        rules = make_base_append_underride_rules(user)
     elif kind == 'content':
-        rules = make_base_content_rules(user)
+        rules = make_base_append_content_rules(user)
 
     for r in rules:
         r['priority_class'] = PRIORITY_CLASS_MAP[kind]
@@ -44,7 +59,20 @@ def make_base_rules(user, kind):
     return rules
 
 
-def make_base_content_rules(user):
+def make_base_prepend_rules(user, kind):
+    rules = []
+
+    if kind == 'override':
+        rules = make_base_prepend_override_rules()
+
+    for r in rules:
+        r['priority_class'] = PRIORITY_CLASS_MAP[kind]
+        r['default'] = True  # Deprecated, left for backwards compat
+
+    return rules
+
+
+def make_base_append_content_rules(user):
     return [
         {
             'rule_id': 'global/content/.m.rule.contains_user_name',
@@ -68,10 +96,43 @@ def make_base_content_rules(user):
     ]
 
 
-def make_base_override_rules():
+def make_base_prepend_override_rules():
     return [
         {
-            'rule_id': 'global/underride/.m.rule.suppress_notices',
+            'rule_id': 'global/override/.m.rule.master',
+            'enabled': False,
+            'conditions': [],
+            'actions': [
+                "dont_notify"
+            ]
+        }
+    ]
+
+
+def make_base_append_override_rules():
+    return [
+        {
+            'rule_id': 'global/override/.m.rule.call',
+            'conditions': [
+                {
+                    'kind': 'event_match',
+                    'key': 'type',
+                    'pattern': 'm.call.invite',
+                }
+            ],
+            'actions': [
+                'notify',
+                {
+                    'set_tweak': 'sound',
+                    'value': 'ring'
+                }, {
+                    'set_tweak': 'highlight',
+                    'value': False
+                }
+            ]
+        },
+        {
+            'rule_id': 'global/override/.m.rule.suppress_notices',
             'conditions': [
                 {
                     'kind': 'event_match',
@@ -80,7 +141,7 @@ def make_base_override_rules():
                 }
             ],
             'actions': [
-                'dont-notify',
+                'dont_notify',
             ]
         },
         {
@@ -113,13 +174,16 @@ def make_base_override_rules():
                 {
                     'set_tweak': 'sound',
                     'value': 'default'
+                }, {
+                    'set_tweak': 'highlight',
+                    'value': False
                 }
             ]
         }
     ]
 
 
-def make_base_underride_rules(user):
+def make_base_append_underride_rules(user):
     return [
         {
             'rule_id': 'global/underride/.m.rule.invite_for_me',
@@ -145,6 +209,9 @@ def make_base_underride_rules(user):
                 {
                     'set_tweak': 'sound',
                     'value': 'default'
+                }, {
+                    'set_tweak': 'highlight',
+                    'value': False
                 }
             ]
         },
@@ -158,7 +225,10 @@ def make_base_underride_rules(user):
                 }
             ],
             'actions': [
-                'notify',
+                'notify', {
+                    'set_tweak': 'highlight',
+                    'value': False
+                }
             ]
         },
         {
@@ -171,32 +241,10 @@ def make_base_underride_rules(user):
                 }
             ],
             'actions': [
-                'notify',
-            ]
-        },
-        {
-            'rule_id': 'global/underride/.m.rule.call',
-            'conditions': [
-                {
-                    'kind': 'event_match',
-                    'key': 'type',
-                    'pattern': 'm.call.invite',
-                }
-            ],
-            'actions': [
-                'notify',
-                {
-                    'set_tweak': 'sound',
-                    'value': 'ring'
+                'notify', {
+                    'set_tweak': 'highlight',
+                    'value': False
                 }
             ]
-        },
-        {
-            'rule_id': 'global/underride/.m.rule.fallback',
-            'conditions': [
-            ],
-            'actions': [
-                'notify',
-            ]
-        },
+        }
     ]

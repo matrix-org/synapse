@@ -37,7 +37,8 @@ class PusherStore(SQLBaseStore):
         )
 
         rows = yield self._execute(
-            None, sql, app_id_and_pushkey[0], app_id_and_pushkey[1]
+            "get_pushers_by_app_id_and_pushkey", None, sql,
+            app_id_and_pushkey[0], app_id_and_pushkey[1]
         )
 
         ret = [
@@ -70,7 +71,7 @@ class PusherStore(SQLBaseStore):
             "FROM pushers"
         )
 
-        rows = yield self._execute(None, sql)
+        rows = yield self._execute("get_all_pushers", None, sql)
 
         ret = [
             {

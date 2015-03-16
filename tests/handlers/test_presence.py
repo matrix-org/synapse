@@ -100,7 +100,7 @@ class PresenceTestCase(unittest.TestCase):
         self.room_members = []
 
         room_member_handler = handlers.room_member_handler = Mock(spec=[
-            "get_rooms_for_user",
+            "get_joined_rooms_for_user",
             "get_room_members",
             "fetch_room_distributions_into",
         ])
@@ -111,7 +111,7 @@ class PresenceTestCase(unittest.TestCase):
                 return defer.succeed([self.room_id])
             else:
                 return defer.succeed([])
-        room_member_handler.get_rooms_for_user = get_rooms_for_user
+        room_member_handler.get_joined_rooms_for_user = get_rooms_for_user
 
         def get_room_members(room_id):
             if room_id == self.room_id:

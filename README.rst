@@ -1,3 +1,5 @@
+.. contents::
+
 Introduction
 ============
 
@@ -250,7 +252,8 @@ fix try re-installing from PyPI or directly from
 ArchLinux
 ---------
 
-If running `$ synctl start` fails wit 'returned non-zero exit status 1', you will need to explicitly call Python2.7 - either running as::
+If running `$ synctl start` fails with 'returned non-zero exit status 1',
+you will need to explicitly call Python2.7 - either running as::
 
     $ python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml --pid-file homeserver.pid
     

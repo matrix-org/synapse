@@ -71,7 +71,7 @@ class EventStreamHandler(BaseHandler):
                 self._streams_per_user[auth_user] += 1
 
             rm_handler = self.hs.get_handlers().room_member_handler
-            room_ids = yield rm_handler.get_rooms_for_user(auth_user)
+            room_ids = yield rm_handler.get_joined_rooms_for_user(auth_user)
 
             if timeout:
                 # If they've set a timeout set a minimum limit.

@@ -26,6 +26,7 @@ from synapse.server import HomeServer
 from synapse.python_dependencies import check_requirements
 
 from twisted.internet import reactor
+from twisted.application import service
 from twisted.enterprise import adbapi
 from twisted.web.resource import Resource
 from twisted.web.static import File
@@ -46,6 +47,7 @@ from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
 from synapse.rest.client.v1 import ClientV1RestResource
 from synapse.rest.client.v2_alpha import ClientV2AlphaRestResource
+from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 
 from daemonize import Daemonize
 import twisted.manhole.telnet
@@ -99,6 +101,12 @@ class SynapseHomeServer(HomeServer):
     def build_resource_for_server_key(self):
         return LocalKey(self)
 
+    def build_resource_for_metrics(self):
+        if self.get_config().enable_metrics:
+            return MetricsResource(self)
+        else:
+            return None
+
     def build_db_pool(self):
         return adbapi.ConnectionPool(
             "sqlite3", self.get_db_name(),
@@ -109,7 +117,7 @@ class SynapseHomeServer(HomeServer):
                                           # so that :memory: sqlite works
         )
 
-    def create_resource_tree(self, web_client, redirect_root_to_web_client):
+    def create_resource_tree(self, redirect_root_to_web_client):
         """Create the resource tree for this Home Server.
 
         This in unduly complicated because Twisted does not support putting
@@ -121,6 +129,9 @@ class SynapseHomeServer(HomeServer):
             location of the web client. This does nothing if web_client is not
             True.
         """
+        config = self.get_config()
+        web_client = config.webclient
+
         # list containing (path_str, Resource) e.g:
         # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
         desired_tree = [
@@ -143,6 +154,10 @@ class SynapseHomeServer(HomeServer):
             self.root_resource = RootRedirect(WEB_CLIENT_PREFIX)
         else:
             self.root_resource = Resource()
+
+        metrics_resource = self.get_resource_for_metrics()
+        if config.metrics_port is None and metrics_resource is not None:
+            desired_tree.append((METRICS_PREFIX, metrics_resource))
 
         # ideally we'd just use getChild and putChild but getChild doesn't work
         # unless you give it a Request object IN ADDITION to the name :/ So
@@ -205,17 +220,32 @@ class SynapseHomeServer(HomeServer):
         """
         return "%s-%s" % (resource, path_seg)
 
-    def start_listening(self, secure_port, unsecure_port):
-        if secure_port is not None:
+    def start_listening(self):
+        config = self.get_config()
+
+        if not config.no_tls and config.bind_port is not None:
             reactor.listenSSL(
-                secure_port, Site(self.root_resource), self.tls_context_factory
+                config.bind_port,
+                Site(self.root_resource),
+                self.tls_context_factory,
+                interface=config.bind_host
             )
-            logger.info("Synapse now listening on port %d", secure_port)
-        if unsecure_port is not None:
+            logger.info("Synapse now listening on port %d", config.bind_port)
+
+        if config.unsecure_port is not None:
             reactor.listenTCP(
-                unsecure_port, Site(self.root_resource)
+                config.unsecure_port,
+                Site(self.root_resource),
+                interface=config.bind_host
             )
-            logger.info("Synapse now listening on port %d", unsecure_port)
+            logger.info("Synapse now listening on port %d", config.unsecure_port)
+
+        metrics_resource = self.get_resource_for_metrics()
+        if metrics_resource and config.metrics_port is not None:
+            reactor.listenTCP(
+                config.metrics_port, Site(metrics_resource), interface="127.0.0.1",
+            )
+            logger.info("Metrics now running on 127.0.0.1 port %d", config.metrics_port)
 
 
 def get_version_string():
@@ -295,10 +325,19 @@ def change_resource_limit(soft_file_no):
         logger.warn("Failed to set file limit: %s", e)
 
 
-def setup():
+def setup(config_options):
+    """
+    Args:
+        config_options_options: The options passed to Synapse. Usually
+            `sys.argv[1:]`.
+        should_run (bool): Whether to start the reactor.
+
+    Returns:
+        HomeServer
+    """
     config = HomeServerConfig.load_config(
         "Synapse Homeserver",
-        sys.argv[1:],
+        config_options,
         generate_section="Homeserver"
     )
 
@@ -330,7 +369,6 @@ def setup():
     )
 
     hs.create_resource_tree(
-        web_client=config.webclient,
         redirect_root_to_web_client=True,
     )
 
@@ -359,24 +397,47 @@ def setup():
         f.namespace['hs'] = hs
         reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
 
-    bind_port = config.bind_port
-    if config.no_tls:
-        bind_port = None
-
-    hs.start_listening(bind_port, config.unsecure_port)
+    hs.start_listening()
 
     hs.get_pusherpool().start()
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
     hs.get_replication_layer().start_get_pdu_cache()
 
-    if config.daemonize:
-        print config.pid_file
+    return hs
+
+
+class SynapseService(service.Service):
+    """A twisted Service class that will start synapse. Used to run synapse
+    via twistd and a .tac.
+    """
+    def __init__(self, config):
+        self.config = config
+
+    def startService(self):
+        hs = setup(self.config)
+        change_resource_limit(hs.config.soft_file_limit)
+
+    def stopService(self):
+        return self._port.stopListening()
+
+
+def run(hs):
+
+    def in_thread():
+        with LoggingContext("run"):
+            change_resource_limit(hs.config.soft_file_limit)
+
+            reactor.run()
+
+    if hs.config.daemonize:
+
+        print hs.config.pid_file
 
         daemon = Daemonize(
             app="synapse-homeserver",
-            pid=config.pid_file,
-            action=lambda: run(config),
+            pid=hs.config.pid_file,
+            action=lambda: in_thread(),
             auto_close_fds=False,
             verbose=True,
             logger=logger,
@@ -384,20 +445,14 @@ def setup():
 
         daemon.start()
     else:
-        run(config)
-
-
-def run(config):
-    with LoggingContext("run"):
-        change_resource_limit(config.soft_file_limit)
-
-        reactor.run()
+        in_thread()
 
 
 def main():
     with LoggingContext("main"):
         check_requirements()
-        setup()
+        hs = setup(sys.argv[1:])
+        run(hs)
 
 
 if __name__ == '__main__':
