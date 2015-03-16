@@ -90,8 +90,8 @@ class BaseHandler(object):
         event = builder.build()
 
         logger.debug(
-            "Created event %s with auth_events: %s, current state: %s",
-            event.event_id, context.auth_events, context.current_state,
+            "Created event %s with current state: %s",
+            event.event_id, context.current_state,
         )
 
         defer.returnValue(
@@ -106,7 +106,7 @@ class BaseHandler(object):
         # We now need to go and hit out to wherever we need to hit out to.
 
         if not suppress_auth:
-            self.auth.check(event, auth_events=context.auth_events)
+            self.auth.check(event, auth_events=context.current_state)
 
         yield self.store.persist_event(event, context=context)
 

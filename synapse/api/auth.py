@@ -28,6 +28,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+AuthEventTypes = (
+    EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,
+    EventTypes.JoinRules,
+)
+
+
 class Auth(object):
 
     def __init__(self, hs):
@@ -166,6 +172,7 @@ class Auth(object):
         target = auth_events.get(key)
 
         target_in_room = target and target.membership == Membership.JOIN
+        target_banned = target and target.membership == Membership.BAN
 
         key = (EventTypes.JoinRules, "", )
         join_rule_event = auth_events.get(key)
@@ -194,6 +201,7 @@ class Auth(object):
             {
                 "caller_in_room": caller_in_room,
                 "caller_invited": caller_invited,
+                "target_banned": target_banned,
                 "target_in_room": target_in_room,
                 "membership": membership,
                 "join_rule": join_rule,
@@ -201,6 +209,11 @@ class Auth(object):
                 "event.user_id": event.user_id,
             }
         )
+
+        if ban_level:
+            ban_level = int(ban_level)
+        else:
+            ban_level = 50  # FIXME (erikj): What should we do here?
 
         if Membership.INVITE == membership:
             # TODO (erikj): We should probably handle this more intelligently
@@ -212,6 +225,10 @@ class Auth(object):
                     403,
                     "%s not in room %s." % (event.user_id, event.room_id,)
                 )
+            elif target_banned:
+                raise AuthError(
+                    403, "%s is banned from the room" % (target_user_id,)
+                )
             elif target_in_room:  # the target is already in the room.
                 raise AuthError(403, "%s is already in the room." %
                                      target_user_id)
@@ -221,6 +238,8 @@ class Auth(object):
             # joined: It's a NOOP
             if event.user_id != target_user_id:
                 raise AuthError(403, "Cannot force another user to join.")
+            elif target_banned:
+                raise AuthError(403, "You are banned from this room")
             elif join_rule == JoinRules.PUBLIC:
                 pass
             elif join_rule == JoinRules.INVITE:
@@ -238,6 +257,10 @@ class Auth(object):
                     403,
                     "%s not in room %s." % (target_user_id, event.room_id,)
                 )
+            elif target_banned and user_level < ban_level:
+                raise AuthError(
+                    403, "You cannot unban user &s." % (target_user_id,)
+                )
             elif target_user_id != event.user_id:
                 if kick_level:
                     kick_level = int(kick_level)
@@ -249,11 +272,6 @@ class Auth(object):
                         403, "You cannot kick user %s." % target_user_id
                     )
         elif Membership.BAN == membership:
-            if ban_level:
-                ban_level = int(ban_level)
-            else:
-                ban_level = 50  # FIXME (erikj): What should we do here?
-
             if user_level < ban_level:
                 raise AuthError(403, "You don't have permission to ban")
         else:
@@ -411,12 +429,6 @@ class Auth(object):
         )
 
         builder.auth_events = auth_events_entries
-
-        context.auth_events = {
-            k: v
-            for k, v in context.current_state.items()
-            if v.event_id in auth_ids
-        }
 
     def compute_auth_events(self, event, current_state):
         if event.type == EventTypes.Create:

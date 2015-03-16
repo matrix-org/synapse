@@ -82,7 +82,7 @@ class StateStore(SQLBaseStore):
         if context.current_state is None:
             return
 
-        state_events = context.current_state
+        state_events = dict(context.current_state)
 
         if event.is_state():
             state_events[(event.type, event.state_key)] = event

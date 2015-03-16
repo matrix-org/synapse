@@ -464,11 +464,9 @@ class FederationHandler(BaseHandler):
             builder=builder,
         )
 
-        self.auth.check(event, auth_events=context.auth_events)
+        self.auth.check(event, auth_events=context.current_state)
 
-        pdu = event
-
-        defer.returnValue(pdu)
+        defer.returnValue(event)
 
     @defer.inlineCallbacks
     @log_function
@@ -705,7 +703,7 @@ class FederationHandler(BaseHandler):
         )
 
         if not auth_events:
-            auth_events = context.auth_events
+            auth_events = context.current_state
 
         logger.debug(
             "_handle_new_event: %s, auth_events: %s",
