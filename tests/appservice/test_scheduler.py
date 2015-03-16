@@ -197,16 +197,56 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
 
     def test_send_single_event_no_queue(self):
         # Expect the event to be sent immediately.
-        pass
+        service = Mock(id=4)
+        event = Mock()
+        self.queuer.enqueue(service, event)
+        self.txn_ctrl.send.assert_called_once_with(service, [event])
 
     def test_send_single_event_with_queue(self):
-        # - Send an event and don't resolve it just yet.
-        # - Send another event: expect send() to NOT be called.
-        # - Resolve the send event
-        # - Expect queued event to be sent
-        pass
+        d = defer.Deferred()
+        self.txn_ctrl.send = Mock(return_value=d)
+        service = Mock(id=4)
+        event = Mock(event_id="first")
+        event2 = Mock(event_id="second")
+        event3 = Mock(event_id="third")
+        # Send an event and don't resolve it just yet.
+        self.queuer.enqueue(service, event)
+        # Send more events: expect send() to NOT be called multiple times.
+        self.queuer.enqueue(service, event2)
+        self.queuer.enqueue(service, event3)
+        self.txn_ctrl.send.assert_called_with(service, [event])
+        self.assertEquals(1, self.txn_ctrl.send.call_count)
+        # Resolve the send event: expect the queued events to be sent
+        d.callback(service)
+        self.txn_ctrl.send.assert_called_with(service, [event2, event3])
+        self.assertEquals(2, self.txn_ctrl.send.call_count)
 
     def test_multiple_service_queues(self):
         # Tests that each service has its own queue, and that they don't block
         # on each other.
-        pass
+        srv1 = Mock(id=4)
+        srv_1_defer = defer.Deferred()
+        srv_1_event = Mock(event_id="srv1a")
+        srv_1_event2 = Mock(event_id="srv1b")
+
+        srv2 = Mock(id=6)
+        srv_2_defer = defer.Deferred()
+        srv_2_event = Mock(event_id="srv2a")
+        srv_2_event2 = Mock(event_id="srv2b")
+
+        send_return_list = [srv_1_defer, srv_2_defer]
+        self.txn_ctrl.send = Mock(side_effect=lambda x,y: send_return_list.pop(0))
+
+        # send events for different ASes and make sure they are sent
+        self.queuer.enqueue(srv1, srv_1_event)
+        self.queuer.enqueue(srv1, srv_1_event2)
+        self.txn_ctrl.send.assert_called_with(srv1, [srv_1_event])
+        self.queuer.enqueue(srv2, srv_2_event)
+        self.queuer.enqueue(srv2, srv_2_event2)
+        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event])
+
+        # make sure callbacks for a service only send queued events for THAT
+        # service
+        srv_2_defer.callback(srv2)
+        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event2])
+        self.assertEquals(3, self.txn_ctrl.send.call_count)
