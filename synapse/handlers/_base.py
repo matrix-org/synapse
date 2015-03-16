@@ -133,9 +133,10 @@ class BaseHandler(object):
         for k, s in context.current_state.items():
             try:
                 if k[0] == EventTypes.Member:
-                    destinations.add(
-                        UserID.from_string(s.state_key).domain
-                    )
+                    if s.content["membership"] == Membership.JOIN:
+                        destinations.add(
+                            UserID.from_string(s.state_key).domain
+                        )
             except SynapseError:
                 logger.warn(
                     "Failed to get destination from event %s", s.event_id
