@@ -134,18 +134,6 @@ class StateHandler(object):
             }
             context.state_group = None
 
-            if hasattr(event, "auth_events") and event.auth_events:
-                auth_ids = self.hs.get_auth().compute_auth_events(
-                    event, context.current_state
-                )
-                context.auth_events = {
-                    k: v
-                    for k, v in context.current_state.items()
-                    if v.event_id in auth_ids
-                }
-            else:
-                context.auth_events = {}
-
             if event.is_state():
                 key = (event.type, event.state_key)
                 if key in context.current_state:
@@ -181,11 +169,6 @@ class StateHandler(object):
             if key in context.current_state:
                 replaces = context.current_state[key]
                 event.unsigned["replaces_state"] = replaces.event_id
-
-        context.auth_events = {
-            k: e for k, e in context.current_state.items()
-            if k[0] in AuthEventTypes
-        }
 
         context.prev_state_events = prev_state
         defer.returnValue(context)

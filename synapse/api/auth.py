@@ -430,12 +430,6 @@ class Auth(object):
 
         builder.auth_events = auth_events_entries
 
-        context.auth_events = {
-            k: v
-            for k, v in context.current_state.items()
-            if v.type in AuthEventTypes
-        }
-
     def compute_auth_events(self, event, current_state):
         if event.type == EventTypes.Create:
             return []
