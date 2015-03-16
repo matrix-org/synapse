@@ -28,6 +28,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+AuthEventTypes = (
+    EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,
+    EventTypes.JoinRules,
+)
+
+
 class Auth(object):
 
     def __init__(self, hs):
@@ -427,7 +433,7 @@ class Auth(object):
         context.auth_events = {
             k: v
             for k, v in context.current_state.items()
-            if v.event_id in auth_ids
+            if v.type in AuthEventTypes
         }
 
     def compute_auth_events(self, event, current_state):
