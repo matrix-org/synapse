@@ -38,6 +38,8 @@ transaction_logger = logging.getLogger("synapse.storage.txn")
 
 metrics = synapse.metrics.get_metrics_for("synapse.storage")
 
+sql_scheduling_timer = metrics.register_distribution("schedule_time")
+
 sql_query_timer = metrics.register_distribution("query_time", labels=["verb"])
 sql_txn_timer = metrics.register_distribution("transaction_time", labels=["desc"])
 sql_getevents_timer = metrics.register_distribution("getEvents_time", labels=["desc"])
@@ -240,6 +242,8 @@ class SQLBaseStore(object):
         """Wraps the .runInteraction() method on the underlying db_pool."""
         current_context = LoggingContext.current_context()
 
+        start_time = time.time() * 1000
+
         def inner_func(txn, *args, **kwargs):
             with LoggingContext("runInteraction") as context:
                 current_context.copy_to(context)
@@ -252,6 +256,7 @@ class SQLBaseStore(object):
 
                 name = "%s-%x" % (desc, txn_id, )
 
+                sql_scheduling_timer.inc_by(time.time() * 1000 - start_time)
                 transaction_logger.debug("[TXN START] {%s}", name)
                 try:
                     return func(LoggingTransaction(txn, name), *args, **kwargs)
