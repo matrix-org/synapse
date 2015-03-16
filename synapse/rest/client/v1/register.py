@@ -354,7 +354,7 @@ class RegisterRestServlet(ClientV1RestServlet):
             })
         else:
             raise SynapseError(
-                400, "HMAC incorrect",
+                403, "HMAC incorrect",
             )
 
 
