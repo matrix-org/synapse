@@ -82,7 +82,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 FilteringStore,
                 PusherStore,
                 PushRuleStore,
-                ApplicationServiceTransactionStore
+                ApplicationServiceTransactionStore,
                 ):
 
     def __init__(self, hs):

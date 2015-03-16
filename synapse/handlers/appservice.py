@@ -27,8 +27,14 @@ logger = logging.getLogger(__name__)
 
 
 def log_failure(failure):
-    logger.error("Application Services Failure: %s", failure.value)
-    logger.error(failure.getTraceback())
+    logger.error(
+        "Application Services Failure",
+        exc_info=(
+            failure.type,
+            failure.value,
+            failure.getTracebackObject()
+        )
+    )
 
 
 # NB: Purposefully not inheriting BaseHandler since that contains way too much

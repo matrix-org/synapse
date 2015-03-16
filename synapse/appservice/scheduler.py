@@ -86,7 +86,7 @@ class AppServiceScheduler(object):
         self.txn_ctrl.start_polling()
 
     def submit_event_for_as(self, service, event):
-        self.event_grouper.on_receive(service, event)
+        self.event_grouper.enqueue(service, event)
 
 
 class _EventGrouper(object):
@@ -96,7 +96,7 @@ class _EventGrouper(object):
     def __init__(self):
         self.groups = {}  # dict of {service: [events]}
 
-    def on_receive(self, service, event):
+    def enqueue(self, service, event):
         if service not in self.groups:
             self.groups[service] = []
         self.groups[service].append(event)

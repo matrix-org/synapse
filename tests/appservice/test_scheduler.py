@@ -213,7 +213,7 @@ class ApplicationServiceSchedulerEventGrouperTestCase(unittest.TestCase):
     def test_drain_single_event(self):
         service = Mock()
         event = Mock()
-        self.grouper.on_receive(service, event)
+        self.grouper.enqueue(service, event)
         groups = self.grouper.drain_groups()
         self.assertTrue(service in groups)
         self.assertEquals([event], groups[service])
@@ -225,7 +225,7 @@ class ApplicationServiceSchedulerEventGrouperTestCase(unittest.TestCase):
         service = Mock()
         events = [Mock(), Mock(), Mock()]
         for e in events:
-            self.grouper.on_receive(service, e)
+            self.grouper.enqueue(service, e)
         groups = self.grouper.drain_groups()
         self.assertTrue(service in groups)
         self.assertEquals(events, groups[service])
@@ -243,11 +243,11 @@ class ApplicationServiceSchedulerEventGrouperTestCase(unittest.TestCase):
             services[2]: events_c
         }
         for e in events_b:
-            self.grouper.on_receive(services[1], e)
+            self.grouper.enqueue(services[1], e)
         for e in events_c:
-            self.grouper.on_receive(services[2], e)
+            self.grouper.enqueue(services[2], e)
         for e in events_a:
-            self.grouper.on_receive(services[0], e)
+            self.grouper.enqueue(services[0], e)
 
         groups = self.grouper.drain_groups()
         for service in services:

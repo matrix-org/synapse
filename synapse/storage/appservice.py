@@ -365,9 +365,9 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             may be empty.
         """
         sql = (
-            "SELECT r.*, a.* FROM application_services_state AS s LEFT JOIN "
-            "application_services AS a ON a.id=s.as_id LEFT JOIN "
-            "application_services_regex AS r ON r.as_id=a.id WHERE state = ?"
+            "SELECT r.*, a.* FROM application_services_state AS s LEFT JOIN"
+            " application_services AS a ON a.id=s.as_id LEFT JOIN"
+            " application_services_regex AS r ON r.as_id=a.id WHERE state = ?"
         )
         results = yield self._execute_and_decode(
             "get_appservices_by_state", sql, state
