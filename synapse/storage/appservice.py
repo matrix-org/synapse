@@ -101,11 +101,12 @@ class ApplicationServiceStore(SQLBaseStore):
         if not service.hs_token:
             raise StoreError(500, "No HS token")
 
-        yield self.runInteraction(
+        as_id = yield self.runInteraction(
             "update_app_service",
             self._update_app_service_txn,
             service
         )
+        service.id = as_id
 
         # update cache TODO: Should this be in the txn?
         for (index, cache_service) in enumerate(self.services_cache):
@@ -124,7 +125,7 @@ class ApplicationServiceStore(SQLBaseStore):
                 "update_app_service_txn: Failed to find as_id for token=",
                 service.token
             )
-            return False
+            return
 
         txn.execute(
             "UPDATE application_services SET url=?, hs_token=?, sender=? "
@@ -144,7 +145,7 @@ class ApplicationServiceStore(SQLBaseStore):
                         "as_id, namespace, regex) values(?,?,?)",
                         (as_id, ns_int, json.dumps(regex_obj))
                     )
-        return True
+        return as_id
 
     def _get_as_id_txn(self, txn, token):
         cursor = txn.execute(

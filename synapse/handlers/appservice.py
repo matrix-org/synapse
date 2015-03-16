@@ -59,13 +59,13 @@ class ApplicationServicesHandler(object):
             )
             if not stored_service:
                 raise StoreError(404, "Application service not found")
+            app_service.id = stored_service.id
         except StoreError:
             raise SynapseError(
                 403, "Unrecognised application services token. "
                 "Consult the home server admin.",
                 errcode=Codes.FORBIDDEN
             )
-
         app_service.hs_token = self._generate_hs_token()
 
         # create a sender for this application service which is used when
