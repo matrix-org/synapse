@@ -25,6 +25,7 @@ import synapse.metrics
 from twisted.internet import defer
 
 from collections import namedtuple, OrderedDict
+import functools
 import simplejson as json
 import sys
 import time
@@ -81,6 +82,7 @@ def cached(max_entries=1000):
 
             cache[key] = value
 
+        @functools.wraps(orig)
         @defer.inlineCallbacks
         def wrapped(self, key):
             if key in cache:
