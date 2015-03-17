@@ -26,7 +26,7 @@ CONDITIONAL_REQUIREMENTS = {
 
 def requirements(config=None, include_conditional=False):
     reqs = REQUIREMENTS.copy()
-    for key,req in CONDITIONAL_REQUIREMENTS.items():
+    for key, req in CONDITIONAL_REQUIREMENTS.items():
         if (config and getattr(config, key)) or include_conditional:
             reqs.update(req)
     return reqs
@@ -61,7 +61,8 @@ class MissingRequirementError(Exception):
 def check_requirements(config=None):
     """Checks that all the modules needed by synapse have been correctly
     installed and are at the correct version"""
-    for dependency, module_requirements in requirements(config, include_conditional=False).items():
+    for dependency, module_requirements in (
+            requirements(config, include_conditional=False).items()):
         for module_requirement in module_requirements:
             if ">=" in module_requirement:
                 module_name, required_version = module_requirement.split(">=")
