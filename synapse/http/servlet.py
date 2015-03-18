@@ -51,8 +51,8 @@ class RestServlet(object):
             pattern = self.PATTERN
 
             for method in ("GET", "PUT", "POST", "OPTIONS", "DELETE"):
-                if hasattr(self, "on_%s" % (method)):
-                    method_handler = getattr(self, "on_%s" % (method))
+                if hasattr(self, "on_%s" % (method,)):
+                    method_handler = getattr(self, "on_%s" % (method,))
                     http_server.register_path(method, pattern, method_handler)
         else:
             raise NotImplementedError("RestServlet must register something.")
