@@ -14,52 +14,42 @@
  */
 
 CREATE TABLE IF NOT EXISTS event_content_hashes (
-    event_id TEXT,
-    algorithm TEXT,
+    event_id VARCHAR(255),
+    algorithm VARCHAR(255),
     hash BLOB,
-    CONSTRAINT uniqueness UNIQUE (event_id, algorithm)
+    UNIQUE (event_id, algorithm)
 );
 
-CREATE INDEX IF NOT EXISTS event_content_hashes_id ON event_content_hashes(
-    event_id
-);
+CREATE INDEX IF NOT EXISTS event_content_hashes_id ON event_content_hashes(event_id);
 
 
 CREATE TABLE IF NOT EXISTS event_reference_hashes (
-    event_id TEXT,
-    algorithm TEXT,
+    event_id VARCHAR(255),
+    algorithm VARCHAR(255),
     hash BLOB,
-    CONSTRAINT uniqueness UNIQUE (event_id, algorithm)
+    UNIQUE (event_id, algorithm)
 );
 
-CREATE INDEX IF NOT EXISTS event_reference_hashes_id ON event_reference_hashes (
-    event_id
-);
+CREATE INDEX IF NOT EXISTS event_reference_hashes_id ON event_reference_hashes(event_id);
 
 
 CREATE TABLE IF NOT EXISTS event_signatures (
-    event_id TEXT,
-    signature_name TEXT,
-    key_id TEXT,
+    event_id VARCHAR(255),
+    signature_name VARCHAR(255),
+    key_id VARCHAR(255),
     signature BLOB,
-    CONSTRAINT uniqueness UNIQUE (event_id, signature_name, key_id)
+    UNIQUE (event_id, signature_name, key_id)
 );
 
-CREATE INDEX IF NOT EXISTS event_signatures_id ON event_signatures (
-    event_id
-);
+CREATE INDEX IF NOT EXISTS event_signatures_id ON event_signatures(event_id);
 
 
 CREATE TABLE IF NOT EXISTS event_edge_hashes(
-    event_id TEXT,
-    prev_event_id TEXT,
-    algorithm TEXT,
+    event_id VARCHAR(255),
+    prev_event_id VARCHAR(255),
+    algorithm VARCHAR(255),
     hash BLOB,
-    CONSTRAINT uniqueness UNIQUE (
-        event_id, prev_event_id, algorithm
-    )
+    UNIQUE (event_id, prev_event_id, algorithm)
 );
 
-CREATE INDEX IF NOT EXISTS event_edge_hashes_id ON event_edge_hashes(
-    event_id
-);
+CREATE INDEX IF NOT EXISTS event_edge_hashes_id ON event_edge_hashes(event_id);

@@ -14,14 +14,12 @@
  */
 
 CREATE TABLE IF NOT EXISTS room_aliases(
-    room_alias TEXT NOT NULL,
-    room_id TEXT NOT NULL
+    room_alias VARCHAR(255) NOT NULL,
+    room_id VARCHAR(255) NOT NULL,
+    UNIQUE (room_alias)
 );
 
 CREATE TABLE IF NOT EXISTS room_alias_servers(
-    room_alias TEXT NOT NULL,
-    server TEXT NOT NULL
+    room_alias VARCHAR(255) NOT NULL,
+    server VARCHAR(255) NOT NULL
 );
-
-
-

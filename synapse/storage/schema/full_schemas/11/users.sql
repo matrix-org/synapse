@@ -13,33 +13,32 @@
  * limitations under the License.
  */
 CREATE TABLE IF NOT EXISTS users(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    password_hash TEXT,
+    id INTEGER PRIMARY KEY,
+    name VARCHAR(255),
+    password_hash VARBINARY(255),
     creation_ts INTEGER,
     admin BOOL DEFAULT 0 NOT NULL,
-    UNIQUE(name) ON CONFLICT ROLLBACK
+    UNIQUE(name)
 );
 
 CREATE TABLE IF NOT EXISTS access_tokens(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     user_id INTEGER NOT NULL,
-    device_id TEXT,
-    token TEXT NOT NULL,
+    device_id VARCHAR(255),
+    token VARCHAR(255) NOT NULL,
     last_used INTEGER,
     FOREIGN KEY(user_id) REFERENCES users(id),
-    UNIQUE(token) ON CONFLICT ROLLBACK
+    UNIQUE(token)
 );
 
 CREATE TABLE IF NOT EXISTS user_ips (
-    user TEXT NOT NULL,
-    access_token TEXT NOT NULL,
-    device_id TEXT,
-    ip TEXT NOT NULL,
-    user_agent TEXT NOT NULL,
+    user VARCHAR(255) NOT NULL,
+    access_token VARCHAR(255) NOT NULL,
+    device_id VARCHAR(255),
+    ip VARCHAR(255) NOT NULL,
+    user_agent VARCHAR(255) NOT NULL,
     last_seen INTEGER NOT NULL,
-    CONSTRAINT user_ip UNIQUE (user, access_token, ip, user_agent) ON CONFLICT REPLACE
+    UNIQUE (user, access_token, ip, user_agent)
 );
 
 CREATE INDEX IF NOT EXISTS user_ips_user ON user_ips(user);
-

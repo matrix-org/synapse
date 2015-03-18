@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 CREATE TABLE IF NOT EXISTS profiles(
-    user_id INTEGER NOT NULL,
-    displayname TEXT,
-    avatar_url TEXT,
-    FOREIGN KEY(user_id) REFERENCES users(id)
+    user_id VARCHAR(255) NOT NULL,
+    displayname VARCHAR(255),
+    avatar_url VARCHAR(255),
+    UNIQUE(user_id)
 );

@@ -13,26 +13,26 @@
  * limitations under the License.
  */
 CREATE TABLE IF NOT EXISTS presence(
-  user_id INTEGER NOT NULL,
+  user_id VARCHAR(255) NOT NULL,
   state INTEGER,
-  status_msg TEXT,
+  status_msg VARCHAR(255),
   mtime INTEGER, -- miliseconds since last state change
-  FOREIGN KEY(user_id) REFERENCES users(id)
+  UNIQUE(user_id)
 );
 
 -- For each of /my/ users which possibly-remote users are allowed to see their
 -- presence state
 CREATE TABLE IF NOT EXISTS presence_allow_inbound(
-  observed_user_id INTEGER NOT NULL,
-  observer_user_id TEXT, -- a UserID,
-  FOREIGN KEY(observed_user_id) REFERENCES users(id)
+  observed_user_id VARCHAR(255) NOT NULL,
+  observer_user_id VARCHAR(255), -- a UserID,
+  UNIQUE(observed_user_id)
 );
 
 -- For each of /my/ users (watcher), which possibly-remote users are they
 -- watching?
 CREATE TABLE IF NOT EXISTS presence_list(
-  user_id INTEGER NOT NULL,
-  observed_user_id TEXT, -- a UserID,
+  user_id VARCHAR(255) NOT NULL,
+  observed_user_id VARCHAR(255), -- a UserID,
   accepted BOOLEAN,
-  FOREIGN KEY(user_id) REFERENCES users(id)
+  UNIQUE(user_id)
 );

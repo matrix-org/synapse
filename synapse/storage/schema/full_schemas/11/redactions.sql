@@ -13,9 +13,9 @@
  * limitations under the License.
  */
 CREATE TABLE IF NOT EXISTS redactions (
-    event_id TEXT NOT NULL,
-    redacts TEXT NOT NULL,
-    CONSTRAINT ev_uniq UNIQUE (event_id)
+    event_id VARCHAR(255) NOT NULL,
+    redacts VARCHAR(255) NOT NULL,
+    UNIQUE (event_id)
 );
 
 CREATE INDEX IF NOT EXISTS redactions_event_id ON redactions (event_id);

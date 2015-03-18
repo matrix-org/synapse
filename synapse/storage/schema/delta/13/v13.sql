@@ -14,21 +14,18 @@
  */
 
 CREATE TABLE IF NOT EXISTS application_services(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    url TEXT,
-    token TEXT,
-    hs_token TEXT,
-    sender TEXT,
-    UNIQUE(token) ON CONFLICT ROLLBACK
+    id INTEGER PRIMARY KEY,
+    url VARCHAR(255),
+    token VARCHAR(255),
+    hs_token VARCHAR(255),
+    sender VARCHAR(255),
+    UNIQUE(token)
 );
 
 CREATE TABLE IF NOT EXISTS application_services_regex(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     as_id INTEGER NOT NULL,
     namespace INTEGER,  /* enum[room_id|room_alias|user_id] */
-    regex TEXT,
+    regex VARCHAR(255),
     FOREIGN KEY(as_id) REFERENCES application_services(id)
 );
-
-
-

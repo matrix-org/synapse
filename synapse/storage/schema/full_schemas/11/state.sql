@@ -15,33 +15,26 @@
 
 CREATE TABLE IF NOT EXISTS state_groups(
     id INTEGER PRIMARY KEY,
-    room_id TEXT NOT NULL,
-    event_id TEXT NOT NULL
+    room_id VARCHAR(255) NOT NULL,
+    event_id VARCHAR(255) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS state_groups_state(
     state_group INTEGER NOT NULL,
-    room_id TEXT NOT NULL,
-    type TEXT NOT NULL,
-    state_key TEXT NOT NULL,
-    event_id TEXT NOT NULL
+    room_id VARCHAR(255) NOT NULL,
+    type VARCHAR(255) NOT NULL,
+    state_key VARCHAR(255) NOT NULL,
+    event_id VARCHAR(255) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS event_to_state_groups(
-    event_id TEXT NOT NULL,
+    event_id VARCHAR(255) NOT NULL,
     state_group INTEGER NOT NULL,
-    CONSTRAINT event_to_state_groups_uniq UNIQUE (event_id)
+    UNIQUE (event_id)
 );
 
 CREATE INDEX IF NOT EXISTS state_groups_id ON state_groups(id);
 
-CREATE INDEX IF NOT EXISTS state_groups_state_id ON state_groups_state(
-    state_group
-);
-CREATE INDEX IF NOT EXISTS state_groups_state_tuple ON state_groups_state(
-    room_id, type, state_key
-);
-
-CREATE INDEX IF NOT EXISTS event_to_state_groups_id ON event_to_state_groups(
-    event_id
-);
+CREATE INDEX IF NOT EXISTS state_groups_state_id ON state_groups_state(state_group);
+CREATE INDEX IF NOT EXISTS state_groups_state_tuple ON state_groups_state(room_id, type, state_key);
+CREATE INDEX IF NOT EXISTS event_to_state_groups_id ON event_to_state_groups(event_id);
