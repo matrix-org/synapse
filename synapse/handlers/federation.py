@@ -290,6 +290,8 @@ class FederationHandler(BaseHandler):
         """
         logger.debug("Joining %s to %s", joinee, room_id)
 
+        yield self.store.clean_room_for_join(room_id)
+
         origin, pdu = yield self.replication_layer.make_join(
             target_hosts,
             room_id,
