@@ -316,11 +316,11 @@ class RegisterRestServlet(ClientV1RestServlet):
     def _do_shared_secret(self, request, register_json, session):
         yield run_on_reactor()
 
-        if "mac" not in register_json:
+        if not isinstance(register_json.get("mac", None), basestring):
             raise SynapseError(400, "Expected mac.")
-        if "user" not in register_json:
+        if not isinstance(register_json.get("user", None), basestring):
             raise SynapseError(400, "Expected 'user' key.")
-        if "password" not in register_json:
+        if not isinstance(register_json.get("password", None), basestring):
             raise SynapseError(400, "Expected 'password' key.")
 
         if not self.hs.config.registration_shared_secret:
