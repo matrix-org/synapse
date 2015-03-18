@@ -27,7 +27,6 @@ from hashlib import sha1
 import hmac
 import simplejson as json
 import logging
-import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -263,14 +262,11 @@ class RegisterRestServlet(ClientV1RestServlet):
             )
 
         password = register_json["password"].encode("utf-8")
-        desired_user_id = (register_json["user"].encode("utf-8")
-                           if "user" in register_json else None)
-        if (desired_user_id
-                and urllib.quote(desired_user_id) != desired_user_id):
-            raise SynapseError(
-                400,
-                "User ID must only contain characters which do not " +
-                "require URL encoding.")
+        desired_user_id = (
+            register_json["user"].encode("utf-8")
+            if "user" in register_json else None
+        )
+
         handler = self.handlers.registration_handler
         (user_id, token) = yield handler.register(
             localpart=desired_user_id,
