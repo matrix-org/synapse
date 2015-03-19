@@ -121,8 +121,8 @@ class TransactionStore(SQLBaseStore):
                 SentTransactions.select_statement("destination = ?"),
             )
 
-        results = txn.execute(query, (destination,))
-        results = SentTransactions.decode_results(results)
+        txn.execute(query, (destination,))
+        results = SentTransactions.decode_results(txn)
 
         prev_txns = [r.transaction_id for r in results]
 
@@ -266,7 +266,7 @@ class TransactionStore(SQLBaseStore):
                                        retry_last_ts, retry_interval):
 
         query = (
-            "INSERT OR REPLACE INTO %s "
+            "REPLACE INTO %s "
             "(destination, retry_last_ts, retry_interval) "
             "VALUES (?, ?, ?) "
         ) % DestinationsTable.table_name

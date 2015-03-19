@@ -102,6 +102,10 @@ def cached(max_entries=1000):
     return wrap
 
 
+def _convert_param_style(sql):
+    return sql.replace("?", "%s")
+
+
 class LoggingTransaction(object):
     """An object that almost-transparently proxies for the 'txn' object
     passed to the constructor. Adds logging and metrics to the .execute()
@@ -121,6 +125,8 @@ class LoggingTransaction(object):
     def execute(self, sql, *args, **kwargs):
         # TODO(paul): Maybe use 'info' and 'debug' for values?
         sql_logger.debug("[SQL] {%s} %s", self.name, sql)
+
+        sql = _convert_param_style(sql)
 
         try:
             if args and args[0]:
@@ -305,11 +311,11 @@ class SQLBaseStore(object):
             The result of decoder(results)
         """
         def interaction(txn):
-            cursor = txn.execute(query, args)
+            txn.execute(query, args)
             if decoder:
-                return decoder(cursor)
+                return decoder(txn)
             else:
-                return cursor.fetchall()
+                return txn.fetchall()
 
         return self.runInteraction(desc, interaction)
 
@@ -337,8 +343,7 @@ class SQLBaseStore(object):
     def _simple_insert_txn(self, txn, table, values, or_replace=False,
                            or_ignore=False):
         sql = "%s INTO %s (%s) VALUES(%s)" % (
-            ("INSERT OR REPLACE" if or_replace else
-             "INSERT OR IGNORE" if or_ignore else "INSERT"),
+            ("REPLACE" if or_replace else "INSERT"),
             table,
             ", ".join(k for k in values),
             ", ".join("?" for k in values)
@@ -448,8 +453,7 @@ class SQLBaseStore(object):
 
     def _simple_select_onecol_txn(self, txn, table, keyvalues, retcol):
         sql = (
-            "SELECT %(retcol)s FROM %(table)s WHERE %(where)s "
-            "ORDER BY rowid asc"
+            "SELECT %(retcol)s FROM %(table)s WHERE %(where)s"
         ) % {
             "retcol": retcol,
             "table": table,
@@ -505,14 +509,14 @@ class SQLBaseStore(object):
             retcols : list of strings giving the names of the columns to return
         """
         if keyvalues:
-            sql = "SELECT %s FROM %s WHERE %s ORDER BY rowid asc" % (
+            sql = "SELECT %s FROM %s WHERE %s" % (
                 ", ".join(retcols),
                 table,
                 " AND ".join("%s = ?" % (k, ) for k in keyvalues)
             )
             txn.execute(sql, keyvalues.values())
         else:
-            sql = "SELECT %s FROM %s ORDER BY rowid asc" % (
+            sql = "SELECT %s FROM %s" % (
                 ", ".join(retcols),
                 table
             )
@@ -546,7 +550,7 @@ class SQLBaseStore(object):
                                  retcols=None, allow_none=False):
         """ Combined SELECT then UPDATE."""
         if retcols:
-            select_sql = "SELECT %s FROM %s WHERE %s ORDER BY rowid asc" % (
+            select_sql = "SELECT %s FROM %s WHERE %s" % (
                 ", ".join(retcols),
                 table,
                 " AND ".join("%s = ?" % (k) for k in keyvalues)
@@ -580,8 +584,8 @@ class SQLBaseStore(object):
                     updatevalues.values() + keyvalues.values()
                 )
 
-                if txn.rowcount == 0:
-                    raise StoreError(404, "No row found")
+                # if txn.rowcount == 0:
+                #     raise StoreError(404, "No row found")
                 if txn.rowcount > 1:
                     raise StoreError(500, "More than one row matched")
 
@@ -802,7 +806,7 @@ class Table(object):
 
     _select_where_clause = "SELECT %s FROM %s WHERE %s"
     _select_clause = "SELECT %s FROM %s"
-    _insert_clause = "INSERT OR REPLACE INTO %s (%s) VALUES (%s)"
+    _insert_clause = "REPLACE INTO %s (%s) VALUES (%s)"
 
     @classmethod
     def select_statement(cls, where_clause=None):

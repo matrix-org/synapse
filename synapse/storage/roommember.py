@@ -68,7 +68,7 @@ class RoomMemberStore(SQLBaseStore):
         # Update room hosts table
         if event.membership == Membership.JOIN:
             sql = (
-                "INSERT OR IGNORE INTO room_hosts (room_id, host) "
+                "REPLACE INTO room_hosts (room_id, host) "
                 "VALUES (?, ?)"
             )
             txn.execute(sql, (event.room_id, domain))

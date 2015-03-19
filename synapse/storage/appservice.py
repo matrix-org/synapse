@@ -147,11 +147,11 @@ class ApplicationServiceStore(SQLBaseStore):
         return True
 
     def _get_as_id_txn(self, txn, token):
-        cursor = txn.execute(
+        txn.execute(
             "SELECT id FROM application_services WHERE token=?",
             (token,)
         )
-        res = cursor.fetchone()
+        res = txn.fetchone()
         if res:
             return res[0]
 

@@ -114,9 +114,9 @@ class RoomStore(SQLBaseStore):
                 "name": name_subquery,
             }
 
-            c = txn.execute(sql, (is_public,))
+            txn.execute(sql, (is_public,))
 
-            return c.fetchall()
+            return txn.fetchall()
 
         rows = yield self.runInteraction(
             "get_rooms", f

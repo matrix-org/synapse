@@ -15,6 +15,8 @@
 
 from ._base import SQLBaseStore
 
+from synapse.util.stringutils import random_string
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -89,14 +91,15 @@ class StateStore(SQLBaseStore):
 
         state_group = context.state_group
         if not state_group:
+            group = _make_group_id(self._clock)
             state_group = self._simple_insert_txn(
                 txn,
                 table="state_groups",
                 values={
+                    "id": group,
                     "room_id": event.room_id,
                     "event_id": event.event_id,
                 },
-                or_ignore=True,
             )
 
             for state in state_events.values():
@@ -110,7 +113,6 @@ class StateStore(SQLBaseStore):
                         "state_key": state.state_key,
                         "event_id": state.event_id,
                     },
-                    or_ignore=True,
                 )
 
         self._simple_insert_txn(
@@ -122,3 +124,7 @@ class StateStore(SQLBaseStore):
             },
             or_replace=True,
         )
+
+
+def _make_group_id(clock):
+    return str(int(clock.time_msec())) + random_string(5)

@@ -45,7 +45,6 @@ class PresenceStore(SQLBaseStore):
             updatevalues={"state": new_state["state"],
                           "status_msg": new_state["status_msg"],
                           "mtime": self._clock.time_msec()},
-            retcols=["state"],
         )
 
     def allow_presence_visible(self, observed_localpart, observer_userid):

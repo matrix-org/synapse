@@ -39,14 +39,10 @@ class RegistrationStore(SQLBaseStore):
         Raises:
             StoreError if there was a problem adding this.
         """
-        row = yield self._simple_select_one("users", {"name": user_id}, ["id"])
-        if not row:
-            raise StoreError(400, "Bad user ID supplied.")
-        row_id = row["id"]
         yield self._simple_insert(
             "access_tokens",
             {
-                "user_id": row_id,
+                "user_id": user_id,
                 "token": token
             }
         )
@@ -82,7 +78,7 @@ class RegistrationStore(SQLBaseStore):
         # it's possible for this to get a conflict, but only for a single user
         # since tokens are namespaced based on their user ID
         txn.execute("INSERT INTO access_tokens(user_id, token) " +
-                    "VALUES (?,?)", [txn.lastrowid, token])
+                    "VALUES (?,?)", [user_id, token])
 
     def get_user_by_id(self, user_id):
         query = ("SELECT users.name, users.password_hash FROM users"
@@ -124,12 +120,12 @@ class RegistrationStore(SQLBaseStore):
             "SELECT users.name, users.admin,"
             " access_tokens.device_id, access_tokens.id as token_id"
             " FROM users"
-            " INNER JOIN access_tokens on users.id = access_tokens.user_id"
+            " INNER JOIN access_tokens on users.name = access_tokens.user_id"
             " WHERE token = ?"
         )
 
-        cursor = txn.execute(sql, (token,))
-        rows = self.cursor_to_dict(cursor)
+        txn.execute(sql, (token,))
+        rows = self.cursor_to_dict(txn)
         if rows:
             return rows[0]
 
