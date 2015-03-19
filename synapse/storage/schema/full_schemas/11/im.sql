@@ -14,8 +14,8 @@
  */
 
 CREATE TABLE IF NOT EXISTS events(
-    stream_ordering INTEGER PRIMARY KEY,
-    topological_ordering INTEGER NOT NULL,
+    stream_ordering BIGINT PRIMARY KEY,
+    topological_ordering BIGINT NOT NULL,
     event_id VARCHAR(255) NOT NULL,
     type VARCHAR(255) NOT NULL,
     room_id VARCHAR(255) NOT NULL,
@@ -23,9 +23,9 @@ CREATE TABLE IF NOT EXISTS events(
     unrecognized_keys BLOB,
     processed BOOL NOT NULL,
     outlier BOOL NOT NULL,
-    depth INTEGER DEFAULT 0 NOT NULL,
+    depth BIGINT DEFAULT 0 NOT NULL,
     UNIQUE (event_id)
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS events_event_id ON events (event_id);
 CREATE INDEX IF NOT EXISTS events_stream_ordering ON events (stream_ordering);
@@ -39,19 +39,19 @@ CREATE TABLE IF NOT EXISTS event_json(
     internal_metadata BLOB NOT NULL,
     json BLOB NOT NULL,
     UNIQUE (event_id)
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS event_json_room_id ON event_json(room_id);
 
 
-CREATE TABLE state_events(
+CREATE TABLE IF NOT EXISTS state_events(
     event_id VARCHAR(255) NOT NULL,
     room_id VARCHAR(255) NOT NULL,
     type VARCHAR(255) NOT NULL,
     state_key VARCHAR(255) NOT NULL,
     prev_state VARCHAR(255),
     UNIQUE (event_id)
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS state_events_room_id ON state_events (room_id);
 CREATE INDEX IF NOT EXISTS state_events_type ON state_events (type);
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS current_state_events(
     state_key VARCHAR(255) NOT NULL,
     UNIQUE (event_id),
     UNIQUE (room_id, type, state_key)
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS current_state_events_room_id ON current_state_events (room_id);
 CREATE INDEX IF NOT EXISTS current_state_events_type ON current_state_events (type);
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS room_memberships(
     room_id VARCHAR(255) NOT NULL,
     membership VARCHAR(255) NOT NULL,
     UNIQUE (event_id)
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS room_memberships_room_id ON room_memberships (room_id);
 CREATE INDEX IF NOT EXISTS room_memberships_user_id ON room_memberships (user_id);
@@ -90,14 +90,14 @@ CREATE TABLE IF NOT EXISTS feedback(
     sender VARCHAR(255),
     room_id VARCHAR(255),
     UNIQUE (event_id)
-);
+) ENGINE = INNODB;
 
 CREATE TABLE IF NOT EXISTS topics(
     event_id VARCHAR(255) NOT NULL,
     room_id VARCHAR(255) NOT NULL,
     topic VARCHAR(255) NOT NULL,
     UNIQUE (event_id)
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS topics_room_id ON topics(room_id);
 
@@ -112,14 +112,14 @@ CREATE INDEX IF NOT EXISTS room_names_room_id ON room_names(room_id);
 
 CREATE TABLE IF NOT EXISTS rooms(
     room_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    is_public INTEGER,
+    is_public BOOL,
     creator VARCHAR(255)
-);
+) ENGINE = INNODB;
 
 CREATE TABLE IF NOT EXISTS room_hosts(
     room_id VARCHAR(255) NOT NULL,
     host VARCHAR(255) NOT NULL,
     UNIQUE (room_id, host)
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS room_hosts_room_id ON room_hosts (room_id);

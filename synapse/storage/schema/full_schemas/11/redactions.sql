@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS redactions (
     event_id VARCHAR(255) NOT NULL,
     redacts VARCHAR(255) NOT NULL,
     UNIQUE (event_id)
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS redactions_event_id ON redactions (event_id);
 CREATE INDEX IF NOT EXISTS redactions_redacts ON redactions (redacts);

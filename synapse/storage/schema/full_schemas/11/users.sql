@@ -13,23 +13,21 @@
  * limitations under the License.
  */
 CREATE TABLE IF NOT EXISTS users(
-    id INTEGER PRIMARY KEY,
     name VARCHAR(255),
     password_hash VARBINARY(255),
-    creation_ts INTEGER,
+    creation_ts BIGINT,
     admin BOOL DEFAULT 0 NOT NULL,
     UNIQUE(name)
-);
+) ENGINE = INNODB;
 
 CREATE TABLE IF NOT EXISTS access_tokens(
-    id INTEGER PRIMARY KEY,
-    user_id INTEGER NOT NULL,
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(255) NOT NULL,
     device_id VARCHAR(255),
     token VARCHAR(255) NOT NULL,
-    last_used INTEGER,
-    FOREIGN KEY(user_id) REFERENCES users(id),
+    last_used BIGINT,
     UNIQUE(token)
-);
+) ENGINE = INNODB;
 
 CREATE TABLE IF NOT EXISTS user_ips (
     user VARCHAR(255) NOT NULL,
@@ -37,8 +35,8 @@ CREATE TABLE IF NOT EXISTS user_ips (
     device_id VARCHAR(255),
     ip VARCHAR(255) NOT NULL,
     user_agent VARCHAR(255) NOT NULL,
-    last_seen INTEGER NOT NULL,
+    last_seen BIGINT NOT NULL,
     UNIQUE (user, access_token, ip, user_agent)
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS user_ips_user ON user_ips(user);

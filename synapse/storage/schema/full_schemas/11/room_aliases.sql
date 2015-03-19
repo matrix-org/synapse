@@ -17,9 +17,9 @@ CREATE TABLE IF NOT EXISTS room_aliases(
     room_alias VARCHAR(255) NOT NULL,
     room_id VARCHAR(255) NOT NULL,
     UNIQUE (room_alias)
-);
+) ENGINE = INNODB;
 
 CREATE TABLE IF NOT EXISTS room_alias_servers(
     room_alias VARCHAR(255) NOT NULL,
     server VARCHAR(255) NOT NULL
-);
+) ENGINE = INNODB;

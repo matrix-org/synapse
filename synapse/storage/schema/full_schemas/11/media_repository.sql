@@ -17,11 +17,11 @@ CREATE TABLE IF NOT EXISTS local_media_repository (
     media_id VARCHAR(255), -- The id used to refer to the media.
     media_type VARCHAR(255), -- The MIME-type of the media.
     media_length INTEGER, -- Length of the media in bytes.
-    created_ts INTEGER, -- When the content was uploaded in ms.
+    created_ts BIGINT, -- When the content was uploaded in ms.
     upload_name VARCHAR(255), -- The name the media was uploaded with.
     user_id VARCHAR(255), -- The user who uploaded the file.
     UNIQUE (media_id)
-);
+) ENGINE = INNODB;
 
 CREATE TABLE IF NOT EXISTS local_media_repository_thumbnails (
     media_id VARCHAR(255), -- The id used to refer to the media.
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS local_media_repository_thumbnails (
     UNIQUE (
         media_id, thumbnail_width, thumbnail_height, thumbnail_type
     )
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS local_media_repository_thumbnails_media_id
     ON local_media_repository_thumbnails (media_id);
@@ -42,12 +42,12 @@ CREATE TABLE IF NOT EXISTS remote_media_cache (
     media_origin VARCHAR(255), -- The remote HS the media came from.
     media_id VARCHAR(255), -- The id used to refer to the media on that server.
     media_type VARCHAR(255), -- The MIME-type of the media.
-    created_ts INTEGER, -- When the content was uploaded in ms.
+    created_ts BIGINT, -- When the content was uploaded in ms.
     upload_name VARCHAR(255), -- The name the media was uploaded with.
     media_length INTEGER, -- Length of the media in bytes.
     filesystem_id VARCHAR(255), -- The name used to store the media on disk.
     UNIQUE (media_origin, media_id)
-);
+) ENGINE = INNODB;
 
 CREATE TABLE IF NOT EXISTS remote_media_cache_thumbnails (
     media_origin VARCHAR(255), -- The remote HS the media came from.
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS remote_media_cache_thumbnails (
         media_origin, media_id, thumbnail_width, thumbnail_height,
         thumbnail_type
      )
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS remote_media_cache_thumbnails_media_id
     ON local_media_repository_thumbnails (media_id);

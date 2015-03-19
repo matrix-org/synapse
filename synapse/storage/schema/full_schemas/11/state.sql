@@ -14,24 +14,24 @@
  */
 
 CREATE TABLE IF NOT EXISTS state_groups(
-    id INTEGER PRIMARY KEY,
+    id VARCHAR(20) PRIMARY KEY,
     room_id VARCHAR(255) NOT NULL,
     event_id VARCHAR(255) NOT NULL
-);
+) ENGINE = INNODB;
 
 CREATE TABLE IF NOT EXISTS state_groups_state(
-    state_group INTEGER NOT NULL,
+    state_group VARCHAR(20) NOT NULL,
     room_id VARCHAR(255) NOT NULL,
     type VARCHAR(255) NOT NULL,
     state_key VARCHAR(255) NOT NULL,
     event_id VARCHAR(255) NOT NULL
-);
+) ENGINE = INNODB;
 
 CREATE TABLE IF NOT EXISTS event_to_state_groups(
     event_id VARCHAR(255) NOT NULL,
-    state_group INTEGER NOT NULL,
+    state_group VARCHAR(255) NOT NULL,
     UNIQUE (event_id)
-);
+) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS state_groups_id ON state_groups(id);
 
