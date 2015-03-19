@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS events(
     UNIQUE (event_id)
 ) ENGINE = INNODB;
 
-CREATE INDEX IF NOT EXISTS events_event_id ON events (event_id);
 CREATE INDEX IF NOT EXISTS events_stream_ordering ON events (stream_ordering);
 CREATE INDEX IF NOT EXISTS events_topological_ordering ON events (topological_ordering);
 CREATE INDEX IF NOT EXISTS events_room_id ON events (room_id);
