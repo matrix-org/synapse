@@ -32,7 +32,7 @@ class Pusher(object):
     INITIAL_BACKOFF = 1000
     MAX_BACKOFF = 60 * 60 * 1000
     GIVE_UP_AFTER = 24 * 60 * 60 * 1000
-    DEFAULT_ACTIONS = ['dont-notify']
+    DEFAULT_ACTIONS = ['dont_notify']
 
     INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
@@ -105,7 +105,11 @@ class Pusher(object):
             room_member_count += 1
 
         for r in rules:
-            if r['rule_id'] in enabled_map and not enabled_map[r['rule_id']]:
+            if r['rule_id'] in enabled_map:
+                r['enabled'] = enabled_map[r['rule_id']]
+            elif 'enabled' not in r:
+                r['enabled'] = True
+            if not r['enabled']:
                 continue
             matches = True
 
@@ -124,13 +128,21 @@ class Pusher(object):
             # ignore rules with no actions (we have an explict 'dont_notify')
             if len(actions) == 0:
                 logger.warn(
-                    "Ignoring rule id %s with no actions for user %s" %
-                    (r['rule_id'], r['user_name'])
+                    "Ignoring rule id %s with no actions for user %s",
+                    r['rule_id'], self.user_name
                 )
                 continue
             if matches:
+                logger.info(
+                    "%s matches for user %s, event %s",
+                    r['rule_id'], self.user_name, ev['event_id']
+                )
                 defer.returnValue(actions)
 
+        logger.info(
+            "No rules match for user %s, event %s",
+            self.user_name, ev['event_id']
+        )
         defer.returnValue(Pusher.DEFAULT_ACTIONS)
 
     @staticmethod

@@ -19,11 +19,26 @@ from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.async import run_on_reactor
 from synapse.types import StreamToken
+import synapse.metrics
 
 import logging
 
 
 logger = logging.getLogger(__name__)
+
+metrics = synapse.metrics.get_metrics_for(__name__)
+
+notified_events_counter = metrics.register_counter("notified_events")
+
+
+# TODO(paul): Should be shared somewhere
+def count(func, l):
+    """Return the number of items in l for which func returns true."""
+    n = 0
+    for x in l:
+        if func(x):
+            n += 1
+    return n
 
 
 class _NotificationListener(object):
@@ -59,6 +74,7 @@ class _NotificationListener(object):
 
         try:
             self.deferred.callback(result)
+            notified_events_counter.inc_by(len(events))
         except defer.AlreadyCalledError:
             pass
 
@@ -93,6 +109,35 @@ class Notifier(object):
 
         hs.get_distributor().observe(
             "user_joined_room", self._user_joined_room
+        )
+
+        # This is not a very cheap test to perform, but it's only executed
+        # when rendering the metrics page, which is likely once per minute at
+        # most when scraping it.
+        def count_listeners():
+            all_listeners = set()
+
+            for x in self.room_to_listeners.values():
+                all_listeners |= x
+            for x in self.user_to_listeners.values():
+                all_listeners |= x
+            for x in self.appservice_to_listeners.values():
+                all_listeners |= x
+
+            return len(all_listeners)
+        metrics.register_callback("listeners", count_listeners)
+
+        metrics.register_callback(
+            "rooms",
+            lambda: count(bool, self.room_to_listeners.values()),
+        )
+        metrics.register_callback(
+            "users",
+            lambda: count(bool, self.user_to_listeners.values()),
+        )
+        metrics.register_callback(
+            "appservices",
+            lambda: count(bool, self.appservice_to_listeners.values()),
         )
 
     @log_function

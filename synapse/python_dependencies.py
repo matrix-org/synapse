@@ -5,7 +5,6 @@ logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
     "syutil>=0.0.3": ["syutil"],
-    "matrix_angular_sdk>=0.6.4": ["syweb>=0.6.4"],
     "Twisted==14.0.2": ["twisted==14.0.2"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
@@ -18,6 +17,19 @@ REQUIREMENTS = {
     "pillow": ["PIL"],
     "pydenticon": ["pydenticon"],
 }
+CONDITIONAL_REQUIREMENTS = {
+    "web_client": {
+        "matrix_angular_sdk>=0.6.5": ["syweb>=0.6.5"],
+    }
+}
+
+
+def requirements(config=None, include_conditional=False):
+    reqs = REQUIREMENTS.copy()
+    for key, req in CONDITIONAL_REQUIREMENTS.items():
+        if (config and getattr(config, key)) or include_conditional:
+            reqs.update(req)
+    return reqs
 
 
 def github_link(project, version, egg):
@@ -36,8 +48,8 @@ DEPENDENCY_LINKS = [
     ),
     github_link(
         project="matrix-org/matrix-angular-sdk",
-        version="v0.6.4",
-        egg="matrix_angular_sdk-0.6.4",
+        version="v0.6.5",
+        egg="matrix_angular_sdk-0.6.5",
     ),
 ]
 
@@ -46,10 +58,11 @@ class MissingRequirementError(Exception):
     pass
 
 
-def check_requirements():
+def check_requirements(config=None):
     """Checks that all the modules needed by synapse have been correctly
     installed and are at the correct version"""
-    for dependency, module_requirements in REQUIREMENTS.items():
+    for dependency, module_requirements in (
+            requirements(config, include_conditional=False).items()):
         for module_requirement in module_requirements:
             if ">=" in module_requirement:
                 module_name, required_version = module_requirement.split(">=")
@@ -110,7 +123,7 @@ def list_requirements():
         egg = link.split("#egg=")[1]
         linked.append(egg.split('-')[0])
         result.append(link)
-    for requirement in REQUIREMENTS:
+    for requirement in requirements(include_conditional=True):
         is_linked = False
         for link in linked:
             if requirement.replace('-', '_').startswith(link):

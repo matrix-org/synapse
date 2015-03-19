@@ -19,7 +19,7 @@ from sqlite3 import IntegrityError
 
 from synapse.api.errors import StoreError, Codes
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, cached
 
 
 class RegistrationStore(SQLBaseStore):
@@ -88,10 +88,14 @@ class RegistrationStore(SQLBaseStore):
         query = ("SELECT users.name, users.password_hash FROM users"
                  " WHERE users.name = ?")
         return self._execute(
-            self.cursor_to_dict,
-            query, user_id
+            "get_user_by_id", self.cursor_to_dict, query, user_id
         )
 
+    @cached()
+    # TODO(paul): Currently there's no code to invalidate this cache. That
+    #   means if/when we ever add internal ways to invalidate access tokens or
+    #   change whether a user is a server admin, those will need to invoke
+    #      store.get_user_by_token.invalidate(token)
     def get_user_by_token(self, token):
         """Get a user from the given access token.
 

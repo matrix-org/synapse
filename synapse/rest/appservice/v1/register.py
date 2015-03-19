@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015 OpenMarket Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -89,7 +89,8 @@ def _parse_json(request):
         if type(content) != dict:
             raise SynapseError(400, "Content must be a JSON object.")
         return content
-    except ValueError:
+    except ValueError as e:
+        logger.warn(e)
         raise SynapseError(400, "Content not JSON.")
 
 

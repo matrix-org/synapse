@@ -18,6 +18,7 @@ from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError
 )
 from synapse.util.logcontext import LoggingContext
+import synapse.metrics
 
 from syutil.jsonutil import (
     encode_canonical_json, encode_pretty_printed_json
@@ -33,6 +34,22 @@ import logging
 import urllib
 
 logger = logging.getLogger(__name__)
+
+metrics = synapse.metrics.get_metrics_for(__name__)
+
+incoming_requests_counter = metrics.register_counter(
+    "requests",
+    labels=["method", "servlet"],
+)
+outgoing_responses_counter = metrics.register_counter(
+    "responses",
+    labels=["method", "code"],
+)
+
+response_timer = metrics.register_distribution(
+    "response_time",
+    labels=["method", "servlet"]
+)
 
 
 class HttpServer(object):
@@ -74,6 +91,7 @@ class JsonResource(HttpServer, resource.Resource):
         self.clock = hs.get_clock()
         self.path_regexs = {}
         self.version_string = hs.version_string
+        self.hs = hs
 
     def register_path(self, method, path_pattern, callback):
         self.path_regexs.setdefault(method, []).append(
@@ -87,7 +105,11 @@ class JsonResource(HttpServer, resource.Resource):
             port (int): The port to listen on.
 
         """
-        reactor.listenTCP(port, server.Site(self))
+        reactor.listenTCP(
+            port,
+            server.Site(self),
+            interface=self.hs.config.bind_host
+        )
 
     # Gets called by twisted
     def render(self, request):
@@ -131,6 +153,15 @@ class JsonResource(HttpServer, resource.Resource):
                 # returned response. We pass both the request and any
                 # matched groups from the regex to the callback.
 
+                callback = path_entry.callback
+
+                servlet_instance = getattr(callback, "__self__", None)
+                if servlet_instance is not None:
+                    servlet_classname = servlet_instance.__class__.__name__
+                else:
+                    servlet_classname = "%r" % callback
+                incoming_requests_counter.inc(request.method, servlet_classname)
+
                 args = [
                     urllib.unquote(u).decode("UTF-8") for u in m.groups()
                 ]
@@ -140,12 +171,13 @@ class JsonResource(HttpServer, resource.Resource):
                     request.method, request.path
                 )
 
-                code, response = yield path_entry.callback(
-                    request,
-                    *args
-                )
+                code, response = yield callback(request, *args)
 
                 self._send_response(request, code, response)
+                response_timer.inc_by(
+                    self.clock.time_msec() - start, request.method, servlet_classname
+                )
+
                 return
 
             # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
@@ -189,6 +221,8 @@ class JsonResource(HttpServer, resource.Resource):
                 "Not sending response to request %s, already disconnected.",
                 request)
             return
+
+        outgoing_responses_counter.inc(request.method, str(code))
 
         # TODO: Only enable CORS for the requests that need it.
         respond_with_json(

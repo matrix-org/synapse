@@ -16,7 +16,6 @@
 
 class LruCache(object):
     """Least-recently-used cache."""
-    # TODO(mjark) Add hit/miss counters
     # TODO(mjark) Add mutex for linked list for thread safety.
     def __init__(self, max_size):
         cache = {}

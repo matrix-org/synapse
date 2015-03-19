@@ -37,7 +37,7 @@ class FeedbackStore(SQLBaseStore):
             "WHERE feedback.target_event_id = ? "
         )
 
-        rows = yield self._execute_and_decode(sql, event_id)
+        rows = yield self._execute_and_decode("get_feedback_for_event", sql, event_id)
 
         defer.returnValue(
             [

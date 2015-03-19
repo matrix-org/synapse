@@ -31,6 +31,7 @@ import base64
 import bcrypt
 import json
 import logging
+import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,13 @@ class RegistrationHandler(BaseHandler):
             password_hash = bcrypt.hashpw(password, bcrypt.gensalt())
 
         if localpart:
+            if localpart and urllib.quote(localpart) != localpart:
+                raise SynapseError(
+                    400,
+                    "User ID must only contain characters which do not"
+                    " require URL encoding."
+                )
+
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
 
