@@ -361,4 +361,5 @@ SERVLET_CLASSES = (
     FederationInviteServlet,
     FederationQueryAuthServlet,
     FederationGetMissingEventsServlet,
+    FederationEventAuthServlet,
 )
