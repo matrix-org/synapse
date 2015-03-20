@@ -39,7 +39,10 @@ class RegistrationStore(SQLBaseStore):
         Raises:
             StoreError if there was a problem adding this.
         """
-        row = yield self._simple_select_one("users", {"name": user_id}, ["id"])
+        row = yield self._simple_select_one(
+            "users", {"name": user_id}, ["id"],
+            desc="add_access_token_to_user",
+        )
         if not row:
             raise StoreError(400, "Bad user ID supplied.")
         row_id = row["id"]
@@ -48,7 +51,8 @@ class RegistrationStore(SQLBaseStore):
             {
                 "user_id": row_id,
                 "token": token
-            }
+            },
+            desc="add_access_token_to_user",
         )
 
     @defer.inlineCallbacks
@@ -120,6 +124,7 @@ class RegistrationStore(SQLBaseStore):
             keyvalues={"name": user.to_string()},
             retcol="admin",
             allow_none=True,
+            desc="is_server_admin",
         )
 
         defer.returnValue(res if res else False)

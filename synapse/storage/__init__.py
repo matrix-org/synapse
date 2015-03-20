@@ -83,7 +83,8 @@ class DataStore(RoomMemberStore, RoomStore,
                 "ip": ip,
                 "user_agent": user_agent,
                 "last_seen": int(self._clock.time_msec()),
-            }
+            },
+            desc="insert_client_ip",
         )
 
     def get_user_ip_and_agents(self, user):
@@ -93,6 +94,7 @@ class DataStore(RoomMemberStore, RoomStore,
             retcols=[
                 "device_id", "access_token", "ip", "user_agent", "last_seen"
             ],
+            desc="get_user_ip_and_agents",
         )
 
 

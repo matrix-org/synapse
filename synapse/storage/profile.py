@@ -21,6 +21,7 @@ class ProfileStore(SQLBaseStore):
         return self._simple_insert(
             table="profiles",
             values={"user_id": user_localpart},
+            desc="create_profile",
         )
 
     def get_profile_displayname(self, user_localpart):
@@ -28,6 +29,7 @@ class ProfileStore(SQLBaseStore):
             table="profiles",
             keyvalues={"user_id": user_localpart},
             retcol="displayname",
+            desc="get_profile_displayname",
         )
 
     def set_profile_displayname(self, user_localpart, new_displayname):
@@ -35,6 +37,7 @@ class ProfileStore(SQLBaseStore):
             table="profiles",
             keyvalues={"user_id": user_localpart},
             updatevalues={"displayname": new_displayname},
+            desc="set_profile_displayname",
         )
 
     def get_profile_avatar_url(self, user_localpart):
@@ -42,6 +45,7 @@ class ProfileStore(SQLBaseStore):
             table="profiles",
             keyvalues={"user_id": user_localpart},
             retcol="avatar_url",
+            desc="get_profile_avatar_url",
         )
 
     def set_profile_avatar_url(self, user_localpart, new_avatar_url):
@@ -49,4 +53,5 @@ class ProfileStore(SQLBaseStore):
             table="profiles",
             keyvalues={"user_id": user_localpart},
             updatevalues={"avatar_url": new_avatar_url},
+            desc="set_profile_avatar_url",
         )

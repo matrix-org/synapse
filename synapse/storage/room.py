@@ -52,7 +52,8 @@ class RoomStore(SQLBaseStore):
                     "room_id": room_id,
                     "creator": room_creator_user_id,
                     "is_public": is_public,
-                }
+                },
+                desc="store_room",
             )
         except Exception as e:
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
@@ -70,6 +71,7 @@ class RoomStore(SQLBaseStore):
             table=RoomsTable.table_name,
             keyvalues={"room_id": room_id},
             retcols=RoomsTable.fields,
+            desc="get_room",
         )
 
     @defer.inlineCallbacks
@@ -144,7 +146,7 @@ class RoomStore(SQLBaseStore):
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "topic": event.content["topic"],
-                }
+                },
             )
 
     def _store_room_name_txn(self, txn, event):
