@@ -17,7 +17,39 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.storage._base import cached
+from synapse.storage._base import Cache, cached
+
+
+class CacheTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.cache = Cache("test")
+
+    def test_empty(self):
+        failed = False
+        try:
+            self.cache.get("foo")
+        except KeyError:
+            failed = True
+
+        self.assertTrue(failed)
+
+    def test_hit(self):
+        self.cache.prefill("foo", 123)
+
+        self.assertEquals(self.cache.get("foo"), 123)
+
+    def test_invalidate(self):
+        self.cache.prefill("foo", 123)
+        self.cache.invalidate("foo")
+
+        failed = False
+        try:
+            self.cache.get("foo")
+        except KeyError:
+            failed = True
+
+        self.assertTrue(failed)
 
 
 class CacheDecoratorTestCase(unittest.TestCase):
