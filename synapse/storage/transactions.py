@@ -130,7 +130,7 @@ class TransactionStore(SQLBaseStore):
 
         query = SentTransactions.insert_statement()
         txn.execute(query, SentTransactions.EntryType(
-            None,
+            self.get_next_stream_id(),
             transaction_id=transaction_id,
             destination=destination,
             ts=origin_server_ts,
