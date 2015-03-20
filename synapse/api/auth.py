@@ -388,7 +388,7 @@ class Auth(object):
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            ret = yield self.store.get_user_by_token(token=token)
+            ret = yield self.store.get_user_by_token(token)
             if not ret:
                 raise StoreError(400, "Unknown token")
             user_info = {

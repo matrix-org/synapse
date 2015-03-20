@@ -160,3 +160,4 @@ class StateStore(SQLBaseStore):
 
 def _make_group_id(clock):
     return str(int(clock.time_msec())) + random_string(5)
+

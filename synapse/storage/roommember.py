@@ -212,7 +212,8 @@ class RoomMemberStore(SQLBaseStore):
         return self._simple_select_onecol(
             "room_hosts",
             {"room_id": room_id},
-            "host"
+            "host",
+            desc="get_joined_hosts_for_room",
         )
 
     def _get_members_by_dict(self, where_dict):

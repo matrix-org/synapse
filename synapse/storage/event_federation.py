@@ -426,3 +426,15 @@ class EventFederationStore(SQLBaseStore):
         )
 
         return events[:limit]
+
+    def clean_room_for_join(self, room_id):
+        return self.runInteraction(
+            "clean_room_for_join",
+            self._clean_room_for_join_txn,
+            room_id,
+        )
+
+    def _clean_room_for_join_txn(self, txn, room_id):
+        query = "DELETE FROM event_forward_extremities WHERE room_id = ?"
+
+        txn.execute(query, (room_id,))

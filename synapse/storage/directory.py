@@ -48,6 +48,7 @@ class DirectoryStore(SQLBaseStore):
             {"room_alias": room_alias.to_string()},
             "room_id",
             allow_none=True,
+            desc="get_association_from_room_alias",
         )
 
         if not room_id:
@@ -58,6 +59,7 @@ class DirectoryStore(SQLBaseStore):
             "room_alias_servers",
             {"room_alias": room_alias.to_string()},
             "server",
+            desc="get_association_from_room_alias",
         )
 
         if not servers:
@@ -87,6 +89,7 @@ class DirectoryStore(SQLBaseStore):
                     "room_alias": room_alias.to_string(),
                     "room_id": room_id,
                 },
+                desc="create_room_alias_association",
             )
         except sqlite3.IntegrityError:
             raise SynapseError(
@@ -100,7 +103,8 @@ class DirectoryStore(SQLBaseStore):
                 {
                     "room_alias": room_alias.to_string(),
                     "server": server,
-                }
+                },
+                desc="create_room_alias_association",
             )
 
     def delete_room_alias(self, room_alias):
@@ -139,4 +143,5 @@ class DirectoryStore(SQLBaseStore):
             "room_aliases",
             {"room_id": room_id},
             "room_alias",
+            desc="get_aliases_for_room",
         )

@@ -180,7 +180,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 1
         self.mock_txn.fetchone.return_value = ("Old Value",)
 
-        ret = yield self.datastore._simple_update_one(
+        ret = yield self.datastore._simple_selectupdate_one(
                 table="tablename",
                 keyvalues={"keycol": "TheKey"},
                 updatevalues={"columname": "New Value"},

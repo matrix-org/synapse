@@ -52,6 +52,7 @@ class EventsStore(SQLBaseStore):
                 is_new_state=is_new_state,
                 current_state=current_state,
             )
+            self.get_room_events_max_id.invalidate()
         except _RollbackButIsFineException:
             pass
 
@@ -241,7 +242,6 @@ class EventsStore(SQLBaseStore):
 
         if stream_ordering is None:
             stream_ordering = self.get_next_stream_id()
-
 
         unrec = {
             k: v

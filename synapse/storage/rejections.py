@@ -29,7 +29,7 @@ class RejectionsStore(SQLBaseStore):
                 "event_id": event_id,
                 "reason": reason,
                 "last_check": self._clock.time_msec(),
-            }
+            },
         )
 
     def get_rejection_reason(self, event_id):
@@ -40,4 +40,5 @@ class RejectionsStore(SQLBaseStore):
                 "event_id": event_id,
             },
             allow_none=True,
+            desc="get_rejection_reason",
         )

@@ -27,7 +27,6 @@ from hashlib import sha1
 import hmac
 import simplejson as json
 import logging
-import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -110,14 +109,22 @@ class RegisterRestServlet(ClientV1RestServlet):
             login_type = register_json["type"]
 
             is_application_server = login_type == LoginType.APPLICATION_SERVICE
-            if self.disable_registration and not is_application_server:
+            is_using_shared_secret = login_type == LoginType.SHARED_SECRET
+
+            can_register = (
+                not self.disable_registration
+                or is_application_server
+                or is_using_shared_secret
+            )
+            if not can_register:
                 raise SynapseError(403, "Registration has been disabled")
 
             stages = {
                 LoginType.RECAPTCHA: self._do_recaptcha,
                 LoginType.PASSWORD: self._do_password,
                 LoginType.EMAIL_IDENTITY: self._do_email_identity,
-                LoginType.APPLICATION_SERVICE: self._do_app_service
+                LoginType.APPLICATION_SERVICE: self._do_app_service,
+                LoginType.SHARED_SECRET: self._do_shared_secret,
             }
 
             session_info = self._get_session_info(request, session)
@@ -255,14 +262,11 @@ class RegisterRestServlet(ClientV1RestServlet):
             )
 
         password = register_json["password"].encode("utf-8")
-        desired_user_id = (register_json["user"].encode("utf-8")
-                           if "user" in register_json else None)
-        if (desired_user_id
-                and urllib.quote(desired_user_id) != desired_user_id):
-            raise SynapseError(
-                400,
-                "User ID must only contain characters which do not " +
-                "require URL encoding.")
+        desired_user_id = (
+            register_json["user"].encode("utf-8")
+            if "user" in register_json else None
+        )
+
         handler = self.handlers.registration_handler
         (user_id, token) = yield handler.register(
             localpart=desired_user_id,
@@ -303,6 +307,51 @@ class RegisterRestServlet(ClientV1RestServlet):
             "access_token": token,
             "home_server": self.hs.hostname,
         })
+
+    @defer.inlineCallbacks
+    def _do_shared_secret(self, request, register_json, session):
+        yield run_on_reactor()
+
+        if not isinstance(register_json.get("mac", None), basestring):
+            raise SynapseError(400, "Expected mac.")
+        if not isinstance(register_json.get("user", None), basestring):
+            raise SynapseError(400, "Expected 'user' key.")
+        if not isinstance(register_json.get("password", None), basestring):
+            raise SynapseError(400, "Expected 'password' key.")
+
+        if not self.hs.config.registration_shared_secret:
+            raise SynapseError(400, "Shared secret registration is not enabled")
+
+        user = register_json["user"].encode("utf-8")
+
+        # str() because otherwise hmac complains that 'unicode' does not
+        # have the buffer interface
+        got_mac = str(register_json["mac"])
+
+        want_mac = hmac.new(
+            key=self.hs.config.registration_shared_secret,
+            msg=user,
+            digestmod=sha1,
+        ).hexdigest()
+
+        password = register_json["password"].encode("utf-8")
+
+        if compare_digest(want_mac, got_mac):
+            handler = self.handlers.registration_handler
+            user_id, token = yield handler.register(
+                localpart=user,
+                password=password,
+            )
+            self._remove_session(session)
+            defer.returnValue({
+                "user_id": user_id,
+                "access_token": token,
+                "home_server": self.hs.hostname,
+            })
+        else:
+            raise SynapseError(
+                403, "HMAC incorrect",
+            )
 
 
 def _parse_json(request):

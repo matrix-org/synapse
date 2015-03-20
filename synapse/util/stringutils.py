@@ -16,6 +16,10 @@
 import random
 import string
 
+_string_with_symbols = (
+    string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
+)
+
 
 def origin_from_ucid(ucid):
     return ucid.split("@", 1)[1]
@@ -23,3 +27,9 @@ def origin_from_ucid(ucid):
 
 def random_string(length):
     return ''.join(random.choice(string.ascii_letters) for _ in xrange(length))
+
+
+def random_string_with_symbols(length):
+    return ''.join(
+        random.choice(_string_with_symbols) for _ in xrange(length)
+    )

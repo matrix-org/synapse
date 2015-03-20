@@ -60,8 +60,8 @@ import re
 import resource
 import subprocess
 import sqlite3
-import syweb
 import yaml
+
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +84,7 @@ class SynapseHomeServer(HomeServer):
         return AppServiceRestResource(self)
 
     def build_resource_for_web_client(self):
+        import syweb
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
         return File(webclient_path)  # TODO configurable?
@@ -131,7 +132,7 @@ class SynapseHomeServer(HomeServer):
             True.
         """
         config = self.get_config()
-        web_client = config.webclient
+        web_client = config.web_client
 
         # list containing (path_str, Resource) e.g:
         # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
@@ -344,7 +345,8 @@ def setup(config_options):
 
     config.setup_logging()
 
-    check_requirements()
+    # check any extra requirements we have now we have a config
+    check_requirements(config)
 
     version_string = get_version_string()
 
@@ -472,6 +474,7 @@ def run(hs):
 
 def main():
     with LoggingContext("main"):
+        # check base requirements
         check_requirements()
         hs = setup(sys.argv[1:])
         run(hs)
