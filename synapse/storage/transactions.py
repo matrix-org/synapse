@@ -122,7 +122,7 @@ class TransactionStore(SQLBaseStore):
             )
 
         txn.execute(query, (destination,))
-        results = SentTransactions.decode_results(txn)
+        results = SentTransactions.decode_results(txn.fetchall())
 
         prev_txns = [r.transaction_id for r in results]
 
