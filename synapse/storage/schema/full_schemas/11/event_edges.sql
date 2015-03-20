@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS state_forward_extremities(
 
 CREATE INDEX IF NOT EXISTS st_extrem_keys ON state_forward_extremities(
     room_id, type, state_key
-) ENGINE = INNODB;
+);
 CREATE INDEX IF NOT EXISTS st_extrem_id ON state_forward_extremities(event_id);
 
 

@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS sent_transactions(
     destination VARCHAR(255),
     response_code INTEGER DEFAULT 0,
     response_json BLOB,
-    ts INTEGER
+    ts BIGINT
 ) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS sent_transaction_dest ON sent_transactions(destination);
