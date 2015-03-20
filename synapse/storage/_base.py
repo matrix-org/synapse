@@ -100,8 +100,7 @@ def cached(max_entries=1000, num_args=1):
             cache_counter.inc_misses(name)
             ret = yield orig(self, *keyargs)
 
-            prefill_args = keyargs + (ret,)
-            prefill(*prefill_args)
+            prefill(*keyargs + (ret,))
 
             defer.returnValue(ret)
 
