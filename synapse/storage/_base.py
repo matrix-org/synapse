@@ -585,7 +585,7 @@ class SQLBaseStore(object):
             raise StoreError(500, "More than one row matched")
 
     def _simple_select_one_txn(self, txn, table, keyvalues, retcols,
-                           allow_none=False):
+                               allow_none=False):
         select_sql = "SELECT %s FROM %s WHERE %s ORDER BY rowid asc" % (
             ", ".join(retcols),
             table,
