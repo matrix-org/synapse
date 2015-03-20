@@ -161,6 +161,43 @@ class RoomStore(SQLBaseStore):
                 }
             )
 
+    @defer.inlineCallbacks
+    def get_room_name_and_aliases(self, room_id):
+        del_sql = (
+            "SELECT event_id FROM redactions WHERE redacts = e.event_id "
+            "LIMIT 1"
+        )
+
+        sql = (
+            "SELECT e.*, (%(redacted)s) AS redacted FROM events as e "
+            "INNER JOIN current_state_events as c ON e.event_id = c.event_id "
+            "INNER JOIN state_events as s ON e.event_id = s.event_id "
+            "WHERE c.room_id = ? "
+        ) % {
+            "redacted": del_sql,
+        }
+
+        sql += " AND ((s.type = 'm.room.name' AND s.state_key = '')"
+        sql += " OR s.type = 'm.room.aliases')"
+        args = (room_id,)
+
+        results = yield self._execute_and_decode("get_current_state", sql, *args)
+
+        events = yield self._parse_events(results)
+
+        name = None
+        aliases = []
+
+        for e in events:
+            if e.type == 'm.room.name':
+                if 'name' in e.content:
+                    name = e.content['name']
+            elif e.type == 'm.room.aliases':
+                if 'aliases' in e.content:
+                    aliases.extend(e.content['aliases'])
+
+        defer.returnValue((name, aliases))
+
 
 class RoomsTable(Table):
     table_name = "rooms"

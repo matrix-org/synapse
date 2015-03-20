@@ -791,6 +791,13 @@ class SQLBaseStore(object):
         return result[0] if result else None
 
 
+class _RollbackButIsFineException(Exception):
+    """ This exception is used to rollback a transaction without implying
+    something went wrong.
+    """
+    pass
+
+
 class Table(object):
     """ A base class used to store information about a particular table.
     """
