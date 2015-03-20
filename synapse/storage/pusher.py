@@ -114,7 +114,9 @@ class PusherStore(SQLBaseStore):
                     ts=pushkey_ts,
                     lang=lang,
                     data=data
-                ))
+                ),
+                desc="add_pusher",
+            )
         except Exception as e:
             logger.error("create_pusher with failed: %s", e)
             raise StoreError(500, "Problem creating pusher.")
@@ -123,7 +125,8 @@ class PusherStore(SQLBaseStore):
     def delete_pusher_by_app_id_pushkey(self, app_id, pushkey):
         yield self._simple_delete_one(
             PushersTable.table_name,
-            dict(app_id=app_id, pushkey=pushkey)
+            {"app_id": app_id, "pushkey": pushkey},
+            desc="delete_pusher_by_app_id_pushkey",
         )
 
     @defer.inlineCallbacks
@@ -131,7 +134,8 @@ class PusherStore(SQLBaseStore):
         yield self._simple_update_one(
             PushersTable.table_name,
             {'app_id': app_id, 'pushkey': pushkey},
-            {'last_token': last_token}
+            {'last_token': last_token},
+            desc="update_pusher_last_token",
         )
 
     @defer.inlineCallbacks
@@ -140,7 +144,8 @@ class PusherStore(SQLBaseStore):
         yield self._simple_update_one(
             PushersTable.table_name,
             {'app_id': app_id, 'pushkey': pushkey},
-            {'last_token': last_token, 'last_success': last_success}
+            {'last_token': last_token, 'last_success': last_success},
+            desc="update_pusher_last_token_and_success",
         )
 
     @defer.inlineCallbacks
@@ -148,7 +153,8 @@ class PusherStore(SQLBaseStore):
         yield self._simple_update_one(
             PushersTable.table_name,
             {'app_id': app_id, 'pushkey': pushkey},
-            {'failing_since': failing_since}
+            {'failing_since': failing_since},
+            desc="update_pusher_failing_since",
         )
 
 

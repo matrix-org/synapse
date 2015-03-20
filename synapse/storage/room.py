@@ -15,11 +15,9 @@
 
 from twisted.internet import defer
 
-from sqlite3 import IntegrityError
-
 from synapse.api.errors import StoreError
 
-from ._base import SQLBaseStore, Table
+from ._base import SQLBaseStore
 
 import collections
 import logging
@@ -27,8 +25,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-OpsLevel = collections.namedtuple("OpsLevel", (
-    "ban_level", "kick_level", "redact_level")
+OpsLevel = collections.namedtuple(
+    "OpsLevel",
+    ("ban_level", "kick_level", "redact_level",)
 )
 
 
@@ -47,13 +46,15 @@ class RoomStore(SQLBaseStore):
             StoreError if the room could not be stored.
         """
         try:
-            yield self._simple_insert(RoomsTable.table_name, dict(
-                room_id=room_id,
-                creator=room_creator_user_id,
-                is_public=is_public
-            ))
-        except IntegrityError:
-            raise StoreError(409, "Room ID in use.")
+            yield self._simple_insert(
+                RoomsTable.table_name,
+                {
+                    "room_id": room_id,
+                    "creator": room_creator_user_id,
+                    "is_public": is_public,
+                },
+                desc="store_room",
+            )
         except Exception as e:
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
@@ -66,9 +67,11 @@ class RoomStore(SQLBaseStore):
         Returns:
             A namedtuple containing the room information, or an empty list.
         """
-        query = RoomsTable.select_statement("room_id=?")
-        return self._execute(
-            "get_room", RoomsTable.decode_single_result, query, room_id,
+        return self._simple_select_one(
+            table=RoomsTable.table_name,
+            keyvalues={"room_id": room_id},
+            retcols=RoomsTable.fields,
+            desc="get_room",
         )
 
     @defer.inlineCallbacks
@@ -143,7 +146,7 @@ class RoomStore(SQLBaseStore):
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "topic": event.content["topic"],
-                }
+                },
             )
 
     def _store_room_name_txn(self, txn, event):
@@ -158,8 +161,45 @@ class RoomStore(SQLBaseStore):
                 }
             )
 
+    @defer.inlineCallbacks
+    def get_room_name_and_aliases(self, room_id):
+        del_sql = (
+            "SELECT event_id FROM redactions WHERE redacts = e.event_id "
+            "LIMIT 1"
+        )
 
-class RoomsTable(Table):
+        sql = (
+            "SELECT e.*, (%(redacted)s) AS redacted FROM events as e "
+            "INNER JOIN current_state_events as c ON e.event_id = c.event_id "
+            "INNER JOIN state_events as s ON e.event_id = s.event_id "
+            "WHERE c.room_id = ? "
+        ) % {
+            "redacted": del_sql,
+        }
+
+        sql += " AND ((s.type = 'm.room.name' AND s.state_key = '')"
+        sql += " OR s.type = 'm.room.aliases')"
+        args = (room_id,)
+
+        results = yield self._execute_and_decode("get_current_state", sql, *args)
+
+        events = yield self._parse_events(results)
+
+        name = None
+        aliases = []
+
+        for e in events:
+            if e.type == 'm.room.name':
+                if 'name' in e.content:
+                    name = e.content['name']
+            elif e.type == 'm.room.aliases':
+                if 'aliases' in e.content:
+                    aliases.extend(e.content['aliases'])
+
+        defer.returnValue((name, aliases))
+
+
+class RoomsTable(object):
     table_name = "rooms"
 
     fields = [
@@ -167,5 +207,3 @@ class RoomsTable(Table):
         "is_public",
         "creator"
     ]
-
-    EntryType = collections.namedtuple("RoomEntry", fields)
