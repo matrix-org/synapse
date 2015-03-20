@@ -26,6 +26,11 @@ class DatabaseConfig(Config):
             self.database_path = self.abspath(args.database_path)
         self.event_cache_size = self.parse_size(args.event_cache_size)
 
+        if args.database_config:
+            self.database_config = self.abspath(args.database_config)
+        else:
+            self.database_config = None
+
     @classmethod
     def add_arguments(cls, parser):
         super(DatabaseConfig, cls).add_arguments(parser)
@@ -37,6 +42,10 @@ class DatabaseConfig(Config):
         db_group.add_argument(
             "--event-cache-size", default="100K",
             help="Number of events to cache in memory."
+        )
+        db_group.add_argument(
+            "--database-config", default=None,
+            help="Location of the database configuration file."
         )
 
     @classmethod
