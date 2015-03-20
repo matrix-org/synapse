@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
+from ._base import Cache
 from .appservice import ApplicationServiceStore
 from .directory import DirectoryStore
 from .events import EventsStore
@@ -51,6 +54,11 @@ SCHEMA_VERSION = 14
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
+# Number of msec of granularity to store the user IP 'last seen' time. Smaller
+# times give more inserts into the database even for readonly API hits
+# 120 seconds == 2 minutes
+LAST_SEEN_GRANULARITY = 120*1000
+
 
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore,
@@ -73,8 +81,28 @@ class DataStore(RoomMemberStore, RoomStore,
         self.min_token_deferred = self._get_min_token()
         self.min_token = None
 
+        self.client_ip_last_seen = Cache(
+            name="client_ip_last_seen",
+            keylen=4,
+        )
+
+    @defer.inlineCallbacks
     def insert_client_ip(self, user, access_token, device_id, ip, user_agent):
-        return self._simple_insert(
+        now = int(self._clock.time_msec())
+        key = (user.to_string(), access_token, device_id, ip)
+
+        try:
+            last_seen = self.client_ip_last_seen.get(*key)
+        except KeyError:
+            last_seen = None
+
+        # Rate-limited inserts
+        if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
+            defer.returnValue(None)
+
+        self.client_ip_last_seen.prefill(*key + (now,))
+
+        yield self._simple_insert(
             "user_ips",
             {
                 "user": user.to_string(),
@@ -82,7 +110,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 "device_id": device_id,
                 "ip": ip,
                 "user_agent": user_agent,
-                "last_seen": int(self._clock.time_msec()),
+                "last_seen": now,
             },
             desc="insert_client_ip",
         )
