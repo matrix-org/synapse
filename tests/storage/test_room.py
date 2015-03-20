@@ -44,7 +44,7 @@ class RoomStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_room(self):
-        self.assertObjectHasAttributes(
+        self.assertDictContainsSubset(
             {"room_id": self.room.to_string(),
              "creator": self.u_creator.to_string(),
              "is_public": True},
