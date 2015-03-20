@@ -35,7 +35,7 @@ what sort order was used:
 
 from twisted.internet import defer
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, cached
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.util.logutils import log_function
@@ -413,6 +413,7 @@ class StreamStore(SQLBaseStore):
             "get_recent_events_for_room", get_recent_events_for_room_txn
         )
 
+    @cached(num_args=0)
     def get_room_events_max_id(self):
         return self.runInteraction(
             "get_room_events_max_id",

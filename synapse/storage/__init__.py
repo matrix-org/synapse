@@ -111,6 +111,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 is_new_state=is_new_state,
                 current_state=current_state,
             )
+            self.get_room_events_max_id.invalidate()
         except _RollbackButIsFineException:
             pass
 
