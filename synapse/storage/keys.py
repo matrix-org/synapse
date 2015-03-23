@@ -66,7 +66,6 @@ class KeyStore(SQLBaseStore):
                 "ts_added_ms": time_now_ms,
                 "tls_certificate": buffer(tls_certificate_bytes),
             },
-            or_ignore=True,
         )
 
     @defer.inlineCallbacks
@@ -116,5 +115,4 @@ class KeyStore(SQLBaseStore):
                 "ts_added_ms": time_now_ms,
                 "verify_key": buffer(verify_key.encode()),
             },
-            or_ignore=True,
         )

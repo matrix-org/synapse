@@ -124,7 +124,6 @@ class StateStore(SQLBaseStore):
                 "state_group": state_group,
                 "event_id": event.event_id,
             },
-            or_replace=True,
         )
 
     @defer.inlineCallbacks

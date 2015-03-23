@@ -56,7 +56,6 @@ class SignatureStore(SQLBaseStore):
                 "algorithm": algorithm,
                 "hash": buffer(hash_bytes),
             },
-            or_ignore=True,
         )
 
     def get_event_reference_hashes(self, event_ids):
@@ -119,7 +118,6 @@ class SignatureStore(SQLBaseStore):
                 "algorithm": algorithm,
                 "hash": buffer(hash_bytes),
             },
-            or_ignore=True,
         )
 
     def _get_event_signatures_txn(self, txn, event_id):
@@ -164,7 +162,6 @@ class SignatureStore(SQLBaseStore):
                 "key_id": key_id,
                 "signature": buffer(signature_bytes),
             },
-            or_ignore=True,
         )
 
     def _get_prev_event_hashes_txn(self, txn, event_id):
@@ -198,5 +195,4 @@ class SignatureStore(SQLBaseStore):
                 "algorithm": algorithm,
                 "hash": buffer(hash_bytes),
             },
-            or_ignore=True,
         )
