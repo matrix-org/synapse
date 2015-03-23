@@ -276,25 +276,32 @@ class TransactionStore(SQLBaseStore):
             retry_interval,
         )
 
-    def _set_destination_retry_timings(cls, txn, destination,
+    def _set_destination_retry_timings(self, txn, destination,
                                        retry_last_ts, retry_interval):
-
         query = (
-            "INSERT INTO destinations"
-            " (destination, retry_last_ts, retry_interval)"
-            " VALUES (?, ?, ?)"
-            " ON DUPLICATE KEY UPDATE"
-            " retry_last_ts=?, retry_interval=?"
+            "UPDATE destinations"
+            " SET retry_last_ts = ?, retry_interval = ?"
+            " WHERE destinations = ?"
         )
 
         txn.execute(
             query,
             (
-                destination,
-                retry_last_ts, retry_interval,
-                retry_last_ts, retry_interval,
+                retry_last_ts, retry_interval, destination,
             )
         )
+
+        if txn.rowcount == 0:
+            # destination wasn't already in table. Insert it.
+            self._simple_insert_txn(
+                txn,
+                table="destinations",
+                values={
+                    "destination": destination,
+                    "retry_last_ts": retry_last_ts,
+                    "retry_interval": retry_interval,
+                }
+            )
 
     def get_destinations_needing_retry(self):
         """Get all destinations which are due a retry for sending a transaction.
