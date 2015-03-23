@@ -95,11 +95,36 @@ class RegistrationStore(SQLBaseStore):
             "get_user_by_id", self.cursor_to_dict, query, user_id
         )
 
+    def user_set_password_hash(self, user_id, password_hash):
+        """
+        NB. This does *not* evict any cache because the one use for this
+            removes most of the entries subsequently anyway so it would be
+            pointless. Use flush_user separately.
+        """
+        return self._simple_update_one('users', {
+            'name': user_id
+        }, {
+            'password_hash': password_hash
+        })
+
+    def user_delete_access_tokens_apart_from(self, user_id, token_id):
+        return self._execute(
+            "delete_access_tokens_apart_from", None,
+            "DELETE FROM access_tokens WHERE user_id = ? AND id != ?",
+            user_id, token_id
+        )
+
+    @defer.inlineCallbacks
+    def flush_user(self, user_id):
+        rows = yield self._execute(
+            'user_delete_access_tokens_apart_from', None,
+            "SELECT token FROM access_tokens WHERE user_id = ?",
+            user_id
+        )
+        for r in rows:
+            self.get_user_by_token.invalidate(r)
+
     @cached()
-    # TODO(paul): Currently there's no code to invalidate this cache. That
-    #   means if/when we ever add internal ways to invalidate access tokens or
-    #   change whether a user is a server admin, those will need to invoke
-    #      store.get_user_by_token.invalidate(token)
     def get_user_by_token(self, token):
         """Get a user from the given access token.
 

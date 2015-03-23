@@ -17,9 +17,11 @@
 """
 
 from synapse.api.urls import CLIENT_V2_ALPHA_PREFIX
+from synapse.api.errors import SynapseError
 import re
 
 import logging
+import simplejson
 
 
 logger = logging.getLogger(__name__)
@@ -36,3 +38,13 @@ def client_v2_pattern(path_regex):
         SRE_Pattern
     """
     return re.compile("^" + CLIENT_V2_ALPHA_PREFIX + path_regex)
+
+
+def parse_json_dict_from_request(request):
+    try:
+        content = simplejson.loads(request.content.read())
+        if type(content) != dict:
+            raise SynapseError(400, "Content must be a JSON object.")
+        return content
+    except simplejson.JSONDecodeError:
+        raise SynapseError(400, "Content not JSON.")

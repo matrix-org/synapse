@@ -29,6 +29,7 @@ from .typing import TypingNotificationHandler
 from .admin import AdminHandler
 from .appservice import ApplicationServicesHandler
 from .sync import SyncHandler
+from .auth import AuthHandler
 
 
 class Handlers(object):
@@ -58,3 +59,4 @@ class Handlers(object):
             hs, ApplicationServiceApi(hs)
         )
         self.sync_handler = SyncHandler(hs)
+        self.auth_handler = AuthHandler(hs)

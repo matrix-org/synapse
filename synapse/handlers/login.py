@@ -69,48 +69,9 @@ class LoginHandler(BaseHandler):
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
     @defer.inlineCallbacks
-    def reset_password(self, user_id, email):
-        is_valid = yield self._check_valid_association(user_id, email)
-        logger.info("reset_password user=%s email=%s valid=%s", user_id, email,
-                    is_valid)
-        if is_valid:
-            try:
-                # send an email out
-                emailutils.send_email(
-                    smtp_server=self.hs.config.email_smtp_server,
-                    from_addr=self.hs.config.email_from_address,
-                    to_addr=email,
-                    subject="Password Reset",
-                    body="TODO."
-                )
-            except EmailException as e:
-                logger.exception(e)
+    def set_password(self, user_id, newpassword, token_id=None):
+        password_hash = bcrypt.hashpw(newpassword, bcrypt.gensalt())
 
-    @defer.inlineCallbacks
-    def _check_valid_association(self, user_id, email):
-        identity = yield self._query_email(email)
-        if identity and "mxid" in identity:
-            if identity["mxid"] == user_id:
-                defer.returnValue(True)
-                return
-        defer.returnValue(False)
-
-    @defer.inlineCallbacks
-    def _query_email(self, email):
-        http_client = SimpleHttpClient(self.hs)
-        try:
-            data = yield http_client.get_json(
-                # TODO FIXME This should be configurable.
-                # XXX: ID servers need to use HTTPS
-                "http://%s%s" % (
-                    "matrix.org:8090", "/_matrix/identity/api/v1/lookup"
-                ),
-                {
-                    'medium': 'email',
-                    'address': email
-                }
-            )
-            defer.returnValue(data)
-        except CodeMessageException as e:
-            data = json.loads(e.msg)
-            defer.returnValue(data)
+        yield self.store.user_set_password_hash(user_id, password_hash)
+        yield self.store.user_delete_access_tokens_apart_from(user_id, token_id)
+        yield self.store.flush_user(user_id)
