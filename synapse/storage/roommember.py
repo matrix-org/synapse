@@ -74,22 +74,9 @@ class RoomMemberStore(SQLBaseStore):
             txn.execute(sql, (event.room_id, domain))
         elif event.membership != Membership.INVITE:
             # Check if this was the last person to have left.
-            member_events = self._get_members_query_txn(
-                txn,
-                where_clause=("c.room_id = ? AND m.membership = ?"
-                              " AND m.user_id != ?"),
-                where_values=(event.room_id, Membership.JOIN, target_user_id,)
+            joined_domains = self._get_joined_hosts_for_room_txn(
+                txn, event.room_id
             )
-
-            joined_domains = set()
-            for e in member_events:
-                try:
-                    joined_domains.add(
-                        UserID.from_string(e.state_key).domain
-                    )
-                except:
-                    # FIXME: How do we deal with invalid user ids in the db?
-                    logger.exception("Invalid user_id: %s", event.state_key)
 
             if domain not in joined_domains:
                 sql = (
@@ -100,7 +87,6 @@ class RoomMemberStore(SQLBaseStore):
 
         self.get_rooms_for_user.invalidate(target_user_id)
 
-    @defer.inlineCallbacks
     def get_room_member(self, user_id, room_id):
         """Retrieve the current state of a room member.
 
@@ -110,41 +96,27 @@ class RoomMemberStore(SQLBaseStore):
         Returns:
             Deferred: Results in a MembershipEvent or None.
         """
-        rows = yield self._get_members_by_dict({
-            "e.room_id": room_id,
-            "m.user_id": user_id,
-        })
+        def f(txn):
+            events = self._get_members_events_txn(
+                txn,
+                room_id,
+                user_id=user_id,
+            )
 
-        defer.returnValue(rows[0] if rows else None)
+            return events[0] if events else None
 
-    def _get_room_member(self, txn, user_id, room_id):
-        sql = (
-            "SELECT e.* FROM events as e"
-            " INNER JOIN room_memberships as m"
-            " ON e.event_id = m.event_id"
-            " INNER JOIN current_state_events as c"
-            " ON m.event_id = c.event_id"
-            " WHERE m.user_id = ? and e.room_id = ?"
-            " LIMIT 1"
-        )
-        txn.execute(sql, (user_id, room_id))
-        rows = self.cursor_to_dict(txn)
-        if rows:
-            return self._parse_events_txn(txn, rows)[0]
-        else:
-            return None
+        return self.runInteraction("get_room_member", f)
 
     def get_users_in_room(self, room_id):
         def f(txn):
-            sql = (
-                "SELECT m.user_id FROM room_memberships as m"
-                " INNER JOIN current_state_events as c"
-                " ON m.event_id = c.event_id"
-                " WHERE m.membership = ? AND m.room_id = ?"
+
+            rows = self._get_members_rows_txn(
+                txn,
+                room_id=room_id,
+                membership=Membership.JOIN,
             )
 
-            txn.execute(sql, (Membership.JOIN, room_id))
-            return [r[0] for r in txn.fetchall()]
+            return [r["user_id"] for r in rows]
         return self.runInteraction("get_users_in_room", f)
 
     def get_room_members(self, room_id, membership=None):
@@ -159,11 +131,14 @@ class RoomMemberStore(SQLBaseStore):
             list of namedtuples representing the members in this room.
         """
 
-        where = {"m.room_id": room_id}
-        if membership:
-            where["m.membership"] = membership
+        def f(txn):
+            return self._get_members_events_txn(
+                txn,
+                room_id,
+                membership=membership,
+            )
 
-        return self._get_members_by_dict(where)
+        return self.runInteraction("get_room_members", f)
 
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         """ Get all the rooms for this user where the membership for this user
@@ -209,28 +184,52 @@ class RoomMemberStore(SQLBaseStore):
         ]
 
     def get_joined_hosts_for_room(self, room_id):
-        return self._simple_select_onecol(
-            "room_hosts",
-            {"room_id": room_id},
-            "host",
-            desc="get_joined_hosts_for_room",
+        return self.runInteraction(
+            "get_joined_hosts_for_room",
+            self._get_joined_hosts_for_room_txn,
+            room_id,
         )
 
-    def _get_members_by_dict(self, where_dict):
-        clause = " AND ".join("%s = ?" % k for k in where_dict.keys())
-        vals = where_dict.values()
-        return self._get_members_query(clause, vals)
+    def _get_joined_hosts_for_room_txn(self, txn, room_id):
+        rows = self._get_members_rows_txn(
+            txn,
+            room_id, membership=Membership.JOIN
+        )
+
+        joined_domains = set(
+            UserID.from_string(r["user_id"]).domain
+            for r in rows
+        )
+
+        return joined_domains
 
     def _get_members_query(self, where_clause, where_values):
         return self.runInteraction(
-            "get_members_query", self._get_members_query_txn,
+            "get_members_query", self._get_members_events_txn,
             where_clause, where_values
         )
 
-    def _get_members_query_txn(self, txn, where_clause, where_values):
+    def _get_members_events_txn(self, txn, room_id, membership=None, user_id=None):
+        rows = self._get_members_rows_txn(
+            txn,
+            room_id, membership, user_id,
+        )
+        return self._get_events_txn(txn, [r["event_id"] for r in rows])
+
+    def _get_members_rows_txn(self, txn, room_id, membership=None, user_id=None):
+        where_clause = "c.room_id = ?"
+        where_values = [room_id]
+
+        if membership:
+            where_clause += " AND m.membership = ?"
+            where_values.append(membership)
+
+        if user_id:
+            where_clause += " AND m.user_id = ?"
+            where_values.append(user_id)
+
         sql = (
-            "SELECT e.* FROM events as e "
-            "INNER JOIN room_memberships as m "
+            "SELECT m.* FROM room_memberships as m "
             "ON e.event_id = m.event_id "
             "INNER JOIN current_state_events as c "
             "ON m.event_id = c.event_id "
@@ -242,8 +241,7 @@ class RoomMemberStore(SQLBaseStore):
         txn.execute(sql, where_values)
         rows = self.cursor_to_dict(txn)
 
-        results = self._parse_events_txn(txn, rows)
-        return results
+        return rows
 
     @cached()
     def get_rooms_for_user(self, user_id):
