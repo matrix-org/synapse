@@ -179,7 +179,7 @@ class FederationHandler(BaseHandler):
         # it's probably a good idea to mark it as not in retry-state
         # for sending (although this is a bit of a leap)
         retry_timings = yield self.store.get_destination_retry_timings(origin)
-        if (retry_timings and retry_timings.retry_last_ts):
+        if retry_timings and retry_timings["retry_last_ts"]:
             self.store.set_destination_retry_timings(origin, 0, 0)
 
         room = yield self.store.get_room(event.room_id)
