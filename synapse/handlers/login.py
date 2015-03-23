@@ -16,13 +16,9 @@
 from twisted.internet import defer
 
 from ._base import BaseHandler
-from synapse.api.errors import LoginError, Codes, CodeMessageException
-from synapse.http.client import SimpleHttpClient
-from synapse.util.emailutils import EmailException
-import synapse.util.emailutils as emailutils
+from synapse.api.errors import LoginError, Codes
 
 import bcrypt
-import json
 import logging
 
 logger = logging.getLogger(__name__)

@@ -21,7 +21,6 @@ from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_pattern, parse_json_dict_from_request
 
-import simplejson as json
 import logging
 
 
@@ -71,6 +70,7 @@ class PasswordRestServlet(RestServlet):
         )
 
         defer.returnValue((200, {}))
+
 
 def register_servlets(hs, http_server):
     PasswordRestServlet(hs).register(http_server)
