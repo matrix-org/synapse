@@ -18,7 +18,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
-from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
 from synapse.types import UserID, ClientInfo
