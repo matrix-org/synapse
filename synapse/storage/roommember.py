@@ -65,26 +65,6 @@ class RoomMemberStore(SQLBaseStore):
             }
         )
 
-        # Update room hosts table
-        if event.membership == Membership.JOIN:
-            sql = (
-                "REPLACE INTO room_hosts (room_id, host) "
-                "VALUES (?, ?)"
-            )
-            txn.execute(sql, (event.room_id, domain))
-        elif event.membership != Membership.INVITE:
-            # Check if this was the last person to have left.
-            joined_domains = self._get_joined_hosts_for_room_txn(
-                txn, event.room_id
-            )
-
-            if domain not in joined_domains:
-                sql = (
-                    "DELETE FROM room_hosts WHERE room_id = ? AND host = ?"
-                )
-
-                txn.execute(sql, (event.room_id, domain))
-
         self.get_rooms_for_user.invalidate(target_user_id)
 
     def get_room_member(self, user_id, room_id):
@@ -229,11 +209,10 @@ class RoomMemberStore(SQLBaseStore):
             where_values.append(user_id)
 
         sql = (
-            "SELECT m.* FROM room_memberships as m "
-            "ON e.event_id = m.event_id "
-            "INNER JOIN current_state_events as c "
-            "ON m.event_id = c.event_id "
-            "WHERE %(where)s "
+            "SELECT m.* FROM room_memberships as m"
+            " INNER JOIN current_state_events as c"
+            " ON m.event_id = c.event_id"
+            " WHERE %(where)s"
         ) % {
             "where": where_clause,
         }
