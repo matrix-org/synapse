@@ -102,10 +102,10 @@ class RoomStore(SQLBaseStore):
                 "ON c.event_id = room_names.event_id "
             )
 
-            # We use non printing ascii character US () as a seperator
+            # We use non printing ascii character US (\x1F) as a separator
             sql = (
                 "SELECT r.room_id, n.name, t.topic, "
-                "group_concat(a.room_alias, '') "
+                "group_concat(a.room_alias, '\x1F') "
                 "FROM rooms AS r "
                 "LEFT JOIN (%(topic)s) AS t ON t.room_id = r.room_id "
                 "LEFT JOIN (%(name)s) AS n ON n.room_id = r.room_id "
@@ -130,7 +130,7 @@ class RoomStore(SQLBaseStore):
                 "room_id": r[0],
                 "name": r[1],
                 "topic": r[2],
-                "aliases": r[3].split(""),
+                "aliases": r[3].split("\x1F"),
             }
             for r in rows
         ]
