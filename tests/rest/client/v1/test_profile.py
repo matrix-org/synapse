@@ -55,7 +55,7 @@ class ProfileTestCase(unittest.TestCase):
         def _get_user_by_req(request=None):
             return (UserID.from_string(myid), "")
 
-        hs.get_auth().get_user_by_req = _get_user_by_req
+        hs.get_v1auth().get_user_by_req = _get_user_by_req
 
         hs.get_handlers().profile_handler = self.mock_handler
 

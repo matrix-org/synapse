@@ -38,7 +38,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_register(self):
         yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
-        u = yield self.store.get_user_by_id(self.user_id)[0]
+        u = (yield self.store.get_user_by_id(self.user_id))[0]
 
         # TODO(paul): Surely this field should be 'user_id', not 'name'
         #  Additionally surely it shouldn't come in a 1-element list
