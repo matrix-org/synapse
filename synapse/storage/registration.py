@@ -174,4 +174,4 @@ class RegistrationStore(SQLBaseStore):
         if rows:
             return rows[0]
 
-        raise StoreError(404, "Token not found.")
+        return None

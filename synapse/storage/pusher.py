@@ -95,7 +95,7 @@ class PusherStore(SQLBaseStore):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def add_pusher(self, user_name, profile_tag, kind, app_id,
+    def add_pusher(self, user_name, access_token, profile_tag, kind, app_id,
                    app_display_name, device_display_name,
                    pushkey, pushkey_ts, lang, data):
         try:
@@ -107,6 +107,7 @@ class PusherStore(SQLBaseStore):
                 ),
                 dict(
                     user_name=user_name,
+                    access_token=access_token,
                     kind=kind,
                     profile_tag=profile_tag,
                     app_display_name=app_display_name,
