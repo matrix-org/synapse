@@ -81,14 +81,16 @@ class DataStore(RoomMemberStore, RoomStore,
         self._next_stream_id = int(hs.get_clock().time_msec()) * 1000
 
     def insert_client_ip(self, user, access_token, device_id, ip, user_agent):
-        return self._simple_insert(
+        return self._simple_upsert(
             "user_ips",
-            {
+            keyvalues={
                 "user": user.to_string(),
                 "access_token": access_token,
-                "device_id": device_id,
                 "ip": ip,
                 "user_agent": user_agent,
+            },
+            values={
+                "device_id": device_id,
                 "last_seen": int(self._clock.time_msec()),
             },
             desc="insert_client_ip",

@@ -84,14 +84,14 @@ class TransactionStore(SQLBaseStore):
 
     def _set_received_txn_response(self, txn, transaction_id, origin, code,
                                    response_json):
-        self._simple_update_one_txn(
+        self._simple_upsert_txn(
             txn,
             table=ReceivedTransactionsTable.table_name,
             keyvalues={
                 "transaction_id": transaction_id,
                 "origin": origin,
             },
-            updatevalues={
+            values={
                 "response_code": code,
                 "response_json": response_json,
             }
