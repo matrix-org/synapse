@@ -65,11 +65,14 @@ class PasswordRestServlet(RestServlet):
             raise SynapseError(400, "", Codes.MISSING_PARAM)
         new_password = body['new_password']
 
-        self.login_handler.set_password(
+        yield self.login_handler.set_password(
             user_id, new_password, client.token_id
         )
 
         defer.returnValue((200, {}))
+
+    def on_OPTIONS(self, _):
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

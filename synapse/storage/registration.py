@@ -89,35 +89,41 @@ class RegistrationStore(SQLBaseStore):
                     "VALUES (?,?)", [txn.lastrowid, token])
 
     def get_user_by_id(self, user_id):
-        query = ("SELECT users.name, users.password_hash FROM users"
+        query = ("SELECT users.id, users.name, users.password_hash FROM users"
                  " WHERE users.name = ?")
         return self._execute(
             "get_user_by_id", self.cursor_to_dict, query, user_id
         )
 
+    @defer.inlineCallbacks
     def user_set_password_hash(self, user_id, password_hash):
         """
         NB. This does *not* evict any cache because the one use for this
             removes most of the entries subsequently anyway so it would be
             pointless. Use flush_user separately.
         """
-        return self._simple_update_one('users', {
+        yield self._simple_update_one('users', {
             'name': user_id
         }, {
             'password_hash': password_hash
         })
 
+    @defer.inlineCallbacks
     def user_delete_access_tokens_apart_from(self, user_id, token_id):
-        return self._execute(
+        rows = yield self.get_user_by_id(user_id)
+        if len(rows) == 0:
+            raise Exception("No such user!")
+
+        yield self._execute(
             "delete_access_tokens_apart_from", None,
             "DELETE FROM access_tokens WHERE user_id = ? AND id != ?",
-            user_id, token_id
+            rows[0]['id'], token_id
         )
 
     @defer.inlineCallbacks
     def flush_user(self, user_id):
         rows = yield self._execute(
-            'user_delete_access_tokens_apart_from', None,
+            'flush_user', None,
             "SELECT token FROM access_tokens WHERE user_id = ?",
             user_id
         )
