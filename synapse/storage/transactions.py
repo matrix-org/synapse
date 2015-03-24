@@ -143,7 +143,8 @@ class TransactionStore(SQLBaseStore):
             txn,
             table=SentTransactions.table_name,
             values={
-                "transaction_id": self.get_next_stream_id(),
+                "id": self.get_next_stream_id(),
+                "transaction_id": transaction_id,
                 "destination": destination,
                 "ts": origin_server_ts,
                 "response_code": 0,
@@ -240,7 +241,7 @@ class TransactionStore(SQLBaseStore):
             allow_none=True,
         )
 
-        if result["retry_last_ts"] > 0:
+        if result and result["retry_last_ts"] > 0:
             return result
         else:
             return None
