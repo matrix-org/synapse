@@ -85,6 +85,21 @@ class PusherPool:
         )
 
     @defer.inlineCallbacks
+    def remove_pushers_by_app_id_and_pushkey_not_user(self, app_id, pushkey,
+                                                      not_user_id):
+        to_remove = yield self.store.get_pushers_by_app_id_and_pushkey(
+            app_id, pushkey
+        )
+        for p in to_remove:
+            if p['user_name'] != not_user_id:
+                logger.info(
+                    "Removing pusher for app id %s, pushkey %s, user %s",
+                    app_id, pushkey, p['user_name']
+                )
+                self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
+
+
+    @defer.inlineCallbacks
     def _add_pusher_to_store(self, user_name, access_token, profile_tag, kind,
                              app_id, app_display_name, device_display_name,
                              pushkey, lang, data):
@@ -101,7 +116,7 @@ class PusherPool:
             lang=lang,
             data=encode_canonical_json(data).decode("UTF-8"),
         )
-        self._refresh_pusher((app_id, pushkey))
+        self._refresh_pusher(app_id, pushkey, user_name)
 
     def _create_pusher(self, pusherdict):
         if pusherdict['kind'] == 'http':
@@ -126,30 +141,42 @@ class PusherPool:
             )
 
     @defer.inlineCallbacks
-    def _refresh_pusher(self, app_id_pushkey):
-        p = yield self.store.get_pushers_by_app_id_and_pushkey(
-            app_id_pushkey
+    def _refresh_pusher(self, app_id, pushkey, user_name):
+        resultlist = yield self.store.get_pushers_by_app_id_and_pushkey(
+            app_id, pushkey
         )
-        p['data'] = json.loads(p['data'])
+        p = None
+        for r in resultlist:
+            if r['user_name'] == user_name:
+                p = r
 
-        self._start_pushers([p])
+        if p:
+            p['data'] = json.loads(p['data'])
+
+            self._start_pushers([p])
 
     def _start_pushers(self, pushers):
         logger.info("Starting %d pushers", len(pushers))
         for pusherdict in pushers:
             p = self._create_pusher(pusherdict)
             if p:
-                fullid = "%s:%s" % (pusherdict['app_id'], pusherdict['pushkey'])
+                fullid = "%s:%s:%s" % (
+                    pusherdict['app_id'],
+                    pusherdict['pushkey'],
+                    pusherdict['user_name']
+                )
                 if fullid in self.pushers:
                     self.pushers[fullid].stop()
                 self.pushers[fullid] = p
                 p.start()
 
     @defer.inlineCallbacks
-    def remove_pusher(self, app_id, pushkey):
-        fullid = "%s:%s" % (app_id, pushkey)
+    def remove_pusher(self, app_id, pushkey, user_name):
+        fullid = "%s:%s:%s" % (app_id, pushkey, user_name)
         if fullid in self.pushers:
             logger.info("Stopping pusher %s", fullid)
             self.pushers[fullid].stop()
             del self.pushers[fullid]
-        yield self.store.delete_pusher_by_app_id_pushkey(app_id, pushkey)
+        yield self.store.delete_pusher_by_app_id_pushkey_user_name(
+            app_id, pushkey, user_name
+        )

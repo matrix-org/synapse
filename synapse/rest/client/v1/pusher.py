@@ -37,7 +37,7 @@ class PusherRestServlet(ClientV1RestServlet):
                 and 'kind' in content and
                 content['kind'] is None):
             yield pusher_pool.remove_pusher(
-                content['app_id'], content['pushkey']
+                content['app_id'], content['pushkey'], user_name=user.to_string()
             )
             defer.returnValue((200, {}))
 
@@ -50,6 +50,17 @@ class PusherRestServlet(ClientV1RestServlet):
         if len(missing):
             raise SynapseError(400, "Missing parameters: "+','.join(missing),
                                errcode=Codes.MISSING_PARAM)
+
+        append = False
+        if 'append' in content:
+            append = content['append']
+
+        if not append:
+            yield pusher_pool.remove_pushers_by_app_id_and_pushkey_not_user(
+                app_id=content['app_id'],
+                pushkey=content['pushkey'],
+                not_user_id=user.to_string()
+            )
 
         try:
             yield pusher_pool.add_pusher(
