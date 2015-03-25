@@ -98,7 +98,6 @@ class PusherPool:
                 )
                 self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
 
-
     @defer.inlineCallbacks
     def _add_pusher_to_store(self, user_name, access_token, profile_tag, kind,
                              app_id, app_display_name, device_display_name,
