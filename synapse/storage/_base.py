@@ -55,10 +55,14 @@ cache_counter = metrics.register_cache(
 
 class Cache(object):
 
-    def __init__(self, name, max_entries=1000, keylen=1):
-        self.cache = OrderedDict()
+    def __init__(self, name, max_entries=1000, keylen=1, lru=False):
+        if lru:
+            self.cache = LruCache(max_size=max_entries)
+            self.max_entries = None
+        else:
+            self.cache = OrderedDict()
+            self.max_entries = max_entries
 
-        self.max_entries = max_entries
         self.name = name
         self.keylen = keylen
 
@@ -82,8 +86,9 @@ class Cache(object):
         if len(keyargs) != self.keylen:
             raise ValueError("Expected a key to have %d items", self.keylen)
 
-        while len(self.cache) > self.max_entries:
-            self.cache.popitem(last=False)
+        if self.max_entries is not None:
+            while len(self.cache) >= self.max_entries:
+                self.cache.popitem(last=False)
 
         self.cache[keyargs] = value
 
@@ -94,9 +99,7 @@ class Cache(object):
         self.cache.pop(keyargs, None)
 
 
-# TODO(paul):
-#  * consider other eviction strategies - LRU?
-def cached(max_entries=1000, num_args=1):
+def cached(max_entries=1000, num_args=1, lru=False):
     """ A method decorator that applies a memoizing cache around the function.
 
     The function is presumed to take zero or more arguments, which are used in
@@ -115,6 +118,7 @@ def cached(max_entries=1000, num_args=1):
             name=orig.__name__,
             max_entries=max_entries,
             keylen=num_args,
+            lru=lru,
         )
 
         @functools.wraps(orig)
