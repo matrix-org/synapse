@@ -51,6 +51,24 @@ class CacheTestCase(unittest.TestCase):
 
         self.assertTrue(failed)
 
+    def test_eviction(self):
+        cache = Cache("test", max_entries=2)
+
+        cache.prefill(1, "one")
+        cache.prefill(2, "two")
+        cache.prefill(3, "three")  # 1 will be evicted
+
+        failed = False
+        try:
+            cache.get(1)
+        except KeyError:
+            failed = True
+
+        self.assertTrue(failed)
+
+        cache.get(2)
+        cache.get(3)
+
 
 class CacheDecoratorTestCase(unittest.TestCase):
 
