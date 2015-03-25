@@ -65,4 +65,4 @@ CREATE TABLE IF NOT EXISTS remote_media_cache_thumbnails (
 ) ENGINE = INNODB;
 
 CREATE INDEX IF NOT EXISTS remote_media_cache_thumbnails_media_id
-    ON local_media_repository_thumbnails (media_id);
+    ON remote_media_cache_thumbnails (media_id);

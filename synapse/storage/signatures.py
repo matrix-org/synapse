@@ -54,7 +54,7 @@ class SignatureStore(SQLBaseStore):
             {
                 "event_id": event_id,
                 "algorithm": algorithm,
-                "hash": buffer(hash_bytes),
+                "hash": hash_bytes,
             },
         )
 
@@ -99,7 +99,7 @@ class SignatureStore(SQLBaseStore):
             " WHERE event_id = ?"
         )
         txn.execute(query, (event_id, ))
-        return dict(txn.fetchall())
+        return {k: v for k, v in txn.fetchall()}
 
     def _store_event_reference_hash_txn(self, txn, event_id, algorithm,
                                         hash_bytes):
@@ -116,7 +116,7 @@ class SignatureStore(SQLBaseStore):
             {
                 "event_id": event_id,
                 "algorithm": algorithm,
-                "hash": buffer(hash_bytes),
+                "hash": hash_bytes,
             },
         )
 
@@ -160,7 +160,7 @@ class SignatureStore(SQLBaseStore):
                 "event_id": event_id,
                 "signature_name": signature_name,
                 "key_id": key_id,
-                "signature": buffer(signature_bytes),
+                "signature": signature_bytes,
             },
         )
 
@@ -193,6 +193,6 @@ class SignatureStore(SQLBaseStore):
                 "event_id": event_id,
                 "prev_event_id": prev_event_id,
                 "algorithm": algorithm,
-                "hash": buffer(hash_bytes),
+                "hash": hash_bytes,
             },
         )

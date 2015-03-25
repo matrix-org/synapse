@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from ._base import SQLBaseStore
 
 
@@ -24,19 +26,25 @@ class ProfileStore(SQLBaseStore):
             desc="create_profile",
         )
 
+    @defer.inlineCallbacks
     def get_profile_displayname(self, user_localpart):
-        return self._simple_select_one_onecol(
+        name = yield self._simple_select_one_onecol(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             retcol="displayname",
             desc="get_profile_displayname",
         )
 
+        if name:
+            name = name.decode("utf8")
+
+        defer.returnValue(name)
+
     def set_profile_displayname(self, user_localpart, new_displayname):
         return self._simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={"displayname": new_displayname},
+            updatevalues={"displayname": new_displayname.encode("utf8")},
             desc="set_profile_displayname",
         )
 

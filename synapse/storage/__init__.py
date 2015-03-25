@@ -410,10 +410,14 @@ def executescript(txn, schema_path):
 
 
 def _get_or_create_schema_state(txn):
-    schema_path = os.path.join(
-        dir_path, "schema", "schema_version.sql",
-    )
-    executescript(txn, schema_path)
+    try:
+        # Bluntly try creating the schema_version tables.
+        schema_path = os.path.join(
+            dir_path, "schema", "schema_version.sql",
+        )
+        executescript(txn, schema_path)
+    except:
+        pass
 
     txn.execute("SELECT version, upgraded FROM schema_version")
     row = txn.fetchone()

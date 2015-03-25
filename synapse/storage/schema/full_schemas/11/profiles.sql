@@ -14,7 +14,7 @@
  */
 CREATE TABLE IF NOT EXISTS profiles(
     user_id VARCHAR(255) NOT NULL,
-    displayname VARCHAR(255),
+    displayname VARBINARY(255),
     avatar_url VARCHAR(255),
     UNIQUE(user_id)
 ) ENGINE = INNODB;

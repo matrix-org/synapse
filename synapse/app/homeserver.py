@@ -110,14 +110,12 @@ class SynapseHomeServer(HomeServer):
             return None
 
     def build_db_pool(self):
-        name = self.db_config.pop("name", None)
-        if name == "MySQLdb":
-            return adbapi.ConnectionPool(
-                name,
-                **self.db_config
-            )
+        name = self.db_config["name"]
 
-        raise RuntimeError("Unsupported database type")
+        return adbapi.ConnectionPool(
+            name,
+            **self.db_config.get("args", {})
+        )
 
     def create_resource_tree(self, redirect_root_to_web_client):
         """Create the resource tree for this Home Server.
@@ -323,7 +321,7 @@ def change_resource_limit(soft_file_no):
         resource.setrlimit(resource.RLIMIT_NOFILE, (soft_file_no, hard))
 
         logger.info("Set file limit to: %d", soft_file_no)
-    except (ValueError, resource.error) as e:
+    except (   ValueError, resource.error) as e:
         logger.warn("Failed to set file limit: %s", e)
 
 
@@ -363,19 +361,32 @@ def setup(config_options):
     if config.database_config:
         with open(config.database_config, 'r') as f:
             db_config = yaml.safe_load(f)
-
-        name = db_config.get("name", None)
-        if name == "MySQLdb":
-            db_config.update({
-                "sql_mode": "TRADITIONAL",
-                "charset": "utf8",
-                "use_unicode": True,
-            })
     else:
         db_config = {
             "name": "sqlite3",
             "database": config.database_path,
         }
+
+    db_config = {
+        k: v for k, v in db_config.items()
+        if not k.startswith("cp_")
+    }
+
+    name = db_config.get("name", None)
+    if name in ["MySQLdb", "mysql.connector"]:
+        db_config.setdefault("args", {}).update({
+            "sql_mode": "TRADITIONAL",
+            "charset": "utf8",
+            "use_unicode": True,
+        })
+    elif name == "sqlite3":
+        db_config.setdefault("args", {}).update({
+            "cp_min": 1,
+            "cp_max": 1,
+            "cp_openfun": prepare_database,
+        })
+    else:
+        raise RuntimeError("Unsupported database type '%s'" % (name,))
 
     hs = SynapseHomeServer(
         config.server_name,
@@ -401,8 +412,8 @@ def setup(config_options):
         # with sqlite3.connect(db_name) as db_conn:
         #     prepare_sqlite3_database(db_conn)
         #     prepare_database(db_conn)
-        import MySQLdb
-        db_conn = MySQLdb.connect(**db_config)
+        import mysql.connector
+        db_conn = mysql.connector.connect(**db_config.get("args", {}))
         prepare_database(db_conn)
     except UpgradeDatabaseException:
         sys.stderr.write(

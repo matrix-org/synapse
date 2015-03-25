@@ -282,7 +282,7 @@ class TransactionStore(SQLBaseStore):
         query = (
             "UPDATE destinations"
             " SET retry_last_ts = ?, retry_interval = ?"
-            " WHERE destinations = ?"
+            " WHERE destination = ?"
         )
 
         txn.execute(

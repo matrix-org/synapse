@@ -81,12 +81,22 @@ class RegistrationStore(SQLBaseStore):
         txn.execute("INSERT INTO access_tokens(user_id, token) " +
                     "VALUES (?,?)", [user_id, token])
 
+    @defer.inlineCallbacks
     def get_user_by_id(self, user_id):
-        query = ("SELECT users.name, users.password_hash FROM users"
-                 " WHERE users.name = ?")
-        return self._execute(
-            "get_user_by_id", self.cursor_to_dict, query, user_id
+        user_info = yield self._simple_select_one(
+            table="users",
+            keyvalues={
+                "name": user_id,
+            },
+            retcols=["name", "password_hash"],
+            allow_none=True,
         )
+
+        if user_info:
+            user_info["password_hash"] = user_info["password_hash"].decode("utf8")
+
+        defer.returnValue(user_info)
+
 
     @cached()
     # TODO(paul): Currently there's no code to invalidate this cache. That

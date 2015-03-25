@@ -294,15 +294,17 @@ class EventsStore(SQLBaseStore):
             )
 
             if is_new_state and not context.rejected:
-                self._simple_insert_txn(
+                self._simple_upsert_txn(
                     txn,
                     "current_state_events",
-                    {
-                        "event_id": event.event_id,
+                    keyvalues={
                         "room_id": event.room_id,
                         "type": event.type,
                         "state_key": event.state_key,
                     },
+                    values={
+                        "event_id": event.event_id,
+                    }
                 )
 
             for e_id, h in event.prev_state:
