@@ -784,6 +784,7 @@ class SQLBaseStore(object):
                 txn, internal_metadata, js, redacted,
                 check_redacted=check_redacted,
                 get_prev_content=get_prev_content,
+                rejected_reason=rejected_reason,
             )
             cache[(check_redacted, get_prev_content, allow_rejected)] = result
             return result
@@ -791,7 +792,8 @@ class SQLBaseStore(object):
             return None
 
     def _get_event_from_row_txn(self, txn, internal_metadata, js, redacted,
-                                check_redacted=True, get_prev_content=False):
+                                check_redacted=True, get_prev_content=False,
+                                rejected_reason=None):
 
         start_time = time.time() * 1000
 
@@ -806,7 +808,11 @@ class SQLBaseStore(object):
         internal_metadata = json.loads(internal_metadata)
         start_time = update_counter("decode_internal", start_time)
 
-        ev = FrozenEvent(d, internal_metadata_dict=internal_metadata)
+        ev = FrozenEvent(
+            d,
+            internal_metadata_dict=internal_metadata,
+            rejected_reason=rejected_reason,
+        )
         start_time = update_counter("build_frozen_event", start_time)
 
         if check_redacted and redacted:
