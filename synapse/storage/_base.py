@@ -749,10 +749,13 @@ class SQLBaseStore(object):
 
         try:
             # Separate cache entries for each way to invoke _get_event_txn
-            ret = cache[(check_redacted, get_prev_content, allow_rejected)]
-
+            ret = cache[(check_redacted, get_prev_content)]
             cache_counter.inc_hits("*getEvent*")
-            return ret
+
+            if allow_rejected or not ret.rejected_reason:
+                return ret
+            else:
+                return None
         except KeyError:
             cache_counter.inc_misses("*getEvent*")
             pass
@@ -779,14 +782,15 @@ class SQLBaseStore(object):
 
         start_time = update_counter("select_event", start_time)
 
+        result = self._get_event_from_row_txn(
+            txn, internal_metadata, js, redacted,
+            check_redacted=check_redacted,
+            get_prev_content=get_prev_content,
+            rejected_reason=rejected_reason,
+        )
+        cache[(check_redacted, get_prev_content)] = result
+
         if allow_rejected or not rejected_reason:
-            result = self._get_event_from_row_txn(
-                txn, internal_metadata, js, redacted,
-                check_redacted=check_redacted,
-                get_prev_content=get_prev_content,
-                rejected_reason=rejected_reason,
-            )
-            cache[(check_redacted, get_prev_content, allow_rejected)] = result
             return result
         else:
             return None
