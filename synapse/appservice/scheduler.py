@@ -112,7 +112,7 @@ class _ServiceQueuer(object):
     def _send_request(self, service, events):
         # send request and add callbacks
         d = self.txn_ctrl.send(service, events)
-        d.addCallback(self._on_request_finish)
+        d.addBoth(self._on_request_finish)
         d.addErrback(self._on_request_fail)
         self.pending_requests[service.id] = d
 
@@ -154,6 +154,7 @@ class _TransactionController(object):
                     self._start_recoverer(service)
         except Exception as e:
             logger.exception(e)
+            self._start_recoverer(service)
         # request has finished
         defer.returnValue(service)
 

@@ -37,7 +37,7 @@ class ApplicationServiceStore(SQLBaseStore):
     def __init__(self, hs):
         super(ApplicationServiceStore, self).__init__(hs)
         self.services_cache = []
-        self.cache_defer = self._populate_cache()
+        self.cache_defer = self._populate_appservice_cache()
         self.cache_defer.addErrback(log_failure)
 
     @defer.inlineCallbacks
@@ -337,7 +337,7 @@ class ApplicationServiceStore(SQLBaseStore):
         return service_list
 
     @defer.inlineCallbacks
-    def _populate_cache(self):
+    def _populate_appservice_cache(self):
         """Populates the ApplicationServiceCache from the database."""
         sql = ("SELECT r.*, a.* FROM application_services AS a LEFT JOIN "
                "application_services_regex AS r ON a.id = r.as_id")
