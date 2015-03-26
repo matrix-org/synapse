@@ -27,10 +27,11 @@ class AppServiceHandlerTestCase(unittest.TestCase):
     def setUp(self):
         self.mock_store = Mock()
         self.mock_as_api = Mock()
+        self.mock_scheduler = Mock()
         hs = Mock()
         hs.get_datastore = Mock(return_value=self.mock_store)
         self.handler = ApplicationServicesHandler(
-            hs, self.mock_as_api
+            hs, self.mock_as_api, self.mock_scheduler
         )
 
     @defer.inlineCallbacks
@@ -52,7 +53,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
         self.mock_as_api.push = Mock()
         yield self.handler.notify_interested_services(event)
-        self.mock_as_api.push.assert_called_once_with(interested_service, event)
+        self.mock_scheduler.submit_event_for_as.assert_called_once_with(
+            interested_service, event
+        )
 
     @defer.inlineCallbacks
     def test_query_room_alias_exists(self):

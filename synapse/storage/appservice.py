@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import simplejson
 from simplejson import JSONDecodeError
+import simplejson as json
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
 from synapse.api.errors import StoreError
-from synapse.appservice import ApplicationService
+from synapse.appservice import ApplicationService, AppServiceTransaction
 from synapse.storage.roommember import RoomsForUser
 from ._base import SQLBaseStore
 
@@ -37,7 +37,7 @@ class ApplicationServiceStore(SQLBaseStore):
     def __init__(self, hs):
         super(ApplicationServiceStore, self).__init__(hs)
         self.services_cache = []
-        self.cache_defer = self._populate_cache()
+        self.cache_defer = self._populate_appservice_cache()
         self.cache_defer.addErrback(log_failure)
 
     @defer.inlineCallbacks
@@ -101,11 +101,12 @@ class ApplicationServiceStore(SQLBaseStore):
         if not service.hs_token:
             raise StoreError(500, "No HS token")
 
-        yield self.runInteraction(
+        as_id = yield self.runInteraction(
             "update_app_service",
             self._update_app_service_txn,
             service
         )
+        service.id = as_id
 
         # update cache TODO: Should this be in the txn?
         for (index, cache_service) in enumerate(self.services_cache):
@@ -124,7 +125,7 @@ class ApplicationServiceStore(SQLBaseStore):
                 "update_app_service_txn: Failed to find as_id for token=",
                 service.token
             )
-            return False
+            return
 
         txn.execute(
             "UPDATE application_services SET url=?, hs_token=?, sender=? "
@@ -142,9 +143,9 @@ class ApplicationServiceStore(SQLBaseStore):
                     txn.execute(
                         "INSERT INTO application_services_regex("
                         "as_id, namespace, regex) values(?,?,?)",
-                        (as_id, ns_int, simplejson.dumps(regex_obj))
+                        (as_id, ns_int, json.dumps(regex_obj))
                     )
-        return True
+        return as_id
 
     def _get_as_id_txn(self, txn, token):
         cursor = txn.execute(
@@ -277,12 +278,7 @@ class ApplicationServiceStore(SQLBaseStore):
 
         return rooms_for_user_matching_user_id
 
-    @defer.inlineCallbacks
-    def _populate_cache(self):
-        """Populates the ApplicationServiceCache from the database."""
-        sql = ("SELECT * FROM application_services LEFT JOIN "
-               "application_services_regex ON application_services.id = "
-               "application_services_regex.as_id")
+    def _parse_services_dict(self, results):
         # SQL results in the form:
         # [
         #   {
@@ -296,12 +292,14 @@ class ApplicationServiceStore(SQLBaseStore):
         #   }
         # ]
         services = {}
-        results = yield self._execute_and_decode("_populate_cache", sql)
         for res in results:
             as_token = res["token"]
+            if as_token is None:
+                continue
             if as_token not in services:
                 # add the service
                 services[as_token] = {
+                    "id": res["id"],
                     "url": res["url"],
                     "token": as_token,
                     "hs_token": res["hs_token"],
@@ -319,20 +317,232 @@ class ApplicationServiceStore(SQLBaseStore):
             try:
                 services[as_token]["namespaces"][
                     ApplicationService.NS_LIST[ns_int]].append(
-                    simplejson.loads(res["regex"])
+                    json.loads(res["regex"])
                 )
             except IndexError:
                 logger.error("Bad namespace enum '%s'. %s", ns_int, res)
             except JSONDecodeError:
                 logger.error("Bad regex object '%s'", res["regex"])
 
-        # TODO get last successful txn id f.e. service
+        service_list = []
         for service in services.values():
-            logger.info("Found application service: %s", service)
-            self.services_cache.append(ApplicationService(
+            service_list.append(ApplicationService(
                 token=service["token"],
                 url=service["url"],
                 namespaces=service["namespaces"],
                 hs_token=service["hs_token"],
-                sender=service["sender"]
+                sender=service["sender"],
+                id=service["id"]
             ))
+        return service_list
+
+    @defer.inlineCallbacks
+    def _populate_appservice_cache(self):
+        """Populates the ApplicationServiceCache from the database."""
+        sql = ("SELECT r.*, a.* FROM application_services AS a LEFT JOIN "
+               "application_services_regex AS r ON a.id = r.as_id")
+
+        results = yield self._execute_and_decode("appservice_cache", sql)
+        services = self._parse_services_dict(results)
+
+        for service in services:
+            logger.info("Found application service: %s", service)
+            self.services_cache.append(service)
+
+
+class ApplicationServiceTransactionStore(SQLBaseStore):
+
+    def __init__(self, hs):
+        super(ApplicationServiceTransactionStore, self).__init__(hs)
+
+    @defer.inlineCallbacks
+    def get_appservices_by_state(self, state):
+        """Get a list of application services based on their state.
+
+        Args:
+            state(ApplicationServiceState): The state to filter on.
+        Returns:
+            A Deferred which resolves to a list of ApplicationServices, which
+            may be empty.
+        """
+        sql = (
+            "SELECT r.*, a.* FROM application_services_state AS s LEFT JOIN"
+            " application_services AS a ON a.id=s.as_id LEFT JOIN"
+            " application_services_regex AS r ON r.as_id=a.id WHERE state = ?"
+        )
+        results = yield self._execute_and_decode(
+            "get_appservices_by_state", sql, state
+        )
+        # NB: This assumes this class is linked with ApplicationServiceStore
+        defer.returnValue(self._parse_services_dict(results))
+
+    @defer.inlineCallbacks
+    def get_appservice_state(self, service):
+        """Get the application service state.
+
+        Args:
+            service(ApplicationService): The service whose state to set.
+        Returns:
+            A Deferred which resolves to ApplicationServiceState.
+        """
+        result = yield self._simple_select_one(
+            "application_services_state",
+            dict(as_id=service.id),
+            ["state"],
+            allow_none=True
+        )
+        if result:
+            defer.returnValue(result.get("state"))
+            return
+        defer.returnValue(None)
+
+    def set_appservice_state(self, service, state):
+        """Set the application service state.
+
+        Args:
+            service(ApplicationService): The service whose state to set.
+            state(ApplicationServiceState): The connectivity state to apply.
+        Returns:
+            A Deferred which resolves when the state was set successfully.
+        """
+        return self._simple_upsert(
+            "application_services_state",
+            dict(as_id=service.id),
+            dict(state=state)
+        )
+
+    def create_appservice_txn(self, service, events):
+        """Atomically creates a new transaction for this application service
+        with the given list of events.
+
+        Args:
+            service(ApplicationService): The service who the transaction is for.
+            events(list<Event>): A list of events to put in the transaction.
+        Returns:
+            AppServiceTransaction: A new transaction.
+        """
+        return self.runInteraction(
+            "create_appservice_txn",
+            self._create_appservice_txn,
+            service, events
+        )
+
+    def _create_appservice_txn(self, txn, service, events):
+        # work out new txn id (highest txn id for this service += 1)
+        # The highest id may be the last one sent (in which case it is last_txn)
+        # or it may be the highest in the txns list (which are waiting to be/are
+        # being sent)
+        last_txn_id = self._get_last_txn(txn, service.id)
+
+        result = txn.execute(
+            "SELECT MAX(txn_id) FROM application_services_txns WHERE as_id=?",
+            (service.id,)
+        )
+        highest_txn_id = result.fetchone()[0]
+        if highest_txn_id is None:
+            highest_txn_id = 0
+
+        new_txn_id = max(highest_txn_id, last_txn_id) + 1
+
+        # Insert new txn into txn table
+        event_ids = [e.event_id for e in events]
+        txn.execute(
+            "INSERT INTO application_services_txns(as_id, txn_id, event_ids) "
+            "VALUES(?,?,?)",
+            (service.id, new_txn_id, json.dumps(event_ids))
+        )
+        return AppServiceTransaction(
+            service=service, id=new_txn_id, events=events
+        )
+
+    def complete_appservice_txn(self, txn_id, service):
+        """Completes an application service transaction.
+
+        Args:
+            txn_id(str): The transaction ID being completed.
+            service(ApplicationService): The application service which was sent
+            this transaction.
+        Returns:
+            A Deferred which resolves if this transaction was stored
+            successfully.
+        """
+        return self.runInteraction(
+            "complete_appservice_txn",
+            self._complete_appservice_txn,
+            txn_id, service
+        )
+
+    def _complete_appservice_txn(self, txn, txn_id, service):
+        txn_id = int(txn_id)
+
+        # Debugging query: Make sure the txn being completed is EXACTLY +1 from
+        # what was there before. If it isn't, we've got problems (e.g. the AS
+        # has probably missed some events), so whine loudly but still continue,
+        # since it shouldn't fail completion of the transaction.
+        last_txn_id = self._get_last_txn(txn, service.id)
+        if (last_txn_id + 1) != txn_id:
+            logger.error(
+                "appservice: Completing a transaction which has an ID > 1 from "
+                "the last ID sent to this AS. We've either dropped events or "
+                "sent it to the AS out of order. FIX ME. last_txn=%s "
+                "completing_txn=%s service_id=%s", last_txn_id, txn_id,
+                service.id
+            )
+
+        # Set current txn_id for AS to 'txn_id'
+        self._simple_upsert_txn(
+            txn, "application_services_state", dict(as_id=service.id),
+            dict(last_txn=txn_id)
+        )
+
+        # Delete txn
+        self._simple_delete_txn(
+            txn, "application_services_txns",
+            dict(txn_id=txn_id, as_id=service.id)
+        )
+
+    def get_oldest_unsent_txn(self, service):
+        """Get the oldest transaction which has not been sent for this
+        service.
+
+        Args:
+            service(ApplicationService): The app service to get the oldest txn.
+        Returns:
+            A Deferred which resolves to an AppServiceTransaction or
+            None.
+        """
+        return self.runInteraction(
+            "get_oldest_unsent_appservice_txn",
+            self._get_oldest_unsent_txn,
+            service
+        )
+
+    def _get_oldest_unsent_txn(self, txn, service):
+        # Monotonically increasing txn ids, so just select the smallest
+        # one in the txns table (we delete them when they are sent)
+        result = txn.execute(
+            "SELECT MIN(txn_id), * FROM application_services_txns WHERE as_id=?",
+            (service.id,)
+        )
+        entry = self.cursor_to_dict(result)[0]
+        if not entry or entry["txn_id"] is None:
+            # the min(txn_id) part will force a row, so entry may not be None
+            return None
+
+        event_ids = json.loads(entry["event_ids"])
+        events = self._get_events_txn(txn, event_ids)
+
+        return AppServiceTransaction(
+            service=service, id=entry["txn_id"], events=events
+        )
+
+    def _get_last_txn(self, txn, service_id):
+        result = txn.execute(
+            "SELECT last_txn FROM application_services_state WHERE as_id=?",
+            (service_id,)
+        )
+        last_txn_id = result.fetchone()
+        if last_txn_id is None or last_txn_id[0] is None:  # no row exists
+            return 0
+        else:
+            return int(last_txn_id[0])  # select 'last_txn' col

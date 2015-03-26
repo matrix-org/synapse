@@ -14,9 +14,10 @@
 # limitations under the License.
 
 from twisted.internet import defer
-
+from .appservice import (
+    ApplicationServiceStore, ApplicationServiceTransactionStore
+)
 from ._base import Cache
-from .appservice import ApplicationServiceStore
 from .directory import DirectoryStore
 from .events import EventsStore
 from .presence import PresenceStore
@@ -50,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -71,6 +72,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 FilteringStore,
                 PusherStore,
                 PushRuleStore,
+                ApplicationServiceTransactionStore,
                 EventsStore,
                 ):
 

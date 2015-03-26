@@ -26,15 +26,28 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def log_failure(failure):
+    logger.error(
+        "Application Services Failure",
+        exc_info=(
+            failure.type,
+            failure.value,
+            failure.getTracebackObject()
+        )
+    )
+
+
 # NB: Purposefully not inheriting BaseHandler since that contains way too much
 # setup code which this handler does not need or use. This makes testing a lot
 # easier.
 class ApplicationServicesHandler(object):
 
-    def __init__(self, hs, appservice_api):
+    def __init__(self, hs, appservice_api, appservice_scheduler):
         self.store = hs.get_datastore()
         self.hs = hs
         self.appservice_api = appservice_api
+        self.scheduler = appservice_scheduler
+        self.started_scheduler = False
 
     @defer.inlineCallbacks
     def register(self, app_service):
@@ -46,13 +59,13 @@ class ApplicationServicesHandler(object):
             )
             if not stored_service:
                 raise StoreError(404, "Application service not found")
+            app_service.id = stored_service.id
         except StoreError:
             raise SynapseError(
                 403, "Unrecognised application services token. "
                 "Consult the home server admin.",
                 errcode=Codes.FORBIDDEN
             )
-
         app_service.hs_token = self._generate_hs_token()
 
         # create a sender for this application service which is used when
@@ -90,9 +103,13 @@ class ApplicationServicesHandler(object):
         if event.type == EventTypes.Member:
             yield self._check_user_exists(event.state_key)
 
-        # Fork off pushes to these services - XXX First cut, best effort
+        if not self.started_scheduler:
+            self.scheduler.start().addErrback(log_failure)
+            self.started_scheduler = True
+
+        # Fork off pushes to these services
         for service in services:
-            self.appservice_api.push(service, event)
+            self.scheduler.submit_event_for_as(service, event)
 
     @defer.inlineCallbacks
     def query_user_exists(self, user_id):
