@@ -1,3 +1,12 @@
+Changes in synapse v0.8.1 (2015-03-18)
+======================================
+
+* Disable registration by default. New users can be added using the command
+  ``register_new_matrix_user`` or by enabling registration in the config.
+* Add metrics to synapse. To enable metrics use config options
+  ``enable_metrics`` and ``metrics_port``.
+* Fix bug where banning only kicked the user.
+
 Changes in synapse v0.8.0 (2015-03-06)
 ======================================
 

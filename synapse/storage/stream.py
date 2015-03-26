@@ -35,7 +35,7 @@ what sort order was used:
 
 from twisted.internet import defer
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, cached
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.util.logutils import log_function
@@ -413,11 +413,31 @@ class StreamStore(SQLBaseStore):
             "get_recent_events_for_room", get_recent_events_for_room_txn
         )
 
+    @cached(num_args=0)
     def get_room_events_max_id(self):
         return self.runInteraction(
             "get_room_events_max_id",
             self._get_room_events_max_id_txn
         )
+
+    @defer.inlineCallbacks
+    def _get_min_token(self):
+        row = yield self._execute(
+            "_get_min_token", None, "SELECT MIN(stream_ordering) FROM events"
+        )
+
+        self.min_token = row[0][0] if row and row[0] and row[0][0] else -1
+        self.min_token = min(self.min_token, -1)
+
+        logger.debug("min_token is: %s", self.min_token)
+
+        defer.returnValue(self.min_token)
+
+    def get_next_stream_id(self):
+        with self._next_stream_id_lock:
+            i = self._next_stream_id
+            self._next_stream_id += 1
+            return i
 
     def _get_room_events_max_id_txn(self, txn):
         txn.execute(

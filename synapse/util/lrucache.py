@@ -90,12 +90,16 @@ class LruCache(object):
         def cache_len():
             return len(cache)
 
+        def cache_contains(key):
+            return key in cache
+
         self.sentinel = object()
         self.get = cache_get
         self.set = cache_set
         self.setdefault = cache_set_default
         self.pop = cache_pop
         self.len = cache_len
+        self.contains = cache_contains
 
     def __getitem__(self, key):
         result = self.get(key, self.sentinel)
@@ -114,3 +118,6 @@ class LruCache(object):
 
     def __len__(self):
         return self.len()
+
+    def __contains__(self, key):
+        return self.contains(key)

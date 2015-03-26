@@ -90,8 +90,8 @@ class BaseHandler(object):
         event = builder.build()
 
         logger.debug(
-            "Created event %s with auth_events: %s, current state: %s",
-            event.event_id, context.auth_events, context.current_state,
+            "Created event %s with current state: %s",
+            event.event_id, context.current_state,
         )
 
         defer.returnValue(
@@ -106,7 +106,7 @@ class BaseHandler(object):
         # We now need to go and hit out to wherever we need to hit out to.
 
         if not suppress_auth:
-            self.auth.check(event, auth_events=context.auth_events)
+            self.auth.check(event, auth_events=context.current_state)
 
         yield self.store.persist_event(event, context=context)
 
@@ -142,7 +142,16 @@ class BaseHandler(object):
                     "Failed to get destination from event %s", s.event_id
                 )
 
-        yield self.notifier.on_new_room_event(event, extra_users=extra_users)
+        # Don't block waiting on waking up all the listeners.
+        d = self.notifier.on_new_room_event(event, extra_users=extra_users)
+
+        def log_failure(f):
+            logger.warn(
+                "Failed to notify about %s: %s",
+                event.event_id, f.value
+            )
+
+        d.addErrback(log_failure)
 
         yield federation_handler.handle_new_event(
             event, destinations=destinations,

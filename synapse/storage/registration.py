@@ -19,7 +19,7 @@ from sqlite3 import IntegrityError
 
 from synapse.api.errors import StoreError, Codes
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, cached
 
 
 class RegistrationStore(SQLBaseStore):
@@ -39,7 +39,10 @@ class RegistrationStore(SQLBaseStore):
         Raises:
             StoreError if there was a problem adding this.
         """
-        row = yield self._simple_select_one("users", {"name": user_id}, ["id"])
+        row = yield self._simple_select_one(
+            "users", {"name": user_id}, ["id"],
+            desc="add_access_token_to_user",
+        )
         if not row:
             raise StoreError(400, "Bad user ID supplied.")
         row_id = row["id"]
@@ -48,7 +51,8 @@ class RegistrationStore(SQLBaseStore):
             {
                 "user_id": row_id,
                 "token": token
-            }
+            },
+            desc="add_access_token_to_user",
         )
 
     @defer.inlineCallbacks
@@ -91,6 +95,11 @@ class RegistrationStore(SQLBaseStore):
             "get_user_by_id", self.cursor_to_dict, query, user_id
         )
 
+    @cached()
+    # TODO(paul): Currently there's no code to invalidate this cache. That
+    #   means if/when we ever add internal ways to invalidate access tokens or
+    #   change whether a user is a server admin, those will need to invoke
+    #      store.get_user_by_token.invalidate(token)
     def get_user_by_token(self, token):
         """Get a user from the given access token.
 
@@ -115,6 +124,7 @@ class RegistrationStore(SQLBaseStore):
             keyvalues={"name": user.to_string()},
             retcol="admin",
             allow_none=True,
+            desc="is_server_admin",
         )
 
         defer.returnValue(res if res else False)

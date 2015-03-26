@@ -45,7 +45,7 @@ setup(
     version=version,
     packages=find_packages(exclude=["tests", "tests.*"]),
     description="Reference Synapse Home Server",
-    install_requires=dependencies["REQUIREMENTS"].keys(),
+    install_requires=dependencies['requirements'](include_conditional=True).keys(),
     setup_requires=[
         "Twisted==14.0.2", # Here to override setuptools_trial's dependency on Twisted>=2.4.0
         "setuptools_trial",
@@ -55,5 +55,5 @@ setup(
     include_package_data=True,
     zip_safe=False,
     long_description=long_description,
-    scripts=["synctl"],
+    scripts=["synctl", "register_new_matrix_user"],
 )

@@ -21,6 +21,7 @@ class PresenceStore(SQLBaseStore):
         return self._simple_insert(
             table="presence",
             values={"user_id": user_localpart},
+            desc="create_presence",
         )
 
     def has_presence_state(self, user_localpart):
@@ -29,6 +30,7 @@ class PresenceStore(SQLBaseStore):
             keyvalues={"user_id": user_localpart},
             retcols=["user_id"],
             allow_none=True,
+            desc="has_presence_state",
         )
 
     def get_presence_state(self, user_localpart):
@@ -36,6 +38,7 @@ class PresenceStore(SQLBaseStore):
             table="presence",
             keyvalues={"user_id": user_localpart},
             retcols=["state", "status_msg", "mtime"],
+            desc="get_presence_state",
         )
 
     def set_presence_state(self, user_localpart, new_state):
@@ -45,7 +48,7 @@ class PresenceStore(SQLBaseStore):
             updatevalues={"state": new_state["state"],
                           "status_msg": new_state["status_msg"],
                           "mtime": self._clock.time_msec()},
-            retcols=["state"],
+            desc="set_presence_state",
         )
 
     def allow_presence_visible(self, observed_localpart, observer_userid):
@@ -53,6 +56,7 @@ class PresenceStore(SQLBaseStore):
             table="presence_allow_inbound",
             values={"observed_user_id": observed_localpart,
                     "observer_user_id": observer_userid},
+            desc="allow_presence_visible",
         )
 
     def disallow_presence_visible(self, observed_localpart, observer_userid):
@@ -60,6 +64,7 @@ class PresenceStore(SQLBaseStore):
             table="presence_allow_inbound",
             keyvalues={"observed_user_id": observed_localpart,
                        "observer_user_id": observer_userid},
+            desc="disallow_presence_visible",
         )
 
     def is_presence_visible(self, observed_localpart, observer_userid):
@@ -69,6 +74,7 @@ class PresenceStore(SQLBaseStore):
                        "observer_user_id": observer_userid},
             retcols=["observed_user_id"],
             allow_none=True,
+            desc="is_presence_visible",
         )
 
     def add_presence_list_pending(self, observer_localpart, observed_userid):
@@ -77,6 +83,7 @@ class PresenceStore(SQLBaseStore):
             values={"user_id": observer_localpart,
                     "observed_user_id": observed_userid,
                     "accepted": False},
+            desc="add_presence_list_pending",
         )
 
     def set_presence_list_accepted(self, observer_localpart, observed_userid):
@@ -85,6 +92,7 @@ class PresenceStore(SQLBaseStore):
             keyvalues={"user_id": observer_localpart,
                        "observed_user_id": observed_userid},
             updatevalues={"accepted": True},
+            desc="set_presence_list_accepted",
         )
 
     def get_presence_list(self, observer_localpart, accepted=None):
@@ -96,6 +104,7 @@ class PresenceStore(SQLBaseStore):
             table="presence_list",
             keyvalues=keyvalues,
             retcols=["observed_user_id", "accepted"],
+            desc="get_presence_list",
         )
 
     def del_presence_list(self, observer_localpart, observed_userid):
@@ -103,4 +112,5 @@ class PresenceStore(SQLBaseStore):
             table="presence_list",
             keyvalues={"user_id": observer_localpart,
                        "observed_user_id": observed_userid},
+            desc="del_presence_list",
         )

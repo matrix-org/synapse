@@ -46,6 +46,11 @@ outgoing_responses_counter = metrics.register_counter(
     labels=["method", "code"],
 )
 
+response_timer = metrics.register_distribution(
+    "response_time",
+    labels=["method", "servlet"]
+)
+
 
 class HttpServer(object):
     """ Interface for registering callbacks on a HTTP server
@@ -169,6 +174,10 @@ class JsonResource(HttpServer, resource.Resource):
                 code, response = yield callback(request, *args)
 
                 self._send_response(request, code, response)
+                response_timer.inc_by(
+                    self.clock.time_msec() - start, request.method, servlet_classname
+                )
+
                 return
 
             # Huh. No one wanted to handle that? Fiiiiiine. Send 400.

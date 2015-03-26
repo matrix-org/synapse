@@ -60,6 +60,7 @@ class LoginType(object):
     EMAIL_IDENTITY = u"m.login.email.identity"
     RECAPTCHA = u"m.login.recaptcha"
     APPLICATION_SERVICE = u"m.login.application_service"
+    SHARED_SECRET = u"org.matrix.login.shared_secret"
 
 
 class EventTypes(object):
