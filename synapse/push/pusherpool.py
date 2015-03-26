@@ -106,8 +106,10 @@ class PusherPool:
             user_id, not_access_token_id
         )
         for p in all:
-            if (p['user_name'] == user_id and
-                        p['access_token'] != not_access_token_id):
+            if (
+                p['user_name'] == user_id and
+                p['access_token'] != not_access_token_id
+            ):
                 logger.info(
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     p['app_id'], p['pushkey'], p['user_name']
