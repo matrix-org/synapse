@@ -733,7 +733,8 @@ class SQLBaseStore(object):
     def _invalidate_get_event_cache(self, event_id):
         for check_redacted in (False, True):
             for get_prev_content in (False, True):
-                self._get_event_cache.invalidate(event_id, check_redacted, get_prev_content)
+                self._get_event_cache.invalidate(event_id, check_redacted,
+                                                 get_prev_content)
 
     def _get_event_txn(self, txn, event_id, check_redacted=True,
                        get_prev_content=False, allow_rejected=False):
