@@ -28,11 +28,9 @@ logger = logging.getLogger(__name__)
 class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_pushers_by_app_id_and_pushkey(self, app_id, pushkey):
+        cols = ",".join(PushersTable.fields)
         sql = (
-            "SELECT id, user_name, kind, profile_tag, app_id,"
-            "app_display_name, device_display_name, pushkey, ts, data, "
-            "last_token, last_success, failing_since "
-            "FROM pushers "
+            "SELECT "+cols+" FROM pushers "
             "WHERE app_id = ? AND pushkey = ?"
         )
 
@@ -43,51 +41,26 @@ class PusherStore(SQLBaseStore):
 
         ret = [
             {
-                "id": r[0],
-                "user_name": r[1],
-                "kind": r[2],
-                "profile_tag": r[3],
-                "app_id": r[4],
-                "app_display_name": r[5],
-                "device_display_name": r[6],
-                "pushkey": r[7],
-                "pushkey_ts": r[8],
-                "data": r[9],
-                "last_token": r[10],
-                "last_success": r[11],
-                "failing_since": r[12]
+                k: r[i] for i, k in enumerate(PushersTable.fields)
             }
             for r in rows
         ]
+        print ret
 
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def get_all_pushers(self):
+        cols = ",".join(PushersTable.fields)
         sql = (
-            "SELECT id, user_name, kind, profile_tag, app_id,"
-            "app_display_name, device_display_name, pushkey, ts, data, "
-            "last_token, last_success, failing_since "
-            "FROM pushers"
+            "SELECT "+cols+" FROM pushers"
         )
 
         rows = yield self._execute("get_all_pushers", None, sql)
 
         ret = [
             {
-                "id": r[0],
-                "user_name": r[1],
-                "kind": r[2],
-                "profile_tag": r[3],
-                "app_id": r[4],
-                "app_display_name": r[5],
-                "device_display_name": r[6],
-                "pushkey": r[7],
-                "pushkey_ts": r[8],
-                "data": r[9],
-                "last_token": r[10],
-                "last_success": r[11],
-                "failing_since": r[12]
+                k: r[i] for i, k in enumerate(PushersTable.fields)
             }
             for r in rows
         ]
@@ -166,13 +139,15 @@ class PushersTable(Table):
     fields = [
         "id",
         "user_name",
+        "access_token",
         "kind",
         "profile_tag",
         "app_id",
         "app_display_name",
         "device_display_name",
         "pushkey",
-        "pushkey_ts",
+        "ts",
+        "lang",
         "data",
         "last_token",
         "last_success",

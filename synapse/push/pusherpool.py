@@ -71,7 +71,7 @@ class PusherPool:
             "app_display_name": app_display_name,
             "device_display_name": device_display_name,
             "pushkey": pushkey,
-            "pushkey_ts": self.hs.get_clock().time_msec(),
+            "ts": self.hs.get_clock().time_msec(),
             "lang": lang,
             "data": data,
             "last_token": None,
@@ -95,6 +95,22 @@ class PusherPool:
                 logger.info(
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     app_id, pushkey, p['user_name']
+                )
+                self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
+
+    @defer.inlineCallbacks
+    def remove_pushers_by_user_access_token(self, user_id, not_access_token_id):
+        all = yield self.store.get_all_pushers()
+        logger.info(
+            "Removing all pushers for user %s except access token %s",
+            user_id, not_access_token_id
+        )
+        for p in all:
+            if (p['user_name'] == user_id and
+                        p['access_token'] != not_access_token_id):
+                logger.info(
+                    "Removing pusher for app id %s, pushkey %s, user %s",
+                    p['app_id'], p['pushkey'], p['user_name']
                 )
                 self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
 
@@ -127,7 +143,7 @@ class PusherPool:
                 app_display_name=pusherdict['app_display_name'],
                 device_display_name=pusherdict['device_display_name'],
                 pushkey=pusherdict['pushkey'],
-                pushkey_ts=pusherdict['pushkey_ts'],
+                pushkey_ts=pusherdict['ts'],
                 data=pusherdict['data'],
                 last_token=pusherdict['last_token'],
                 last_success=pusherdict['last_success'],

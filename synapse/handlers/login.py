@@ -70,4 +70,7 @@ class LoginHandler(BaseHandler):
 
         yield self.store.user_set_password_hash(user_id, password_hash)
         yield self.store.user_delete_access_tokens_apart_from(user_id, token_id)
+        yield self.hs.get_pusherpool().remove_pushers_by_user_access_token(
+            user_id, token_id
+        )
         yield self.store.flush_user(user_id)
