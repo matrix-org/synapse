@@ -34,6 +34,7 @@ for port in 8080 8081 8082; do
         --tls-dh-params-path "demo/demo.tls.dh" \
         --media-store-path "demo/media_store.$port" \
 		$PARAMS $SYNAPSE_PARAMS \
+		--disable-registration false
 
     python -m synapse.app.homeserver \
         --config-path "demo/etc/$port.config" \
