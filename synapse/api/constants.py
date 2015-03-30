@@ -62,6 +62,8 @@ class LoginType(object):
     APPLICATION_SERVICE = u"m.login.application_service"
     SHARED_SECRET = u"org.matrix.login.shared_secret"
 
+    HIDDEN_TYPES = [APPLICATION_SERVICE, SHARED_SECRET]
+
 
 class EventTypes(object):
     Member = "m.room.member"

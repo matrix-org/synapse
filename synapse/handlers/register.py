@@ -157,7 +157,11 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def check_recaptcha(self, ip, private_key, challenge, response):
-        """Checks a recaptcha is correct."""
+        """
+        Checks a recaptcha is correct.
+
+        Used only by c/s api v1
+        """
 
         captcha_response = yield self._validate_captcha(
             ip,
@@ -282,6 +286,8 @@ class RegistrationHandler(BaseHandler):
     def _validate_captcha(self, ip_addr, private_key, challenge, response):
         """Validates the captcha provided.
 
+        Used only by c/s api v1
+
         Returns:
             dict: Containing 'valid'(bool) and 'error_url'(str) if invalid.
 
@@ -299,6 +305,9 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _submit_captcha(self, ip_addr, private_key, challenge, response):
+        """
+        Used only by c/s api v1
+        """
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
         client = CaptchaServerHttpClient(self.hs)

@@ -40,6 +40,12 @@ def client_v2_pattern(path_regex):
     return re.compile("^" + CLIENT_V2_ALPHA_PREFIX + path_regex)
 
 
+def parse_request_allow_empty(request):
+    content = request.content.read()
+    if content == None or content == '':
+        return None
+    return simplejson.loads(content)
+
 def parse_json_dict_from_request(request):
     try:
         content = simplejson.loads(request.content.read())
