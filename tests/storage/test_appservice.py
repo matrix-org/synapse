@@ -101,42 +101,48 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        self.as_yaml_files = []
         self.db_pool = SQLiteMemoryDbPool()
         yield self.db_pool.prepare()
-        hs = HomeServer(
-            "test", db_pool=self.db_pool, clock=MockClock(), config=Mock()
-        )
         self.as_list = [
             {
                 "token": "token1",
                 "url": "https://matrix-as.org",
-                "id": 3
+                "id": "token1"
             },
             {
                 "token": "alpha_tok",
                 "url": "https://alpha.com",
-                "id": 5
+                "id": "alpha_tok"
             },
             {
                 "token": "beta_tok",
                 "url": "https://beta.com",
-                "id": 6
+                "id": "beta_tok"
             },
             {
                 "token": "delta_tok",
                 "url": "https://delta.com",
-                "id": 7
+                "id": "delta_tok"
             },
         ]
         for s in self.as_list:
-            yield self._add_service(s["id"], s["url"], s["token"])
+            yield self._add_service(s["url"], s["token"])
+
+        hs = HomeServer(
+            "test", db_pool=self.db_pool, clock=MockClock(), config=Mock(
+                app_service_config_files=self.as_yaml_files
+            )
+        )
         self.store = TestTransactionStore(hs)
 
-    def _add_service(self, as_id, url, token):
-        return self.db_pool.runQuery(
-            "INSERT INTO application_services(id, url, token) VALUES(?,?,?)",
-            (as_id, url, token)
-        )
+    def _add_service(self, url, as_token):
+        as_yaml = dict(url=url, as_token=as_token, hs_token="something",
+                       sender="a_sender", namespaces={})
+        # use the token as the filename
+        with open(as_token, 'w') as outfile:
+            outfile.write(yaml.dump(as_yaml))
+            self.as_yaml_files.append(as_token)
 
     def _set_state(self, id, state, txn=None):
         return self.db_pool.runQuery(
@@ -388,8 +394,10 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             ApplicationServiceState.DOWN
         )
         self.assertEquals(2, len(services))
-        self.assertEquals(self.as_list[2]["id"], services[0].id)
-        self.assertEquals(self.as_list[0]["id"], services[1].id)
+        self.assertEquals(
+            set([self.as_list[2]["id"], self.as_list[0]["id"]]),
+            set([services[0].id, services[1].id])
+        )
 
 
 # required for ApplicationServiceTransactionStoreTestCase tests

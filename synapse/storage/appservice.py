@@ -231,7 +231,8 @@ class ApplicationServiceStore(SQLBaseStore):
             url=as_info["url"],
             namespaces=as_info["namespaces"],
             hs_token=as_info["hs_token"],
-            sender=as_info["sender"]
+            sender=as_info["sender"],
+            id=as_info["as_token"]  # the token is the only unique thing here
         )
 
     def _populate_appservice_cache(self, config_files):
@@ -268,16 +269,20 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             A Deferred which resolves to a list of ApplicationServices, which
             may be empty.
         """
-        sql = (
-            "SELECT r.*, a.* FROM application_services_state AS s LEFT JOIN"
-            " application_services AS a ON a.id=s.as_id LEFT JOIN"
-            " application_services_regex AS r ON r.as_id=a.id WHERE state = ?"
-        )
-        results = yield self._execute_and_decode(
-            "get_appservices_by_state", sql, state
+        results = yield self._simple_select_list(
+            "application_services_state",
+            dict(state=state),
+            ["as_id"]
         )
         # NB: This assumes this class is linked with ApplicationServiceStore
-        defer.returnValue(self._parse_services_dict(results))
+        as_list = yield self.get_app_services()
+        services = []
+
+        for res in results:
+            for service in as_list:
+                if service.id == res["as_id"]:
+                    services.append(service)
+        defer.returnValue(services)
 
     @defer.inlineCallbacks
     def get_appservice_state(self, service):

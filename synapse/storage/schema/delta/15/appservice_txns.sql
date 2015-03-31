@@ -14,14 +14,13 @@
  */
 
 CREATE TABLE IF NOT EXISTS application_services_state(
-    as_id INTEGER PRIMARY KEY,
+    as_id TEXT PRIMARY KEY,
     state TEXT,
-    last_txn TEXT,
-    FOREIGN KEY(as_id) REFERENCES application_services(id)
+    last_txn TEXT
 );
 
 CREATE TABLE IF NOT EXISTS application_services_txns(
-    as_id INTEGER NOT NULL,
+    as_id TEXT NOT NULL,
     txn_id INTEGER NOT NULL,
     event_ids TEXT NOT NULL,
     UNIQUE(as_id, txn_id) ON CONFLICT ROLLBACK
