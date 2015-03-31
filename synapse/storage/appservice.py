@@ -21,6 +21,7 @@ from twisted.internet import defer
 from synapse.api.constants import Membership
 from synapse.appservice import ApplicationService, AppServiceTransaction
 from synapse.storage.roommember import RoomsForUser
+from synapse.types import UserID
 from ._base import SQLBaseStore
 
 
@@ -31,6 +32,7 @@ class ApplicationServiceStore(SQLBaseStore):
 
     def __init__(self, hs):
         super(ApplicationServiceStore, self).__init__(hs)
+        self.hostname = hs.hostname
         self.services_cache = []
         self._populate_appservice_cache(
             hs.config.app_service_config_files
@@ -200,10 +202,15 @@ class ApplicationServiceStore(SQLBaseStore):
         return service_list
 
     def _load_appservice(self, as_info):
-        required_string_fields = ["url", "as_token", "hs_token", "sender"]
+        required_string_fields = [
+            "url", "as_token", "hs_token", "sender_localpart"
+        ]
         for field in required_string_fields:
             if not isinstance(as_info.get(field), basestring):
                 raise KeyError("Required string field: '%s'", field)
+
+        user = UserID(as_info["sender_localpart"], self.hostname)
+        user_id = user.to_string()
 
         # namespace checks
         if not isinstance(as_info.get("namespaces"), dict):
@@ -231,7 +238,7 @@ class ApplicationServiceStore(SQLBaseStore):
             url=as_info["url"],
             namespaces=as_info["namespaces"],
             hs_token=as_info["hs_token"],
-            sender=as_info["sender"],
+            sender=user_id,
             id=as_info["as_token"]  # the token is the only unique thing here
         )
 

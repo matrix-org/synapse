@@ -60,7 +60,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
 
     def _add_appservice(self, as_token, url, hs_token, sender):
         as_yaml = dict(url=url, as_token=as_token, hs_token=hs_token,
-                       sender=sender, namespaces={})
+                       sender_localpart=sender, namespaces={})
         # use the token as the filename
         with open(as_token, 'w') as outfile:
             outfile.write(yaml.dump(as_yaml))
@@ -138,7 +138,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
 
     def _add_service(self, url, as_token):
         as_yaml = dict(url=url, as_token=as_token, hs_token="something",
-                       sender="a_sender", namespaces={})
+                       sender_localpart="a_sender", namespaces={})
         # use the token as the filename
         with open(as_token, 'w') as outfile:
             outfile.write(yaml.dump(as_yaml))
