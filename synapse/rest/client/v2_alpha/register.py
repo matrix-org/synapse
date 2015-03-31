@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import LoginError, SynapseError, Codes
+from synapse.api.errors import SynapseError, Codes
 from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_pattern, parse_request_allow_empty

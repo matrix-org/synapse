@@ -42,9 +42,10 @@ def client_v2_pattern(path_regex):
 
 def parse_request_allow_empty(request):
     content = request.content.read()
-    if content == None or content == '':
+    if content is None or content == '':
         return None
     return simplejson.loads(content)
+
 
 def parse_json_dict_from_request(request):
     try:
