@@ -16,10 +16,8 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.types import UserID
-import synapse.util.stringutils as stringutils
 
 import logging
 
@@ -48,38 +46,6 @@ class ApplicationServicesHandler(object):
         self.appservice_api = appservice_api
         self.scheduler = appservice_scheduler
         self.started_scheduler = False
-
-    @defer.inlineCallbacks
-    def register(self, app_service):
-        logger.info("Register -> %s", app_service)
-        # check the token is recognised
-        try:
-            stored_service = yield self.store.get_app_service_by_token(
-                app_service.token
-            )
-            if not stored_service:
-                raise StoreError(404, "Application service not found")
-            app_service.id = stored_service.id
-        except StoreError:
-            raise SynapseError(
-                403, "Unrecognised application services token. "
-                "Consult the home server admin.",
-                errcode=Codes.FORBIDDEN
-            )
-        app_service.hs_token = self._generate_hs_token()
-
-        # create a sender for this application service which is used when
-        # creating rooms, etc..
-        account = yield self.hs.get_handlers().registration_handler.register()
-        app_service.sender = account[0]
-
-        yield self.store.update_app_service(app_service)
-        defer.returnValue(app_service)
-
-    @defer.inlineCallbacks
-    def unregister(self, token):
-        logger.info("Unregister as_token=%s", token)
-        yield self.store.unregister_app_service(token)
 
     @defer.inlineCallbacks
     def notify_interested_services(self, event):
@@ -223,6 +189,3 @@ class ApplicationServicesHandler(object):
             exists = yield self.query_user_exists(user_id)
             defer.returnValue(exists)
         defer.returnValue(True)
-
-    def _generate_hs_token(self):
-        return stringutils.random_string(24)

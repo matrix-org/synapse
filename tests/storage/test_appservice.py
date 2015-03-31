@@ -50,45 +50,6 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         self.store = ApplicationServiceStore(hs)
 
     @defer.inlineCallbacks
-    def test_update_and_retrieval_of_service(self):
-        url = "https://matrix.org/appservices/foobar"
-        hs_token = "hstok"
-        user_regex = [
-            {"regex": "@foobar_.*:matrix.org", "exclusive": True}
-        ]
-        alias_regex = [
-            {"regex": "#foobar_.*:matrix.org", "exclusive": False}
-        ]
-        room_regex = [
-
-        ]
-        service = ApplicationService(
-            url=url, hs_token=hs_token, token=self.as_token, namespaces={
-                ApplicationService.NS_USERS: user_regex,
-                ApplicationService.NS_ALIASES: alias_regex,
-                ApplicationService.NS_ROOMS: room_regex
-        })
-        yield self.store.update_app_service(service)
-
-        stored_service = yield self.store.get_app_service_by_token(
-            self.as_token
-        )
-        self.assertEquals(stored_service.token, self.as_token)
-        self.assertEquals(stored_service.url, url)
-        self.assertEquals(
-            stored_service.namespaces[ApplicationService.NS_ALIASES],
-            alias_regex
-        )
-        self.assertEquals(
-            stored_service.namespaces[ApplicationService.NS_ROOMS],
-            room_regex
-        )
-        self.assertEquals(
-            stored_service.namespaces[ApplicationService.NS_USERS],
-            user_regex
-        )
-
-    @defer.inlineCallbacks
     def test_retrieve_unknown_service_token(self):
         service = yield self.store.get_app_service_by_token("invalid_token")
         self.assertEquals(service, None)
