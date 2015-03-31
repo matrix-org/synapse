@@ -129,7 +129,7 @@ class JsonResource(HttpServer, resource.Resource):
 
     @defer.inlineCallbacks
     def _async_render(self, request):
-        """ This gets called by twisted every time someone sends us a request.
+        """ This gets called from render() every time someone sends us a request.
             This checks if anyone has registered a callback for that method and
             path.
         """
