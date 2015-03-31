@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import urllib
 import yaml
 from simplejson import JSONDecodeError
 import simplejson as json
@@ -209,7 +210,12 @@ class ApplicationServiceStore(SQLBaseStore):
             if not isinstance(as_info.get(field), basestring):
                 raise KeyError("Required string field: '%s'", field)
 
-        user = UserID(as_info["sender_localpart"], self.hostname)
+        localpart = as_info["sender_localpart"]
+        if urllib.quote(localpart) != localpart:
+            raise ValueError(
+                "sender_localpart needs characters which are not URL encoded."
+            )
+        user = UserID(localpart, self.hostname)
         user_id = user.to_string()
 
         # namespace checks
