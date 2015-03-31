@@ -57,10 +57,10 @@ class HttpServer(object):
     """
 
     def register_path(self, method, path_pattern, callback):
-        """ Register a callback that get's fired if we receive a http request
+        """ Register a callback that gets fired if we receive a http request
         with the given method for a path that matches the given regex.
 
-        If the regex contains groups these get's passed to the calback via
+        If the regex contains groups these gets passed to the calback via
         an unpacked tuple.
 
         Args:
@@ -111,9 +111,8 @@ class JsonResource(HttpServer, resource.Resource):
             interface=self.hs.config.bind_host
         )
 
-    # Gets called by twisted
     def render(self, request):
-        """ This get's called by twisted every time someone sends us a request.
+        """ This gets called by twisted every time someone sends us a request.
         """
         self._async_render_with_logging_context(request)
         return server.NOT_DONE_YET
@@ -130,7 +129,7 @@ class JsonResource(HttpServer, resource.Resource):
 
     @defer.inlineCallbacks
     def _async_render(self, request):
-        """ This get's called by twisted every time someone sends us a request.
+        """ This gets called by twisted every time someone sends us a request.
             This checks if anyone has registered a callback for that method and
             path.
         """
