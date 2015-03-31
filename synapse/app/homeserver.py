@@ -32,7 +32,6 @@ from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
 from synapse.http.server import JsonResource, RootRedirect
-from synapse.rest.appservice.v1 import AppServiceRestResource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
 from synapse.http.server_key_resource import LocalKey
@@ -77,9 +76,6 @@ class SynapseHomeServer(HomeServer):
 
     def build_resource_for_federation(self):
         return JsonResource(self)
-
-    def build_resource_for_app_services(self):
-        return AppServiceRestResource(self)
 
     def build_resource_for_web_client(self):
         import syweb
@@ -141,7 +137,6 @@ class SynapseHomeServer(HomeServer):
             (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
             (MEDIA_PREFIX, self.get_resource_for_media_repository()),
-            (APP_SERVICE_PREFIX, self.get_resource_for_app_services()),
             (STATIC_PREFIX, self.get_resource_for_static_content()),
         ]
 
