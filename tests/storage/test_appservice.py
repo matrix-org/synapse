@@ -22,6 +22,8 @@ from synapse.storage.appservice import (
 )
 
 import json
+import os
+import yaml
 from mock import Mock
 from tests.utils import SQLiteMemoryDbPool, MockClock
 
@@ -30,24 +32,39 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        self.as_yaml_files = []
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
         hs = HomeServer(
-            "test", db_pool=db_pool, clock=MockClock(), config=Mock()
+            "test", db_pool=db_pool, clock=MockClock(),
+            config=Mock(
+                app_service_config_files=self.as_yaml_files
+            )
         )
+
         self.as_token = "token1"
-        db_pool.runQuery(
-            "INSERT INTO application_services(token) VALUES(?)",
-            (self.as_token,)
-        )
-        db_pool.runQuery(
-            "INSERT INTO application_services(token) VALUES(?)", ("token2",)
-        )
-        db_pool.runQuery(
-            "INSERT INTO application_services(token) VALUES(?)", ("token3",)
-        )
+        self.as_url = "some_url"
+        self._add_appservice(self.as_token, self.as_url, "some_hs_token", "bob")
+        self._add_appservice("token2", "some_url", "some_hs_token", "bob")
+        self._add_appservice("token3", "some_url", "some_hs_token", "bob")
         # must be done after inserts
         self.store = ApplicationServiceStore(hs)
+
+    def tearDown(self):
+        # TODO: suboptimal that we need to create files for tests!
+        for f in self.as_yaml_files:
+            try:
+                os.remove(f)
+            except:
+                pass
+
+    def _add_appservice(self, as_token, url, hs_token, sender):
+        as_yaml = dict(url=url, as_token=as_token, hs_token=hs_token,
+                       sender=sender, namespaces={})
+        # use the token as the filename
+        with open(as_token, 'w') as outfile:
+            outfile.write(yaml.dump(as_yaml))
+            self.as_yaml_files.append(as_token)
 
     @defer.inlineCallbacks
     def test_retrieve_unknown_service_token(self):
@@ -60,7 +77,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             self.as_token
         )
         self.assertEquals(stored_service.token, self.as_token)
-        self.assertEquals(stored_service.url, None)
+        self.assertEquals(stored_service.url, self.as_url)
         self.assertEquals(
             stored_service.namespaces[ApplicationService.NS_ALIASES],
             []

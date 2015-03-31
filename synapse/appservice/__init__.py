@@ -95,7 +95,7 @@ class ApplicationService(object):
         #   rooms: [ {regex: "[A-z]+.*", exclusive: true}, ...],
         # }
         if not namespaces:
-            return None
+            namespaces = {}
 
         for ns in ApplicationService.NS_LIST:
             if ns not in namespaces:

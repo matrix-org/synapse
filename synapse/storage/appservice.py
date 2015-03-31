@@ -37,7 +37,7 @@ class ApplicationServiceStore(SQLBaseStore):
         )
 
     def get_app_services(self):
-        defer.succeed(self.services_cache)
+        return defer.succeed(self.services_cache)
 
     def get_app_service_by_user_id(self, user_id):
         """Retrieve an application service from their user ID.
@@ -54,9 +54,8 @@ class ApplicationServiceStore(SQLBaseStore):
         """
         for service in self.services_cache:
             if service.sender == user_id:
-                defer.succeed(service)
-                return
-        defer.succeed(None)
+                return defer.succeed(service)
+        return defer.succeed(None)
 
     def get_app_service_by_token(self, token):
         """Get the application service with the given appservice token.
@@ -69,7 +68,7 @@ class ApplicationServiceStore(SQLBaseStore):
         for service in self.services_cache:
             if service.token == token:
                 return defer.succeed(service)
-        defer.succeed(None)
+        return defer.succeed(None)
 
     def get_app_service_rooms(self, service):
         """Get a list of RoomsForUser for this application service.
@@ -237,11 +236,16 @@ class ApplicationServiceStore(SQLBaseStore):
 
     def _populate_appservice_cache(self, config_files):
         """Populates a cache of Application Services from the config files."""
+        if not isinstance(config_files, list):
+            logger.warning(
+                "Expected %s to be a list of AS config files.", config_files
+            )
+            return
+
         for config_file in config_files:
             try:
                 with open(config_file, 'r') as f:
-                    as_info = yaml.load(f)
-                    appservice = self._load_appservice(as_info)
+                    appservice = self._load_appservice(yaml.load(f))
                     logger.info("Loaded application service: %s", appservice)
                     self.services_cache.append(appservice)
             except Exception as e:
