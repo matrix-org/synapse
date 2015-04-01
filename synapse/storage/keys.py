@@ -64,7 +64,7 @@ class KeyStore(SQLBaseStore):
                 "fingerprint": fingerprint,
                 "from_server": from_server,
                 "ts_added_ms": time_now_ms,
-                "tls_certificate": tls_certificate_bytes,
+                "tls_certificate": buffer(tls_certificate_bytes),
             },
         )
 
@@ -113,6 +113,6 @@ class KeyStore(SQLBaseStore):
                 "key_id": "%s:%s" % (verify_key.alg, verify_key.version),
                 "from_server": from_server,
                 "ts_added_ms": time_now_ms,
-                "verify_key": verify_key.encode(),
+                "verify_key": buffer(verify_key.encode()),
             },
         )

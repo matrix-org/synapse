@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS application_services(
     hs_token VARCHAR(255),
     sender VARCHAR(255),
     UNIQUE(token)
-) ENGINE = INNODB;
+) ;
 
 CREATE TABLE IF NOT EXISTS application_services_regex(
     id BIGINT PRIMARY KEY,
@@ -28,4 +28,4 @@ CREATE TABLE IF NOT EXISTS application_services_regex(
     namespace INTEGER,  /* enum[room_id|room_alias|user_id] */
     regex VARCHAR(255),
     FOREIGN KEY(as_id) REFERENCES application_services(id)
-) ENGINE = INNODB;
+) ;

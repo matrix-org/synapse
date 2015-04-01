@@ -115,12 +115,6 @@ class EventStreamPermissionsTestCase(RestTestCase):
         hs = yield setup_test_homeserver(
             http_client=None,
             replication_layer=Mock(),
-            clock=Mock(spec=[
-                "call_later",
-                "cancel_call_later",
-                "time_msec",
-                "time"
-            ]),
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
@@ -131,9 +125,6 @@ class EventStreamPermissionsTestCase(RestTestCase):
         hs.config.disable_registration = False
 
         hs.get_handlers().federation_handler = Mock()
-
-        hs.get_clock().time_msec.return_value = 1000000
-        hs.get_clock().time.return_value = 1000
 
         synapse.rest.client.v1.register.register_servlets(hs, self.mock_resource)
         synapse.rest.client.v1.events.register_servlets(hs, self.mock_resource)

@@ -54,7 +54,7 @@ class SignatureStore(SQLBaseStore):
             {
                 "event_id": event_id,
                 "algorithm": algorithm,
-                "hash": hash_bytes,
+                "hash": buffer(hash_bytes),
             },
         )
 
@@ -116,7 +116,7 @@ class SignatureStore(SQLBaseStore):
             {
                 "event_id": event_id,
                 "algorithm": algorithm,
-                "hash": hash_bytes,
+                "hash": buffer(hash_bytes),
             },
         )
 
@@ -160,7 +160,7 @@ class SignatureStore(SQLBaseStore):
                 "event_id": event_id,
                 "signature_name": signature_name,
                 "key_id": key_id,
-                "signature": signature_bytes,
+                "signature": buffer(signature_bytes),
             },
         )
 
@@ -193,6 +193,6 @@ class SignatureStore(SQLBaseStore):
                 "event_id": event_id,
                 "prev_event_id": prev_event_id,
                 "algorithm": algorithm,
-                "hash": hash_bytes,
+                "hash": buffer(hash_bytes),
             },
         )

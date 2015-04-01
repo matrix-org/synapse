@@ -24,8 +24,6 @@ from ..utils import MockHttpResource, MockClock, setup_test_homeserver
 from synapse.federation import initialize_http_replication
 from synapse.events import FrozenEvent
 
-from synapse.storage.transactions import DestinationsTable
-
 
 def make_pdu(prev_pdus=[], **kwargs):
     """Provide some default fields for making a PduTuple."""
@@ -57,8 +55,14 @@ class FederationTestCase(unittest.TestCase):
         self.mock_persistence.get_received_txn_response.return_value = (
             defer.succeed(None)
         )
+
+        retry_timings_res = {
+            "destination": "",
+            "retry_last_ts": 0,
+            "retry_interval": 0,
+        }
         self.mock_persistence.get_destination_retry_timings.return_value = (
-            defer.succeed(DestinationsTable.EntryType("", 0, 0))
+            defer.succeed(retry_timings_res)
         )
         self.mock_persistence.get_auth_chain.return_value = []
         self.clock = MockClock()

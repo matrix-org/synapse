@@ -14,20 +14,20 @@
  */
 CREATE TABLE IF NOT EXISTS users(
     name VARCHAR(255),
-    password_hash VARBINARY(255),
+    password_hash VARCHAR(255),
     creation_ts BIGINT,
     admin BOOL DEFAULT 0 NOT NULL,
     UNIQUE(name)
-) ENGINE = INNODB;
+) ;
 
 CREATE TABLE IF NOT EXISTS access_tokens(
-    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    id BIGINT PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
     device_id VARCHAR(255),
     token VARCHAR(255) NOT NULL,
     last_used BIGINT,
     UNIQUE(token)
-) ENGINE = INNODB;
+) ;
 
 CREATE TABLE IF NOT EXISTS user_ips (
     user VARCHAR(255) NOT NULL,
@@ -37,6 +37,6 @@ CREATE TABLE IF NOT EXISTS user_ips (
     user_agent VARCHAR(255) NOT NULL,
     last_seen BIGINT NOT NULL,
     UNIQUE (user, access_token, ip, user_agent)
-) ENGINE = INNODB;
+) ;
 
 CREATE INDEX IF NOT EXISTS user_ips_user ON user_ips(user);

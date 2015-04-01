@@ -119,7 +119,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
         yield self.inject_room_member(self.room, self.u_alice, Membership.JOIN)
 
         self.assertEquals(
-            ["test"],
+            {"test"},
             (yield self.store.get_joined_hosts_for_room(self.room.to_string()))
         )
 
@@ -127,7 +127,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
         yield self.inject_room_member(self.room, self.u_bob, Membership.JOIN)
 
         self.assertEquals(
-            ["test"],
+            {"test"},
             (yield self.store.get_joined_hosts_for_room(self.room.to_string()))
         )
 
@@ -136,9 +136,9 @@ class RoomMemberStoreTestCase(unittest.TestCase):
 
         self.assertEquals(
             {"test", "elsewhere"},
-            set((yield
+            (yield
                 self.store.get_joined_hosts_for_room(self.room.to_string())
-            ))
+            )
         )
 
         # Should still have both hosts
@@ -146,15 +146,15 @@ class RoomMemberStoreTestCase(unittest.TestCase):
 
         self.assertEquals(
             {"test", "elsewhere"},
-            set((yield
+            (yield
                 self.store.get_joined_hosts_for_room(self.room.to_string())
-            ))
+            )
         )
 
         # Should have only one host after other leaves
         yield self.inject_room_member(self.room, self.u_charlie, Membership.LEAVE)
 
         self.assertEquals(
-            ["test"],
+            {"test"},
             (yield self.store.get_joined_hosts_for_room(self.room.to_string()))
         )

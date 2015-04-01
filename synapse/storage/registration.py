@@ -42,6 +42,7 @@ class RegistrationStore(SQLBaseStore):
         yield self._simple_insert(
             "access_tokens",
             {
+                "id": self.get_next_stream_id(),
                 "user_id": user_id,
                 "token": token
             },
@@ -78,8 +79,11 @@ class RegistrationStore(SQLBaseStore):
 
         # it's possible for this to get a conflict, but only for a single user
         # since tokens are namespaced based on their user ID
-        txn.execute("INSERT INTO access_tokens(user_id, token) " +
-                    "VALUES (?,?)", [user_id, token])
+        txn.execute(
+            "INSERT INTO access_tokens(id, user_id, token)"
+            " VALUES (?,?,?)",
+            (self.get_next_stream_id(), user_id, token,)
+        )
 
     @defer.inlineCallbacks
     def get_user_by_id(self, user_id):

@@ -20,6 +20,7 @@ sys.dont_write_bytecode = True
 from synapse.storage import (
     prepare_database, prepare_sqlite3_database, UpgradeDatabaseException,
 )
+from synapse.storage.engines import create_engine
 
 from synapse.server import HomeServer
 
@@ -376,7 +377,7 @@ def setup(config_options):
     if name in ["MySQLdb", "mysql.connector"]:
         db_config.setdefault("args", {}).update({
             "sql_mode": "TRADITIONAL",
-            "charset": "utf8",
+            "charset": "utf8mb4",
             "use_unicode": True,
         })
     elif name == "sqlite3":
@@ -388,6 +389,8 @@ def setup(config_options):
     else:
         raise RuntimeError("Unsupported database type '%s'" % (name,))
 
+    database_engine = create_engine(name)
+
     hs = SynapseHomeServer(
         config.server_name,
         domain_with_port=domain_with_port,
@@ -398,6 +401,7 @@ def setup(config_options):
         config=config,
         content_addr=config.content_addr,
         version_string=version_string,
+        database_engine=database_engine,
     )
 
     hs.create_resource_tree(
@@ -409,12 +413,14 @@ def setup(config_options):
     logger.info("Preparing database: %s...", db_name)
 
     try:
-        # with sqlite3.connect(db_name) as db_conn:
-        #     prepare_sqlite3_database(db_conn)
-        #     prepare_database(db_conn)
-        import mysql.connector
-        db_conn = mysql.connector.connect(**db_config.get("args", {}))
-        prepare_database(db_conn)
+        db_conn = database_engine.module.connect(**db_config.get("args", {}))
+
+        if name == "sqlite3":
+            prepare_sqlite3_database(db_conn)
+
+        prepare_database(db_conn, database_engine)
+
+        db_conn.commit()
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"

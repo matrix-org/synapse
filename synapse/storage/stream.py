@@ -433,12 +433,6 @@ class StreamStore(SQLBaseStore):
 
         defer.returnValue(self.min_token)
 
-    def get_next_stream_id(self):
-        with self._next_stream_id_lock:
-            i = self._next_stream_id
-            self._next_stream_id += 1
-            return i
-
     def _get_room_events_max_id_txn(self, txn):
         txn.execute(
             "SELECT MAX(stream_ordering) as m FROM events"

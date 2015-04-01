@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS rejections(
     reason VARCHAR(255) NOT NULL,
     last_check VARCHAR(255) NOT NULL,
     UNIQUE (event_id)
-) ENGINE = INNODB;
+) ;
 
 -- Push notification endpoints that users have configured
 CREATE TABLE IF NOT EXISTS pushers (
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS pushers (
   last_success BIGINT,
   failing_since BIGINT,
   UNIQUE (app_id, pushkey)
-) ENGINE = INNODB;
+) ;
 
 CREATE TABLE IF NOT EXISTS push_rules (
   id BIGINT PRIMARY KEY,
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS push_rules (
   conditions VARCHAR(255) NOT NULL,
   actions VARCHAR(255) NOT NULL,
   UNIQUE(user_name, rule_id)
-) ENGINE = INNODB;
+) ;
 
 CREATE INDEX IF NOT EXISTS push_rules_user_name on push_rules (user_name);
 
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS user_filters(
   user_id VARCHAR(255),
   filter_id BIGINT,
   filter_json BLOB
-) ENGINE = INNODB;
+) ;
 
 CREATE INDEX IF NOT EXISTS user_filters_by_user_id_filter_id ON user_filters(
     user_id, filter_id

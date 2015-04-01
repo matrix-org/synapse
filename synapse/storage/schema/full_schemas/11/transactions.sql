@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS received_transactions(
     response_json BLOB,
     has_been_referenced BOOL default 0, -- Whether thishas been referenced by a prev_tx
     UNIQUE (transaction_id, origin)
-) ENGINE = INNODB;
+) ;
 
 CREATE INDEX IF NOT EXISTS transactions_have_ref ON received_transactions(origin, has_been_referenced);-- WHERE has_been_referenced = 0;
 
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS sent_transactions(
     response_code INTEGER DEFAULT 0,
     response_json BLOB,
     ts BIGINT
-) ENGINE = INNODB;
+) ;
 
 CREATE INDEX IF NOT EXISTS sent_transaction_dest ON sent_transactions(destination);
 CREATE INDEX IF NOT EXISTS sent_transaction_txn_id ON sent_transactions(transaction_id);
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS transaction_id_to_pdu(
     pdu_id VARCHAR(255),
     pdu_origin VARCHAR(255),
     UNIQUE (transaction_id, destination)
-) ENGINE = INNODB;
+) ;
 
 CREATE INDEX IF NOT EXISTS transaction_id_to_pdu_dest ON transaction_id_to_pdu(destination);
 
@@ -60,4 +60,4 @@ CREATE TABLE IF NOT EXISTS destinations(
     destination VARCHAR(255) PRIMARY KEY,
     retry_last_ts BIGINT,
     retry_interval INTEGER
-) ENGINE = INNODB;
+) ;

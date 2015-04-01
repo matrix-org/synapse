@@ -16,22 +16,18 @@ from tests import unittest
 from twisted.internet import defer
 
 from synapse.appservice import ApplicationService
-from synapse.server import HomeServer
 from synapse.storage.appservice import ApplicationServiceStore
 
-from mock import Mock
-from tests.utils import SQLiteMemoryDbPool, MockClock
+from tests.utils import setup_test_homeserver
 
 
 class ApplicationServiceStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        db_pool = SQLiteMemoryDbPool()
-        yield db_pool.prepare()
-        hs = HomeServer(
-            "test", db_pool=db_pool, clock=MockClock(), config=Mock()
-        )
+        hs = yield setup_test_homeserver()
+        db_pool = hs.get_db_pool()
+
         self.as_token = "token1"
         db_pool.runQuery(
             "INSERT INTO application_services(token) VALUES(?)",
