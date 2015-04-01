@@ -365,7 +365,9 @@ def setup(config_options):
     else:
         db_config = {
             "name": "sqlite3",
-            "database": config.database_path,
+            "args": {
+                "database": config.database_path,
+            },
         }
 
     db_config = {
@@ -381,10 +383,12 @@ def setup(config_options):
             "use_unicode": True,
         })
     elif name == "sqlite3":
+        def open_fun(conn):
+            prepare_database(conn, database_engine)
         db_config.setdefault("args", {}).update({
             "cp_min": 1,
             "cp_max": 1,
-            "cp_openfun": prepare_database,
+            "cp_openfun": open_fun,
         })
     else:
         raise RuntimeError("Unsupported database type '%s'" % (name,))
@@ -413,7 +417,12 @@ def setup(config_options):
     logger.info("Preparing database: %s...", db_name)
 
     try:
-        db_conn = database_engine.module.connect(**db_config.get("args", {}))
+        db_conn = database_engine.module.connect(
+            **{
+                k: v for k, v in db_config.get("args", {}).items()
+                if not k.startswith("cp_")
+            }
+        )
 
         if name == "sqlite3":
             prepare_sqlite3_database(db_conn)
