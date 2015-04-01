@@ -22,6 +22,8 @@ from synapse.storage.appservice import (
 )
 
 import json
+import os
+import yaml
 from mock import Mock
 from tests.utils import SQLiteMemoryDbPool, MockClock
 
@@ -30,63 +32,39 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        self.as_yaml_files = []
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
         hs = HomeServer(
-            "test", db_pool=db_pool, clock=MockClock(), config=Mock()
+            "test", db_pool=db_pool, clock=MockClock(),
+            config=Mock(
+                app_service_config_files=self.as_yaml_files
+            )
         )
+
         self.as_token = "token1"
-        db_pool.runQuery(
-            "INSERT INTO application_services(token) VALUES(?)",
-            (self.as_token,)
-        )
-        db_pool.runQuery(
-            "INSERT INTO application_services(token) VALUES(?)", ("token2",)
-        )
-        db_pool.runQuery(
-            "INSERT INTO application_services(token) VALUES(?)", ("token3",)
-        )
+        self.as_url = "some_url"
+        self._add_appservice(self.as_token, self.as_url, "some_hs_token", "bob")
+        self._add_appservice("token2", "some_url", "some_hs_token", "bob")
+        self._add_appservice("token3", "some_url", "some_hs_token", "bob")
         # must be done after inserts
         self.store = ApplicationServiceStore(hs)
 
-    @defer.inlineCallbacks
-    def test_update_and_retrieval_of_service(self):
-        url = "https://matrix.org/appservices/foobar"
-        hs_token = "hstok"
-        user_regex = [
-            {"regex": "@foobar_.*:matrix.org", "exclusive": True}
-        ]
-        alias_regex = [
-            {"regex": "#foobar_.*:matrix.org", "exclusive": False}
-        ]
-        room_regex = [
+    def tearDown(self):
+        # TODO: suboptimal that we need to create files for tests!
+        for f in self.as_yaml_files:
+            try:
+                os.remove(f)
+            except:
+                pass
 
-        ]
-        service = ApplicationService(
-            url=url, hs_token=hs_token, token=self.as_token, namespaces={
-                ApplicationService.NS_USERS: user_regex,
-                ApplicationService.NS_ALIASES: alias_regex,
-                ApplicationService.NS_ROOMS: room_regex
-        })
-        yield self.store.update_app_service(service)
-
-        stored_service = yield self.store.get_app_service_by_token(
-            self.as_token
-        )
-        self.assertEquals(stored_service.token, self.as_token)
-        self.assertEquals(stored_service.url, url)
-        self.assertEquals(
-            stored_service.namespaces[ApplicationService.NS_ALIASES],
-            alias_regex
-        )
-        self.assertEquals(
-            stored_service.namespaces[ApplicationService.NS_ROOMS],
-            room_regex
-        )
-        self.assertEquals(
-            stored_service.namespaces[ApplicationService.NS_USERS],
-            user_regex
-        )
+    def _add_appservice(self, as_token, url, hs_token, sender):
+        as_yaml = dict(url=url, as_token=as_token, hs_token=hs_token,
+                       sender_localpart=sender, namespaces={})
+        # use the token as the filename
+        with open(as_token, 'w') as outfile:
+            outfile.write(yaml.dump(as_yaml))
+            self.as_yaml_files.append(as_token)
 
     @defer.inlineCallbacks
     def test_retrieve_unknown_service_token(self):
@@ -99,7 +77,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             self.as_token
         )
         self.assertEquals(stored_service.token, self.as_token)
-        self.assertEquals(stored_service.url, None)
+        self.assertEquals(stored_service.url, self.as_url)
         self.assertEquals(
             stored_service.namespaces[ApplicationService.NS_ALIASES],
             []
@@ -123,42 +101,48 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        self.as_yaml_files = []
         self.db_pool = SQLiteMemoryDbPool()
         yield self.db_pool.prepare()
-        hs = HomeServer(
-            "test", db_pool=self.db_pool, clock=MockClock(), config=Mock()
-        )
         self.as_list = [
             {
                 "token": "token1",
                 "url": "https://matrix-as.org",
-                "id": 3
+                "id": "token1"
             },
             {
                 "token": "alpha_tok",
                 "url": "https://alpha.com",
-                "id": 5
+                "id": "alpha_tok"
             },
             {
                 "token": "beta_tok",
                 "url": "https://beta.com",
-                "id": 6
+                "id": "beta_tok"
             },
             {
                 "token": "delta_tok",
                 "url": "https://delta.com",
-                "id": 7
+                "id": "delta_tok"
             },
         ]
         for s in self.as_list:
-            yield self._add_service(s["id"], s["url"], s["token"])
+            yield self._add_service(s["url"], s["token"])
+
+        hs = HomeServer(
+            "test", db_pool=self.db_pool, clock=MockClock(), config=Mock(
+                app_service_config_files=self.as_yaml_files
+            )
+        )
         self.store = TestTransactionStore(hs)
 
-    def _add_service(self, as_id, url, token):
-        return self.db_pool.runQuery(
-            "INSERT INTO application_services(id, url, token) VALUES(?,?,?)",
-            (as_id, url, token)
-        )
+    def _add_service(self, url, as_token):
+        as_yaml = dict(url=url, as_token=as_token, hs_token="something",
+                       sender_localpart="a_sender", namespaces={})
+        # use the token as the filename
+        with open(as_token, 'w') as outfile:
+            outfile.write(yaml.dump(as_yaml))
+            self.as_yaml_files.append(as_token)
 
     def _set_state(self, id, state, txn=None):
         return self.db_pool.runQuery(
@@ -410,8 +394,10 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             ApplicationServiceState.DOWN
         )
         self.assertEquals(2, len(services))
-        self.assertEquals(self.as_list[2]["id"], services[0].id)
-        self.assertEquals(self.as_list[0]["id"], services[1].id)
+        self.assertEquals(
+            set([self.as_list[2]["id"], self.as_list[0]["id"]]),
+            set([services[0].id, services[1].id])
+        )
 
 
 # required for ApplicationServiceTransactionStoreTestCase tests
