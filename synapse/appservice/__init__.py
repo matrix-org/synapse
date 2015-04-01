@@ -199,7 +199,10 @@ class ApplicationService(object):
             return self._matches_user(event, member_list)
 
     def is_interested_in_user(self, user_id):
-        return self._matches_regex(user_id, ApplicationService.NS_USERS)
+        return (
+            self._matches_regex(user_id, ApplicationService.NS_USERS)
+            or user_id == self.sender
+        )
 
     def is_interested_in_alias(self, alias):
         return self._matches_regex(alias, ApplicationService.NS_ALIASES)
