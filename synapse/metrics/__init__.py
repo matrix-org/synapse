@@ -122,6 +122,7 @@ TYPES = {
     stat.S_IFIFO: "FIFO",
 }
 
+
 def _process_fds():
     counts = {(k,): 0 for k in TYPES.values()}
     counts[("other",)] = 0
