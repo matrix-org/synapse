@@ -211,7 +211,10 @@ class ApplicationService(object):
         return self._matches_regex(room_id, ApplicationService.NS_ROOMS)
 
     def is_exclusive_user(self, user_id):
-        return self._is_exclusive(ApplicationService.NS_USERS, user_id)
+        return (
+            self._is_exclusive(ApplicationService.NS_USERS, user_id)
+            or user_id == self.sender
+        )
 
     def is_exclusive_alias(self, alias):
         return self._is_exclusive(ApplicationService.NS_ALIASES, alias)

@@ -180,7 +180,14 @@ class ApplicationServicesHandler(object):
             return
 
         user_info = yield self.store.get_user_by_id(user_id)
-        defer.returnValue(len(user_info) == 0)
+        if len(user_info) > 0:
+            defer.returnValue(False)
+            return
+
+        # user not found; could be the AS though, so check.
+        services = yield self.store.get_app_services()
+        service_list = [s for s in services if s.sender == user_id]
+        defer.returnValue(len(service_list) == 0)
 
     @defer.inlineCallbacks
     def _check_user_exists(self, user_id):
