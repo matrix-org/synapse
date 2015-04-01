@@ -170,9 +170,12 @@ class JsonResource(HttpServer, resource.Resource):
                     request.method, request.path
                 )
 
-                code, response = yield callback(request, *args)
+                callback_return = yield callback(request, *args)
+                if callback_return is not None:
+                    code, response = callback_return
 
-                self._send_response(request, code, response)
+                    self._send_response(request, code, response)
+
                 response_timer.inc_by(
                     self.clock.time_msec() - start, request.method, servlet_classname
                 )

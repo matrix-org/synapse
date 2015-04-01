@@ -45,7 +45,7 @@ class RegisterRestServlet(RestServlet):
             [LoginType.RECAPTCHA],
             [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
             [LoginType.APPLICATION_SERVICE]
-        ], body)
+        ], body, self.hs.get_ip_from_request(request))
 
         if not authed:
             defer.returnValue((401, result))

@@ -20,11 +20,14 @@ from synapse.api.constants import LoginType
 from synapse.types import UserID
 from synapse.api.errors import LoginError, Codes
 from synapse.http.client import SimpleHttpClient
+
 from twisted.web.client import PartialDownloadError
 
 import logging
 import bcrypt
 import simplejson
+
+import synapse.util.stringutils as stringutils
 
 
 logger = logging.getLogger(__name__)
@@ -34,6 +37,11 @@ class AuthHandler(BaseHandler):
 
     def __init__(self, hs):
         super(AuthHandler, self).__init__(hs)
+        self.checkers = {
+            LoginType.PASSWORD: self._check_password_auth,
+            LoginType.RECAPTCHA: self._check_recaptcha,
+        }
+        self.sessions = {}
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip=None):
@@ -52,40 +60,64 @@ class AuthHandler(BaseHandler):
             If authed is false, the dictionary is the server response to the
             login request and should be passed back to the client.
         """
-        types = {
-            LoginType.PASSWORD: self.check_password_auth,
-            LoginType.RECAPTCHA: self.check_recaptcha,
-        }
 
         if not clientdict or 'auth' not in clientdict:
-            defer.returnValue((False, self.auth_dict_for_flows(flows)))
+            sess = self._get_session_info(None)
+            defer.returnValue(
+                (False, self._auth_dict_for_flows(flows, sess))
+            )
 
         authdict = clientdict['auth']
 
-        # In future: support sessions & retrieve previously succeeded
-        # login types
-        creds = {}
+        sess = self._get_session_info(
+            authdict['session'] if 'session' in authdict else None
+        )
+        if 'creds' not in sess:
+            sess['creds'] = {}
+        creds = sess['creds']
 
         # check auth type currently being presented
-        if 'type' not in authdict:
-            raise LoginError(400, "", Codes.MISSING_PARAM)
-        if authdict['type'] not in types:
-            raise LoginError(400, "", Codes.UNRECOGNIZED)
-        result = yield types[authdict['type']](authdict, clientip)
-        if result:
-            creds[authdict['type']] = result
+        if 'type' in authdict:
+            if authdict['type'] not in self.checkers:
+                raise LoginError(400, "", Codes.UNRECOGNIZED)
+            result = yield self.checkers[authdict['type']](authdict, clientip)
+            if result:
+                creds[authdict['type']] = result
+                self._save_session(sess)
 
         for f in flows:
             if len(set(f) - set(creds.keys())) == 0:
                 logger.info("Auth completed with creds: %r", creds)
+                self._remove_session(sess)
                 defer.returnValue((True, creds))
 
-        ret = self.auth_dict_for_flows(flows)
+        ret = self._auth_dict_for_flows(flows, sess)
         ret['completed'] = creds.keys()
         defer.returnValue((False, ret))
 
     @defer.inlineCallbacks
-    def check_password_auth(self, authdict, _):
+    def add_oob_auth(self, stagetype, authdict, clientip):
+        if stagetype not in self.checkers:
+            raise LoginError(400, "", Codes.MISSING_PARAM)
+        if 'session' not in authdict:
+            raise LoginError(400, "", Codes.MISSING_PARAM)
+
+        sess = self._get_session_info(
+            authdict['session']
+        )
+        if 'creds' not in sess:
+            sess['creds'] = {}
+        creds = sess['creds']
+
+        result = yield self.checkers[stagetype](authdict, clientip)
+        if result:
+            creds[stagetype] = result
+            self._save_session(sess)
+            defer.returnValue(True)
+        defer.returnValue(False)
+
+    @defer.inlineCallbacks
+    def _check_password_auth(self, authdict, _):
         if "user" not in authdict or "password" not in authdict:
             raise LoginError(400, "", Codes.MISSING_PARAM)
 
@@ -107,7 +139,7 @@ class AuthHandler(BaseHandler):
             raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
     @defer.inlineCallbacks
-    def check_recaptcha(self, authdict, clientip):
+    def _check_recaptcha(self, authdict, clientip):
         try:
             user_response = authdict["response"]
         except KeyError:
@@ -143,10 +175,10 @@ class AuthHandler(BaseHandler):
             defer.returnValue(True)
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
-    def get_params_recaptcha(self):
+    def _get_params_recaptcha(self):
         return {"public_key": self.hs.config.recaptcha_public_key}
 
-    def auth_dict_for_flows(self, flows):
+    def _auth_dict_for_flows(self, flows, session):
         public_flows = []
         for f in flows:
             hidden = False
@@ -157,7 +189,7 @@ class AuthHandler(BaseHandler):
                 public_flows.append(f)
 
         get_params = {
-            LoginType.RECAPTCHA: self.get_params_recaptcha,
+            LoginType.RECAPTCHA: self._get_params_recaptcha,
         }
 
         params = {}
@@ -168,6 +200,30 @@ class AuthHandler(BaseHandler):
                     params[stage] = get_params[stage]()
 
         return {
+            "session": session['id'],
             "flows": [{"stages": f} for f in public_flows],
             "params": params
         }
+
+    def _get_session_info(self, session_id):
+        if session_id not in self.sessions:
+            session_id = None
+
+        if not session_id:
+            # create a new session
+            while session_id is None or session_id in self.sessions:
+                session_id = stringutils.random_string(24)
+            self.sessions[session_id] = {
+                "id": session_id,
+            }
+
+        return self.sessions[session_id]
+
+    def _save_session(self, session):
+        # TODO: Persistent storage
+        logger.debug("Saving session %s", session)
+        self.sessions[session["id"]] = session
+
+    def _remove_session(self, session):
+        logger.debug("Removing session %s", session)
+        del self.sessions[session["id"]]
