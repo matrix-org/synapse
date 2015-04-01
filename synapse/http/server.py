@@ -79,6 +79,13 @@ class JsonResource(HttpServer, resource.Resource):
     Resources.
 
     Register callbacks via register_path()
+
+    Callbacks can return a tuple of status code and a dict in which case the
+    the dict will automatically be sent to the client as a JSON object.
+
+    The JsonResource is primarily intended for returning JSON, but callbacks
+    may send something other than JSON, they may do so by using the methods
+    on the request object and instead returning None.
     """
 
     isLeaf = True
