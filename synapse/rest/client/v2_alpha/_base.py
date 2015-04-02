@@ -44,7 +44,10 @@ def parse_request_allow_empty(request):
     content = request.content.read()
     if content is None or content == '':
         return None
-    return simplejson.loads(content)
+    try:
+        return simplejson.loads(content)
+    except simplejson.JSONDecodeError:
+        raise SynapseError(400, "Content not JSON.")
 
 
 def parse_json_dict_from_request(request):
