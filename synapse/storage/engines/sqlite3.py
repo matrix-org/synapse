@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.storage import prepare_database, prepare_sqlite3_database
+
 
 class Sqlite3Engine(object):
     def __init__(self, database_module):
@@ -23,3 +25,10 @@ class Sqlite3Engine(object):
 
     def encode_parameter(self, param):
         return param
+
+    def on_new_connection(self, db_conn):
+        self.prepare_database(db_conn)
+
+    def prepare_database(self, db_conn):
+        prepare_sqlite3_database(db_conn)
+        prepare_database(db_conn, self)

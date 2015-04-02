@@ -18,7 +18,7 @@ import sys
 sys.dont_write_bytecode = True
 
 from synapse.storage import (
-    prepare_database, prepare_sqlite3_database, UpgradeDatabaseException,
+    prepare_database, UpgradeDatabaseException,
 )
 from synapse.storage.engines import create_engine
 
@@ -381,19 +381,18 @@ def setup(config_options):
             "sql_mode": "TRADITIONAL",
             "charset": "utf8mb4",
             "use_unicode": True,
+            "collation": "utf8mb4_general_ci",
         })
     elif name == "sqlite3":
-        def open_fun(conn):
-            prepare_database(conn, database_engine)
         db_config.setdefault("args", {}).update({
             "cp_min": 1,
             "cp_max": 1,
-            "cp_openfun": open_fun,
         })
     else:
         raise RuntimeError("Unsupported database type '%s'" % (name,))
 
     database_engine = create_engine(name)
+    db_config["args"]["cp_openfun"] = database_engine.on_new_connection
 
     hs = SynapseHomeServer(
         config.server_name,
@@ -424,10 +423,7 @@ def setup(config_options):
             }
         )
 
-        if name == "sqlite3":
-            prepare_sqlite3_database(db_conn)
-
-        prepare_database(db_conn, database_engine)
+        database_engine.prepare_database(db_conn)
 
         db_conn.commit()
     except UpgradeDatabaseException:

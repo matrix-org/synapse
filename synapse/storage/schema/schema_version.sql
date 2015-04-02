@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS schema_version(
 
 CREATE TABLE IF NOT EXISTS applied_schema_deltas(
     `version` INTEGER NOT NULL,
-    `file` VARCHAR(255) NOT NULL,
+    `file` VARCHAR(150) NOT NULL,
     UNIQUE(version, file)
 );
 

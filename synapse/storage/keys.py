@@ -57,15 +57,18 @@ class KeyStore(SQLBaseStore):
             OpenSSL.crypto.FILETYPE_ASN1, tls_certificate
         )
         fingerprint = hashlib.sha256(tls_certificate_bytes).hexdigest()
-        return self._simple_insert(
+        return self._simple_upsert(
             table="server_tls_certificates",
-            values={
+            keyvalues={
                 "server_name": server_name,
                 "fingerprint": fingerprint,
+            },
+            values={
                 "from_server": from_server,
                 "ts_added_ms": time_now_ms,
                 "tls_certificate": buffer(tls_certificate_bytes),
             },
+            desc="store_server_certificate",
         )
 
     @defer.inlineCallbacks
@@ -106,13 +109,16 @@ class KeyStore(SQLBaseStore):
             ts_now_ms (int): The time now in milliseconds
             verification_key (VerifyKey): The NACL verify key.
         """
-        return self._simple_insert(
+        return self._simple_upsert(
             table="server_signature_keys",
-            values={
+            keyvalues={
                 "server_name": server_name,
                 "key_id": "%s:%s" % (verify_key.alg, verify_key.version),
+            },
+            values={
                 "from_server": from_server,
                 "ts_added_ms": time_now_ms,
                 "verify_key": buffer(verify_key.encode()),
             },
+            desc="store_server_verify_key",
         )

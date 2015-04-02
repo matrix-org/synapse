@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 CREATE TABLE IF NOT EXISTS users(
-    name VARCHAR(255),
-    password_hash VARCHAR(255),
+    name VARCHAR(150),
+    password_hash VARCHAR(150),
     creation_ts BIGINT,
     admin BOOL DEFAULT 0 NOT NULL,
     UNIQUE(name)
@@ -22,19 +22,19 @@ CREATE TABLE IF NOT EXISTS users(
 
 CREATE TABLE IF NOT EXISTS access_tokens(
     id BIGINT PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL,
-    device_id VARCHAR(255),
-    token VARCHAR(255) NOT NULL,
+    user_id VARCHAR(150) NOT NULL,
+    device_id VARCHAR(150),
+    token VARCHAR(150) NOT NULL,
     last_used BIGINT,
     UNIQUE(token)
 ) ;
 
 CREATE TABLE IF NOT EXISTS user_ips (
-    user VARCHAR(255) NOT NULL,
-    access_token VARCHAR(255) NOT NULL,
-    device_id VARCHAR(255),
-    ip VARCHAR(255) NOT NULL,
-    user_agent VARCHAR(255) NOT NULL,
+    user VARCHAR(150) NOT NULL,
+    access_token VARCHAR(150) NOT NULL,
+    device_id VARCHAR(150),
+    ip VARCHAR(150) NOT NULL,
+    user_agent VARCHAR(150) NOT NULL,
     last_seen BIGINT NOT NULL,
     UNIQUE (user, access_token, ip, user_agent)
 ) ;

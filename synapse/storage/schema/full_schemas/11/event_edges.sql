@@ -14,8 +14,8 @@
  */
 
 CREATE TABLE IF NOT EXISTS event_forward_extremities(
-    event_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
     UNIQUE (event_id, room_id)
 ) ;
 
@@ -24,8 +24,8 @@ CREATE INDEX IF NOT EXISTS ev_extrem_id ON event_forward_extremities(event_id);
 
 
 CREATE TABLE IF NOT EXISTS event_backward_extremities(
-    event_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
     UNIQUE (event_id, room_id)
 ) ;
 
@@ -34,9 +34,9 @@ CREATE INDEX IF NOT EXISTS ev_b_extrem_id ON event_backward_extremities(event_id
 
 
 CREATE TABLE IF NOT EXISTS event_edges(
-    event_id VARCHAR(255) NOT NULL,
-    prev_event_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    prev_event_id VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
     is_state BOOL NOT NULL,
     UNIQUE (event_id, prev_event_id, room_id, is_state)
 ) ;
@@ -46,7 +46,7 @@ CREATE INDEX IF NOT EXISTS ev_edges_prev_id ON event_edges(prev_event_id);
 
 
 CREATE TABLE IF NOT EXISTS room_depth(
-    room_id VARCHAR(255) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
     min_depth INTEGER NOT NULL,
     UNIQUE (room_id)
 ) ;
@@ -55,8 +55,8 @@ CREATE INDEX IF NOT EXISTS room_depth_room ON room_depth(room_id);
 
 
 create TABLE IF NOT EXISTS event_destinations(
-    event_id VARCHAR(255) NOT NULL,
-    destination VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    destination VARCHAR(150) NOT NULL,
     delivered_ts BIGINT DEFAULT 0, -- or 0 if not delivered
     UNIQUE (event_id, destination)
 ) ;
@@ -65,10 +65,10 @@ CREATE INDEX IF NOT EXISTS event_destinations_id ON event_destinations(event_id)
 
 
 CREATE TABLE IF NOT EXISTS state_forward_extremities(
-    event_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
-    type VARCHAR(255) NOT NULL,
-    state_key VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
+    type VARCHAR(150) NOT NULL,
+    state_key VARCHAR(150) NOT NULL,
     UNIQUE (event_id, room_id)
 ) ;
 
@@ -79,9 +79,9 @@ CREATE INDEX IF NOT EXISTS st_extrem_id ON state_forward_extremities(event_id);
 
 
 CREATE TABLE IF NOT EXISTS event_auth(
-    event_id VARCHAR(255) NOT NULL,
-    auth_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    auth_id VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
     UNIQUE (event_id, auth_id, room_id)
 ) ;
 

@@ -15,10 +15,10 @@
 
 CREATE TABLE IF NOT EXISTS application_services(
     id BIGINT PRIMARY KEY,
-    url VARCHAR(255),
-    token VARCHAR(255),
-    hs_token VARCHAR(255),
-    sender VARCHAR(255),
+    url VARCHAR(150),
+    token VARCHAR(150),
+    hs_token VARCHAR(150),
+    sender VARCHAR(150),
     UNIQUE(token)
 ) ;
 
@@ -26,6 +26,6 @@ CREATE TABLE IF NOT EXISTS application_services_regex(
     id BIGINT PRIMARY KEY,
     as_id BIGINT NOT NULL,
     namespace INTEGER,  /* enum[room_id|room_alias|user_id] */
-    regex VARCHAR(255),
+    regex VARCHAR(150),
     FOREIGN KEY(as_id) REFERENCES application_services(id)
 ) ;

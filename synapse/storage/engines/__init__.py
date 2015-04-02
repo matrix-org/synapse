@@ -16,6 +16,8 @@
 from .maria import MariaEngine
 from .sqlite3 import Sqlite3Engine
 
+import importlib
+
 
 SUPPORTED_MODULE = {
     "sqlite3": Sqlite3Engine,
@@ -27,7 +29,7 @@ def create_engine(name):
     engine_class = SUPPORTED_MODULE.get(name, None)
 
     if engine_class:
-        module = __import__(name)
+        module = importlib.import_module(name)
         return engine_class(module)
 
     raise RuntimeError(

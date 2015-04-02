@@ -142,19 +142,23 @@ class LoggingTransaction(object):
 
         sql = self.database_engine.convert_param_style(sql)
 
-        try:
-            if args and args[0]:
-                values = args[0]
+        if args and args[0]:
+            args = list(args)
+            args[0] = [
+                self.database_engine.encode_parameter(a) for a in args[0]
+            ]
+            try:
                 sql_logger.debug(
-                    "[SQL values] {%s} " + ", ".join(("<%r>",) * len(values)),
+                    "[SQL values] {%s} " + ", ".join(("<%r>",) * len(args[0])),
                     self.name,
-                    *values
+                    *args[0]
                 )
-        except:
-            # Don't let logging failures stop SQL from working
-            pass
+            except:
+                # Don't let logging failures stop SQL from working
+                pass
 
         start = time.time() * 1000
+
         try:
             return self.txn.execute(
                 sql, *args, **kwargs
@@ -761,8 +765,6 @@ class SQLBaseStore(object):
             return None
 
         internal_metadata, js, redacted, rejected_reason = res
-        js = js.decode("utf8")
-        internal_metadata = internal_metadata.decode("utf8")
 
         start_time = update_counter("select_event", start_time)
 

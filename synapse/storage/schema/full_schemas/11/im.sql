@@ -16,9 +16,9 @@
 CREATE TABLE IF NOT EXISTS events(
     stream_ordering BIGINT PRIMARY KEY,
     topological_ordering BIGINT NOT NULL,
-    event_id VARCHAR(255) NOT NULL,
-    type VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    type VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
     content BLOB NOT NULL,
     unrecognized_keys BLOB,
     processed BOOL NOT NULL,
@@ -33,8 +33,8 @@ CREATE INDEX IF NOT EXISTS events_room_id ON events (room_id);
 
 
 CREATE TABLE IF NOT EXISTS event_json(
-    event_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
     internal_metadata BLOB NOT NULL,
     json BLOB NOT NULL,
     UNIQUE (event_id)
@@ -44,11 +44,11 @@ CREATE INDEX IF NOT EXISTS event_json_room_id ON event_json(room_id);
 
 
 CREATE TABLE IF NOT EXISTS state_events(
-    event_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
-    type VARCHAR(255) NOT NULL,
-    state_key VARCHAR(255) NOT NULL,
-    prev_state VARCHAR(255),
+    event_id VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
+    type VARCHAR(150) NOT NULL,
+    state_key VARCHAR(150) NOT NULL,
+    prev_state VARCHAR(150),
     UNIQUE (event_id)
 ) ;
 
@@ -58,10 +58,10 @@ CREATE INDEX IF NOT EXISTS state_events_state_key ON state_events (state_key);
 
 
 CREATE TABLE IF NOT EXISTS current_state_events(
-    event_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
-    type VARCHAR(255) NOT NULL,
-    state_key VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
+    type VARCHAR(150) NOT NULL,
+    state_key VARCHAR(150) NOT NULL,
     UNIQUE (event_id),
     UNIQUE (room_id, type, state_key)
 ) ;
@@ -71,11 +71,11 @@ CREATE INDEX IF NOT EXISTS current_state_events_type ON current_state_events (ty
 CREATE INDEX IF NOT EXISTS current_state_events_state_key ON current_state_events (state_key);
 
 CREATE TABLE IF NOT EXISTS room_memberships(
-    event_id VARCHAR(255) NOT NULL,
-    user_id VARCHAR(255) NOT NULL,
-    sender VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
-    membership VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    user_id VARCHAR(150) NOT NULL,
+    sender VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
+    membership VARCHAR(150) NOT NULL,
     UNIQUE (event_id)
 ) ;
 
@@ -83,41 +83,41 @@ CREATE INDEX IF NOT EXISTS room_memberships_room_id ON room_memberships (room_id
 CREATE INDEX IF NOT EXISTS room_memberships_user_id ON room_memberships (user_id);
 
 CREATE TABLE IF NOT EXISTS feedback(
-    event_id VARCHAR(255) NOT NULL,
-    feedback_type VARCHAR(255),
-    target_event_id VARCHAR(255),
-    sender VARCHAR(255),
-    room_id VARCHAR(255),
+    event_id VARCHAR(150) NOT NULL,
+    feedback_type VARCHAR(150),
+    target_event_id VARCHAR(150),
+    sender VARCHAR(150),
+    room_id VARCHAR(150),
     UNIQUE (event_id)
 ) ;
 
 CREATE TABLE IF NOT EXISTS topics(
-    event_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
-    topic VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
+    topic VARCHAR(150) NOT NULL,
     UNIQUE (event_id)
 ) ;
 
 CREATE INDEX IF NOT EXISTS topics_room_id ON topics(room_id);
 
 CREATE TABLE IF NOT EXISTS room_names(
-    event_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
-    name VARCHAR(255) NOT NULL,
+    event_id VARCHAR(150) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
+    name VARCHAR(150) NOT NULL,
     UNIQUE (event_id)
 );
 
 CREATE INDEX IF NOT EXISTS room_names_room_id ON room_names(room_id);
 
 CREATE TABLE IF NOT EXISTS rooms(
-    room_id VARCHAR(255) PRIMARY KEY NOT NULL,
+    room_id VARCHAR(150) PRIMARY KEY NOT NULL,
     is_public BOOL,
-    creator VARCHAR(255)
+    creator VARCHAR(150)
 ) ;
 
 CREATE TABLE IF NOT EXISTS room_hosts(
-    room_id VARCHAR(255) NOT NULL,
-    host VARCHAR(255) NOT NULL,
+    room_id VARCHAR(150) NOT NULL,
+    host VARCHAR(150) NOT NULL,
     UNIQUE (room_id, host)
 ) ;
 

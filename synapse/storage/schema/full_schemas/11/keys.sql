@@ -13,18 +13,18 @@
  * limitations under the License.
  */
 CREATE TABLE IF NOT EXISTS server_tls_certificates(
-  server_name VARCHAR(255), -- Server name.
-  fingerprint VARCHAR(255), -- Certificate fingerprint.
-  from_server VARCHAR(255), -- Which key server the certificate was fetched from.
+  server_name VARCHAR(150), -- Server name.
+  fingerprint VARCHAR(150), -- Certificate fingerprint.
+  from_server VARCHAR(150), -- Which key server the certificate was fetched from.
   ts_added_ms BIGINT, -- When the certifcate was added.
   tls_certificate BLOB, -- DER encoded x509 certificate.
   UNIQUE (server_name, fingerprint)
 ) ;
 
 CREATE TABLE IF NOT EXISTS server_signature_keys(
-  server_name VARCHAR(255), -- Server name.
-  key_id VARCHAR(255), -- Key version.
-  from_server VARCHAR(255), -- Which key server the key was fetched form.
+  server_name VARCHAR(150), -- Server name.
+  key_id VARCHAR(150), -- Key version.
+  from_server VARCHAR(150), -- Which key server the key was fetched form.
   ts_added_ms BIGINT, -- When the key was added.
   verify_key BLOB, -- NACL verification key.
   UNIQUE (server_name, key_id)

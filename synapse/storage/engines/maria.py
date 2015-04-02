@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.storage import prepare_database
 
 import types
 
@@ -28,3 +29,14 @@ class MariaEngine(object):
         if isinstance(param, types.BufferType):
             return str(param)
         return param
+
+    def on_new_connection(self, db_conn):
+        pass
+
+    def prepare_database(self, db_conn):
+        cur = db_conn.cursor()
+        cur.execute(
+            "ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"
+        )
+        db_conn.commit()
+        prepare_database(db_conn, self)

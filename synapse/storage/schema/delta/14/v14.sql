@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS push_rules_enable (
   id BIGINT PRIMARY KEY,
-  user_name VARCHAR(255) NOT NULL,
-  rule_id VARCHAR(255) NOT NULL,
+  user_name VARCHAR(150) NOT NULL,
+  rule_id VARCHAR(150) NOT NULL,
   enabled TINYINT,
   UNIQUE(user_name, rule_id)
 ) ;
