@@ -90,6 +90,7 @@ if (window.onAuthDone != undefined) {
 </html>
 """
 
+
 class AuthRestServlet(RestServlet):
     """
     Handles Client / Server API authentication in any situations where it
