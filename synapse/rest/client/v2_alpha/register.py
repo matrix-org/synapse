@@ -59,7 +59,13 @@ class RegisterRestServlet(RestServlet):
         is_using_shared_secret = False
         is_application_server = False
 
-        if 'mac' in body:
+        service = None
+        if 'access_token' in request.args:
+            service = yield self.auth.get_appservice_by_req(request)
+
+        if service:
+            is_application_server = True
+        elif 'mac' in body:
             # Check registration-specific shared secret auth
             if 'username' not in body:
                 raise SynapseError(400, "", Codes.MISSING_PARAM)
@@ -71,7 +77,6 @@ class RegisterRestServlet(RestServlet):
             authed, result = yield self.auth_handler.check_auth([
                 [LoginType.RECAPTCHA],
                 [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
-                [LoginType.APPLICATION_SERVICE]
             ], body, self.hs.get_ip_from_request(request))
 
             if not authed:
