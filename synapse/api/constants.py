@@ -60,9 +60,11 @@ class LoginType(object):
     EMAIL_IDENTITY = u"m.login.email.identity"
     RECAPTCHA = u"m.login.recaptcha"
     APPLICATION_SERVICE = u"m.login.application_service"
+
+    # Only for C/S API v1
     SHARED_SECRET = u"org.matrix.login.shared_secret"
 
-    HIDDEN_TYPES = [APPLICATION_SERVICE, SHARED_SECRET]
+    HIDDEN_TYPES = [APPLICATION_SERVICE]
 
 
 class EventTypes(object):

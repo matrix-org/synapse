@@ -22,6 +22,19 @@ from synapse.http.servlet import RestServlet
 from ._base import client_v2_pattern, parse_request_allow_empty
 
 import logging
+import hmac
+from hashlib import sha1
+from synapse.util.async import run_on_reactor
+
+
+# We ought to be using hmac.compare_digest() but on older pythons it doesn't
+# exist. It's a _really minor_ security flaw to use plain string comparison
+# because the timing attack is so obscured by all the other code here it's
+# unlikely to make much difference
+if hasattr(hmac, "compare_digest"):
+    compare_digest = hmac.compare_digest
+else:
+    compare_digest = lambda a, b: a == b
 
 
 logger = logging.getLogger(__name__)
@@ -39,19 +52,30 @@ class RegisterRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        yield run_on_reactor()
+
         body = parse_request_allow_empty(request)
 
-        authed, result = yield self.auth_handler.check_auth([
-            [LoginType.RECAPTCHA],
-            [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
-            [LoginType.APPLICATION_SERVICE]
-        ], body, self.hs.get_ip_from_request(request))
+        is_using_shared_secret = False
+        is_application_server = False
 
-        if not authed:
-            defer.returnValue((401, result))
+        if 'mac' in body:
+            # Check registration-specific shared secret auth
+            if 'username' not in body:
+                raise SynapseError(400, "", Codes.MISSING_PARAM)
+            self._check_shared_secret_auth(
+                body['username'], body['mac']
+            )
+            is_using_shared_secret = True
+        else:
+            authed, result = yield self.auth_handler.check_auth([
+                [LoginType.RECAPTCHA],
+                [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
+                [LoginType.APPLICATION_SERVICE]
+            ], body, self.hs.get_ip_from_request(request))
 
-        is_application_server = LoginType.APPLICATION_SERVICE in result
-        is_using_shared_secret = LoginType.SHARED_SECRET in result
+            if not authed:
+                defer.returnValue((401, result))
 
         can_register = (
             not self.hs.config.disable_registration
@@ -80,6 +104,29 @@ class RegisterRestServlet(RestServlet):
 
     def on_OPTIONS(self, _):
         return 200, {}
+
+    def _check_shared_secret_auth(self, username, mac):
+        if not self.hs.config.registration_shared_secret:
+            raise SynapseError(400, "Shared secret registration is not enabled")
+
+        user = username.encode("utf-8")
+
+        # str() because otherwise hmac complains that 'unicode' does not
+        # have the buffer interface
+        got_mac = str(mac)
+
+        want_mac = hmac.new(
+            key=self.hs.config.registration_shared_secret,
+            msg=user,
+            digestmod=sha1,
+        ).hexdigest()
+
+        if compare_digest(want_mac, got_mac):
+            return True
+        else:
+            raise SynapseError(
+                403, "HMAC incorrect",
+            )
 
 
 def register_servlets(hs, http_server):
