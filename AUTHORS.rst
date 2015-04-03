@@ -17,7 +17,7 @@ Paul "LeoNerd" Evans <paul at matrix.org>
  * HS core
  * Presence
  * Typing Notifications
- * Caching layer
+ * Performance metrics and caching layer
 
 Dave Baker <dave at matrix.org>
  * Push notifications
