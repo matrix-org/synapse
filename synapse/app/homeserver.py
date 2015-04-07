@@ -64,7 +64,7 @@ import sqlite3
 import yaml
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("synapse.app.homeserver")
 
 
 class SynapseHomeServer(HomeServer):
