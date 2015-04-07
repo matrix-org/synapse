@@ -33,8 +33,8 @@ for port in 8080 8081 8082; do
         --manhole $((port + 1000)) \
         --tls-dh-params-path "demo/demo.tls.dh" \
         --media-store-path "demo/media_store.$port" \
-		$PARAMS $SYNAPSE_PARAMS \
-		--enable-registration
+        $PARAMS $SYNAPSE_PARAMS \
+        --enable-registration
 
     python -m synapse.app.homeserver \
         --config-path "demo/etc/$port.config" \

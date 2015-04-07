@@ -40,7 +40,7 @@ class RegistrationConfig(Config):
 
         reg_group.add_argument(
             "--enable-registration",
-            const=False,
+            const=True,
             default=False,
             nargs='?',
             help="Enable registration for new users.",
