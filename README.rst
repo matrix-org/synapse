@@ -129,7 +129,8 @@ To set up your homeserver, run (in your virtualenv, as before)::
 Substituting your host and domain name as appropriate.
 
 By default, registration of new users is disabled. You can either enable
-registration in the config (it is then recommended to also set up CAPTCHA), or
+registration in the config by specifying ``enable_registration: true``
+(it is then recommended to also set up CAPTCHA), or
 you can use the command line to register new users::
 
     $ source ~/.synapse/bin/activate

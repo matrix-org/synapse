@@ -199,6 +199,19 @@ class ApplicationServiceTestCase(unittest.TestCase):
             aliases_for_event=["#xmpp_barfoo:matrix.org"]
         ))
 
+    def test_interested_in_self(self):
+        # make sure invites get through
+        self.service.sender = "@appservice:name"
+        self.service.namespaces[ApplicationService.NS_USERS].append(
+            _regex("@irc_.*")
+        )
+        self.event.type = "m.room.member"
+        self.event.content = {
+            "membership": "invite"
+        }
+        self.event.state_key = self.service.sender
+        self.assertTrue(self.service.is_interested(self.event))
+
     def test_member_list_match(self):
         self.service.namespaces[ApplicationService.NS_USERS].append(
             _regex("@irc_.*")

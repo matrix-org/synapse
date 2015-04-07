@@ -24,12 +24,13 @@ from .email import EmailConfig
 from .voip import VoipConfig
 from .registration import RegistrationConfig
 from .metrics import MetricsConfig
+from .appservice import AppServiceConfig
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
                        EmailConfig, VoipConfig, RegistrationConfig,
-                       MetricsConfig,):
+                       MetricsConfig, AppServiceConfig,):
     pass
 
 

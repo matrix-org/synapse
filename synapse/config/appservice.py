@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,3 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from ._base import Config
+
+
+class AppServiceConfig(Config):
+
+    def __init__(self, args):
+        super(AppServiceConfig, self).__init__(args)
+        self.app_service_config_files = args.app_service_config_files
+
+    @classmethod
+    def add_arguments(cls, parser):
+        super(AppServiceConfig, cls).add_arguments(parser)
+        group = parser.add_argument_group("appservice")
+        group.add_argument(
+            "--app-service-config-files", type=str, nargs='+',
+            help="A list of application service config files to use."
+        )
