@@ -486,7 +486,7 @@ class Auth(object):
             send_level = send_level_event.content.get("events", {}).get(
                 event.type
             )
-            if not send_level:
+            if send_level is None:
                 if hasattr(event, "state_key"):
                     send_level = send_level_event.content.get(
                         "state_default", 50
