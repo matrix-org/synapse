@@ -442,8 +442,6 @@ def prepare_sqlite3_database(db_conn):
     new. This only affects sqlite databases since they were the only ones
     supported at the time.
     """
-    import sqlite3
-
     with db_conn:
         schema_path = os.path.join(
             dir_path, "schema", "schema_version.sql",
@@ -462,10 +460,7 @@ def prepare_sqlite3_database(db_conn):
 
             if row and row[0]:
                 db_conn.execute(
-                    _convert_param_style(
-                        "REPLACE INTO schema_version (version, upgraded)"
-                        " VALUES (?,?)",
-                        sqlite3
-                    ),
+                    "REPLACE INTO schema_version (version, upgraded)"
+                    " VALUES (?,?)",
                     (row[0], False)
                 )
