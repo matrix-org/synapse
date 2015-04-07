@@ -32,3 +32,6 @@ class Sqlite3Engine(object):
     def prepare_database(self, db_conn):
         prepare_sqlite3_database(db_conn)
         prepare_database(db_conn, self)
+
+    def is_deadlock(self, error):
+        return False

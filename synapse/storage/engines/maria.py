@@ -40,3 +40,8 @@ class MariaEngine(object):
         )
         db_conn.commit()
         prepare_database(db_conn, self)
+
+    def is_deadlock(self, error):
+        if isinstance(error, self.module.InternalError):
+            return error.sqlstate == 40001 and error.errno == 1213
+        return False

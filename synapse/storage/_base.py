@@ -160,9 +160,19 @@ class LoggingTransaction(object):
         start = time.time() * 1000
 
         try:
-            return self.txn.execute(
-                sql, *args, **kwargs
-            )
+            i = 0
+            N = 5
+            while True:
+                try:
+                    return self.txn.execute(
+                        sql, *args, **kwargs
+                    )
+                except self.database_engine.module.DatabaseError as e:
+                    if self.database_engine.is_deadlock(e) and i < N:
+                        i += 1
+                        logger.warn("[SQL DEADLOCK] {%s}", self.name)
+                        continue
+                    raise
         except Exception as e:
                 logger.debug("[SQL FAIL] {%s} %s", self.name, e)
                 raise
