@@ -39,10 +39,12 @@ class RegistrationStore(SQLBaseStore):
         Raises:
             StoreError if there was a problem adding this.
         """
-        yield self._simple_insert(
+        next_id = yield self._access_tokens_id_gen.get_next()
+
+        self._simple_insert(
             "access_tokens",
             {
-                "id": self.get_next_stream_id(),
+                "id": next_id,
                 "user_id": user_id,
                 "token": token
             },
@@ -68,6 +70,8 @@ class RegistrationStore(SQLBaseStore):
     def _register(self, txn, user_id, token, password_hash):
         now = int(self.clock.time())
 
+        next_id = self._access_tokens_id_gen.get_next_txn(txn)
+
         try:
             txn.execute("INSERT INTO users(name, password_hash, creation_ts) "
                         "VALUES (?,?,?)",
@@ -82,7 +86,7 @@ class RegistrationStore(SQLBaseStore):
         txn.execute(
             "INSERT INTO access_tokens(id, user_id, token)"
             " VALUES (?,?,?)",
-            (self.get_next_stream_id(), user_id, token,)
+            (next_id, user_id, token,)
         )
 
     @defer.inlineCallbacks

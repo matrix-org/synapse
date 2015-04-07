@@ -96,12 +96,16 @@ class EventsStore(SQLBaseStore):
         # Remove the any existing cache entries for the event_id
         self._get_event_cache.pop(event.event_id)
 
+        if stream_ordering is None:
+            stream_ordering = self._stream_id_gen.get_next_txn(txn)
+
         # We purposefully do this first since if we include a `current_state`
         # key, we *want* to update the `current_state_events` table
         if current_state:
-            txn.execute(
-                "DELETE FROM current_state_events WHERE room_id = ?",
-                (event.room_id,)
+            self._simple_delete_txn(
+                txn,
+                table="current_state_events",
+                keyvalues={"room_id": event.room_id},
             )
 
             for s in current_state:
@@ -239,9 +243,6 @@ class EventsStore(SQLBaseStore):
             "outlier": outlier,
             "depth": event.depth,
         }
-
-        if stream_ordering is None:
-            stream_ordering = self.get_next_stream_id()
 
         unrec = {
             k: v
