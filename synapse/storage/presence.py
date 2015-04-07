@@ -57,6 +57,7 @@ class PresenceStore(SQLBaseStore):
             values={"observed_user_id": observed_localpart,
                     "observer_user_id": observer_userid},
             desc="allow_presence_visible",
+            or_ignore=True,
         )
 
     def disallow_presence_visible(self, observed_localpart, observer_userid):

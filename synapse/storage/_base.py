@@ -393,7 +393,8 @@ class SQLBaseStore(object):
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
 
-    def _simple_insert(self, table, values, desc="_simple_insert"):
+    def _simple_insert(self, table, values, or_ignore=False,
+                       desc="_simple_insert"):
         """Executes an INSERT query on the named table.
 
         Args:
@@ -403,10 +404,11 @@ class SQLBaseStore(object):
         return self.runInteraction(
             desc,
             self._simple_insert_txn, table, values,
+            or_ignore=or_ignore
         )
 
     @log_function
-    def _simple_insert_txn(self, txn, table, values):
+    def _simple_insert_txn(self, txn, table, values, or_ignore=False):
         sql = "INSERT INTO %s (%s) VALUES(%s)" % (
             table,
             ", ".join(k for k in values),
@@ -418,8 +420,11 @@ class SQLBaseStore(object):
             sql, values.values(),
         )
 
-        txn.execute(sql, values.values())
-        return txn.lastrowid
+        try:
+            txn.execute(sql, values.values())
+        except self.database_engine.module.IntegrityError:
+            if not or_ignore:
+                raise
 
     def _simple_upsert(self, table, keyvalues, values, desc="_simple_upsert"):
         """
