@@ -837,11 +837,11 @@ class SQLBaseStore(object):
             return curr_time
 
         logger.debug("Got js: %r", js)
-        d = json.loads(js)
+        d = json.loads(str(js).decode("utf8"))
         start_time = update_counter("decode_json", start_time)
 
         logger.debug("Got internal_metadata: %r", internal_metadata)
-        internal_metadata = json.loads(internal_metadata)
+        internal_metadata = json.loads(str(internal_metadata).decode("utf8"))
         start_time = update_counter("decode_internal", start_time)
 
         ev = FrozenEvent(d, internal_metadata_dict=internal_metadata)

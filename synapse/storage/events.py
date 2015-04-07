@@ -179,7 +179,7 @@ class EventsStore(SQLBaseStore):
                 )
                 txn.execute(
                     sql,
-                    (metadata_json.decode("UTF-8"), event.event_id,)
+                    (buffer(metadata_json), event.event_id,)
                 )
 
                 sql = (
@@ -224,14 +224,14 @@ class EventsStore(SQLBaseStore):
             values={
                 "event_id": event.event_id,
                 "room_id": event.room_id,
-                "internal_metadata": metadata_json.decode("UTF-8"),
-                "json": encode_canonical_json(event_dict).decode("UTF-8"),
+                "internal_metadata": buffer(metadata_json),
+                "json": buffer(encode_canonical_json(event_dict)),
             },
         )
 
-        content = encode_canonical_json(
+        content = buffer(encode_canonical_json(
             event.content
-        ).decode("UTF-8")
+        ))
 
         vals = {
             "topological_ordering": event.depth,
@@ -256,9 +256,9 @@ class EventsStore(SQLBaseStore):
             ]
         }
 
-        vals["unrecognized_keys"] = encode_canonical_json(
+        vals["unrecognized_keys"] = buffer(encode_canonical_json(
             unrec
-        ).decode("UTF-8")
+        ))
 
         sql = (
             "INSERT INTO events"
