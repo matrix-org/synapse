@@ -375,4 +375,3 @@ class DestinationsTable(object):
         "retry_last_ts",
         "retry_interval",
     ]
-

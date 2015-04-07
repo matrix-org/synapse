@@ -105,7 +105,6 @@ class RegistrationStore(SQLBaseStore):
 
         defer.returnValue(user_info)
 
-
     @cached()
     # TODO(paul): Currently there's no code to invalidate this cache. That
     #   means if/when we ever add internal ways to invalidate access tokens or

@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
 from .appservice import ApplicationServiceStore
 from .directory import DirectoryStore
 from .events import EventsStore
@@ -42,8 +40,6 @@ import imp
 import logging
 import os
 import re
-
-import threading
 
 
 logger = logging.getLogger(__name__)

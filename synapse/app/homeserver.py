@@ -17,9 +17,7 @@
 import sys
 sys.dont_write_bytecode = True
 
-from synapse.storage import (
-    prepare_database, UpgradeDatabaseException,
-)
+from synapse.storage import UpgradeDatabaseException
 from synapse.storage.engines import create_engine
 
 from synapse.server import HomeServer
@@ -60,7 +58,6 @@ import os
 import re
 import resource
 import subprocess
-import sqlite3
 import yaml
 
 
@@ -322,7 +319,7 @@ def change_resource_limit(soft_file_no):
         resource.setrlimit(resource.RLIMIT_NOFILE, (soft_file_no, hard))
 
         logger.info("Set file limit to: %d", soft_file_no)
-    except (   ValueError, resource.error) as e:
+    except (ValueError, resource.error) as e:
         logger.warn("Failed to set file limit: %s", e)
 
 
