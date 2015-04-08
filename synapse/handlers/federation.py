@@ -442,7 +442,7 @@ class FederationHandler(BaseHandler):
             def log_failure(f):
                 logger.warn(
                     "Failed to notify about %s: %s",
-                    event.event_id, f.value
+                    new_event.event_id, f.value
                 )
 
             d.addErrback(log_failure)
