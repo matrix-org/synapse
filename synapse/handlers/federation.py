@@ -201,9 +201,17 @@ class FederationHandler(BaseHandler):
                 target_user = UserID.from_string(target_user_id)
                 extra_users.append(target_user)
 
-            yield self.notifier.on_new_room_event(
+            d = self.notifier.on_new_room_event(
                 event, extra_users=extra_users
             )
+
+            def log_failure(f):
+                logger.warn(
+                    "Failed to notify about %s: %s",
+                    event.event_id, f.value
+                )
+
+            d.addErrback(log_failure)
 
         if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
@@ -427,9 +435,17 @@ class FederationHandler(BaseHandler):
                 auth_events=auth_events,
             )
 
-            yield self.notifier.on_new_room_event(
+            d = self.notifier.on_new_room_event(
                 new_event, extra_users=[joinee]
             )
+
+            def log_failure(f):
+                logger.warn(
+                    "Failed to notify about %s: %s",
+                    new_event.event_id, f.value
+                )
+
+            d.addErrback(log_failure)
 
             logger.debug("Finished joining %s to %s", joinee, room_id)
         finally:
@@ -500,9 +516,17 @@ class FederationHandler(BaseHandler):
             target_user = UserID.from_string(target_user_id)
             extra_users.append(target_user)
 
-        yield self.notifier.on_new_room_event(
+        d = self.notifier.on_new_room_event(
             event, extra_users=extra_users
         )
+
+        def log_failure(f):
+            logger.warn(
+                "Failed to notify about %s: %s",
+                event.event_id, f.value
+            )
+
+        d.addErrback(log_failure)
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.JOIN:
@@ -574,9 +598,17 @@ class FederationHandler(BaseHandler):
         )
 
         target_user = UserID.from_string(event.state_key)
-        yield self.notifier.on_new_room_event(
+        d = self.notifier.on_new_room_event(
             event, extra_users=[target_user],
         )
+
+        def log_failure(f):
+            logger.warn(
+                "Failed to notify about %s: %s",
+                event.event_id, f.value
+            )
+
+        d.addErrback(log_failure)
 
         defer.returnValue(event)
 
