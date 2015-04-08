@@ -169,9 +169,7 @@ class Notifier(object):
         room_listeners = self.room_to_listeners.get(room_id, set())
 
         # Remove any 'stale' listeners.
-        for l in room_listeners.copy():
-            if l.notified():
-                room_listeners.discard(l)
+        _discard_if_notified(room_listeners)
 
         listeners = room_listeners.copy()
 
@@ -179,9 +177,7 @@ class Notifier(object):
             user_listeners = self.user_to_listeners.get(user, set())
 
             # Remove any 'stale' listeners.
-            for l in user_listeners.copy():
-                if l.notified():
-                    user_listeners.discard(l)
+            _discard_if_notified(user_listeners)
 
             listeners |= user_listeners
 
@@ -197,9 +193,7 @@ class Notifier(object):
                 )
 
                 # Remove any 'stale' listeners.
-                for l in app_listeners.copy():
-                    if l.notified():
-                        app_listeners.discard(l)
+                _discard_if_notified(app_listeners)
 
                 listeners |= app_listeners
 
@@ -255,9 +249,7 @@ class Notifier(object):
             user_listeners = self.user_to_listeners.get(user, set())
 
             # Remove any 'stale' listeners.
-            for l in user_listeners.copy():
-                if l.notified():
-                    user_listeners.discard(l)
+            _discard_if_notified(user_listeners)
 
             listeners |= user_listeners
 
@@ -265,9 +257,7 @@ class Notifier(object):
             room_listeners = self.room_to_listeners.get(room, set())
 
             # Remove any 'stale' listeners.
-            for l in room_listeners.copy():
-                if l.notified():
-                    room_listeners.discard(l)
+            _discard_if_notified(room_listeners)
 
             listeners |= room_listeners
 
@@ -470,3 +460,12 @@ class Notifier(object):
 
         for l in new_listeners:
             l.rooms.add(room_id)
+
+
+def _discard_if_notified(listener_set):
+    to_discard = set()
+    for l in listener_set:
+        if l.notified():
+            to_discard.add(l)
+
+    listener_set -= to_discard
