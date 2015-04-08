@@ -168,7 +168,6 @@ class Notifier(object):
 
         room_listeners = self.room_to_listeners.get(room_id, set())
 
-        # Remove any 'stale' listeners.
         _discard_if_notified(room_listeners)
 
         listeners = room_listeners.copy()
@@ -176,7 +175,6 @@ class Notifier(object):
         for user in extra_users:
             user_listeners = self.user_to_listeners.get(user, set())
 
-            # Remove any 'stale' listeners.
             _discard_if_notified(user_listeners)
 
             listeners |= user_listeners
@@ -192,7 +190,6 @@ class Notifier(object):
                     appservice, set()
                 )
 
-                # Remove any 'stale' listeners.
                 _discard_if_notified(app_listeners)
 
                 listeners |= app_listeners
@@ -248,7 +245,6 @@ class Notifier(object):
         for user in users:
             user_listeners = self.user_to_listeners.get(user, set())
 
-            # Remove any 'stale' listeners.
             _discard_if_notified(user_listeners)
 
             listeners |= user_listeners
@@ -256,7 +252,6 @@ class Notifier(object):
         for room in rooms:
             room_listeners = self.room_to_listeners.get(room, set())
 
-            # Remove any 'stale' listeners.
             _discard_if_notified(room_listeners)
 
             listeners |= room_listeners
@@ -463,6 +458,8 @@ class Notifier(object):
 
 
 def _discard_if_notified(listener_set):
+    """Remove any 'stale' listeners from the given set.
+    """
     to_discard = set()
     for l in listener_set:
         if l.notified():
