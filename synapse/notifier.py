@@ -252,10 +252,24 @@ class Notifier(object):
         listeners = set()
 
         for user in users:
-            listeners |= self.user_to_listeners.get(user, set()).copy()
+            user_listeners = self.user_to_listeners.get(user, set())
+
+            # Remove any 'stale' listeners.
+            for l in user_listeners.copy():
+                if l.notified():
+                    user_listeners.discard(l)
+
+            listeners |= user_listeners
 
         for room in rooms:
-            listeners |= self.room_to_listeners.get(room, set()).copy()
+            room_listeners = self.room_to_listeners.get(room, set())
+
+            # Remove any 'stale' listeners.
+            for l in room_listeners.copy():
+                if l.notified():
+                    room_listeners.discard(l)
+
+            listeners |= room_listeners
 
         @defer.inlineCallbacks
         def notify(listener):
