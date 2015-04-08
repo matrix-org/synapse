@@ -349,7 +349,7 @@ and port where the server is running.  (At the current time synapse does not
 support clustering multiple servers into a single logical homeserver).  The DNS
 record would then look something like::
 
-    $ dig -t srv _matrix._tcp.machine.my.domaine.name
+    $ dig -t srv _matrix._tcp.machine.my.domain.name
     _matrix._tcp    IN      SRV     10 0 8448 machine.my.domain.name.
 
 
