@@ -427,3 +427,6 @@ class Notifier(object):
 
         listeners = self.room_to_listeners.setdefault(room_id, set())
         listeners |= new_listeners
+
+        for l in new_listeners:
+            l.rooms.add(room_id)
