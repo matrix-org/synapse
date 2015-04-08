@@ -182,22 +182,12 @@ class LoggingTransaction(object):
         start = time.time() * 1000
 
         try:
-            i = 0
-            N = 5
-            while True:
-                try:
-                    return self.txn.execute(
-                        sql, *args, **kwargs
-                    )
-                except self.database_engine.module.DatabaseError as e:
-                    if self.database_engine.is_deadlock(e) and i < N:
-                        i += 1
-                        logger.warn("[SQL DEADLOCK] {%s}", self.name)
-                        continue
-                    raise
+            return self.txn.execute(
+                sql, *args, **kwargs
+            )
         except Exception as e:
-                logger.debug("[SQL FAIL] {%s} %s", self.name, e)
-                raise
+            logger.debug("[SQL FAIL] {%s} %s", self.name, e)
+            raise
         finally:
             msecs = (time.time() * 1000) - start
             sql_logger.debug("[SQL time] {%s} %f", self.name, msecs)
@@ -347,7 +337,7 @@ class SQLBaseStore(object):
 
         start_time = time.time() * 1000
 
-        def inner_func(txn, *args, **kwargs):
+        def inner_func(conn, *args, **kwargs):
             with LoggingContext("runInteraction") as context:
                 current_context.copy_to(context)
                 start = time.time() * 1000
@@ -362,10 +352,24 @@ class SQLBaseStore(object):
                 sql_scheduling_timer.inc_by(time.time() * 1000 - start_time)
                 transaction_logger.debug("[TXN START] {%s}", name)
                 try:
-                    return func(
-                        LoggingTransaction(txn, name, self.database_engine),
-                        *args, **kwargs
-                    )
+                    i = 0
+                    N = 5
+                    while True:
+                        try:
+                            txn = conn.cursor()
+                            return func(
+                                LoggingTransaction(txn, name, self.database_engine),
+                                *args, **kwargs
+                            )
+                        except self.database_engine.module.DatabaseError as e:
+                            logger.warn("[TXN DEADLOCK] {%s} %r, %r", name, e.errno, e.sqlstate)
+                            if self.database_engine.is_deadlock(e):
+                                logger.warn("[TXN DEADLOCK] {%s} %d/%d", name, i, N)
+                                if i < N:
+                                    i += 1
+                                    conn.rollback()
+                                    continue
+                            raise
                 except Exception as e:
                     logger.debug("[TXN FAIL] {%s}", name, e)
                     raise
@@ -380,7 +384,7 @@ class SQLBaseStore(object):
                     sql_txn_timer.inc_by(duration, desc)
 
         with PreserveLoggingContext():
-            result = yield self._db_pool.runInteraction(
+            result = yield self._db_pool.runWithConnection(
                 inner_func, *args, **kwargs
             )
         defer.returnValue(result)
