@@ -413,12 +413,10 @@ class StreamStore(SQLBaseStore):
             "get_recent_events_for_room", get_recent_events_for_room_txn
         )
 
-    @cached(num_args=0)
+    @defer.inlineCallbacks
     def get_room_events_max_id(self):
-        return self.runInteraction(
-            "get_room_events_max_id",
-            self._get_room_events_max_id_txn
-        )
+        token = yield self._stream_id_gen.get_max_token(self)
+        defer.returnValue("s%d" % (token,))
 
     @defer.inlineCallbacks
     def _get_min_token(self):
@@ -432,21 +430,6 @@ class StreamStore(SQLBaseStore):
         logger.debug("min_token is: %s", self.min_token)
 
         defer.returnValue(self.min_token)
-
-    def _get_room_events_max_id_txn(self, txn):
-        txn.execute(
-            "SELECT MAX(stream_ordering) as m FROM events"
-        )
-
-        res = self.cursor_to_dict(txn)
-
-        logger.debug("get_room_events_max_id: %s", res)
-
-        if not res or not res[0] or not res[0]["m"]:
-            return "s0"
-
-        key = res[0]["m"]
-        return "s%d" % (key,)
 
     @staticmethod
     def _set_before_and_after(events, rows):

@@ -52,7 +52,6 @@ class EventsStore(SQLBaseStore):
                 is_new_state=is_new_state,
                 current_state=current_state,
             )
-            self.get_room_events_max_id.invalidate()
         except _RollbackButIsFineException:
             pass
 
@@ -97,7 +96,13 @@ class EventsStore(SQLBaseStore):
         self._get_event_cache.pop(event.event_id)
 
         if stream_ordering is None:
-            stream_ordering = self._stream_id_gen.get_next_txn(txn)
+            with self._stream_id_gen.get_next_txn(txn) as stream_ordering:
+                return self._persist_event_txn(
+                    txn, event, context, backfilled,
+                    stream_ordering=stream_ordering,
+                    is_new_state=is_new_state,
+                    current_state=current_state,
+                )
 
         # We purposefully do this first since if we include a `current_state`
         # key, we *want* to update the `current_state_events` table
