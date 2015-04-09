@@ -59,8 +59,8 @@ class _NotificationListener(object):
         self.limit = limit
         self.timeout = timeout
         self.deferred = deferred
-
         self.rooms = rooms
+        self.timer = None
 
     def notified(self):
         return self.deferred.called
@@ -92,6 +92,13 @@ class _NotificationListener(object):
             notifier.appservice_to_listeners.get(
                 self.appservice, set()
             ).discard(self)
+
+        # Cancel the timeout for this notifer if one exists.
+        if self.timer is not None:
+            try:
+                notifier.clock.cancel_call_later(self.timer)
+            except:
+                logger.exception("Failed to cancel notifier timer")
 
 
 class Notifier(object):
@@ -325,14 +332,20 @@ class Notifier(object):
             self._register_with_keys(listener[0])
 
         result = yield callback()
+        timer = [None]
+
         if timeout:
             timed_out = [False]
 
             def _timeout_listener():
                 timed_out[0] = True
+                timer[0] = None
                 listener[0].notify(self, [], from_token, from_token)
 
-            self.clock.call_later(timeout/1000., _timeout_listener)
+            # We create multiple notification listeners so we have to manage
+            # canceling the timeout ourselves.
+            timer[0] = self.clock.call_later(timeout/1000., _timeout_listener)
+
             while not result and not timed_out[0]:
                 yield deferred
                 deferred = defer.Deferred()
@@ -346,6 +359,12 @@ class Notifier(object):
                 )
                 self._register_with_keys(listener[0])
                 result = yield callback()
+
+        if timer[0] is not None:
+            try:
+                self.clock.cancel_call_later(timer[0])
+            except:
+                logger.exception("Failed to cancel notifer timer")
 
         defer.returnValue(result)
 
@@ -400,8 +419,11 @@ class Notifier(object):
         if not timeout:
             _timeout_listener()
         else:
-            self.clock.call_later(timeout/1000.0, _timeout_listener)
-
+            # Only add the timer if the listener hasn't been notified
+            if not listener.notified():
+                listener.timer = self.clock.call_later(
+                    timeout/1000.0, _timeout_listener
+                )
         return
 
     @log_function
