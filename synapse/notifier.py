@@ -404,6 +404,7 @@ class Notifier(object):
         def _timeout_listener():
             # TODO (erikj): We should probably set to_token to the current
             # max rather than reusing from_token.
+            # Remove the timer from the listener so we don't try to cancel it.
             listener.timer = None
             listener.notify(
                 self,
