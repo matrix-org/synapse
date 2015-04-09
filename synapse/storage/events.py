@@ -93,7 +93,7 @@ class EventsStore(SQLBaseStore):
                            current_state=None):
 
         # Remove the any existing cache entries for the event_id
-        self._get_event_cache.pop(event.event_id)
+        self._invalidate_get_event_cache(event.event_id)
 
         if stream_ordering is None:
             with self._stream_id_gen.get_next_txn(txn) as stream_ordering:
@@ -356,7 +356,7 @@ class EventsStore(SQLBaseStore):
 
     def _store_redaction(self, txn, event):
         # invalidate the cache for the redacted event
-        self._get_event_cache.pop(event.redacts)
+        self._invalidate_get_event_cache(event.redacts)
         txn.execute(
             "INSERT INTO redactions (event_id, redacts) VALUES (?,?)",
             (event.event_id, event.redacts)
