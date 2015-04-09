@@ -17,4 +17,4 @@ CREATE TABLE IF NOT EXISTS profiles(
     displayname VARCHAR(150),
     avatar_url VARCHAR(150),
     UNIQUE(user_id)
-) ;
+);

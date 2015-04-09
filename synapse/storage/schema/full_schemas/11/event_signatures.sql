@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS event_content_hashes (
     algorithm VARCHAR(150),
     hash BLOB,
     UNIQUE (event_id, algorithm)
-) ;
+);
 
 CREATE INDEX IF NOT EXISTS event_content_hashes_id ON event_content_hashes(event_id);
 
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS event_reference_hashes (
     algorithm VARCHAR(150),
     hash BLOB,
     UNIQUE (event_id, algorithm)
-) ;
+);
 
 CREATE INDEX IF NOT EXISTS event_reference_hashes_id ON event_reference_hashes(event_id);
 
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS event_signatures (
     key_id VARCHAR(150),
     signature BLOB,
     UNIQUE (event_id, signature_name, key_id)
-) ;
+);
 
 CREATE INDEX IF NOT EXISTS event_signatures_id ON event_signatures(event_id);
 
@@ -50,6 +50,6 @@ CREATE TABLE IF NOT EXISTS event_edge_hashes(
     algorithm VARCHAR(150),
     hash BLOB,
     UNIQUE (event_id, prev_event_id, algorithm)
-) ;
+);
 
 CREATE INDEX IF NOT EXISTS event_edge_hashes_id ON event_edge_hashes(event_id);

@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS users(
     creation_ts BIGINT,
     admin BOOL DEFAULT 0 NOT NULL,
     UNIQUE(name)
-) ;
+);
 
 CREATE TABLE IF NOT EXISTS access_tokens(
     id BIGINT PRIMARY KEY,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS access_tokens(
     token VARCHAR(150) NOT NULL,
     last_used BIGINT,
     UNIQUE(token)
-) ;
+);
 
 CREATE TABLE IF NOT EXISTS user_ips (
     user VARCHAR(150) NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS user_ips (
     ip VARCHAR(150) NOT NULL,
     user_agent VARCHAR(150) NOT NULL,
     last_seen BIGINT NOT NULL
-) ;
+);
 
 CREATE INDEX IF NOT EXISTS user_ips_user ON user_ips(user);
 CREATE INDEX IF NOT EXISTS user_ips_user_ip ON user_ips(user, access_token, ip);

@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS state_groups(
     id VARCHAR(20) PRIMARY KEY,
     room_id VARCHAR(150) NOT NULL,
     event_id VARCHAR(150) NOT NULL
-) ;
+);
 
 CREATE TABLE IF NOT EXISTS state_groups_state(
     state_group VARCHAR(20) NOT NULL,
@@ -25,13 +25,13 @@ CREATE TABLE IF NOT EXISTS state_groups_state(
     type VARCHAR(150) NOT NULL,
     state_key VARCHAR(150) NOT NULL,
     event_id VARCHAR(150) NOT NULL
-) ;
+);
 
 CREATE TABLE IF NOT EXISTS event_to_state_groups(
     event_id VARCHAR(150) NOT NULL,
     state_group VARCHAR(150) NOT NULL,
     UNIQUE (event_id)
-) ;
+);
 
 CREATE INDEX IF NOT EXISTS state_groups_id ON state_groups(id);
 

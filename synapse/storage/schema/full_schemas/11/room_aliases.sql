@@ -17,9 +17,9 @@ CREATE TABLE IF NOT EXISTS room_aliases(
     room_alias VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
     UNIQUE (room_alias)
-) ;
+);
 
 CREATE TABLE IF NOT EXISTS room_alias_servers(
     room_alias VARCHAR(150) NOT NULL,
     server VARCHAR(150) NOT NULL
-) ;
+);

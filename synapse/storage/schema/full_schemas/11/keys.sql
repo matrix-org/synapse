@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS server_tls_certificates(
   ts_added_ms BIGINT, -- When the certifcate was added.
   tls_certificate BLOB, -- DER encoded x509 certificate.
   UNIQUE (server_name, fingerprint)
-) ;
+);
 
 CREATE TABLE IF NOT EXISTS server_signature_keys(
   server_name VARCHAR(150), -- Server name.
@@ -28,4 +28,4 @@ CREATE TABLE IF NOT EXISTS server_signature_keys(
   ts_added_ms BIGINT, -- When the key was added.
   verify_key BLOB, -- NACL verification key.
   UNIQUE (server_name, key_id)
-) ;
+);
