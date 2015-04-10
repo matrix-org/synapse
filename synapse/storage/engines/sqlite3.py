@@ -15,6 +15,8 @@
 
 from synapse.storage import prepare_database, prepare_sqlite3_database
 
+import types
+
 
 class Sqlite3Engine(object):
     def __init__(self, database_module):
@@ -35,3 +37,8 @@ class Sqlite3Engine(object):
 
     def is_deadlock(self, error):
         return False
+
+    def load_unicode(self, v):
+        if isinstance(v, types.UnicodeType):
+            return v
+        return bytes(v).decode("UTF8")

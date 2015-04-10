@@ -812,6 +812,9 @@ class SQLBaseStore(object):
 
         internal_metadata, js, redacted, rejected_reason = res
 
+        internal_metadata = self.database_engine.load_unicode(internal_metadata)
+        js = self.database_engine.load_unicode(js)
+
         start_time = update_counter("select_event", start_time)
 
         result = self._get_event_from_row_txn(
@@ -839,11 +842,11 @@ class SQLBaseStore(object):
             return curr_time
 
         logger.debug("Got js: %r", js)
-        d = json.loads(str(js).decode("utf8"))
+        d = json.loads(js)
         start_time = update_counter("decode_json", start_time)
 
         logger.debug("Got internal_metadata: %r", internal_metadata)
-        internal_metadata = json.loads(str(internal_metadata).decode("utf8"))
+        internal_metadata = json.loads(internal_metadata)
         start_time = update_counter("decode_internal", start_time)
 
         ev = FrozenEvent(

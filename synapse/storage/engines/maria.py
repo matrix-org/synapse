@@ -27,7 +27,7 @@ class MariaEngine(object):
 
     def encode_parameter(self, param):
         if isinstance(param, types.BufferType):
-            return str(param)
+            return bytes(param)
         return param
 
     def on_new_connection(self, db_conn):
@@ -45,3 +45,6 @@ class MariaEngine(object):
         if isinstance(error, self.module.DatabaseError):
             return error.sqlstate == "40001" and error.errno == 1213
         return False
+
+    def load_unicode(self, v):
+        return bytes(v).decode("UTF8")

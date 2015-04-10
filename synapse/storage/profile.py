@@ -36,7 +36,7 @@ class ProfileStore(SQLBaseStore):
         )
 
         if name:
-            name = name.decode("utf8")
+            name = self.database_engine.load_unicode(name)
 
         defer.returnValue(name)
 

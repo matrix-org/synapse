@@ -99,7 +99,9 @@ class RegistrationStore(SQLBaseStore):
         )
 
         if user_info:
-            user_info["password_hash"] = user_info["password_hash"].decode("utf8")
+            user_info["password_hash"] = self.database_engine.load_unicode(
+                user_info["password_hash"]
+            )
 
         defer.returnValue(user_info)
 
