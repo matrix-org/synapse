@@ -15,6 +15,5 @@
 CREATE TABLE IF NOT EXISTS profiles(
     user_id VARCHAR(150) NOT NULL,
     displayname VARCHAR(150),
-    avatar_url VARCHAR(150),
-    UNIQUE(user_id)
+    avatar_url VARCHAR(150)
 );

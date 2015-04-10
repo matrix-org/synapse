@@ -14,7 +14,7 @@
  */
 
 CREATE TABLE IF NOT EXISTS events(
-    stream_ordering BIGINT PRIMARY KEY AUTOINCREMENT,
+    stream_ordering BIGINT PRIMARY KEY,
     topological_ordering BIGINT NOT NULL,
     event_id VARCHAR(150) NOT NULL,
     type VARCHAR(150) NOT NULL,
@@ -62,10 +62,10 @@ CREATE TABLE IF NOT EXISTS current_state_events(
     room_id VARCHAR(150) NOT NULL,
     type VARCHAR(150) NOT NULL,
     state_key VARCHAR(150) NOT NULL,
+    UNIQUE (event_id),
     UNIQUE (room_id, type, state_key)
 );
 
-CREATE INDEX IF NOT EXISTS curr_events_event_id ON current_state_events (event_id);
 CREATE INDEX IF NOT EXISTS current_state_events_room_id ON current_state_events (room_id);
 CREATE INDEX IF NOT EXISTS current_state_events_type ON current_state_events (type);
 CREATE INDEX IF NOT EXISTS current_state_events_state_key ON current_state_events (state_key);
@@ -75,10 +75,10 @@ CREATE TABLE IF NOT EXISTS room_memberships(
     user_id VARCHAR(150) NOT NULL,
     sender VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
-    membership VARCHAR(150) NOT NULL
+    membership VARCHAR(150) NOT NULL,
+    UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS room_memberships_event_id ON room_memberships (event_id);
 CREATE INDEX IF NOT EXISTS room_memberships_room_id ON room_memberships (room_id);
 CREATE INDEX IF NOT EXISTS room_memberships_user_id ON room_memberships (user_id);
 
@@ -87,25 +87,26 @@ CREATE TABLE IF NOT EXISTS feedback(
     feedback_type VARCHAR(150),
     target_event_id VARCHAR(150),
     sender VARCHAR(150),
-    room_id VARCHAR(150)
+    room_id VARCHAR(150),
+    UNIQUE (event_id)
 );
 
 CREATE TABLE IF NOT EXISTS topics(
     event_id VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
-    topic VARCHAR(150) NOT NULL
+    topic VARCHAR(150) NOT NULL,
+    UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS topics_event_id ON topics(event_id);
 CREATE INDEX IF NOT EXISTS topics_room_id ON topics(room_id);
 
 CREATE TABLE IF NOT EXISTS room_names(
     event_id VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
-    name VARCHAR(150) NOT NULL
+    name VARCHAR(150) NOT NULL,
+    UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS room_names_event_id ON room_names(event_id);
 CREATE INDEX IF NOT EXISTS room_names_room_id ON room_names(room_id);
 
 CREATE TABLE IF NOT EXISTS rooms(

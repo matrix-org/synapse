@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 CREATE TABLE IF NOT EXISTS users(
-    id BIGINT PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(150),
     password_hash VARCHAR(150),
     creation_ts BIGINT,
@@ -36,8 +35,8 @@ CREATE TABLE IF NOT EXISTS user_ips (
     device_id VARCHAR(150),
     ip VARCHAR(150) NOT NULL,
     user_agent VARCHAR(150) NOT NULL,
-    last_seen BIGINT NOT NULL,
-    UNIQUE (user, access_token, ip, user_agent)
+    last_seen BIGINT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS user_ips_user ON user_ips(user);
+CREATE INDEX IF NOT EXISTS user_ips_user_ip ON user_ips(user, access_token, ip);

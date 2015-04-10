@@ -49,10 +49,10 @@ CREATE TABLE IF NOT EXISTS transaction_id_to_pdu(
     transaction_id INTEGER,
     destination VARCHAR(150),
     pdu_id VARCHAR(150),
-    pdu_origin VARCHAR(150)
+    pdu_origin VARCHAR(150),
+    UNIQUE (transaction_id, destination)
 );
 
-CREATE INDEX IF NOT EXISTS transaction_id_to_pdu_tx ON transaction_id_to_pdu(transaction_id, destination)
 CREATE INDEX IF NOT EXISTS transaction_id_to_pdu_dest ON transaction_id_to_pdu(destination);
 
 -- To track destination health

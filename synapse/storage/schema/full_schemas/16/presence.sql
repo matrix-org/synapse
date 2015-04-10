@@ -16,14 +16,16 @@ CREATE TABLE IF NOT EXISTS presence(
   user_id VARCHAR(150) NOT NULL,
   state VARCHAR(20),
   status_msg VARCHAR(150),
-  mtime BIGINT -- miliseconds since last state change
+  mtime BIGINT, -- miliseconds since last state change
+  UNIQUE (user_id)
 );
 
 -- For each of /my/ users which possibly-remote users are allowed to see their
 -- presence state
 CREATE TABLE IF NOT EXISTS presence_allow_inbound(
   observed_user_id VARCHAR(150) NOT NULL,
-  observer_user_id VARCHAR(150) NOT NULL -- a UserID,
+  observer_user_id VARCHAR(150) NOT NULL, -- a UserID,
+  UNIQUE (observed_user_id, observer_user_id)
 );
 
 -- For each of /my/ users (watcher), which possibly-remote users are they
@@ -31,5 +33,6 @@ CREATE TABLE IF NOT EXISTS presence_allow_inbound(
 CREATE TABLE IF NOT EXISTS presence_list(
   user_id VARCHAR(150) NOT NULL,
   observed_user_id VARCHAR(150) NOT NULL, -- a UserID,
-  accepted BOOLEAN NOT NULL
+  accepted BOOLEAN NOT NULL,
+  UNIQUE (user_id, observed_user_id)
 );

@@ -12,13 +12,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-CREATE TABLE IF NOT EXISTS room_aliases(
-    room_alias VARCHAR(150) NOT NULL,
-    room_id VARCHAR(150) NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS room_alias_servers(
-    room_alias VARCHAR(150) NOT NULL,
-    server VARCHAR(150) NOT NULL
+CREATE TABLE IF NOT EXISTS profiles(
+    user_id VARCHAR(150) NOT NULL,
+    displayname VARCHAR(150),
+    avatar_url VARCHAR(150),
+    UNIQUE(user_id)
 );
