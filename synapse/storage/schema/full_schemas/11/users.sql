@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 CREATE TABLE IF NOT EXISTS users(
-    id BIGINT PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(150),
     password_hash VARCHAR(150),
     creation_ts BIGINT,
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users(
 );
 
 CREATE TABLE IF NOT EXISTS access_tokens(
-    id BIGINT PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id VARCHAR(150) NOT NULL,
     device_id VARCHAR(150),
     token VARCHAR(150) NOT NULL,

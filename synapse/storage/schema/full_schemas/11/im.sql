@@ -14,7 +14,7 @@
  */
 
 CREATE TABLE IF NOT EXISTS events(
-    stream_ordering BIGINT PRIMARY KEY AUTOINCREMENT,
+    stream_ordering INTEGER PRIMARY KEY AUTOINCREMENT,
     topological_ordering BIGINT NOT NULL,
     event_id VARCHAR(150) NOT NULL,
     type VARCHAR(150) NOT NULL,
