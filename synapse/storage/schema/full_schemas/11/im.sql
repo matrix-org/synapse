@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS events(
     event_id VARCHAR(150) NOT NULL,
     type VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
-    content BLOB NOT NULL,
-    unrecognized_keys BLOB,
+    content LONGBLOB NOT NULL,
+    unrecognized_keys LONGBLOB,
     processed BOOL NOT NULL,
     outlier BOOL NOT NULL,
     depth BIGINT UNSIGNED DEFAULT 0 NOT NULL,
@@ -35,8 +35,8 @@ CREATE INDEX IF NOT EXISTS events_room_id ON events (room_id);
 CREATE TABLE IF NOT EXISTS event_json(
     event_id VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
-    internal_metadata BLOB NOT NULL,
-    json BLOB NOT NULL,
+    internal_metadata LONGBLOB NOT NULL,
+    json LONGBLOB NOT NULL,
     UNIQUE (event_id)
 );
 
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS feedback(
 CREATE TABLE IF NOT EXISTS topics(
     event_id VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
-    topic VARCHAR(150) NOT NULL
+    topic TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS topics_event_id ON topics(event_id);
@@ -102,7 +102,7 @@ CREATE INDEX IF NOT EXISTS topics_room_id ON topics(room_id);
 CREATE TABLE IF NOT EXISTS room_names(
     event_id VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
-    name VARCHAR(150) NOT NULL
+    name TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS room_names_event_id ON room_names(event_id);

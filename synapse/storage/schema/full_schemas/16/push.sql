@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS pushers (
   pushkey VARBINARY(512) NOT NULL,
   ts BIGINT UNSIGNED NOT NULL,
   lang VARCHAR(8),
-  data BLOB,
+  data LONGBLOB,
   last_token TEXT,
   last_success BIGINT UNSIGNED,
   failing_since BIGINT UNSIGNED,
@@ -55,7 +55,7 @@ CREATE INDEX IF NOT EXISTS push_rules_user_name on push_rules (user_name);
 CREATE TABLE IF NOT EXISTS user_filters(
   user_id VARCHAR(150),
   filter_id BIGINT UNSIGNED,
-  filter_json BLOB
+  filter_json LONGBLOB
 );
 
 CREATE INDEX IF NOT EXISTS user_filters_by_user_id_filter_id ON user_filters(

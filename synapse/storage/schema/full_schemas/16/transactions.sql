@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS received_transactions(
     origin VARCHAR(150),
     ts BIGINT UNSIGNED,
     response_code INTEGER,
-    response_json BLOB,
+    response_json LONGBLOB,
     has_been_referenced BOOL default 0, -- Whether thishas been referenced by a prev_tx
     UNIQUE (transaction_id, origin)
 );
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS sent_transactions(
     transaction_id VARCHAR(150),
     destination VARCHAR(150),
     response_code INTEGER DEFAULT 0,
-    response_json BLOB,
+    response_json LONGBLOB,
     ts BIGINT UNSIGNED
 );
 
