@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS presence(
   user_id VARCHAR(150) NOT NULL,
   state VARCHAR(20),
   status_msg VARCHAR(150),
-  mtime BIGINT -- miliseconds since last state change
+  mtime BIGINT UNSIGNED -- miliseconds since last state change
 );
 
 -- For each of /my/ users which possibly-remote users are allowed to see their

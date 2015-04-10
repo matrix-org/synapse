@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS users(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(150),
     password_hash VARCHAR(150),
-    creation_ts BIGINT,
+    creation_ts BIGINT UNSIGNED,
     admin BOOL DEFAULT 0 NOT NULL,
     UNIQUE(name)
 );
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS access_tokens(
     user_id VARCHAR(150) NOT NULL,
     device_id VARCHAR(150),
     token VARCHAR(150) NOT NULL,
-    last_used BIGINT,
+    last_used BIGINT UNSIGNED,
     UNIQUE(token)
 );
 
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS user_ips (
     device_id VARCHAR(150),
     ip VARCHAR(150) NOT NULL,
     user_agent VARCHAR(150) NOT NULL,
-    last_seen BIGINT NOT NULL,
+    last_seen BIGINT UNSIGNED NOT NULL,
     UNIQUE (user, access_token, ip, user_agent)
 );
 

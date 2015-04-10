@@ -15,7 +15,7 @@
 
 CREATE TABLE IF NOT EXISTS events(
     stream_ordering INTEGER PRIMARY KEY AUTOINCREMENT,
-    topological_ordering BIGINT NOT NULL,
+    topological_ordering BIGINT UNSIGNED NOT NULL,
     event_id VARCHAR(150) NOT NULL,
     type VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS events(
     unrecognized_keys BLOB,
     processed BOOL NOT NULL,
     outlier BOOL NOT NULL,
-    depth BIGINT DEFAULT 0 NOT NULL,
+    depth BIGINT UNSIGNED DEFAULT 0 NOT NULL,
     UNIQUE (event_id)
 );
 

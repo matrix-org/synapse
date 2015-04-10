@@ -57,7 +57,7 @@ CREATE INDEX IF NOT EXISTS room_depth_room ON room_depth(room_id);
 create TABLE IF NOT EXISTS event_destinations(
     event_id VARCHAR(150) NOT NULL,
     destination VARCHAR(150) NOT NULL,
-    delivered_ts BIGINT DEFAULT 0, -- or 0 if not delivered
+    delivered_ts BIGINT UNSIGNED DEFAULT 0, -- or 0 if not delivered
     UNIQUE (event_id, destination)
 );
 

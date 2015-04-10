@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS application_services(
 
 CREATE TABLE IF NOT EXISTS application_services_regex(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    as_id BIGINT NOT NULL,
+    as_id BIGINT UNSIGNED NOT NULL,
     namespace INTEGER,  /* enum[room_id|room_alias|user_id] */
     regex VARCHAR(150),
     FOREIGN KEY(as_id) REFERENCES application_services(id)

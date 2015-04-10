@@ -30,12 +30,12 @@ CREATE TABLE IF NOT EXISTS pushers (
   app_display_name VARCHAR(64) NOT NULL,
   device_display_name VARCHAR(128) NOT NULL,
   pushkey VARBINARY(512) NOT NULL,
-  ts BIGINT NOT NULL,
+  ts BIGINT UNSIGNED NOT NULL,
   lang VARCHAR(8),
   data BLOB,
   last_token TEXT,
-  last_success BIGINT,
-  failing_since BIGINT,
+  last_success BIGINT UNSIGNED,
+  failing_since BIGINT UNSIGNED,
   UNIQUE (app_id, pushkey)
 );
 
@@ -54,7 +54,7 @@ CREATE INDEX IF NOT EXISTS push_rules_user_name on push_rules (user_name);
 
 CREATE TABLE IF NOT EXISTS user_filters(
   user_id VARCHAR(150),
-  filter_id BIGINT,
+  filter_id BIGINT UNSIGNED,
   filter_json BLOB
 );
 

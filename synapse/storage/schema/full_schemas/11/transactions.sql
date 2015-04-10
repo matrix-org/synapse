@@ -16,7 +16,7 @@
 CREATE TABLE IF NOT EXISTS received_transactions(
     transaction_id VARCHAR(150),
     origin VARCHAR(150),
-    ts BIGINT,
+    ts BIGINT UNSIGNED,
     response_code INTEGER,
     response_json BLOB,
     has_been_referenced BOOL default 0, -- Whether thishas been referenced by a prev_tx
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS sent_transactions(
     destination VARCHAR(150),
     response_code INTEGER DEFAULT 0,
     response_json BLOB,
-    ts BIGINT
+    ts BIGINT UNSIGNED
 );
 
 CREATE INDEX IF NOT EXISTS sent_transaction_dest ON sent_transactions(destination);
@@ -58,6 +58,6 @@ CREATE INDEX IF NOT EXISTS transaction_id_to_pdu_dest ON transaction_id_to_pdu(d
 -- To track destination health
 CREATE TABLE IF NOT EXISTS destinations(
     destination VARCHAR(150) PRIMARY KEY,
-    retry_last_ts BIGINT,
+    retry_last_ts BIGINT UNSIGNED,
     retry_interval INTEGER
 );

@@ -1,11 +1,11 @@
 -- Convert `access_tokens`.user from rowids to user strings.
 -- MUST BE DONE BEFORE REMOVING ID COLUMN FROM USERS TABLE BELOW
 CREATE TABLE IF NOT EXISTS new_access_tokens(
-    id BIGINT PRIMARY KEY,
+    id BIGINT UNSIGNED PRIMARY KEY,
     user_id VARCHAR(150) NOT NULL,
     device_id VARCHAR(150),
     token VARCHAR(150) NOT NULL,
-    last_used BIGINT,
+    last_used BIGINT UNSIGNED,
     UNIQUE(token)
 );
 
@@ -22,7 +22,7 @@ ALTER TABLE new_access_tokens RENAME TO access_tokens;
 CREATE TABLE IF NOT EXISTS new_users(
     name VARCHAR(150),
     password_hash VARCHAR(150),
-    creation_ts BIGINT,
+    creation_ts BIGINT UNSIGNED,
     admin BOOL DEFAULT 0 NOT NULL,
     UNIQUE(name)
 );
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS new_user_ips (
     device_id VARCHAR(150),
     ip VARCHAR(150) NOT NULL,
     user_agent VARCHAR(150) NOT NULL,
-    last_seen BIGINT NOT NULL
+    last_seen BIGINT UNSIGNED NOT NULL
 );
 
 INSERT INTO new_user_ips
