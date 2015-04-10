@@ -29,7 +29,7 @@ CREATE INDEX IF NOT EXISTS transactions_have_ref ON received_transactions(origin
 -- Stores what transactions we've sent, what their response was (if we got one) and whether we have
 -- since referenced the transaction in another outgoing transaction
 CREATE TABLE IF NOT EXISTS sent_transactions(
-    id BIGINT PRIMARY KEY, -- This is used to apply insertion ordering
+    id BIGINT PRIMARY KEY AUTOINCREMENT, -- This is used to apply insertion ordering
     transaction_id VARCHAR(150),
     destination VARCHAR(150),
     response_code INTEGER DEFAULT 0,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS transaction_id_to_pdu(
     pdu_origin VARCHAR(150)
 );
 
-CREATE INDEX IF NOT EXISTS transaction_id_to_pdu_tx ON transaction_id_to_pdu(transaction_id, destination)
+CREATE INDEX IF NOT EXISTS transaction_id_to_pdu_tx ON transaction_id_to_pdu(transaction_id, destination);
 CREATE INDEX IF NOT EXISTS transaction_id_to_pdu_dest ON transaction_id_to_pdu(destination);
 
 -- To track destination health
