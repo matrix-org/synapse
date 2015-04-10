@@ -363,7 +363,6 @@ def setup(config_options):
 
     db_config = {
         k: v for k, v in db_config.items()
-        if not k.startswith("cp_")
     }
 
     name = db_config.get("name", None)
@@ -372,7 +371,7 @@ def setup(config_options):
             "sql_mode": "TRADITIONAL",
             "charset": "utf8mb4",
             "use_unicode": True,
-            "collation": "utf8mb4_general_ci",
+            "collation": "utf8mb4_bin",
         })
     elif name == "sqlite3":
         db_config.setdefault("args", {}).update({

@@ -36,7 +36,7 @@ class MariaEngine(object):
     def prepare_database(self, db_conn):
         cur = db_conn.cursor()
         cur.execute(
-            "ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"
+            "ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"
         )
         db_conn.commit()
         prepare_database(db_conn, self)
