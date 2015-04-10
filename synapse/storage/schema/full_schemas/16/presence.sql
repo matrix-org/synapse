@@ -36,3 +36,5 @@ CREATE TABLE IF NOT EXISTS presence_list(
   accepted BOOLEAN NOT NULL,
   UNIQUE (user_id, observed_user_id)
 );
+
+CREATE INDEX IF NOT EXISTS presence_list_user_id ON presence_list (user_id);
