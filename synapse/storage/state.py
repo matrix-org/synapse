@@ -93,7 +93,7 @@ class StateStore(SQLBaseStore):
 
         state_group = context.state_group
         if not state_group:
-            state_group = _make_group_id(self._clock)
+            state_group = self._state_groups_id_gen.get_next_txn(txn)
             self._simple_insert_txn(
                 txn,
                 table="state_groups",

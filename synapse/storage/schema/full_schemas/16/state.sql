@@ -14,7 +14,7 @@
  */
 
 CREATE TABLE IF NOT EXISTS state_groups(
-    id VARCHAR(20) PRIMARY KEY,
+    id BIGINT UNSIGNED PRIMARY KEY,
     room_id VARCHAR(150) NOT NULL,
     event_id VARCHAR(150) NOT NULL
 );
