@@ -19,6 +19,7 @@ from synapse.http.server import respond_with_json_bytes
 from syutil.crypto.jsonsign import sign_json
 from syutil.base64util import encode_base64
 from syutil.jsonutil import encode_canonical_json
+from hashlib import sha256
 from OpenSSL import crypto
 import logging
 
@@ -88,12 +89,17 @@ class LocalKey(Resource):
             crypto.FILETYPE_ASN1,
             self.config.tls_certificate
         )
+
+        sha256_fingerprint = sha256(x509_certificate_bytes).digest()
+
         json_object = {
-            u"expires": self.expires,
+            u"valid_until": self.expires,
             u"server_name": self.config.server_name,
             u"verify_keys": verify_keys,
             u"old_verify_keys": old_verify_keys,
-            u"tls_certificate": encode_base64(x509_certificate_bytes)
+            u"tls_fingerprints": [{
+                u"sha256": encode_base64(sha256_fingerprint),
+            }]
         }
         for key in self.config.signing_key:
             json_object = sign_json(
