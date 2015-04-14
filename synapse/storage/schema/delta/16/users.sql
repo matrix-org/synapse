@@ -36,7 +36,7 @@ ALTER TABLE new_users RENAME TO users;
 
 -- Remove UNIQUE constraint from `user_ips` table
 CREATE TABLE IF NOT EXISTS new_user_ips (
-    user VARCHAR(150) NOT NULL,
+    user_id VARCHAR(150) NOT NULL,
     access_token VARCHAR(150) NOT NULL,
     device_id VARCHAR(150),
     ip VARCHAR(150) NOT NULL,
@@ -51,6 +51,6 @@ DROP TABLE user_ips;
 
 ALTER TABLE new_user_ips RENAME TO user_ips;
 
-CREATE INDEX IF NOT EXISTS user_ips_user ON user_ips(user);
-CREATE INDEX IF NOT EXISTS user_ips_user_ip ON user_ips(user, access_token, ip);
+CREATE INDEX IF NOT EXISTS user_ips_user ON user_ips(user_id);
+CREATE INDEX IF NOT EXISTS user_ips_user_ip ON user_ips(user_id, access_token, ip);
 

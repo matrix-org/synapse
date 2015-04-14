@@ -107,7 +107,7 @@ class DataStore(RoomMemberStore, RoomStore,
         yield self._simple_upsert(
             "user_ips",
             keyvalues={
-                "user": user.to_string(),
+                "user_id": user.to_string(),
                 "access_token": access_token,
                 "ip": ip,
                 "user_agent": user_agent,
@@ -122,7 +122,7 @@ class DataStore(RoomMemberStore, RoomStore,
     def get_user_ip_and_agents(self, user):
         return self._simple_select_list(
             table="user_ips",
-            keyvalues={"user": user.to_string()},
+            keyvalues={"user_id": user.to_string()},
             retcols=[
                 "device_id", "access_token", "ip", "user_agent", "last_seen"
             ],
