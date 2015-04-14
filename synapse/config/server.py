@@ -23,6 +23,9 @@ class ServerConfig(Config):
         super(ServerConfig, self).__init__(args)
         self.server_name = args.server_name
         self.signing_key = self.read_signing_key(args.signing_key_path)
+        self.old_signing_keys = self.read_old_signing_keys(
+            args.old_signing_key_path
+        )
         self.bind_port = args.bind_port
         self.bind_host = args.bind_host
         self.unsecure_port = args.unsecure_port
@@ -31,6 +34,7 @@ class ServerConfig(Config):
         self.web_client = args.web_client
         self.manhole = args.manhole
         self.soft_file_limit = args.soft_file_limit
+        self.key_refresh_interval = args.key_refresh_interval
 
         if not args.content_addr:
             host = args.server_name
@@ -55,6 +59,14 @@ class ServerConfig(Config):
         )
         server_group.add_argument("--signing-key-path",
                                   help="The signing key to sign messages with")
+        server_group.add_argument("--old-signing-key-path",
+                                  help="The old signing keys")
+        server_group.add_argument("--key-refresh-interval",
+                                  default=24 * 60 * 60 * 1000, # 1 Day
+                                  help="How long a key response is valid for."
+                                       " Used to set the exipiry in /key/v2/."
+                                       " Controls how frequently servers will"
+                                       " query what keys are still valid")
         server_group.add_argument("-p", "--bind-port", metavar="PORT",
                                   type=int, help="https port to listen on",
                                   default=8448)
@@ -96,6 +108,19 @@ class ServerConfig(Config):
                 " Try running again with --generate-config"
             )
 
+    def read_old_signing_keys(self, old_signing_key_path):
+        old_signing_keys = self.read_file(
+            old_signing_key_path, "old_signing_key"
+        )
+        try:
+            return syutil.crypto.signing_key.read_old_signing_keys(
+                old_signing_keys.splitlines(True)
+            )
+        except Exception:
+            raise ConfigError(
+                "Error reading old signing keys."
+            )
+
     @classmethod
     def generate_config(cls, args, config_dir_path):
         super(ServerConfig, cls).generate_config(args, config_dir_path)
@@ -110,7 +135,7 @@ class ServerConfig(Config):
             with open(args.signing_key_path, "w") as signing_key_file:
                 syutil.crypto.signing_key.write_signing_keys(
                     signing_key_file,
-                    (syutil.crypto.signing_key.generate_singing_key("auto"),),
+                    (syutil.crypto.signing_key.generate_signing_key("auto"),),
                 )
         else:
             signing_keys = cls.read_file(args.signing_key_path, "signing_key")
@@ -126,3 +151,10 @@ class ServerConfig(Config):
                         signing_key_file,
                         (key,),
                     )
+
+        if not args.old_signing_key_path:
+            args.old_signing_key_path = base_key_name + ".old.signing.keys"
+
+        if not os.path.exists(args.old_signing_key_path):
+            with open(args.old_signing_key_path, "w") as old_signing_key_file:
+                pass
