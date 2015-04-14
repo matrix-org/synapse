@@ -55,9 +55,11 @@ class IdGenerator(object):
                 )
 
                 val, = txn.fetchone()
-                self._next_id = val or 2
+                cur = val or 0
+                cur += 1
+                self._next_id = cur + 1
 
-                return 1
+                return cur
 
 
 class StreamIdGenerator(object):
