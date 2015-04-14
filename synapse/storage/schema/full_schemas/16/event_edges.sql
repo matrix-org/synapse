@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS event_forward_extremities(
     UNIQUE (event_id, room_id)
 );
 
-CREATE INDEX IF NOT EXISTS ev_extrem_room ON event_forward_extremities(room_id);
-CREATE INDEX IF NOT EXISTS ev_extrem_id ON event_forward_extremities(event_id);
+CREATE INDEX ev_extrem_room ON event_forward_extremities(room_id);
+CREATE INDEX ev_extrem_id ON event_forward_extremities(event_id);
 
 
 CREATE TABLE IF NOT EXISTS event_backward_extremities(
@@ -29,8 +29,8 @@ CREATE TABLE IF NOT EXISTS event_backward_extremities(
     UNIQUE (event_id, room_id)
 );
 
-CREATE INDEX IF NOT EXISTS ev_b_extrem_room ON event_backward_extremities(room_id);
-CREATE INDEX IF NOT EXISTS ev_b_extrem_id ON event_backward_extremities(event_id);
+CREATE INDEX ev_b_extrem_room ON event_backward_extremities(room_id);
+CREATE INDEX ev_b_extrem_id ON event_backward_extremities(event_id);
 
 
 CREATE TABLE IF NOT EXISTS event_edges(
@@ -41,8 +41,8 @@ CREATE TABLE IF NOT EXISTS event_edges(
     UNIQUE (event_id, prev_event_id, room_id, is_state)
 );
 
-CREATE INDEX IF NOT EXISTS ev_edges_id ON event_edges(event_id);
-CREATE INDEX IF NOT EXISTS ev_edges_prev_id ON event_edges(prev_event_id);
+CREATE INDEX ev_edges_id ON event_edges(event_id);
+CREATE INDEX ev_edges_prev_id ON event_edges(prev_event_id);
 
 
 CREATE TABLE IF NOT EXISTS room_depth(
@@ -51,17 +51,17 @@ CREATE TABLE IF NOT EXISTS room_depth(
     UNIQUE (room_id)
 );
 
-CREATE INDEX IF NOT EXISTS room_depth_room ON room_depth(room_id);
+CREATE INDEX room_depth_room ON room_depth(room_id);
 
 
 create TABLE IF NOT EXISTS event_destinations(
     event_id VARCHAR(150) NOT NULL,
     destination VARCHAR(150) NOT NULL,
-    delivered_ts BIGINT UNSIGNED DEFAULT 0, -- or 0 if not delivered
+    delivered_ts BIGINT DEFAULT 0, -- or 0 if not delivered
     UNIQUE (event_id, destination)
 );
 
-CREATE INDEX IF NOT EXISTS event_destinations_id ON event_destinations(event_id);
+CREATE INDEX event_destinations_id ON event_destinations(event_id);
 
 
 CREATE TABLE IF NOT EXISTS state_forward_extremities(
@@ -72,10 +72,10 @@ CREATE TABLE IF NOT EXISTS state_forward_extremities(
     UNIQUE (event_id, room_id)
 );
 
-CREATE INDEX IF NOT EXISTS st_extrem_keys ON state_forward_extremities(
+CREATE INDEX st_extrem_keys ON state_forward_extremities(
     room_id, type, state_key
 );
-CREATE INDEX IF NOT EXISTS st_extrem_id ON state_forward_extremities(event_id);
+CREATE INDEX st_extrem_id ON state_forward_extremities(event_id);
 
 
 CREATE TABLE IF NOT EXISTS event_auth(
@@ -85,5 +85,5 @@ CREATE TABLE IF NOT EXISTS event_auth(
     UNIQUE (event_id, auth_id, room_id)
 );
 
-CREATE INDEX IF NOT EXISTS evauth_edges_id ON event_auth(event_id);
-CREATE INDEX IF NOT EXISTS evauth_edges_auth_id ON event_auth(auth_id);
+CREATE INDEX evauth_edges_id ON event_auth(event_id);
+CREATE INDEX evauth_edges_auth_id ON event_auth(auth_id);

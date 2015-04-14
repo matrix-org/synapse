@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS server_tls_certificates(
   server_name VARCHAR(150), -- Server name.
   fingerprint VARCHAR(150), -- Certificate fingerprint.
   from_server VARCHAR(150), -- Which key server the certificate was fetched from.
-  ts_added_ms BIGINT UNSIGNED, -- When the certifcate was added.
-  tls_certificate LONGBLOB, -- DER encoded x509 certificate.
+  ts_added_ms BIGINT, -- When the certifcate was added.
+  tls_certificate bytea, -- DER encoded x509 certificate.
   UNIQUE (server_name, fingerprint)
 );
 
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS server_signature_keys(
   server_name VARCHAR(150), -- Server name.
   key_id VARCHAR(150), -- Key version.
   from_server VARCHAR(150), -- Which key server the key was fetched form.
-  ts_added_ms BIGINT UNSIGNED, -- When the key was added.
-  verify_key LONGBLOB, -- NACL verification key.
+  ts_added_ms BIGINT, -- When the key was added.
+  verify_key bytea, -- NACL verification key.
   UNIQUE (server_name, key_id)
 );

@@ -236,7 +236,7 @@ def _setup_new_database(cur, database_engine):
 
     cur.execute(
         database_engine.convert_param_style(
-            "REPLACE INTO schema_version (version, upgraded)"
+            "INSERT INTO schema_version (version, upgraded)"
             " VALUES (?,?)"
         ),
         (max_current_ver, False,)
@@ -432,14 +432,11 @@ def executescript(txn, schema_path):
 
 
 def _get_or_create_schema_state(txn, database_engine):
-    try:
-        # Bluntly try creating the schema_version tables.
-        schema_path = os.path.join(
-            dir_path, "schema", "schema_version.sql",
-        )
-        executescript(txn, schema_path)
-    except:
-        pass
+    # Bluntly try creating the schema_version tables.
+    schema_path = os.path.join(
+        dir_path, "schema", "schema_version.sql",
+    )
+    executescript(txn, schema_path)
 
     txn.execute("SELECT version, upgraded FROM schema_version")
     row = txn.fetchone()

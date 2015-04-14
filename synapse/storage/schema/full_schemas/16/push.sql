@@ -22,52 +22,52 @@ CREATE TABLE IF NOT EXISTS rejections(
 
 -- Push notification endpoints that users have configured
 CREATE TABLE IF NOT EXISTS pushers (
-  id BIGINT UNSIGNED PRIMARY KEY,
+  id BIGINT PRIMARY KEY,
   user_name VARCHAR(150) NOT NULL,
   profile_tag VARCHAR(32) NOT NULL,
   kind VARCHAR(8) NOT NULL,
   app_id VARCHAR(64) NOT NULL,
   app_display_name VARCHAR(64) NOT NULL,
   device_display_name VARCHAR(128) NOT NULL,
-  pushkey VARBINARY(512) NOT NULL,
-  ts BIGINT UNSIGNED NOT NULL,
+  pushkey bytea NOT NULL,
+  ts BIGINT NOT NULL,
   lang VARCHAR(8),
-  data LONGBLOB,
+  data bytea,
   last_token TEXT,
-  last_success BIGINT UNSIGNED,
-  failing_since BIGINT UNSIGNED,
+  last_success BIGINT,
+  failing_since BIGINT,
   UNIQUE (app_id, pushkey)
 );
 
 CREATE TABLE IF NOT EXISTS push_rules (
-  id BIGINT UNSIGNED PRIMARY KEY,
+  id BIGINT PRIMARY KEY,
   user_name VARCHAR(150) NOT NULL,
   rule_id VARCHAR(150) NOT NULL,
-  priority_class TINYINT NOT NULL,
+  priority_class SMALLINT NOT NULL,
   priority INTEGER NOT NULL DEFAULT 0,
   conditions VARCHAR(150) NOT NULL,
   actions VARCHAR(150) NOT NULL,
   UNIQUE(user_name, rule_id)
 );
 
-CREATE INDEX IF NOT EXISTS push_rules_user_name on push_rules (user_name);
+CREATE INDEX push_rules_user_name on push_rules (user_name);
 
 CREATE TABLE IF NOT EXISTS user_filters(
   user_id VARCHAR(150),
-  filter_id BIGINT UNSIGNED,
-  filter_json LONGBLOB
+  filter_id BIGINT,
+  filter_json bytea
 );
 
-CREATE INDEX IF NOT EXISTS user_filters_by_user_id_filter_id ON user_filters(
+CREATE INDEX user_filters_by_user_id_filter_id ON user_filters(
     user_id, filter_id
 );
 
 CREATE TABLE IF NOT EXISTS push_rules_enable (
-  id BIGINT UNSIGNED PRIMARY KEY,
+  id BIGINT PRIMARY KEY,
   user_name VARCHAR(150) NOT NULL,
   rule_id VARCHAR(150) NOT NULL,
-  enabled TINYINT,
+  enabled SMALLINT,
   UNIQUE(user_name, rule_id)
 );
 
-CREATE INDEX IF NOT EXISTS push_rules_enable_user_name on push_rules_enable (user_name);
+CREATE INDEX push_rules_enable_user_name on push_rules_enable (user_name);

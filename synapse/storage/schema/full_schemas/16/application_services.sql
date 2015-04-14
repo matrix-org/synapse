@@ -14,7 +14,7 @@
  */
 
 CREATE TABLE IF NOT EXISTS application_services(
-    id BIGINT UNSIGNED PRIMARY KEY,
+    id BIGINT PRIMARY KEY,
     url VARCHAR(150),
     token VARCHAR(150),
     hs_token VARCHAR(150),
@@ -23,8 +23,8 @@ CREATE TABLE IF NOT EXISTS application_services(
 );
 
 CREATE TABLE IF NOT EXISTS application_services_regex(
-    id BIGINT UNSIGNED PRIMARY KEY,
-    as_id BIGINT UNSIGNED NOT NULL,
+    id BIGINT PRIMARY KEY,
+    as_id BIGINT NOT NULL,
     namespace INTEGER,  /* enum[room_id|room_alias|user_id] */
     regex VARCHAR(150),
     FOREIGN KEY(as_id) REFERENCES application_services(id)
@@ -39,10 +39,10 @@ CREATE TABLE IF NOT EXISTS application_services_state(
 CREATE TABLE IF NOT EXISTS application_services_txns(
     as_id VARCHAR(150) NOT NULL,
     txn_id INTEGER NOT NULL,
-    event_ids LONGBLOB NOT NULL,
+    event_ids bytea NOT NULL,
     UNIQUE(as_id, txn_id)
 );
 
-CREATE INDEX IF NOT EXISTS application_services_txns_id ON application_services_txns (
+CREATE INDEX application_services_txns_id ON application_services_txns (
     as_id
 );

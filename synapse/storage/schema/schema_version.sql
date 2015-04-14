@@ -14,16 +14,14 @@
  */
 
 CREATE TABLE IF NOT EXISTS schema_version(
-    `Lock` CHAR(1) NOT NULL DEFAULT 'X' UNIQUE,  -- Makes sure this table only has one row.
-    `version` INTEGER NOT NULL,
-    `upgraded` BOOL NOT NULL,  -- Whether we reached this version from an upgrade or an initial schema.
-    CHECK (`Lock`='X')
+    Lock CHAR(1) NOT NULL DEFAULT 'X' UNIQUE,  -- Makes sure this table only has one row.
+    version INTEGER NOT NULL,
+    upgraded BOOL NOT NULL,  -- Whether we reached this version from an upgrade or an initial schema.
+    CHECK (Lock='X')
 );
 
 CREATE TABLE IF NOT EXISTS applied_schema_deltas(
-    `version` INTEGER NOT NULL,
-    `file` VARCHAR(150) NOT NULL,
+    version INTEGER NOT NULL,
+    file VARCHAR(150) NOT NULL,
     UNIQUE(version, file)
 );
-
-CREATE INDEX IF NOT EXISTS schema_deltas_ver ON applied_schema_deltas(version);

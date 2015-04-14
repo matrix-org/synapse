@@ -14,33 +14,33 @@
  */
 
 CREATE TABLE IF NOT EXISTS events(
-    stream_ordering BIGINT UNSIGNED PRIMARY KEY,
-    topological_ordering BIGINT UNSIGNED NOT NULL,
+    stream_ordering BIGINT PRIMARY KEY,
+    topological_ordering BIGINT NOT NULL,
     event_id VARCHAR(150) NOT NULL,
     type VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
-    content LONGBLOB NOT NULL,
-    unrecognized_keys LONGBLOB,
+    content bytea NOT NULL,
+    unrecognized_keys bytea,
     processed BOOL NOT NULL,
     outlier BOOL NOT NULL,
-    depth BIGINT UNSIGNED DEFAULT 0 NOT NULL,
+    depth BIGINT DEFAULT 0 NOT NULL,
     UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS events_stream_ordering ON events (stream_ordering);
-CREATE INDEX IF NOT EXISTS events_topological_ordering ON events (topological_ordering);
-CREATE INDEX IF NOT EXISTS events_room_id ON events (room_id);
+CREATE INDEX events_stream_ordering ON events (stream_ordering);
+CREATE INDEX events_topological_ordering ON events (topological_ordering);
+CREATE INDEX events_room_id ON events (room_id);
 
 
 CREATE TABLE IF NOT EXISTS event_json(
     event_id VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
-    internal_metadata LONGBLOB NOT NULL,
-    json LONGBLOB NOT NULL,
+    internal_metadata bytea NOT NULL,
+    json bytea NOT NULL,
     UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS event_json_room_id ON event_json(room_id);
+CREATE INDEX event_json_room_id ON event_json(room_id);
 
 
 CREATE TABLE IF NOT EXISTS state_events(
@@ -52,9 +52,9 @@ CREATE TABLE IF NOT EXISTS state_events(
     UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS state_events_room_id ON state_events (room_id);
-CREATE INDEX IF NOT EXISTS state_events_type ON state_events (type);
-CREATE INDEX IF NOT EXISTS state_events_state_key ON state_events (state_key);
+CREATE INDEX state_events_room_id ON state_events (room_id);
+CREATE INDEX state_events_type ON state_events (type);
+CREATE INDEX state_events_state_key ON state_events (state_key);
 
 
 CREATE TABLE IF NOT EXISTS current_state_events(
@@ -66,9 +66,9 @@ CREATE TABLE IF NOT EXISTS current_state_events(
     UNIQUE (room_id, type, state_key)
 );
 
-CREATE INDEX IF NOT EXISTS current_state_events_room_id ON current_state_events (room_id);
-CREATE INDEX IF NOT EXISTS current_state_events_type ON current_state_events (type);
-CREATE INDEX IF NOT EXISTS current_state_events_state_key ON current_state_events (state_key);
+CREATE INDEX current_state_events_room_id ON current_state_events (room_id);
+CREATE INDEX current_state_events_type ON current_state_events (type);
+CREATE INDEX current_state_events_state_key ON current_state_events (state_key);
 
 CREATE TABLE IF NOT EXISTS room_memberships(
     event_id VARCHAR(150) NOT NULL,
@@ -79,8 +79,8 @@ CREATE TABLE IF NOT EXISTS room_memberships(
     UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS room_memberships_room_id ON room_memberships (room_id);
-CREATE INDEX IF NOT EXISTS room_memberships_user_id ON room_memberships (user_id);
+CREATE INDEX room_memberships_room_id ON room_memberships (room_id);
+CREATE INDEX room_memberships_user_id ON room_memberships (user_id);
 
 CREATE TABLE IF NOT EXISTS feedback(
     event_id VARCHAR(150) NOT NULL,
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS topics(
     UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS topics_room_id ON topics(room_id);
+CREATE INDEX topics_room_id ON topics(room_id);
 
 CREATE TABLE IF NOT EXISTS room_names(
     event_id VARCHAR(150) NOT NULL,
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS room_names(
     UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS room_names_room_id ON room_names(room_id);
+CREATE INDEX room_names_room_id ON room_names(room_id);
 
 CREATE TABLE IF NOT EXISTS rooms(
     room_id VARCHAR(150) PRIMARY KEY NOT NULL,
@@ -121,4 +121,4 @@ CREATE TABLE IF NOT EXISTS room_hosts(
     UNIQUE (room_id, host)
 );
 
-CREATE INDEX IF NOT EXISTS room_hosts_room_id ON room_hosts (room_id);
+CREATE INDEX room_hosts_room_id ON room_hosts (room_id);

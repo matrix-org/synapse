@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS presence(
   user_id VARCHAR(150) NOT NULL,
   state VARCHAR(20),
   status_msg VARCHAR(150),
-  mtime BIGINT UNSIGNED, -- miliseconds since last state change
+  mtime BIGINT, -- miliseconds since last state change
   UNIQUE (user_id)
 );
 
@@ -37,4 +37,4 @@ CREATE TABLE IF NOT EXISTS presence_list(
   UNIQUE (user_id, observed_user_id)
 );
 
-CREATE INDEX IF NOT EXISTS presence_list_user_id ON presence_list (user_id);
+CREATE INDEX presence_list_user_id ON presence_list (user_id);

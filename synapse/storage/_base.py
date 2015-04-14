@@ -330,7 +330,7 @@ class SQLBaseStore(object):
                                     continue
                             raise
                 except Exception as e:
-                    logger.debug("[TXN FAIL] {%s}", name, e)
+                    logger.debug("[TXN FAIL] {%s} %s", name, e)
                     raise
                 finally:
                     end = time.time() * 1000

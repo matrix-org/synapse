@@ -240,7 +240,7 @@ class StreamStore(SQLBaseStore):
 
         sql = (
             "SELECT e.event_id, e.stream_ordering FROM events AS e WHERE "
-            "(e.outlier = 0 AND (room_id IN (%(current)s)) OR "
+            "(e.outlier = ? AND (room_id IN (%(current)s)) OR "
             "(event_id IN (%(invites)s))) "
             "AND e.stream_ordering > ? AND e.stream_ordering <= ? "
             "ORDER BY stream_ordering ASC LIMIT %(limit)d "
@@ -251,7 +251,7 @@ class StreamStore(SQLBaseStore):
         }
 
         def f(txn):
-            txn.execute(sql, (user_id, user_id, from_id.stream, to_id.stream,))
+            txn.execute(sql, (False, user_id, user_id, from_id.stream, to_id.stream,))
 
             rows = self.cursor_to_dict(txn)
 
@@ -283,7 +283,7 @@ class StreamStore(SQLBaseStore):
         # Tokens really represent positions between elements, but we use
         # the convention of pointing to the event before the gap. Hence
         # we have a bit of asymmetry when it comes to equalities.
-        args = [room_id]
+        args = [False, room_id]
         if direction == 'b':
             order = "DESC"
             bounds = _StreamToken.parse(from_key).upper_bound()
@@ -307,7 +307,7 @@ class StreamStore(SQLBaseStore):
 
         sql = (
             "SELECT * FROM events"
-            " WHERE outlier = 0 AND room_id = ? AND %(bounds)s"
+            " WHERE outlier = ? AND room_id = ? AND %(bounds)s"
             " ORDER BY topological_ordering %(order)s,"
             " stream_ordering %(order)s %(limit)s"
         ) % {
@@ -358,7 +358,7 @@ class StreamStore(SQLBaseStore):
             sql = (
                 "SELECT stream_ordering, topological_ordering, event_id"
                 " FROM events"
-                " WHERE room_id = ? AND stream_ordering <= ? AND outlier = 0"
+                " WHERE room_id = ? AND stream_ordering <= ? AND outlier = ?"
                 " ORDER BY topological_ordering DESC, stream_ordering DESC"
                 " LIMIT ?"
             )
@@ -368,17 +368,17 @@ class StreamStore(SQLBaseStore):
                 "SELECT stream_ordering, topological_ordering, event_id"
                 " FROM events"
                 " WHERE room_id = ? AND stream_ordering > ?"
-                " AND stream_ordering <= ? AND outlier = 0"
+                " AND stream_ordering <= ? AND outlier = ?"
                 " ORDER BY topological_ordering DESC, stream_ordering DESC"
                 " LIMIT ?"
             )
 
         def get_recent_events_for_room_txn(txn):
             if from_token is None:
-                txn.execute(sql, (room_id, end_token.stream, limit,))
+                txn.execute(sql, (room_id, end_token.stream, False, limit,))
             else:
                 txn.execute(sql, (
-                    room_id, from_token.stream, end_token.stream, limit
+                    room_id, from_token.stream, end_token.stream, False, limit
                 ))
 
             rows = self.cursor_to_dict(txn)

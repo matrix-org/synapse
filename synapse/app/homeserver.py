@@ -373,6 +373,8 @@ def setup(config_options):
             "use_unicode": True,
             "collation": "utf8mb4_bin",
         })
+    elif name == "psycopg2":
+        pass
     elif name == "sqlite3":
         db_config.setdefault("args", {}).update({
             "cp_min": 1,

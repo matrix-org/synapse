@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from .maria import MariaEngine
+from .postgres import PostgresEngine
 from .sqlite3 import Sqlite3Engine
 
 import importlib
@@ -22,6 +23,7 @@ import importlib
 SUPPORTED_MODULE = {
     "sqlite3": Sqlite3Engine,
     "mysql.connector": MariaEngine,
+    "psycopg2": PostgresEngine,
 }
 
 
