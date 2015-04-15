@@ -272,6 +272,11 @@ class Auth(object):
                         403, "You cannot kick user %s." % target_user_id
                     )
         elif Membership.BAN == membership:
+            if not caller_in_room:  # caller isn't joined
+                raise AuthError(
+                    403,
+                    "%s not in room %s." % (event.user_id, event.room_id,)
+                )
             if user_level < ban_level:
                 raise AuthError(403, "You don't have permission to ban")
         else:
