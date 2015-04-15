@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS events(
 
 CREATE INDEX events_stream_ordering ON events (stream_ordering);
 CREATE INDEX events_topological_ordering ON events (topological_ordering);
+CREATE INDEX events_order ON events (topological_ordering, stream_ordering);
 CREATE INDEX events_room_id ON events (room_id);
 
 

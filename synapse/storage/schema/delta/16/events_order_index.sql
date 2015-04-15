@@ -1,0 +1,1 @@
+CREATE INDEX events_order ON events (topological_ordering, stream_ordering);
