@@ -184,7 +184,7 @@ class TransactionStore(SQLBaseStore):
             },
             updatevalues={
                 "response_code": code,
-                "response_json": response_json,
+                "response_json": None,  # For now, don't persist response_json
             }
         )
 
