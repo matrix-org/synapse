@@ -260,6 +260,7 @@ class SQLBaseStore(object):
         self._transaction_id_gen = IdGenerator("sent_transactions", "id", self)
         self._state_groups_id_gen = IdGenerator("state_groups", "id", self)
         self._access_tokens_id_gen = IdGenerator("access_tokens", "id", self)
+        self._pushers_id_gen = IdGenerator("pushers", "id", self)
 
     def start_profiling(self):
         self._previous_loop_ts = self._clock.time_msec()
@@ -423,20 +424,22 @@ class SQLBaseStore(object):
 
         txn.execute(sql, values.values())
 
-    def _simple_upsert(self, table, keyvalues, values, desc="_simple_upsert"):
+    def _simple_upsert(self, table, keyvalues, values,
+                       insertion_values={}, desc="_simple_upsert"):
         """
         Args:
             table (str): The table to upsert into
             keyvalues (dict): The unique key tables and their new values
             values (dict): The nonunique columns and their new values
+            insertion_values (dict): key/values to use when inserting
         Returns: A deferred
         """
         return self.runInteraction(
             desc,
-            self._simple_upsert_txn, table, keyvalues, values
+            self._simple_upsert_txn, table, keyvalues, values, insertion_values,
         )
 
-    def _simple_upsert_txn(self, txn, table, keyvalues, values):
+    def _simple_upsert_txn(self, txn, table, keyvalues, values, insertion_values={}):
         # Try to update
         sql = "UPDATE %s SET %s WHERE %s" % (
             table,
@@ -455,6 +458,7 @@ class SQLBaseStore(object):
             allvalues = {}
             allvalues.update(keyvalues)
             allvalues.update(values)
+            allvalues.update(insertion_values)
 
             sql = "INSERT INTO %s (%s) VALUES (%s)" % (
                 table,
