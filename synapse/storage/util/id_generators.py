@@ -97,9 +97,11 @@ class StreamIdGenerator(object):
 
         @contextlib.contextmanager
         def manager():
-            yield next_id
-            with self._lock:
-                self._unfinished_ids.remove(next_id)
+            try:
+                yield next_id
+            finally:
+                with self._lock:
+                    self._unfinished_ids.remove(next_id)
 
         return manager()
 
