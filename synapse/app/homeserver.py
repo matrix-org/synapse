@@ -366,14 +366,7 @@ def setup(config_options):
     }
 
     name = db_config.get("name", None)
-    if name in ["MySQLdb", "mysql.connector"]:
-        db_config.setdefault("args", {}).update({
-            "sql_mode": "TRADITIONAL",
-            "charset": "utf8mb4",
-            "use_unicode": True,
-            "collation": "utf8mb4_bin",
-        })
-    elif name == "psycopg2":
+    if name == "psycopg2":
         pass
     elif name == "sqlite3":
         db_config.setdefault("args", {}).update({

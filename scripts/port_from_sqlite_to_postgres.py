@@ -26,7 +26,7 @@ import types
 import yaml
 
 
-logger = logging.getLogger("port_to_maria")
+logger = logging.getLogger("port_from_sqlite_to_postgres")
 
 
 BINARY_COLUMNS = {
@@ -159,10 +159,10 @@ def chunks(n):
 
 
 @defer.inlineCallbacks
-def handle_table(table, sqlite_store, mysql_store):
+def handle_table(table, sqlite_store, postgres_store):
     if table in APPEND_ONLY_TABLES:
         # It's safe to just carry on inserting.
-        next_chunk = yield mysql_store._simple_select_one_onecol(
+        next_chunk = yield postgres_store._simple_select_one_onecol(
             table="port_from_sqlite3",
             keyvalues={"table_name": table},
             retcol="rowid",
@@ -170,7 +170,7 @@ def handle_table(table, sqlite_store, mysql_store):
         )
 
         if next_chunk is None:
-            yield mysql_store._simple_insert(
+            yield postgres_store._simple_insert(
                 table="port_from_sqlite3",
                 values={"table_name": table, "rowid": 0}
             )
@@ -183,13 +183,13 @@ def handle_table(table, sqlite_store, mysql_store):
                 (table,)
             )
             txn.execute("TRUNCATE %s CASCADE" % (table,))
-            mysql_store._simple_insert_txn(
+            postgres_store._simple_insert_txn(
                 txn,
                 table="port_from_sqlite3",
                 values={"table_name": table, "rowid": 0}
             )
 
-        yield mysql_store.runInteraction(
+        yield postgres_store.runInteraction(
             "delete_non_append_only", delete_all
         )
 
@@ -237,7 +237,7 @@ def handle_table(table, sqlite_store, mysql_store):
 
             for i, row in enumerate(rows):
                 rows[i] = tuple(
-                    mysql_store.database_engine.encode_parameter(
+                    postgres_store.database_engine.encode_parameter(
                         conv(j, col)
                     )
                     for j, col in enumerate(row)
@@ -245,16 +245,16 @@ def handle_table(table, sqlite_store, mysql_store):
                 )
 
             def ins(txn):
-                mysql_store.insert_many_txn(txn, table, headers[1:], rows)
+                postgres_store.insert_many_txn(txn, table, headers[1:], rows)
 
-                mysql_store._simple_update_one_txn(
+                postgres_store._simple_update_one_txn(
                     txn,
                     table="port_from_sqlite3",
                     keyvalues={"table_name": table},
                     updatevalues={"rowid": next_chunk},
                 )
 
-            yield mysql_store.runInteraction("insert_many", ins)
+            yield postgres_store.runInteraction("insert_many", ins)
         else:
             return
 
@@ -273,30 +273,30 @@ def setup_db(db_config, database_engine):
 
 
 @defer.inlineCallbacks
-def main(sqlite_config, mysql_config):
+def main(sqlite_config, postgress_config):
     try:
         sqlite_db_pool = adbapi.ConnectionPool(
             sqlite_config["name"],
             **sqlite_config["args"]
         )
 
-        mysql_db_pool = adbapi.ConnectionPool(
-            mysql_config["name"],
-            **mysql_config["args"]
+        postgres_db_pool = adbapi.ConnectionPool(
+            postgress_config["name"],
+            **postgress_config["args"]
         )
 
         sqlite_engine = create_engine("sqlite3")
-        mysql_engine = create_engine("psycopg2")
+        postgres_engine = create_engine("psycopg2")
 
         sqlite_store = Store(sqlite_db_pool, sqlite_engine)
-        mysql_store = Store(mysql_db_pool, mysql_engine)
+        postgres_store = Store(postgres_db_pool, postgres_engine)
 
-        # Step 1. Set up mysql database.
+        # Step 1. Set up databases.
         logger.info("Preparing sqlite database...")
         setup_db(sqlite_config, sqlite_engine)
 
-        logger.info("Preparing mysql database...")
-        setup_db(mysql_config, mysql_engine)
+        logger.info("Preparing postgres database...")
+        setup_db(postgress_config, postgres_engine)
 
         # Step 2. Get tables.
         logger.info("Fetching tables...")
@@ -319,7 +319,7 @@ def main(sqlite_config, mysql_config):
             )
 
         try:
-            yield mysql_store.runInteraction(
+            yield postgres_store.runInteraction(
                 "create_port_table", create_port_table
             )
         except Exception as e:
@@ -328,7 +328,7 @@ def main(sqlite_config, mysql_config):
         # Process tables.
         yield defer.gatherResults(
             [
-                handle_table(table, sqlite_store, mysql_store)
+                handle_table(table, sqlite_store, postgres_store)
                 for table in tables
                 if table not in ["schema_version", "applied_schema_deltas"]
                 and not table.startswith("sqlite_")
@@ -336,10 +336,6 @@ def main(sqlite_config, mysql_config):
             consumeErrors=True,
         )
 
-        # for table in ["current_state_events"]:  # tables:
-        #     if table not in ["schema_version", "applied_schema_deltas"]:
-        #         if not table.startswith("sqlite_"):
-        #             yield handle_table(table, sqlite_store, mysql_store)
     except:
         logger.exception("")
     finally:
@@ -350,7 +346,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--sqlite-database")
     parser.add_argument(
-        "--mysql-config", type=argparse.FileType('r'),
+        "--postgres-config", type=argparse.FileType('r'),
     )
 
     args = parser.parse_args()
@@ -366,18 +362,12 @@ if __name__ == "__main__":
         },
     }
 
-    mysql_config = yaml.safe_load(args.mysql_config)
-    # mysql_config["args"].update({
-    #     "sql_mode": "TRADITIONAL",
-    #     "charset": "utf8mb4",
-    #     "use_unicode": True,
-    #     "collation": "utf8mb4_bin",
-    # })
+    postgres_config = yaml.safe_load(args.postgres_config)
 
     reactor.callWhenRunning(
         main,
         sqlite_config=sqlite_config,
-        mysql_config=mysql_config,
+        postgres_config=postgres_config,
     )
 
     reactor.run()

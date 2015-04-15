@@ -1,5 +1,5 @@
 
--- We can use SQLite features here, since mysql support was only added in v16
+-- We can use SQLite features here, since other db support was only added in v16
 
 --
 DELETE FROM current_state_events WHERE rowid not in (
