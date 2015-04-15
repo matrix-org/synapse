@@ -99,7 +99,7 @@ class PusherStore(SQLBaseStore):
                    app_display_name, device_display_name,
                    pushkey, pushkey_ts, lang, data):
         try:
-            next_id = self._pushers_id_gen.get_next()
+            next_id = yield self._pushers_id_gen.get_next()
             yield self._simple_upsert(
                 PushersTable.table_name,
                 dict(
