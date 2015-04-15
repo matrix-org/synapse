@@ -175,8 +175,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
         ])
 
         self.assertEquals(self.event_source.get_current_key(), 1)
+        events = yield self.event_source.get_new_events_for_user(self.u_apple, 0, None)
         self.assertEquals(
-            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            events[0],
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
@@ -237,8 +238,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
         ])
 
         self.assertEquals(self.event_source.get_current_key(), 1)
+        events = yield self.event_source.get_new_events_for_user(self.u_apple, 0, None)
         self.assertEquals(
-            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            events[0],
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
@@ -292,8 +294,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
         yield put_json.await_calls()
 
         self.assertEquals(self.event_source.get_current_key(), 1)
+        events = yield self.event_source.get_new_events_for_user(self.u_apple, 0, None)
         self.assertEquals(
-            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            events[0],
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
@@ -322,8 +325,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.on_new_user_event.reset_mock()
 
         self.assertEquals(self.event_source.get_current_key(), 1)
+        events = yield self.event_source.get_new_events_for_user(self.u_apple, 0, None)
         self.assertEquals(
-            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            events[0],
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
@@ -340,8 +344,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
         ])
 
         self.assertEquals(self.event_source.get_current_key(), 2)
+        events = yield self.event_source.get_new_events_for_user(self.u_apple, 1, None)
         self.assertEquals(
-            self.event_source.get_new_events_for_user(self.u_apple, 1, None)[0],
+            events[0],
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
@@ -366,8 +371,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.on_new_user_event.reset_mock()
 
         self.assertEquals(self.event_source.get_current_key(), 3)
+        events = yield self.event_source.get_new_events_for_user(self.u_apple, 0, None)
         self.assertEquals(
-            self.event_source.get_new_events_for_user(self.u_apple, 0, None)[0],
+            events[0],
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,

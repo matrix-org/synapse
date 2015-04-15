@@ -252,7 +252,7 @@ class TypingNotificationEventSource(object):
             # TODO: check if user is in room
             events.append(self._make_event_for(room_id))
 
-        return (events, handler._latest_room_serial)
+        return defer.succeed((events, handler._latest_room_serial))
 
     def get_current_key(self):
         return self.handler()._latest_room_serial

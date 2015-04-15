@@ -115,8 +115,9 @@ class RoomTypingTestCase(RestTestCase):
         self.assertEquals(200, code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
+        events = yield self.event_source.get_new_events_for_user(self.user_id, 0, None)
         self.assertEquals(
-            self.event_source.get_new_events_for_user(self.user_id, 0, None)[0],
+            events[0],
             [
                 {"type": "m.typing",
                  "room_id": self.room_id,
