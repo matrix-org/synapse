@@ -847,11 +847,9 @@ class SQLBaseStore(object):
             sql_getevents_timer.inc_by(curr_time - last_time, desc)
             return curr_time
 
-        logger.debug("Got js: %r", js)
         d = json.loads(js)
         start_time = update_counter("decode_json", start_time)
 
-        logger.debug("Got internal_metadata: %r", internal_metadata)
         internal_metadata = json.loads(internal_metadata)
         start_time = update_counter("decode_internal", start_time)
 
