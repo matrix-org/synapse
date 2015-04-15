@@ -180,7 +180,11 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def register_email(self, threepidCreds):
-        """Registers emails with an identity server."""
+        """
+        Registers emails with an identity server.
+
+        Used only by c/s api v1
+        """
 
         for c in threepidCreds:
             logger.info("validating theeepidcred sid %s on id server %s",

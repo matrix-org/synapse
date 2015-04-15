@@ -20,6 +20,7 @@ from synapse.api.constants import LoginType
 from synapse.types import UserID
 from synapse.api.errors import LoginError, Codes
 from synapse.http.client import SimpleHttpClient
+from synapse.util.async import run_on_reactor
 
 from twisted.web.client import PartialDownloadError
 
@@ -40,6 +41,7 @@ class AuthHandler(BaseHandler):
         self.checkers = {
             LoginType.PASSWORD: self._check_password_auth,
             LoginType.RECAPTCHA: self._check_recaptcha,
+            LoginType.EMAIL_IDENTITY: self._check_email_identity,
         }
         self.sessions = {}
 
@@ -54,24 +56,37 @@ class AuthHandler(BaseHandler):
             authdict: The dictionary from the client root level, not the
                       'auth' key: this method prompts for auth if none is sent.
         Returns:
-            A tuple of authed, dict where authed is true if the client
-            has successfully completed an auth flow. If it is true, the dict
-            contains the authenticated credentials of each stage.
-            If authed is false, the dictionary is the server response to the
-            login request and should be passed back to the client.
+            A tuple of authed, dict, dict where authed is true if the client
+            has successfully completed an auth flow. If it is true, the first
+            dict contains the authenticated credentials of each stage.
+
+            If authed is false, the first dictionary is the server response to
+            the login request and should be passed back to the client.
+
+            In either case, the second dict contains the parameters for this
+            request (which may have been given only in a previous call).
         """
 
-        if not clientdict or 'auth' not in clientdict:
-            sess = self._get_session_info(None)
+        authdict = None
+        sid = None
+        if clientdict and 'auth' in clientdict:
+            authdict = clientdict['auth']
+            del clientdict['auth']
+            if 'session' in authdict:
+                sid = authdict['session']
+        sess = self._get_session_info(sid)
+
+        if len(clientdict) > 0:
+            sess['clientdict'] = clientdict
+            self._save_session(sess)
+        elif 'clientdict' in sess:
+            clientdict = sess['clientdict']
+
+        if not authdict:
             defer.returnValue(
-                (False, self._auth_dict_for_flows(flows, sess))
+                (False, self._auth_dict_for_flows(flows, sess), clientdict)
             )
 
-        authdict = clientdict['auth']
-
-        sess = self._get_session_info(
-            authdict['session'] if 'session' in authdict else None
-        )
         if 'creds' not in sess:
             sess['creds'] = {}
         creds = sess['creds']
@@ -89,11 +104,11 @@ class AuthHandler(BaseHandler):
             if len(set(f) - set(creds.keys())) == 0:
                 logger.info("Auth completed with creds: %r", creds)
                 self._remove_session(sess)
-                defer.returnValue((True, creds))
+                defer.returnValue((True, creds, clientdict))
 
         ret = self._auth_dict_for_flows(flows, sess)
         ret['completed'] = creds.keys()
-        defer.returnValue((False, ret))
+        defer.returnValue((False, ret, clientdict))
 
     @defer.inlineCallbacks
     def add_oob_auth(self, stagetype, authdict, clientip):
@@ -175,18 +190,25 @@ class AuthHandler(BaseHandler):
             defer.returnValue(True)
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
+    @defer.inlineCallbacks
+    def _check_email_identity(self, authdict, _):
+        yield run_on_reactor()
+
+        threepidCreds = authdict['threepidCreds']
+        identity_handler = self.hs.get_handlers().identity_handler
+
+        logger.debug("Getting validated threepid. threepidcreds: %r" % (threepidCreds,))
+        threepid = yield identity_handler.threepid_from_creds(threepidCreds)
+
+        defer.returnValue(threepid)
+
     def _get_params_recaptcha(self):
         return {"public_key": self.hs.config.recaptcha_public_key}
 
     def _auth_dict_for_flows(self, flows, session):
         public_flows = []
         for f in flows:
-            hidden = False
-            for stagetype in f:
-                if stagetype in LoginType.HIDDEN_TYPES:
-                    hidden = True
-            if not hidden:
-                public_flows.append(f)
+            public_flows.append(f)
 
         get_params = {
             LoginType.RECAPTCHA: self._get_params_recaptcha,

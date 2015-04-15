@@ -30,6 +30,7 @@ from .admin import AdminHandler
 from .appservice import ApplicationServicesHandler
 from .sync import SyncHandler
 from .auth import AuthHandler
+from .identity import IdentityHandler
 
 
 class Handlers(object):
@@ -60,3 +61,4 @@ class Handlers(object):
         )
         self.sync_handler = SyncHandler(hs)
         self.auth_handler = AuthHandler(hs)
+        self.identity_handler = IdentityHandler(hs)

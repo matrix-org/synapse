@@ -74,7 +74,7 @@ class RegisterRestServlet(RestServlet):
             )
             is_using_shared_secret = True
         else:
-            authed, result = yield self.auth_handler.check_auth([
+            authed, result, params = yield self.auth_handler.check_auth([
                 [LoginType.RECAPTCHA],
                 [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
             ], body, self.hs.get_ip_from_request(request))
@@ -90,10 +90,10 @@ class RegisterRestServlet(RestServlet):
         if not can_register:
             raise SynapseError(403, "Registration has been disabled")
 
-        if 'username' not in body or 'password' not in body:
+        if 'username' not in params or 'password' not in params:
             raise SynapseError(400, "", Codes.MISSING_PARAM)
-        desired_username = body['username']
-        new_password = body['password']
+        desired_username = params['username']
+        new_password = params['password']
 
         (user_id, token) = yield self.registration_handler.register(
             localpart=desired_username,

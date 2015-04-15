@@ -41,7 +41,7 @@ class PasswordRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_dict_from_request(request)
 
-        authed, result = yield self.auth_handler.check_auth([
+        authed, result, params = yield self.auth_handler.check_auth([
             [LoginType.PASSWORD]
         ], body)
 
@@ -61,9 +61,9 @@ class PasswordRestServlet(RestServlet):
 
         user_id = auth_user.to_string()
 
-        if 'new_password' not in body:
+        if 'new_password' not in params:
             raise SynapseError(400, "", Codes.MISSING_PARAM)
-        new_password = body['new_password']
+        new_password = params['new_password']
 
         yield self.login_handler.set_password(
             user_id, new_password, client.token_id
