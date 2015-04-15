@@ -42,6 +42,7 @@ class AuthHandler(BaseHandler):
             LoginType.PASSWORD: self._check_password_auth,
             LoginType.RECAPTCHA: self._check_recaptcha,
             LoginType.EMAIL_IDENTITY: self._check_email_identity,
+            LoginType.DUMMY: self._check_dummy_auth,
         }
         self.sessions = {}
 
@@ -201,6 +202,11 @@ class AuthHandler(BaseHandler):
         threepid = yield identity_handler.threepid_from_creds(threepidCreds)
 
         defer.returnValue(threepid)
+
+    @defer.inlineCallbacks
+    def _check_dummy_auth(self, authdict, _):
+        yield run_on_reactor()
+        defer.returnValue(True)
 
     def _get_params_recaptcha(self):
         return {"public_key": self.hs.config.recaptcha_public_key}

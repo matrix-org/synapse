@@ -42,8 +42,8 @@ class IdentityHandler(BaseHandler):
         # each request
         http_client = SimpleHttpClient(self.hs)
         # XXX: make this configurable!
-        #trustedIdServers = ['matrix.org', 'localhost:8090']
-        trustedIdServers = ['matrix.org']
+        trustedIdServers = ['matrix.org', 'localhost:8090']
+        #trustedIdServers = ['matrix.org']
         if not creds['idServer'] in trustedIdServers:
             logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
                         'credentials', creds['idServer'])
@@ -52,7 +52,7 @@ class IdentityHandler(BaseHandler):
         data = {}
         try:
             data = yield http_client.get_json(
-                "https://%s%s" % (
+                "http://%s%s" % (
                     creds['idServer'],
                     "/_matrix/identity/api/v1/3pid/getValidated3pid"
                 ),

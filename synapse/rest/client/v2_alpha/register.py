@@ -63,6 +63,17 @@ class RegisterRestServlet(RestServlet):
         if 'access_token' in request.args:
             service = yield self.auth.get_appservice_by_req(request)
 
+        if self.hs.config.enable_registration_captcha:
+            flows = [
+                [LoginType.RECAPTCHA],
+                [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA]
+            ]
+        else:
+            flows = [
+                [LoginType.DUMMY],
+                [LoginType.EMAIL_IDENTITY]
+            ]
+
         if service:
             is_application_server = True
         elif 'mac' in body:
@@ -74,10 +85,9 @@ class RegisterRestServlet(RestServlet):
             )
             is_using_shared_secret = True
         else:
-            authed, result, params = yield self.auth_handler.check_auth([
-                [LoginType.RECAPTCHA],
-                [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
-            ], body, self.hs.get_ip_from_request(request))
+            authed, result, params = yield self.auth_handler.check_auth(
+                flows, body, self.hs.get_ip_from_request(request)
+            )
 
             if not authed:
                 defer.returnValue((401, result))
