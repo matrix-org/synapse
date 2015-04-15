@@ -58,8 +58,6 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def _create_new_client_event(self, builder):
-        yield run_on_reactor()
-
         latest_ret = yield self.store.get_latest_events_in_room(
             builder.room_id,
         )
@@ -101,8 +99,6 @@ class BaseHandler(object):
     @defer.inlineCallbacks
     def handle_new_client_event(self, event, context, extra_destinations=[],
                                 extra_users=[], suppress_auth=False):
-        yield run_on_reactor()
-
         # We now need to go and hit out to wherever we need to hit out to.
 
         if not suppress_auth:
