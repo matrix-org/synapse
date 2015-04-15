@@ -118,3 +118,59 @@ class KeyStore(SQLBaseStore):
             },
             or_ignore=True,
         )
+
+    def store_server_keys_json(self, server_name, key_id, from_server,
+                               ts_now_ms, ts_expires_ms, key_json_bytes):
+        """Stores the JSON bytes for a set of keys from a server
+        The JSON should be signed by the originating server, the intermediate
+        server, and by this server. Updates the value for the
+        (server_name, key_id, from_server) triplet if one already existed.
+        Args:
+            server_name (str): The name of the server.
+            key_id (str): The identifer of the key this JSON is for.
+            from_server (str): The server this JSON was fetched from.
+            ts_now_ms (int): The time now in milliseconds.
+            ts_valid_until_ms (int): The time when this json stops being valid.
+            key_json (bytes): The encoded JSON.
+        """
+        return self._simple_insert(
+            table="server_keys_json",
+            values={
+                "server_name": server_name,
+                "key_id": key_id,
+                "from_server": from_server,
+                "ts_added_ms": ts_now_ms,
+                "ts_valid_until_ms": ts_valid_until_ms,
+                "key_json": key_json_bytes,
+            },
+            or_replace=True,
+        )
+
+    def get_server_keys_json(self, server_keys):
+        """Retrive the key json for a list of server_keys and key ids.
+        If no keys are found for a given server, key_id and source then
+        that server, key_id, and source triplet will be missing from the
+        returned dictionary. The JSON is returned as a byte array so that it
+        can be efficiently used in an HTTP response.
+        Args:
+            server_keys (list): List of (server_name, key_id, source) triplets.
+        Returns:
+            Dict mapping (server_name, key_id, source) triplets to dicts with
+            "ts_valid_until_ms" and "key_json" keys.
+        """
+        def _get_server_keys_json_txn(txn):
+            results = {}
+            for server_name, key_id, from_server in server_keys:
+                rows = _simple_select_list_txn(
+                    keyvalues={
+                        "server_name": server_name,
+                        "key_id": key_id,
+                        "from_server": from_server,
+                    },
+                    retcols=("ts_valid_until_ms", "key_json"),
+                )
+                results[(server_name, key_id, from_server)] = rows
+            return results
+        return runInteraction(
+            "get_server_keys_json", _get_server_keys_json_txn
+        )
