@@ -274,7 +274,8 @@ class MessageHandler(BaseHandler):
         if limit is None:
             limit = 10
 
-        for event in room_list:
+        @defer.inlineCallbacks
+        def handle_room(event):
             d = {
                 "room_id": event.room_id,
                 "membership": event.membership,
@@ -290,7 +291,7 @@ class MessageHandler(BaseHandler):
             rooms_ret.append(d)
 
             if event.membership != Membership.JOIN:
-                continue
+                return
             try:
                 messages, token = yield self.store.get_recent_events_for_room(
                     event.room_id,
@@ -320,6 +321,11 @@ class MessageHandler(BaseHandler):
                 ]
             except:
                 logger.exception("Failed to get snapshot")
+
+        yield defer.gatherResults(
+            [handle_room(e) for e in room_list],
+            consumeErrors=True
+        )
 
         ret = {
             "rooms": rooms_ret,
