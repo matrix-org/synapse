@@ -269,13 +269,15 @@ class EventsStore(SQLBaseStore):
             "INSERT INTO events"
             " (stream_ordering, topological_ordering, event_id, type,"
             " room_id, content, processed, outlier, depth)"
-            " VALUES (%s,?,?,?,?,?,?,?,?)"
-        ) % (stream_ordering,)
+            " VALUES (?,?,?,?,?,?,?,?,?)"
+        )
 
         txn.execute(
             sql,
-            (event.depth, event.event_id, event.type, event.room_id,
-             content, True, outlier, event.depth)
+            (
+                stream_ordering, event.depth, event.event_id, event.type,
+                event.room_id, content, True, outlier, event.depth
+            )
         )
 
         if context.rejected:
@@ -321,7 +323,7 @@ class EventsStore(SQLBaseStore):
                         "event_id": event.event_id,
                         "prev_event_id": e_id,
                         "room_id": event.room_id,
-                        "is_state": 1,
+                        "is_state": True,
                     },
                 )
 
