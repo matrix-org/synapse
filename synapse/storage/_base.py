@@ -388,6 +388,7 @@ class SQLBaseStore(object):
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
 
+    @defer.inlineCallbacks
     def _simple_insert(self, table, values, or_ignore=False,
                        desc="_simple_insert"):
         """Executes an INSERT query on the named table.
@@ -396,14 +397,20 @@ class SQLBaseStore(object):
             table : string giving the table name
             values : dict of new column names and values for them
         """
-        return self.runInteraction(
-            desc,
-            self._simple_insert_txn, table, values,
-            or_ignore=or_ignore
-        )
+        try:
+            yield self.runInteraction(
+                desc,
+                self._simple_insert_txn, table, values,
+                or_ignore=or_ignore
+            )
+        except self.database_engine.module.IntegrityError:
+            # We have to do or_ignore flag at this layer, since we can't reuse
+            # a cursor after we receive an error from the db.
+            if not or_ignore:
+                raise
 
     @log_function
-    def _simple_insert_txn(self, txn, table, values, or_ignore=False):
+    def _simple_insert_txn(self, txn, table, values):
         sql = "INSERT INTO %s (%s) VALUES(%s)" % (
             table,
             ", ".join(k for k in values),
@@ -415,11 +422,7 @@ class SQLBaseStore(object):
             sql, values.values(),
         )
 
-        try:
-            txn.execute(sql, values.values())
-        except self.database_engine.module.IntegrityError:
-            if not or_ignore:
-                raise
+        txn.execute(sql, values.values())
 
     def _simple_upsert(self, table, keyvalues, values, desc="_simple_upsert"):
         """
