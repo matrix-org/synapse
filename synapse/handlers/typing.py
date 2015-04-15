@@ -223,12 +223,18 @@ class TypingNotificationEventSource(object):
     def __init__(self, hs):
         self.hs = hs
         self._handler = None
+        self._room_member_handler = None
 
     def handler(self):
         # Avoid cyclic dependency in handler setup
         if not self._handler:
             self._handler = self.hs.get_handlers().typing_notification_handler
         return self._handler
+
+    def room_member_handler(self):
+        if not self._room_member_handler:
+            self._room_member_handler = self.hs.get_handlers().room_member_handler
+        return self._room_member_handler
 
     def _make_event_for(self, room_id):
         typing = self.handler()._room_typing[room_id]
@@ -240,19 +246,25 @@ class TypingNotificationEventSource(object):
             },
         }
 
+    @defer.inlineCallbacks
     def get_new_events_for_user(self, user, from_key, limit):
         from_key = int(from_key)
         handler = self.handler()
 
+        joined_room_ids = (
+            yield self.room_member_handler().get_joined_rooms_for_user(user)
+        )
+
         events = []
         for room_id in handler._room_serials:
+            if room_id not in joined_room_ids:
+                continue
             if handler._room_serials[room_id] <= from_key:
                 continue
 
-            # TODO: check if user is in room
             events.append(self._make_event_for(room_id))
 
-        return defer.succeed((events, handler._latest_room_serial))
+        defer.returnValue((events, handler._latest_room_serial))
 
     def get_current_key(self):
         return self.handler()._latest_room_serial
