@@ -34,6 +34,8 @@ class RoomTypingTestCase(RestTestCase):
     """ Tests /rooms/$room_id/typing/$user_id REST API. """
     user_id = "@sid:red"
 
+    user = UserID.from_string(user_id)
+
     @defer.inlineCallbacks
     def setUp(self):
         self.clock = MockClock()
@@ -75,7 +77,7 @@ class RoomTypingTestCase(RestTestCase):
 
         def get_room_members(room_id):
             if room_id == self.room_id:
-                return defer.succeed([UserID.from_string(self.user_id)])
+                return defer.succeed([self.user])
             else:
                 return defer.succeed([])
 
@@ -115,7 +117,7 @@ class RoomTypingTestCase(RestTestCase):
         self.assertEquals(200, code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
-        events = yield self.event_source.get_new_events_for_user(self.user_id, 0, None)
+        events = yield self.event_source.get_new_events_for_user(self.user, 0, None)
         self.assertEquals(
             events[0],
             [

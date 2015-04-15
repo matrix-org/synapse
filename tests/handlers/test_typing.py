@@ -126,6 +126,13 @@ class TypingNotificationsTestCase(unittest.TestCase):
                 return defer.succeed([])
         self.room_member_handler.get_room_members = get_room_members
 
+        def get_joined_rooms_for_user(user):
+            if user in self.room_members:
+                return defer.succeed([self.room_id])
+            else:
+                return defer.succeed([])
+        self.room_member_handler.get_joined_rooms_for_user = get_joined_rooms_for_user
+
         @defer.inlineCallbacks
         def fetch_room_distributions_into(room_id, localusers=None,
                 remotedomains=None, ignore_user=None):
