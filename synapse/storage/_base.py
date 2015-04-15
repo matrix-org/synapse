@@ -401,7 +401,6 @@ class SQLBaseStore(object):
             yield self.runInteraction(
                 desc,
                 self._simple_insert_txn, table, values,
-                or_ignore=or_ignore
             )
         except self.database_engine.module.IntegrityError:
             # We have to do or_ignore flag at this layer, since we can't reuse
