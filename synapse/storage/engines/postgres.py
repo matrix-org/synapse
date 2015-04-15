@@ -37,7 +37,7 @@ class PostgresEngine(object):
 
     def is_deadlock(self, error):
         if isinstance(error, self.module.DatabaseError):
-            return error.pgcode == "40P01"
+            return error.pgcode in ["40001", "40P01"]
         return False
 
     def load_unicode(self, v):
