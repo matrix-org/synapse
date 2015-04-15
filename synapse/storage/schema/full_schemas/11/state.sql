@@ -14,13 +14,13 @@
  */
 
 CREATE TABLE IF NOT EXISTS state_groups(
-    id VARCHAR(20) PRIMARY KEY,
+    id INTEGER PRIMARY KEY,
     room_id VARCHAR(150) NOT NULL,
     event_id VARCHAR(150) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS state_groups_state(
-    state_group VARCHAR(20) NOT NULL,
+    state_group INTEGER NOT NULL,
     room_id VARCHAR(150) NOT NULL,
     type VARCHAR(150) NOT NULL,
     state_key VARCHAR(150) NOT NULL,
@@ -29,12 +29,12 @@ CREATE TABLE IF NOT EXISTS state_groups_state(
 
 CREATE TABLE IF NOT EXISTS event_to_state_groups(
     event_id VARCHAR(150) NOT NULL,
-    state_group VARCHAR(150) NOT NULL,
+    state_group INTEGER NOT NULL,
     UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS state_groups_id ON state_groups(id);
+CREATE INDEX state_groups_id ON state_groups(id);
 
-CREATE INDEX IF NOT EXISTS state_groups_state_id ON state_groups_state(state_group);
-CREATE INDEX IF NOT EXISTS state_groups_state_tuple ON state_groups_state(room_id, type, state_key);
-CREATE INDEX IF NOT EXISTS event_to_state_groups_id ON event_to_state_groups(event_id);
+CREATE INDEX state_groups_state_id ON state_groups_state(state_group);
+CREATE INDEX state_groups_state_tuple ON state_groups_state(room_id, type, state_key);
+CREATE INDEX event_to_state_groups_id ON event_to_state_groups(event_id);

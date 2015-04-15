@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS state_groups(
 );
 
 CREATE TABLE IF NOT EXISTS state_groups_state(
-    state_group VARCHAR(20) NOT NULL,
+    state_group BIGINT NOT NULL,
     room_id VARCHAR(150) NOT NULL,
     type VARCHAR(150) NOT NULL,
     state_key VARCHAR(150) NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS state_groups_state(
 
 CREATE TABLE IF NOT EXISTS event_to_state_groups(
     event_id VARCHAR(150) NOT NULL,
-    state_group VARCHAR(150) NOT NULL,
+    state_group BIGINT NOT NULL,
     UNIQUE (event_id)
 );
 

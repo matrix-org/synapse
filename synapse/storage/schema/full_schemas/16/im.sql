@@ -14,7 +14,7 @@
  */
 
 CREATE TABLE IF NOT EXISTS events(
-    stream_ordering BIGINT PRIMARY KEY,
+    stream_ordering INTEGER PRIMARY KEY,
     topological_ordering BIGINT NOT NULL,
     event_id VARCHAR(150) NOT NULL,
     type VARCHAR(150) NOT NULL,
@@ -31,6 +31,9 @@ CREATE INDEX events_stream_ordering ON events (stream_ordering);
 CREATE INDEX events_topological_ordering ON events (topological_ordering);
 CREATE INDEX events_order ON events (topological_ordering, stream_ordering);
 CREATE INDEX events_room_id ON events (room_id);
+CREATE INDEX events_order_room ON events (
+    room_id, topological_ordering, stream_ordering
+);
 
 
 CREATE TABLE IF NOT EXISTS event_json(

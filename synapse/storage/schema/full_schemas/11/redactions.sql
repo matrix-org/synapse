@@ -18,5 +18,5 @@ CREATE TABLE IF NOT EXISTS redactions (
     UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS redactions_event_id ON redactions (event_id);
-CREATE INDEX IF NOT EXISTS redactions_redacts ON redactions (redacts);
+CREATE INDEX redactions_event_id ON redactions (event_id);
+CREATE INDEX redactions_redacts ON redactions (redacts);
