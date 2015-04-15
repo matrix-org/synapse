@@ -98,7 +98,7 @@ class _NotificationListener(object):
             try:
                 notifier.clock.cancel_call_later(self.timer)
             except:
-                logger.exception("Failed to cancel notifier timer")
+                logger.warn("Failed to cancel notifier timer")
 
 
 class Notifier(object):
