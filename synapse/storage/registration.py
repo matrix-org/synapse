@@ -39,7 +39,7 @@ class RegistrationStore(SQLBaseStore):
         """
         next_id = yield self._access_tokens_id_gen.get_next()
 
-        self._simple_insert(
+        yield self._simple_insert(
             "access_tokens",
             {
                 "id": next_id,
