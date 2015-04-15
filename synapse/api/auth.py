@@ -215,17 +215,20 @@ class Auth(object):
         else:
             ban_level = 50  # FIXME (erikj): What should we do here?
 
-        if Membership.INVITE == membership:
-            # TODO (erikj): We should probably handle this more intelligently
-            # PRIVATE join rules.
-
-            # Invites are valid iff caller is in the room and target isn't.
+        if Membership.JOIN != membership:
+            # JOIN is the only action you can perform if you're not in the room
             if not caller_in_room:  # caller isn't joined
                 raise AuthError(
                     403,
                     "%s not in room %s." % (event.user_id, event.room_id,)
                 )
-            elif target_banned:
+
+        if Membership.INVITE == membership:
+            # TODO (erikj): We should probably handle this more intelligently
+            # PRIVATE join rules.
+
+            # Invites are valid iff caller is in the room and target isn't.
+            if target_banned:
                 raise AuthError(
                     403, "%s is banned from the room" % (target_user_id,)
                 )
@@ -251,13 +254,7 @@ class Auth(object):
                 raise AuthError(403, "You are not allowed to join this room")
         elif Membership.LEAVE == membership:
             # TODO (erikj): Implement kicks.
-
-            if not caller_in_room:  # trying to leave a room you aren't joined
-                raise AuthError(
-                    403,
-                    "%s not in room %s." % (target_user_id, event.room_id,)
-                )
-            elif target_banned and user_level < ban_level:
+            if target_banned and user_level < ban_level:
                 raise AuthError(
                     403, "You cannot unban user &s." % (target_user_id,)
                 )
@@ -272,11 +269,6 @@ class Auth(object):
                         403, "You cannot kick user %s." % target_user_id
                     )
         elif Membership.BAN == membership:
-            if not caller_in_room:  # caller isn't joined
-                raise AuthError(
-                    403,
-                    "%s not in room %s." % (event.user_id, event.room_id,)
-                )
             if user_level < ban_level:
                 raise AuthError(403, "You don't have permission to ban")
         else:
