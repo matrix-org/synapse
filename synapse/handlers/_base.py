@@ -139,7 +139,9 @@ class BaseHandler(object):
                 )
 
         # Don't block waiting on waking up all the listeners.
-        d = self.notifier.on_new_room_event(event, extra_users=extra_users)
+        notify_d = self.notifier.on_new_room_event(
+            event, extra_users=extra_users
+        )
 
         def log_failure(f):
             logger.warn(
@@ -147,8 +149,10 @@ class BaseHandler(object):
                 event.event_id, f.value
             )
 
-        d.addErrback(log_failure)
+        notify_d.addErrback(log_failure)
 
-        yield federation_handler.handle_new_event(
+        fed_d = federation_handler.handle_new_event(
             event, destinations=destinations,
         )
+
+        fed_d.addErrback(log_failure)
