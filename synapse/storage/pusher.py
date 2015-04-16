@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
-
 from ._base import SQLBaseStore, Table
 from twisted.internet import defer
 
@@ -167,4 +165,3 @@ class PusherStore(SQLBaseStore):
 
 class PushersTable(Table):
     table_name = "pushers"
-

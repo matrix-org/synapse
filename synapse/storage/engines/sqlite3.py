@@ -15,8 +15,6 @@
 
 from synapse.storage import prepare_database, prepare_sqlite3_database
 
-import types
-
 
 class Sqlite3Engine(object):
     def __init__(self, database_module):
