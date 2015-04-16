@@ -48,8 +48,6 @@ class RegistrationHandler(BaseHandler):
     def check_username(self, localpart):
         yield run_on_reactor()
 
-        print "checking username %s" % (localpart)
-
         if urllib.quote(localpart) != localpart:
             raise SynapseError(
                 400,
@@ -62,11 +60,7 @@ class RegistrationHandler(BaseHandler):
 
         yield self.check_user_id_is_valid(user_id)
 
-        print "is valid"
-
         u = yield self.store.get_user_by_id(user_id)
-        print "user is: "
-        print u
         if u:
             raise SynapseError(
                 400,
