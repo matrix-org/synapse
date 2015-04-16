@@ -201,6 +201,8 @@ class AuthHandler(BaseHandler):
         logger.debug("Getting validated threepid. threepidcreds: %r" % (threepidCreds,))
         threepid = yield identity_handler.threepid_from_creds(threepidCreds)
 
+        threepid['threepidCreds'] = authdict['threepidCreds']
+
         defer.returnValue(threepid)
 
     @defer.inlineCallbacks

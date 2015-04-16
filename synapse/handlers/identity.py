@@ -64,3 +64,26 @@ class IdentityHandler(BaseHandler):
         if 'medium' in data:
             defer.returnValue(data)
         defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def bind_threepid(self, creds, mxid):
+        yield run_on_reactor()
+        logger.debug("binding threepid %r to %s", creds, mxid)
+        http_client = SimpleHttpClient(self.hs)
+        data = None
+        try:
+            data = yield http_client.post_urlencoded_get_json(
+                # XXX: Change when ID servers are all HTTPS
+                "http://%s%s" % (
+                    creds['idServer'], "/_matrix/identity/api/v1/3pid/bind"
+                ),
+                {
+                    'sid': creds['sid'],
+                    'clientSecret': creds['clientSecret'],
+                    'mxid': mxid,
+                }
+            )
+            logger.debug("bound threepid %r to %s", creds, mxid)
+        except CodeMessageException as e:
+            data = json.loads(e.msg)
+        defer.returnValue(data)

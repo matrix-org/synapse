@@ -49,12 +49,20 @@ class RegisterRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_handlers().auth_handler
         self.registration_handler = hs.get_handlers().registration_handler
+        self.identity_handler = hs.get_handlers().identity_handler
 
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor()
 
         body = parse_request_allow_empty(request)
+        if 'password' not in body:
+            raise SynapseError(400, "", Codes.MISSING_PARAM)
+
+        if 'username' in body:
+            desired_username = body['username']
+            print "username in body"
+            yield self.registration_handler.check_username(desired_username)
 
         is_using_shared_secret = False
         is_application_server = False
@@ -100,15 +108,28 @@ class RegisterRestServlet(RestServlet):
         if not can_register:
             raise SynapseError(403, "Registration has been disabled")
 
-        if 'username' not in params or 'password' not in params:
+        if 'password' not in params:
             raise SynapseError(400, "", Codes.MISSING_PARAM)
-        desired_username = params['username']
+        desired_username = params['username'] if 'username' in params else None
         new_password = params['password']
 
         (user_id, token) = yield self.registration_handler.register(
             localpart=desired_username,
             password=new_password
         )
+
+        if 'bind_email' in params and params['bind_email']:
+            logger.info("bind_email specified: binding")
+
+            emailThreepid = result[LoginType.EMAIL_IDENTITY]
+            threepidCreds = emailThreepid['threepidCreds']
+            logger.debug("Binding emails %s to %s" % (
+                emailThreepid, user_id
+            ))
+            yield self.identity_handler.bind_threepid(threepidCreds, user_id)
+        else:
+            logger.info("bind_email not specified: not binding email")
+
         result = {
             "user_id": user_id,
             "access_token": token,
