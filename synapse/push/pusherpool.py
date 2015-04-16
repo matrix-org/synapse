@@ -19,10 +19,7 @@ from twisted.internet import defer
 from httppusher import HttpPusher
 from synapse.push import PusherConfigException
 
-from syutil.jsonutil import encode_canonical_json
-
 import logging
-import simplejson as json
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +49,6 @@ class PusherPool:
     @defer.inlineCallbacks
     def start(self):
         pushers = yield self.store.get_all_pushers()
-        for p in pushers:
-            p['data'] = json.loads(p['data'])
         self._start_pushers(pushers)
 
     @defer.inlineCallbacks
@@ -98,7 +93,7 @@ class PusherPool:
             pushkey=pushkey,
             pushkey_ts=self.hs.get_clock().time_msec(),
             lang=lang,
-            data=encode_canonical_json(data).decode("UTF-8"),
+            data=data,
         )
         self._refresh_pusher((app_id, pushkey))
 
@@ -129,7 +124,6 @@ class PusherPool:
         p = yield self.store.get_pushers_by_app_id_and_pushkey(
             app_id_pushkey
         )
-        p['data'] = json.loads(p['data'])
 
         self._start_pushers([p])
 

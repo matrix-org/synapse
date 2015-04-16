@@ -20,7 +20,10 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 
+from syutil.jsonutil import encode_canonical_json
+
 import logging
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +55,7 @@ class PusherStore(SQLBaseStore):
                 "device_display_name": r[6],
                 "pushkey": r[7],
                 "pushkey_ts": r[8],
-                "data": r[9],
+                "data": json.loads(r[9]),
                 "last_token": r[10],
                 "last_success": r[11],
                 "failing_since": r[12]
@@ -84,7 +87,7 @@ class PusherStore(SQLBaseStore):
                 "device_display_name": r[6],
                 "pushkey": r[7],
                 "pushkey_ts": r[8],
-                "data": r[9],
+                "data": json.loads(r[9]),
                 "last_token": r[10],
                 "last_success": r[11],
                 "failing_since": r[12]
@@ -114,7 +117,7 @@ class PusherStore(SQLBaseStore):
                     device_display_name=device_display_name,
                     ts=pushkey_ts,
                     lang=lang,
-                    data=data
+                    data=encode_canonical_json(data).decode("UTF-8"),
                 ),
                 insertion_values=dict(
                     id=next_id,
@@ -165,20 +168,3 @@ class PusherStore(SQLBaseStore):
 class PushersTable(Table):
     table_name = "pushers"
 
-    fields = [
-        "id",
-        "user_name",
-        "kind",
-        "profile_tag",
-        "app_id",
-        "app_display_name",
-        "device_display_name",
-        "pushkey",
-        "pushkey_ts",
-        "data",
-        "last_token",
-        "last_success",
-        "failing_since"
-    ]
-
-    EntryType = collections.namedtuple("PusherEntry", fields)
