@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS events(
     event_id VARCHAR(150) NOT NULL,
     type VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
-    content bytea NOT NULL,
-    unrecognized_keys bytea,
+    content TEXT NOT NULL,
+    unrecognized_keys TEXT,
     processed BOOL NOT NULL,
     outlier BOOL NOT NULL,
     depth BIGINT DEFAULT 0 NOT NULL,
@@ -35,8 +35,8 @@ CREATE INDEX events_room_id ON events (room_id);
 CREATE TABLE IF NOT EXISTS event_json(
     event_id VARCHAR(150) NOT NULL,
     room_id VARCHAR(150) NOT NULL,
-    internal_metadata bytea NOT NULL,
-    json bytea NOT NULL,
+    internal_metadata TEXT NOT NULL,
+    json TEXT NOT NULL,
     UNIQUE (event_id)
 );
 

@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS application_services_state(
 CREATE TABLE IF NOT EXISTS application_services_txns(
     as_id VARCHAR(150) NOT NULL,
     txn_id INTEGER NOT NULL,
-    event_ids bytea NOT NULL,
+    event_ids TEXT NOT NULL,
     UNIQUE(as_id, txn_id)
 );
 

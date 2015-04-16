@@ -35,16 +35,13 @@ class ProfileStore(SQLBaseStore):
             desc="get_profile_displayname",
         )
 
-        if name:
-            name = self.database_engine.load_unicode(name)
-
         defer.returnValue(name)
 
     def set_profile_displayname(self, user_localpart, new_displayname):
         return self._simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={"displayname": new_displayname.encode("utf8")},
+            updatevalues={"displayname": new_displayname},
             desc="set_profile_displayname",
         )
 

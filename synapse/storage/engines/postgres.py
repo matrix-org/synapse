@@ -39,6 +39,3 @@ class PostgresEngine(object):
         if isinstance(error, self.module.DatabaseError):
             return error.pgcode in ["40001", "40P01"]
         return False
-
-    def load_unicode(self, v):
-        return bytes(v).decode("UTF8")

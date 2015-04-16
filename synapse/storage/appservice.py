@@ -366,9 +366,7 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         new_txn_id = max(highest_txn_id, last_txn_id) + 1
 
         # Insert new txn into txn table
-        event_ids = buffer(
-            json.dumps([e.event_id for e in events]).encode("utf8")
-        )
+        event_ids = json.dumps([e.event_id for e in events])
         txn.execute(
             "INSERT INTO application_services_txns(as_id, txn_id, event_ids) "
             "VALUES(?,?,?)",

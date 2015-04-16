@@ -818,9 +818,6 @@ class SQLBaseStore(object):
 
         internal_metadata, js, redacted, rejected_reason = res
 
-        internal_metadata = self.database_engine.load_unicode(internal_metadata)
-        js = self.database_engine.load_unicode(js)
-
         start_time = update_counter("select_event", start_time)
 
         result = self._get_event_from_row_txn(

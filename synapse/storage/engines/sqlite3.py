@@ -37,8 +37,3 @@ class Sqlite3Engine(object):
 
     def is_deadlock(self, error):
         return False
-
-    def load_unicode(self, v):
-        if isinstance(v, types.UnicodeType):
-            return v
-        return bytes(v).decode("UTF8")
