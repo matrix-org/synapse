@@ -18,18 +18,15 @@ from twisted.internet import defer
 
 from synapse.types import UserID
 from synapse.api.errors import (
-    AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError,
-    CodeMessageException
+    AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
 )
 from ._base import BaseHandler
 import synapse.util.stringutils as stringutils
 from synapse.util.async import run_on_reactor
-from synapse.http.client import SimpleHttpClient
 from synapse.http.client import CaptchaServerHttpClient
 
 import base64
 import bcrypt
-import json
 import logging
 import urllib
 
