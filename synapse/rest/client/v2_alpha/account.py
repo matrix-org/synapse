@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.api.constants import LoginType
 from synapse.api.errors import LoginError, SynapseError, Codes
 from synapse.http.servlet import RestServlet
+from synapse.util.async import run_on_reactor
 
 from ._base import client_v2_pattern, parse_json_dict_from_request
 
@@ -39,6 +40,8 @@ class PasswordRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        yield run_on_reactor()
+
         body = parse_json_dict_from_request(request)
 
         authed, result, params = yield self.auth_handler.check_auth([
@@ -78,16 +81,51 @@ class PasswordRestServlet(RestServlet):
 class ThreepidRestServlet(RestServlet):
     PATTERN = client_v2_pattern("/account/3pid")
 
+    def __init__(self, hs):
+        super(ThreepidRestServlet, self).__init__()
+        self.hs = hs
+        self.login_handler = hs.get_handlers().login_handler
+        self.identity_handler = hs.get_handlers().identity_handler
+        self.auth = hs.get_auth()
+
     @defer.inlineCallbacks
     def on_POST(self, request):
+        yield run_on_reactor()
+
         body = parse_json_dict_from_request(request)
 
         if 'threePidCreds' not in body:
             raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
+        threePidCreds = body['threePidCreds']
 
         auth_user, client = yield self.auth.get_user_by_req(request)
 
+        threepid = yield self.identity_handler.threepid_from_creds(threePidCreds)
 
+        if not threepid:
+            raise SynapseError(400, "Failed to auth 3pid")
+
+        for reqd in ['medium', 'address', 'validatedAt']:
+            if reqd not in threepid:
+                logger.warn("Couldn't add 3pid: invalid response from ID sevrer")
+                raise SynapseError(500, "Invalid response from ID Server")
+
+        yield self.login_handler.add_threepid(
+            auth_user.to_string(),
+            threepid['medium'],
+            threepid['address'],
+            threepid['validatedAt'],
+        )
+
+        if 'bind' in body and body['bind']:
+            logger.debug("Binding emails %s to %s" % (
+                threepid, auth_user.to_string()
+            ))
+            yield self.identity_handler.bind_threepid(
+                threePidCreds, auth_user.to_string()
+            )
+
+        defer.returnValue((200, {}))
 
 
 def register_servlets(hs, http_server):

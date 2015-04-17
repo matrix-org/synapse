@@ -175,3 +175,14 @@ class RegistrationStore(SQLBaseStore):
             return rows[0]
 
         return None
+
+    @defer.inlineCallbacks
+    def user_add_threepid(self, user_id, medium, address, validated_at, added_at):
+        yield self._simple_upsert("user_threepids", {
+            "user": user_id,
+            "medium": medium,
+            "address": address,
+        }, {
+            "validated_at": validated_at,
+            "added_at": added_at,
+        })

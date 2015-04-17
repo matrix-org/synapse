@@ -74,3 +74,10 @@ class LoginHandler(BaseHandler):
             user_id, token_id
         )
         yield self.store.flush_user(user_id)
+
+    @defer.inlineCallbacks
+    def add_threepid(self, user_id, medium, address, validated_at):
+        yield self.store.user_add_threepid(
+            user_id, medium, address, validated_at,
+            self.hs.get_clock().time_msec()
+        )

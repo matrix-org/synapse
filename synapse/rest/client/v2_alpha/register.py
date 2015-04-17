@@ -50,6 +50,7 @@ class RegisterRestServlet(RestServlet):
         self.auth_handler = hs.get_handlers().auth_handler
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
+        self.login_handler = hs.get_handlers().login_handler
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -61,7 +62,6 @@ class RegisterRestServlet(RestServlet):
 
         if 'username' in body:
             desired_username = body['username']
-            print "username in body"
             yield self.registration_handler.check_username(desired_username)
 
         is_using_shared_secret = False
@@ -118,17 +118,31 @@ class RegisterRestServlet(RestServlet):
             password=new_password
         )
 
-        if 'bind_email' in params and params['bind_email']:
-            logger.info("bind_email specified: binding")
+        if LoginType.EMAIL_IDENTITY in result:
+            threepid = result[LoginType.EMAIL_IDENTITY]
 
-            emailThreepid = result[LoginType.EMAIL_IDENTITY]
-            threepidCreds = emailThreepid['threepidCreds']
-            logger.debug("Binding emails %s to %s" % (
-                emailThreepid, user_id
-            ))
-            yield self.identity_handler.bind_threepid(threepidCreds, user_id)
-        else:
-            logger.info("bind_email not specified: not binding email")
+            for reqd in ['medium', 'address', 'validatedAt']:
+                if reqd not in threepid:
+                    logger.info("Can't add incomplete 3pid")
+                else:
+                    yield self.login_handler.add_threepid(
+                        user_id,
+                        threepid['medium'],
+                        threepid['address'],
+                        threepid['validatedAt'],
+                    )
+
+            if 'bind_email' in params and params['bind_email']:
+                logger.info("bind_email specified: binding")
+
+                emailThreepid = result[LoginType.EMAIL_IDENTITY]
+                threepidCreds = emailThreepid['threepidCreds']
+                logger.debug("Binding emails %s to %s" % (
+                    emailThreepid, user_id
+                ))
+                yield self.identity_handler.bind_threepid(threepidCreds, user_id)
+            else:
+                logger.info("bind_email not specified: not binding email")
 
         result = {
             "user_id": user_id,
