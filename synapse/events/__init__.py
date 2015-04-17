@@ -46,9 +46,10 @@ def _event_dict_property(key):
 
 class EventBase(object):
     def __init__(self, event_dict, signatures={}, unsigned={},
-                 internal_metadata_dict={}):
+                 internal_metadata_dict={}, rejected_reason=None):
         self.signatures = signatures
         self.unsigned = unsigned
+        self.rejected_reason = rejected_reason
 
         self._event_dict = event_dict
 
@@ -109,7 +110,7 @@ class EventBase(object):
 
 
 class FrozenEvent(EventBase):
-    def __init__(self, event_dict, internal_metadata_dict={}):
+    def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
         event_dict = dict(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
@@ -128,6 +129,7 @@ class FrozenEvent(EventBase):
             signatures=signatures,
             unsigned=unsigned,
             internal_metadata_dict=internal_metadata_dict,
+            rejected_reason=rejected_reason,
         )
 
     @staticmethod

@@ -1,3 +1,10 @@
+Changes in synapse vX
+=====================
+
+* Changed config option from ``disable_registration`` to
+  ``enable_registration``. Old option will be ignored.
+
+
 Changes in synapse v0.8.1 (2015-03-18)
 ======================================
 

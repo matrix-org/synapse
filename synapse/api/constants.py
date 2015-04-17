@@ -59,6 +59,9 @@ class LoginType(object):
     EMAIL_URL = u"m.login.email.url"
     EMAIL_IDENTITY = u"m.login.email.identity"
     RECAPTCHA = u"m.login.recaptcha"
+    DUMMY = u"m.login.dummy"
+
+    # Only for C/S API v1
     APPLICATION_SERVICE = u"m.login.application_service"
     SHARED_SECRET = u"org.matrix.login.shared_secret"
 

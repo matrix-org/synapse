@@ -18,7 +18,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
-from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
 from synapse.types import UserID, ClientInfo
@@ -40,6 +40,7 @@ class Auth(object):
         self.hs = hs
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
+        self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
 
     def check(self, event, auth_events):
         """ Checks if this event is correctly authed.
@@ -215,17 +216,20 @@ class Auth(object):
         else:
             ban_level = 50  # FIXME (erikj): What should we do here?
 
-        if Membership.INVITE == membership:
-            # TODO (erikj): We should probably handle this more intelligently
-            # PRIVATE join rules.
-
-            # Invites are valid iff caller is in the room and target isn't.
+        if Membership.JOIN != membership:
+            # JOIN is the only action you can perform if you're not in the room
             if not caller_in_room:  # caller isn't joined
                 raise AuthError(
                     403,
                     "%s not in room %s." % (event.user_id, event.room_id,)
                 )
-            elif target_banned:
+
+        if Membership.INVITE == membership:
+            # TODO (erikj): We should probably handle this more intelligently
+            # PRIVATE join rules.
+
+            # Invites are valid iff caller is in the room and target isn't.
+            if target_banned:
                 raise AuthError(
                     403, "%s is banned from the room" % (target_user_id,)
                 )
@@ -251,13 +255,7 @@ class Auth(object):
                 raise AuthError(403, "You are not allowed to join this room")
         elif Membership.LEAVE == membership:
             # TODO (erikj): Implement kicks.
-
-            if not caller_in_room:  # trying to leave a room you aren't joined
-                raise AuthError(
-                    403,
-                    "%s not in room %s." % (target_user_id, event.room_id,)
-                )
-            elif target_banned and user_level < ban_level:
+            if target_banned and user_level < ban_level:
                 raise AuthError(
                     403, "You cannot unban user &s." % (target_user_id,)
                 )
@@ -373,7 +371,9 @@ class Auth(object):
 
             defer.returnValue((user, ClientInfo(device_id, token_id)))
         except KeyError:
-            raise AuthError(403, "Missing access token.")
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token."
+            )
 
     @defer.inlineCallbacks
     def get_user_by_token(self, token):
@@ -387,21 +387,20 @@ class Auth(object):
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
-        try:
-            ret = yield self.store.get_user_by_token(token)
-            if not ret:
-                raise StoreError(400, "Unknown token")
-            user_info = {
-                "admin": bool(ret.get("admin", False)),
-                "device_id": ret.get("device_id"),
-                "user": UserID.from_string(ret.get("name")),
-                "token_id": ret.get("token_id", None),
-            }
+        ret = yield self.store.get_user_by_token(token)
+        if not ret:
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
+                errcode=Codes.UNKNOWN_TOKEN
+            )
+        user_info = {
+            "admin": bool(ret.get("admin", False)),
+            "device_id": ret.get("device_id"),
+            "user": UserID.from_string(ret.get("name")),
+            "token_id": ret.get("token_id", None),
+        }
 
-            defer.returnValue(user_info)
-        except StoreError:
-            raise AuthError(403, "Unrecognised access token.",
-                            errcode=Codes.UNKNOWN_TOKEN)
+        defer.returnValue(user_info)
 
     @defer.inlineCallbacks
     def get_appservice_by_req(self, request):
@@ -409,11 +408,16 @@ class Auth(object):
             token = request.args["access_token"][0]
             service = yield self.store.get_app_service_by_token(token)
             if not service:
-                raise AuthError(403, "Unrecognised access token.",
-                                errcode=Codes.UNKNOWN_TOKEN)
+                raise AuthError(
+                    self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                    "Unrecognised access token.",
+                    errcode=Codes.UNKNOWN_TOKEN
+                )
             defer.returnValue(service)
         except KeyError:
-            raise AuthError(403, "Missing access token.")
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token."
+            )
 
     def is_server_admin(self, user):
         return self.store.is_server_admin(user)
@@ -486,7 +490,7 @@ class Auth(object):
             send_level = send_level_event.content.get("events", {}).get(
                 event.type
             )
-            if not send_level:
+            if send_level is None:
                 if hasattr(event, "state_key"):
                     send_level = send_level_event.content.get(
                         "state_default", 50

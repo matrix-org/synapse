@@ -32,6 +32,7 @@ class MediaRepositoryStore(SQLBaseStore):
             {"media_id": media_id},
             ("media_type", "media_length", "upload_name", "created_ts"),
             allow_none=True,
+            desc="get_local_media",
         )
 
     def store_local_media(self, media_id, media_type, time_now_ms, upload_name,
@@ -45,7 +46,8 @@ class MediaRepositoryStore(SQLBaseStore):
                 "upload_name": upload_name,
                 "media_length": media_length,
                 "user_id": user_id.to_string(),
-            }
+            },
+            desc="store_local_media",
         )
 
     def get_local_media_thumbnails(self, media_id):
@@ -55,7 +57,8 @@ class MediaRepositoryStore(SQLBaseStore):
             (
                 "thumbnail_width", "thumbnail_height", "thumbnail_method",
                 "thumbnail_type", "thumbnail_length",
-            )
+            ),
+            desc="get_local_media_thumbnails",
         )
 
     def store_local_thumbnail(self, media_id, thumbnail_width,
@@ -70,7 +73,8 @@ class MediaRepositoryStore(SQLBaseStore):
                 "thumbnail_method": thumbnail_method,
                 "thumbnail_type": thumbnail_type,
                 "thumbnail_length": thumbnail_length,
-            }
+            },
+            desc="store_local_thumbnail",
         )
 
     def get_cached_remote_media(self, origin, media_id):
@@ -82,6 +86,7 @@ class MediaRepositoryStore(SQLBaseStore):
                 "filesystem_id",
             ),
             allow_none=True,
+            desc="get_cached_remote_media",
         )
 
     def store_cached_remote_media(self, origin, media_id, media_type,
@@ -97,7 +102,8 @@ class MediaRepositoryStore(SQLBaseStore):
                 "created_ts": time_now_ms,
                 "upload_name": upload_name,
                 "filesystem_id": filesystem_id,
-            }
+            },
+            desc="store_cached_remote_media",
         )
 
     def get_remote_media_thumbnails(self, origin, media_id):
@@ -107,7 +113,8 @@ class MediaRepositoryStore(SQLBaseStore):
             (
                 "thumbnail_width", "thumbnail_height", "thumbnail_method",
                 "thumbnail_type", "thumbnail_length", "filesystem_id",
-            )
+            ),
+            desc="get_remote_media_thumbnails",
         )
 
     def store_remote_media_thumbnail(self, origin, media_id, filesystem_id,
@@ -125,5 +132,6 @@ class MediaRepositoryStore(SQLBaseStore):
                 "thumbnail_type": thumbnail_type,
                 "thumbnail_length": thumbnail_length,
                 "filesystem_id": filesystem_id,
-            }
+            },
+            desc="store_remote_media_thumbnail",
         )

@@ -33,6 +33,10 @@ logger = logging.getLogger(__name__)
 metrics = synapse.metrics.get_metrics_for(__name__)
 
 
+# Don't bother bumping "last active" time if it differs by less than 60 seconds
+LAST_ACTIVE_GRANULARITY = 60*1000
+
+
 # TODO(paul): Maybe there's one of these I can steal from somewhere
 def partition(l, func):
     """Partition the list by the result of func applied to each element."""
@@ -281,6 +285,10 @@ class PresenceHandler(BaseHandler):
     def bump_presence_active_time(self, user, now=None):
         if now is None:
             now = self.clock.time_msec()
+
+        prev_state = self._get_or_make_usercache(user)
+        if now - prev_state.state.get("last_active", 0) < LAST_ACTIVE_GRANULARITY:
+            return
 
         self.changed_presencelike_data(user, {"last_active": now})
 

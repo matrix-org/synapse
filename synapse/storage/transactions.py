@@ -46,15 +46,19 @@ class TransactionStore(SQLBaseStore):
         )
 
     def _get_received_txn_response(self, txn, transaction_id, origin):
-        where_clause = "transaction_id = ? AND origin = ?"
-        query = ReceivedTransactionsTable.select_statement(where_clause)
+        result = self._simple_select_one_txn(
+            txn,
+            table=ReceivedTransactionsTable.table_name,
+            keyvalues={
+                "transaction_id": transaction_id,
+                "origin": origin,
+            },
+            retcols=ReceivedTransactionsTable.fields,
+            allow_none=True,
+        )
 
-        txn.execute(query, (transaction_id, origin))
-
-        results = ReceivedTransactionsTable.decode_results(txn.fetchall())
-
-        if results and results[0].response_code:
-            return (results[0].response_code, results[0].response_json)
+        if result and result.response_code:
+            return result["response_code"], result["response_json"]
         else:
             return None
 
