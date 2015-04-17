@@ -19,7 +19,11 @@ CREATE TABLE IF NOT EXISTS room_aliases(
     UNIQUE (room_alias)
 );
 
+CREATE INDEX room_aliases_id ON room_aliases(room_id);
+
 CREATE TABLE IF NOT EXISTS room_alias_servers(
     room_alias VARCHAR(150) NOT NULL,
     server VARCHAR(150) NOT NULL
 );
+
+CREATE INDEX room_alias_servers_alias ON room_alias_servers(room_alias);

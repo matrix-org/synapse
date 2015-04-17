@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS user_ips (
     access_token VARCHAR(150) NOT NULL,
     device_id VARCHAR(150),
     ip VARCHAR(150) NOT NULL,
-    user_agent VARCHAR(150) NOT NULL,
+    user_agent TEXT NOT NULL,
     last_seen BIGINT NOT NULL,
     UNIQUE (user, access_token, ip, user_agent)
 );

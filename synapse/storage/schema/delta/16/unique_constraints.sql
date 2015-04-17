@@ -70,3 +70,11 @@ DROP INDEX IF EXISTS presence_list_observers;
 CREATE UNIQUE INDEX presence_list_observers ON presence_list(
     user_id, observed_user_id
 );
+
+--
+DELETE FROM room_aliases WHERE rowid not in (
+    SELECT MIN(rowid) FROM room_aliases GROUP BY room_alias
+);
+
+DROP INDEX IF EXISTS room_aliases_id;
+CREATE INDEX room_aliases_id ON room_aliases(room_id);
