@@ -89,6 +89,18 @@ class ThreepidRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
+    def on_GET(self, request):
+        yield run_on_reactor()
+
+        auth_user, _ = yield self.auth.get_user_by_req(request)
+
+        threepids = yield self.hs.get_datastore().user_get_threepids(
+            auth_user.to_string()
+        )
+
+        defer.returnValue((200, {'threepids': threepids}))
+
+    @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor()
 
