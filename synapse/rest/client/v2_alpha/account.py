@@ -75,7 +75,7 @@ class PasswordRestServlet(RestServlet):
         return 200, {}
 
 
-class AddThreepidRestServlet(RestServlet):
+class ThreepidRestServlet(RestServlet):
     PATTERN = client_v2_pattern("/account/3pid")
 
     @defer.inlineCallbacks
@@ -92,3 +92,5 @@ class AddThreepidRestServlet(RestServlet):
 
 def register_servlets(hs, http_server):
     PasswordRestServlet(hs).register(http_server)
+    ThreepidRestServlet(hs).register(http_server)
+    ThreepidRestServlet(hs).register(http_server)
