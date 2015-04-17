@@ -16,14 +16,23 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.types import UserID
-import synapse.util.stringutils as stringutils
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def log_failure(failure):
+    logger.error(
+        "Application Services Failure",
+        exc_info=(
+            failure.type,
+            failure.value,
+            failure.getTracebackObject()
+        )
+    )
 
 
 # NB: Purposefully not inheriting BaseHandler since that contains way too much
@@ -31,42 +40,12 @@ logger = logging.getLogger(__name__)
 # easier.
 class ApplicationServicesHandler(object):
 
-    def __init__(self, hs, appservice_api):
+    def __init__(self, hs, appservice_api, appservice_scheduler):
         self.store = hs.get_datastore()
         self.hs = hs
         self.appservice_api = appservice_api
-
-    @defer.inlineCallbacks
-    def register(self, app_service):
-        logger.info("Register -> %s", app_service)
-        # check the token is recognised
-        try:
-            stored_service = yield self.store.get_app_service_by_token(
-                app_service.token
-            )
-            if not stored_service:
-                raise StoreError(404, "Application service not found")
-        except StoreError:
-            raise SynapseError(
-                403, "Unrecognised application services token. "
-                "Consult the home server admin.",
-                errcode=Codes.FORBIDDEN
-            )
-
-        app_service.hs_token = self._generate_hs_token()
-
-        # create a sender for this application service which is used when
-        # creating rooms, etc..
-        account = yield self.hs.get_handlers().registration_handler.register()
-        app_service.sender = account[0]
-
-        yield self.store.update_app_service(app_service)
-        defer.returnValue(app_service)
-
-    @defer.inlineCallbacks
-    def unregister(self, token):
-        logger.info("Unregister as_token=%s", token)
-        yield self.store.unregister_app_service(token)
+        self.scheduler = appservice_scheduler
+        self.started_scheduler = False
 
     @defer.inlineCallbacks
     def notify_interested_services(self, event):
@@ -90,9 +69,13 @@ class ApplicationServicesHandler(object):
         if event.type == EventTypes.Member:
             yield self._check_user_exists(event.state_key)
 
-        # Fork off pushes to these services - XXX First cut, best effort
+        if not self.started_scheduler:
+            self.scheduler.start().addErrback(log_failure)
+            self.started_scheduler = True
+
+        # Fork off pushes to these services
         for service in services:
-            self.appservice_api.push(service, event)
+            self.scheduler.submit_event_for_as(service, event)
 
     @defer.inlineCallbacks
     def query_user_exists(self, user_id):
@@ -197,7 +180,14 @@ class ApplicationServicesHandler(object):
             return
 
         user_info = yield self.store.get_user_by_id(user_id)
-        defer.returnValue(len(user_info) == 0)
+        if len(user_info) > 0:
+            defer.returnValue(False)
+            return
+
+        # user not found; could be the AS though, so check.
+        services = yield self.store.get_app_services()
+        service_list = [s for s in services if s.sender == user_id]
+        defer.returnValue(len(service_list) == 0)
 
     @defer.inlineCallbacks
     def _check_user_exists(self, user_id):
@@ -206,6 +196,3 @@ class ApplicationServicesHandler(object):
             exists = yield self.query_user_exists(user_id)
             defer.returnValue(exists)
         defer.returnValue(True)
-
-    def _generate_hs_token(self):
-        return stringutils.random_string(24)

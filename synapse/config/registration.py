@@ -25,11 +25,11 @@ class RegistrationConfig(Config):
     def __init__(self, args):
         super(RegistrationConfig, self).__init__(args)
 
-        # `args.disable_registration` may either be a bool or a string depending
-        # on if the option was given a value (e.g. --disable-registration=false
-        # would set `args.disable_registration` to "false" not False.)
-        self.disable_registration = bool(
-            distutils.util.strtobool(str(args.disable_registration))
+        # `args.enable_registration` may either be a bool or a string depending
+        # on if the option was given a value (e.g. --enable-registration=true
+        # would set `args.enable_registration` to "true" not True.)
+        self.disable_registration = not bool(
+            distutils.util.strtobool(str(args.enable_registration))
         )
         self.registration_shared_secret = args.registration_shared_secret
 
@@ -39,11 +39,11 @@ class RegistrationConfig(Config):
         reg_group = parser.add_argument_group("registration")
 
         reg_group.add_argument(
-            "--disable-registration",
+            "--enable-registration",
             const=True,
-            default=True,
+            default=False,
             nargs='?',
-            help="Disable registration of new users.",
+            help="Enable registration for new users.",
         )
         reg_group.add_argument(
             "--registration-shared-secret", type=str,
@@ -53,8 +53,8 @@ class RegistrationConfig(Config):
 
     @classmethod
     def generate_config(cls, args, config_dir_path):
-        if args.disable_registration is None:
-            args.disable_registration = True
+        if args.enable_registration is None:
+            args.enable_registration = False
 
         if args.registration_shared_secret is None:
             args.registration_shared_secret = random_string_with_symbols(50)

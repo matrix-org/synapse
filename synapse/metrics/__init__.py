@@ -18,6 +18,8 @@ from __future__ import absolute_import
 
 import logging
 from resource import getrusage, getpagesize, RUSAGE_SELF
+import os
+import stat
 
 from .metric import (
     CounterMetric, CallbackMetric, DistributionMetric, CacheMetric
@@ -109,3 +111,36 @@ resource_metrics.register_callback("stime", lambda: rusage.ru_stime * 1000)
 
 # pages
 resource_metrics.register_callback("maxrss", lambda: rusage.ru_maxrss * PAGE_SIZE)
+
+TYPES = {
+    stat.S_IFSOCK: "SOCK",
+    stat.S_IFLNK: "LNK",
+    stat.S_IFREG: "REG",
+    stat.S_IFBLK: "BLK",
+    stat.S_IFDIR: "DIR",
+    stat.S_IFCHR: "CHR",
+    stat.S_IFIFO: "FIFO",
+}
+
+
+def _process_fds():
+    counts = {(k,): 0 for k in TYPES.values()}
+    counts[("other",)] = 0
+
+    for fd in os.listdir("/proc/self/fd"):
+        try:
+            s = os.stat("/proc/self/fd/%s" % (fd))
+            fmt = stat.S_IFMT(s.st_mode)
+            if fmt in TYPES:
+                t = TYPES[fmt]
+            else:
+                t = "other"
+
+            counts[(t,)] += 1
+        except OSError:
+            # the dirh itself used by listdir() is usually missing by now
+            pass
+
+    return counts
+
+get_metrics_for("process").register_callback("fds", _process_fds, labels=["type"])
