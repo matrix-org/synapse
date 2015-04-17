@@ -19,11 +19,7 @@ from twisted.internet import defer
 from .base import ClientV1RestServlet, client_path_pattern
 from synapse.types import UserID
 
-import logging
 import simplejson as json
-
-
-logger = logging.getLogger(__name__)
 
 
 class ProfileDisplaynameRestServlet(ClientV1RestServlet):
@@ -51,8 +47,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_displayname(
-            user, auth_user, new_name
-        )
+            user, auth_user, new_name)
 
         defer.returnValue((200, {}))
 
