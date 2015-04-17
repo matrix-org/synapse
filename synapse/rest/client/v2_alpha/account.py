@@ -93,4 +93,3 @@ class ThreepidRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     PasswordRestServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
-    ThreepidRestServlet(hs).register(http_server)
