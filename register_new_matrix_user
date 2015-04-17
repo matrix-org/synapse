@@ -49,7 +49,12 @@ def request_registration(user, password, server_location, shared_secret):
         headers={'Content-Type': 'application/json'}
     )
     try:
-        f = urllib2.urlopen(req)
+        if sys.version_info[:3] >= (2, 7, 9):
+            # As of version 2.7.9, urllib2 now checks SSL certs
+            import ssl
+            f = urllib2.urlopen(req, context=ssl.SSLContext(ssl.PROTOCOL_SSLv23))
+        else:
+            f = urllib2.urlopen(req)
         f.read()
         f.close()
         print "Success."
