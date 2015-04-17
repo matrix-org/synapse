@@ -37,7 +37,7 @@ class DatabaseConfig(Config):
         db_group = parser.add_argument_group("database")
         db_group.add_argument(
             "-d", "--database-path", default="homeserver.db",
-            help="The database name."
+            metavar="SQLITE_DATABASE_PATH", help="The database name."
         )
         db_group.add_argument(
             "--event-cache-size", default="100K",
