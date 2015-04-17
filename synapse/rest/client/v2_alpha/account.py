@@ -45,31 +45,42 @@ class PasswordRestServlet(RestServlet):
         body = parse_json_dict_from_request(request)
 
         authed, result, params = yield self.auth_handler.check_auth([
-            [LoginType.PASSWORD]
+            [LoginType.PASSWORD],
+            [LoginType.EMAIL_IDENTITY]
         ], body)
 
         if not authed:
             defer.returnValue((401, result))
 
-        auth_user = None
+        user_id = None
 
         if LoginType.PASSWORD in result:
             # if using password, they should also be logged in
             auth_user, client = yield self.auth.get_user_by_req(request)
             if auth_user.to_string() != result[LoginType.PASSWORD]:
                 raise LoginError(400, "", Codes.UNKNOWN)
+            user_id = auth_user.to_string()
+        elif LoginType.EMAIL_IDENTITY in result:
+            threepid = result[LoginType.EMAIL_IDENTITY]
+            if 'medium' not in threepid or 'address' not in threepid:
+                raise SynapseError(500, "Malformed threepid")
+            # if using email, we must know about the email they're authing with!
+            threepid_user = yield self.hs.get_datastore().get_user_by_threepid(
+                threepid['medium'], threepid['address']
+            )
+            if not threepid_user:
+                raise SynapseError(404, "Email address not found", Codes.NOT_FOUND)
+            user_id = threepid_user
         else:
             logger.error("Auth succeeded but no known type!", result.keys())
             raise SynapseError(500, "", Codes.UNKNOWN)
-
-        user_id = auth_user.to_string()
 
         if 'new_password' not in params:
             raise SynapseError(400, "", Codes.MISSING_PARAM)
         new_password = params['new_password']
 
         yield self.login_handler.set_password(
-            user_id, new_password, client.token_id
+            user_id, new_password, None
         )
 
         defer.returnValue((200, {}))

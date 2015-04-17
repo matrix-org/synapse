@@ -195,11 +195,17 @@ class AuthHandler(BaseHandler):
     def _check_email_identity(self, authdict, _):
         yield run_on_reactor()
 
+        if 'threepidCreds' not in authdict:
+            raise LoginError(400, "Missing threepidCreds", Codes.MISSING_PARAM)
+
         threepidCreds = authdict['threepidCreds']
         identity_handler = self.hs.get_handlers().identity_handler
 
-        logger.debug("Getting validated threepid. threepidcreds: %r" % (threepidCreds,))
+        logger.info("Getting validated threepid. threepidcreds: %r" % (threepidCreds,))
         threepid = yield identity_handler.threepid_from_creds(threepidCreds)
+
+        if not threepid:
+            raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
         threepid['threepidCreds'] = authdict['threepidCreds']
 
