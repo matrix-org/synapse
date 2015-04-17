@@ -75,5 +75,20 @@ class PasswordRestServlet(RestServlet):
         return 200, {}
 
 
+class AddThreepidRestServlet(RestServlet):
+    PATTERN = client_v2_pattern("/account/3pid")
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        body = parse_json_dict_from_request(request)
+
+        if 'threePidCreds' not in body:
+            raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
+
+        auth_user, client = yield self.auth.get_user_by_req(request)
+
+
+
+
 def register_servlets(hs, http_server):
     PasswordRestServlet(hs).register(http_server)
