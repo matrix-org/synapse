@@ -268,7 +268,7 @@ class CursesProgress(Progress):
 
         if self.finished:
             self.stdscr.addstr(
-                self.rows-1, 0 ,
+                self.rows-1, 0,
                 "Press any key to exit...",
             )
 
@@ -560,7 +560,6 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default=1000)
 
     args = parser.parse_args()
-
 
     logging_config = {
         "level": logging.DEBUG if args.v else logging.INFO,
