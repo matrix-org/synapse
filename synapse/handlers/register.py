@@ -88,7 +88,7 @@ class RegistrationHandler(BaseHandler):
             password_hash = bcrypt.hashpw(password, bcrypt.gensalt())
 
         if localpart:
-            self.check_username(localpart)
+            yield self.check_username(localpart)
 
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
