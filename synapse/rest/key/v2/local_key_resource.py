@@ -74,7 +74,9 @@ class LocalKey(Resource):
         for key in self.config.signing_key:
             verify_key_bytes = key.verify_key.encode()
             key_id = "%s:%s" % (key.alg, key.version)
-            verify_keys[key_id] = encode_base64(verify_key_bytes)
+            verify_keys[key_id] = {
+                u"key": encode_base64(verify_key_bytes)
+            }
 
         old_verify_keys = {}
         for key in self.config.old_signing_keys:
