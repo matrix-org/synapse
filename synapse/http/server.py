@@ -57,9 +57,18 @@ _next_request_id = 0
 def request_handler(request_handler):
     """Wraps a method that acts as a request handler with the necessary logging
     and exception handling.
-    The method must have a signature of "handle_foo(self, request)".
-    The argument "self" must have "version_string" and "clock" attributes.
-    The argument "request" must be a twisted HTTP request.
+
+    The method must have a signature of "handle_foo(self, request)". The
+    argument "self" must have "version_string" and "clock" attributes. The
+    argument "request" must be a twisted HTTP request.
+
+    The method must return a deferred. If the deferred succeeds we assume that
+    a response has been sent. If the deferred fails with a SynapseError we use
+    it to send a JSON response with the appropriate HTTP reponse code. If the
+    deferred fails with any other type of error we send a 500 reponse.
+
+    We insert a unique request-id into the logging context for this request and
+    log the response and duration for this request.
     """
 
     @defer.inlineCallbacks

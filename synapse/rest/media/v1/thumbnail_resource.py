@@ -14,7 +14,9 @@
 # limitations under the License.
 
 
-from .base_resource import BaseMediaResource
+from .base_resource import BaseMediaResource, parse_media_id
+from synapse.http.servlet import parse_string, parse_integer
+from synapse.http.server import request_handler
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
@@ -31,14 +33,14 @@ class ThumbnailResource(BaseMediaResource):
         self._async_render_GET(request)
         return NOT_DONE_YET
 
-    @BaseMediaResource.catch_errors
+    @request_handler
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
-        server_name, media_id = self._parse_media_id(request)
-        width = self._parse_integer(request, "width")
-        height = self._parse_integer(request, "height")
-        method = self._parse_string(request, "method", "scale")
-        m_type = self._parse_string(request, "type", "image/png")
+        server_name, media_id = parse_media_id(request)
+        width = parse_integer(request, "width")
+        height = parse_integer(request, "height")
+        method = parse_string(request, "method", "scale")
+        m_type = parse_string(request, "type", "image/png")
 
         if server_name == self.server_name:
             yield self._respond_local_thumbnail(
