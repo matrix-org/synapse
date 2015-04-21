@@ -592,6 +592,7 @@ class Auth(object):
             ("ban", []),
             ("redact", []),
             ("kick", []),
+            ("invite", []),
         ]
 
         old_list = current_state.content.get("users")
