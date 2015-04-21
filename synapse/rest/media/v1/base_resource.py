@@ -57,6 +57,7 @@ class BaseMediaResource(Resource):
         self.max_upload_size = hs.config.max_upload_size
         self.max_image_pixels = hs.config.max_image_pixels
         self.filepaths = filepaths
+        self.version_string = hs.version_string
         self.downloads = {}
 
     def _respond_404(self, request):
