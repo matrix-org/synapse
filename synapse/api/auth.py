@@ -275,7 +275,6 @@ class Auth(object):
                         403, "You cannot kick user %s." % target_user_id
                     )
         elif Membership.BAN == membership:
-            print "I wonder how user's level of %r compares to ban level of %r" % (user_level, ban_level)
             if user_level < ban_level:
                 raise AuthError(403, "You don't have permission to ban")
         else:
