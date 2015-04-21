@@ -23,6 +23,61 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def parse_integer(request, name, default=None, required=False):
+    if name in request.args:
+        try:
+            return int(request.args[name][0])
+        except:
+            message = "Query parameter %r must be an integer" % (name,)
+            raise SynapseError(400, message)
+    else:
+        if required:
+            message = "Missing integer query parameter %r" % (name,)
+            raise SynapseError(400, message)
+        else:
+            return default
+
+
+def parse_boolean(request, name, default=None, required=False):
+    if name in request.args:
+        try:
+            return {
+                "true": True,
+                "false": False,
+            }[request.args[name][0]]
+        except:
+            message = (
+                "Boolean query parameter %r must be one of"
+                " ['true', 'false']"
+            ) % (name,)
+            raise SynapseError(400, message)
+    else:
+        if required:
+            message = "Missing boolean query parameter %r" % (name,)
+            raise SynapseError(400, message)
+        else:
+            return default
+
+
+def parse_string(request, name, default=None, required=False,
+                 allowed_values=None, param_type="string"):
+    if name in request.args:
+        value = request.args[name][0]
+        if allowed_values is not None and value not in allowed_values:
+            message = "Query parameter %r must be one of [%s]" % (
+                name, ", ".join(repr(v) for v in allowed_values)
+            )
+            raise SynapseError(message)
+        else:
+            return value
+    else:
+        if required:
+            message = "Missing %s query parameter %r" % (param_type, name)
+            raise SynapseError(400, message)
+        else:
+            return default
+
+
 class RestServlet(object):
 
     """ A Synapse REST Servlet.
@@ -56,58 +111,3 @@ class RestServlet(object):
                     http_server.register_path(method, pattern, method_handler)
         else:
             raise NotImplementedError("RestServlet must register something.")
-
-    @staticmethod
-    def parse_integer(request, name, default=None, required=False):
-        if name in request.args:
-            try:
-                return int(request.args[name][0])
-            except:
-                message = "Query parameter %r must be an integer" % (name,)
-                raise SynapseError(400, message)
-        else:
-            if required:
-                message = "Missing integer query parameter %r" % (name,)
-                raise SynapseError(400, message)
-            else:
-                return default
-
-    @staticmethod
-    def parse_boolean(request, name, default=None, required=False):
-        if name in request.args:
-            try:
-                return {
-                    "true": True,
-                    "false": False,
-                }[request.args[name][0]]
-            except:
-                message = (
-                    "Boolean query parameter %r must be one of"
-                    " ['true', 'false']"
-                ) % (name,)
-                raise SynapseError(400, message)
-        else:
-            if required:
-                message = "Missing boolean query parameter %r" % (name,)
-                raise SynapseError(400, message)
-            else:
-                return default
-
-    @staticmethod
-    def parse_string(request, name, default=None, required=False,
-                     allowed_values=None, param_type="string"):
-        if name in request.args:
-            value = request.args[name][0]
-            if allowed_values is not None and value not in allowed_values:
-                message = "Query parameter %r must be one of [%s]" % (
-                    name, ", ".join(repr(v) for v in allowed_values)
-                )
-                raise SynapseError(message)
-            else:
-                return value
-        else:
-            if required:
-                message = "Missing %s query parameter %r" % (param_type, name)
-                raise SynapseError(400, message)
-            else:
-                return default
