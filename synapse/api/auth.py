@@ -291,7 +291,6 @@ class Auth(object):
 
         return level
 
-
     def _get_named_level(self, auth_events, name, default):
         power_level_event = self._get_power_level_event(auth_events)
 
