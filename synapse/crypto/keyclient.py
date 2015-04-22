@@ -26,7 +26,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 KEY_API_V1 = b"/_matrix/key/v1/"
-KEY_API_V2 = b"/_matrix/key/v2/local"
+
 
 @defer.inlineCallbacks
 def fetch_server_key(server_name, ssl_context_factory, path=KEY_API_V1):
@@ -94,8 +94,8 @@ class SynapseKeyClientProtocol(HTTPClient):
         if status != b"200":
             # logger.info("Non-200 response from %s: %s %s",
             #            self.transport.getHost(), status, message)
-            error = SynapseKeyClientError("Non-200 response %r from %r" %
-                (status, self.host)
+            error = SynapseKeyClientError(
+                "Non-200 response %r from %r" % (status, self.host)
             )
             error.status = status
             self.errback(error)

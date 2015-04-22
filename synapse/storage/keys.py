@@ -140,8 +140,8 @@ class KeyStore(SQLBaseStore):
                 "key_id": key_id,
                 "from_server": from_server,
                 "ts_added_ms": ts_now_ms,
-                "ts_valid_until_ms": ts_valid_until_ms,
-                "key_json": key_json_bytes,
+                "ts_valid_until_ms": ts_expires_ms,
+                "key_json": buffer(key_json_bytes),
             },
             or_replace=True,
         )
@@ -149,9 +149,9 @@ class KeyStore(SQLBaseStore):
     def get_server_keys_json(self, server_keys):
         """Retrive the key json for a list of server_keys and key ids.
         If no keys are found for a given server, key_id and source then
-        that server, key_id, and source triplet will be missing from the
-        returned dictionary. The JSON is returned as a byte array so that it
-        can be efficiently used in an HTTP response.
+        that server, key_id, and source triplet entry will be an empty list.
+        The JSON is returned as a byte array so that it can be efficiently
+        used in an HTTP response.
         Args:
             server_keys (list): List of (server_name, key_id, source) triplets.
         Returns:
@@ -161,16 +161,25 @@ class KeyStore(SQLBaseStore):
         def _get_server_keys_json_txn(txn):
             results = {}
             for server_name, key_id, from_server in server_keys:
-                rows = _simple_select_list_txn(
-                    keyvalues={
-                        "server_name": server_name,
-                        "key_id": key_id,
-                        "from_server": from_server,
-                    },
-                    retcols=("ts_valid_until_ms", "key_json"),
+                keyvalues = {"server_name": server_name}
+                if key_id is not None:
+                    keyvalues["key_id"] = key_id
+                if from_server is not None:
+                    keyvalues["from_server"] = from_server
+                rows = self._simple_select_list_txn(
+                    txn,
+                    "server_keys_json",
+                    keyvalues=keyvalues,
+                    retcols=(
+                        "key_id",
+                        "from_server",
+                        "ts_added_ms",
+                        "ts_valid_until_ms",
+                        "key_json",
+                    ),
                 )
                 results[(server_name, key_id, from_server)] = rows
             return results
-        return runInteraction(
+        return self.runInteraction(
             "get_server_keys_json", _get_server_keys_json_txn
         )

@@ -31,7 +31,7 @@ class LocalKey(Resource):
     """HTTP resource containing encoding the TLS X.509 certificate and NACL
     signature verification keys for this server::
 
-        GET /_matrix/key/v2/ HTTP/1.1
+        GET /_matrix/key/v2/server/a.key.id HTTP/1.1
 
         HTTP/1.1 200 OK
         Content-Type: application/json
@@ -56,6 +56,8 @@ class LocalKey(Resource):
         }
     """
 
+    isLeaf = True
+
     def __init__(self, hs):
         self.version_string = hs.version_string
         self.config = hs.config
@@ -67,7 +69,6 @@ class LocalKey(Resource):
         refresh_interval = self.config.key_refresh_interval
         self.expires = int(time_now_msec + refresh_interval)
         self.response_body = encode_canonical_json(self.response_json_object())
-
 
     def response_json_object(self):
         verify_keys = {}
@@ -120,7 +121,3 @@ class LocalKey(Resource):
             request, 200, self.response_body,
             version_string=self.version_string
         )
-
-    def getChild(self, name, request):
-        if name == '':
-            return self

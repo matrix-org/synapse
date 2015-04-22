@@ -13,7 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.web.resource import Resource
 from .local_key_resource import LocalKey
+from .remote_key_resource import RemoteKey
 
-class KeyApiV2Resource(LocalKey):
-    pass
+
+class KeyApiV2Resource(Resource):
+    def __init__(self, hs):
+        Resource.__init__(self)
+        self.putChild("server", LocalKey(hs))
+        self.putChild("query", RemoteKey(hs))

@@ -62,7 +62,7 @@ class ServerConfig(Config):
         server_group.add_argument("--old-signing-key-path",
                                   help="The old signing keys")
         server_group.add_argument("--key-refresh-interval",
-                                  default=24 * 60 * 60 * 1000, # 1 Day
+                                  default=24 * 60 * 60 * 1000,  # 1 Day
                                   help="How long a key response is valid for."
                                        " Used to set the exipiry in /key/v2/."
                                        " Controls how frequently servers will"
@@ -156,5 +156,5 @@ class ServerConfig(Config):
             args.old_signing_key_path = base_key_name + ".old.signing.keys"
 
         if not os.path.exists(args.old_signing_key_path):
-            with open(args.old_signing_key_path, "w") as old_signing_key_file:
+            with open(args.old_signing_key_path, "w"):
                 pass
