@@ -78,8 +78,16 @@ class AuthHandler(BaseHandler):
         sess = self._get_session_info(sid)
 
         if len(clientdict) > 0:
-            sess['clientdict'] = clientdict
-            self._save_session(sess)
+            # This was designed to allow the client to omit the parameters
+            # and just supply the session in subsequent calls so it split
+            # auth between devices by just sharing the session, (eg. so you
+            # could continue registration from your phone having clicked the
+            # email auth link on there). It's probably too open to abuse
+            # because it lets unauthenticated clients store arbitrary objects
+            # on a home server.
+            #sess['clientdict'] = clientdict
+            #self._save_session(sess)
+            pass
         elif 'clientdict' in sess:
             clientdict = sess['clientdict']
 
