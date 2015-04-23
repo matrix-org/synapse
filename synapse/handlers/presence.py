@@ -135,6 +135,9 @@ class PresenceHandler(BaseHandler):
         self._remote_sendmap = {}
         # map remote users to sets of local users who're interested in them
         self._remote_recvmap = {}
+        # list of (serial, set of(userids)) tuples, ordered by serial, latest
+        # first
+        self._remote_offline_serials = []
 
         # map any user to a UserPresenceCache
         self._user_cachemap = {}
@@ -715,6 +718,10 @@ class PresenceHandler(BaseHandler):
             )
 
             if state["presence"] == PresenceState.OFFLINE:
+                self._remote_offline_serials.insert(
+                    0,
+                    (self._user_cachemap_latest_serial, set([user.to_string()]))
+                )
                 del self._user_cachemap[user]
 
         for poll in content.get("poll", []):
@@ -855,6 +862,20 @@ class PresenceEventSource(object):
             updates.append(cached.make_event(user=observed_user, clock=clock))
 
         # TODO(paul): limit
+
+        for serial, user_ids in presence._remote_offline_serials:
+            if serial < from_key:
+                break
+
+            for u in user_ids:
+                updates.append({
+                    "type": "m.presence",
+                    "content": {"user_id": u, "presence": PresenceState.OFFLINE},
+                })
+        # TODO(paul): For the v2 API we want to tell the client their from_key
+        #   is too old if we fell off the end of the _remote_offline_serials
+        #   list, and get them to invalidate+resync. In v1 we have no such
+        #   concept so this is a best-effort result.
 
         if updates:
             defer.returnValue((updates, latest_serial))
