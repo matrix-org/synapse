@@ -20,7 +20,6 @@ from .database import DatabaseConfig
 from .ratelimiting import RatelimitConfig
 from .repository import ContentRepositoryConfig
 from .captcha import CaptchaConfig
-from .email import EmailConfig
 from .voip import VoipConfig
 from .registration import RegistrationConfig
 from .metrics import MetricsConfig
@@ -29,7 +28,7 @@ from .appservice import AppServiceConfig
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
-                       EmailConfig, VoipConfig, RegistrationConfig,
+                       VoipConfig, RegistrationConfig,
                        MetricsConfig, AppServiceConfig,):
     pass
 
