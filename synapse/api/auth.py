@@ -372,7 +372,8 @@ class Auth(object):
             defer.returnValue((user, ClientInfo(device_id, token_id)))
         except KeyError:
             raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token."
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
+                errcode=Codes.MISSING_TOKEN
             )
 
     @defer.inlineCallbacks
