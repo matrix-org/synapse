@@ -39,6 +39,7 @@ class Codes(object):
     MISSING_PARAM = "M_MISSING_PARAM",
     TOO_LARGE = "M_TOO_LARGE",
     EXCLUSIVE = "M_EXCLUSIVE"
+    THREEPID_AUTH_FAILED = "M_THREEPID_AUTH_FAILED"
 
 
 class CodeMessageException(RuntimeError):

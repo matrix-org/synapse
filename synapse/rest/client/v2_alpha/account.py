@@ -126,7 +126,9 @@ class ThreepidRestServlet(RestServlet):
         threepid = yield self.identity_handler.threepid_from_creds(threePidCreds)
 
         if not threepid:
-            raise SynapseError(400, "Failed to auth 3pid")
+            raise SynapseError(
+                400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED
+            )
 
         for reqd in ['medium', 'address', 'validatedAt']:
             if reqd not in threepid:
