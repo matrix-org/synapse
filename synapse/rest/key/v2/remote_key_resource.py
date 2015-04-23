@@ -41,7 +41,7 @@ class RemoteKey(Resource):
         "server_keys": [
             {
                 "server_name": "remote.server.example.com"
-                "valid_until": # posix timestamp
+                "valid_until_ts": # posix timestamp
                 "verify_keys": {
                     "a.key.id": { # The identifier for a key.
                         key: "" # base64 encoded verification key.
@@ -50,7 +50,7 @@ class RemoteKey(Resource):
                 "old_verify_keys": {
                     "an.old.key.id": { # The identifier for an old key.
                         key: "", # base64 encoded key
-                        expired: 0, # when th e
+                        "expired_ts": 0, # when the key stop being used.
                     }
                 }
                 "tls_fingerprints": [
@@ -121,7 +121,7 @@ class RemoteKey(Resource):
 
         cached = yield self.store.get_server_keys_json(store_queries)
 
-        json_results = []
+        json_results = set()
 
         time_now_ms = self.clock.time_msec()
 
@@ -129,20 +129,23 @@ class RemoteKey(Resource):
         for (server_name, key_id, from_server), results in cached.items():
             results = [
                 (result["ts_added_ms"], result) for result in results
-                if result["ts_valid_until_ms"] > time_now_ms
             ]
 
-            if not results:
-                if key_id is not None:
-                    cache_misses.setdefault(server_name, set()).add(key_id)
+            if not results and key_id is not None:
+                cache_misses.setdefault(server_name, set()).add(key_id)
                 continue
 
             if key_id is not None:
-                most_recent_result = max(results)
-                json_results.append(most_recent_result[-1]["key_json"])
+                ts_added_ms, most_recent_result = max(results)
+                ts_valid_until_ms = most_recent_result["ts_valid_until_ms"]
+                if (ts_added_ms + ts_valid_until_ms) / 2 < time_now_ms:
+                    # We more than half way through the lifetime of the
+                    # response. We should fetch a fresh copy.
+                    cache_misses.setdefault(server_name, set()).add(key_id)
+                json_results.add(bytes(most_recent_result["key_json"]))
             else:
-                for result in results:
-                    json_results.append(result[-1]["key_json"])
+                for ts_added, result in results:
+                    json_results.add(bytes(result["key_json"]))
 
         if cache_misses and query_remote_on_cache_miss:
             for server_name, key_ids in cache_misses.items():

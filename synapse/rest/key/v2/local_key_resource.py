@@ -36,14 +36,16 @@ class LocalKey(Resource):
         HTTP/1.1 200 OK
         Content-Type: application/json
         {
-            "expires": # integer posix timestamp when this result expires.
+            "valid_until_ts": # integer posix timestamp when this result expires.
             "server_name": "this.server.example.com"
             "verify_keys": {
-                "algorithm:version": # base64 encoded NACL verification key.
+                "algorithm:version": {
+                    "key": # base64 encoded NACL verification key.
+                }
             },
             "old_verify_keys": {
                 "algorithm:version": {
-                    "expired": # integer posix timestamp when the key expired.
+                    "expired_ts": # integer posix timestamp when the key expired.
                     "key": # base64 encoded NACL verification key.
                 }
             }
@@ -67,7 +69,7 @@ class LocalKey(Resource):
 
     def update_response_body(self, time_now_msec):
         refresh_interval = self.config.key_refresh_interval
-        self.expires = int(time_now_msec + refresh_interval)
+        self.valid_until_ts = int(time_now_msec + refresh_interval)
         self.response_body = encode_canonical_json(self.response_json_object())
 
     def response_json_object(self):
@@ -85,7 +87,7 @@ class LocalKey(Resource):
             verify_key_bytes = key.encode()
             old_verify_keys[key_id] = {
                 u"key": encode_base64(verify_key_bytes),
-                u"expired": key.expired,
+                u"expired_ts": key.expired,
             }
 
         x509_certificate_bytes = crypto.dump_certificate(
@@ -96,7 +98,7 @@ class LocalKey(Resource):
         sha256_fingerprint = sha256(x509_certificate_bytes).digest()
 
         json_object = {
-            u"valid_until": self.expires,
+            u"valid_until_ts": self.valid_until_ts,
             u"server_name": self.config.server_name,
             u"verify_keys": verify_keys,
             u"old_verify_keys": old_verify_keys,
@@ -115,8 +117,8 @@ class LocalKey(Resource):
     def render_GET(self, request):
         time_now = self.clock.time_msec()
         # Update the expiry time if less than half the interval remains.
-        if time_now + self.config.key_refresh_interval / 2 > self.expires:
-            self.update_response_body()
+        if time_now + self.config.key_refresh_interval / 2 > self.valid_until_ts:
+            self.update_response_body(time_now)
         return respond_with_json_bytes(
             request, 200, self.response_body,
             version_string=self.version_string
