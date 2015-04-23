@@ -36,6 +36,9 @@ metrics = synapse.metrics.get_metrics_for(__name__)
 # Don't bother bumping "last active" time if it differs by less than 60 seconds
 LAST_ACTIVE_GRANULARITY = 60*1000
 
+# Keep no more than this number of offline serial revisions
+MAX_OFFLINE_SERIALS = 1000
+
 
 # TODO(paul): Maybe there's one of these I can steal from somewhere
 def partition(l, func):
@@ -722,6 +725,8 @@ class PresenceHandler(BaseHandler):
                     0,
                     (self._user_cachemap_latest_serial, set([user.to_string()]))
                 )
+                while len(self._remote_offline_serials) > MAX_OFFLINE_SERIALS:
+                    self._remote_offline_serials.pop()  # remove the oldest
                 del self._user_cachemap[user]
 
         for poll in content.get("poll", []):
