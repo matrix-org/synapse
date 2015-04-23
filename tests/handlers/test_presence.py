@@ -916,6 +916,33 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
             ]
         )
 
+        yield self.mock_federation_resource.trigger("PUT",
+            "/_matrix/federation/v1/send/1000001/",
+            _make_edu_json("elsewhere", "m.presence",
+                content={
+                    "push": [
+                        {"user_id": "@potato:remote",
+                         "presence": "online"},
+                    ],
+                }
+            )
+        )
+
+        self.assertEquals(self.event_source.get_current_key(), 2)
+
+        (events, _) = yield self.event_source.get_new_events_for_user(
+            self.u_apple, 0, None
+        )
+        self.assertEquals(events,
+            [
+                {"type": "m.presence",
+                 "content": {
+                     "user_id": "@potato:remote",
+                     "presence": ONLINE,
+                }}
+            ]
+        )
+
     @defer.inlineCallbacks
     def test_join_room_local(self):
         self.room_members = [self.u_apple, self.u_banana]

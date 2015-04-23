@@ -720,14 +720,24 @@ class PresenceHandler(BaseHandler):
                 statuscache=statuscache,
             )
 
+            user_id = user.to_string()
+
             if state["presence"] == PresenceState.OFFLINE:
                 self._remote_offline_serials.insert(
                     0,
-                    (self._user_cachemap_latest_serial, set([user.to_string()]))
+                    (self._user_cachemap_latest_serial, set([user_id]))
                 )
                 while len(self._remote_offline_serials) > MAX_OFFLINE_SERIALS:
                     self._remote_offline_serials.pop()  # remove the oldest
                 del self._user_cachemap[user]
+            else:
+                # Remove the user from remote_offline_serials now that they're
+                # no longer offline
+                for idx, elem in enumerate(self._remote_offline_serials):
+                    (_, user_ids) = elem
+                    user_ids.discard(user_id)
+                    if not user_ids:
+                        self._remote_offline_serials.pop(idx)
 
         for poll in content.get("poll", []):
             user = UserID.from_string(poll)
