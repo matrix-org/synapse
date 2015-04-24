@@ -367,10 +367,6 @@ SRV record, as that is the name other machines will expect it to have::
 You may additionally want to pass one or more "-v" options, in order to
 increase the verbosity of logging output; at least for initial testing.
 
-For the initial alpha release, the homeserver is not speaking TLS for
-either client-server or server-server traffic for ease of debugging. We have
-also not spent any time yet getting the homeserver to run behind loadbalancers.
-
 Running a Demo Federation of Homeservers
 ----------------------------------------
 
