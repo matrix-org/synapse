@@ -52,7 +52,7 @@ class IdentityHandler(BaseHandler):
         data = {}
         try:
             data = yield http_client.get_json(
-                "http://%s%s" % (
+                "https://%s%s" % (
                     creds['id_server'],
                     "/_matrix/identity/api/v1/3pid/getValidated3pid"
                 ),
@@ -73,8 +73,7 @@ class IdentityHandler(BaseHandler):
         data = None
         try:
             data = yield http_client.post_urlencoded_get_json(
-                # XXX: Change when ID servers are all HTTPS
-                "http://%s%s" % (
+                "https://%s%s" % (
                     creds['id_server'], "/_matrix/identity/api/v1/3pid/bind"
                 ),
                 {
