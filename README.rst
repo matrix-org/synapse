@@ -86,7 +86,7 @@ Homeserver Installation
 =======================
 
 System requirements:
-- POSIX-compliant system (tested on Linux & OSX)
+- POSIX-compliant system (tested on Linux & OS X)
 - Python 2.7
 
 Synapse is written in python but some of the libraries is uses are written in
