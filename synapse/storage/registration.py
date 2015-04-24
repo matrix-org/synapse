@@ -144,3 +144,21 @@ class RegistrationStore(SQLBaseStore):
             return rows[0]
 
         raise StoreError(404, "Token not found.")
+
+    @defer.inlineCallbacks
+    def all_users_on_domain(self, domain):
+        res = yield self.runInteraction(
+            "all_users_on_domain",
+            self._all_users_on_domain_txn,
+            domain
+        )
+        defer.returnValue(res)
+
+    def _all_users_on_domain_txn(self, txn, domain):
+        sql = "SELECT COUNT(*) FROM users WHERE name NOT LIKE ?"
+        pat = "%:"+domain
+        cursor = txn.execute(sql, (pat,))
+        num_not_matching = cursor.fetchall()[0][0]
+        if num_not_matching == 0:
+            return True
+        return False

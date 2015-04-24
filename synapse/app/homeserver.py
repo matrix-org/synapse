@@ -26,6 +26,7 @@ from synapse.server import HomeServer
 from synapse.python_dependencies import check_requirements
 
 from twisted.internet import reactor
+from twisted.internet import defer
 from twisted.application import service
 from twisted.enterprise import adbapi
 from twisted.web.resource import Resource
@@ -241,6 +242,22 @@ class SynapseHomeServer(HomeServer):
             )
             logger.info("Metrics now running on 127.0.0.1 port %d", config.metrics_port)
 
+    @defer.inlineCallbacks
+    def post_startup_check(self):
+        all_users_native = yield self.get_datastore().all_users_on_domain(
+            self.hostname
+        )
+        if not all_users_native:
+            sys.stderr.write(
+                "\n"
+                "******************************************************\n"
+                "Found users in database not native to %s!\n"
+                "You cannot changed a synapse server_name after it's been configured\n"
+                "******************************************************\n"
+                "\n"
+            )
+            reactor.stop()
+
 
 def get_version_string():
     try:
@@ -398,6 +415,8 @@ def setup(config_options):
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
     hs.get_replication_layer().start_get_pdu_cache()
+
+    reactor.callWhenRunning(hs.post_startup_check)
 
     return hs
 
