@@ -60,7 +60,10 @@ class ServerConfig(Config):
         server_group.add_argument("--signing-key-path",
                                   help="The signing key to sign messages with")
         server_group.add_argument("--old-signing-key-path",
-                                  help="The old signing keys")
+                                  help="The keys that the server used to sign"
+                                       " sign messages with but won't use"
+                                       " to sign new messages. E.g. it has"
+                                       " lost its private key")
         server_group.add_argument("--key-refresh-interval",
                                   default=24 * 60 * 60 * 1000,  # 1 Day
                                   help="How long a key response is valid for."
