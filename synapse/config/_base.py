@@ -77,6 +77,17 @@ class Config(object):
         with open(file_path) as file_stream:
             return file_stream.read()
 
+    @classmethod
+    def read_yaml_file(cls, file_path, config_name):
+        cls.check_file(file_path, config_name)
+        with open(file_path) as file_stream:
+            try:
+                return yaml.load(file_stream)
+            except Exception as e:
+                raise ConfigError(
+                    "Error parsing yaml in file %r: " % (file_path,), e
+                )
+
     @staticmethod
     def default_path(name):
         return os.path.abspath(os.path.join(os.path.curdir, name))

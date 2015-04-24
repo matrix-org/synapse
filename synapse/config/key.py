@@ -27,6 +27,9 @@ class KeyConfig(Config):
             args.old_signing_key_path
         )
         self.key_refresh_interval = args.key_refresh_interval
+        self.perspectives = self.read_perspectives(
+            args.perspectives_config_path
+        )
 
     @classmethod
     def add_arguments(cls, parser):
@@ -45,6 +48,15 @@ class KeyConfig(Config):
                                     " Used to set the exipiry in /key/v2/."
                                     " Controls how frequently servers will"
                                     " query what keys are still valid")
+        key_group.add_argument("--perspectives-config-path",
+                               help="The trusted servers to download signing"
+                                    " keys from")
+
+    def read_perspectives(self, perspectives_config_path):
+        servers = self.read_yaml_file(
+            perspectives_config_path, "perspectives_config_path"
+        )
+        return servers
 
     def read_signing_key(self, signing_key_path):
         signing_keys = self.read_file(signing_key_path, "signing_key")
@@ -108,3 +120,10 @@ class KeyConfig(Config):
         if not os.path.exists(args.old_signing_key_path):
             with open(args.old_signing_key_path, "w"):
                 pass
+
+        if not args.perspectives_config_path:
+            args.perspectives_config_path = base_key_name + ".perspectives"
+
+        if not os.path.exists(args.perspectives_config_path):
+            with open(args.perspectives_config_path, "w") as perspectives_file:
+                perspectives_file.write("@@@")
