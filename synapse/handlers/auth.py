@@ -85,8 +85,8 @@ class AuthHandler(BaseHandler):
             # email auth link on there). It's probably too open to abuse
             # because it lets unauthenticated clients store arbitrary objects
             # on a home server.
-            #sess['clientdict'] = clientdict
-            #self._save_session(sess)
+            # sess['clientdict'] = clientdict
+            # self._save_session(sess)
             pass
         elif 'clientdict' in sess:
             clientdict = sess['clientdict']
