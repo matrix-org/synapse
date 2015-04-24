@@ -44,19 +44,19 @@ class IdentityHandler(BaseHandler):
         # XXX: make this configurable!
         # trustedIdServers = ['matrix.org', 'localhost:8090']
         trustedIdServers = ['matrix.org']
-        if not creds['idServer'] in trustedIdServers:
+        if not creds['id_server'] in trustedIdServers:
             logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
-                        'credentials', creds['idServer'])
+                        'credentials', creds['id_server'])
             defer.returnValue(None)
 
         data = {}
         try:
             data = yield http_client.get_json(
                 "http://%s%s" % (
-                    creds['idServer'],
+                    creds['id_server'],
                     "/_matrix/identity/api/v1/3pid/getValidated3pid"
                 ),
-                {'sid': creds['sid'], 'clientSecret': creds['clientSecret']}
+                {'sid': creds['sid'], 'client_secret': creds['client_secret']}
             )
         except CodeMessageException as e:
             data = json.loads(e.msg)
@@ -75,11 +75,11 @@ class IdentityHandler(BaseHandler):
             data = yield http_client.post_urlencoded_get_json(
                 # XXX: Change when ID servers are all HTTPS
                 "http://%s%s" % (
-                    creds['idServer'], "/_matrix/identity/api/v1/3pid/bind"
+                    creds['id_server'], "/_matrix/identity/api/v1/3pid/bind"
                 ),
                 {
                     'sid': creds['sid'],
-                    'clientSecret': creds['clientSecret'],
+                    'client_secret': creds['client_secret'],
                     'mxid': mxid,
                 }
             )

@@ -136,11 +136,11 @@ class RegisterRestServlet(RestServlet):
                 logger.info("bind_email specified: binding")
 
                 emailThreepid = result[LoginType.EMAIL_IDENTITY]
-                threepidCreds = emailThreepid['threepidCreds']
+                threepid_creds = emailThreepid['threepid_creds']
                 logger.debug("Binding emails %s to %s" % (
                     emailThreepid, user_id
                 ))
-                yield self.identity_handler.bind_threepid(threepidCreds, user_id)
+                yield self.identity_handler.bind_threepid(threepid_creds, user_id)
             else:
                 logger.info("bind_email not specified: not binding email")
 
