@@ -42,7 +42,7 @@ class Keyring(object):
         self.clock = hs.get_clock()
         self.client = hs.get_http_client()
         self.config = hs.get_config()
-        self.perspective_servers = {}
+        self.perspective_servers = self.config.perspectives
         self.hs = hs
 
     @defer.inlineCallbacks
@@ -111,6 +111,10 @@ class Keyring(object):
                 )
                 break
             except:
+                logging.info(
+                    "Unable to getting key %r for %r from %r",
+                    key_ids, server_name, perspective_name,
+                )
                 pass
 
         limiter = yield get_retry_limiter(

@@ -83,9 +83,9 @@ class Config(object):
         with open(file_path) as file_stream:
             try:
                 return yaml.load(file_stream)
-            except Exception as e:
+            except:
                 raise ConfigError(
-                    "Error parsing yaml in file %r: " % (file_path,), e
+                    "Error parsing yaml in file %r" % (file_path,)
                 )
 
     @staticmethod

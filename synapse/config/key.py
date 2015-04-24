@@ -16,6 +16,10 @@
 import os
 from ._base import Config, ConfigError
 import syutil.crypto.signing_key
+from syutil.crypto.signing_key import (
+    is_signing_algorithm_supported, decode_verify_key_bytes
+)
+from syutil.base64util import decode_base64
 
 
 class KeyConfig(Config):
@@ -53,9 +57,17 @@ class KeyConfig(Config):
                                     " keys from")
 
     def read_perspectives(self, perspectives_config_path):
-        servers = self.read_yaml_file(
+        config = self.read_yaml_file(
             perspectives_config_path, "perspectives_config_path"
         )
+        servers = {}
+        for server_name, server_config in config["servers"].items():
+            for key_id, key_data in server_config["verify_keys"].items():
+                if is_signing_algorithm_supported(key_id):
+                    key_base64 = key_data["key"]
+                    key_bytes = decode_base64(key_base64)
+                    verify_key = decode_verify_key_bytes(key_id, key_bytes)
+                    servers.setdefault(server_name, {})[key_id] = verify_key
         return servers
 
     def read_signing_key(self, signing_key_path):
@@ -126,4 +138,10 @@ class KeyConfig(Config):
 
         if not os.path.exists(args.perspectives_config_path):
             with open(args.perspectives_config_path, "w") as perspectives_file:
-                perspectives_file.write("@@@")
+                perspectives_file.write(
+                    'servers:\n'
+                    '  matrix.org:\n'
+                    '    verify_keys:\n'
+                    '      "ed25519:auto":\n'
+                    '         key: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"\n'
+                )
