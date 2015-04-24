@@ -51,6 +51,80 @@ response_timer = metrics.register_distribution(
     labels=["method", "servlet"]
 )
 
+_next_request_id = 0
+
+
+def request_handler(request_handler):
+    """Wraps a method that acts as a request handler with the necessary logging
+    and exception handling.
+
+    The method must have a signature of "handle_foo(self, request)". The
+    argument "self" must have "version_string" and "clock" attributes. The
+    argument "request" must be a twisted HTTP request.
+
+    The method must return a deferred. If the deferred succeeds we assume that
+    a response has been sent. If the deferred fails with a SynapseError we use
+    it to send a JSON response with the appropriate HTTP reponse code. If the
+    deferred fails with any other type of error we send a 500 reponse.
+
+    We insert a unique request-id into the logging context for this request and
+    log the response and duration for this request.
+    """
+
+    @defer.inlineCallbacks
+    def wrapped_request_handler(self, request):
+        global _next_request_id
+        request_id = "%s-%s" % (request.method, _next_request_id)
+        _next_request_id += 1
+        with LoggingContext(request_id) as request_context:
+            request_context.request = request_id
+            code = None
+            start = self.clock.time_msec()
+            try:
+                logger.info(
+                    "Received request: %s %s",
+                    request.method, request.path
+                )
+                yield request_handler(self, request)
+                code = request.code
+            except CodeMessageException as e:
+                code = e.code
+                if isinstance(e, SynapseError):
+                    logger.info(
+                        "%s SynapseError: %s - %s", request, code, e.msg
+                    )
+                else:
+                    logger.exception(e)
+                outgoing_responses_counter.inc(request.method, str(code))
+                respond_with_json(
+                    request, code, cs_exception(e), send_cors=True,
+                    pretty_print=_request_user_agent_is_curl(request),
+                    version_string=self.version_string,
+                )
+            except:
+                code = 500
+                logger.exception(
+                    "Failed handle request %s.%s on %r: %r",
+                    request_handler.__module__,
+                    request_handler.__name__,
+                    self,
+                    request
+                )
+                respond_with_json(
+                    request,
+                    500,
+                    {"error": "Internal server error"},
+                    send_cors=True
+                )
+            finally:
+                code = str(code) if code else "-"
+                end = self.clock.time_msec()
+                logger.info(
+                    "Processed request: %dms %s %s %s",
+                    end-start, code, request.method, request.path
+                )
+    return wrapped_request_handler
+
 
 class HttpServer(object):
     """ Interface for registering callbacks on a HTTP server
@@ -121,104 +195,57 @@ class JsonResource(HttpServer, resource.Resource):
     def render(self, request):
         """ This gets called by twisted every time someone sends us a request.
         """
-        self._async_render_with_logging_context(request)
+        self._async_render(request)
         return server.NOT_DONE_YET
 
-    _request_id = 0
-
-    @defer.inlineCallbacks
-    def _async_render_with_logging_context(self, request):
-        request_id = "%s-%s" % (request.method, JsonResource._request_id)
-        JsonResource._request_id += 1
-        with LoggingContext(request_id) as request_context:
-            request_context.request = request_id
-            yield self._async_render(request)
-
+    @request_handler
     @defer.inlineCallbacks
     def _async_render(self, request):
         """ This gets called from render() every time someone sends us a request.
             This checks if anyone has registered a callback for that method and
             path.
         """
-        code = None
         start = self.clock.time_msec()
-        try:
-            # Just say yes to OPTIONS.
-            if request.method == "OPTIONS":
-                self._send_response(request, 200, {})
-                return
+        if request.method == "OPTIONS":
+            self._send_response(request, 200, {})
+            return
+        # Loop through all the registered callbacks to check if the method
+        # and path regex match
+        for path_entry in self.path_regexs.get(request.method, []):
+            m = path_entry.pattern.match(request.path)
+            if not m:
+                continue
 
-            # Loop through all the registered callbacks to check if the method
-            # and path regex match
-            for path_entry in self.path_regexs.get(request.method, []):
-                m = path_entry.pattern.match(request.path)
-                if not m:
-                    continue
+            # We found a match! Trigger callback and then return the
+            # returned response. We pass both the request and any
+            # matched groups from the regex to the callback.
 
-                # We found a match! Trigger callback and then return the
-                # returned response. We pass both the request and any
-                # matched groups from the regex to the callback.
+            callback = path_entry.callback
 
-                callback = path_entry.callback
-
-                servlet_instance = getattr(callback, "__self__", None)
-                if servlet_instance is not None:
-                    servlet_classname = servlet_instance.__class__.__name__
-                else:
-                    servlet_classname = "%r" % callback
-                incoming_requests_counter.inc(request.method, servlet_classname)
-
-                args = [
-                    urllib.unquote(u).decode("UTF-8") for u in m.groups()
-                ]
-
-                logger.info(
-                    "Received request: %s %s",
-                    request.method, request.path
-                )
-
-                callback_return = yield callback(request, *args)
-                if callback_return is not None:
-                    code, response = callback_return
-
-                    self._send_response(request, code, response)
-
-                response_timer.inc_by(
-                    self.clock.time_msec() - start, request.method, servlet_classname
-                )
-
-                return
-
-            # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-            raise UnrecognizedRequestError()
-        except CodeMessageException as e:
-            if isinstance(e, SynapseError):
-                logger.info("%s SynapseError: %s - %s", request, e.code, e.msg)
+            servlet_instance = getattr(callback, "__self__", None)
+            if servlet_instance is not None:
+                servlet_classname = servlet_instance.__class__.__name__
             else:
-                logger.exception(e)
+                servlet_classname = "%r" % callback
+            incoming_requests_counter.inc(request.method, servlet_classname)
 
-            code = e.code
-            self._send_response(
-                request,
-                code,
-                cs_exception(e),
-                response_code_message=e.response_code_message
-            )
-        except Exception as e:
-            logger.exception(e)
-            self._send_response(
-                request,
-                500,
-                {"error": "Internal server error"}
-            )
-        finally:
-            code = str(code) if code else "-"
+            args = [
+                urllib.unquote(u).decode("UTF-8") for u in m.groups()
+            ]
 
-            end = self.clock.time_msec()
-            logger.info(
-                "Processed request: %dms %s %s %s",
-                end-start, code, request.method, request.path
+            callback_return = yield callback(request, *args)
+            if callback_return is not None:
+                code, response = callback_return
+                self._send_response(request, code, response)
+
+            response_timer.inc_by(
+                self.clock.time_msec() - start, request.method, servlet_classname
             )
+
+            return
+
+        # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
+        raise UnrecognizedRequestError()
 
     def _send_response(self, request, code, response_json_object,
                        response_code_message=None):
@@ -238,19 +265,9 @@ class JsonResource(HttpServer, resource.Resource):
             request, code, response_json_object,
             send_cors=True,
             response_code_message=response_code_message,
-            pretty_print=self._request_user_agent_is_curl,
+            pretty_print=_request_user_agent_is_curl(request),
             version_string=self.version_string,
         )
-
-    @staticmethod
-    def _request_user_agent_is_curl(request):
-        user_agents = request.requestHeaders.getRawHeaders(
-            "User-Agent", default=[]
-        )
-        for user_agent in user_agents:
-            if "curl" in user_agent:
-                return True
-        return False
 
 
 class RootRedirect(resource.Resource):
@@ -272,8 +289,8 @@ class RootRedirect(resource.Resource):
 def respond_with_json(request, code, json_object, send_cors=False,
                       response_code_message=None, pretty_print=False,
                       version_string=""):
-    if not pretty_print:
-        json_bytes = encode_pretty_printed_json(json_object)
+    if pretty_print:
+        json_bytes = encode_pretty_printed_json(json_object) + "\n"
     else:
         json_bytes = encode_canonical_json(json_object)
 
@@ -313,3 +330,13 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
     request.write(json_bytes)
     request.finish()
     return NOT_DONE_YET
+
+
+def _request_user_agent_is_curl(request):
+    user_agents = request.requestHeaders.getRawHeaders(
+        "User-Agent", default=[]
+    )
+    for user_agent in user_agents:
+        if "curl" in user_agent:
+            return True
+    return False

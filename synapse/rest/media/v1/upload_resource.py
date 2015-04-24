@@ -13,12 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import respond_with_json
+from synapse.http.server import respond_with_json, request_handler
 
 from synapse.util.stringutils import random_string
-from synapse.api.errors import (
-    cs_exception, SynapseError, CodeMessageException
-)
+from synapse.api.errors import SynapseError
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
@@ -69,53 +67,42 @@ class UploadResource(BaseMediaResource):
 
         defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
 
+    @request_handler
     @defer.inlineCallbacks
     def _async_render_POST(self, request):
-        try:
-            auth_user, client = yield self.auth.get_user_by_req(request)
-            # TODO: The checks here are a bit late. The content will have
-            # already been uploaded to a tmp file at this point
-            content_length = request.getHeader("Content-Length")
-            if content_length is None:
-                raise SynapseError(
-                    msg="Request must specify a Content-Length", code=400
-                )
-            if int(content_length) > self.max_upload_size:
-                raise SynapseError(
-                    msg="Upload request body is too large",
-                    code=413,
-                )
-
-            headers = request.requestHeaders
-
-            if headers.hasHeader("Content-Type"):
-                media_type = headers.getRawHeaders("Content-Type")[0]
-            else:
-                raise SynapseError(
-                    msg="Upload request missing 'Content-Type'",
-                    code=400,
-                )
-
-            # if headers.hasHeader("Content-Disposition"):
-            #     disposition = headers.getRawHeaders("Content-Disposition")[0]
-            # TODO(markjh): parse content-dispostion
-
-            content_uri = yield self.create_content(
-                media_type, None, request.content.read(),
-                content_length, auth_user
+        auth_user, client = yield self.auth.get_user_by_req(request)
+        # TODO: The checks here are a bit late. The content will have
+        # already been uploaded to a tmp file at this point
+        content_length = request.getHeader("Content-Length")
+        if content_length is None:
+            raise SynapseError(
+                msg="Request must specify a Content-Length", code=400
+            )
+        if int(content_length) > self.max_upload_size:
+            raise SynapseError(
+                msg="Upload request body is too large",
+                code=413,
             )
 
-            respond_with_json(
-                request, 200, {"content_uri": content_uri}, send_cors=True
+        headers = request.requestHeaders
+
+        if headers.hasHeader("Content-Type"):
+            media_type = headers.getRawHeaders("Content-Type")[0]
+        else:
+            raise SynapseError(
+                msg="Upload request missing 'Content-Type'",
+                code=400,
             )
-        except CodeMessageException as e:
-            logger.exception(e)
-            respond_with_json(request, e.code, cs_exception(e), send_cors=True)
-        except:
-            logger.exception("Failed to store file")
-            respond_with_json(
-                request,
-                500,
-                {"error": "Internal server error"},
-                send_cors=True
-            )
+
+        # if headers.hasHeader("Content-Disposition"):
+        #     disposition = headers.getRawHeaders("Content-Disposition")[0]
+        # TODO(markjh): parse content-dispostion
+
+        content_uri = yield self.create_content(
+            media_type, None, request.content.read(),
+            content_length, auth_user
+        )
+
+        respond_with_json(
+            request, 200, {"content_uri": content_uri}, send_cors=True
+        )
