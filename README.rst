@@ -429,7 +429,7 @@ track 3PID logins and publish end-user public keys.
 
 It's currently early days for identity servers as Matrix is not yet using 3PIDs
 as the primary means of identity and E2E encryption is not complete. As such,
-we are running a single identity server (http://matrix.org:8090) at the current
+we are running a single identity server (https://matrix.org) at the current
 time.
 
 
