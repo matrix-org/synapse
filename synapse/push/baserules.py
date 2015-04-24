@@ -126,7 +126,25 @@ def make_base_prepend_override_rules():
 def make_base_append_override_rules():
     return [
         {
-            'rule_id': 'global/override/.m.rule.call',
+            'rule_id': 'global/override/.m.rule.suppress_notices',
+            'conditions': [
+                {
+                    'kind': 'event_match',
+                    'key': 'content.msgtype',
+                    'pattern': 'm.notice',
+                }
+            ],
+            'actions': [
+                'dont_notify',
+            ]
+        }
+    ]
+
+
+def make_base_append_underride_rules(user):
+    return [
+        {
+            'rule_id': 'global/underride/.m.rule.call',
             'conditions': [
                 {
                     'kind': 'event_match',
@@ -143,19 +161,6 @@ def make_base_append_override_rules():
                     'set_tweak': 'highlight',
                     'value': False
                 }
-            ]
-        },
-        {
-            'rule_id': 'global/override/.m.rule.suppress_notices',
-            'conditions': [
-                {
-                    'kind': 'event_match',
-                    'key': 'content.msgtype',
-                    'pattern': 'm.notice',
-                }
-            ],
-            'actions': [
-                'dont_notify',
             ]
         },
         {
@@ -176,7 +181,7 @@ def make_base_append_override_rules():
             ]
         },
         {
-            'rule_id': 'global/override/.m.rule.room_one_to_one',
+            'rule_id': 'global/underride/.m.rule.room_one_to_one',
             'conditions': [
                 {
                     'kind': 'room_member_count',
@@ -193,12 +198,7 @@ def make_base_append_override_rules():
                     'value': False
                 }
             ]
-        }
-    ]
-
-
-def make_base_append_underride_rules(user):
-    return [
+        },
         {
             'rule_id': 'global/underride/.m.rule.invite_for_me',
             'conditions': [
