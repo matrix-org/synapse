@@ -53,6 +53,7 @@ class RegistrationConfig(Config):
 
     @classmethod
     def generate_config(cls, args, config_dir_path):
+        super(RegistrationConfig, cls).genenerate_config(args, config_dir_path)
         if args.enable_registration is None:
             args.enable_registration = False
 
