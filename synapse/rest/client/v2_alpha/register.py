@@ -121,7 +121,7 @@ class RegisterRestServlet(RestServlet):
         if LoginType.EMAIL_IDENTITY in result:
             threepid = result[LoginType.EMAIL_IDENTITY]
 
-            for reqd in ['medium', 'address', 'validatedAt']:
+            for reqd in ['medium', 'address', 'validated_at']:
                 if reqd not in threepid:
                     logger.info("Can't add incomplete 3pid")
                 else:
@@ -129,7 +129,7 @@ class RegisterRestServlet(RestServlet):
                         user_id,
                         threepid['medium'],
                         threepid['address'],
-                        threepid['validatedAt'],
+                        threepid['validated_at'],
                     )
 
             if 'bind_email' in params and params['bind_email']:

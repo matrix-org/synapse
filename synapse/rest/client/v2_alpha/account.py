@@ -130,7 +130,7 @@ class ThreepidRestServlet(RestServlet):
                 400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED
             )
 
-        for reqd in ['medium', 'address', 'validatedAt']:
+        for reqd in ['medium', 'address', 'validated_at']:
             if reqd not in threepid:
                 logger.warn("Couldn't add 3pid: invalid response from ID sevrer")
                 raise SynapseError(500, "Invalid response from ID Server")
@@ -139,7 +139,7 @@ class ThreepidRestServlet(RestServlet):
             auth_user.to_string(),
             threepid['medium'],
             threepid['address'],
-            threepid['validatedAt'],
+            threepid['validated_at'],
         )
 
         if 'bind' in body and body['bind']:
