@@ -101,86 +101,10 @@ class Keyring(object):
             defer.returnValue(cached[0])
             return
 
-        @defer.inlineCallbacks
-        def fetch_keys():
-            # Try to fetch the key from the remote server.
-
-            limiter = yield get_retry_limiter(
-                server_name,
-                self.clock,
-                self.store,
-            )
-
-            with limiter:
-                (response, tls_certificate) = yield fetch_server_key(
-                    server_name, self.hs.tls_context_factory
-                )
-
-            # Check the response.
-
-            x509_certificate_bytes = crypto.dump_certificate(
-                crypto.FILETYPE_ASN1, tls_certificate
-            )
-
-            if ("signatures" not in response
-                    or server_name not in response["signatures"]):
-                raise ValueError("Key response not signed by remote server")
-
-            if "tls_certificate" not in response:
-                raise ValueError("Key response missing TLS certificate")
-
-            tls_certificate_b64 = response["tls_certificate"]
-
-            if encode_base64(x509_certificate_bytes) != tls_certificate_b64:
-                raise ValueError("TLS certificate doesn't match")
-
-            verify_keys = {}
-            for key_id, key_base64 in response["verify_keys"].items():
-                if is_signing_algorithm_supported(key_id):
-                    key_bytes = decode_base64(key_base64)
-                    verify_key = decode_verify_key_bytes(key_id, key_bytes)
-                    verify_keys[key_id] = verify_key
-
-            for key_id in response["signatures"][server_name]:
-                if key_id not in response["verify_keys"]:
-                    raise ValueError(
-                        "Key response must include verification keys for all"
-                        " signatures"
-                    )
-                if key_id in verify_keys:
-                    verify_signed_json(
-                        response,
-                        server_name,
-                        verify_keys[key_id]
-                    )
-
-            # Cache the result in the datastore.
-
-            time_now_ms = self.clock.time_msec()
-
-            yield self.store.store_server_certificate(
-                server_name,
-                server_name,
-                time_now_ms,
-                tls_certificate,
-            )
-
-            for key_id, key in verify_keys.items():
-                yield self.store.store_server_verify_key(
-                    server_name, server_name, time_now_ms, key
-                )
-
-            for key_id in key_ids:
-                if key_id in verify_keys:
-                    defer.returnValue(verify_keys[key_id])
-                    return
-
-            raise ValueError("No verification key found for given key ids")
-
         download = self.key_downloads.get(server_name)
 
         if download is None:
-            download = fetch_keys()
+            download = self._get_server_verify_key_impl(server_name, key_ids)
             self.key_downloads[server_name] = download
 
             @download.addBoth
@@ -190,3 +114,80 @@ class Keyring(object):
 
         r = yield create_observer(download)
         defer.returnValue(r)
+
+
+    @defer.inlineCallbacks
+    def _get_server_verify_key_impl(self, server_name, key_ids):
+        # Try to fetch the key from the remote server.
+
+        limiter = yield get_retry_limiter(
+            server_name,
+            self.clock,
+            self.store,
+        )
+
+        with limiter:
+            (response, tls_certificate) = yield fetch_server_key(
+                server_name, self.hs.tls_context_factory
+            )
+
+        # Check the response.
+
+        x509_certificate_bytes = crypto.dump_certificate(
+            crypto.FILETYPE_ASN1, tls_certificate
+        )
+
+        if ("signatures" not in response
+                or server_name not in response["signatures"]):
+            raise ValueError("Key response not signed by remote server")
+
+        if "tls_certificate" not in response:
+            raise ValueError("Key response missing TLS certificate")
+
+        tls_certificate_b64 = response["tls_certificate"]
+
+        if encode_base64(x509_certificate_bytes) != tls_certificate_b64:
+            raise ValueError("TLS certificate doesn't match")
+
+        verify_keys = {}
+        for key_id, key_base64 in response["verify_keys"].items():
+            if is_signing_algorithm_supported(key_id):
+                key_bytes = decode_base64(key_base64)
+                verify_key = decode_verify_key_bytes(key_id, key_bytes)
+                verify_keys[key_id] = verify_key
+
+        for key_id in response["signatures"][server_name]:
+            if key_id not in response["verify_keys"]:
+                raise ValueError(
+                    "Key response must include verification keys for all"
+                    " signatures"
+                )
+            if key_id in verify_keys:
+                verify_signed_json(
+                    response,
+                    server_name,
+                    verify_keys[key_id]
+                )
+
+        # Cache the result in the datastore.
+
+        time_now_ms = self.clock.time_msec()
+
+        yield self.store.store_server_certificate(
+            server_name,
+            server_name,
+            time_now_ms,
+            tls_certificate,
+        )
+
+        for key_id, key in verify_keys.items():
+            yield self.store.store_server_verify_key(
+                server_name, server_name, time_now_ms, key
+            )
+
+        for key_id in key_ids:
+            if key_id in verify_keys:
+                defer.returnValue(verify_keys[key_id])
+                return
+
+        raise ValueError("No verification key found for given key ids")
