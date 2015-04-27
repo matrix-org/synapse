@@ -244,7 +244,7 @@ class SynapseHomeServer(HomeServer):
 
     @defer.inlineCallbacks
     def post_startup_check(self):
-        all_users_native = yield self.get_datastore().all_users_on_domain(
+        all_users_native = yield self.get_datastore().are_all_users_on_domain(
             self.hostname
         )
         if not all_users_native:
