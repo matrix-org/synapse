@@ -27,7 +27,6 @@ from synapse.server import HomeServer
 from synapse.python_dependencies import check_requirements
 
 from twisted.internet import reactor
-from twisted.internet import defer
 from twisted.application import service
 from twisted.enterprise import adbapi
 from twisted.web.resource import Resource
