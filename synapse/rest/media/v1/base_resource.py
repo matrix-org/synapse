@@ -25,6 +25,8 @@ from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.protocols.basic import FileSender
 
+from synapse.util.async import create_observer
+
 import os
 
 import logging
@@ -87,7 +89,7 @@ class BaseMediaResource(Resource):
             def callback(media_info):
                 del self.downloads[key]
                 return media_info
-        return download
+        return create_observer(download)
 
     @defer.inlineCallbacks
     def _get_remote_media_impl(self, server_name, media_id):
