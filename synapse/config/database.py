@@ -15,6 +15,7 @@
 
 from ._base import Config
 import os
+import yaml
 
 
 class DatabaseConfig(Config):
@@ -27,9 +28,27 @@ class DatabaseConfig(Config):
         self.event_cache_size = self.parse_size(args.event_cache_size)
 
         if args.database_config:
-            self.database_config = self.abspath(args.database_config)
+            with open(args.database_config) as f:
+                self.database_config = yaml.safe_load(f)
         else:
-            self.database_config = None
+            self.database_config = {
+                "name": "sqlite3",
+                "args": {
+                    "database": self.database_path,
+                },
+            }
+
+        name = self.database_config.get("name", None)
+        if name == "psycopg2":
+            pass
+        elif name == "sqlite3":
+            self.database_config.setdefault("args", {}).update({
+                "cp_min": 1,
+                "cp_max": 1,
+                "check_same_thread": False,
+            })
+        else:
+            raise RuntimeError("Unsupported database type '%s'" % (name,))
 
     @classmethod
     def add_arguments(cls, parser):
