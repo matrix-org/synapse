@@ -121,6 +121,10 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def add_oob_auth(self, stagetype, authdict, clientip):
+        """
+        Adds the result of out-of-band authentication into an existing auth
+        session. Currently used for adding the result of fallback auth.
+        """
         if stagetype not in self.checkers:
             raise LoginError(400, "", Codes.MISSING_PARAM)
         if 'session' not in authdict:
