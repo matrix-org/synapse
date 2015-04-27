@@ -168,7 +168,7 @@ class Porter(object):
             )
 
     @defer.inlineCallbacks
-    def handle_table(self, table):
+    def setup_table(self, table):
         def delete_all(txn):
             txn.execute(
                 "DELETE FROM port_from_sqlite3 WHERE table_name = %s",
@@ -287,6 +287,10 @@ class Porter(object):
 
         postgres_size = yield self.postgres_store.execute(get_table_size)
 
+        defer.returnValue((table, postgres_size, table_size, next_chunk))
+
+    @defer.inlineCallbacks
+    def handle_table(self, table, postgres_size, table_size, next_chunk):
         if not table_size:
             return
 
@@ -364,14 +368,14 @@ class Porter(object):
             self.postgres_store = Store(postgres_db_pool, postgres_engine)
 
             # Step 1. Set up databases.
-            self.progress.on_prepare_sqlite()
+            self.progress.set_state("Preparing SQLite3")
             self.setup_db(sqlite_config, sqlite_engine)
 
-            self.progress.on_prepare_postgres()
+            self.progress.set_state("Preparing PostgreSQL")
             self.setup_db(postgres_config, postgres_engine)
 
             # Step 2. Get tables.
-            self.progress.fetching_tables()
+            self.progress.set_state("Fetching tables")
             sqlite_tables = yield self.sqlite_store._simple_select_onecol(
                 table="sqlite_master",
                 keyvalues={
@@ -390,7 +394,7 @@ class Porter(object):
 
             tables = set(sqlite_tables) & set(postgres_tables)
 
-            self.progress.preparing_tables()
+            self.progress.set_state("Creating tables")
 
             logger.info("Found %d tables", len(tables))
 
@@ -409,13 +413,24 @@ class Porter(object):
             except Exception as e:
                 logger.info("Failed to create port table: %s", e)
 
-            # Process tables.
-            yield defer.gatherResults(
+            self.progress.set_state("Preparing tables")
+
+            # Set up tables.
+            setup_res = yield defer.gatherResults(
                 [
-                    self.handle_table(table)
+                    self.setup_table(table)
                     for table in tables
                     if table not in ["schema_version", "applied_schema_deltas"]
                     and not table.startswith("sqlite_")
+                ],
+                consumeErrors=True,
+            )
+
+            # Process tables.
+            yield defer.gatherResults(
+                [
+                    self.handle_table(*res)
+                    for res in setup_res
                 ],
                 consumeErrors=True,
             )
