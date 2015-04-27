@@ -143,7 +143,8 @@ class ThreepidRestServlet(RestServlet):
         )
 
         if 'bind' in body and body['bind']:
-            logger.debug("Binding emails %s to %s",
+            logger.debug(
+                "Binding emails %s to %s",
                 threepid, auth_user.to_string()
             )
             yield self.identity_handler.bind_threepid(
