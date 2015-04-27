@@ -56,7 +56,6 @@ import os
 import re
 import resource
 import subprocess
-import yaml
 
 
 logger = logging.getLogger("synapse.app.homeserver")
