@@ -372,6 +372,7 @@ def setup(config_options):
         db_config.setdefault("args", {}).update({
             "cp_min": 1,
             "cp_max": 1,
+            "check_same_thread": False,
         })
     else:
         raise RuntimeError("Unsupported database type '%s'" % (name,))
