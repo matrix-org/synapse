@@ -105,21 +105,22 @@ class StreamIdGenerator(object):
 
         return manager()
 
+    @defer.inlineCallbacks
     def get_max_token(self, store):
         """Returns the maximum stream id such that all stream ids less than or
         equal to it have been successfully persisted.
         """
         with self._lock:
             if self._unfinished_ids:
-                return self._unfinished_ids[0] - 1
+                defer.returnValue(self._unfinished_ids[0] - 1)
 
             if not self._current_max:
-                return store.runInteraction(
+                yield store.runInteraction(
                     "_compute_current_max",
                     self._compute_current_max,
                 )
 
-            return self._current_max
+            defer.returnValue(self._current_max)
 
     def _compute_current_max(self, txn):
         txn.execute("SELECT MAX(stream_ordering) FROM events")
