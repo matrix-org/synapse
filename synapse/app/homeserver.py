@@ -18,7 +18,8 @@ import sys
 sys.dont_write_bytecode = True
 
 from synapse.storage import (
-    prepare_database, prepare_sqlite3_database, UpgradeDatabaseException,
+    prepare_database, prepare_sqlite3_database, are_all_users_on_domain,
+    UpgradeDatabaseException,
 )
 
 from synapse.server import HomeServer
@@ -242,10 +243,9 @@ class SynapseHomeServer(HomeServer):
             )
             logger.info("Metrics now running on 127.0.0.1 port %d", config.metrics_port)
 
-    @defer.inlineCallbacks
-    def post_startup_check(self):
-        all_users_native = yield self.get_datastore().are_all_users_on_domain(
-            self.hostname
+    def run_startup_checks(self, db_conn):
+        all_users_native = are_all_users_on_domain(
+            db_conn, self.hostname
         )
         if not all_users_native:
             sys.stderr.write(
@@ -254,9 +254,9 @@ class SynapseHomeServer(HomeServer):
                 "Found users in database not native to %s!\n"
                 "You cannot changed a synapse server_name after it's been configured\n"
                 "******************************************************\n"
-                "\n"
+                "\n" % (self.hostname,)
             )
-            reactor.stop()
+            sys.exit(1)
 
 
 def get_version_string():
@@ -392,6 +392,7 @@ def setup(config_options):
         with sqlite3.connect(db_name) as db_conn:
             prepare_sqlite3_database(db_conn)
             prepare_database(db_conn)
+            hs.run_startup_checks(db_conn)
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"
@@ -415,8 +416,6 @@ def setup(config_options):
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
     hs.get_replication_layer().start_get_pdu_cache()
-
-    reactor.callWhenRunning(hs.post_startup_check)
 
     return hs
 
