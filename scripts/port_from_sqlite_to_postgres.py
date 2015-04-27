@@ -142,207 +142,6 @@ class Store(object):
             raise
 
 
-class Progress(object):
-    """Used to report progress of the port
-    """
-    def __init__(self):
-        self.tables = {}
-
-        self.start_time = int(time.time())
-
-    def add_table(self, table, cur, size):
-        self.tables[table] = {
-            "start": cur,
-            "num_done": cur,
-            "total": size,
-            "perc": int(cur * 100 / size),
-        }
-
-    def update(self, table, num_done):
-        data = self.tables[table]
-        data["num_done"] = num_done
-        data["perc"] = int(num_done * 100 / data["total"])
-
-    def done(self):
-        pass
-
-
-class CursesProgress(Progress):
-    """Reports progress to a curses window
-    """
-    def __init__(self, stdscr):
-        self.stdscr = stdscr
-
-        curses.use_default_colors()
-        curses.curs_set(0)
-
-        curses.init_pair(1, curses.COLOR_RED, -1)
-        curses.init_pair(2, curses.COLOR_GREEN, -1)
-
-        self.last_update = 0
-
-        self.finished = False
-
-        super(CursesProgress, self).__init__()
-
-    def update(self, table, num_done):
-        super(CursesProgress, self).update(table, num_done)
-
-        self.render()
-
-    def render(self, force=False):
-        now = time.time()
-
-        if not force and now - self.last_update < 0.2:
-            # reactor.callLater(1, self.render)
-            return
-
-        self.stdscr.clear()
-
-        rows, cols = self.stdscr.getmaxyx()
-
-        duration = int(now) - int(self.start_time)
-
-        minutes, seconds = divmod(duration, 60)
-        duration_str = '%02dm %02ds' % (minutes, seconds,)
-
-        if self.finished:
-            status = "Time spent: %s (Done!)" % (duration_str,)
-        else:
-            min_perc = min(
-                (v["num_done"] - v["start"]) * 100. / (v["total"] - v["start"])
-                if v["total"] - v["start"] else 100
-                for v in self.tables.values()
-            )
-            if min_perc > 0:
-                est_remaining = (int(now) - self.start_time) * 100 / min_perc
-                est_remaining_str = '%02dm %02ds remaining' % divmod(est_remaining, 60)
-            else:
-                est_remaining_str = "Unknown"
-            status = (
-                "Time spent: %s (est. remaining: %s)"
-                % (duration_str, est_remaining_str,)
-            )
-
-        self.stdscr.addstr(
-            0, 0,
-            status,
-            curses.A_BOLD,
-        )
-
-        max_len = max([len(t) for t in self.tables.keys()])
-
-        left_margin = 5
-        middle_space = 1
-
-        items = self.tables.items()
-        items.sort(
-            key=lambda i: (i[1]["perc"], i[0]),
-        )
-
-        for i, (table, data) in enumerate(items):
-            if i + 2 >= rows:
-                break
-
-            perc = data["perc"]
-
-            color = curses.color_pair(2) if perc == 100 else curses.color_pair(1)
-
-            self.stdscr.addstr(
-                i+2, left_margin + max_len - len(table),
-                table,
-                curses.A_BOLD | color,
-            )
-
-            size = 20
-
-            progress = "[%s%s]" % (
-                "#" * int(perc*size/100),
-                " " * (size - int(perc*size/100)),
-            )
-
-            self.stdscr.addstr(
-                i+2, left_margin + max_len + middle_space,
-                "%s %3d%% (%d/%d)" % (progress, perc, data["num_done"], data["total"]),
-            )
-
-        if self.finished:
-            self.stdscr.addstr(
-                self.rows-1, 0,
-                "Press any key to exit...",
-            )
-
-        self.stdscr.refresh()
-        self.last_update = time.time()
-
-    def done(self):
-        self.finished = True
-        self.render(True)
-        self.stdscr.getch()
-
-    def on_prepare_sqlite(self):
-        self.stdscr.clear()
-        self.stdscr.addstr(
-            0, 0,
-            "Preparing SQLite database...",
-            curses.A_BOLD,
-        )
-        self.stdscr.refresh()
-
-    def on_prepare_postgres(self):
-        self.stdscr.clear()
-        self.stdscr.addstr(
-            0, 0,
-            "Preparing PostgreSQL database...",
-            curses.A_BOLD,
-        )
-        self.stdscr.refresh()
-
-    def fetching_tables(self):
-        self.stdscr.clear()
-        self.stdscr.addstr(
-            0, 0,
-            "Fetching tables...",
-            curses.A_BOLD,
-        )
-        self.stdscr.refresh()
-
-    def preparing_tables(self):
-        self.stdscr.clear()
-        self.stdscr.addstr(
-            0, 0,
-            "Preparing tables...",
-            curses.A_BOLD,
-        )
-        self.stdscr.refresh()
-
-
-class TerminalProgress(Progress):
-    """Just prints progress to the terminal
-    """
-    def update(self, table, num_done):
-        super(TerminalProgress, self).update(table, num_done)
-
-        data = self.tables[table]
-
-        print "%s: %d%% (%d/%d)" % (
-            table, data["perc"],
-            data["num_done"], data["total"],
-        )
-
-    def on_prepare_sqlite(self):
-        print "Preparing SQLite database..."
-
-    def on_prepare_postgres(self):
-        print "Preparing PostgreSQL database..."
-
-    def fetching_tables(self):
-        print "Fetching tables..."
-
-    def preparing_tables(self):
-        print "Preparing tables..."
-
-
 class Porter(object):
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
@@ -628,6 +427,180 @@ class Porter(object):
             logger.exception("")
         finally:
             reactor.stop()
+
+
+##############################################
+###### The following is simply UI stuff ######
+##############################################
+
+
+class Progress(object):
+    """Used to report progress of the port
+    """
+    def __init__(self):
+        self.tables = {}
+
+        self.start_time = int(time.time())
+
+    def add_table(self, table, cur, size):
+        self.tables[table] = {
+            "start": cur,
+            "num_done": cur,
+            "total": size,
+            "perc": int(cur * 100 / size),
+        }
+
+    def update(self, table, num_done):
+        data = self.tables[table]
+        data["num_done"] = num_done
+        data["perc"] = int(num_done * 100 / data["total"])
+
+    def done(self):
+        pass
+
+
+class CursesProgress(Progress):
+    """Reports progress to a curses window
+    """
+    def __init__(self, stdscr):
+        self.stdscr = stdscr
+
+        curses.use_default_colors()
+        curses.curs_set(0)
+
+        curses.init_pair(1, curses.COLOR_RED, -1)
+        curses.init_pair(2, curses.COLOR_GREEN, -1)
+
+        self.last_update = 0
+
+        self.finished = False
+
+        super(CursesProgress, self).__init__()
+
+    def update(self, table, num_done):
+        super(CursesProgress, self).update(table, num_done)
+
+        self.render()
+
+    def render(self, force=False):
+        now = time.time()
+
+        if not force and now - self.last_update < 0.2:
+            # reactor.callLater(1, self.render)
+            return
+
+        self.stdscr.clear()
+
+        rows, cols = self.stdscr.getmaxyx()
+
+        duration = int(now) - int(self.start_time)
+
+        minutes, seconds = divmod(duration, 60)
+        duration_str = '%02dm %02ds' % (minutes, seconds,)
+
+        if self.finished:
+            status = "Time spent: %s (Done!)" % (duration_str,)
+        else:
+            min_perc = min(
+                (v["num_done"] - v["start"]) * 100. / (v["total"] - v["start"])
+                if v["total"] - v["start"] else 100
+                for v in self.tables.values()
+            )
+            if min_perc > 0:
+                est_remaining = (int(now) - self.start_time) * 100 / min_perc
+                est_remaining_str = '%02dm %02ds remaining' % divmod(est_remaining, 60)
+            else:
+                est_remaining_str = "Unknown"
+            status = (
+                "Time spent: %s (est. remaining: %s)"
+                % (duration_str, est_remaining_str,)
+            )
+
+        self.stdscr.addstr(
+            0, 0,
+            status,
+            curses.A_BOLD,
+        )
+
+        max_len = max([len(t) for t in self.tables.keys()])
+
+        left_margin = 5
+        middle_space = 1
+
+        items = self.tables.items()
+        items.sort(
+            key=lambda i: (i[1]["perc"], i[0]),
+        )
+
+        for i, (table, data) in enumerate(items):
+            if i + 2 >= rows:
+                break
+
+            perc = data["perc"]
+
+            color = curses.color_pair(2) if perc == 100 else curses.color_pair(1)
+
+            self.stdscr.addstr(
+                i+2, left_margin + max_len - len(table),
+                table,
+                curses.A_BOLD | color,
+            )
+
+            size = 20
+
+            progress = "[%s%s]" % (
+                "#" * int(perc*size/100),
+                " " * (size - int(perc*size/100)),
+            )
+
+            self.stdscr.addstr(
+                i+2, left_margin + max_len + middle_space,
+                "%s %3d%% (%d/%d)" % (progress, perc, data["num_done"], data["total"]),
+            )
+
+        if self.finished:
+            self.stdscr.addstr(
+                self.rows-1, 0,
+                "Press any key to exit...",
+            )
+
+        self.stdscr.refresh()
+        self.last_update = time.time()
+
+    def done(self):
+        self.finished = True
+        self.render(True)
+        self.stdscr.getch()
+
+    def set_state(self, state):
+        self.stdscr.clear()
+        self.stdscr.addstr(
+            0, 0,
+            state + "...",
+            curses.A_BOLD,
+        )
+        self.stdscr.refresh()
+
+
+class TerminalProgress(Progress):
+    """Just prints progress to the terminal
+    """
+    def update(self, table, num_done):
+        super(TerminalProgress, self).update(table, num_done)
+
+        data = self.tables[table]
+
+        print "%s: %d%% (%d/%d)" % (
+            table, data["perc"],
+            data["num_done"], data["total"],
+        )
+
+    def set_state(self, state):
+        print state + "..."
+
+
+##############################################
+##############################################
 
 
 if __name__ == "__main__":
