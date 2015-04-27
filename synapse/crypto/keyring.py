@@ -115,7 +115,6 @@ class Keyring(object):
         r = yield create_observer(download)
         defer.returnValue(r)
 
-
     @defer.inlineCallbacks
     def _get_server_verify_key_impl(self, server_name, key_ids):
         # Try to fetch the key from the remote server.
