@@ -183,17 +183,7 @@ class Auth(object):
         else:
             join_rule = JoinRules.INVITE
 
-        user_level = self._get_power_level_from_event_state(
-            event,
-            event.user_id,
-            auth_events,
-        )
-
-        # TODO(paul): There's an awful lot of int()-casting in this code;
-        #   surely we should be squashing strings to integers at a higher
-        #   level, maybe when we insert?
-        if user_level is not None:
-            user_level = int(user_level)
+        user_level = self._get_user_power_level(event.user_id, auth_events)
 
         # FIXME (erikj): What should we do here as the default?
         ban_level = self._get_named_level(auth_events, "ban", 50)
@@ -281,23 +271,26 @@ class Auth(object):
         key = (EventTypes.PowerLevels, "", )
         return auth_events.get(key)
 
-    def _get_power_level_from_event_state(self, event, user_id, auth_events):
+    def _get_user_power_level(self, user_id, auth_events):
         power_level_event = self._get_power_level_event(auth_events)
-        level = None
 
         if power_level_event:
             level = power_level_event.content.get("users", {}).get(user_id)
             if not level:
                 level = power_level_event.content.get("users_default", 0)
+
+            if level is None:
+                return 0
+            else:
+                return int(level)
         else:
             key = (EventTypes.Create, "", )
             create_event = auth_events.get(key)
             if (create_event is not None and
                     create_event.content["creator"] == user_id):
                 return 100
-
-        return level
-
+            else:
+                return 0
 
     def _get_named_level(self, auth_events, name, default):
         power_level_event = self._get_power_level_event(auth_events)
@@ -504,16 +497,7 @@ class Auth(object):
         else:
             send_level = 0
 
-        user_level = self._get_power_level_from_event_state(
-            event,
-            event.user_id,
-            auth_events,
-        )
-
-        if user_level:
-            user_level = int(user_level)
-        else:
-            user_level = 0
+        user_level = self._get_user_power_level(event.user_id, auth_events)
 
         if user_level < send_level:
             raise AuthError(
@@ -545,11 +529,7 @@ class Auth(object):
         return True
 
     def _check_redaction(self, event, auth_events):
-        user_level = self._get_power_level_from_event_state(
-            event,
-            event.user_id,
-            auth_events,
-        )
+        user_level = self._get_user_power_level(event.user_id, auth_events)
 
         redact_level = self._get_named_level(auth_events, "redact", 50)
 
@@ -579,11 +559,7 @@ class Auth(object):
         if not current_state:
             return
 
-        user_level = self._get_power_level_from_event_state(
-            event,
-            event.user_id,
-            auth_events,
-        )
+        user_level = self._get_user_power_level(event.user_id, auth_events)
 
         # Check other levels:
         levels_to_check = [

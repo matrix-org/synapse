@@ -1,3 +1,17 @@
+# Copyright 2015 OpenMarket Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 
 
@@ -112,7 +126,25 @@ def make_base_prepend_override_rules():
 def make_base_append_override_rules():
     return [
         {
-            'rule_id': 'global/override/.m.rule.call',
+            'rule_id': 'global/override/.m.rule.suppress_notices',
+            'conditions': [
+                {
+                    'kind': 'event_match',
+                    'key': 'content.msgtype',
+                    'pattern': 'm.notice',
+                }
+            ],
+            'actions': [
+                'dont_notify',
+            ]
+        }
+    ]
+
+
+def make_base_append_underride_rules(user):
+    return [
+        {
+            'rule_id': 'global/underride/.m.rule.call',
             'conditions': [
                 {
                     'kind': 'event_match',
@@ -129,19 +161,6 @@ def make_base_append_override_rules():
                     'set_tweak': 'highlight',
                     'value': False
                 }
-            ]
-        },
-        {
-            'rule_id': 'global/override/.m.rule.suppress_notices',
-            'conditions': [
-                {
-                    'kind': 'event_match',
-                    'key': 'content.msgtype',
-                    'pattern': 'm.notice',
-                }
-            ],
-            'actions': [
-                'dont_notify',
             ]
         },
         {
@@ -162,7 +181,7 @@ def make_base_append_override_rules():
             ]
         },
         {
-            'rule_id': 'global/override/.m.rule.room_one_to_one',
+            'rule_id': 'global/underride/.m.rule.room_one_to_one',
             'conditions': [
                 {
                     'kind': 'room_member_count',
@@ -179,12 +198,7 @@ def make_base_append_override_rules():
                     'value': False
                 }
             ]
-        }
-    ]
-
-
-def make_base_append_underride_rules(user):
-    return [
+        },
         {
             'rule_id': 'global/underride/.m.rule.invite_for_me',
             'conditions': [
