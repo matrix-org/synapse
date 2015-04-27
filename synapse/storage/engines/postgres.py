@@ -39,3 +39,6 @@ class PostgresEngine(object):
         if isinstance(error, self.module.DatabaseError):
             return error.pgcode in ["40001", "40P01"]
         return False
+
+    def is_connection_closed(self, conn):
+        return bool(conn)

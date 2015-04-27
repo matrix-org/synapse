@@ -300,6 +300,9 @@ class SQLBaseStore(object):
 
         def inner_func(conn, *args, **kwargs):
             with LoggingContext("runInteraction") as context:
+                if self.database_engine.is_connection_closed(conn):
+                    conn.reconnect()
+
                 current_context.copy_to(context)
                 start = time.time() * 1000
                 txn_id = self._TXN_ID
@@ -322,12 +325,35 @@ class SQLBaseStore(object):
                                 LoggingTransaction(txn, name, self.database_engine),
                                 *args, **kwargs
                             )
+                        except self.database_engine.module.OperationalError as e:
+                            # This can happen if the database disappears mid
+                            # transaction.
+                            logger.warn(
+                                "[TXN OPERROR] {%s} %s %d/%d",
+                                name, e, i, N
+                            )
+                            if i < N:
+                                i += 1
+                                try:
+                                    conn.rollback()
+                                except self.database_engine.module.Error as e1:
+                                    logger.warn(
+                                        "[TXN EROLL] {%s} %s",
+                                        name, e1,
+                                    )
+                                continue
                         except self.database_engine.module.DatabaseError as e:
                             if self.database_engine.is_deadlock(e):
                                 logger.warn("[TXN DEADLOCK] {%s} %d/%d", name, i, N)
                                 if i < N:
                                     i += 1
-                                    conn.rollback()
+                                    try:
+                                        conn.rollback()
+                                    except self.database_engine.module.Error as e1:
+                                        logger.warn(
+                                            "[TXN EROLL] {%s} %s",
+                                            name, e1,
+                                        )
                                     continue
                             raise
                 except Exception as e:

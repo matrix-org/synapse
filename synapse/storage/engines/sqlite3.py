@@ -35,3 +35,6 @@ class Sqlite3Engine(object):
 
     def is_deadlock(self, error):
         return False
+
+    def is_connection_closed(self, conn):
+        return False
