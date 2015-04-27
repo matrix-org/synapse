@@ -4,7 +4,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,12 +12,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-CREATE TABLE IF NOT EXISTS push_rules_enable (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_name TEXT NOT NULL,
-  rule_id TEXT NOT NULL,
-  enabled TINYINT,
-  UNIQUE(user_name, rule_id)
+
+CREATE TABLE IF NOT EXISTS application_services_state(
+    as_id TEXT PRIMARY KEY,
+    state TEXT,
+    last_txn TEXT
 );
 
-CREATE INDEX IF NOT EXISTS push_rules_enable_user_name on push_rules_enable (user_name);
+CREATE TABLE IF NOT EXISTS application_services_txns(
+    as_id TEXT NOT NULL,
+    txn_id INTEGER NOT NULL,
+    event_ids TEXT NOT NULL,
+    UNIQUE(as_id, txn_id) ON CONFLICT ROLLBACK
+);
+
+
+

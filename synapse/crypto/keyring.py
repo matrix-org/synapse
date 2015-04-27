@@ -24,6 +24,8 @@ from synapse.api.errors import SynapseError, Codes
 
 from synapse.util.retryutils import get_retry_limiter
 
+from synapse.util.async import create_observer
+
 from OpenSSL import crypto
 
 import logging
@@ -37,6 +39,8 @@ class Keyring(object):
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.hs = hs
+
+        self.key_downloads = {}
 
     @defer.inlineCallbacks
     def verify_json_for_server(self, server_name, json_object):
@@ -97,76 +101,92 @@ class Keyring(object):
             defer.returnValue(cached[0])
             return
 
-        # Try to fetch the key from the remote server.
+        @defer.inlineCallbacks
+        def fetch_keys():
+            # Try to fetch the key from the remote server.
 
-        limiter = yield get_retry_limiter(
-            server_name,
-            self.clock,
-            self.store,
-        )
-
-        with limiter:
-            (response, tls_certificate) = yield fetch_server_key(
-                server_name, self.hs.tls_context_factory
+            limiter = yield get_retry_limiter(
+                server_name,
+                self.clock,
+                self.store,
             )
 
-        # Check the response.
-
-        x509_certificate_bytes = crypto.dump_certificate(
-            crypto.FILETYPE_ASN1, tls_certificate
-        )
-
-        if ("signatures" not in response
-                or server_name not in response["signatures"]):
-            raise ValueError("Key response not signed by remote server")
-
-        if "tls_certificate" not in response:
-            raise ValueError("Key response missing TLS certificate")
-
-        tls_certificate_b64 = response["tls_certificate"]
-
-        if encode_base64(x509_certificate_bytes) != tls_certificate_b64:
-            raise ValueError("TLS certificate doesn't match")
-
-        verify_keys = {}
-        for key_id, key_base64 in response["verify_keys"].items():
-            if is_signing_algorithm_supported(key_id):
-                key_bytes = decode_base64(key_base64)
-                verify_key = decode_verify_key_bytes(key_id, key_bytes)
-                verify_keys[key_id] = verify_key
-
-        for key_id in response["signatures"][server_name]:
-            if key_id not in response["verify_keys"]:
-                raise ValueError(
-                    "Key response must include verification keys for all"
-                    " signatures"
-                )
-            if key_id in verify_keys:
-                verify_signed_json(
-                    response,
-                    server_name,
-                    verify_keys[key_id]
+            with limiter:
+                (response, tls_certificate) = yield fetch_server_key(
+                    server_name, self.hs.tls_context_factory
                 )
 
-        # Cache the result in the datastore.
+            # Check the response.
 
-        time_now_ms = self.clock.time_msec()
-
-        yield self.store.store_server_certificate(
-            server_name,
-            server_name,
-            time_now_ms,
-            tls_certificate,
-        )
-
-        for key_id, key in verify_keys.items():
-            yield self.store.store_server_verify_key(
-                server_name, server_name, time_now_ms, key
+            x509_certificate_bytes = crypto.dump_certificate(
+                crypto.FILETYPE_ASN1, tls_certificate
             )
 
-        for key_id in key_ids:
-            if key_id in verify_keys:
-                defer.returnValue(verify_keys[key_id])
-                return
+            if ("signatures" not in response
+                    or server_name not in response["signatures"]):
+                raise ValueError("Key response not signed by remote server")
 
-        raise ValueError("No verification key found for given key ids")
+            if "tls_certificate" not in response:
+                raise ValueError("Key response missing TLS certificate")
+
+            tls_certificate_b64 = response["tls_certificate"]
+
+            if encode_base64(x509_certificate_bytes) != tls_certificate_b64:
+                raise ValueError("TLS certificate doesn't match")
+
+            verify_keys = {}
+            for key_id, key_base64 in response["verify_keys"].items():
+                if is_signing_algorithm_supported(key_id):
+                    key_bytes = decode_base64(key_base64)
+                    verify_key = decode_verify_key_bytes(key_id, key_bytes)
+                    verify_keys[key_id] = verify_key
+
+            for key_id in response["signatures"][server_name]:
+                if key_id not in response["verify_keys"]:
+                    raise ValueError(
+                        "Key response must include verification keys for all"
+                        " signatures"
+                    )
+                if key_id in verify_keys:
+                    verify_signed_json(
+                        response,
+                        server_name,
+                        verify_keys[key_id]
+                    )
+
+            # Cache the result in the datastore.
+
+            time_now_ms = self.clock.time_msec()
+
+            yield self.store.store_server_certificate(
+                server_name,
+                server_name,
+                time_now_ms,
+                tls_certificate,
+            )
+
+            for key_id, key in verify_keys.items():
+                yield self.store.store_server_verify_key(
+                    server_name, server_name, time_now_ms, key
+                )
+
+            for key_id in key_ids:
+                if key_id in verify_keys:
+                    defer.returnValue(verify_keys[key_id])
+                    return
+
+            raise ValueError("No verification key found for given key ids")
+
+        download = self.key_downloads.get(server_name)
+
+        if download is None:
+            download = fetch_keys()
+            self.key_downloads[server_name] = download
+
+            @download.addBoth
+            def callback(ret):
+                del self.key_downloads[server_name]
+                return ret
+
+        r = yield create_observer(download)
+        defer.returnValue(r)

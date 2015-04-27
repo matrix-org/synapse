@@ -110,7 +110,7 @@ class ServerConfig(Config):
             with open(args.signing_key_path, "w") as signing_key_file:
                 syutil.crypto.signing_key.write_signing_keys(
                     signing_key_file,
-                    (syutil.crypto.signing_key.generate_singing_key("auto"),),
+                    (syutil.crypto.signing_key.generate_signing_key("auto"),),
                 )
         else:
             signing_keys = cls.read_file(args.signing_key_path, "signing_key")

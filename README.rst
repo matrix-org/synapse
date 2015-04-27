@@ -86,7 +86,7 @@ Homeserver Installation
 =======================
 
 System requirements:
-- POSIX-compliant system (tested on Linux & OSX)
+- POSIX-compliant system (tested on Linux & OS X)
 - Python 2.7
 
 Synapse is written in python but some of the libraries is uses are written in
@@ -128,8 +128,18 @@ To set up your homeserver, run (in your virtualenv, as before)::
 
 Substituting your host and domain name as appropriate.
 
+This will generate you a config file that you can then customise, but it will
+also generate a set of keys for you. These keys will allow your Home Server to
+identify itself to other Home Servers, so don't lose or delete them. It would be
+wise to back them up somewhere safe. If, for whatever reason, you do need to
+change your Home Server's keys, you may find that other Home Servers have the
+old key cached. If you update the signing key, you should change the name of the
+key in the <server name>.signing.key file (the second word, which by default is
+, 'auto') to something different.
+
 By default, registration of new users is disabled. You can either enable
-registration in the config (it is then recommended to also set up CAPTCHA), or
+registration in the config by specifying ``enable_registration: true``
+(it is then recommended to also set up CAPTCHA), or
 you can use the command line to register new users::
 
     $ source ~/.synapse/bin/activate
@@ -348,7 +358,7 @@ and port where the server is running.  (At the current time synapse does not
 support clustering multiple servers into a single logical homeserver).  The DNS
 record would then look something like::
 
-    $ dig -t srv _matrix._tcp.machine.my.domaine.name
+    $ dig -t srv _matrix._tcp.machine.my.domain.name
     _matrix._tcp    IN      SRV     10 0 8448 machine.my.domain.name.
 
 
@@ -365,10 +375,6 @@ SRV record, as that is the name other machines will expect it to have::
 
 You may additionally want to pass one or more "-v" options, in order to
 increase the verbosity of logging output; at least for initial testing.
-
-For the initial alpha release, the homeserver is not speaking TLS for
-either client-server or server-server traffic for ease of debugging. We have
-also not spent any time yet getting the homeserver to run behind loadbalancers.
 
 Running a Demo Federation of Homeservers
 ----------------------------------------
@@ -432,7 +438,7 @@ track 3PID logins and publish end-user public keys.
 
 It's currently early days for identity servers as Matrix is not yet using 3PIDs
 as the primary means of identity and E2E encryption is not complete. As such,
-we are running a single identity server (http://matrix.org:8090) at the current
+we are running a single identity server (https://matrix.org) at the current
 time.
 
 
