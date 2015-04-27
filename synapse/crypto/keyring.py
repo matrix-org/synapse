@@ -26,6 +26,8 @@ from synapse.api.errors import SynapseError, Codes
 
 from synapse.util.retryutils import get_retry_limiter
 
+from synapse.util.async import create_observer
+
 from OpenSSL import crypto
 
 import urllib
@@ -44,6 +46,8 @@ class Keyring(object):
         self.config = hs.get_config()
         self.perspective_servers = self.config.perspectives
         self.hs = hs
+
+        self.key_downloads = {}
 
     @defer.inlineCallbacks
     def verify_json_for_server(self, server_name, json_object):
@@ -103,6 +107,22 @@ class Keyring(object):
             defer.returnValue(cached[0])
             return
 
+        download = self.key_downloads.get(server_name)
+
+        if download is None:
+            download = self._get_server_verify_key_impl(server_name, key_ids)
+            self.key_downloads[server_name] = download
+
+            @download.addBoth
+            def callback(ret):
+                del self.key_downloads[server_name]
+                return ret
+
+        r = yield create_observer(download)
+        defer.returnValue(r)
+
+    @defer.inlineCallbacks
+    def _get_server_verify_key_impl(self, server_name, key_ids):
         keys = None
         for perspective_name, perspective_keys in self.perspective_servers.items():
             try:
