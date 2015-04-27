@@ -42,3 +42,6 @@ class PostgresEngine(object):
 
     def is_connection_closed(self, conn):
         return bool(conn)
+
+    def lock_table(self, txn, table):
+        txn.execute("LOCK TABLE %s in EXCLUSIVE MODE" % (table,))

@@ -466,6 +466,9 @@ class SQLBaseStore(object):
         )
 
     def _simple_upsert_txn(self, txn, table, keyvalues, values, insertion_values={}):
+        # We need to lock the table :(
+        self.database_engine.lock_table(txn, table)
+
         # Try to update
         sql = "UPDATE %s SET %s WHERE %s" % (
             table,

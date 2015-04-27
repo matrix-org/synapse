@@ -76,25 +76,16 @@ class TransactionStore(SQLBaseStore):
             response_json (str)
         """
 
-        return self.runInteraction(
-            "set_received_txn_response",
-            self._set_received_txn_response,
-            transaction_id, origin, code, response_dict
-        )
-
-    def _set_received_txn_response(self, txn, transaction_id, origin, code,
-                                   response_json):
-        self._simple_upsert_txn(
-            txn,
+        return self._simple_insert(
             table=ReceivedTransactionsTable.table_name,
-            keyvalues={
+            values={
                 "transaction_id": transaction_id,
                 "origin": origin,
-            },
-            values={
                 "response_code": code,
-                "response_json": response_json,
-            }
+                "response_json": response_dict,
+            },
+            or_ignore=True,
+            desc="set_received_txn_response",
         )
 
     def prep_send_transaction(self, transaction_id, destination,

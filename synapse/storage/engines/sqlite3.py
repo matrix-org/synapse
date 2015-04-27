@@ -38,3 +38,6 @@ class Sqlite3Engine(object):
 
     def is_connection_closed(self, conn):
         return False
+
+    def lock_table(self, txn, table):
+        return

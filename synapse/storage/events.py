@@ -283,50 +283,6 @@ class EventsStore(SQLBaseStore):
         if context.rejected:
             self._store_rejections_txn(txn, event.event_id, context.rejected)
 
-        if event.is_state():
-            vals = {
-                "event_id": event.event_id,
-                "room_id": event.room_id,
-                "type": event.type,
-                "state_key": event.state_key,
-            }
-
-            # TODO: How does this work with backfilling?
-            if hasattr(event, "replaces_state"):
-                vals["prev_state"] = event.replaces_state
-
-            self._simple_insert_txn(
-                txn,
-                "state_events",
-                vals,
-            )
-
-            if is_new_state and not context.rejected:
-                self._simple_upsert_txn(
-                    txn,
-                    "current_state_events",
-                    keyvalues={
-                        "room_id": event.room_id,
-                        "type": event.type,
-                        "state_key": event.state_key,
-                    },
-                    values={
-                        "event_id": event.event_id,
-                    }
-                )
-
-            for e_id, h in event.prev_state:
-                self._simple_insert_txn(
-                    txn,
-                    table="event_edges",
-                    values={
-                        "event_id": event.event_id,
-                        "prev_event_id": e_id,
-                        "room_id": event.room_id,
-                        "is_state": True,
-                    },
-                )
-
         for hash_alg, hash_base64 in event.hashes.items():
             hash_bytes = decode_base64(hash_base64)
             self._store_event_content_hash_txn(
@@ -355,6 +311,50 @@ class EventsStore(SQLBaseStore):
         self._store_event_reference_hash_txn(
             txn, event.event_id, ref_alg, ref_hash_bytes
         )
+
+        if event.is_state():
+            vals = {
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "type": event.type,
+                "state_key": event.state_key,
+            }
+
+            # TODO: How does this work with backfilling?
+            if hasattr(event, "replaces_state"):
+                vals["prev_state"] = event.replaces_state
+
+            self._simple_insert_txn(
+                txn,
+                "state_events",
+                vals,
+            )
+
+            for e_id, h in event.prev_state:
+                self._simple_insert_txn(
+                    txn,
+                    table="event_edges",
+                    values={
+                        "event_id": event.event_id,
+                        "prev_event_id": e_id,
+                        "room_id": event.room_id,
+                        "is_state": True,
+                    },
+                )
+
+            if is_new_state and not context.rejected:
+                self._simple_upsert_txn(
+                    txn,
+                    "current_state_events",
+                    keyvalues={
+                        "room_id": event.room_id,
+                        "type": event.type,
+                        "state_key": event.state_key,
+                    },
+                    values={
+                        "event_id": event.event_id,
+                    }
+                )
 
     def _store_redaction(self, txn, event):
         # invalidate the cache for the redacted event
