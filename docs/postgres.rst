@@ -74,7 +74,8 @@ the original snapshot was taken, repeat the previous steps with a newer
 snapshot.
 
 To complete the conversion shut down the synapse server and run the port
-script one last time, e.g. if the SQLite database is at  ``homeserver.db`` run:
+script one last time, e.g. if the SQLite database is at  ``homeserver.db``
+run::
 
     python scripts/port_from_sqlite_to_postgres.py \
         --sqlite-database homeserver.db \
