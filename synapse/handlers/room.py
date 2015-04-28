@@ -213,7 +213,8 @@ class RoomCreationHandler(BaseHandler):
                 "state_default": 50,
                 "ban": 50,
                 "kick": 50,
-                "redact": 50
+                "redact": 50,
+                "invite": 0,
             },
         )
 

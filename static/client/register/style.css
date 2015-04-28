@@ -37,9 +37,13 @@ textarea, input {
     margin: auto
 }
 
+.g-recaptcha div {
+    margin: auto;
+}
+
 #registrationForm {
     text-align: left;
-    padding: 1em;
+    padding: 5px;
     margin-bottom: 40px;
     display: inline-block;
     
