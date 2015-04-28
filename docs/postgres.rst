@@ -32,3 +32,54 @@ following form::
 All key, values in ``args`` are passed to the ``psycopg2.connect(..)``
 function, except keys beginning with ``cp_``, which are consumed by the twisted
 adbapi connection pool.
+
+
+Porting from SQLite
+===================
+
+The script ``port_from_sqlite_to_postgres.py`` allows porting an existing
+synapse server backed by SQLite to using PostgreSQL. This is done in as a two
+phase process:
+
+1. Copy the existing SQLite database to a separate location (while the server
+   is down) and running the port script against that offline database.
+2. Shut down the server. Rerun the port script to port any data that has come
+   in since taking the first snapshot. Restart server against the PostgrSQL
+   database.
+
+The port script is designed to be run repeatedly against newer snapshots of the
+SQLite database file. This makes it safe to repeat step 1 if there was a delay
+between taking the previous snapshot and ready to do step 2.
+
+It is safe to at any time kill the port script and restart it.
+
+Using the port script
+~~~~~~~~~~~~~~~~~~~~~
+
+Firstly, shut down the currently running synapse server and copy its database
+file to another location. Once the copy is complete, restart synapse.
+
+Assuming your database config file (as described in the section *Synapse
+config*) is named ``database_config.yaml`` and the SQLite snapshot is at
+``homeserver.db.snapshot`` then simply run::
+
+    python scripts/port_from_sqlite_to_postgres.py \
+        --sqlite-database homeserver.db.snapshot \
+        --postgres-config database_config.yaml
+
+The flag ``--curses`` displays a coloured curses progress UI.
+
+If the script took a long time to complete, or time has otherwise passed since
+the original snapshot was taken, repeat the previous steps with a newer
+snapshot.
+
+To complete the conversion shut down the synapse server and run the port
+script one last time, e.g. if the SQLite database is at  ``homeserver.db`` run:
+
+    python scripts/port_from_sqlite_to_postgres.py \
+        --sqlite-database homeserver.db \
+        --postgres-config database_config.yaml
+
+Once that has completed, change the synapse config to point at the PostgreSQL
+database configuration file and restart synapse. Synapse should now be running
+against PostgreSQL.
