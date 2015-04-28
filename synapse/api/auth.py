@@ -222,6 +222,13 @@ class Auth(object):
             elif target_in_room:  # the target is already in the room.
                 raise AuthError(403, "%s is already in the room." %
                                      target_user_id)
+            else:
+                invite_level = self._get_named_level(auth_events, "invite", 0)
+
+                if user_level < invite_level:
+                    raise AuthError(
+                        403, "You cannot invite user %s." % target_user_id
+                    )
         elif Membership.JOIN == membership:
             # Joins are valid iff caller == target and they were:
             # invited: They are accepting the invitation
@@ -561,6 +568,7 @@ class Auth(object):
             ("ban", []),
             ("redact", []),
             ("kick", []),
+            ("invite", []),
         ]
 
         old_list = current_state.content.get("users")
