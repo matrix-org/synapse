@@ -14,13 +14,13 @@
  */
 
 CREATE TABLE IF NOT EXISTS application_services_state(
-    as_id VARCHAR(150) PRIMARY KEY,
+    as_id TEXT PRIMARY KEY,
     state VARCHAR(5),
     last_txn INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS application_services_txns(
-    as_id VARCHAR(150) NOT NULL,
+    as_id TEXT NOT NULL,
     txn_id INTEGER NOT NULL,
     event_ids TEXT NOT NULL,
     UNIQUE(as_id, txn_id)

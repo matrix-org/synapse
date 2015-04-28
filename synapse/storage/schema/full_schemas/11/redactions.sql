@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 CREATE TABLE IF NOT EXISTS redactions (
-    event_id VARCHAR(150) NOT NULL,
-    redacts VARCHAR(150) NOT NULL,
+    event_id TEXT NOT NULL,
+    redacts TEXT NOT NULL,
     UNIQUE (event_id)
 );
 

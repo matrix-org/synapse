@@ -14,8 +14,8 @@
  */
 -- Stores what transaction ids we have received and what our response was
 CREATE TABLE IF NOT EXISTS received_transactions(
-    transaction_id VARCHAR(150),
-    origin VARCHAR(150),
+    transaction_id TEXT,
+    origin TEXT,
     ts BIGINT,
     response_code INTEGER,
     response_json bytea,
@@ -30,8 +30,8 @@ CREATE INDEX transactions_have_ref ON received_transactions(origin, has_been_ref
 -- since referenced the transaction in another outgoing transaction
 CREATE TABLE IF NOT EXISTS sent_transactions(
     id BIGINT PRIMARY KEY, -- This is used to apply insertion ordering
-    transaction_id VARCHAR(150),
-    destination VARCHAR(150),
+    transaction_id TEXT,
+    destination TEXT,
     response_code INTEGER DEFAULT 0,
     response_json TEXT,
     ts BIGINT
@@ -47,9 +47,9 @@ CREATE INDEX sent_transaction_sent ON sent_transactions(response_code);
 -- For sent transactions only.
 CREATE TABLE IF NOT EXISTS transaction_id_to_pdu(
     transaction_id INTEGER,
-    destination VARCHAR(150),
-    pdu_id VARCHAR(150),
-    pdu_origin VARCHAR(150),
+    destination TEXT,
+    pdu_id TEXT,
+    pdu_origin TEXT,
     UNIQUE (transaction_id, destination)
 );
 
@@ -57,7 +57,7 @@ CREATE INDEX transaction_id_to_pdu_dest ON transaction_id_to_pdu(destination);
 
 -- To track destination health
 CREATE TABLE IF NOT EXISTS destinations(
-    destination VARCHAR(150) PRIMARY KEY,
+    destination TEXT PRIMARY KEY,
     retry_last_ts BIGINT,
     retry_interval INTEGER
 );

@@ -14,8 +14,8 @@
  */
 CREATE TABLE IF NOT EXISTS push_rules_enable (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_name VARCHAR(150) NOT NULL,
-  rule_id VARCHAR(150) NOT NULL,
+  user_name TEXT NOT NULL,
+  rule_id TEXT NOT NULL,
   enabled TINYINT,
   UNIQUE(user_name, rule_id)
 );

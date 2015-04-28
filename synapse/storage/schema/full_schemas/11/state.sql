@@ -15,20 +15,20 @@
 
 CREATE TABLE IF NOT EXISTS state_groups(
     id INTEGER PRIMARY KEY,
-    room_id VARCHAR(150) NOT NULL,
-    event_id VARCHAR(150) NOT NULL
+    room_id TEXT NOT NULL,
+    event_id TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS state_groups_state(
     state_group INTEGER NOT NULL,
-    room_id VARCHAR(150) NOT NULL,
-    type VARCHAR(150) NOT NULL,
-    state_key VARCHAR(150) NOT NULL,
-    event_id VARCHAR(150) NOT NULL
+    room_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    state_key TEXT NOT NULL,
+    event_id TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS event_to_state_groups(
-    event_id VARCHAR(150) NOT NULL,
+    event_id TEXT NOT NULL,
     state_group INTEGER NOT NULL,
     UNIQUE (event_id)
 );

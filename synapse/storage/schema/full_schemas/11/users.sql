@@ -14,8 +14,8 @@
  */
 CREATE TABLE IF NOT EXISTS users(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(150),
-    password_hash VARCHAR(150),
+    name TEXT,
+    password_hash TEXT,
     creation_ts BIGINT,
     admin SMALLINT DEFAULT 0 NOT NULL,
     UNIQUE(name)
@@ -23,18 +23,18 @@ CREATE TABLE IF NOT EXISTS users(
 
 CREATE TABLE IF NOT EXISTS access_tokens(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id VARCHAR(150) NOT NULL,
-    device_id VARCHAR(150),
-    token VARCHAR(150) NOT NULL,
+    user_id TEXT NOT NULL,
+    device_id TEXT,
+    token TEXT NOT NULL,
     last_used BIGINT,
     UNIQUE(token)
 );
 
 CREATE TABLE IF NOT EXISTS user_ips (
-    user VARCHAR(150) NOT NULL,
-    access_token VARCHAR(150) NOT NULL,
-    device_id VARCHAR(150),
-    ip VARCHAR(150) NOT NULL,
+    user TEXT NOT NULL,
+    access_token TEXT NOT NULL,
+    device_id TEXT,
+    ip TEXT NOT NULL,
     user_agent TEXT NOT NULL,
     last_seen BIGINT NOT NULL,
     UNIQUE (user, access_token, ip, user_agent)

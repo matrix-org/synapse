@@ -2,9 +2,9 @@
 -- MUST BE DONE BEFORE REMOVING ID COLUMN FROM USERS TABLE BELOW
 CREATE TABLE IF NOT EXISTS new_access_tokens(
     id BIGINT UNSIGNED PRIMARY KEY,
-    user_id VARCHAR(150) NOT NULL,
-    device_id VARCHAR(150),
-    token VARCHAR(150) NOT NULL,
+    user_id TEXT NOT NULL,
+    device_id TEXT,
+    token TEXT NOT NULL,
     last_used BIGINT UNSIGNED,
     UNIQUE(token)
 );
@@ -20,8 +20,8 @@ ALTER TABLE new_access_tokens RENAME TO access_tokens;
 
 -- Remove ID column from `users` table
 CREATE TABLE IF NOT EXISTS new_users(
-    name VARCHAR(150),
-    password_hash VARCHAR(150),
+    name TEXT,
+    password_hash TEXT,
     creation_ts BIGINT UNSIGNED,
     admin BOOL DEFAULT 0 NOT NULL,
     UNIQUE(name)
@@ -36,11 +36,11 @@ ALTER TABLE new_users RENAME TO users;
 
 -- Remove UNIQUE constraint from `user_ips` table
 CREATE TABLE IF NOT EXISTS new_user_ips (
-    user_id VARCHAR(150) NOT NULL,
-    access_token VARCHAR(150) NOT NULL,
-    device_id VARCHAR(150),
-    ip VARCHAR(150) NOT NULL,
-    user_agent VARCHAR(150) NOT NULL,
+    user_id TEXT NOT NULL,
+    access_token TEXT NOT NULL,
+    device_id TEXT,
+    ip TEXT NOT NULL,
+    user_agent TEXT NOT NULL,
     last_seen BIGINT UNSIGNED NOT NULL
 );
 
