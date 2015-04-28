@@ -184,10 +184,11 @@ class Porter(object):
         if table == "sent_transactions":
             # This is a big table, and we really only need some of the recent
             # data
+
             yield self.postgres_store.execute(delete_all)
 
             # Only save things from the last day
-            yesterday = 1429114568820 #int(time.time()*1000) - 86400000
+            yesterday = int(time.time()*1000) - 86400000
 
             # And save the max transaction id from each destination
             select = (
