@@ -124,6 +124,9 @@ To install the synapse homeserver run::
 This installs synapse, along with the libraries it uses, into a virtual
 environment under ``~/.synapse``.
 
+Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
+above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
+
 To set up your homeserver, run (in your virtualenv, as before)::
 
     $ cd ~/.synapse
