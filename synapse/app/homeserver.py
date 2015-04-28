@@ -19,8 +19,7 @@ sys.dont_write_bytecode = True
 
 from synapse.storage.engines import create_engine
 from synapse.storage import (
-    prepare_database, prepare_sqlite3_database, are_all_users_on_domain,
-    UpgradeDatabaseException,
+    are_all_users_on_domain, UpgradeDatabaseException,
 )
 
 from synapse.server import HomeServer
