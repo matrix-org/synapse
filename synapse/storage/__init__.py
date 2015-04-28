@@ -421,3 +421,13 @@ def prepare_sqlite3_database(db_conn):
                     " VALUES (?,?)",
                     (row[0], False)
                 )
+
+
+def are_all_users_on_domain(txn, domain):
+    sql = "SELECT COUNT(*) FROM users WHERE name NOT LIKE ?"
+    pat = "%:" + domain
+    cursor = txn.execute(sql, (pat,))
+    num_not_matching = cursor.fetchall()[0][0]
+    if num_not_matching == 0:
+        return True
+    return False

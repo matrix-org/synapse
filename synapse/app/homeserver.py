@@ -18,7 +18,8 @@ import sys
 sys.dont_write_bytecode = True
 
 from synapse.storage import (
-    prepare_database, prepare_sqlite3_database, UpgradeDatabaseException,
+    prepare_database, prepare_sqlite3_database, are_all_users_on_domain,
+    UpgradeDatabaseException,
 )
 
 from synapse.server import HomeServer
@@ -241,6 +242,21 @@ class SynapseHomeServer(HomeServer):
             )
             logger.info("Metrics now running on 127.0.0.1 port %d", config.metrics_port)
 
+    def run_startup_checks(self, db_conn):
+        all_users_native = are_all_users_on_domain(
+            db_conn, self.hostname
+        )
+        if not all_users_native:
+            sys.stderr.write(
+                "\n"
+                "******************************************************\n"
+                "Found users in database not native to %s!\n"
+                "You cannot changed a synapse server_name after it's been configured\n"
+                "******************************************************\n"
+                "\n" % (self.hostname,)
+            )
+            sys.exit(1)
+
 
 def get_version_string():
     try:
@@ -375,6 +391,7 @@ def setup(config_options):
         with sqlite3.connect(db_name) as db_conn:
             prepare_sqlite3_database(db_conn)
             prepare_database(db_conn)
+            hs.run_startup_checks(db_conn)
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"
