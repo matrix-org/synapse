@@ -454,7 +454,7 @@ class Porter(object):
 
         total_count = remaining_count + inserted_rows
 
-        defer.returnValue((next_chunk, remaining_count, total_count))
+        defer.returnValue((next_chunk, inserted_rows, total_count))
 
     @defer.inlineCallbacks
     def _get_remaining_count_to_port(self, table, next_chunk):
