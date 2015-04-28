@@ -858,6 +858,9 @@ class PresenceEventSource(object):
 
         presence = self.hs.get_handlers().presence_handler
         cachemap = presence._user_cachemap
+
+        max_serial = presence._user_cachemap_latest_serial
+
         clock = self.clock
         latest_serial = 0
 
@@ -866,7 +869,7 @@ class PresenceEventSource(object):
         for observed_user in cachemap.keys():
             cached = cachemap[observed_user]
 
-            if cached.serial <= from_key:
+            if cached.serial <= from_key or cached.serial > max_serial:
                 continue
 
             if not (yield self.is_visible(observer_user, observed_user)):
@@ -880,6 +883,9 @@ class PresenceEventSource(object):
         for serial, user_ids in presence._remote_offline_serials:
             if serial < from_key:
                 break
+
+            if serial > max_serial:
+                continue
 
             latest_serial = max(latest_serial, serial)
             for u in user_ids:
