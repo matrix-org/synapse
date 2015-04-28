@@ -671,15 +671,30 @@ class TerminalProgress(Progress):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="A script to port an existing synapse SQLite database to"
+                    " a new PostgreSQL database."
+    )
     parser.add_argument("-v", action='store_true')
-    parser.add_argument("--curses", action='store_true')
-    parser.add_argument("--sqlite-database")
     parser.add_argument(
-        "--postgres-config", type=argparse.FileType('r'),
+        "--sqlite-database", required=True,
+        help="The snapshot of the SQLite database file. This must not be"
+             " currently used by a running synapse server"
+    )
+    parser.add_argument(
+        "--postgres-config", type=argparse.FileType('r'), required=True,
+        help="The database config file for the PostgreSQL database"
+    )
+    parser.add_argument(
+        "--curses", action='store_true',
+        help="display a curses based progress UI"
     )
 
-    parser.add_argument("--batch-size", type=int, default=1000)
+    parser.add_argument(
+        "--batch-size", type=int, default=1000,
+        help="The number of rows to select from the SQLite table each"
+             " iteration [default=1000]",
+    )
 
     args = parser.parse_args()
 
@@ -704,6 +719,13 @@ if __name__ == "__main__":
     }
 
     postgres_config = yaml.safe_load(args.postgres_config)
+
+    if "name" not in postgres_config:
+        sys.stderr.write("Malformed database config: no 'name'")
+        sys.exit(2)
+    if postgres_config["name"] != "psycopg2":
+        sys.stderr.write("Database must use 'psycopg2' connector.")
+        sys.exit(3)
 
     def start(stdscr=None):
         if stdscr:
