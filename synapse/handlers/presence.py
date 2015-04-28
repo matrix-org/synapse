@@ -859,7 +859,7 @@ class PresenceEventSource(object):
         presence = self.hs.get_handlers().presence_handler
         cachemap = presence._user_cachemap
         clock = self.clock
-        latest_serial = None
+        latest_serial = 0
 
         updates = []
         # TODO(paul): use a DeferredList ? How to limit concurrency.
@@ -872,8 +872,7 @@ class PresenceEventSource(object):
             if not (yield self.is_visible(observer_user, observed_user)):
                 continue
 
-            if latest_serial is None or cached.serial > latest_serial:
-                latest_serial = cached.serial
+            latest_serial = max(cached.serial, latest_serial)
             updates.append(cached.make_event(user=observed_user, clock=clock))
 
         # TODO(paul): limit
@@ -882,6 +881,7 @@ class PresenceEventSource(object):
             if serial < from_key:
                 break
 
+            latest_serial = max(cached.serial, serial)
             for u in user_ids:
                 updates.append({
                     "type": "m.presence",
