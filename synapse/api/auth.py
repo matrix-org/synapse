@@ -18,7 +18,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
-from synapse.api.errors import AuthError, StoreError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
 from synapse.types import UserID, ClientInfo
@@ -40,6 +40,7 @@ class Auth(object):
         self.hs = hs
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
+        self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
 
     def check(self, event, auth_events):
         """ Checks if this event is correctly authed.
@@ -369,7 +370,10 @@ class Auth(object):
 
             defer.returnValue((user, ClientInfo(device_id, token_id)))
         except KeyError:
-            raise AuthError(403, "Missing access token.")
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
+                errcode=Codes.MISSING_TOKEN
+            )
 
     @defer.inlineCallbacks
     def get_user_by_token(self, token):
@@ -383,21 +387,20 @@ class Auth(object):
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
-        try:
-            ret = yield self.store.get_user_by_token(token)
-            if not ret:
-                raise StoreError(400, "Unknown token")
-            user_info = {
-                "admin": bool(ret.get("admin", False)),
-                "device_id": ret.get("device_id"),
-                "user": UserID.from_string(ret.get("name")),
-                "token_id": ret.get("token_id", None),
-            }
+        ret = yield self.store.get_user_by_token(token)
+        if not ret:
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
+                errcode=Codes.UNKNOWN_TOKEN
+            )
+        user_info = {
+            "admin": bool(ret.get("admin", False)),
+            "device_id": ret.get("device_id"),
+            "user": UserID.from_string(ret.get("name")),
+            "token_id": ret.get("token_id", None),
+        }
 
-            defer.returnValue(user_info)
-        except StoreError:
-            raise AuthError(403, "Unrecognised access token.",
-                            errcode=Codes.UNKNOWN_TOKEN)
+        defer.returnValue(user_info)
 
     @defer.inlineCallbacks
     def get_appservice_by_req(self, request):
@@ -405,11 +408,16 @@ class Auth(object):
             token = request.args["access_token"][0]
             service = yield self.store.get_app_service_by_token(token)
             if not service:
-                raise AuthError(403, "Unrecognised access token.",
-                                errcode=Codes.UNKNOWN_TOKEN)
+                raise AuthError(
+                    self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                    "Unrecognised access token.",
+                    errcode=Codes.UNKNOWN_TOKEN
+                )
             defer.returnValue(service)
         except KeyError:
-            raise AuthError(403, "Missing access token.")
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token."
+            )
 
     def is_server_admin(self, user):
         return self.store.is_server_admin(user)

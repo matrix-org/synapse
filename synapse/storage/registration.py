@@ -89,17 +89,48 @@ class RegistrationStore(SQLBaseStore):
                     "VALUES (?,?)", [txn.lastrowid, token])
 
     def get_user_by_id(self, user_id):
-        query = ("SELECT users.name, users.password_hash FROM users"
+        query = ("SELECT users.id, users.name, users.password_hash FROM users"
                  " WHERE users.name = ?")
         return self._execute(
             "get_user_by_id", self.cursor_to_dict, query, user_id
         )
 
+    @defer.inlineCallbacks
+    def user_set_password_hash(self, user_id, password_hash):
+        """
+        NB. This does *not* evict any cache because the one use for this
+            removes most of the entries subsequently anyway so it would be
+            pointless. Use flush_user separately.
+        """
+        yield self._simple_update_one('users', {
+            'name': user_id
+        }, {
+            'password_hash': password_hash
+        })
+
+    @defer.inlineCallbacks
+    def user_delete_access_tokens_apart_from(self, user_id, token_id):
+        rows = yield self.get_user_by_id(user_id)
+        if len(rows) == 0:
+            raise Exception("No such user!")
+
+        yield self._execute(
+            "delete_access_tokens_apart_from", None,
+            "DELETE FROM access_tokens WHERE user_id = ? AND id != ?",
+            rows[0]['id'], token_id
+        )
+
+    @defer.inlineCallbacks
+    def flush_user(self, user_id):
+        rows = yield self._execute(
+            'flush_user', None,
+            "SELECT token FROM access_tokens WHERE user_id = ?",
+            user_id
+        )
+        for r in rows:
+            self.get_user_by_token.invalidate(r)
+
     @cached()
-    # TODO(paul): Currently there's no code to invalidate this cache. That
-    #   means if/when we ever add internal ways to invalidate access tokens or
-    #   change whether a user is a server admin, those will need to invoke
-    #      store.get_user_by_token.invalidate(token)
     def get_user_by_token(self, token):
         """Get a user from the given access token.
 
@@ -143,4 +174,40 @@ class RegistrationStore(SQLBaseStore):
         if rows:
             return rows[0]
 
-        raise StoreError(404, "Token not found.")
+        return None
+
+    @defer.inlineCallbacks
+    def user_add_threepid(self, user_id, medium, address, validated_at, added_at):
+        yield self._simple_upsert("user_threepids", {
+            "user": user_id,
+            "medium": medium,
+            "address": address,
+        }, {
+            "validated_at": validated_at,
+            "added_at": added_at,
+        })
+
+    @defer.inlineCallbacks
+    def user_get_threepids(self, user_id):
+        ret = yield self._simple_select_list(
+            "user_threepids", {
+                "user": user_id
+            },
+            ['medium', 'address', 'validated_at', 'added_at'],
+            'user_get_threepids'
+        )
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def get_user_by_threepid(self, medium, address):
+        ret = yield self._simple_select_one(
+            "user_threepids",
+            {
+                "medium": medium,
+                "address": address
+            },
+            ['user'], True, 'get_user_by_threepid'
+        )
+        if ret:
+            defer.returnValue(ret['user'])
+        defer.returnValue(None)

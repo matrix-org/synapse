@@ -38,13 +38,12 @@ class RegistrationStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_register(self):
         yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
+        u = (yield self.store.get_user_by_id(self.user_id))[0]
 
-        self.assertEquals(
-            # TODO(paul): Surely this field should be 'user_id', not 'name'
-            #  Additionally surely it shouldn't come in a 1-element list
-            [{"name": self.user_id, "password_hash": self.pwhash}],
-            (yield self.store.get_user_by_id(self.user_id))
-        )
+        # TODO(paul): Surely this field should be 'user_id', not 'name'
+        #  Additionally surely it shouldn't come in a 1-element list
+        self.assertEquals(self.user_id, u['name'])
+        self.assertEquals(self.pwhash, u['password_hash'])
 
         self.assertEquals(
             {"admin": 0,

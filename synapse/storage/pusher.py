@@ -27,67 +27,40 @@ logger = logging.getLogger(__name__)
 
 class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
-    def get_pushers_by_app_id_and_pushkey(self, app_id_and_pushkey):
+    def get_pushers_by_app_id_and_pushkey(self, app_id, pushkey):
+        cols = ",".join(PushersTable.fields)
         sql = (
-            "SELECT id, user_name, kind, profile_tag, app_id,"
-            "app_display_name, device_display_name, pushkey, ts, data, "
-            "last_token, last_success, failing_since "
-            "FROM pushers "
+            "SELECT "+cols+" FROM pushers "
             "WHERE app_id = ? AND pushkey = ?"
         )
 
         rows = yield self._execute(
             "get_pushers_by_app_id_and_pushkey", None, sql,
-            app_id_and_pushkey[0], app_id_and_pushkey[1]
+            app_id, pushkey
         )
 
         ret = [
             {
-                "id": r[0],
-                "user_name": r[1],
-                "kind": r[2],
-                "profile_tag": r[3],
-                "app_id": r[4],
-                "app_display_name": r[5],
-                "device_display_name": r[6],
-                "pushkey": r[7],
-                "pushkey_ts": r[8],
-                "data": r[9],
-                "last_token": r[10],
-                "last_success": r[11],
-                "failing_since": r[12]
+                k: r[i] for i, k in enumerate(PushersTable.fields)
             }
             for r in rows
         ]
+        print ret
 
-        defer.returnValue(ret[0])
+        defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def get_all_pushers(self):
+        cols = ",".join(PushersTable.fields)
         sql = (
-            "SELECT id, user_name, kind, profile_tag, app_id,"
-            "app_display_name, device_display_name, pushkey, ts, data, "
-            "last_token, last_success, failing_since "
-            "FROM pushers"
+            "SELECT "+cols+" FROM pushers"
         )
 
         rows = yield self._execute("get_all_pushers", None, sql)
 
         ret = [
             {
-                "id": r[0],
-                "user_name": r[1],
-                "kind": r[2],
-                "profile_tag": r[3],
-                "app_id": r[4],
-                "app_display_name": r[5],
-                "device_display_name": r[6],
-                "pushkey": r[7],
-                "pushkey_ts": r[8],
-                "data": r[9],
-                "last_token": r[10],
-                "last_success": r[11],
-                "failing_since": r[12]
+                k: r[i] for i, k in enumerate(PushersTable.fields)
             }
             for r in rows
         ]
@@ -95,7 +68,7 @@ class PusherStore(SQLBaseStore):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def add_pusher(self, user_name, profile_tag, kind, app_id,
+    def add_pusher(self, user_name, access_token, profile_tag, kind, app_id,
                    app_display_name, device_display_name,
                    pushkey, pushkey_ts, lang, data):
         try:
@@ -104,9 +77,10 @@ class PusherStore(SQLBaseStore):
                 dict(
                     app_id=app_id,
                     pushkey=pushkey,
+                    user_name=user_name,
                 ),
                 dict(
-                    user_name=user_name,
+                    access_token=access_token,
                     kind=kind,
                     profile_tag=profile_tag,
                     app_display_name=app_display_name,
@@ -122,37 +96,38 @@ class PusherStore(SQLBaseStore):
             raise StoreError(500, "Problem creating pusher.")
 
     @defer.inlineCallbacks
-    def delete_pusher_by_app_id_pushkey(self, app_id, pushkey):
+    def delete_pusher_by_app_id_pushkey_user_name(self, app_id, pushkey, user_name):
         yield self._simple_delete_one(
             PushersTable.table_name,
-            {"app_id": app_id, "pushkey": pushkey},
-            desc="delete_pusher_by_app_id_pushkey",
+            {"app_id": app_id, "pushkey": pushkey, 'user_name': user_name},
+            desc="delete_pusher_by_app_id_pushkey_user_name",
         )
 
     @defer.inlineCallbacks
-    def update_pusher_last_token(self, app_id, pushkey, last_token):
+    def update_pusher_last_token(self, app_id, pushkey, user_name, last_token):
         yield self._simple_update_one(
             PushersTable.table_name,
-            {'app_id': app_id, 'pushkey': pushkey},
+            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_name},
             {'last_token': last_token},
             desc="update_pusher_last_token",
         )
 
     @defer.inlineCallbacks
-    def update_pusher_last_token_and_success(self, app_id, pushkey,
+    def update_pusher_last_token_and_success(self, app_id, pushkey, user_name,
                                              last_token, last_success):
         yield self._simple_update_one(
             PushersTable.table_name,
-            {'app_id': app_id, 'pushkey': pushkey},
+            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_name},
             {'last_token': last_token, 'last_success': last_success},
             desc="update_pusher_last_token_and_success",
         )
 
     @defer.inlineCallbacks
-    def update_pusher_failing_since(self, app_id, pushkey, failing_since):
+    def update_pusher_failing_since(self, app_id, pushkey, user_name,
+                                    failing_since):
         yield self._simple_update_one(
             PushersTable.table_name,
-            {'app_id': app_id, 'pushkey': pushkey},
+            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_name},
             {'failing_since': failing_since},
             desc="update_pusher_failing_since",
         )
@@ -164,13 +139,15 @@ class PushersTable(Table):
     fields = [
         "id",
         "user_name",
+        "access_token",
         "kind",
         "profile_tag",
         "app_id",
         "app_display_name",
         "device_display_name",
         "pushkey",
-        "pushkey_ts",
+        "ts",
+        "lang",
         "data",
         "last_token",
         "last_success",

@@ -131,10 +131,10 @@ class HttpServer(object):
     """
 
     def register_path(self, method, path_pattern, callback):
-        """ Register a callback that get's fired if we receive a http request
+        """ Register a callback that gets fired if we receive a http request
         with the given method for a path that matches the given regex.
 
-        If the regex contains groups these get's passed to the calback via
+        If the regex contains groups these gets passed to the calback via
         an unpacked tuple.
 
         Args:
@@ -153,6 +153,13 @@ class JsonResource(HttpServer, resource.Resource):
     Resources.
 
     Register callbacks via register_path()
+
+    Callbacks can return a tuple of status code and a dict in which case the
+    the dict will automatically be sent to the client as a JSON object.
+
+    The JsonResource is primarily intended for returning JSON, but callbacks
+    may send something other than JSON, they may do so by using the methods
+    on the request object and instead returning None.
     """
 
     isLeaf = True
@@ -185,9 +192,8 @@ class JsonResource(HttpServer, resource.Resource):
             interface=self.hs.config.bind_host
         )
 
-    # Gets called by twisted
     def render(self, request):
-        """ This get's called by twisted every time someone sends us a request.
+        """ This gets called by twisted every time someone sends us a request.
         """
         self._async_render(request)
         return server.NOT_DONE_YET
@@ -195,7 +201,7 @@ class JsonResource(HttpServer, resource.Resource):
     @request_handler
     @defer.inlineCallbacks
     def _async_render(self, request):
-        """ This get's called by twisted every time someone sends us a request.
+        """ This gets called from render() every time someone sends us a request.
             This checks if anyone has registered a callback for that method and
             path.
         """
@@ -227,9 +233,11 @@ class JsonResource(HttpServer, resource.Resource):
                 urllib.unquote(u).decode("UTF-8") for u in m.groups()
             ]
 
-            code, response = yield callback(request, *args)
+            callback_return = yield callback(request, *args)
+            if callback_return is not None:
+                code, response = callback_return
+                self._send_response(request, code, response)
 
-            self._send_response(request, code, response)
             response_timer.inc_by(
                 self.clock.time_msec() - start, request.method, servlet_classname
             )

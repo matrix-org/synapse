@@ -65,6 +65,7 @@ class BaseHomeServer(object):
         'replication_layer',
         'datastore',
         'handlers',
+        'v1auth',
         'auth',
         'rest_servlet_factory',
         'state_handler',
@@ -180,6 +181,15 @@ class HomeServer(BaseHomeServer):
 
     def build_auth(self):
         return Auth(self)
+
+    def build_v1auth(self):
+        orf = Auth(self)
+        # Matrix spec makes no reference to what HTTP status code is returned,
+        # but the V1 API uses 403 where it means 401, and the webclient
+        # relies on this behaviour, so V1 gets its own copy of the auth
+        # with backwards compat behaviour.
+        orf.TOKEN_NOT_FOUND_HTTP_STATUS = 403
+        return orf
 
     def build_state_handler(self):
         return StateHandler(self)

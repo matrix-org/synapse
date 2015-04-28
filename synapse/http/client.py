@@ -200,6 +200,8 @@ class CaptchaServerHttpClient(SimpleHttpClient):
     """
     Separate HTTP client for talking to google's captcha servers
     Only slightly special because accepts partial download responses
+
+    used only by c/s api v1
     """
 
     @defer.inlineCallbacks

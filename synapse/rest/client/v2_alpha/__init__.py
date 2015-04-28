@@ -15,7 +15,10 @@
 
 from . import (
     sync,
-    filter
+    filter,
+    account,
+    register,
+    auth
 )
 
 from synapse.http.server import JsonResource
@@ -32,3 +35,6 @@ class ClientV2AlphaRestResource(JsonResource):
     def register_servlets(client_resource, hs):
         sync.register_servlets(hs, client_resource)
         filter.register_servlets(hs, client_resource)
+        account.register_servlets(hs, client_resource)
+        register.register_servlets(hs, client_resource)
+        auth.register_servlets(hs, client_resource)
