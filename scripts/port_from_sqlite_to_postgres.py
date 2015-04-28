@@ -575,7 +575,7 @@ class CursesProgress(Progress):
 
         if self.finished:
             self.stdscr.addstr(
-                self.rows-1, 0,
+                rows-1, 0,
                 "Press any key to exit...",
             )
 
