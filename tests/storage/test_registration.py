@@ -38,31 +38,42 @@ class RegistrationStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_register(self):
         yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
-        u = (yield self.store.get_user_by_id(self.user_id))[0]
-
-        # TODO(paul): Surely this field should be 'user_id', not 'name'
-        #  Additionally surely it shouldn't come in a 1-element list
-        self.assertEquals(self.user_id, u['name'])
-        self.assertEquals(self.pwhash, u['password_hash'])
 
         self.assertEquals(
-            {"admin": 0,
-             "device_id": None,
-             "name": self.user_id,
-             "token_id": 1},
-            (yield self.store.get_user_by_token(self.tokens[0]))
+            # TODO(paul): Surely this field should be 'user_id', not 'name'
+            #  Additionally surely it shouldn't come in a 1-element list
+            {"name": self.user_id, "password_hash": self.pwhash},
+            (yield self.store.get_user_by_id(self.user_id))
         )
+
+        result = yield self.store.get_user_by_token(self.tokens[1])
+
+        self.assertDictContainsSubset(
+            {
+                "admin": 0,
+                 "device_id": None,
+                 "name": self.user_id,
+            },
+            result
+        )
+
+        self.assertTrue("token_id" in result)
 
     @defer.inlineCallbacks
     def test_add_tokens(self):
         yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
         yield self.store.add_access_token_to_user(self.user_id, self.tokens[1])
 
-        self.assertEquals(
-            {"admin": 0,
-             "device_id": None,
-             "name": self.user_id,
-             "token_id": 2},
-            (yield self.store.get_user_by_token(self.tokens[1]))
+        result = yield self.store.get_user_by_token(self.tokens[1])
+
+        self.assertDictContainsSubset(
+            {
+                "admin": 0,
+                 "device_id": None,
+                 "name": self.user_id,
+            },
+            result
         )
+
+        self.assertTrue("token_id" in result)
 

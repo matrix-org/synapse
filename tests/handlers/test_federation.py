@@ -87,6 +87,15 @@ class FederationTestCase(unittest.TestCase):
         self.datastore.get_room.return_value = defer.succeed(True)
         self.auth.check_host_in_room.return_value = defer.succeed(True)
 
+        retry_timings_res = {
+            "destination": "",
+            "retry_last_ts": 0,
+            "retry_interval": 0,
+        }
+        self.datastore.get_destination_retry_timings.return_value = (
+            defer.succeed(retry_timings_res)
+        )
+
         def have_events(event_ids):
             return defer.succeed({})
         self.datastore.have_events.side_effect = have_events

@@ -53,7 +53,7 @@ class LoginHandler(BaseHandler):
             logger.warn("Attempted to login as %s but they do not exist", user)
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
-        stored_hash = user_info[0]["password_hash"]
+        stored_hash = user_info["password_hash"]
         if bcrypt.checkpw(password, stored_hash):
             # generate an access token and store it.
             token = self.reg_handler._generate_token(user)

@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
-
 from ._base import SQLBaseStore, Table
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+
+from syutil.jsonutil import encode_canonical_json
 
 import logging
 
@@ -28,50 +28,35 @@ logger = logging.getLogger(__name__)
 class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_pushers_by_app_id_and_pushkey(self, app_id, pushkey):
-        cols = ",".join(PushersTable.fields)
         sql = (
-            "SELECT "+cols+" FROM pushers "
+            "SELECT * FROM pushers "
             "WHERE app_id = ? AND pushkey = ?"
         )
 
-        rows = yield self._execute(
-            "get_pushers_by_app_id_and_pushkey", None, sql,
+        rows = yield self._execute_and_decode(
+            "get_pushers_by_app_id_and_pushkey",
+            sql,
             app_id, pushkey
         )
 
-        ret = [
-            {
-                k: r[i] for i, k in enumerate(PushersTable.fields)
-            }
-            for r in rows
-        ]
-        print ret
-
-        defer.returnValue(ret)
+        defer.returnValue(rows)
 
     @defer.inlineCallbacks
     def get_all_pushers(self):
-        cols = ",".join(PushersTable.fields)
         sql = (
-            "SELECT "+cols+" FROM pushers"
+            "SELECT * FROM pushers"
         )
 
-        rows = yield self._execute("get_all_pushers", None, sql)
+        rows = yield self._execute_and_decode("get_all_pushers", sql)
 
-        ret = [
-            {
-                k: r[i] for i, k in enumerate(PushersTable.fields)
-            }
-            for r in rows
-        ]
-
-        defer.returnValue(ret)
+        defer.returnValue(rows)
 
     @defer.inlineCallbacks
     def add_pusher(self, user_name, access_token, profile_tag, kind, app_id,
                    app_display_name, device_display_name,
                    pushkey, pushkey_ts, lang, data):
         try:
+            next_id = yield self._pushers_id_gen.get_next()
             yield self._simple_upsert(
                 PushersTable.table_name,
                 dict(
@@ -87,7 +72,10 @@ class PusherStore(SQLBaseStore):
                     device_display_name=device_display_name,
                     ts=pushkey_ts,
                     lang=lang,
-                    data=data
+                    data=encode_canonical_json(data).decode("UTF-8"),
+                ),
+                insertion_values=dict(
+                    id=next_id,
                 ),
                 desc="add_pusher",
             )
@@ -135,23 +123,3 @@ class PusherStore(SQLBaseStore):
 
 class PushersTable(Table):
     table_name = "pushers"
-
-    fields = [
-        "id",
-        "user_name",
-        "access_token",
-        "kind",
-        "profile_tag",
-        "app_id",
-        "app_display_name",
-        "device_display_name",
-        "pushkey",
-        "ts",
-        "lang",
-        "data",
-        "last_token",
-        "last_success",
-        "failing_since"
-    ]
-
-    EntryType = collections.namedtuple("PusherEntry", fields)
