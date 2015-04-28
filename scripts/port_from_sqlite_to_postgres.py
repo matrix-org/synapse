@@ -535,10 +535,19 @@ class CursesProgress(Progress):
 
         self.finished = False
 
+        self.total_processed = 0
+        self.total_remaining = 0
+
         super(CursesProgress, self).__init__()
 
     def update(self, table, num_done):
         super(CursesProgress, self).update(table, num_done)
+
+        self.total_processed = 0
+        self.total_remaining = 0
+        for table, data in self.tables.items():
+            self.total_processed += data["num_done"] - data["start"]
+            self.total_remaining += data["total"] - data["num_done"]
 
         self.render()
 
@@ -561,13 +570,11 @@ class CursesProgress(Progress):
         if self.finished:
             status = "Time spent: %s (Done!)" % (duration_str,)
         else:
-            min_perc = min(
-                (v["num_done"] - v["start"]) * 100. / (v["total"] - v["start"])
-                if v["total"] - v["start"] else 100
-                for v in self.tables.values()
-            )
-            if min_perc > 0:
-                est_remaining = (int(now) - self.start_time) * 100 / min_perc
+
+            if self.total_processed > 0:
+                left = float(self.total_remaining) / self.total_processed
+
+                est_remaining = (int(now) - self.start_time) * left
                 est_remaining_str = '%02dm %02ds remaining' % divmod(est_remaining, 60)
             else:
                 est_remaining_str = "Unknown"
