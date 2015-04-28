@@ -881,7 +881,7 @@ class PresenceEventSource(object):
             if serial < from_key:
                 break
 
-            latest_serial = max(cached.serial, serial)
+            latest_serial = max(latest_serial, serial)
             for u in user_ids:
                 updates.append({
                     "type": "m.presence",
