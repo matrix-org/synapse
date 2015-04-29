@@ -1,6 +1,23 @@
 Using Postgres
 --------------
 
+Set up database
+===============
+
+The PostgreSQL database used *must* have the correct encoding set, otherwise
+would not be able to store UTF8 strings. To create a database with the correct
+encoding use, e.g.::
+
+ CREATE DATABASE synapse
+  ENCODING 'UTF8'
+  LC_COLLATE='C'
+  LC_CTYPE='C'
+  template=template0
+  OWNER synapse_user;
+
+This would create an appropriate database named ``synapse`` owned by the
+``synapse_user`` user (which must already exist).
+
 Set up client
 =============
 
