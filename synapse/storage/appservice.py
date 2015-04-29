@@ -442,13 +442,15 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         # Monotonically increasing txn ids, so just select the smallest
         # one in the txns table (we delete them when they are sent)
         result = txn.execute(
-            "SELECT MIN(txn_id), * FROM application_services_txns WHERE as_id=?",
+            "SELECT * FROM application_services_txns WHERE as_id=?"
+            " ORDER BY txn_id ASC LIMIT 1",
             (service.id,)
         )
-        entry = self.cursor_to_dict(result)[0]
-        if not entry or entry["txn_id"] is None:
-            # the min(txn_id) part will force a row, so entry may not be None
+        rows = self.cursor_to_dict(result)
+        if not rows:
             return None
+
+        entry = rows[0]
 
         event_ids = json.loads(entry["event_ids"])
         events = self._get_events_txn(txn, event_ids)
