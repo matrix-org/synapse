@@ -53,7 +53,7 @@ class PusherStore(SQLBaseStore):
             dataJson = r['data']
             r['data'] = None
             try:
-                r['data'] = json.loads(dataJson)
+                r['data'] = json.loads(str(dataJson).decode("UTF8"))
             except:
                 logger.warn("Invalid JSON in data for pusher %d: %s", r['id'], dataJson)
                 pass
@@ -81,7 +81,7 @@ class PusherStore(SQLBaseStore):
                     device_display_name=device_display_name,
                     ts=pushkey_ts,
                     lang=lang,
-                    data=encode_canonical_json(data).decode("UTF-8"),
+                    data=encode_canonical_json(data),
                 ),
                 insertion_values=dict(
                     id=next_id,
