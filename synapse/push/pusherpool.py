@@ -19,8 +19,6 @@ from twisted.internet import defer
 from httppusher import HttpPusher
 from synapse.push import PusherConfigException
 
-from synapse.util.async import run_on_reactor
-
 import logging
 
 logger = logging.getLogger(__name__)
@@ -50,7 +48,6 @@ class PusherPool:
 
     @defer.inlineCallbacks
     def start(self):
-        yield run_on_reactor()
         pushers = yield self.store.get_all_pushers()
         self._start_pushers(pushers)
 

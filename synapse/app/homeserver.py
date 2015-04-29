@@ -442,10 +442,14 @@ def setup(config_options):
 
     hs.start_listening()
 
-    hs.get_pusherpool().start()
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
     hs.get_replication_layer().start_get_pdu_cache()
+
+    def on_start():
+        hs.get_pusherpool().start()
+
+    reactor.callWhenRunning(on_start)
 
     return hs
 
