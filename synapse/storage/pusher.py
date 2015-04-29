@@ -22,11 +22,33 @@ from syutil.jsonutil import encode_canonical_json
 
 import logging
 import simplejson as json
+import types
 
 logger = logging.getLogger(__name__)
 
 
 class PusherStore(SQLBaseStore):
+    def _decode_pushers_rows(self, rows):
+        for r in rows:
+            dataJson = r['data']
+            r['data'] = None
+            try:
+                if isinstance(dataJson, types.BufferType):
+                    dataJson = str(dataJson).decode("UTF8")
+
+                r['data'] = json.loads(dataJson)
+            except Exception as e:
+                logger.warn(
+                    "Invalid JSON in data for pusher %d: %s, %s",
+                    r['id'], dataJson, e.message,
+                )
+                pass
+
+            if isinstance(r['pushkey'], types.BufferType):
+                r['pushkey'] = str(r['pushkey']).decode("UTF8")
+
+        return rows
+
     @defer.inlineCallbacks
     def get_pushers_by_app_id_and_pushkey(self, app_id, pushkey):
         def r(txn):
@@ -38,10 +60,7 @@ class PusherStore(SQLBaseStore):
             txn.execute(sql, (app_id, pushkey,))
             rows = self.cursor_to_dict(txn)
 
-            for r in rows:
-                r['pushkey'] = str(r['pushkey']).decode("UTF8")
-
-            return rows
+            return self._decode_pushers_rows(rows)
 
         rows = yield self.runInteraction(
             "get_pushers_by_app_id_and_pushkey", r
@@ -55,21 +74,7 @@ class PusherStore(SQLBaseStore):
             txn.execute("SELECT * FROM pushers")
             rows = self.cursor_to_dict(txn)
 
-            for r in rows:
-                dataJson = r['data']
-                r['data'] = None
-                try:
-                    r['data'] = json.loads(str(dataJson).decode("UTF8"))
-                except Exception as e:
-                    logger.warn(
-                        "Invalid JSON in data for pusher %d: %s, %s",
-                        r['id'], dataJson, e.message,
-                    )
-                    pass
-
-                r['pushkey'] = str(r['pushkey']).decode("UTF8")
-
-            return rows
+            return self._decode_pushers_rows(rows)
 
         rows = yield self.runInteraction("get_all_pushers", get_pushers)
         defer.returnValue(rows)
