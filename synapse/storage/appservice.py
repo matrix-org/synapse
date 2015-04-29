@@ -355,11 +355,11 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         # being sent)
         last_txn_id = self._get_last_txn(txn, service.id)
 
-        result = txn.execute(
+        txn.execute(
             "SELECT MAX(txn_id) FROM application_services_txns WHERE as_id=?",
             (service.id,)
         )
-        highest_txn_id = result.fetchone()[0]
+        highest_txn_id = txn.fetchone()[0]
         if highest_txn_id is None:
             highest_txn_id = 0
 
@@ -460,11 +460,11 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         )
 
     def _get_last_txn(self, txn, service_id):
-        result = txn.execute(
+        txn.execute(
             "SELECT last_txn FROM application_services_state WHERE as_id=?",
             (service_id,)
         )
-        last_txn_id = result.fetchone()
+        last_txn_id = txn.fetchone()
         if last_txn_id is None or last_txn_id[0] is None:  # no row exists
             return 0
         else:
