@@ -28,7 +28,8 @@ class PostgresEngine(object):
         rows = txn.fetchall()
         if rows and rows[0][0] != "UTF8":
             raise IncorrectDatabaseSetup(
-                "Database has incorrect encoding: '%s' instead of 'UTF8'"
+                "Database has incorrect encoding: '%s' instead of 'UTF8'\n"
+                "See docs/postgres.rst for more information."
                 % (rows[0][0],)
             )
 
