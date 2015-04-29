@@ -29,15 +29,22 @@ logger = logging.getLogger(__name__)
 class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_pushers_by_app_id_and_pushkey(self, app_id, pushkey):
-        sql = (
-            "SELECT * FROM pushers "
-            "WHERE app_id = ? AND pushkey = ?"
-        )
+        def r(txn):
+            sql = (
+                "SELECT * FROM pushers"
+                " WHERE app_id = ? AND pushkey = ?"
+            )
 
-        rows = yield self._execute_and_decode(
-            "get_pushers_by_app_id_and_pushkey",
-            sql,
-            app_id, pushkey
+            txn.execute(sql, (app_id, pushkey,))
+            rows = self.cursor_to_dict(txn)
+
+            for r in rows:
+                r['pushkey'] = str(r['pushkey']).decode("UTF8")
+
+            return rows
+
+        rows = yield self.runInteraction(
+            "get_pushers_by_app_id_and_pushkey", r
         )
 
         defer.returnValue(rows)
@@ -59,6 +66,8 @@ class PusherStore(SQLBaseStore):
                         r['id'], dataJson, e.message,
                     )
                     pass
+
+                r['pushkey'] = str(r['pushkey']).decode("UTF8")
 
             return rows
 
