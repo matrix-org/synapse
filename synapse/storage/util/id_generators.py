@@ -85,7 +85,7 @@ class StreamIdGenerator(object):
                 # ... persist event ...
         """
         if not self._current_max:
-            self._compute_current_max(txn)
+            self._get_or_compute_current_max(txn)
 
         with self._lock:
             self._current_max += 1
