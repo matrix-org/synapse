@@ -14,8 +14,6 @@
 # limitations under the License.
 
 from ._base import IncorrectDatabaseSetup
-assert IncorrectDatabaseSetup  # Appease PEP8
-
 from .postgres import PostgresEngine
 from .sqlite3 import Sqlite3Engine
 
@@ -38,3 +36,6 @@ def create_engine(name):
     raise RuntimeError(
         "Unsupported database engine '%s'" % (name,)
     )
+
+
+__all__ = ["create_engine", "IncorrectDatabaseSetup"]
