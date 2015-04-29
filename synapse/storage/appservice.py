@@ -441,12 +441,12 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
     def _get_oldest_unsent_txn(self, txn, service):
         # Monotonically increasing txn ids, so just select the smallest
         # one in the txns table (we delete them when they are sent)
-        result = txn.execute(
+        txn.execute(
             "SELECT * FROM application_services_txns WHERE as_id=?"
             " ORDER BY txn_id ASC LIMIT 1",
             (service.id,)
         )
-        rows = self.cursor_to_dict(result)
+        rows = self.cursor_to_dict(txn)
         if not rows:
             return None
 
