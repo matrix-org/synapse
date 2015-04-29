@@ -87,14 +87,29 @@ class IdentityHandler(BaseHandler):
         logger.debug("binding threepid %r to %s", creds, mxid)
         http_client = SimpleHttpClient(self.hs)
         data = None
+
+        if 'id_server' in creds:
+            id_server = creds['id_server']
+        elif 'idServer' in creds:
+            id_server = creds['idServer']
+        else:
+            raise SynapseError(400, "No id_server in creds")
+
+        if 'client_secret' in creds:
+            client_secret = creds['client_secret']
+        elif 'clientSecret' in creds:
+            client_secret = creds['clientSecret']
+        else:
+            raise SynapseError(400, "No client_secret in creds")
+
         try:
             data = yield http_client.post_urlencoded_get_json(
                 "https://%s%s" % (
-                    creds['id_server'], "/_matrix/identity/api/v1/3pid/bind"
+                    id_server, "/_matrix/identity/api/v1/3pid/bind"
                 ),
                 {
                     'sid': creds['sid'],
-                    'client_secret': creds['client_secret'],
+                    'client_secret': client_secret,
                     'mxid': mxid,
                 }
             )
