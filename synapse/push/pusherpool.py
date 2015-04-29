@@ -186,6 +186,8 @@ class PusherPool:
                 self.pushers[fullid] = p
                 p.start()
 
+        logger.info("Started pushers")
+
     @defer.inlineCallbacks
     def remove_pusher(self, app_id, pushkey, user_name):
         fullid = "%s:%s:%s" % (app_id, pushkey, user_name)
