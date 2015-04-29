@@ -171,10 +171,21 @@ class Keyring(object):
         )
 
         with limiter:
+            # TODO(mark): Set the minimum_valid_until_ts to that needed by
+            # the events being validated or the current time if validating
+            # an incoming request.
             responses = yield self.client.post_json(
                 destination=perspective_name,
                 path=b"/_matrix/key/v2/query",
-                data={u"server_keys": {server_name: list(key_ids)}},
+                data={
+                    u"server_keys": {
+                        server_name: {
+                            key_id: {
+                                u"minimum_valid_until_ts": 0
+                            } for key_id in key_ids
+                        }
+                    }
+                },
             )
 
         keys = {}
