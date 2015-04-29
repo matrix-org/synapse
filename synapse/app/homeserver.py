@@ -36,10 +36,12 @@ from synapse.http.server import JsonResource, RootRedirect
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
 from synapse.rest.key.v1.server_key_resource import LocalKey
+from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX, STATIC_PREFIX
+    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX, STATIC_PREFIX,
+    SERVER_KEY_V2_PREFIX,
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -97,6 +99,9 @@ class SynapseHomeServer(HomeServer):
     def build_resource_for_server_key(self):
         return LocalKey(self)
 
+    def build_resource_for_server_key_v2(self):
+        return KeyApiV2Resource(self)
+
     def build_resource_for_metrics(self):
         if self.get_config().enable_metrics:
             return MetricsResource(self)
@@ -134,6 +139,7 @@ class SynapseHomeServer(HomeServer):
             (FEDERATION_PREFIX, self.get_resource_for_federation()),
             (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
+            (SERVER_KEY_V2_PREFIX, self.get_resource_for_server_key_v2()),
             (MEDIA_PREFIX, self.get_resource_for_media_repository()),
             (STATIC_PREFIX, self.get_resource_for_static_content()),
         ]

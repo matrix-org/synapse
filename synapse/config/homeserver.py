@@ -24,12 +24,13 @@ from .voip import VoipConfig
 from .registration import RegistrationConfig
 from .metrics import MetricsConfig
 from .appservice import AppServiceConfig
+from .key import KeyConfig
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
                        VoipConfig, RegistrationConfig,
-                       MetricsConfig, AppServiceConfig,):
+                       MetricsConfig, AppServiceConfig, KeyConfig,):
     pass
 
 

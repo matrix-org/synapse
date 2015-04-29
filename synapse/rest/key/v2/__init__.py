@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,15 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains the URL paths to prefix various aspects of the server with. """
+from twisted.web.resource import Resource
+from .local_key_resource import LocalKey
+from .remote_key_resource import RemoteKey
 
-CLIENT_PREFIX = "/_matrix/client/api/v1"
-CLIENT_V2_ALPHA_PREFIX = "/_matrix/client/v2_alpha"
-FEDERATION_PREFIX = "/_matrix/federation/v1"
-STATIC_PREFIX = "/_matrix/static"
-WEB_CLIENT_PREFIX = "/_matrix/client"
-CONTENT_REPO_PREFIX = "/_matrix/content"
-SERVER_KEY_PREFIX = "/_matrix/key/v1"
-SERVER_KEY_V2_PREFIX = "/_matrix/key/v2"
-MEDIA_PREFIX = "/_matrix/media/v1"
-APP_SERVICE_PREFIX = "/_matrix/appservice/v1"
+
+class KeyApiV2Resource(Resource):
+    def __init__(self, hs):
+        Resource.__init__(self)
+        self.putChild("server", LocalKey(hs))
+        self.putChild("query", RemoteKey(hs))

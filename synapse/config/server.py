@@ -13,16 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-from ._base import Config, ConfigError
-import syutil.crypto.signing_key
+from ._base import Config
 
 
 class ServerConfig(Config):
     def __init__(self, args):
         super(ServerConfig, self).__init__(args)
         self.server_name = args.server_name
-        self.signing_key = self.read_signing_key(args.signing_key_path)
         self.bind_port = args.bind_port
         self.bind_host = args.bind_host
         self.unsecure_port = args.unsecure_port
@@ -53,8 +50,6 @@ class ServerConfig(Config):
                  "This is used by remote servers to connect to this server, "
                  "e.g. matrix.org, localhost:8080, etc."
         )
-        server_group.add_argument("--signing-key-path",
-                                  help="The signing key to sign messages with")
         server_group.add_argument("-p", "--bind-port", metavar="PORT",
                                   type=int, help="https port to listen on",
                                   default=8448)
@@ -83,46 +78,3 @@ class ServerConfig(Config):
                                        "Zero is used to indicate synapse "
                                        "should set the soft limit to the hard"
                                        "limit.")
-
-    def read_signing_key(self, signing_key_path):
-        signing_keys = self.read_file(signing_key_path, "signing_key")
-        try:
-            return syutil.crypto.signing_key.read_signing_keys(
-                signing_keys.splitlines(True)
-            )
-        except Exception:
-            raise ConfigError(
-                "Error reading signing_key."
-                " Try running again with --generate-config"
-            )
-
-    @classmethod
-    def generate_config(cls, args, config_dir_path):
-        super(ServerConfig, cls).generate_config(args, config_dir_path)
-        base_key_name = os.path.join(config_dir_path, args.server_name)
-
-        args.pid_file = os.path.abspath(args.pid_file)
-
-        if not args.signing_key_path:
-            args.signing_key_path = base_key_name + ".signing.key"
-
-        if not os.path.exists(args.signing_key_path):
-            with open(args.signing_key_path, "w") as signing_key_file:
-                syutil.crypto.signing_key.write_signing_keys(
-                    signing_key_file,
-                    (syutil.crypto.signing_key.generate_signing_key("auto"),),
-                )
-        else:
-            signing_keys = cls.read_file(args.signing_key_path, "signing_key")
-            if len(signing_keys.split("\n")[0].split()) == 1:
-                # handle keys in the old format.
-                key = syutil.crypto.signing_key.decode_signing_key_base64(
-                    syutil.crypto.signing_key.NACL_ED25519,
-                    "auto",
-                    signing_keys.split("\n")[0]
-                )
-                with open(args.signing_key_path, "w") as signing_key_file:
-                    syutil.crypto.signing_key.write_signing_keys(
-                        signing_key_file,
-                        (key,),
-                    )

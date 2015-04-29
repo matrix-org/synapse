@@ -79,6 +79,7 @@ class BaseHomeServer(object):
         'resource_for_web_client',
         'resource_for_content_repo',
         'resource_for_server_key',
+        'resource_for_server_key_v2',
         'resource_for_media_repository',
         'resource_for_metrics',
         'event_sources',
