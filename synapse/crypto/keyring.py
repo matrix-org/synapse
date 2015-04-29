@@ -124,18 +124,28 @@ class Keyring(object):
     @defer.inlineCallbacks
     def _get_server_verify_key_impl(self, server_name, key_ids):
         keys = None
+
+        perspective_results = []
         for perspective_name, perspective_keys in self.perspective_servers.items():
-            try:
-                keys = yield self.get_server_verify_key_v2_indirect(
-                    server_name, key_ids, perspective_name, perspective_keys
-                )
-                break
-            except:
-                logging.info(
-                    "Unable to getting key %r for %r from %r",
-                    key_ids, server_name, perspective_name,
-                )
-                pass
+            @defer.inlineCallbacks
+            def get_key():
+                try:
+                    result = yield self.get_server_verify_key_v2_indirect(
+                        server_name, key_ids, perspective_name, perspective_keys
+                    )
+                    defer.returnValue(result)
+                except:
+                    logging.info(
+                        "Unable to getting key %r for %r from %r",
+                        key_ids, server_name, perspective_name,
+                    )
+            perspective_results.append(get_key())
+
+        perspective_results = yield defer.gatherResults(perspective_results)
+
+        for results in perspective_results:
+            if results is not None:
+                keys = results
 
         limiter = yield get_retry_limiter(
             server_name,
