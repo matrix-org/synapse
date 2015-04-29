@@ -24,6 +24,7 @@ from collections import OrderedDict
 from synapse.server import HomeServer
 
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.engines import create_engine
 
 
 class SQLBaseStoreTestCase(unittest.TestCase):
@@ -32,15 +33,26 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.db_pool = Mock(spec=["runInteraction"])
         self.mock_txn = Mock()
+        self.mock_conn = Mock(spec_set=["cursor"])
+        self.mock_conn.cursor.return_value = self.mock_txn
         # Our fake runInteraction just runs synchronously inline
 
         def runInteraction(func, *args, **kwargs):
             return defer.succeed(func(self.mock_txn, *args, **kwargs))
         self.db_pool.runInteraction = runInteraction
 
+        def runWithConnection(func, *args, **kwargs):
+            return defer.succeed(func(self.mock_conn, *args, **kwargs))
+        self.db_pool.runWithConnection = runWithConnection
+
         config = Mock()
         config.event_cache_size = 1
-        hs = HomeServer("test", db_pool=self.db_pool, config=config)
+        hs = HomeServer(
+            "test",
+            db_pool=self.db_pool,
+            config=config,
+            database_engine=create_engine("sqlite3"),
+        )
 
         self.datastore = SQLBaseStore(hs)
 
@@ -86,8 +98,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.assertEquals("Value", value)
         self.mock_txn.execute.assert_called_with(
-                "SELECT retcol FROM tablename WHERE keycol = ? "
-                "ORDER BY rowid asc",
+                "SELECT retcol FROM tablename WHERE keycol = ?",
                 ["TheKey"]
         )
 
@@ -104,8 +115,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.assertEquals({"colA": 1, "colB": 2, "colC": 3}, ret)
         self.mock_txn.execute.assert_called_with(
-                "SELECT colA, colB, colC FROM tablename WHERE keycol = ? "
-                "ORDER BY rowid asc",
+                "SELECT colA, colB, colC FROM tablename WHERE keycol = ?",
                 ["TheKey"]
         )
 
@@ -139,8 +149,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.assertEquals([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
         self.mock_txn.execute.assert_called_with(
-                "SELECT colA FROM tablename WHERE keycol = ? "
-                "ORDER BY rowid asc",
+                "SELECT colA FROM tablename WHERE keycol = ?",
                 ["A set"]
         )
 
@@ -189,8 +198,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.assertEquals({"columname": "Old Value"}, ret)
         self.mock_txn.execute.assert_has_calls([
-                call('SELECT columname FROM tablename WHERE keycol = ? '
-                     'ORDER BY rowid asc',
+                call('SELECT columname FROM tablename WHERE keycol = ?',
                     ['TheKey']),
                 call("UPDATE tablename SET columname = ? WHERE keycol = ?",
                     ["New Value", "TheKey"])

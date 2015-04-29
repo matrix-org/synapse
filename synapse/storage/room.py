@@ -72,6 +72,7 @@ class RoomStore(SQLBaseStore):
             keyvalues={"room_id": room_id},
             retcols=RoomsTable.fields,
             desc="get_room",
+            allow_none=True,
         )
 
     @defer.inlineCallbacks
@@ -102,24 +103,37 @@ class RoomStore(SQLBaseStore):
                 "ON c.event_id = room_names.event_id "
             )
 
-            # We use non printing ascii character US () as a seperator
+            # We use non printing ascii character US (\x1F) as a separator
             sql = (
-                "SELECT r.room_id, n.name, t.topic, "
-                "group_concat(a.room_alias, '') "
-                "FROM rooms AS r "
-                "LEFT JOIN (%(topic)s) AS t ON t.room_id = r.room_id "
-                "LEFT JOIN (%(name)s) AS n ON n.room_id = r.room_id "
-                "INNER JOIN room_aliases AS a ON a.room_id = r.room_id "
-                "WHERE r.is_public = ? "
-                "GROUP BY r.room_id "
+                "SELECT r.room_id, max(n.name), max(t.topic)"
+                " FROM rooms AS r"
+                " LEFT JOIN (%(topic)s) AS t ON t.room_id = r.room_id"
+                " LEFT JOIN (%(name)s) AS n ON n.room_id = r.room_id"
+                " WHERE r.is_public = ?"
+                " GROUP BY r.room_id"
             ) % {
                 "topic": topic_subquery,
                 "name": name_subquery,
             }
 
-            c = txn.execute(sql, (is_public,))
+            txn.execute(sql, (is_public,))
 
-            return c.fetchall()
+            rows = txn.fetchall()
+
+            for i, row in enumerate(rows):
+                room_id = row[0]
+                aliases = self._simple_select_onecol_txn(
+                    txn,
+                    table="room_aliases",
+                    keyvalues={
+                        "room_id": room_id
+                    },
+                    retcol="room_alias",
+                )
+
+                rows[i] = list(row) + [aliases]
+
+            return rows
 
         rows = yield self.runInteraction(
             "get_rooms", f
@@ -130,9 +144,10 @@ class RoomStore(SQLBaseStore):
                 "room_id": r[0],
                 "name": r[1],
                 "topic": r[2],
-                "aliases": r[3].split(""),
+                "aliases": r[3],
             }
             for r in rows
+            if r[3]  # We only return rooms that have at least one alias.
         ]
 
         defer.returnValue(ret)

@@ -16,7 +16,6 @@
 from twisted.internet import defer
 
 from synapse.api.errors import LimitExceededError, SynapseError
-from synapse.util.async import run_on_reactor
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID
@@ -58,8 +57,6 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def _create_new_client_event(self, builder):
-        yield run_on_reactor()
-
         latest_ret = yield self.store.get_latest_events_in_room(
             builder.room_id,
         )
@@ -101,8 +98,6 @@ class BaseHandler(object):
     @defer.inlineCallbacks
     def handle_new_client_event(self, event, context, extra_destinations=[],
                                 extra_users=[], suppress_auth=False):
-        yield run_on_reactor()
-
         # We now need to go and hit out to wherever we need to hit out to.
 
         if not suppress_auth:
@@ -143,7 +138,9 @@ class BaseHandler(object):
                 )
 
         # Don't block waiting on waking up all the listeners.
-        d = self.notifier.on_new_room_event(event, extra_users=extra_users)
+        notify_d = self.notifier.on_new_room_event(
+            event, extra_users=extra_users
+        )
 
         def log_failure(f):
             logger.warn(
@@ -151,8 +148,10 @@ class BaseHandler(object):
                 event.event_id, f.value
             )
 
-        d.addErrback(log_failure)
+        notify_d.addErrback(log_failure)
 
-        yield federation_handler.handle_new_event(
+        fed_d = federation_handler.handle_new_event(
             event, destinations=destinations,
         )
+
+        fed_d.addErrback(log_failure)

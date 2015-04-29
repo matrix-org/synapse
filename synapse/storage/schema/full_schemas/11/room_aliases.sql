@@ -22,6 +22,3 @@ CREATE TABLE IF NOT EXISTS room_alias_servers(
     room_alias TEXT NOT NULL,
     server TEXT NOT NULL
 );
-
-
-

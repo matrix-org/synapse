@@ -17,8 +17,9 @@
 import sys
 sys.dont_write_bytecode = True
 
+from synapse.storage.engines import create_engine
 from synapse.storage import (
-    prepare_database, prepare_sqlite3_database, UpgradeDatabaseException,
+    are_all_users_on_domain, UpgradeDatabaseException,
 )
 
 from synapse.server import HomeServer
@@ -59,9 +60,9 @@ import os
 import re
 import resource
 import subprocess
-import sqlite3
 
-logger = logging.getLogger(__name__)
+
+logger = logging.getLogger("synapse.app.homeserver")
 
 
 class SynapseHomeServer(HomeServer):
@@ -108,13 +109,11 @@ class SynapseHomeServer(HomeServer):
             return None
 
     def build_db_pool(self):
+        name = self.db_config["name"]
+
         return adbapi.ConnectionPool(
-            "sqlite3", self.get_db_name(),
-            check_same_thread=False,
-            cp_min=1,
-            cp_max=1,
-            cp_openfun=prepare_database,  # Prepare the database for each conn
-                                          # so that :memory: sqlite works
+            name,
+            **self.db_config.get("args", {})
         )
 
     def create_resource_tree(self, redirect_root_to_web_client):
@@ -247,6 +246,21 @@ class SynapseHomeServer(HomeServer):
             )
             logger.info("Metrics now running on 127.0.0.1 port %d", config.metrics_port)
 
+    def run_startup_checks(self, db_conn, database_engine):
+        all_users_native = are_all_users_on_domain(
+            db_conn.cursor(), database_engine, self.hostname
+        )
+        if not all_users_native:
+            sys.stderr.write(
+                "\n"
+                "******************************************************\n"
+                "Found users in database not native to %s!\n"
+                "You cannot changed a synapse server_name after it's been configured\n"
+                "******************************************************\n"
+                "\n" % (self.hostname,)
+            )
+            sys.exit(1)
+
 
 def get_version_string():
     try:
@@ -358,15 +372,20 @@ def setup(config_options):
 
     tls_context_factory = context_factory.ServerContextFactory(config)
 
+    database_engine = create_engine(config.database_config["name"])
+    config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
+
     hs = SynapseHomeServer(
         config.server_name,
         domain_with_port=domain_with_port,
         upload_dir=os.path.abspath("uploads"),
         db_name=config.database_path,
+        db_config=config.database_config,
         tls_context_factory=tls_context_factory,
         config=config,
         content_addr=config.content_addr,
         version_string=version_string,
+        database_engine=database_engine,
     )
 
     hs.create_resource_tree(
@@ -378,9 +397,17 @@ def setup(config_options):
     logger.info("Preparing database: %s...", db_name)
 
     try:
-        with sqlite3.connect(db_name) as db_conn:
-            prepare_sqlite3_database(db_conn)
-            prepare_database(db_conn)
+        db_conn = database_engine.module.connect(
+            **{
+                k: v for k, v in config.database_config.get("args", {}).items()
+                if not k.startswith("cp_")
+            }
+        )
+
+        database_engine.prepare_database(db_conn)
+        hs.run_startup_checks(db_conn, database_engine)
+
+        db_conn.commit()
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"

@@ -194,8 +194,13 @@ class MockedDatastorePresenceTestCase(PresenceTestCase):
         return datastore
 
     def setUp_datastore_federation_mocks(self, datastore):
+        retry_timings_res = {
+            "destination": "",
+            "retry_last_ts": 0,
+            "retry_interval": 0,
+        }
         datastore.get_destination_retry_timings.return_value = (
-            defer.succeed(DestinationsTable.EntryType("", 0, 0))
+            defer.succeed(retry_timings_res)
         )
 
         def get_received_txn_response(*args):

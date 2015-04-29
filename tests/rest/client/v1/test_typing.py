@@ -69,7 +69,7 @@ class RoomTypingTestCase(RestTestCase):
                 "token_id": 1,
             }
 
-        hs.get_auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth().get_user_by_token = _get_user_by_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)

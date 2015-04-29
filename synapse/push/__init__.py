@@ -253,7 +253,8 @@ class Pusher(object):
                 self.user_name, config, timeout=0)
             self.last_token = chunk['end']
             self.store.update_pusher_last_token(
-                self.app_id, self.pushkey, self.last_token)
+                self.app_id, self.pushkey, self.user_name, self.last_token
+            )
             logger.info("Pusher %s for user %s starting from token %s",
                         self.pushkey, self.user_name, self.last_token)
 
@@ -314,7 +315,7 @@ class Pusher(object):
                                 pk
                             )
                             yield self.hs.get_pusherpool().remove_pusher(
-                                self.app_id, pk
+                                self.app_id, pk, self.user_name
                             )
 
             if not self.alive:
@@ -326,6 +327,7 @@ class Pusher(object):
                 self.store.update_pusher_last_token_and_success(
                     self.app_id,
                     self.pushkey,
+                    self.user_name,
                     self.last_token,
                     self.clock.time_msec()
                 )
@@ -334,6 +336,7 @@ class Pusher(object):
                     self.store.update_pusher_failing_since(
                         self.app_id,
                         self.pushkey,
+                        self.user_name,
                         self.failing_since)
             else:
                 if not self.failing_since:
@@ -341,6 +344,7 @@ class Pusher(object):
                     self.store.update_pusher_failing_since(
                         self.app_id,
                         self.pushkey,
+                        self.user_name,
                         self.failing_since
                     )
 
@@ -358,6 +362,7 @@ class Pusher(object):
                     self.store.update_pusher_last_token(
                         self.app_id,
                         self.pushkey,
+                        self.user_name,
                         self.last_token
                     )
 
@@ -365,6 +370,7 @@ class Pusher(object):
                     self.store.update_pusher_failing_since(
                         self.app_id,
                         self.pushkey,
+                        self.user_name,
                         self.failing_since
                     )
                 else:

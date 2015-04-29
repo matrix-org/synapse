@@ -213,7 +213,8 @@ class RoomCreationHandler(BaseHandler):
                 "state_default": 50,
                 "ban": 50,
                 "kick": 50,
-                "redact": 50
+                "redact": 50,
+                "invite": 0,
             },
         )
 
@@ -309,25 +310,6 @@ class RoomMemberHandler(BaseHandler):
         # TODO snapshot this list to return on subsequent requests when
         # paginating
         defer.returnValue(chunk_data)
-
-    @defer.inlineCallbacks
-    def get_room_member(self, room_id, member_user_id, auth_user_id):
-        """Retrieve a room member from a room.
-
-        Args:
-            room_id : The room the member is in.
-            member_user_id : The member's user ID
-            auth_user_id : The user ID of the user making this request.
-        Returns:
-            The room member, or None if this member does not exist.
-        Raises:
-            SynapseError if something goes wrong.
-        """
-        yield self.auth.check_joined_room(room_id, auth_user_id)
-
-        member = yield self.store.get_room_member(user_id=member_user_id,
-                                                  room_id=room_id)
-        defer.returnValue(member)
 
     @defer.inlineCallbacks
     def change_membership(self, event, context, do_auth=True):

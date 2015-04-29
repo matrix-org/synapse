@@ -20,6 +20,7 @@ class CaptchaConfig(Config):
     def __init__(self, args):
         super(CaptchaConfig, self).__init__(args)
         self.recaptcha_private_key = args.recaptcha_private_key
+        self.recaptcha_public_key = args.recaptcha_public_key
         self.enable_registration_captcha = args.enable_registration_captcha
         self.captcha_ip_origin_is_x_forwarded = (
             args.captcha_ip_origin_is_x_forwarded
@@ -31,8 +32,12 @@ class CaptchaConfig(Config):
         super(CaptchaConfig, cls).add_arguments(parser)
         group = parser.add_argument_group("recaptcha")
         group.add_argument(
+            "--recaptcha-public-key", type=str, default="YOUR_PUBLIC_KEY",
+            help="This Home Server's ReCAPTCHA public key."
+        )
+        group.add_argument(
             "--recaptcha-private-key", type=str, default="YOUR_PRIVATE_KEY",
-            help="The matching private key for the web client's public key."
+            help="This Home Server's ReCAPTCHA private key."
         )
         group.add_argument(
             "--enable-registration-captcha", type=bool, default=False,

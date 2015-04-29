@@ -158,9 +158,10 @@ class Config(object):
                         and value is not None):
                     config[key] = value
             with open(config_args.config_path, "w") as config_file:
-                # TODO(paul) it would be lovely if we wrote out vim- and emacs-
-                #   style mode markers into the file, to hint to people that
-                #   this is a YAML file.
+                # TODO(mark/paul) We might want to output emacs-style mode
+                # markers as well as vim-style mode markers into the file,
+                # to further hint to people this is a YAML file.
+                config_file.write("# vim:ft=yaml\n")
                 yaml.dump(config, config_file, default_flow_style=False)
             print (
                 "A config file has been generated in %s for server name"

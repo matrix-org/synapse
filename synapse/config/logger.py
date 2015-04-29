@@ -78,7 +78,6 @@ class LoggingConfig(Config):
             handler.addFilter(LoggingContextFilter(request=""))
 
             logger.addHandler(handler)
-            logger.info("Test")
         else:
             with open(self.log_config, 'r') as f:
                 logging.config.dictConfig(yaml.load(f))

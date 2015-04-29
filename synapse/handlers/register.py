@@ -18,18 +18,15 @@ from twisted.internet import defer
 
 from synapse.types import UserID
 from synapse.api.errors import (
-    AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError,
-    CodeMessageException
+    AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
 )
 from ._base import BaseHandler
 import synapse.util.stringutils as stringutils
 from synapse.util.async import run_on_reactor
-from synapse.http.client import SimpleHttpClient
 from synapse.http.client import CaptchaServerHttpClient
 
 import base64
 import bcrypt
-import json
 import logging
 import urllib
 
@@ -43,6 +40,30 @@ class RegistrationHandler(BaseHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("registered_user")
+
+    @defer.inlineCallbacks
+    def check_username(self, localpart):
+        yield run_on_reactor()
+
+        if urllib.quote(localpart) != localpart:
+            raise SynapseError(
+                400,
+                "User ID must only contain characters which do not"
+                " require URL encoding."
+            )
+
+        user = UserID(localpart, self.hs.hostname)
+        user_id = user.to_string()
+
+        yield self.check_user_id_is_valid(user_id)
+
+        u = yield self.store.get_user_by_id(user_id)
+        if u:
+            raise SynapseError(
+                400,
+                "User ID already taken.",
+                errcode=Codes.USER_IN_USE,
+            )
 
     @defer.inlineCallbacks
     def register(self, localpart=None, password=None):
@@ -64,17 +85,10 @@ class RegistrationHandler(BaseHandler):
             password_hash = bcrypt.hashpw(password, bcrypt.gensalt())
 
         if localpart:
-            if localpart and urllib.quote(localpart) != localpart:
-                raise SynapseError(
-                    400,
-                    "User ID must only contain characters which do not"
-                    " require URL encoding."
-                )
+            yield self.check_username(localpart)
 
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
-
-            yield self.check_user_id_is_valid(user_id)
 
             token = self._generate_token(user_id)
             yield self.store.register(
@@ -157,7 +171,11 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def check_recaptcha(self, ip, private_key, challenge, response):
-        """Checks a recaptcha is correct."""
+        """
+        Checks a recaptcha is correct.
+
+        Used only by c/s api v1
+        """
 
         captcha_response = yield self._validate_captcha(
             ip,
@@ -176,13 +194,18 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def register_email(self, threepidCreds):
-        """Registers emails with an identity server."""
+        """
+        Registers emails with an identity server.
+
+        Used only by c/s api v1
+        """
 
         for c in threepidCreds:
             logger.info("validating theeepidcred sid %s on id server %s",
                         c['sid'], c['idServer'])
             try:
-                threepid = yield self._threepid_from_creds(c)
+                identity_handler = self.hs.get_handlers().identity_handler
+                threepid = yield identity_handler.threepid_from_creds(c)
             except:
                 logger.exception("Couldn't validate 3pid")
                 raise RegistrationError(400, "Couldn't validate 3pid")
@@ -194,12 +217,16 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def bind_emails(self, user_id, threepidCreds):
-        """Links emails with a user ID and informs an identity server."""
+        """Links emails with a user ID and informs an identity server.
+
+        Used only by c/s api v1
+        """
 
         # Now we have a matrix ID, bind it to the threepids we were given
         for c in threepidCreds:
+            identity_handler = self.hs.get_handlers().identity_handler
             # XXX: This should be a deferred list, shouldn't it?
-            yield self._bind_threepid(c, user_id)
+            yield identity_handler.bind_threepid(c, user_id)
 
     @defer.inlineCallbacks
     def check_user_id_is_valid(self, user_id):
@@ -227,60 +254,10 @@ class RegistrationHandler(BaseHandler):
         return "-" + stringutils.random_string(18)
 
     @defer.inlineCallbacks
-    def _threepid_from_creds(self, creds):
-        # TODO: get this from the homeserver rather than creating a new one for
-        # each request
-        http_client = SimpleHttpClient(self.hs)
-        # XXX: make this configurable!
-        trustedIdServers = ['matrix.org:8090', 'matrix.org']
-        if not creds['idServer'] in trustedIdServers:
-            logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
-                        'credentials', creds['idServer'])
-            defer.returnValue(None)
-
-        data = {}
-        try:
-            data = yield http_client.get_json(
-                # XXX: This should be HTTPS
-                "http://%s%s" % (
-                    creds['idServer'],
-                    "/_matrix/identity/api/v1/3pid/getValidated3pid"
-                ),
-                {'sid': creds['sid'], 'clientSecret': creds['clientSecret']}
-            )
-        except CodeMessageException as e:
-            data = json.loads(e.msg)
-
-        if 'medium' in data:
-            defer.returnValue(data)
-        defer.returnValue(None)
-
-    @defer.inlineCallbacks
-    def _bind_threepid(self, creds, mxid):
-        yield
-        logger.debug("binding threepid")
-        http_client = SimpleHttpClient(self.hs)
-        data = None
-        try:
-            data = yield http_client.post_urlencoded_get_json(
-                # XXX: Change when ID servers are all HTTPS
-                "http://%s%s" % (
-                    creds['idServer'], "/_matrix/identity/api/v1/3pid/bind"
-                ),
-                {
-                    'sid': creds['sid'],
-                    'clientSecret': creds['clientSecret'],
-                    'mxid': mxid,
-                }
-            )
-            logger.debug("bound threepid")
-        except CodeMessageException as e:
-            data = json.loads(e.msg)
-        defer.returnValue(data)
-
-    @defer.inlineCallbacks
     def _validate_captcha(self, ip_addr, private_key, challenge, response):
         """Validates the captcha provided.
+
+        Used only by c/s api v1
 
         Returns:
             dict: Containing 'valid'(bool) and 'error_url'(str) if invalid.
@@ -299,6 +276,9 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _submit_captcha(self, ip_addr, private_key, challenge, response):
+        """
+        Used only by c/s api v1
+        """
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
         client = CaptchaServerHttpClient(self.hs)
