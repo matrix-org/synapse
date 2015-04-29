@@ -22,6 +22,7 @@ from synapse.api.errors import (
 from ._base import BaseHandler
 from synapse.http.client import SimpleHttpClient
 from synapse.util.async import run_on_reactor
+from synapse.api.errors import SynapseError
 
 import json
 import logging
@@ -59,7 +60,7 @@ class IdentityHandler(BaseHandler):
         else:
             raise SynapseError(400, "No client_secret in creds")
 
-        if not id_server in trustedIdServers:
+        if id_server not in trustedIdServers:
             logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
                         'credentials', id_server)
             defer.returnValue(None)
