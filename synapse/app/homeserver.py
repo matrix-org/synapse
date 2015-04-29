@@ -18,7 +18,7 @@ import sys
 sys.dont_write_bytecode = True
 from synapse.python_dependencies import check_requirements
 
-if __name__=='__main__':
+if __name__ == '__main__':
     check_requirements()
 
 from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
