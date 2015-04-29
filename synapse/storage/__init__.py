@@ -368,9 +368,10 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
                 (v, relative_path)
             )
 
+            cur.execute("DELETE FROM schema_version")
             cur.execute(
                 database_engine.convert_param_style(
-                    "REPLACE INTO schema_version (version, upgraded)"
+                    "INSERT INTO schema_version (version, upgraded)"
                     " VALUES (?,?)",
                 ),
                 (v, True)
