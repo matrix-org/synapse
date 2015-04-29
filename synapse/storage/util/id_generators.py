@@ -30,15 +30,13 @@ class IdGenerator(object):
 
     @defer.inlineCallbacks
     def get_next(self):
+        if self._next_id is None:
+            yield self.store.runInteraction(
+                "IdGenerator_%s" % (self.table,),
+                self.get_next_txn,
+            )
+
         with self._lock:
-            if not self._next_id:
-                res = yield self.store._execute_and_decode(
-                    "IdGenerator_%s" % (self.table,),
-                    "SELECT MAX(%s) as mx FROM %s" % (self.column, self.table,)
-                )
-
-                self._next_id = (res and res[0] and res[0]["mx"]) or 1
-
             i = self._next_id
             self._next_id += 1
             defer.returnValue(i)
