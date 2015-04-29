@@ -60,6 +60,8 @@ class PusherStore(SQLBaseStore):
                     )
                     pass
 
+            return rows
+
         rows = yield self.runInteraction("get_all_pushers", get_pushers)
         defer.returnValue(rows)
 
