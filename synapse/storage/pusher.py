@@ -44,20 +44,26 @@ class PusherStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_all_pushers(self):
-        sql = (
-            "SELECT * FROM pushers"
+        def get_pushers(txn):
+            txn.execute("SELECT * FROM pushers")
+            rows = self.cursor_to_dict(txn)
+
+            for r in rows:
+                dataJson = r['data']
+                r['data'] = None
+                try:
+                    r['data'] = json.loads(str(dataJson).decode("UTF8"))
+                except Exception as e:
+                    logger.warn(
+                        "Invalid JSON in data for pusher %d: %s, %s",
+                        r['id'], dataJson, e.message,
+                    )
+                    pass
+
+        rows = yield self.runInteraction(
+            get_pushers,
+            desc="get_all_pushers",
         )
-
-        rows = yield self._execute_and_decode("get_all_pushers", sql)
-        for r in rows:
-            dataJson = r['data']
-            r['data'] = None
-            try:
-                r['data'] = json.loads(str(dataJson).decode("UTF8"))
-            except:
-                logger.warn("Invalid JSON in data for pusher %d: %s", r['id'], dataJson)
-                pass
-
         defer.returnValue(rows)
 
     @defer.inlineCallbacks
