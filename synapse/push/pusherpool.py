@@ -170,7 +170,11 @@ class PusherPool:
     def _start_pushers(self, pushers):
         logger.info("Starting %d pushers", len(pushers))
         for pusherdict in pushers:
-            p = self._create_pusher(pusherdict)
+            try:
+                p = self._create_pusher(pusherdict)
+            except PusherConfigException:
+                logger.exception("Couldn't start a pusher: caught PusherConfigException")
+                continue
             if p:
                 fullid = "%s:%s:%s" % (
                     pusherdict['app_id'],

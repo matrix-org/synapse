@@ -21,6 +21,7 @@ from synapse.api.errors import StoreError
 from syutil.jsonutil import encode_canonical_json
 
 import logging
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,14 @@ class PusherStore(SQLBaseStore):
         )
 
         rows = yield self._execute_and_decode("get_all_pushers", sql)
+        for r in rows:
+            dataJson = r['data']
+            r['data'] = None
+            try:
+                r['data'] = json.loads(dataJson)
+            except:
+                logger.warn("Invalid JSON in data for pusher %d: %s", r['id'], dataJson)
+                pass
 
         defer.returnValue(rows)
 
