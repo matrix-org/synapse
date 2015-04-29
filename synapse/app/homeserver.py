@@ -16,6 +16,10 @@
 
 import sys
 sys.dont_write_bytecode = True
+from synapse.python_dependencies import check_requirements
+
+if __name__=='__main__':
+    check_requirements()
 
 from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
 from synapse.storage import (
@@ -24,7 +28,6 @@ from synapse.storage import (
 
 from synapse.server import HomeServer
 
-from synapse.python_dependencies import check_requirements
 
 from twisted.internet import reactor
 from twisted.application import service
