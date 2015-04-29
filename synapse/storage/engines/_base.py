@@ -13,26 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import IncorrectDatabaseSetup
-from .postgres import PostgresEngine
-from .sqlite3 import Sqlite3Engine
 
-import importlib
-
-
-SUPPORTED_MODULE = {
-    "sqlite3": Sqlite3Engine,
-    "psycopg2": PostgresEngine,
-}
-
-
-def create_engine(name):
-    engine_class = SUPPORTED_MODULE.get(name, None)
-
-    if engine_class:
-        module = importlib.import_module(name)
-        return engine_class(module)
-
-    raise RuntimeError(
-        "Unsupported database engine '%s'" % (name,)
-    )
+class IncorrectDatabaseSetup(RuntimeError):
+    pass

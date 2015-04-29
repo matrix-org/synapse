@@ -15,11 +15,22 @@
 
 from synapse.storage import prepare_database
 
+from ._base import IncorrectDatabaseSetup
+
 
 class PostgresEngine(object):
     def __init__(self, database_module):
         self.module = database_module
         self.module.extensions.register_type(self.module.extensions.UNICODE)
+
+    def check_database(self, txn):
+        txn.execute("SHOW SERVER_ENCODING")
+        rows = txn.fetchall()
+        if rows and rows[0][0] != "UTF8":
+            raise IncorrectDatabaseSetup(
+                "Database has incorrect encoding: '%s' instead of 'UTF8'"
+                % (rows[0][0],)
+            )
 
     def convert_param_style(self, sql):
         return sql.replace("?", "%s")

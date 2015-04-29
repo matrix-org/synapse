@@ -283,6 +283,10 @@ class Porter(object):
             self.sqlite_store = Store(sqlite_db_pool, sqlite_engine)
             self.postgres_store = Store(postgres_db_pool, postgres_engine)
 
+            yield self.postgres_store.execute(
+                postgres_engine.check_database
+            )
+
             # Step 1. Set up databases.
             self.progress.set_state("Preparing SQLite3")
             self.setup_db(sqlite_config, sqlite_engine)

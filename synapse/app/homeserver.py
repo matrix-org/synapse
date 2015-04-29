@@ -17,7 +17,7 @@
 import sys
 sys.dont_write_bytecode = True
 
-from synapse.storage.engines import create_engine
+from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
 from synapse.storage import (
     are_all_users_on_domain, UpgradeDatabaseException,
 )
@@ -254,6 +254,15 @@ class SynapseHomeServer(HomeServer):
                 "\n" % (self.hostname,)
             )
             sys.exit(1)
+
+        try:
+            database_engine.check_database(db_conn.cursor())
+        except IncorrectDatabaseSetup as e:
+            sys.stderr.write("*" * len(e.message) + '\n')
+            sys.stderr.write(e.message)
+            sys.stderr.write('\n')
+            sys.stderr.write("*" * len(e.message) + '\n')
+            sys.exit(2)
 
 
 def get_version_string():
