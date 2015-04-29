@@ -17,7 +17,7 @@
 import sys
 sys.dont_write_bytecode = True
 
-from synapse.storage.engines import create_engine
+from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
 from synapse.storage import (
     are_all_users_on_domain, UpgradeDatabaseException,
 )
@@ -245,15 +245,27 @@ class SynapseHomeServer(HomeServer):
             db_conn.cursor(), database_engine, self.hostname
         )
         if not all_users_native:
-            sys.stderr.write(
-                "\n"
-                "******************************************************\n"
+            quit_with_error(
                 "Found users in database not native to %s!\n"
-                "You cannot changed a synapse server_name after it's been configured\n"
-                "******************************************************\n"
-                "\n" % (self.hostname,)
+                "You cannot changed a synapse server_name after it's been configured"
+                % (self.hostname,)
             )
-            sys.exit(1)
+
+        try:
+            database_engine.check_database(db_conn.cursor())
+        except IncorrectDatabaseSetup as e:
+            quit_with_error(e.message)
+
+
+def quit_with_error(error_string):
+    message_lines = error_string.split("\n")
+    line_length = max([len(l) for l in message_lines]) + 2
+    sys.stderr.write("*" * line_length + '\n')
+    for line in message_lines:
+        if line.strip():
+            sys.stderr.write(" %s\n" % (line.strip(),))
+    sys.stderr.write("*" * line_length + '\n')
+    sys.exit(1)
 
 
 def get_version_string():

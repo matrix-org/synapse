@@ -20,6 +20,9 @@ class Sqlite3Engine(object):
     def __init__(self, database_module):
         self.module = database_module
 
+    def check_database(self, txn):
+        pass
+
     def convert_param_style(self, sql):
         return sql
 
