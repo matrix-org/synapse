@@ -1,3 +1,7 @@
+# This assumes that Synapse has been installed as a system package
+# (e.g. https://aur.archlinux.org/packages/matrix-synapse/ for ArchLinux)
+# rather than in a user home directory or similar under virtualenv.
+
 [Unit]
 Description=Synapse Matrix homeserver
 
