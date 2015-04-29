@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS rejections(
 CREATE TABLE IF NOT EXISTS pushers (
   id BIGINT PRIMARY KEY,
   user_name TEXT NOT NULL,
+  access_token BIGINT DEFAULT NULL,
   profile_tag VARCHAR(32) NOT NULL,
   kind VARCHAR(8) NOT NULL,
   app_id VARCHAR(64) NOT NULL,
