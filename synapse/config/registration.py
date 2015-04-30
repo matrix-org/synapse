@@ -17,18 +17,18 @@ from ._base import Config
 
 from synapse.util.stringutils import random_string_with_symbols
 
-import distutils.util
+from distutils.util import strtobool
 
 
 class RegistrationConfig(Config):
 
     def read_config(self, config):
         self.disable_registration = not bool(
-            distutils.util.strtobool(str(config["enable_registration"]))
+            strtobool(str(config["enable_registration"]))
         )
         if "disable_registration" in config:
             self.disable_registration = bool(
-                distutils.util.strtobool(str(config["disable_registration"]))
+                strtobool(str(config["disable_registration"]))
             )
 
         self.registration_shared_secret = config.get("registration_shared_secret")
@@ -45,3 +45,16 @@ class RegistrationConfig(Config):
         # secret, even if registration is otherwise disabled.
         registration_shared_secret: "%(registration_shared_secret)s"
         """ % locals()
+
+    def add_arguments(self, parser):
+        reg_group = parser.add_argument_group("registration")
+        reg_group.add_argument(
+            "--enable-registration", action="store_true",
+            help="Enable registration for new users."
+        )
+
+    def read_arguments(self, args):
+        if args.enable_registration is not None:
+            self.disable_registration = not bool(
+                strtobool(str(args.enable_registration))
+            )
