@@ -130,16 +130,15 @@ class StateStore(SQLBaseStore):
     def get_current_state(self, room_id, event_type=None, state_key=""):
         def f(txn):
             sql = (
-                "SELECT e.event_id FROM events as e"
-                " INNER JOIN current_state_events as c ON e.event_id = c.event_id"
-                " WHERE c.room_id = ? "
+                "SELECT event_id FROM current_state_events"
+                " WHERE room_id = ? "
             )
 
             if event_type and state_key is not None:
-                sql += " AND c.type = ? AND c.state_key = ? "
+                sql += " AND type = ? AND state_key = ? "
                 args = (room_id, event_type, state_key)
             elif event_type:
-                sql += " AND c.type = ?"
+                sql += " AND type = ?"
                 args = (room_id, event_type)
             else:
                 args = (room_id, )
