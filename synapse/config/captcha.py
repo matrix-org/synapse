@@ -47,5 +47,5 @@ class CaptchaConfig(Config):
         captcha_ip_origin_is_x_forwarded: False
 
         # A secret key used to bypass the captcha test entirely.
-        captcha_bypass_secret: ~
+        #captcha_bypass_secret: "YOUR_SECRET_HERE"
         """

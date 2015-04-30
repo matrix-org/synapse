@@ -83,7 +83,7 @@ class ServerConfig(Config):
 
         # Turn on the twisted telnet manhole service on localhost on the given
         # port.
-        manhole: ~
+        #manhole: 9000
         """ % locals()
 
     def read_arguments(self, args):
