@@ -27,30 +27,33 @@ class ConfigError(Exception):
 class Config(object):
 
     @staticmethod
-    def parse_size(string):
+    def parse_size(value):
+        if isinstance(value, int) or isinstance(value, long):
+            return value
         sizes = {"K": 1024, "M": 1024 * 1024}
         size = 1
-        suffix = string[-1]
+        suffix = value[-1]
         if suffix in sizes:
-            string = string[:-1]
+            value = value[:-1]
             size = sizes[suffix]
-        return int(string) * size
+        return int(value) * size
 
     @staticmethod
-    def parse_duration(string):
+    def parse_duration(value):
+        if isinstance(value, int) or isinstance(value, long):
+            return value
         second = 1000
         hour = 60 * 60 * second
         day = 24 * hour
         week = 7 * day
         year = 365 * day
-
         sizes = {"s": second, "h": hour, "d": day, "w": week, "y": year}
         size = 1
-        suffix = string[-1]
+        suffix = value[-1]
         if suffix in sizes:
-            string = string[:-1]
+            value = value[:-1]
             size = sizes[suffix]
-        return int(string) * size
+        return int(value) * size
 
     @staticmethod
     def abspath(file_path):
