@@ -149,7 +149,8 @@ class StreamStore(SQLBaseStore):
         # select all the events between from/to with a sensible limit
         sql = (
             "SELECT e.event_id, e.room_id, e.type, s.state_key, "
-            "e.stream_ordering FROM events AS e LEFT JOIN state_events as s ON "
+            "e.stream_ordering FROM events AS e "
+            "LEFT JOIN state_events as s ON "
             "e.event_id = s.event_id "
             "WHERE e.stream_ordering > ? AND e.stream_ordering <= ? "
             "ORDER BY stream_ordering ASC LIMIT %(limit)d "
@@ -214,8 +215,9 @@ class StreamStore(SQLBaseStore):
 
         current_room_membership_sql = (
             "SELECT m.room_id FROM room_memberships as m "
-            "INNER JOIN current_state_events as c ON m.event_id = c.event_id "
-            "WHERE m.user_id = ? AND m.membership = 'join'"
+            " INNER JOIN current_state_events as c"
+            " ON m.event_id = c.event_id AND c.state_key = m.user_id"
+            " WHERE m.user_id = ? AND m.membership = 'join'"
         )
 
         # We also want to get any membership events about that user, e.g.
