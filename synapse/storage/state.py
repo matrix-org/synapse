@@ -147,7 +147,7 @@ class StateStore(SQLBaseStore):
             txn.execute(sql, args)
             results = self.cursor_to_dict(txn)
 
-            return self._parse_events_txn(results)
+            return self._parse_events_txn(txn, results)
 
         events = self.runInteraction("get_current_state", f)
         defer.returnValue(events)
