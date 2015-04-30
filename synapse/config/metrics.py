@@ -19,7 +19,7 @@ from ._base import Config
 class MetricsConfig(Config):
     def read_config(self, config):
         self.enable_metrics = config["enable_metrics"]
-        self.metrics_port = config["metrics_port"]
+        self.metrics_port = config.get("metrics_port")
 
     def default_config(self, config_dir_path, server_name):
         return """\
@@ -29,5 +29,5 @@ class MetricsConfig(Config):
         enable_metrics: False
 
         # Separate port to accept metrics requests on (on localhost)
-        metrics_port: ~
+        # metrics_port: 8081
         """
