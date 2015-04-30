@@ -190,7 +190,7 @@ class RoomStore(SQLBaseStore):
     def get_room_name_and_aliases(self, room_id):
         def f(txn):
             sql = (
-                "SELECT event_id FROM events current_state_events "
+                "SELECT event_id FROM current_state_events "
                 "WHERE room_id = ? "
             )
 
