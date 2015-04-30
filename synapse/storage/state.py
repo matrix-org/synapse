@@ -149,7 +149,7 @@ class StateStore(SQLBaseStore):
 
             return self._parse_events_txn(txn, results)
 
-        events = self.runInteraction("get_current_state", f)
+        events = yield self.runInteraction("get_current_state", f)
         defer.returnValue(events)
 
 
