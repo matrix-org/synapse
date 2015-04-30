@@ -128,25 +128,28 @@ class StateStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
-        sql = (
-            "SELECT e.*, r.event_id FROM events as e"
-            " LEFT JOIN redactions as r ON r.redacts = e.event_id"
-            " INNER JOIN current_state_events as c ON e.event_id = c.event_id"
-            " WHERE c.room_id = ? "
-        )
+        def f(txn):
+            sql = (
+                "SELECT e.event_id FROM events as e"
+                " INNER JOIN current_state_events as c ON e.event_id = c.event_id"
+                " WHERE c.room_id = ? "
+            )
 
-        if event_type and state_key is not None:
-            sql += " AND c.type = ? AND c.state_key = ? "
-            args = (room_id, event_type, state_key)
-        elif event_type:
-            sql += " AND c.type = ?"
-            args = (room_id, event_type)
-        else:
-            args = (room_id, )
+            if event_type and state_key is not None:
+                sql += " AND c.type = ? AND c.state_key = ? "
+                args = (room_id, event_type, state_key)
+            elif event_type:
+                sql += " AND c.type = ?"
+                args = (room_id, event_type)
+            else:
+                args = (room_id, )
 
-        results = yield self._execute_and_decode("get_current_state", sql, *args)
+            txn.execute(sql, args)
+            results = self.cursor_to_dict(txn)
 
-        events = yield self._parse_events(results)
+            return self._parse_events_txn(results)
+
+        events = self.runInteraction("get_current_state", f)
         defer.returnValue(events)
 
 

@@ -188,26 +188,21 @@ class RoomStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_room_name_and_aliases(self, room_id):
-        del_sql = (
-            "SELECT event_id FROM redactions WHERE redacts = e.event_id "
-            "LIMIT 1"
-        )
+        def f(txn):
+            sql = (
+                "SELECT event_id FROM events current_state_events "
+                "WHERE room_id = ? "
+            )
 
-        sql = (
-            "SELECT e.*, (%(redacted)s) AS redacted FROM events as e "
-            "INNER JOIN current_state_events as c ON e.event_id = c.event_id "
-            "WHERE c.room_id = ? "
-        ) % {
-            "redacted": del_sql,
-        }
+            sql += " AND ((type = 'm.room.name' AND state_key = '')"
+            sql += " OR type = 'm.room.aliases')"
 
-        sql += " AND ((c.type = 'm.room.name' AND c.state_key = '')"
-        sql += " OR c.type = 'm.room.aliases')"
-        args = (room_id,)
+            txn.execute(sql, (room_id,))
+            results = self.cursor_to_dict(txn)
 
-        results = yield self._execute_and_decode("get_current_state", sql, *args)
+            return self._parse_events_txn(txn, results)
 
-        events = yield self._parse_events(results)
+        events = yield self.runInteraction("get_room_name_and_aliases", f)
 
         name = None
         aliases = []
