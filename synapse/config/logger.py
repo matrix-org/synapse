@@ -27,7 +27,6 @@ class LoggingConfig(Config):
         self.verbosity = int(args.verbose) if args.verbose else None
         self.log_config = self.abspath(args.log_config)
         self.log_file = self.abspath(args.log_file)
-        self.access_log_file = self.abspath(args.access_log_file)
 
     @classmethod
     def add_arguments(cls, parser):
@@ -44,10 +43,6 @@ class LoggingConfig(Config):
         logging_group.add_argument(
             '--log-config', dest="log_config", default=None,
             help="Python logging config file"
-        )
-        logging_group.add_argument(
-            '--access-log-file', dest="access_log_file", default="access.log",
-            help="File to log server access to"
         )
 
     def setup_logging(self):
@@ -83,17 +78,6 @@ class LoggingConfig(Config):
             handler.addFilter(LoggingContextFilter(request=""))
 
             logger.addHandler(handler)
-
-            if self.access_log_file:
-                access_logger = logging.getLogger('synapse.access')
-                # we log to both files by default
-                access_logger.propagate = 1
-                access_log_handler = logging.handlers.RotatingFileHandler(
-                    self.access_log_file, maxBytes=(1000 * 1000 * 100), backupCount=3
-                )
-                access_log_formatter = logging.Formatter('%(message)s')
-                access_log_handler.setFormatter(access_log_formatter)
-                access_logger.addHandler(access_log_handler)
         else:
             with open(self.log_config, 'r') as f:
                 logging.config.dictConfig(yaml.load(f))
