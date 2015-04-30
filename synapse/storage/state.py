@@ -128,25 +128,18 @@ class StateStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
-        del_sql = (
-            "SELECT event_id FROM redactions WHERE redacts = e.event_id "
-            "LIMIT 1"
+        sql = (
+            "SELECT e.*, r.event_id FROM events as e"
+            " LEFT JOIN redactions as r ON r.redacts = e.event_id"
+            " INNER JOIN current_state_events as c ON e.event_id = c.event_id"
+            " WHERE c.room_id = ? "
         )
 
-        sql = (
-            "SELECT e.*, (%(redacted)s) AS redacted FROM events as e "
-            "INNER JOIN current_state_events as c ON e.event_id = c.event_id "
-            "INNER JOIN state_events as s ON e.event_id = s.event_id "
-            "WHERE c.room_id = ? "
-        ) % {
-            "redacted": del_sql,
-        }
-
         if event_type and state_key is not None:
-            sql += " AND s.type = ? AND s.state_key = ? "
+            sql += " AND c.type = ? AND c.state_key = ? "
             args = (room_id, event_type, state_key)
         elif event_type:
-            sql += " AND s.type = ?"
+            sql += " AND c.type = ?"
             args = (room_id, event_type)
         else:
             args = (room_id, )

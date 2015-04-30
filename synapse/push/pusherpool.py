@@ -170,7 +170,11 @@ class PusherPool:
     def _start_pushers(self, pushers):
         logger.info("Starting %d pushers", len(pushers))
         for pusherdict in pushers:
-            p = self._create_pusher(pusherdict)
+            try:
+                p = self._create_pusher(pusherdict)
+            except PusherConfigException:
+                logger.exception("Couldn't start a pusher: caught PusherConfigException")
+                continue
             if p:
                 fullid = "%s:%s:%s" % (
                     pusherdict['app_id'],
@@ -181,6 +185,8 @@ class PusherPool:
                     self.pushers[fullid].stop()
                 self.pushers[fullid] = p
                 p.start()
+
+        logger.info("Started pushers")
 
     @defer.inlineCallbacks
     def remove_pusher(self, app_id, pushkey, user_name):

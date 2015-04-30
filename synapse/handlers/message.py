@@ -267,8 +267,7 @@ class MessageHandler(BaseHandler):
             user, pagination_config.get_source_config("presence"), None
         )
 
-        public_rooms = yield self.store.get_rooms(is_public=True)
-        public_room_ids = [r["room_id"] for r in public_rooms]
+        public_room_ids = yield self.store.get_public_room_ids()
 
         limit = pagin_config.limit
         if limit is None:

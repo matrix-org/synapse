@@ -355,11 +355,11 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         # being sent)
         last_txn_id = self._get_last_txn(txn, service.id)
 
-        result = txn.execute(
+        txn.execute(
             "SELECT MAX(txn_id) FROM application_services_txns WHERE as_id=?",
             (service.id,)
         )
-        highest_txn_id = result.fetchone()[0]
+        highest_txn_id = txn.fetchone()[0]
         if highest_txn_id is None:
             highest_txn_id = 0
 
@@ -441,14 +441,16 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
     def _get_oldest_unsent_txn(self, txn, service):
         # Monotonically increasing txn ids, so just select the smallest
         # one in the txns table (we delete them when they are sent)
-        result = txn.execute(
-            "SELECT MIN(txn_id), * FROM application_services_txns WHERE as_id=?",
+        txn.execute(
+            "SELECT * FROM application_services_txns WHERE as_id=?"
+            " ORDER BY txn_id ASC LIMIT 1",
             (service.id,)
         )
-        entry = self.cursor_to_dict(result)[0]
-        if not entry or entry["txn_id"] is None:
-            # the min(txn_id) part will force a row, so entry may not be None
+        rows = self.cursor_to_dict(txn)
+        if not rows:
             return None
+
+        entry = rows[0]
 
         event_ids = json.loads(entry["event_ids"])
         events = self._get_events_txn(txn, event_ids)
@@ -458,11 +460,11 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         )
 
     def _get_last_txn(self, txn, service_id):
-        result = txn.execute(
+        txn.execute(
             "SELECT last_txn FROM application_services_state WHERE as_id=?",
             (service_id,)
         )
-        last_txn_id = result.fetchone()
+        last_txn_id = txn.fetchone()
         if last_txn_id is None or last_txn_id[0] is None:  # no row exists
             return 0
         else:

@@ -21,6 +21,7 @@ class CaptchaConfig(Config):
         self.recaptcha_private_key = config["recaptcha_private_key"]
         self.recaptcha_public_key = config["recaptcha_public_key"]
         self.enable_registration_captcha = config["enable_registration_captcha"]
+        # XXX: This is used for more than just captcha
         self.captcha_ip_origin_is_x_forwarded = (
             config["captcha_ip_origin_is_x_forwarded"]
         )

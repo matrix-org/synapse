@@ -881,7 +881,7 @@ class PresenceEventSource(object):
         # TODO(paul): limit
 
         for serial, user_ids in presence._remote_offline_serials:
-            if serial < from_key:
+            if serial <= from_key:
                 break
 
             if serial > max_serial:

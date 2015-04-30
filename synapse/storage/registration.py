@@ -181,7 +181,7 @@ class RegistrationStore(SQLBaseStore):
     @defer.inlineCallbacks
     def user_add_threepid(self, user_id, medium, address, validated_at, added_at):
         yield self._simple_upsert("user_threepids", {
-            "user": user_id,
+            "user_id": user_id,
             "medium": medium,
             "address": address,
         }, {
@@ -193,7 +193,7 @@ class RegistrationStore(SQLBaseStore):
     def user_get_threepids(self, user_id):
         ret = yield self._simple_select_list(
             "user_threepids", {
-                "user": user_id
+                "user_id": user_id
             },
             ['medium', 'address', 'validated_at', 'added_at'],
             'user_get_threepids'

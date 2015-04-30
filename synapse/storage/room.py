@@ -75,6 +75,16 @@ class RoomStore(SQLBaseStore):
             allow_none=True,
         )
 
+    def get_public_room_ids(self):
+        return self._simple_select_onecol(
+            table="rooms",
+            keyvalues={
+                "is_public": True,
+            },
+            retcol="room_id",
+            desc="get_public_room_ids",
+        )
+
     @defer.inlineCallbacks
     def get_rooms(self, is_public):
         """Retrieve a list of all public rooms.
@@ -186,14 +196,13 @@ class RoomStore(SQLBaseStore):
         sql = (
             "SELECT e.*, (%(redacted)s) AS redacted FROM events as e "
             "INNER JOIN current_state_events as c ON e.event_id = c.event_id "
-            "INNER JOIN state_events as s ON e.event_id = s.event_id "
             "WHERE c.room_id = ? "
         ) % {
             "redacted": del_sql,
         }
 
-        sql += " AND ((s.type = 'm.room.name' AND s.state_key = '')"
-        sql += " OR s.type = 'm.room.aliases')"
+        sql += " AND ((c.type = 'm.room.name' AND c.state_key = '')"
+        sql += " OR c.type = 'm.room.aliases')"
         args = (room_id,)
 
         results = yield self._execute_and_decode("get_current_state", sql, *args)

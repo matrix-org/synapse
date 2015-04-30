@@ -24,7 +24,7 @@ from syutil.jsonutil import (
     encode_canonical_json, encode_pretty_printed_json
 )
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from twisted.web import server, resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.util import redirectTo
@@ -177,19 +177,6 @@ class JsonResource(HttpServer, resource.Resource):
     def register_path(self, method, path_pattern, callback):
         self.path_regexs.setdefault(method, []).append(
             self._PathEntry(path_pattern, callback)
-        )
-
-    def start_listening(self, port):
-        """ Registers the http server with the twisted reactor.
-
-        Args:
-            port (int): The port to listen on.
-
-        """
-        reactor.listenTCP(
-            port,
-            server.Site(self),
-            interface=self.hs.config.bind_host
         )
 
     def render(self, request):
