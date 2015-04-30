@@ -170,7 +170,7 @@ traditionally used for convenience and simplicity.
 
 The advantages of Postgres include:
 
- * significant performance improvements due to the superior threading and
+ * significant performannce improvements due to the superior threading and
    caching model, smarter query optimiser
  * allowing the DB to be run on separate hardware
  * allowing basic active/backup high-availability with a "hot spare" synapse
@@ -409,7 +409,6 @@ SRV record, as that is the name other machines will expect it to have::
 
     $ python -m synapse.app.homeserver \
         --server-name YOURDOMAIN \
-        --bind-port 8448 \
         --config-path homeserver.yaml \
         --generate-config
     $ python -m synapse.app.homeserver --config-path homeserver.yaml
