@@ -22,15 +22,6 @@ class ContentRepositoryConfig(Config):
         self.max_image_pixels = self.parse_size(config["max_image_pixels"])
         self.media_store_path = self.ensure_directory(config["media_store_path"])
 
-    def parse_size(self, string):
-        sizes = {"K": 1024, "M": 1024 * 1024}
-        size = 1
-        suffix = string[-1]
-        if suffix in sizes:
-            string = string[:-1]
-            size = sizes[suffix]
-        return int(string) * size
-
     def default_config(self, config_dir_path, server_name):
         media_store = self.default_path("media_store")
         return """

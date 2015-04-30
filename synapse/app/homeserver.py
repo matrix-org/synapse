@@ -406,7 +406,6 @@ def setup(config_options):
         redirect_root_to_web_client=True,
     )
 
-
     logger.info("Preparing database: %r...", config.database_config)
 
     try:
