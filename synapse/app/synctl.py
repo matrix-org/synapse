@@ -18,6 +18,7 @@ import sys
 import os
 import subprocess
 import signal
+import yaml
 
 SYNAPSE = ["python", "-B", "-m", "synapse.app.homeserver"]
 
@@ -28,6 +29,7 @@ NORMAL = "\x1b[m"
 
 CONFIG = yaml.load(open(CONFIGFILE))
 PIDFILE = CONFIG["pid_file"]
+
 
 def start():
     if not os.path.exists(CONFIGFILE):
