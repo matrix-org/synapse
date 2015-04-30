@@ -75,6 +75,16 @@ class RoomStore(SQLBaseStore):
             allow_none=True,
         )
 
+    def get_public_room_ids(self):
+        return self._simple_select_onecol(
+            table="rooms",
+            keyvalues={
+                "is_public": True,
+            },
+            retcol="room_id",
+            desc="get_public_room_ids",
+        )
+
     @defer.inlineCallbacks
     def get_rooms(self, is_public):
         """Retrieve a list of all public rooms.
