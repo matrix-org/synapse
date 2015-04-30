@@ -120,9 +120,10 @@ class KeyConfig(Config):
             signing_keys = self.read_file(signing_key_path, "signing_key")
             if len(signing_keys.split("\n")[0].split()) == 1:
                 # handle keys in the old format.
+                key_id = "a_" + random_string(4)
                 key = syutil.crypto.signing_key.decode_signing_key_base64(
                     syutil.crypto.signing_key.NACL_ED25519,
-                    "auto",
+                    key_id,
                     signing_keys.split("\n")[0]
                 )
                 with open(signing_key_path, "w") as signing_key_file:
