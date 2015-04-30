@@ -179,19 +179,6 @@ class JsonResource(HttpServer, resource.Resource):
             self._PathEntry(path_pattern, callback)
         )
 
-    def start_listening(self, port):
-        """ Registers the http server with the twisted reactor.
-
-        Args:
-            port (int): The port to listen on.
-
-        """
-        reactor.listenTCP(
-            port,
-            server.Site(self),
-            interface=self.hs.config.bind_host
-        )
-
     def render(self, request):
         """ This gets called by twisted every time someone sends us a request.
         """
