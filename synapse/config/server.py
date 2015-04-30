@@ -23,7 +23,7 @@ class ServerConfig(Config):
         self.bind_port = config["bind_port"]
         self.bind_host = config["bind_host"]
         self.unsecure_port = config["unsecure_port"]
-        self.manhole = config["manhole"]
+        self.manhole = config.get("manhole")
         self.pid_file = self.abspath(config.get("pid_file"))
         self.web_client = config["web_client"]
         self.soft_file_limit = config["soft_file_limit"]
