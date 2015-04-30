@@ -20,6 +20,7 @@ from syutil.crypto.signing_key import (
     is_signing_algorithm_supported, decode_verify_key_bytes
 )
 from syutil.base64util import decode_base64
+from synapse.util.stringutils import random_string
 
 
 class KeyConfig(Config):
@@ -110,9 +111,10 @@ class KeyConfig(Config):
         signing_key_path = config["signing_key_path"]
         if not os.path.exists(signing_key_path):
             with open(signing_key_path, "w") as signing_key_file:
+                key_id = "a_" + random_string(4)
                 syutil.crypto.signing_key.write_signing_keys(
                     signing_key_file,
-                    (syutil.crypto.signing_key.generate_signing_key("auto"),),
+                    (syutil.crypto.signing_key.generate_signing_key(key_id),),
                 )
         else:
             signing_keys = self.read_file(signing_key_path, "signing_key")
