@@ -35,6 +35,7 @@ from twisted.enterprise import adbapi
 from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
+from twisted.web.http import proxiedLogFormatter
 from synapse.http.server import JsonResource, RootRedirect
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
@@ -225,10 +226,18 @@ class SynapseHomeServer(HomeServer):
     def start_listening(self):
         config = self.get_config()
 
+        log_formatter = None
+        if config.captcha_ip_origin_is_x_forwarded:
+            log_formatter = proxiedLogFormatter
+
         if not config.no_tls and config.bind_port is not None:
             reactor.listenSSL(
                 config.bind_port,
-                Site(self.root_resource),
+                Site(
+                    self.root_resource,
+                    logPath=config.access_log_file,
+                    logFormatter=log_formatter,
+                ),
                 self.tls_context_factory,
                 interface=config.bind_host
             )
@@ -237,7 +246,11 @@ class SynapseHomeServer(HomeServer):
         if config.unsecure_port is not None:
             reactor.listenTCP(
                 config.unsecure_port,
-                Site(self.root_resource),
+                Site(
+                    self.root_resource,
+                    logPath=config.access_log_file,
+                    logFormatter=log_formatter,
+                ),
                 interface=config.bind_host
             )
             logger.info("Synapse now listening on port %d", config.unsecure_port)
@@ -245,7 +258,13 @@ class SynapseHomeServer(HomeServer):
         metrics_resource = self.get_resource_for_metrics()
         if metrics_resource and config.metrics_port is not None:
             reactor.listenTCP(
-                config.metrics_port, Site(metrics_resource), interface="127.0.0.1",
+                config.metrics_port,
+                Site(
+                    metrics_resource,
+                    logPath=config.access_log_file,
+                    logFormatter=log_formatter,
+                ),
+                interface="127.0.0.1",
             )
             logger.info("Metrics now running on 127.0.0.1 port %d", config.metrics_port)
 

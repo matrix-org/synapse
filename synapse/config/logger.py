@@ -27,6 +27,7 @@ class LoggingConfig(Config):
         self.verbosity = int(args.verbose) if args.verbose else None
         self.log_config = self.abspath(args.log_config)
         self.log_file = self.abspath(args.log_file)
+        self.access_log_file = self.abspath(args.access_log_file)
 
     @classmethod
     def add_arguments(cls, parser):
@@ -43,6 +44,10 @@ class LoggingConfig(Config):
         logging_group.add_argument(
             '--log-config', dest="log_config", default=None,
             help="Python logging config file"
+        )
+        logging_group.add_argument(
+            '--access-log-file', dest="access_log_file", default="access.log",
+            help="File to log server access to"
         )
 
     def setup_logging(self):
