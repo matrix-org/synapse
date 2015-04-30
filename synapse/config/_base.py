@@ -171,7 +171,7 @@ class Config(object):
                 config_bytes, config = obj.generate_config(
                     config_dir_path, server_name
                 )
-                obj.invoke_all("generate_keys", config)
+                obj.invoke_all("generate_files", config)
                 config_file.write(config_bytes)
             print (
                 "A config file has been generated in %s for server name"
@@ -192,6 +192,7 @@ class Config(object):
 
         server_name = specified_config["server_name"]
         _, config = obj.generate_config(config_dir_path, server_name)
+        config.pop("log_config")
         config.update(specified_config)
 
         obj.invoke_all("read_config", config)

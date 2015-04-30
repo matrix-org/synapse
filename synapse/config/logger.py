@@ -19,6 +19,47 @@ from twisted.python.log import PythonLoggingObserver
 import logging
 import logging.config
 import yaml
+from string import Template
+import os
+
+
+DEFAULT_LOG_CONFIG = Template("""
+version: 1
+
+formatters:
+  precise:
+   format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s\
+- %(message)s'
+
+filters:
+  context:
+    (): synapse.util.logcontext.LoggingContextFilter
+    request: ""
+
+handlers:
+  file:
+    class: logging.handlers.RotatingFileHandler
+    formatter: precise
+    filename: ${log_file}
+    maxBytes: 104857600
+    backupCount: 10
+    filters: [context]
+    level: INFO
+  console:
+    class: logging.StreamHandler
+    formatter: precise
+
+loggers:
+    synapse:
+        level: INFO
+
+    synapse.storage.SQL:
+        level: INFO
+
+root:
+    level: INFO
+    handlers: [file, console]
+""")
 
 
 class LoggingConfig(Config):
@@ -30,6 +71,9 @@ class LoggingConfig(Config):
 
     def default_config(self, config_dir_path, server_name):
         log_file = self.abspath("homeserver.log")
+        log_config = self.abspath(
+            os.path.join(config_dir_path, server_name + ".log.config")
+        )
         return """
         # Logging verbosity level.
         verbose: 0
@@ -38,7 +82,7 @@ class LoggingConfig(Config):
         log_file: "%(log_file)s"
 
         # A yaml python logging config file
-        #log_config: "your.log.config.yaml"
+        log_config: "%(log_config)s"
         """ % locals()
 
     def read_arguments(self, args):
@@ -63,6 +107,14 @@ class LoggingConfig(Config):
             '--log-config', dest="log_config", default=None,
             help="Python logging config file"
         )
+
+    def generate_files(self, config):
+        log_config = config.get("log_config")
+        if log_config and not os.path.exists(log_config):
+            with open(log_config, "wb") as log_config_file:
+                log_config_file.write(
+                    DEFAULT_LOG_CONFIG.substitute(log_file=config["log_file"])
+                )
 
     def setup_logging(self):
         log_format = (

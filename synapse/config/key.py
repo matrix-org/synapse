@@ -107,7 +107,7 @@ class KeyConfig(Config):
                 )
         return keys
 
-    def generate_keys(self, config):
+    def generate_files(self, config):
         signing_key_path = config["signing_key_path"]
         if not os.path.exists(signing_key_path):
             with open(signing_key_path, "w") as signing_key_file:

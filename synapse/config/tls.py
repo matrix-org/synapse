@@ -70,7 +70,7 @@ class TlsConfig(Config):
         private_key_pem = self.read_file(private_key_path, "tls_private_key")
         return crypto.load_privatekey(crypto.FILETYPE_PEM, private_key_pem)
 
-    def generate_keys(self, config):
+    def generate_files(self, config):
         tls_certificate_path = config["tls_certificate_path"]
         tls_private_key_path = config["tls_private_key_path"]
         tls_dh_params_path = config["tls_dh_params_path"]

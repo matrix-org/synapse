@@ -26,7 +26,7 @@ for port in 8080 8081 8082; do
 
     https_port=$((port + 400))
     mkdir -p demo/$port
-#    pushd demo/$port
+    pushd demo/$port
 
     #rm $DIR/etc/$port.config
     python -m synapse.app.homeserver \
@@ -39,7 +39,7 @@ for port in 8080 8081 8082; do
         -D \
         -vv \
 
- #   popd
+    popd
 done
 
 cd "$CWD"
