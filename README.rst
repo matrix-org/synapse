@@ -170,7 +170,7 @@ traditionally used for convenience and simplicity.
 
 The advantages of Postgres include:
 
- * significant performannce improvements due to the superior threading and
+ * significant performance improvements due to the superior threading and
    caching model, smarter query optimiser
  * allowing the DB to be run on separate hardware
  * allowing basic active/backup high-availability with a "hot spare" synapse
