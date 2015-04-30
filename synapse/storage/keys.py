@@ -137,8 +137,13 @@ class KeyStore(SQLBaseStore):
             ts_valid_until_ms (int): The time when this json stops being valid.
             key_json (bytes): The encoded JSON.
         """
-        return self._simple_insert(
+        return self._simple_upsert(
             table="server_keys_json",
+            keyvalues={
+                "server_name": server_name,
+                "key_id": key_id,
+                "from_server": from_server,
+            },
             values={
                 "server_name": server_name,
                 "key_id": key_id,
@@ -147,7 +152,6 @@ class KeyStore(SQLBaseStore):
                 "ts_valid_until_ms": ts_expires_ms,
                 "key_json": buffer(key_json_bytes),
             },
-            or_replace=True,
         )
 
     def get_server_keys_json(self, server_keys):
