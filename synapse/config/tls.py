@@ -23,37 +23,44 @@ GENERATE_DH_PARAMS = False
 
 
 class TlsConfig(Config):
-    def __init__(self, args):
-        super(TlsConfig, self).__init__(args)
+    def read_config(self, config):
         self.tls_certificate = self.read_tls_certificate(
-            args.tls_certificate_path
+            config.get("tls_certificate_path")
         )
 
-        self.no_tls = args.no_tls
+        self.no_tls = config.get("no_tls", False)
 
         if self.no_tls:
             self.tls_private_key = None
         else:
             self.tls_private_key = self.read_tls_private_key(
-                args.tls_private_key_path
+                config.get("tls_private_key_path")
             )
 
         self.tls_dh_params_path = self.check_file(
-            args.tls_dh_params_path, "tls_dh_params"
+            config.get("tls_dh_params_path"), "tls_dh_params"
         )
 
-    @classmethod
-    def add_arguments(cls, parser):
-        super(TlsConfig, cls).add_arguments(parser)
-        tls_group = parser.add_argument_group("tls")
-        tls_group.add_argument("--tls-certificate-path",
-                               help="PEM encoded X509 certificate for TLS")
-        tls_group.add_argument("--tls-private-key-path",
-                               help="PEM encoded private key for TLS")
-        tls_group.add_argument("--tls-dh-params-path",
-                               help="PEM dh parameters for ephemeral keys")
-        tls_group.add_argument("--no-tls", action='store_true',
-                               help="Don't bind to the https port.")
+    def default_config(self, config_dir_path, server_name):
+        base_key_name = os.path.join(config_dir_path, server_name)
+
+        tls_certificate_path = base_key_name + ".tls.crt"
+        tls_private_key_path = base_key_name + ".tls.key"
+        tls_dh_params_path = base_key_name + ".tls.dh"
+
+        return """\
+        # PEM encoded X509 certificate for TLS
+        tls_certificate_path: "%(tls_certificate_path)s"
+
+        # PEM encoded private key for TLS
+        tls_private_key_path: "%(tls_private_key_path)s"
+
+        # PEM dh parameters for ephemeral keys
+        tls_dh_params_path: "%(tls_dh_params_path)s"
+
+        # Don't bind to the https port
+        no_tls: False
+        """ % locals()
 
     def read_tls_certificate(self, cert_path):
         cert_pem = self.read_file(cert_path, "tls_certificate")
@@ -63,22 +70,13 @@ class TlsConfig(Config):
         private_key_pem = self.read_file(private_key_path, "tls_private_key")
         return crypto.load_privatekey(crypto.FILETYPE_PEM, private_key_pem)
 
-    @classmethod
-    def generate_config(cls, args, config_dir_path):
-        super(TlsConfig, cls).generate_config(args, config_dir_path)
-        base_key_name = os.path.join(config_dir_path, args.server_name)
+    def generate_keys(self, config):
+        tls_certificate_path = config["tls_certificate_path"]
+        tls_private_key_path = config["tls_private_key_path"]
+        tls_dh_params_path = config["tls_dh_params_path"]
 
-        if args.tls_certificate_path is None:
-            args.tls_certificate_path = base_key_name + ".tls.crt"
-
-        if args.tls_private_key_path is None:
-            args.tls_private_key_path = base_key_name + ".tls.key"
-
-        if args.tls_dh_params_path is None:
-            args.tls_dh_params_path = base_key_name + ".tls.dh"
-
-        if not os.path.exists(args.tls_private_key_path):
-            with open(args.tls_private_key_path, "w") as private_key_file:
+        if not os.path.exists(tls_private_key_path):
+            with open(tls_private_key_path, "w") as private_key_file:
                 tls_private_key = crypto.PKey()
                 tls_private_key.generate_key(crypto.TYPE_RSA, 2048)
                 private_key_pem = crypto.dump_privatekey(
@@ -86,17 +84,17 @@ class TlsConfig(Config):
                 )
                 private_key_file.write(private_key_pem)
         else:
-            with open(args.tls_private_key_path) as private_key_file:
+            with open(tls_private_key_path) as private_key_file:
                 private_key_pem = private_key_file.read()
                 tls_private_key = crypto.load_privatekey(
                     crypto.FILETYPE_PEM, private_key_pem
                 )
 
-        if not os.path.exists(args.tls_certificate_path):
-            with open(args.tls_certificate_path, "w") as certifcate_file:
+        if not os.path.exists(tls_certificate_path):
+            with open(tls_certificate_path, "w") as certifcate_file:
                 cert = crypto.X509()
                 subject = cert.get_subject()
-                subject.CN = args.server_name
+                subject.CN = config["server_name"]
 
                 cert.set_serial_number(1000)
                 cert.gmtime_adj_notBefore(0)
@@ -110,16 +108,16 @@ class TlsConfig(Config):
 
                 certifcate_file.write(cert_pem)
 
-        if not os.path.exists(args.tls_dh_params_path):
+        if not os.path.exists(tls_dh_params_path):
             if GENERATE_DH_PARAMS:
                 subprocess.check_call([
                     "openssl", "dhparam",
                     "-outform", "PEM",
-                    "-out", args.tls_dh_params_path,
+                    "-out", tls_dh_params_path,
                     "2048"
                 ])
             else:
-                with open(args.tls_dh_params_path, "w") as dh_params_file:
+                with open(tls_dh_params_path, "w") as dh_params_file:
                     dh_params_file.write(
                         "2048-bit DH parameters taken from rfc3526\n"
                         "-----BEGIN DH PARAMETERS-----\n"

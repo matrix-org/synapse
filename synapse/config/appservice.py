@@ -17,15 +17,11 @@ from ._base import Config
 
 class AppServiceConfig(Config):
 
-    def __init__(self, args):
-        super(AppServiceConfig, self).__init__(args)
-        self.app_service_config_files = args.app_service_config_files
+    def read_config(self, config):
+        self.app_service_config_files = config.get("app_service_config_files", [])
 
-    @classmethod
-    def add_arguments(cls, parser):
-        super(AppServiceConfig, cls).add_arguments(parser)
-        group = parser.add_argument_group("appservice")
-        group.add_argument(
-            "--app-service-config-files", type=str, nargs='+',
-            help="A list of application service config files to use."
-        )
+    def default_config(cls, config_dir_path, server_name):
+        return """\
+        # A list of application service config file to use
+        app_service_config_files: []
+        """

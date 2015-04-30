@@ -17,11 +17,10 @@ from ._base import Config
 
 
 class ContentRepositoryConfig(Config):
-    def __init__(self, args):
-        super(ContentRepositoryConfig, self).__init__(args)
-        self.max_upload_size = self.parse_size(args.max_upload_size)
-        self.max_image_pixels = self.parse_size(args.max_image_pixels)
-        self.media_store_path = self.ensure_directory(args.media_store_path)
+    def read_config(self, config):
+        self.max_upload_size = self.parse_size(config["max_upload_size"])
+        self.max_image_pixels = self.parse_size(config["max_image_pixels"])
+        self.media_store_path = self.ensure_directory(config["media_store_path"])
 
     def parse_size(self, string):
         sizes = {"K": 1024, "M": 1024 * 1024}
@@ -32,17 +31,15 @@ class ContentRepositoryConfig(Config):
             size = sizes[suffix]
         return int(string) * size
 
-    @classmethod
-    def add_arguments(cls, parser):
-        super(ContentRepositoryConfig, cls).add_arguments(parser)
-        db_group = parser.add_argument_group("content_repository")
-        db_group.add_argument(
-            "--max-upload-size", default="10M"
-        )
-        db_group.add_argument(
-            "--media-store-path", default=cls.default_path("media_store")
-        )
-        db_group.add_argument(
-            "--max-image-pixels", default="32M",
-            help="Maximum number of pixels that will be thumbnailed"
-        )
+    def default_config(self, config_dir_path, server_name):
+        media_store = self.default_path("media_store")
+        return """
+        # Directory where uploaded images and attachments are stored.
+        media_store_path: "%(media_store)s"
+
+        # The largest allowed upload size in bytes
+        max_upload_size: "10M"
+
+        # Maximum number of pixels that will be thumbnailed
+        max_image_pixels: "32M"
+        """ % locals()

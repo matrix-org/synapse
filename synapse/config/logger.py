@@ -22,22 +22,41 @@ import yaml
 
 
 class LoggingConfig(Config):
-    def __init__(self, args):
-        super(LoggingConfig, self).__init__(args)
-        self.verbosity = int(args.verbose) if args.verbose else None
-        self.log_config = self.abspath(args.log_config)
-        self.log_file = self.abspath(args.log_file)
 
-    @classmethod
+    def read_config(self, config):
+        self.verbosity = config.get("verbose", 0)
+        self.log_config = self.abspath(config.get("log_config"))
+        self.log_file = self.abspath(config.get("log_file"))
+
+    def default_config(self, config_dir_path, server_name):
+        log_file = self.abspath("homeserver.log")
+        return """
+        # Logging verbosity level.
+        verbose: 0
+
+        # File to write logging to
+        log_file: "%(log_file)s"
+
+        # A yaml python logging config file
+        #log_config: "your.log.config.yaml"
+        """ % locals()
+
+    def read_arguments(self, args):
+        if args.verbose is not None:
+            self.verbosity = args.verbose
+        if args.log_config is not None:
+            self.log_config = args.log_config
+        if args.log_file is not None:
+            self.log_file = args.log_file
+
     def add_arguments(cls, parser):
-        super(LoggingConfig, cls).add_arguments(parser)
         logging_group = parser.add_argument_group("logging")
         logging_group.add_argument(
             '-v', '--verbose', dest="verbose", action='count',
             help="The verbosity level."
         )
         logging_group.add_argument(
-            '-f', '--log-file', dest="log_file", default="homeserver.log",
+            '-f', '--log-file', dest="log_file",
             help="File to log to."
         )
         logging_group.add_argument(
