@@ -65,6 +65,7 @@ class RoomMemberStore(SQLBaseStore):
         )
 
         self.get_rooms_for_user.invalidate(target_user_id)
+        self.get_joined_hosts_for_room.invalidate(event.room_id)
 
     def get_room_member(self, user_id, room_id):
         """Retrieve the current state of a room member.
@@ -162,6 +163,7 @@ class RoomMemberStore(SQLBaseStore):
             RoomsForUser(**r) for r in self.cursor_to_dict(txn)
         ]
 
+    @cached()
     def get_joined_hosts_for_room(self, room_id):
         return self.runInteraction(
             "get_joined_hosts_for_room",
