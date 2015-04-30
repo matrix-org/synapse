@@ -35,7 +35,7 @@ from twisted.enterprise import adbapi
 from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
-from twisted.web.http import proxiedLogFormatter
+from twisted.web.http import proxiedLogFormatter, combinedLogFormatter
 from synapse.http.server import JsonResource, RootRedirect
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
@@ -226,17 +226,13 @@ class SynapseHomeServer(HomeServer):
     def start_listening(self):
         config = self.get_config()
 
-        log_formatter = None
-        if config.captcha_ip_origin_is_x_forwarded:
-            log_formatter = proxiedLogFormatter
-
         if not config.no_tls and config.bind_port is not None:
             reactor.listenSSL(
                 config.bind_port,
-                Site(
+                SynapseSite(
+                    "synapse.access.https",
+                    config,
                     self.root_resource,
-                    logPath=config.access_log_file,
-                    logFormatter=log_formatter,
                 ),
                 self.tls_context_factory,
                 interface=config.bind_host
@@ -246,10 +242,10 @@ class SynapseHomeServer(HomeServer):
         if config.unsecure_port is not None:
             reactor.listenTCP(
                 config.unsecure_port,
-                Site(
+                SynapseSite(
+                    "synapse.access.http",
+                    config,
                     self.root_resource,
-                    logPath=config.access_log_file,
-                    logFormatter=log_formatter,
                 ),
                 interface=config.bind_host
             )
@@ -259,10 +255,10 @@ class SynapseHomeServer(HomeServer):
         if metrics_resource and config.metrics_port is not None:
             reactor.listenTCP(
                 config.metrics_port,
-                Site(
+                SynapseSite(
+                    "synapse.access.metrics",
+                    config,
                     metrics_resource,
-                    logPath=config.access_log_file,
-                    logFormatter=log_formatter,
                 ),
                 interface="127.0.0.1",
             )
@@ -482,6 +478,24 @@ class SynapseService(service.Service):
 
     def stopService(self):
         return self._port.stopListening()
+
+
+class SynapseSite(Site):
+    """
+    Subclass of a twisted http Site that does access logging with python's
+    standard logging
+    """
+    def __init__(self, logger_name, config, resource, *args, **kwargs):
+        Site.__init__(self, resource, *args, **kwargs)
+        if config.captcha_ip_origin_is_x_forwarded:
+            self._log_formatter = proxiedLogFormatter
+        else:
+            self._log_formatter = combinedLogFormatter
+        self.access_logger = logging.getLogger(logger_name)
+
+    def log(self, request):
+        line = self._log_formatter(self._logDateTime, request)
+        self.access_logger.info(line)
 
 
 def run(hs):

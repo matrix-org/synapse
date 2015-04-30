@@ -83,6 +83,17 @@ class LoggingConfig(Config):
             handler.addFilter(LoggingContextFilter(request=""))
 
             logger.addHandler(handler)
+
+            if self.access_log_file:
+                access_logger = logging.getLogger('synapse.access')
+                # we log to both files by default
+                access_logger.propagate = 1
+                access_log_handler = logging.handlers.RotatingFileHandler(
+                    self.access_log_file, maxBytes=(1000 * 1000 * 100), backupCount=3
+                )
+                access_log_formatter = logging.Formatter('%(message)s')
+                access_log_handler.setFormatter(access_log_formatter)
+                access_logger.addHandler(access_log_handler)
         else:
             with open(self.log_config, 'r') as f:
                 logging.config.dictConfig(yaml.load(f))
