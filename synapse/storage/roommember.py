@@ -154,7 +154,9 @@ class RoomMemberStore(SQLBaseStore):
             "SELECT m.room_id, m.sender, m.membership"
             " FROM room_memberships as m"
             " INNER JOIN current_state_events as c"
-            " ON m.event_id = c.event_id"
+            " ON m.event_id = c.event_id "
+            " AND m.room_id = c.room_id "
+            " AND m.user_id = c.state_key"
             " WHERE %s"
         ) % (where_clause,)
 
@@ -212,7 +214,9 @@ class RoomMemberStore(SQLBaseStore):
         sql = (
             "SELECT m.* FROM room_memberships as m"
             " INNER JOIN current_state_events as c"
-            " ON m.event_id = c.event_id AND m.room_id = c.room_id "
+            " ON m.event_id = c.event_id "
+            " AND m.room_id = c.room_id "
+            " AND m.user_id = c.state_key"
             " WHERE %(where)s"
         ) % {
             "where": where_clause,
