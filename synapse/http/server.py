@@ -24,7 +24,7 @@ from syutil.jsonutil import (
     encode_canonical_json, encode_pretty_printed_json
 )
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from twisted.web import server, resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.util import redirectTo
