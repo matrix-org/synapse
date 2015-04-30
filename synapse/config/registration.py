@@ -26,6 +26,11 @@ class RegistrationConfig(Config):
         self.disable_registration = not bool(
             distutils.util.strtobool(str(config["enable_registration"]))
         )
+        if "disable_registration" in config:
+            self.disable_registration = bool(
+                distutils.util.strtobool(str(config["disable_registration"]))
+            )
+
         self.registration_shared_secret = config.get("registration_shared_secret")
 
     def default_config(self, config_dir, server_name):
