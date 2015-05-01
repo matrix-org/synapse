@@ -112,10 +112,15 @@ class RegistrationStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def user_delete_access_tokens_apart_from(self, user_id, token_id):
-        yield self._execute(
-            "delete_access_tokens_apart_from", None,
+        yield self.runInteraction(
+            "user_delete_access_tokens_apart_from",
+            self._user_delete_access_tokens_apart_from, user_id, token_id
+        )
+
+    def _user_delete_access_tokens_apart_from(self, txn, user_id, token_id):
+        txn.execute(
             "DELETE FROM access_tokens WHERE user_id = ? AND id != ?",
-            user_id, token_id
+            (user_id, token_id)
         )
 
     @defer.inlineCallbacks
