@@ -27,6 +27,7 @@ class ServerConfig(Config):
         self.pid_file = self.abspath(config.get("pid_file"))
         self.web_client = config["web_client"]
         self.soft_file_limit = config["soft_file_limit"]
+        self.daemonize = config.get("daemonize")
 
         # Attempt to guess the content_addr for the v0 content repostitory
         content_addr = config.get("content_addr")
@@ -89,11 +90,13 @@ class ServerConfig(Config):
     def read_arguments(self, args):
         if args.manhole is not None:
             self.manhole = args.manhole
-        self.daemonize = args.daemonize
+        if args.daemonize is not None:
+            self.daemonize = args.daemonize
 
     def add_arguments(self, parser):
         server_group = parser.add_argument_group("server")
         server_group.add_argument("-D", "--daemonize", action='store_true',
+                                  default=None,
                                   help="Daemonize the home server")
         server_group.add_argument("--manhole", metavar="PORT", dest="manhole",
                                   type=int,
