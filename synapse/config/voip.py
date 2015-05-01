@@ -17,28 +17,21 @@ from ._base import Config
 
 class VoipConfig(Config):
 
-    def __init__(self, args):
-        super(VoipConfig, self).__init__(args)
-        self.turn_uris = args.turn_uris
-        self.turn_shared_secret = args.turn_shared_secret
-        self.turn_user_lifetime = args.turn_user_lifetime
+    def read_config(self, config):
+        self.turn_uris = config.get("turn_uris", [])
+        self.turn_shared_secret = config["turn_shared_secret"]
+        self.turn_user_lifetime = self.parse_duration(config["turn_user_lifetime"])
 
-    @classmethod
-    def add_arguments(cls, parser):
-        super(VoipConfig, cls).add_arguments(parser)
-        group = parser.add_argument_group("voip")
-        group.add_argument(
-            "--turn-uris", type=str, default=None, action='append',
-            help="The public URIs of the TURN server to give to clients"
-        )
-        group.add_argument(
-            "--turn-shared-secret", type=str, default=None,
-            help=(
-                "The shared secret used to compute passwords for the TURN"
-                " server"
-            )
-        )
-        group.add_argument(
-            "--turn-user-lifetime", type=int, default=(1000 * 60 * 60),
-            help="How long generated TURN credentials last, in ms"
-        )
+    def default_config(self, config_dir_path, server_name):
+        return """\
+        ## Turn ##
+
+        # The public URIs of the TURN server to give to clients
+        turn_uris: []
+
+        # The shared secret used to compute passwords for the TURN server
+        turn_shared_secret: "YOUR_SHARED_SECRET"
+
+        # How long generated TURN credentials last
+        turn_user_lifetime: "1h"
+        """

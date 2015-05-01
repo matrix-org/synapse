@@ -17,20 +17,17 @@ from ._base import Config
 
 
 class MetricsConfig(Config):
-    def __init__(self, args):
-        super(MetricsConfig, self).__init__(args)
-        self.enable_metrics = args.enable_metrics
-        self.metrics_port = args.metrics_port
+    def read_config(self, config):
+        self.enable_metrics = config["enable_metrics"]
+        self.metrics_port = config.get("metrics_port")
 
-    @classmethod
-    def add_arguments(cls, parser):
-        super(MetricsConfig, cls).add_arguments(parser)
-        metrics_group = parser.add_argument_group("metrics")
-        metrics_group.add_argument(
-            '--enable-metrics', dest="enable_metrics", action="store_true",
-            help="Enable collection and rendering of performance metrics"
-        )
-        metrics_group.add_argument(
-            '--metrics-port', metavar="PORT", type=int,
-            help="Separate port to accept metrics requests on (on localhost)"
-        )
+    def default_config(self, config_dir_path, server_name):
+        return """\
+        ## Metrics ###
+
+        # Enable collection and rendering of performance metrics
+        enable_metrics: False
+
+        # Separate port to accept metrics requests on (on localhost)
+        # metrics_port: 8081
+        """

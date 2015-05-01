@@ -17,42 +17,35 @@ from ._base import Config
 
 class CaptchaConfig(Config):
 
-    def __init__(self, args):
-        super(CaptchaConfig, self).__init__(args)
-        self.recaptcha_private_key = args.recaptcha_private_key
-        self.recaptcha_public_key = args.recaptcha_public_key
-        self.enable_registration_captcha = args.enable_registration_captcha
-
+    def read_config(self, config):
+        self.recaptcha_private_key = config["recaptcha_private_key"]
+        self.recaptcha_public_key = config["recaptcha_public_key"]
+        self.enable_registration_captcha = config["enable_registration_captcha"]
         # XXX: This is used for more than just captcha
         self.captcha_ip_origin_is_x_forwarded = (
-            args.captcha_ip_origin_is_x_forwarded
+            config["captcha_ip_origin_is_x_forwarded"]
         )
-        self.captcha_bypass_secret = args.captcha_bypass_secret
+        self.captcha_bypass_secret = config.get("captcha_bypass_secret")
 
-    @classmethod
-    def add_arguments(cls, parser):
-        super(CaptchaConfig, cls).add_arguments(parser)
-        group = parser.add_argument_group("recaptcha")
-        group.add_argument(
-            "--recaptcha-public-key", type=str, default="YOUR_PUBLIC_KEY",
-            help="This Home Server's ReCAPTCHA public key."
-        )
-        group.add_argument(
-            "--recaptcha-private-key", type=str, default="YOUR_PRIVATE_KEY",
-            help="This Home Server's ReCAPTCHA private key."
-        )
-        group.add_argument(
-            "--enable-registration-captcha", type=bool, default=False,
-            help="Enables ReCaptcha checks when registering, preventing signup"
-            + " unless a captcha is answered. Requires a valid ReCaptcha "
-            + "public/private key."
-        )
-        group.add_argument(
-            "--captcha_ip_origin_is_x_forwarded", type=bool, default=False,
-            help="When checking captchas, use the X-Forwarded-For (XFF) header"
-            + " as the client IP and not the actual client IP."
-        )
-        group.add_argument(
-            "--captcha_bypass_secret", type=str,
-            help="A secret key used to bypass the captcha test entirely."
-        )
+    def default_config(self, config_dir_path, server_name):
+        return """\
+        ## Captcha ##
+
+        # This Home Server's ReCAPTCHA public key.
+        recaptcha_private_key: "YOUR_PUBLIC_KEY"
+
+        # This Home Server's ReCAPTCHA private key.
+        recaptcha_public_key: "YOUR_PRIVATE_KEY"
+
+        # Enables ReCaptcha checks when registering, preventing signup
+        # unless a captcha is answered. Requires a valid ReCaptcha
+        # public/private key.
+        enable_registration_captcha: False
+
+        # When checking captchas, use the X-Forwarded-For (XFF) header
+        # as the client IP and not the actual client IP.
+        captcha_ip_origin_is_x_forwarded: False
+
+        # A secret key used to bypass the captcha test entirely.
+        #captcha_bypass_secret: "YOUR_SECRET_HERE"
+        """

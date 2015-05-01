@@ -17,45 +17,44 @@ from ._base import Config
 
 from synapse.util.stringutils import random_string_with_symbols
 
-import distutils.util
+from distutils.util import strtobool
 
 
 class RegistrationConfig(Config):
 
-    def __init__(self, args):
-        super(RegistrationConfig, self).__init__(args)
-
-        # `args.enable_registration` may either be a bool or a string depending
-        # on if the option was given a value (e.g. --enable-registration=true
-        # would set `args.enable_registration` to "true" not True.)
+    def read_config(self, config):
         self.disable_registration = not bool(
-            distutils.util.strtobool(str(args.enable_registration))
+            strtobool(str(config["enable_registration"]))
         )
-        self.registration_shared_secret = args.registration_shared_secret
+        if "disable_registration" in config:
+            self.disable_registration = bool(
+                strtobool(str(config["disable_registration"]))
+            )
 
-    @classmethod
-    def add_arguments(cls, parser):
-        super(RegistrationConfig, cls).add_arguments(parser)
+        self.registration_shared_secret = config.get("registration_shared_secret")
+
+    def default_config(self, config_dir, server_name):
+        registration_shared_secret = random_string_with_symbols(50)
+        return """\
+        ## Registration ##
+
+        # Enable registration for new users.
+        enable_registration: True
+
+        # If set, allows registration by anyone who also has the shared
+        # secret, even if registration is otherwise disabled.
+        registration_shared_secret: "%(registration_shared_secret)s"
+        """ % locals()
+
+    def add_arguments(self, parser):
         reg_group = parser.add_argument_group("registration")
-
         reg_group.add_argument(
-            "--enable-registration",
-            const=True,
-            default=False,
-            nargs='?',
-            help="Enable registration for new users.",
-        )
-        reg_group.add_argument(
-            "--registration-shared-secret", type=str,
-            help="If set, allows registration by anyone who also has the shared"
-                 " secret, even if registration is otherwise disabled.",
+            "--enable-registration", action="store_true", default=None,
+            help="Enable registration for new users."
         )
 
-    @classmethod
-    def generate_config(cls, args, config_dir_path):
-        super(RegistrationConfig, cls).generate_config(args, config_dir_path)
-        if args.enable_registration is None:
-            args.enable_registration = False
-
-        if args.registration_shared_secret is None:
-            args.registration_shared_secret = random_string_with_symbols(50)
+    def read_arguments(self, args):
+        if args.enable_registration is not None:
+            self.disable_registration = not bool(
+                strtobool(str(args.enable_registration))
+            )

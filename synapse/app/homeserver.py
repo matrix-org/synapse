@@ -409,7 +409,6 @@ def setup(config_options):
         config.server_name,
         domain_with_port=domain_with_port,
         upload_dir=os.path.abspath("uploads"),
-        db_name=config.database_path,
         db_config=config.database_config,
         tls_context_factory=tls_context_factory,
         config=config,
@@ -422,9 +421,7 @@ def setup(config_options):
         redirect_root_to_web_client=True,
     )
 
-    db_name = hs.get_db_name()
-
-    logger.info("Preparing database: %s...", db_name)
+    logger.info("Preparing database: %r...", config.database_config)
 
     try:
         db_conn = database_engine.module.connect(
@@ -446,7 +443,7 @@ def setup(config_options):
         )
         sys.exit(1)
 
-    logger.info("Database prepared in %s.", db_name)
+    logger.info("Database prepared in %r.", config.database_config)
 
     if config.manhole:
         f = twisted.manhole.telnet.ShellFactory()

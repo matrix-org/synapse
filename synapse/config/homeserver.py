@@ -36,4 +36,6 @@ class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
 
 if __name__ == '__main__':
     import sys
-    HomeServerConfig.load_config("Generate config", sys.argv[1:], "HomeServer")
+    sys.stdout.write(
+        HomeServerConfig().generate_config(sys.argv[1], sys.argv[2])[0]
+    )

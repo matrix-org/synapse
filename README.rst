@@ -318,7 +318,7 @@ ArchLinux
 If running `$ synctl start` fails with 'returned non-zero exit status 1',
 you will need to explicitly call Python2.7 - either running as::
 
-    $ python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml --pid-file homeserver.pid
+    $ python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml
     
 ...or by editing synctl with the correct python executable.
 
@@ -409,7 +409,6 @@ SRV record, as that is the name other machines will expect it to have::
 
     $ python -m synapse.app.homeserver \
         --server-name YOURDOMAIN \
-        --bind-port 8448 \
         --config-path homeserver.yaml \
         --generate-config
     $ python -m synapse.app.homeserver --config-path homeserver.yaml
