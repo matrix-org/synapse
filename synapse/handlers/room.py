@@ -529,11 +529,19 @@ class RoomListHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_public_room_list(self):
         chunk = yield self.store.get_rooms(is_public=True)
-        for room in chunk:
-            joined_users = yield self.store.get_users_in_room(
-                room_id=room["room_id"],
-            )
-            room["num_joined_members"] = len(joined_users)
+        results = yield defer.gatherResults(
+            [
+                self.store.get_users_in_room(
+                    room_id=room["room_id"],
+                )
+                for room in chunk
+            ],
+            consumeErrors=True,
+        )
+
+        for i, room in enumerate(chunk):
+            room["num_joined_members"] = len(len(results[i]))
+
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
 
