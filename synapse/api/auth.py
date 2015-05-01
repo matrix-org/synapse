@@ -66,7 +66,7 @@ class Auth(object):
 
             logger.debug(
                 "Auth events: %s",
-                [a.event_id for a in auth_events]
+                [a.event_id for a in auth_events.values()]
             )
 
             if event.type == EventTypes.Member:
