@@ -104,6 +104,8 @@ class DataStore(RoomMemberStore, RoomStore,
 
         self.client_ip_last_seen.prefill(*key + (now,))
 
+        # It's safe not to lock here: a) no unique constraint,
+        # b) LAST_SEEN_GRANULARITY makes concurrent updates incredibly unlikely
         yield self._simple_upsert(
             "user_ips",
             keyvalues={
@@ -117,6 +119,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 "last_seen": now,
             },
             desc="insert_client_ip",
+            lock=False,
         )
 
     def get_user_ip_and_agents(self, user):

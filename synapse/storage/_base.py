@@ -452,7 +452,7 @@ class SQLBaseStore(object):
         txn.execute(sql, values.values())
 
     def _simple_upsert(self, table, keyvalues, values,
-                       insertion_values={}, desc="_simple_upsert"):
+                       insertion_values={}, desc="_simple_upsert", lock=True):
         """
         Args:
             table (str): The table to upsert into
@@ -464,11 +464,14 @@ class SQLBaseStore(object):
         return self.runInteraction(
             desc,
             self._simple_upsert_txn, table, keyvalues, values, insertion_values,
+            lock
         )
 
-    def _simple_upsert_txn(self, txn, table, keyvalues, values, insertion_values={}):
-        # We need to lock the table :(
-        self.database_engine.lock_table(txn, table)
+    def _simple_upsert_txn(self, txn, table, keyvalues, values, insertion_values={},
+                           lock=True):
+        # We need to lock the table :(, unless we're *really* careful
+        if lock:
+            self.database_engine.lock_table(txn, table)
 
         # Try to update
         sql = "UPDATE %s SET %s WHERE %s" % (
