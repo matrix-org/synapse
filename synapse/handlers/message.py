@@ -250,10 +250,18 @@ class MessageHandler(BaseHandler):
             is joined on, may return a "messages" key with messages, depending
             on the specified PaginationConfig.
         """
+        start_time = self.clock.time_msec()
+
+        def delta():
+            return self.clock.time_msec() - start_time
+
+        logger.info("initial_sync: start")
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
             user_id=user_id,
             membership_list=[Membership.INVITE, Membership.JOIN]
         )
+
+        logger.info("initial_sync: got_rooms %d", delta())
 
         user = UserID.from_string(user_id)
 
@@ -261,13 +269,19 @@ class MessageHandler(BaseHandler):
 
         now_token = yield self.hs.get_event_sources().get_current_token()
 
+        logger.info("initial_sync: now_token %d", delta())
+
         presence_stream = self.hs.get_event_sources().sources["presence"]
         pagination_config = PaginationConfig(from_token=now_token)
         presence, _ = yield presence_stream.get_pagination_rows(
             user, pagination_config.get_source_config("presence"), None
         )
 
+        logger.info("initial_sync: presence_done %d", delta())
+
         public_room_ids = yield self.store.get_public_room_ids()
+
+        logger.info("initial_sync: public_rooms %d", delta())
 
         limit = pagin_config.limit
         if limit is None:
@@ -275,6 +289,8 @@ class MessageHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def handle_room(event):
+            logger.info("initial_sync: start: %s %d", event.room_id, delta())
+
             d = {
                 "room_id": event.room_id,
                 "membership": event.membership,
@@ -325,10 +341,14 @@ class MessageHandler(BaseHandler):
             except:
                 logger.exception("Failed to get snapshot")
 
+            logger.info("initial_sync: end: %s %d", event.room_id, delta())
+
         yield defer.gatherResults(
             [handle_room(e) for e in room_list],
             consumeErrors=True
         )
+
+        logger.info("initial_sync: done", delta())
 
         ret = {
             "rooms": rooms_ret,
