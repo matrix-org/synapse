@@ -540,7 +540,7 @@ class RoomListHandler(BaseHandler):
         )
 
         for i, room in enumerate(chunk):
-            room["num_joined_members"] = len(len(results[i]))
+            room["num_joined_members"] = len(results[i])
 
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
