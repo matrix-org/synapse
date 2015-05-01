@@ -96,11 +96,22 @@ class EventFederationStore(SQLBaseStore):
             room_id,
         )
 
+    def get_latest_event_ids_in_room(self, room_id):
+        return self._simple_select_onecol(
+            table="event_forward_extremities",
+            keyvalues={
+                "room_id": room_id,
+            },
+            retcol="event_id",
+            desc="get_latest_events_in_room",
+        )
+
     def _get_latest_events_in_room(self, txn, room_id):
         sql = (
             "SELECT e.event_id, e.depth FROM events as e "
             "INNER JOIN event_forward_extremities as f "
             "ON e.event_id = f.event_id "
+            "AND e.room_id = f.room_id "
             "WHERE f.room_id = ?"
         )
 
