@@ -159,26 +159,37 @@ class Config(object):
                 print "Most specify a server_name to a generate config for."
                 sys.exit(1)
             (config_path,) = config_args.config_path
-            if os.path.exists(config_path):
-                print "Config file %r already exists. Not overwriting" % (
-                    config_args.config_path
-                )
-                sys.exit(1)
             if not os.path.exists(config_dir_path):
                 os.makedirs(config_dir_path)
+            if os.path.exists(config_path):
+                print "Config file %r already exists" % (config_path,)
+                yaml_config = cls.read_config_file(config_path)
+                yaml_name = yaml_config["server_name"]
+                if server_name != yaml_name:
+                    print (
+                        "Config file %r has a different server_name: "
+                        " %r != %r" % (config_path, server_name, yaml_name)
+                    )
+                    sys.exit(1)
+                config_bytes, config = obj.generate_config(
+                    config_dir_path, server_name
+                )
+                config.update(yaml_config)
+                print "Generating any missing keys for %r" % (server_name,)
+                obj.invoke_all("generate_files", config)
+                sys.exit(0)
             with open(config_path, "wb") as config_file:
-
                 config_bytes, config = obj.generate_config(
                     config_dir_path, server_name
                 )
                 obj.invoke_all("generate_files", config)
                 config_file.write(config_bytes)
-            print (
-                "A config file has been generated in %s for server name"
-                " '%s' with corresponding SSL keys and self-signed"
-                " certificates. Please review this file and customise it to"
-                " your needs."
-            ) % (config_path, server_name)
+                print (
+                    "A config file has been generated in %s for server name"
+                    " '%s' with corresponding SSL keys and self-signed"
+                    " certificates. Please review this file and customise it to"
+                    " your needs."
+                ) % (config_path, server_name)
             print (
                 "If this server name is incorrect, you will need to regenerate"
                 " the SSL certificates"

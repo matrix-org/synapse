@@ -49,7 +49,7 @@ class RegistrationConfig(Config):
     def add_arguments(self, parser):
         reg_group = parser.add_argument_group("registration")
         reg_group.add_argument(
-            "--enable-registration", action="store_true",
+            "--enable-registration", action="store_true", default=None,
             help="Enable registration for new users."
         )
 

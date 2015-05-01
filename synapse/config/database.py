@@ -56,6 +56,7 @@ class DatabaseConfig(Config):
           args:
             # Path to the database
             database: "%(database_path)s"
+
         # Number of events to cache in memory.
         event_cache_size: "10K"
         """ % locals()
@@ -68,7 +69,7 @@ class DatabaseConfig(Config):
             database_path = self.abspath(database_path)
         if self.database_config.get("name", None) == "sqlite3":
             if database_path is not None:
-                self.database_config["database"] = database_path
+                self.database_config["args"]["database"] = database_path
 
     def add_arguments(self, parser):
         db_group = parser.add_argument_group("database")
