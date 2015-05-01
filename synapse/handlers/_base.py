@@ -150,8 +150,6 @@ class BaseHandler(object):
 
         notify_d.addErrback(log_failure)
 
-        fed_d = federation_handler.handle_new_event(
+        federation_handler.handle_new_event(
             event, destinations=destinations,
         )
-
-        fed_d.addErrback(log_failure)

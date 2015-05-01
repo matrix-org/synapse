@@ -87,7 +87,7 @@ class FederationHandler(BaseHandler):
             processing.
         """
 
-        self.replication_layer.send_pdu(event, destinations)
+        return self.replication_layer.send_pdu(event, destinations)
 
     @log_function
     @defer.inlineCallbacks
