@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, cached
 from syutil.base64util import encode_base64
 
 import logging
@@ -96,6 +96,7 @@ class EventFederationStore(SQLBaseStore):
             room_id,
         )
 
+    @cached()
     def get_latest_event_ids_in_room(self, room_id):
         return self._simple_select_onecol(
             table="event_forward_extremities",
@@ -328,6 +329,8 @@ class EventFederationStore(SQLBaseStore):
                 ")"
             )
             txn.execute(query)
+
+            self.get_latest_event_ids_in_room.invalidate(room_id)
 
     def get_backfill_events(self, room_id, event_list, limit):
         """Get a list of Events for a given topic that occurred before (and
