@@ -159,7 +159,7 @@ class AuthHandler(BaseHandler):
             logger.warn("Attempted to login as %s but they do not exist", user)
             raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
-        stored_hash = user_info[0]["password_hash"]
+        stored_hash = user_info["password_hash"]
         if bcrypt.checkpw(password, stored_hash):
             defer.returnValue(user)
         else:
