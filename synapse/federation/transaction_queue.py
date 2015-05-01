@@ -104,7 +104,6 @@ class TransactionQueue(object):
             return not destination.startswith("localhost")
 
     @defer.inlineCallbacks
-    @log_function
     def enqueue_pdu(self, pdu, destinations, order):
         # We loop through all destinations to see whether we already have
         # a transaction in progress. If we do, stick it in the pending_pdus
