@@ -65,12 +65,12 @@ class PasswordRestServlet(RestServlet):
             if 'medium' not in threepid or 'address' not in threepid:
                 raise SynapseError(500, "Malformed threepid")
             # if using email, we must know about the email they're authing with!
-            threepid_user = yield self.hs.get_datastore().get_user_by_threepid(
+            threepid_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
                 threepid['medium'], threepid['address']
             )
-            if not threepid_user:
+            if not threepid_user_id:
                 raise SynapseError(404, "Email address not found", Codes.NOT_FOUND)
-            user_id = threepid_user
+            user_id = threepid_user_id
         else:
             logger.error("Auth succeeded but no known type!", result.keys())
             raise SynapseError(500, "", Codes.UNKNOWN)

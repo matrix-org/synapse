@@ -202,15 +202,15 @@ class RegistrationStore(SQLBaseStore):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def get_user_by_threepid(self, medium, address):
+    def get_user_id_by_threepid(self, medium, address):
         ret = yield self._simple_select_one(
             "user_threepids",
             {
                 "medium": medium,
                 "address": address
             },
-            ['user'], True, 'get_user_by_threepid'
+            ['user_id'], True, 'get_user_id_by_threepid'
         )
         if ret:
-            defer.returnValue(ret['user'])
+            defer.returnValue(ret['user_id'])
         defer.returnValue(None)
