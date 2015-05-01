@@ -112,14 +112,14 @@ class RegistrationStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def user_delete_access_tokens_apart_from(self, user_id, token_id):
-        rows = yield self.get_user_by_id(user_id)
-        if len(rows) == 0:
+        user = yield self.get_user_by_id(user_id)
+        if not user:
             raise Exception("No such user!")
 
         yield self._execute(
             "delete_access_tokens_apart_from", None,
             "DELETE FROM access_tokens WHERE user_id = ? AND id != ?",
-            rows[0]['id'], token_id
+            user['id'], token_id
         )
 
     @defer.inlineCallbacks
