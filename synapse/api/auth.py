@@ -65,7 +65,10 @@ class Auth(object):
             if event.type == EventTypes.Aliases:
                 return True
 
-            logger.debug("Auth events: %s", auth_events)
+            logger.debug(
+                "Auth events: %s",
+                [a.event_id for a in auth_events]
+            )
 
             if event.type == EventTypes.Member:
                 allowed = self.is_membership_change_allowed(
