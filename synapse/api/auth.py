@@ -20,7 +20,6 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.util.logutils import log_function
-from synapse.util.async import run_on_reactor
 from synapse.types import UserID, ClientInfo
 
 import logging
@@ -427,8 +426,6 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def add_auth_events(self, builder, context):
-        yield run_on_reactor()
-
         auth_ids = self.compute_auth_events(builder, context.current_state)
 
         auth_events_entries = yield self.store.add_event_hashes(

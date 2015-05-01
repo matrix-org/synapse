@@ -89,8 +89,6 @@ class FederationHandler(BaseHandler):
             processing.
         """
 
-        yield run_on_reactor()
-
         self.replication_layer.send_pdu(event, destinations)
 
     @log_function

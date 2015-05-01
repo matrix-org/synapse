@@ -17,7 +17,6 @@ from twisted.internet import defer
 
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
-from synapse.util.async import run_on_reactor
 from synapse.types import StreamToken
 import synapse.metrics
 
@@ -162,8 +161,6 @@ class Notifier(object):
         listening to the room, and any listeners for the users in the
         `extra_users` param.
         """
-        yield run_on_reactor()
-
         # poke any interested application service.
         self.hs.get_handlers().appservice_handler.notify_interested_services(
             event
@@ -240,8 +237,6 @@ class Notifier(object):
 
         Will wake up all listeners for the given users and rooms.
         """
-        yield run_on_reactor()
-
         # TODO(paul): This is horrible, having to manually list every event
         # source here individually
         presence_source = self.event_sources.sources["presence"]
