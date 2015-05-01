@@ -360,7 +360,7 @@ class Auth(object):
                 default=[""]
             )[0]
             if user and access_token and ip_addr:
-                yield self.store.insert_client_ip(
+                self.store.insert_client_ip(
                     user=user,
                     access_token=access_token,
                     device_id=user_info["device_id"],
