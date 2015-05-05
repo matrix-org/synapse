@@ -167,10 +167,6 @@ class LoggingTransaction(object):
         sql = self.database_engine.convert_param_style(sql)
 
         if args and args[0]:
-            args = list(args)
-            args[0] = [
-                self.database_engine.encode_parameter(a) for a in args[0]
-            ]
             try:
                 sql_logger.debug(
                     "[SQL values] {%s} " + ", ".join(("<%r>",) * len(args[0])),

@@ -26,9 +26,6 @@ class Sqlite3Engine(object):
     def convert_param_style(self, sql):
         return sql
 
-    def encode_parameter(self, param):
-        return param
-
     def on_new_connection(self, db_conn):
         self.prepare_database(db_conn)
 

@@ -36,9 +36,6 @@ class PostgresEngine(object):
     def convert_param_style(self, sql):
         return sql.replace("?", "%s")
 
-    def encode_parameter(self, param):
-        return param
-
     def on_new_connection(self, db_conn):
         db_conn.set_isolation_level(
             self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
