@@ -264,16 +264,16 @@ class EventFederationStore(SQLBaseStore):
         """
         self._simple_insert_many_txn(
             txn,
-                table="event_edges",
-                values=[
-                    {
-                        "event_id": event_id,
-                        "prev_event_id": e_id,
-                        "room_id": room_id,
-                        "is_state": False,
-                    }
-                    for e_id, _ in prev_events
-                ],
+            table="event_edges",
+            values=[
+                {
+                    "event_id": event_id,
+                    "prev_event_id": e_id,
+                    "room_id": room_id,
+                    "is_state": False,
+                }
+                for e_id, _ in prev_events
+            ],
         )
 
         # Update the extremities table if this is not an outlier.
