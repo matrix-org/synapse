@@ -241,7 +241,7 @@ class EventFederationStore(SQLBaseStore):
 
         return int(min_depth) if min_depth is not None else None
 
-    def _update_min_depth_for_room_txn(self, txn, room_id, depth):
+    def _update_min_depth_for_room_txn(self, txn, invalidates, room_id, depth):
         min_depth = self._get_min_depth_interaction(txn, room_id)
 
         do_insert = depth < min_depth if min_depth else True
@@ -256,8 +256,8 @@ class EventFederationStore(SQLBaseStore):
                 },
             )
 
-    def _handle_prev_events(self, txn, outlier, event_id, prev_events,
-                            room_id):
+    def _handle_prev_events(self, txn, invalidates, outlier, event_id,
+                            prev_events, room_id):
         """
         For the given event, update the event edges table and forward and
         backward extremities tables.
@@ -330,7 +330,9 @@ class EventFederationStore(SQLBaseStore):
             )
             txn.execute(query)
 
-            self.get_latest_event_ids_in_room.invalidate(room_id)
+            invalidates.append((
+                self.get_latest_event_ids_in_room.invalidate, room_id
+            ))
 
     def get_backfill_events(self, room_id, event_list, limit):
         """Get a list of Events for a given topic that occurred before (and

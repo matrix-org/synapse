@@ -82,7 +82,7 @@ class StateStore(SQLBaseStore):
             f,
         )
 
-    def _store_state_groups_txn(self, txn, event, context):
+    def _store_state_groups_txn(self, txn, invalidates, event, context):
         if context.current_state is None:
             return
 
