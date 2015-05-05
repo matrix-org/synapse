@@ -33,6 +33,7 @@ import sys
 import time
 import threading
 
+DEBUG_CACHES = False
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,17 @@ def cached(max_entries=1000, num_args=1, lru=False):
         @defer.inlineCallbacks
         def wrapped(self, *keyargs):
             try:
-                defer.returnValue(cache.get(*keyargs))
+                cached_result = cache.get(*keyargs)
+                if DEBUG_CACHES:
+                    actual_result = yield orig(self, *keyargs)
+                    if actual_result != cached_result:
+                        logger.error(
+                            "Stale cache entry %s%r: cached: %r, actual %r",
+                            orig.__name__, keyargs,
+                            cached_result, actual_result,
+                        )
+                        raise ValueError("Stale cache entry")
+                defer.returnValue(cached_result)
             except KeyError:
                 sequence = cache.sequence
 
