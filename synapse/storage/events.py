@@ -202,7 +202,7 @@ class EventsStore(SQLBaseStore):
                     sql,
                     (False, event.event_id,)
                 )
-            return
+            return invalidates
 
         self._handle_prev_events(
             txn,
