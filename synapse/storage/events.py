@@ -113,17 +113,19 @@ class EventsStore(SQLBaseStore):
                 keyvalues={"room_id": event.room_id},
             )
 
-            for s in current_state:
-                self._simple_insert_txn(
-                    txn,
-                    "current_state_events",
+            self._simple_insert_many_txn(
+                txn,
+                "current_state_events",
+                [
                     {
                         "event_id": s.event_id,
                         "room_id": s.room_id,
                         "type": s.type,
                         "state_key": s.state_key,
-                    },
-                )
+                    }
+                    for s in current_state
+                ],
+            )
 
         if event.is_state() and is_new_state:
             if not backfilled and not context.rejected:
@@ -296,16 +298,18 @@ class EventsStore(SQLBaseStore):
                     txn, event.event_id, prev_event_id, alg, hash_bytes
                 )
 
-        for auth_id, _ in event.auth_events:
-            self._simple_insert_txn(
-                txn,
-                table="event_auth",
-                values={
+        self._simple_insert_many_txn(
+            txn,
+            table="event_auth",
+            values=[
+                {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "auth_id": auth_id,
-                },
-            )
+                }
+                for auth_id, _ in event.auth_events
+            ],
+        )
 
         (ref_alg, ref_hash_bytes) = compute_event_reference_hash(event)
         self._store_event_reference_hash_txn(
@@ -330,17 +334,19 @@ class EventsStore(SQLBaseStore):
                 vals,
             )
 
-            for e_id, h in event.prev_state:
-                self._simple_insert_txn(
-                    txn,
-                    table="event_edges",
-                    values={
+            self._simple_insert_many_txn(
+                txn,
+                table="event_edges",
+                values=[
+                    {
                         "event_id": event.event_id,
                         "prev_event_id": e_id,
                         "room_id": event.room_id,
                         "is_state": True,
-                    },
-                )
+                    }
+                    for e_id, h in event.prev_state
+                ],
+            )
 
             if is_new_state and not context.rejected:
                 self._simple_upsert_txn(

@@ -104,18 +104,20 @@ class StateStore(SQLBaseStore):
                 },
             )
 
-            for state in state_events.values():
-                self._simple_insert_txn(
-                    txn,
-                    table="state_groups_state",
-                    values={
+            self._simple_insert_many_txn(
+                txn,
+                table="state_groups_state",
+                values=[
+                    {
                         "state_group": state_group,
                         "room_id": state.room_id,
                         "type": state.type,
                         "state_key": state.state_key,
                         "event_id": state.event_id,
-                    },
-                )
+                    }
+                    for state in state_events.values()
+                ],
+            )
 
         self._simple_insert_txn(
             txn,
