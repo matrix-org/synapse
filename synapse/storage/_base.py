@@ -98,6 +98,8 @@ class Cache(object):
     def update(self, sequence, *args):
         self.check_thread()
         if self.sequence == sequence:
+            # Only update the cache if the caches sequence number matches the
+            # number that the cache had before the SELECT was started (SYN-369)
             self.prefill(*args)
 
     def prefill(self, *args):  # because I can't  *keyargs, value
@@ -117,6 +119,8 @@ class Cache(object):
         self.check_thread()
         if len(keyargs) != self.keylen:
             raise ValueError("Expected a key to have %d items", self.keylen)
+        # Increment the sequence number so that any SELECT statements that
+        # raced with the INSERT don't update the cache (SYN-369)
         self.sequence += 1
         self.cache.pop(keyargs, None)
 
@@ -159,6 +163,9 @@ def cached(max_entries=1000, num_args=1, lru=False):
                         raise ValueError("Stale cache entry")
                 defer.returnValue(cached_result)
             except KeyError:
+                # Get the sequence number of the cache before reading from the
+                # database so that we can tell if the cache is invalidated
+                # while the SELECT is executing (SYN-369)
                 sequence = cache.sequence
 
                 ret = yield orig(self, *keyargs)
