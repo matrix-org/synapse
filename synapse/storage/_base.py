@@ -453,6 +453,14 @@ class SQLBaseStore(object):
         if not values:
             return
 
+        # This is a *slight* abomination to get a list of tuples of key names
+        # and a list of tuples of value names.
+        #
+        # i.e. [{"a": 1, "b": 2}, {"c": 3, "d": 4}]
+        #         => [("a", "b",), ("c", "d",)] and [(1, 2,), (3, 4,)]
+        #
+        # The sort is to ensure that we don't rely on dictionary iteration
+        # order.
         keys, vals = zip(*[
             zip(
                 *(sorted(i.items(), key=lambda kv: kv[0]))
