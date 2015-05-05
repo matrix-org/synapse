@@ -93,7 +93,7 @@ class EventsStore(SQLBaseStore):
                            current_state=None):
 
         # Remove the any existing cache entries for the event_id
-        self._invalidate_get_event_cache(event.event_id)
+        txn.call_after(self._invalidate_get_event_cache, event.event_id)
 
         if stream_ordering is None:
             with self._stream_id_gen.get_next_txn(txn) as stream_ordering:
@@ -114,6 +114,13 @@ class EventsStore(SQLBaseStore):
             )
 
             for s in current_state:
+                if s.type == EventTypes.Member:
+                    txn.call_after(
+                        self.get_rooms_for_user.invalidate, s.state_key
+                    )
+                    txn.call_after(
+                        self.get_joined_hosts_for_room.invalidate, s.room_id
+                    )
                 self._simple_insert_txn(
                     txn,
                     "current_state_events",
@@ -281,7 +288,9 @@ class EventsStore(SQLBaseStore):
         )
 
         if context.rejected:
-            self._store_rejections_txn(txn, event.event_id, context.rejected)
+            self._store_rejections_txn(
+                txn, event.event_id, context.rejected
+            )
 
         for hash_alg, hash_base64 in event.hashes.items():
             hash_bytes = decode_base64(hash_base64)
@@ -293,7 +302,8 @@ class EventsStore(SQLBaseStore):
             for alg, hash_base64 in prev_hashes.items():
                 hash_bytes = decode_base64(hash_base64)
                 self._store_prev_event_hash_txn(
-                    txn, event.event_id, prev_event_id, alg, hash_bytes
+                    txn, event.event_id, prev_event_id, alg,
+                    hash_bytes
                 )
 
         for auth_id, _ in event.auth_events:
@@ -356,9 +366,11 @@ class EventsStore(SQLBaseStore):
                     }
                 )
 
+        return
+
     def _store_redaction(self, txn, event):
         # invalidate the cache for the redacted event
-        self._invalidate_get_event_cache(event.redacts)
+        txn.call_after(self._invalidate_get_event_cache, event.redacts)
         txn.execute(
             "INSERT INTO redactions (event_id, redacts) VALUES (?,?)",
             (event.event_id, event.redacts)
