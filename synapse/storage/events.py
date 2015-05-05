@@ -120,6 +120,11 @@ class EventsStore(SQLBaseStore):
             )
 
             for s in current_state:
+                if s.type == EventTypes.Member:
+                    invalidates.extend([
+                        (self.get_rooms_for_user.invalidate, s.state_key),
+                        (self.get_joined_hosts_for_room.invalidate, s.room_id),
+                    ])
                 self._simple_insert_txn(
                     txn,
                     "current_state_events",
