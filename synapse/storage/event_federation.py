@@ -104,7 +104,7 @@ class EventFederationStore(SQLBaseStore):
                 "room_id": room_id,
             },
             retcol="event_id",
-            desc="get_latest_events_in_room",
+            desc="get_latest_event_ids_in_room",
         )
 
     def _get_latest_events_in_room(self, txn, room_id):
