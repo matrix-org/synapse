@@ -194,6 +194,10 @@ class LoggingTransaction(object):
         object.__setattr__(self, "after_callbacks", after_callbacks)
 
     def call_after(self, callback, *args):
+        """Call the given callback on the main twisted thread after the
+        transaction has finished. Used to invalidate the caches on the
+        correct thread.
+        """
         self.after_callbacks.append((callback, args))
 
     def __getattr__(self, name):
