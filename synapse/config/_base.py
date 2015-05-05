@@ -144,16 +144,17 @@ class Config(object):
         )
         config_args, remaining_args = config_parser.parse_known_args(argv)
 
-        if not config_args.config_path:
-            config_parser.error(
-                "Must supply a config file.\nA config file can be automatically"
-                " generated using \"--generate-config -h SERVER_NAME"
-                " -c CONFIG-FILE\""
-            )
-
-        config_dir_path = os.path.dirname(config_args.config_path[0])
-        config_dir_path = os.path.abspath(config_dir_path)
         if config_args.generate_config:
+            if not config_args.config_path:
+                config_parser.error(
+                    "Must supply a config file.\nA config file can be automatically"
+                    " generated using \"--generate-config -h SERVER_NAME"
+                    " -c CONFIG-FILE\""
+                )
+
+            config_dir_path = os.path.dirname(config_args.config_path[0])
+            config_dir_path = os.path.abspath(config_dir_path)
+
             server_name = config_args.server_name
             if not server_name:
                 print "Most specify a server_name to a generate config for."
@@ -196,6 +197,25 @@ class Config(object):
             )
             sys.exit(0)
 
+        parser = argparse.ArgumentParser(
+            parents=[config_parser],
+            description=description,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+
+        obj.invoke_all("add_arguments", parser)
+        args = parser.parse_args(remaining_args)
+
+        if not config_args.config_path:
+            config_parser.error(
+                "Must supply a config file.\nA config file can be automatically"
+                " generated using \"--generate-config -h SERVER_NAME"
+                " -c CONFIG-FILE\""
+            )
+
+        config_dir_path = os.path.dirname(config_args.config_path[0])
+        config_dir_path = os.path.abspath(config_dir_path)
+
         specified_config = {}
         for config_path in config_args.config_path:
             yaml_config = cls.read_config_file(config_path)
@@ -207,15 +227,6 @@ class Config(object):
         config.update(specified_config)
 
         obj.invoke_all("read_config", config)
-
-        parser = argparse.ArgumentParser(
-            parents=[config_parser],
-            description=description,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-        )
-
-        obj.invoke_all("add_arguments", parser)
-        args = parser.parse_args(remaining_args)
 
         obj.invoke_all("read_arguments", args)
 
