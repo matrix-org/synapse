@@ -162,7 +162,8 @@ class TransactionStore(SQLBaseStore):
         return self.runInteraction(
             "delivered_txn",
             self._delivered_txn,
-            transaction_id, destination, code, response_dict
+            transaction_id, destination, code,
+            buffer(encode_canonical_json(response_dict)),
         )
 
     def _delivered_txn(self, txn, transaction_id, destination,

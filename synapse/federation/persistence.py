@@ -99,5 +99,5 @@ class TransactionActions(object):
             transaction.transaction_id,
             transaction.destination,
             response_code,
-            encode_canonical_json(response_dict)
+            response_dict,
         )
