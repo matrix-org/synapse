@@ -332,7 +332,9 @@ class EventFederationStore(SQLBaseStore):
             )
             txn.execute(query)
 
-            self.get_latest_event_ids_in_room.invalidate(room_id)
+            txn.call_after(
+                self.get_latest_event_ids_in_room.invalidate, room_id
+            )
 
     def get_backfill_events(self, room_id, event_list, limit):
         """Get a list of Events for a given topic that occurred before (and

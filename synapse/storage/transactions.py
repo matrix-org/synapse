@@ -17,6 +17,7 @@ from ._base import SQLBaseStore, cached
 
 from collections import namedtuple
 
+from syutil.jsonutil import encode_canonical_json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -82,7 +83,7 @@ class TransactionStore(SQLBaseStore):
                 "transaction_id": transaction_id,
                 "origin": origin,
                 "response_code": code,
-                "response_json": response_dict,
+                "response_json": buffer(encode_canonical_json(response_dict)),
             },
             or_ignore=True,
             desc="set_received_txn_response",
@@ -161,7 +162,8 @@ class TransactionStore(SQLBaseStore):
         return self.runInteraction(
             "delivered_txn",
             self._delivered_txn,
-            transaction_id, destination, code, response_dict
+            transaction_id, destination, code,
+            buffer(encode_canonical_json(response_dict)),
         )
 
     def _delivered_txn(self, txn, transaction_id, destination,
