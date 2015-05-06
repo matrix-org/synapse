@@ -4,7 +4,7 @@ Changes in synapse v0.9.0 (2015-05-06)
 General:
 
 * Add support for using a PostgreSQL database instead of SQLite. See
-  ``docs/postgres.rst`` for details.
+  `docs/postgres.rst`_ for details.
 * Add password change and reset APIs.
 * Fix memory leak due to not releasing stale notifiers.
 * Fix race in caches that occasionally caused some presence updates to be
@@ -37,6 +37,7 @@ Application services:
 * Reliably retry sending of events from Synapse to application services.
 * Implement API change in how application services register with home servers.
 
+.. _`docs/postgres.rst`: docs/postgres.rst
 .. _`Retrieving Server Keys`: https://github.com/matrix-org/matrix-doc/blob/6f2698/specification/30_server_server_api.rst#retrieving-server-keys
 
 
