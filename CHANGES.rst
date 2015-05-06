@@ -1,8 +1,32 @@
-Changes in synapse vX
-=====================
+Changes in synapse v0.9.0 (2015-05-06)
+======================================
 
-* Changed config option from ``disable_registration`` to
-  ``enable_registration``. Old option will be ignored.
+General:
+
+* Add support for using a PostgreSQL database instead of SQLite. See
+  ``docs/postgres.rst`` for details.
+* Add password change and reset APIs.
+* Fix memory leak due to not releasing stale notifiers.
+* Fix race in caches that occasionally caused some presence updates to be
+  dropped.
+* Check server name has not changed on restart.
+
+Federation:
+
+* Add key distribution mechanisms for fetching public keys of unavailable
+  remote home servers.
+
+Configuration:
+
+* Add support for multiple config files.
+* Add support for dictionaries in config files.
+* Remove some options from the command line, they should be specified in
+  config files instead.
+
+Application services:
+
+* Reliably retry sending of events from Synapse to application services.
+* Implement API change in how application services register with home servers.
 
 
 Changes in synapse v0.8.1 (2015-03-18)
