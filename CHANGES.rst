@@ -34,12 +34,13 @@ Configuration:
 
 Application services:
 
-* Reliably retry sending of events from Synapse to application services.
+* Reliably retry sending of events from Synapse to application services, as per
+  `Application Services`_ spec.
 * Implement API change in how application services register with home servers.
 
 .. _`docs/postgres.rst`: docs/postgres.rst
 .. _`Retrieving Server Keys`: https://github.com/matrix-org/matrix-doc/blob/6f2698/specification/30_server_server_api.rst#retrieving-server-keys
-
+.. _`Application Services`: https://github.com/matrix-org/matrix-doc/blob/0c6bd9/specification/25_application_service_api.rst#home-server---application-service-api
 
 Changes in synapse v0.8.1 (2015-03-18)
 ======================================
