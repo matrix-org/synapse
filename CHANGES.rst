@@ -14,19 +14,30 @@ General:
 Federation:
 
 * Add key distribution mechanisms for fetching public keys of unavailable
-  remote home servers.
+  remote home servers. See `Retrieving Server Keys`_ in the spec.
 
 Configuration:
 
 * Add support for multiple config files.
 * Add support for dictionaries in config files.
-* Remove some options from the command line, they should be specified in
-  config files instead.
+* Remove support for specifying config options on the command line, except
+  for:
+
+  * ``--daemonize`` - Daemonize the home server.
+  * ``--manhole`` - Turn on the twisted telnet manhole service on the given
+    port.
+  * ``--database-path`` - The path to a sqlite database to use.
+  * ``--verbose`` - The verbosity level.
+  * ``--log-file`` - File to log to.
+  * ``--log-config`` - Python logging config file.
+  * ``--enable-registration`` - Enable registration for new users.
 
 Application services:
 
 * Reliably retry sending of events from Synapse to application services.
 * Implement API change in how application services register with home servers.
+
+.. _`Retrieving Server Keys`: https://github.com/matrix-org/matrix-doc/blob/6f2698/specification/30_server_server_api.rst#retrieving-server-keys
 
 
 Changes in synapse v0.8.1 (2015-03-18)
