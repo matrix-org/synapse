@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 from synapse.storage import SCHEMA_VERSION, read_schema
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.signatures import SignatureStore
