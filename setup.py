@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import glob
 import os
 from setuptools import setup, find_packages
 
@@ -55,5 +56,5 @@ setup(
     include_package_data=True,
     zip_safe=False,
     long_description=long_description,
-    scripts=["synctl", "register_new_matrix_user"],
+    scripts=["synctl"] + glob.glob("scripts/*"),
 )
