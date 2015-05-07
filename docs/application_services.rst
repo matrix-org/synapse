@@ -2,9 +2,17 @@ Registering an Application Service
 ==================================
 
 The registration of new application services depends on the homeserver used. 
-In synapse you need to create a new configuration file for your AS and add it
-to the list of AS's specified under the ``app_service_config_files`` config
+In synapse, you need to create a new configuration file for your AS and add it
+to the list specified under the ``app_service_config_files`` config
 option in your synapse config.
+
+For example:
+
+.. code-block:: yaml
+
+  app_service_config_files:
+  - /home/matrix/.synapse/<your-AS>.yaml
+
 
 The format of the AS configuration file is as follows:
 
