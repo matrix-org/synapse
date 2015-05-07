@@ -5,7 +5,7 @@ General:
 
 * Add support for using a PostgreSQL database instead of SQLite. See
   `docs/postgres.rst`_ for details.
-* Add password change and reset APIs.
+* Add password change and reset APIs. See `Registration`_ in the spec.
 * Fix memory leak due to not releasing stale notifiers - SYN-339.
 * Fix race in caches that occasionally caused some presence updates to be
   dropped - SYN-369.
@@ -42,6 +42,7 @@ Application services:
   has the same format as the old ``/register`` request.
 
 .. _`docs/postgres.rst`: docs/postgres.rst
+.. _`Registration`: https://github.com/matrix-org/matrix-doc/blob/master/specification/10_client_server_api.rst#registration
 .. _`Retrieving Server Keys`: https://github.com/matrix-org/matrix-doc/blob/6f2698/specification/30_server_server_api.rst#retrieving-server-keys
 .. _`Application Services`: https://github.com/matrix-org/matrix-doc/blob/0c6bd9/specification/25_application_service_api.rst#home-server---application-service-api
 
