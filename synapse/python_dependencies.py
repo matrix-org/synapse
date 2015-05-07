@@ -24,7 +24,7 @@ REQUIREMENTS = {
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
     "pyyaml": ["yaml"],
     "pyasn1": ["pyasn1"],
-    "pynacl": ["nacl"],
+    "pynacl>=0.0.3": ["nacl>=0.0.3"],
     "daemonize": ["daemonize"],
     "py-bcrypt": ["bcrypt"],
     "frozendict>=0.4": ["frozendict"],
@@ -50,11 +50,6 @@ def github_link(project, version, egg):
     return "https://github.com/%s/tarball/%s/#egg=%s" % (project, version, egg)
 
 DEPENDENCY_LINKS = [
-    github_link(
-        project="pyca/pynacl",
-        version="d4d3175589b892f6ea7c22f466e0e223853516fa",
-        egg="pynacl-0.3.0",
-    ),
     github_link(
         project="matrix-org/syutil",
         version="v0.0.6",
