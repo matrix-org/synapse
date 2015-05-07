@@ -6,9 +6,9 @@ General:
 * Add support for using a PostgreSQL database instead of SQLite. See
   `docs/postgres.rst`_ for details.
 * Add password change and reset APIs.
-* Fix memory leak due to not releasing stale notifiers.
+* Fix memory leak due to not releasing stale notifiers - SYN-339.
 * Fix race in caches that occasionally caused some presence updates to be
-  dropped.
+  dropped - SYN-369.
 * Check server name has not changed on restart.
 
 Federation:
