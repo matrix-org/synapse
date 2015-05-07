@@ -82,7 +82,7 @@ class RegistrationHandler(BaseHandler):
         yield run_on_reactor()
         password_hash = None
         if password:
-            password_hash = bcrypt.hashpw(password, bcrypt.gensalt(1))
+            password_hash = bcrypt.hashpw(password, bcrypt.gensalt())
 
         if localpart:
             yield self.check_username(localpart)
