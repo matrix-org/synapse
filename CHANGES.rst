@@ -1,9 +1,52 @@
-Changes in synapse vX
-=====================
+Changes in synapse v0.9.0 (2015-05-07)
+======================================
 
-* Changed config option from ``disable_registration`` to
-  ``enable_registration``. Old option will be ignored.
+General:
 
+* Add support for using a PostgreSQL database instead of SQLite. See
+  `docs/postgres.rst`_ for details.
+* Add password change and reset APIs. See `Registration`_ in the spec.
+* Fix memory leak due to not releasing stale notifiers - SYN-339.
+* Fix race in caches that occasionally caused some presence updates to be
+  dropped - SYN-369.
+* Check server name has not changed on restart.
+
+Federation:
+
+* Add key distribution mechanisms for fetching public keys of unavailable
+  remote home servers. See `Retrieving Server Keys`_ in the spec.
+
+Configuration:
+
+* Add support for multiple config files.
+* Add support for dictionaries in config files.
+* Remove support for specifying config options on the command line, except
+  for:
+
+  * ``--daemonize`` - Daemonize the home server.
+  * ``--manhole`` - Turn on the twisted telnet manhole service on the given
+    port.
+  * ``--database-path`` - The path to a sqlite database to use.
+  * ``--verbose`` - The verbosity level.
+  * ``--log-file`` - File to log to.
+  * ``--log-config`` - Python logging config file.
+  * ``--enable-registration`` - Enable registration for new users.
+
+Application services:
+
+* Reliably retry sending of events from Synapse to application services, as per
+  `Application Services`_ spec.
+* Application services can no longer register via the ``/register`` API,
+  instead their configuration should be saved to a file and listed in the
+  synapse ``app_service_config_files`` config option. The AS configuration file
+  has the same format as the old ``/register`` request.
+  See `docs/application_services.rst`_ for more information.
+
+.. _`docs/postgres.rst`: docs/postgres.rst
+.. _`docs/application_services.rst`: docs/application_services.rst
+.. _`Registration`: https://github.com/matrix-org/matrix-doc/blob/master/specification/10_client_server_api.rst#registration
+.. _`Retrieving Server Keys`: https://github.com/matrix-org/matrix-doc/blob/6f2698/specification/30_server_server_api.rst#retrieving-server-keys
+.. _`Application Services`: https://github.com/matrix-org/matrix-doc/blob/0c6bd9/specification/25_application_service_api.rst#home-server---application-service-api
 
 Changes in synapse v0.8.1 (2015-03-18)
 ======================================
