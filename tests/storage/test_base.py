@@ -67,7 +67,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.mock_txn.execute.assert_called_with(
                 "INSERT INTO tablename (columname) VALUES(?)",
-                ["Value"]
+                ("Value",)
         )
 
     @defer.inlineCallbacks
@@ -82,7 +82,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.mock_txn.execute.assert_called_with(
                 "INSERT INTO tablename (colA, colB, colC) VALUES(?, ?, ?)",
-                [1, 2, 3]
+                (1, 2, 3,)
         )
 
     @defer.inlineCallbacks

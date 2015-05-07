@@ -93,7 +93,7 @@ class EventsStore(SQLBaseStore):
                            current_state=None):
 
         # Remove the any existing cache entries for the event_id
-        self._invalidate_get_event_cache(event.event_id)
+        txn.call_after(self._invalidate_get_event_cache, event.event_id)
 
         if stream_ordering is None:
             with self._stream_id_gen.get_next_txn(txn) as stream_ordering:
@@ -114,6 +114,13 @@ class EventsStore(SQLBaseStore):
             )
 
             for s in current_state:
+                if s.type == EventTypes.Member:
+                    txn.call_after(
+                        self.get_rooms_for_user.invalidate, s.state_key
+                    )
+                    txn.call_after(
+                        self.get_joined_hosts_for_room.invalidate, s.room_id
+                    )
                 self._simple_insert_txn(
                     txn,
                     "current_state_events",
@@ -122,30 +129,8 @@ class EventsStore(SQLBaseStore):
                         "room_id": s.room_id,
                         "type": s.type,
                         "state_key": s.state_key,
-                    },
+                    }
                 )
-
-        if event.is_state() and is_new_state:
-            if not backfilled and not context.rejected:
-                self._simple_insert_txn(
-                    txn,
-                    table="state_forward_extremities",
-                    values={
-                        "event_id": event.event_id,
-                        "room_id": event.room_id,
-                        "type": event.type,
-                        "state_key": event.state_key,
-                    },
-                )
-
-                for prev_state_id, _ in event.prev_state:
-                    self._simple_delete_txn(
-                        txn,
-                        table="state_forward_extremities",
-                        keyvalues={
-                            "event_id": prev_state_id,
-                        }
-                    )
 
         outlier = event.internal_metadata.is_outlier()
 
@@ -281,7 +266,9 @@ class EventsStore(SQLBaseStore):
         )
 
         if context.rejected:
-            self._store_rejections_txn(txn, event.event_id, context.rejected)
+            self._store_rejections_txn(
+                txn, event.event_id, context.rejected
+            )
 
         for hash_alg, hash_base64 in event.hashes.items():
             hash_bytes = decode_base64(hash_base64)
@@ -293,19 +280,22 @@ class EventsStore(SQLBaseStore):
             for alg, hash_base64 in prev_hashes.items():
                 hash_bytes = decode_base64(hash_base64)
                 self._store_prev_event_hash_txn(
-                    txn, event.event_id, prev_event_id, alg, hash_bytes
+                    txn, event.event_id, prev_event_id, alg,
+                    hash_bytes
                 )
 
-        for auth_id, _ in event.auth_events:
-            self._simple_insert_txn(
-                txn,
-                table="event_auth",
-                values={
+        self._simple_insert_many_txn(
+            txn,
+            table="event_auth",
+            values=[
+                {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "auth_id": auth_id,
-                },
-            )
+                }
+                for auth_id, _ in event.auth_events
+            ],
+        )
 
         (ref_alg, ref_hash_bytes) = compute_event_reference_hash(event)
         self._store_event_reference_hash_txn(
@@ -330,17 +320,19 @@ class EventsStore(SQLBaseStore):
                 vals,
             )
 
-            for e_id, h in event.prev_state:
-                self._simple_insert_txn(
-                    txn,
-                    table="event_edges",
-                    values={
+            self._simple_insert_many_txn(
+                txn,
+                table="event_edges",
+                values=[
+                    {
                         "event_id": event.event_id,
                         "prev_event_id": e_id,
                         "room_id": event.room_id,
                         "is_state": True,
-                    },
-                )
+                    }
+                    for e_id, h in event.prev_state
+                ],
+            )
 
             if is_new_state and not context.rejected:
                 self._simple_upsert_txn(
@@ -356,9 +348,11 @@ class EventsStore(SQLBaseStore):
                     }
                 )
 
+        return
+
     def _store_redaction(self, txn, event):
         # invalidate the cache for the redacted event
-        self._invalidate_get_event_cache(event.redacts)
+        txn.call_after(self._invalidate_get_event_cache, event.redacts)
         txn.execute(
             "INSERT INTO redactions (event_id, redacts) VALUES (?,?)",
             (event.event_id, event.redacts)

@@ -104,7 +104,7 @@ class EventFederationStore(SQLBaseStore):
                 "room_id": room_id,
             },
             retcol="event_id",
-            desc="get_latest_events_in_room",
+            desc="get_latest_event_ids_in_room",
         )
 
     def _get_latest_events_in_room(self, txn, room_id):
@@ -262,18 +262,19 @@ class EventFederationStore(SQLBaseStore):
         For the given event, update the event edges table and forward and
         backward extremities tables.
         """
-        for e_id, _ in prev_events:
-            # TODO (erikj): This could be done as a bulk insert
-            self._simple_insert_txn(
-                txn,
-                table="event_edges",
-                values={
+        self._simple_insert_many_txn(
+            txn,
+            table="event_edges",
+            values=[
+                {
                     "event_id": event_id,
                     "prev_event_id": e_id,
                     "room_id": room_id,
                     "is_state": False,
-                },
-            )
+                }
+                for e_id, _ in prev_events
+            ],
+        )
 
         # Update the extremities table if this is not an outlier.
         if not outlier:
@@ -307,16 +308,17 @@ class EventFederationStore(SQLBaseStore):
 
             # Insert all the prev_events as a backwards thing, they'll get
             # deleted in a second if they're incorrect anyway.
-            for e_id, _ in prev_events:
-                # TODO (erikj): This could be done as a bulk insert
-                self._simple_insert_txn(
-                    txn,
-                    table="event_backward_extremities",
-                    values={
+            self._simple_insert_many_txn(
+                txn,
+                table="event_backward_extremities",
+                values=[
+                    {
                         "event_id": e_id,
                         "room_id": room_id,
-                    },
-                )
+                    }
+                    for e_id, _ in prev_events
+                ],
+            )
 
             # Also delete from the backwards extremities table all ones that
             # reference events that we have already seen
@@ -330,7 +332,9 @@ class EventFederationStore(SQLBaseStore):
             )
             txn.execute(query)
 
-            self.get_latest_event_ids_in_room.invalidate(room_id)
+            txn.call_after(
+                self.get_latest_event_ids_in_room.invalidate, room_id
+            )
 
     def get_backfill_events(self, room_id, event_list, limit):
         """Get a list of Events for a given topic that occurred before (and

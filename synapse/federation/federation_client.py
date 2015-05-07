@@ -491,7 +491,7 @@ class FederationClient(FederationBase):
             ]
 
             signed_events = yield self._check_sigs_and_hash_and_fetch(
-                destination, events, outlier=True
+                destination, events, outlier=False
             )
 
             have_gotten_all_from_destination = True
