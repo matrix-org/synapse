@@ -36,7 +36,10 @@ Application services:
 
 * Reliably retry sending of events from Synapse to application services, as per
   `Application Services`_ spec.
-* Implement API change in how application services register with home servers.
+* Application services can no longer register via the ``/register`` API,
+  instead their configuration should be saved to a file and listed in the
+  synapse ``app_service_config_files`` config option. The AS configuration file
+  has the same format as the old ``/register`` request.
 
 .. _`docs/postgres.rst`: docs/postgres.rst
 .. _`Retrieving Server Keys`: https://github.com/matrix-org/matrix-doc/blob/6f2698/specification/30_server_server_api.rst#retrieving-server-keys
