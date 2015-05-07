@@ -40,8 +40,10 @@ Application services:
   instead their configuration should be saved to a file and listed in the
   synapse ``app_service_config_files`` config option. The AS configuration file
   has the same format as the old ``/register`` request.
+  See `docs/application_services.rst`_ for more information.
 
 .. _`docs/postgres.rst`: docs/postgres.rst
+.. _`docs/application_services.rst`: docs/application_services.rst
 .. _`Registration`: https://github.com/matrix-org/matrix-doc/blob/master/specification/10_client_server_api.rst#registration
 .. _`Retrieving Server Keys`: https://github.com/matrix-org/matrix-doc/blob/6f2698/specification/30_server_server_api.rst#retrieving-server-keys
 .. _`Application Services`: https://github.com/matrix-org/matrix-doc/blob/0c6bd9/specification/25_application_service_api.rst#home-server---application-service-api
