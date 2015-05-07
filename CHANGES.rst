@@ -1,4 +1,4 @@
-Changes in synapse v0.9.0 (2015-05-06)
+Changes in synapse v0.9.0 (2015-05-07)
 ======================================
 
 General:
