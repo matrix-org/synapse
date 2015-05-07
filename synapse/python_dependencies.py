@@ -33,7 +33,7 @@ REQUIREMENTS = {
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {
-        "matrix_angular_sdk>=0.6.5": ["syweb>=0.6.5"],
+        "matrix_angular_sdk>=0.6.6": ["syweb>=0.6.6"],
     }
 }
 
@@ -62,8 +62,8 @@ DEPENDENCY_LINKS = [
     ),
     github_link(
         project="matrix-org/matrix-angular-sdk",
-        version="v0.6.5",
-        egg="matrix_angular_sdk-0.6.5",
+        version="v0.6.6",
+        egg="matrix_angular_sdk-0.6.6",
     ),
 ]
 
