@@ -50,7 +50,8 @@ class PushRuleStore(SQLBaseStore):
         results = yield self._simple_select_list(
             PushRuleEnableTable.table_name,
             {'user_name': user_name},
-            PushRuleEnableTable.fields
+            PushRuleEnableTable.fields,
+            desc="get_push_rules_enabled_for_user",
         )
         defer.returnValue(
             {r['rule_id']: False if r['enabled'] == 0 else True for r in results}
@@ -153,7 +154,7 @@ class PushRuleStore(SQLBaseStore):
             txn.execute(sql, (user_name, priority_class, new_rule_priority))
 
         # now insert the new rule
-        sql = "INSERT OR REPLACE INTO "+PushRuleTable.table_name+" ("
+        sql = "INSERT INTO "+PushRuleTable.table_name+" ("
         sql += ",".join(new_rule.keys())+") VALUES ("
         sql += ", ".join(["?" for _ in new_rule.keys()])+")"
 
@@ -182,7 +183,7 @@ class PushRuleStore(SQLBaseStore):
         new_rule['priority_class'] = priority_class
         new_rule['priority'] = new_prio
 
-        sql = "INSERT OR REPLACE INTO "+PushRuleTable.table_name+" ("
+        sql = "INSERT INTO "+PushRuleTable.table_name+" ("
         sql += ",".join(new_rule.keys())+") VALUES ("
         sql += ", ".join(["?" for _ in new_rule.keys()])+")"
 
@@ -201,7 +202,8 @@ class PushRuleStore(SQLBaseStore):
         """
         yield self._simple_delete_one(
             PushRuleTable.table_name,
-            {'user_name': user_name, 'rule_id': rule_id}
+            {'user_name': user_name, 'rule_id': rule_id},
+            desc="delete_push_rule",
         )
 
     @defer.inlineCallbacks
@@ -209,7 +211,8 @@ class PushRuleStore(SQLBaseStore):
         yield self._simple_upsert(
             PushRuleEnableTable.table_name,
             {'user_name': user_name, 'rule_id': rule_id},
-            {'enabled': enabled}
+            {'enabled': enabled},
+            desc="set_push_rule_enabled",
         )
 
 

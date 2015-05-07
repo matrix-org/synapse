@@ -14,6 +14,10 @@
 # limitations under the License.
 
 
+from functools import wraps
+import threading
+
+
 class LruCache(object):
     """Least-recently-used cache."""
     # TODO(mjark) Add mutex for linked list for thread safety.
@@ -23,6 +27,16 @@ class LruCache(object):
         list_root[:] = [list_root, list_root, None, None]
 
         PREV, NEXT, KEY, VALUE = 0, 1, 2, 3
+
+        lock = threading.Lock()
+
+        def synchronized(f):
+            @wraps(f)
+            def inner(*args, **kwargs):
+                with lock:
+                    return f(*args, **kwargs)
+
+            return inner
 
         def add_node(key, value):
             prev_node = list_root
@@ -51,6 +65,7 @@ class LruCache(object):
             next_node[PREV] = prev_node
             cache.pop(node[KEY], None)
 
+        @synchronized
         def cache_get(key, default=None):
             node = cache.get(key, None)
             if node is not None:
@@ -59,6 +74,7 @@ class LruCache(object):
             else:
                 return default
 
+        @synchronized
         def cache_set(key, value):
             node = cache.get(key, None)
             if node is not None:
@@ -69,6 +85,7 @@ class LruCache(object):
                 if len(cache) > max_size:
                     delete_node(list_root[PREV])
 
+        @synchronized
         def cache_set_default(key, value):
             node = cache.get(key, None)
             if node is not None:
@@ -79,6 +96,7 @@ class LruCache(object):
                     delete_node(list_root[PREV])
                 return value
 
+        @synchronized
         def cache_pop(key, default=None):
             node = cache.get(key, None)
             if node:
@@ -87,8 +105,13 @@ class LruCache(object):
             else:
                 return default
 
+        @synchronized
         def cache_len():
             return len(cache)
+
+        @synchronized
+        def cache_contains(key):
+            return key in cache
 
         self.sentinel = object()
         self.get = cache_get
@@ -96,6 +119,7 @@ class LruCache(object):
         self.setdefault = cache_set_default
         self.pop = cache_pop
         self.len = cache_len
+        self.contains = cache_contains
 
     def __getitem__(self, key):
         result = self.get(key, self.sentinel)
@@ -114,3 +138,6 @@ class LruCache(object):
 
     def __len__(self):
         return self.len()
+
+    def __contains__(self, key):
+        return self.contains(key)

@@ -20,7 +20,7 @@ The overall architecture is::
              https://somewhere.org/_matrix      https://elsewhere.net/_matrix
 
 ``#matrix:matrix.org`` is the official support room for Matrix, and can be
-accessed by the web client at http://matrix.org/alpha or via an IRC bridge at
+accessed by the web client at http://matrix.org/beta or via an IRC bridge at
 irc://irc.freenode.net/matrix.
 
 Synapse is currently in rapid development, but as of version 0.5 we believe it 
@@ -69,24 +69,30 @@ Synapse ships with two basic demo Matrix clients: webclient (a basic group chat
 web client demo implemented in AngularJS) and cmdclient (a basic Python
 command line utility which lets you easily see what the JSON APIs are up to).
 
-Meanwhile, iOS and Android SDKs and clients are currently in development and available from:
+Meanwhile, iOS and Android SDKs and clients are available from:
 
 - https://github.com/matrix-org/matrix-ios-sdk
+- https://github.com/matrix-org/matrix-ios-kit
+- https://github.com/matrix-org/matrix-ios-console
 - https://github.com/matrix-org/matrix-android-sdk
 
-We'd like to invite you to join #matrix:matrix.org (via http://matrix.org/alpha), run a homeserver, take a look at the Matrix spec at
-http://matrix.org/docs/spec, experiment with the APIs and the demo
-clients, and report any bugs via http://matrix.org/jira.
+We'd like to invite you to join #matrix:matrix.org (via
+https://matrix.org/beta), run a homeserver, take a look at the Matrix spec at
+https://matrix.org/docs/spec and API docs at https://matrix.org/docs/api,
+experiment with the APIs and the demo clients, and report any bugs via
+https://matrix.org/jira.
 
 Thanks for using Matrix!
 
 [1] End-to-end encryption is currently in development
 
-Homeserver Installation
-=======================
+Synapse Installation
+====================
+
+Synapse is the reference python/twisted Matrix homeserver implementation.
 
 System requirements:
-- POSIX-compliant system (tested on Linux & OSX)
+- POSIX-compliant system (tested on Linux & OS X)
 - Python 2.7
 
 Synapse is written in python but some of the libraries is uses are written in
@@ -118,6 +124,9 @@ To install the synapse homeserver run::
 This installs synapse, along with the libraries it uses, into a virtual
 environment under ``~/.synapse``.
 
+Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
+above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
+
 To set up your homeserver, run (in your virtualenv, as before)::
 
     $ cd ~/.synapse
@@ -128,8 +137,18 @@ To set up your homeserver, run (in your virtualenv, as before)::
 
 Substituting your host and domain name as appropriate.
 
+This will generate you a config file that you can then customise, but it will
+also generate a set of keys for you. These keys will allow your Home Server to
+identify itself to other Home Servers, so don't lose or delete them. It would be
+wise to back them up somewhere safe. If, for whatever reason, you do need to
+change your Home Server's keys, you may find that other Home Servers have the
+old key cached. If you update the signing key, you should change the name of the
+key in the <server name>.signing.key file (the second word, which by default is
+, 'auto') to something different.
+
 By default, registration of new users is disabled. You can either enable
-registration in the config (it is then recommended to also set up CAPTCHA), or
+registration in the config by specifying ``enable_registration: true``
+(it is then recommended to also set up CAPTCHA), or
 you can use the command line to register new users::
 
     $ source ~/.synapse/bin/activate
@@ -142,36 +161,51 @@ you can use the command line to register new users::
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See docs/turn-howto.rst for details.
 
-Troubleshooting Installation
-----------------------------
+Using PostgreSQL
+================
 
-Synapse requires pip 1.7 or later, so if your OS provides too old a version and 
-you get errors about ``error: no such option: --process-dependency-links`` you 
-may need to manually upgrade it::
+As of Synapse 0.9, `PostgreSQL <http://www.postgresql.org>`_ is supported as an
+alternative to the `SQLite <http://sqlite.org/>`_ database that Synapse has
+traditionally used for convenience and simplicity.
 
-    $ sudo pip install --upgrade pip
+The advantages of Postgres include:
 
-If pip crashes mid-installation for reason (e.g. lost terminal), pip may
-refuse to run until you remove the temporary installation directory it
-created. To reset the installation::
+ * significant performance improvements due to the superior threading and
+   caching model, smarter query optimiser
+ * allowing the DB to be run on separate hardware
+ * allowing basic active/backup high-availability with a "hot spare" synapse
+   pointing at the same DB master, as well as enabling DB replication in
+   synapse itself.
+   
+The only disadvantage is that the code is relatively new as of April 2015 and
+may have a few regressions relative to SQLite.
 
-    $ rm -rf /tmp/pip_install_matrix
+For information on how to install and use PostgreSQL, please see
+`docs/postgres.rst <docs/postgres.rst>`_.
 
-pip seems to leak *lots* of memory during installation.  For instance, a Linux 
-host with 512MB of RAM may run out of memory whilst installing Twisted.  If this 
-happens, you will have to individually install the dependencies which are 
-failing, e.g.::
+Running Synapse
+===============
 
-    $ pip install twisted
+To actually run your new homeserver, pick a working directory for Synapse to run 
+(e.g. ``~/.synapse``), and::
 
-On OSX, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
-will need to export CFLAGS=-Qunused-arguments.
+    $ cd ~/.synapse
+    $ source ./bin/activate
+    $ synctl start
+
+Platform Specific Instructions
+==============================
 
 ArchLinux
 ---------
 
-Installation on ArchLinux may encounter a few hiccups as Arch defaults to
-python 3, but synapse currently assumes python 2.7 by default.
+The quickest way to get up and running with ArchLinux is probably with Ivan
+Shapovalov's AUR package from
+https://aur.archlinux.org/packages/matrix-synapse/, which should pull in all
+the necessary dependencies.
+
+Alternatively, to install using pip a few changes may be needed as ArchLinux
+defaults to python 3, but synapse currently assumes python 2.7 by default:
 
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 )::
 
@@ -191,7 +225,7 @@ installing under virtualenv)::
     $ sudo pip2.7 uninstall py-bcrypt
     $ sudo pip2.7 install py-bcrypt
     
-During setup of homeserver you need to call python2.7 directly again::
+During setup of Synapse you need to call python2.7 directly again::
 
     $ cd ~/.synapse
     $ python2.7 -m synapse.app.homeserver \
@@ -232,15 +266,33 @@ Troubleshooting:
   you do, you may need to create a symlink to ``libsodium.a`` so ``ld`` can find
   it: ``ln -s /usr/local/lib/libsodium.a /usr/lib/libsodium.a``
 
-Running Your Homeserver
-=======================
+Troubleshooting
+===============
 
-To actually run your new homeserver, pick a working directory for Synapse to run 
-(e.g. ``~/.synapse``), and::
+Troubleshooting Installation
+----------------------------
 
-    $ cd ~/.synapse
-    $ source ./bin/activate
-    $ synctl start
+Synapse requires pip 1.7 or later, so if your OS provides too old a version and 
+you get errors about ``error: no such option: --process-dependency-links`` you 
+may need to manually upgrade it::
+
+    $ sudo pip install --upgrade pip
+
+If pip crashes mid-installation for reason (e.g. lost terminal), pip may
+refuse to run until you remove the temporary installation directory it
+created. To reset the installation::
+
+    $ rm -rf /tmp/pip_install_matrix
+
+pip seems to leak *lots* of memory during installation.  For instance, a Linux 
+host with 512MB of RAM may run out of memory whilst installing Twisted.  If this 
+happens, you will have to individually install the dependencies which are 
+failing, e.g.::
+
+    $ pip install twisted
+
+On OSX, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
+will need to export CFLAGS=-Qunused-arguments.
 
 Troubleshooting Running
 -----------------------
@@ -261,25 +313,25 @@ fix try re-installing from PyPI or directly from
     $ pip install --user https://github.com/pyca/pynacl/tarball/master
 
 ArchLinux
----------
+~~~~~~~~~
 
 If running `$ synctl start` fails with 'returned non-zero exit status 1',
 you will need to explicitly call Python2.7 - either running as::
 
-    $ python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml --pid-file homeserver.pid
+    $ python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml
     
 ...or by editing synctl with the correct python executable.
 
-Homeserver Development
-======================
+Synapse Development
+===================
 
-To check out a homeserver for development, clone the git repo into a working
+To check out a synapse for development, clone the git repo into a working
 directory of your choice::
 
     $ git clone https://github.com/matrix-org/synapse.git
     $ cd synapse
 
-The homeserver has a number of external dependencies, that are easiest
+Synapse has a number of external dependencies, that are easiest
 to install using pip and a virtualenv::
 
     $ virtualenv env
@@ -290,7 +342,7 @@ to install using pip and a virtualenv::
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
 
-Once this is done, you may wish to run the homeserver's unit tests, to
+Once this is done, you may wish to run Synapse's unit tests, to
 check that everything is installed as it should be::
 
     $ python setup.py test
@@ -302,10 +354,10 @@ This should end with a 'PASSED' result::
     PASSED (successes=143)
 
 
-Upgrading an existing homeserver
-================================
+Upgrading an existing Synapse
+=============================
 
-IMPORTANT: Before upgrading an existing homeserver to a new version, please
+IMPORTANT: Before upgrading an existing synapse to a new version, please
 refer to UPGRADE.rst for any additional instructions.
 
 Otherwise, simply re-install the new codebase over the current one - e.g.
@@ -348,7 +400,7 @@ and port where the server is running.  (At the current time synapse does not
 support clustering multiple servers into a single logical homeserver).  The DNS
 record would then look something like::
 
-    $ dig -t srv _matrix._tcp.machine.my.domaine.name
+    $ dig -t srv _matrix._tcp.machine.my.domain.name
     _matrix._tcp    IN      SRV     10 0 8448 machine.my.domain.name.
 
 
@@ -357,7 +409,6 @@ SRV record, as that is the name other machines will expect it to have::
 
     $ python -m synapse.app.homeserver \
         --server-name YOURDOMAIN \
-        --bind-port 8448 \
         --config-path homeserver.yaml \
         --generate-config
     $ python -m synapse.app.homeserver --config-path homeserver.yaml
@@ -366,12 +417,8 @@ SRV record, as that is the name other machines will expect it to have::
 You may additionally want to pass one or more "-v" options, in order to
 increase the verbosity of logging output; at least for initial testing.
 
-For the initial alpha release, the homeserver is not speaking TLS for
-either client-server or server-server traffic for ease of debugging. We have
-also not spent any time yet getting the homeserver to run behind loadbalancers.
-
-Running a Demo Federation of Homeservers
-----------------------------------------
+Running a Demo Federation of Synapses
+-------------------------------------
 
 If you want to get up and running quickly with a trio of homeservers in a
 private federation (``localhost:8080``, ``localhost:8081`` and
@@ -406,7 +453,10 @@ account. Your name will take the form of::
 Specify your desired localpart in the topmost box of the "Register for an
 account" form, and click the "Register" button. Hostnames can contain ports if
 required due to lack of SRV records (e.g. @matthew:localhost:8448 on an
-internal synapse sandbox running on localhost)
+internal synapse sandbox running on localhost).
+
+If registration fails, you may need to enable it in the homeserver (see
+`Synapse Installation`_ above)
 
 
 Logging In To An Existing Account
@@ -432,7 +482,7 @@ track 3PID logins and publish end-user public keys.
 
 It's currently early days for identity servers as Matrix is not yet using 3PIDs
 as the primary means of identity and E2E encryption is not complete. As such,
-we are running a single identity server (http://matrix.org:8090) at the current
+we are running a single identity server (https://matrix.org) at the current
 time.
 
 

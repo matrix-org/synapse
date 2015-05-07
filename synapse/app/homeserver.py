@@ -16,14 +16,18 @@
 
 import sys
 sys.dont_write_bytecode = True
+from synapse.python_dependencies import check_requirements
 
+if __name__ == '__main__':
+    check_requirements()
+
+from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
 from synapse.storage import (
-    prepare_database, prepare_sqlite3_database, UpgradeDatabaseException,
+    are_all_users_on_domain, UpgradeDatabaseException,
 )
 
 from synapse.server import HomeServer
 
-from synapse.python_dependencies import check_requirements
 
 from twisted.internet import reactor
 from twisted.application import service
@@ -31,16 +35,17 @@ from twisted.enterprise import adbapi
 from twisted.web.resource import Resource
 from twisted.web.static import File
 from twisted.web.server import Site
+from twisted.web.http import proxiedLogFormatter, combinedLogFormatter
 from synapse.http.server import JsonResource, RootRedirect
-from synapse.rest.appservice.v1 import AppServiceRestResource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
-from synapse.http.server_key_resource import LocalKey
+from synapse.rest.key.v1.server_key_resource import LocalKey
+from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX, APP_SERVICE_PREFIX,
-    STATIC_PREFIX
+    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX, STATIC_PREFIX,
+    SERVER_KEY_V2_PREFIX,
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -59,9 +64,9 @@ import os
 import re
 import resource
 import subprocess
-import sqlite3
 
-logger = logging.getLogger(__name__)
+
+logger = logging.getLogger("synapse.app.homeserver")
 
 
 class SynapseHomeServer(HomeServer):
@@ -77,9 +82,6 @@ class SynapseHomeServer(HomeServer):
 
     def build_resource_for_federation(self):
         return JsonResource(self)
-
-    def build_resource_for_app_services(self):
-        return AppServiceRestResource(self)
 
     def build_resource_for_web_client(self):
         import syweb
@@ -101,6 +103,9 @@ class SynapseHomeServer(HomeServer):
     def build_resource_for_server_key(self):
         return LocalKey(self)
 
+    def build_resource_for_server_key_v2(self):
+        return KeyApiV2Resource(self)
+
     def build_resource_for_metrics(self):
         if self.get_config().enable_metrics:
             return MetricsResource(self)
@@ -108,13 +113,11 @@ class SynapseHomeServer(HomeServer):
             return None
 
     def build_db_pool(self):
+        name = self.db_config["name"]
+
         return adbapi.ConnectionPool(
-            "sqlite3", self.get_db_name(),
-            check_same_thread=False,
-            cp_min=1,
-            cp_max=1,
-            cp_openfun=prepare_database,  # Prepare the database for each conn
-                                          # so that :memory: sqlite works
+            name,
+            **self.db_config.get("args", {})
         )
 
     def create_resource_tree(self, redirect_root_to_web_client):
@@ -140,8 +143,8 @@ class SynapseHomeServer(HomeServer):
             (FEDERATION_PREFIX, self.get_resource_for_federation()),
             (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
             (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
+            (SERVER_KEY_V2_PREFIX, self.get_resource_for_server_key_v2()),
             (MEDIA_PREFIX, self.get_resource_for_media_repository()),
-            (APP_SERVICE_PREFIX, self.get_resource_for_app_services()),
             (STATIC_PREFIX, self.get_resource_for_static_content()),
         ]
 
@@ -226,7 +229,11 @@ class SynapseHomeServer(HomeServer):
         if not config.no_tls and config.bind_port is not None:
             reactor.listenSSL(
                 config.bind_port,
-                Site(self.root_resource),
+                SynapseSite(
+                    "synapse.access.https",
+                    config,
+                    self.root_resource,
+                ),
                 self.tls_context_factory,
                 interface=config.bind_host
             )
@@ -235,7 +242,11 @@ class SynapseHomeServer(HomeServer):
         if config.unsecure_port is not None:
             reactor.listenTCP(
                 config.unsecure_port,
-                Site(self.root_resource),
+                SynapseSite(
+                    "synapse.access.http",
+                    config,
+                    self.root_resource,
+                ),
                 interface=config.bind_host
             )
             logger.info("Synapse now listening on port %d", config.unsecure_port)
@@ -243,9 +254,42 @@ class SynapseHomeServer(HomeServer):
         metrics_resource = self.get_resource_for_metrics()
         if metrics_resource and config.metrics_port is not None:
             reactor.listenTCP(
-                config.metrics_port, Site(metrics_resource), interface="127.0.0.1",
+                config.metrics_port,
+                SynapseSite(
+                    "synapse.access.metrics",
+                    config,
+                    metrics_resource,
+                ),
+                interface="127.0.0.1",
             )
             logger.info("Metrics now running on 127.0.0.1 port %d", config.metrics_port)
+
+    def run_startup_checks(self, db_conn, database_engine):
+        all_users_native = are_all_users_on_domain(
+            db_conn.cursor(), database_engine, self.hostname
+        )
+        if not all_users_native:
+            quit_with_error(
+                "Found users in database not native to %s!\n"
+                "You cannot changed a synapse server_name after it's been configured"
+                % (self.hostname,)
+            )
+
+        try:
+            database_engine.check_database(db_conn.cursor())
+        except IncorrectDatabaseSetup as e:
+            quit_with_error(e.message)
+
+
+def quit_with_error(error_string):
+    message_lines = error_string.split("\n")
+    line_length = max([len(l) for l in message_lines]) + 2
+    sys.stderr.write("*" * line_length + '\n')
+    for line in message_lines:
+        if line.strip():
+            sys.stderr.write(" %s\n" % (line.strip(),))
+    sys.stderr.write("*" * line_length + '\n')
+    sys.exit(1)
 
 
 def get_version_string():
@@ -358,29 +402,39 @@ def setup(config_options):
 
     tls_context_factory = context_factory.ServerContextFactory(config)
 
+    database_engine = create_engine(config.database_config["name"])
+    config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
+
     hs = SynapseHomeServer(
         config.server_name,
         domain_with_port=domain_with_port,
         upload_dir=os.path.abspath("uploads"),
-        db_name=config.database_path,
+        db_config=config.database_config,
         tls_context_factory=tls_context_factory,
         config=config,
         content_addr=config.content_addr,
         version_string=version_string,
+        database_engine=database_engine,
     )
 
     hs.create_resource_tree(
         redirect_root_to_web_client=True,
     )
 
-    db_name = hs.get_db_name()
-
-    logger.info("Preparing database: %s...", db_name)
+    logger.info("Preparing database: %r...", config.database_config)
 
     try:
-        with sqlite3.connect(db_name) as db_conn:
-            prepare_sqlite3_database(db_conn)
-            prepare_database(db_conn)
+        db_conn = database_engine.module.connect(
+            **{
+                k: v for k, v in config.database_config.get("args", {}).items()
+                if not k.startswith("cp_")
+            }
+        )
+
+        database_engine.prepare_database(db_conn)
+        hs.run_startup_checks(db_conn, database_engine)
+
+        db_conn.commit()
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"
@@ -389,7 +443,7 @@ def setup(config_options):
         )
         sys.exit(1)
 
-    logger.info("Database prepared in %s.", db_name)
+    logger.info("Database prepared in %r.", config.database_config)
 
     if config.manhole:
         f = twisted.manhole.telnet.ShellFactory()
@@ -421,6 +475,24 @@ class SynapseService(service.Service):
 
     def stopService(self):
         return self._port.stopListening()
+
+
+class SynapseSite(Site):
+    """
+    Subclass of a twisted http Site that does access logging with python's
+    standard logging
+    """
+    def __init__(self, logger_name, config, resource, *args, **kwargs):
+        Site.__init__(self, resource, *args, **kwargs)
+        if config.captcha_ip_origin_is_x_forwarded:
+            self._log_formatter = proxiedLogFormatter
+        else:
+            self._log_formatter = combinedLogFormatter
+        self.access_logger = logging.getLogger(logger_name)
+
+    def log(self, request):
+        line = self._log_formatter(self._logDateTime, request)
+        self.access_logger.info(line)
 
 
 def run(hs):

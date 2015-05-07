@@ -7,6 +7,9 @@ matrix:
 matrix-bot:
   user_id: '@vertobot:matrix.org'
   password: ''
+  domain: 'matrix.org"
+  as_url: 'http://localhost:8009'
+  as_token: 'vertobot123'
 
 verto-bot:
   host: webrtc.freeswitch.org

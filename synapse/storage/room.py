@@ -15,11 +15,9 @@
 
 from twisted.internet import defer
 
-from sqlite3 import IntegrityError
-
 from synapse.api.errors import StoreError
 
-from ._base import SQLBaseStore, Table
+from ._base import SQLBaseStore
 
 import collections
 import logging
@@ -27,8 +25,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-OpsLevel = collections.namedtuple("OpsLevel", (
-    "ban_level", "kick_level", "redact_level")
+OpsLevel = collections.namedtuple(
+    "OpsLevel",
+    ("ban_level", "kick_level", "redact_level",)
 )
 
 
@@ -47,13 +46,15 @@ class RoomStore(SQLBaseStore):
             StoreError if the room could not be stored.
         """
         try:
-            yield self._simple_insert(RoomsTable.table_name, dict(
-                room_id=room_id,
-                creator=room_creator_user_id,
-                is_public=is_public
-            ))
-        except IntegrityError:
-            raise StoreError(409, "Room ID in use.")
+            yield self._simple_insert(
+                RoomsTable.table_name,
+                {
+                    "room_id": room_id,
+                    "creator": room_creator_user_id,
+                    "is_public": is_public,
+                },
+                desc="store_room",
+            )
         except Exception as e:
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
@@ -66,9 +67,22 @@ class RoomStore(SQLBaseStore):
         Returns:
             A namedtuple containing the room information, or an empty list.
         """
-        query = RoomsTable.select_statement("room_id=?")
-        return self._execute(
-            "get_room", RoomsTable.decode_single_result, query, room_id,
+        return self._simple_select_one(
+            table=RoomsTable.table_name,
+            keyvalues={"room_id": room_id},
+            retcols=RoomsTable.fields,
+            desc="get_room",
+            allow_none=True,
+        )
+
+    def get_public_room_ids(self):
+        return self._simple_select_onecol(
+            table="rooms",
+            keyvalues={
+                "is_public": True,
+            },
+            retcol="room_id",
+            desc="get_public_room_ids",
         )
 
     @defer.inlineCallbacks
@@ -99,24 +113,37 @@ class RoomStore(SQLBaseStore):
                 "ON c.event_id = room_names.event_id "
             )
 
-            # We use non printing ascii character US () as a seperator
+            # We use non printing ascii character US (\x1F) as a separator
             sql = (
-                "SELECT r.room_id, n.name, t.topic, "
-                "group_concat(a.room_alias, '') "
-                "FROM rooms AS r "
-                "LEFT JOIN (%(topic)s) AS t ON t.room_id = r.room_id "
-                "LEFT JOIN (%(name)s) AS n ON n.room_id = r.room_id "
-                "INNER JOIN room_aliases AS a ON a.room_id = r.room_id "
-                "WHERE r.is_public = ? "
-                "GROUP BY r.room_id "
+                "SELECT r.room_id, max(n.name), max(t.topic)"
+                " FROM rooms AS r"
+                " LEFT JOIN (%(topic)s) AS t ON t.room_id = r.room_id"
+                " LEFT JOIN (%(name)s) AS n ON n.room_id = r.room_id"
+                " WHERE r.is_public = ?"
+                " GROUP BY r.room_id"
             ) % {
                 "topic": topic_subquery,
                 "name": name_subquery,
             }
 
-            c = txn.execute(sql, (is_public,))
+            txn.execute(sql, (is_public,))
 
-            return c.fetchall()
+            rows = txn.fetchall()
+
+            for i, row in enumerate(rows):
+                room_id = row[0]
+                aliases = self._simple_select_onecol_txn(
+                    txn,
+                    table="room_aliases",
+                    keyvalues={
+                        "room_id": room_id
+                    },
+                    retcol="room_alias",
+                )
+
+                rows[i] = list(row) + [aliases]
+
+            return rows
 
         rows = yield self.runInteraction(
             "get_rooms", f
@@ -127,9 +154,10 @@ class RoomStore(SQLBaseStore):
                 "room_id": r[0],
                 "name": r[1],
                 "topic": r[2],
-                "aliases": r[3].split(""),
+                "aliases": r[3],
             }
             for r in rows
+            if r[3]  # We only return rooms that have at least one alias.
         ]
 
         defer.returnValue(ret)
@@ -143,7 +171,7 @@ class RoomStore(SQLBaseStore):
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "topic": event.content["topic"],
-                }
+                },
             )
 
     def _store_room_name_txn(self, txn, event):
@@ -158,8 +186,39 @@ class RoomStore(SQLBaseStore):
                 }
             )
 
+    @defer.inlineCallbacks
+    def get_room_name_and_aliases(self, room_id):
+        def f(txn):
+            sql = (
+                "SELECT event_id FROM current_state_events "
+                "WHERE room_id = ? "
+            )
 
-class RoomsTable(Table):
+            sql += " AND ((type = 'm.room.name' AND state_key = '')"
+            sql += " OR type = 'm.room.aliases')"
+
+            txn.execute(sql, (room_id,))
+            results = self.cursor_to_dict(txn)
+
+            return self._parse_events_txn(txn, results)
+
+        events = yield self.runInteraction("get_room_name_and_aliases", f)
+
+        name = None
+        aliases = []
+
+        for e in events:
+            if e.type == 'm.room.name':
+                if 'name' in e.content:
+                    name = e.content['name']
+            elif e.type == 'm.room.aliases':
+                if 'aliases' in e.content:
+                    aliases.extend(e.content['aliases'])
+
+        defer.returnValue((name, aliases))
+
+
+class RoomsTable(object):
     table_name = "rooms"
 
     fields = [
@@ -167,5 +226,3 @@ class RoomsTable(Table):
         "is_public",
         "creator"
     ]
-
-    EntryType = collections.namedtuple("RoomEntry", fields)

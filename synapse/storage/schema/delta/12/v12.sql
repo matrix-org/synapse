@@ -17,26 +17,25 @@ CREATE TABLE IF NOT EXISTS rejections(
     event_id TEXT NOT NULL,
     reason TEXT NOT NULL,
     last_check TEXT NOT NULL,
-    CONSTRAINT ev_id UNIQUE (event_id) ON CONFLICT REPLACE
+    UNIQUE (event_id)
 );
 
 -- Push notification endpoints that users have configured
 CREATE TABLE IF NOT EXISTS pushers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_name TEXT NOT NULL,
-  profile_tag varchar(32) NOT NULL,
-  kind varchar(8) NOT NULL,
-  app_id varchar(64) NOT NULL,
-  app_display_name varchar(64) NOT NULL,
-  device_display_name varchar(128) NOT NULL,
-  pushkey blob NOT NULL,
-  ts BIGINT NOT NULL,
-  lang varchar(8),
-  data blob,
+  profile_tag VARCHAR(32) NOT NULL,
+  kind VARCHAR(8) NOT NULL,
+  app_id VARCHAR(64) NOT NULL,
+  app_display_name VARCHAR(64) NOT NULL,
+  device_display_name VARCHAR(128) NOT NULL,
+  pushkey VARBINARY(512) NOT NULL,
+  ts BIGINT UNSIGNED NOT NULL,
+  lang VARCHAR(8),
+  data LONGBLOB,
   last_token TEXT,
-  last_success BIGINT,
-  failing_since BIGINT,
-  FOREIGN KEY(user_name) REFERENCES users(name),
+  last_success BIGINT UNSIGNED,
+  failing_since BIGINT UNSIGNED,
   UNIQUE (app_id, pushkey)
 );
 
@@ -55,13 +54,10 @@ CREATE INDEX IF NOT EXISTS push_rules_user_name on push_rules (user_name);
 
 CREATE TABLE IF NOT EXISTS user_filters(
   user_id TEXT,
-  filter_id INTEGER,
-  filter_json TEXT,
-  FOREIGN KEY(user_id) REFERENCES users(id)
+  filter_id BIGINT UNSIGNED,
+  filter_json LONGBLOB
 );
 
 CREATE INDEX IF NOT EXISTS user_filters_by_user_id_filter_id ON user_filters(
-  user_id, filter_id
+    user_id, filter_id
 );
-
-PRAGMA user_version = 12;

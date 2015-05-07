@@ -13,116 +13,92 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-from ._base import Config, ConfigError
-import syutil.crypto.signing_key
+from ._base import Config
 
 
 class ServerConfig(Config):
-    def __init__(self, args):
-        super(ServerConfig, self).__init__(args)
-        self.server_name = args.server_name
-        self.signing_key = self.read_signing_key(args.signing_key_path)
-        self.bind_port = args.bind_port
-        self.bind_host = args.bind_host
-        self.unsecure_port = args.unsecure_port
-        self.daemonize = args.daemonize
-        self.pid_file = self.abspath(args.pid_file)
-        self.web_client = args.web_client
-        self.manhole = args.manhole
-        self.soft_file_limit = args.soft_file_limit
 
-        if not args.content_addr:
-            host = args.server_name
+    def read_config(self, config):
+        self.server_name = config["server_name"]
+        self.bind_port = config["bind_port"]
+        self.bind_host = config["bind_host"]
+        self.unsecure_port = config["unsecure_port"]
+        self.manhole = config.get("manhole")
+        self.pid_file = self.abspath(config.get("pid_file"))
+        self.web_client = config["web_client"]
+        self.soft_file_limit = config["soft_file_limit"]
+        self.daemonize = config.get("daemonize")
+
+        # Attempt to guess the content_addr for the v0 content repostitory
+        content_addr = config.get("content_addr")
+        if not content_addr:
+            host = self.server_name
             if ':' not in host:
-                host = "%s:%d" % (host, args.unsecure_port)
+                host = "%s:%d" % (host, self.unsecure_port)
             else:
                 host = host.split(':')[0]
-                host = "%s:%d" % (host, args.unsecure_port)
-            args.content_addr = "http://%s" % (host,)
+                host = "%s:%d" % (host, self.unsecure_port)
+            content_addr = "http://%s" % (host,)
 
-        self.content_addr = args.content_addr
+        self.content_addr = content_addr
 
-    @classmethod
-    def add_arguments(cls, parser):
-        super(ServerConfig, cls).add_arguments(parser)
+    def default_config(self, config_dir_path, server_name):
+        if ":" in server_name:
+            bind_port = int(server_name.split(":")[1])
+            unsecure_port = bind_port - 400
+        else:
+            bind_port = 8448
+            unsecure_port = 8008
+
+        pid_file = self.abspath("homeserver.pid")
+        return """\
+        ## Server ##
+
+        # The domain name of the server, with optional explicit port.
+        # This is used by remote servers to connect to this server,
+        # e.g. matrix.org, localhost:8080, etc.
+        server_name: "%(server_name)s"
+
+        # The port to listen for HTTPS requests on.
+        # For when matrix traffic is sent directly to synapse.
+        bind_port: %(bind_port)s
+
+        # The port to listen for HTTP requests on.
+        # For when matrix traffic passes through loadbalancer that unwraps TLS.
+        unsecure_port: %(unsecure_port)s
+
+        # Local interface to listen on.
+        # The empty string will cause synapse to listen on all interfaces.
+        bind_host: ""
+
+        # When running as a daemon, the file to store the pid in
+        pid_file: %(pid_file)s
+
+        # Whether to serve a web client from the HTTP/HTTPS root resource.
+        web_client: True
+
+        # Set the soft limit on the number of file descriptors synapse can use
+        # Zero is used to indicate synapse should set the soft limit to the
+        # hard limit.
+        soft_file_limit: 0
+
+        # Turn on the twisted telnet manhole service on localhost on the given
+        # port.
+        #manhole: 9000
+        """ % locals()
+
+    def read_arguments(self, args):
+        if args.manhole is not None:
+            self.manhole = args.manhole
+        if args.daemonize is not None:
+            self.daemonize = args.daemonize
+
+    def add_arguments(self, parser):
         server_group = parser.add_argument_group("server")
-        server_group.add_argument(
-            "-H", "--server-name", default="localhost",
-            help="The domain name of the server, with optional explicit port. "
-                 "This is used by remote servers to connect to this server, "
-                 "e.g. matrix.org, localhost:8080, etc."
-        )
-        server_group.add_argument("--signing-key-path",
-                                  help="The signing key to sign messages with")
-        server_group.add_argument("-p", "--bind-port", metavar="PORT",
-                                  type=int, help="https port to listen on",
-                                  default=8448)
-        server_group.add_argument("--unsecure-port", metavar="PORT",
-                                  type=int, help="http port to listen on",
-                                  default=8008)
-        server_group.add_argument("--bind-host", default="",
-                                  help="Local interface to listen on")
         server_group.add_argument("-D", "--daemonize", action='store_true',
+                                  default=None,
                                   help="Daemonize the home server")
-        server_group.add_argument('--pid-file', default="homeserver.pid",
-                                  help="When running as a daemon, the file to"
-                                  " store the pid in")
-        server_group.add_argument('--web_client', default=True, type=bool,
-                                  help="Whether or not to serve a web client")
         server_group.add_argument("--manhole", metavar="PORT", dest="manhole",
                                   type=int,
                                   help="Turn on the twisted telnet manhole"
                                   " service on the given port.")
-        server_group.add_argument("--content-addr", default=None,
-                                  help="The host and scheme to use for the "
-                                  "content repository")
-        server_group.add_argument("--soft-file-limit", type=int, default=0,
-                                  help="Set the soft limit on the number of "
-                                       "file descriptors synapse can use. "
-                                       "Zero is used to indicate synapse "
-                                       "should set the soft limit to the hard"
-                                       "limit.")
-
-    def read_signing_key(self, signing_key_path):
-        signing_keys = self.read_file(signing_key_path, "signing_key")
-        try:
-            return syutil.crypto.signing_key.read_signing_keys(
-                signing_keys.splitlines(True)
-            )
-        except Exception:
-            raise ConfigError(
-                "Error reading signing_key."
-                " Try running again with --generate-config"
-            )
-
-    @classmethod
-    def generate_config(cls, args, config_dir_path):
-        super(ServerConfig, cls).generate_config(args, config_dir_path)
-        base_key_name = os.path.join(config_dir_path, args.server_name)
-
-        args.pid_file = os.path.abspath(args.pid_file)
-
-        if not args.signing_key_path:
-            args.signing_key_path = base_key_name + ".signing.key"
-
-        if not os.path.exists(args.signing_key_path):
-            with open(args.signing_key_path, "w") as signing_key_file:
-                syutil.crypto.signing_key.write_signing_keys(
-                    signing_key_file,
-                    (syutil.crypto.signing_key.generate_singing_key("auto"),),
-                )
-        else:
-            signing_keys = cls.read_file(args.signing_key_path, "signing_key")
-            if len(signing_keys.split("\n")[0].split()) == 1:
-                # handle keys in the old format.
-                key = syutil.crypto.signing_key.decode_signing_key_base64(
-                    syutil.crypto.signing_key.NACL_ED25519,
-                    "auto",
-                    signing_keys.split("\n")[0]
-                )
-                with open(args.signing_key_path, "w") as signing_key_file:
-                    syutil.crypto.signing_key.write_signing_keys(
-                        signing_key_file,
-                        (key,),
-                    )

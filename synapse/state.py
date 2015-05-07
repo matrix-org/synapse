@@ -86,12 +86,7 @@ class StateHandler(object):
         If `event_type` is specified, then the method returns only the one
         event (or None) with that `event_type` and `state_key`.
         """
-        events = yield self.store.get_latest_events_in_room(room_id)
-
-        event_ids = [
-            e_id
-            for e_id, _, _ in events
-        ]
+        event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
         cache = None
         if self._state_cache is not None:

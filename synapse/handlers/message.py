@@ -267,14 +267,14 @@ class MessageHandler(BaseHandler):
             user, pagination_config.get_source_config("presence"), None
         )
 
-        public_rooms = yield self.store.get_rooms(is_public=True)
-        public_room_ids = [r["room_id"] for r in public_rooms]
+        public_room_ids = yield self.store.get_public_room_ids()
 
         limit = pagin_config.limit
         if limit is None:
             limit = 10
 
-        for event in room_list:
+        @defer.inlineCallbacks
+        def handle_room(event):
             d = {
                 "room_id": event.room_id,
                 "membership": event.membership,
@@ -290,12 +290,19 @@ class MessageHandler(BaseHandler):
             rooms_ret.append(d)
 
             if event.membership != Membership.JOIN:
-                continue
+                return
             try:
-                messages, token = yield self.store.get_recent_events_for_room(
-                    event.room_id,
-                    limit=limit,
-                    end_token=now_token.room_key,
+                (messages, token), current_state = yield defer.gatherResults(
+                    [
+                        self.store.get_recent_events_for_room(
+                            event.room_id,
+                            limit=limit,
+                            end_token=now_token.room_key,
+                        ),
+                        self.state_handler.get_current_state(
+                            event.room_id
+                        ),
+                    ]
                 )
 
                 start_token = now_token.copy_and_replace("room_key", token[0])
@@ -311,15 +318,17 @@ class MessageHandler(BaseHandler):
                     "end": end_token.to_string(),
                 }
 
-                current_state = yield self.state_handler.get_current_state(
-                    event.room_id
-                )
                 d["state"] = [
                     serialize_event(c, time_now, as_client_event)
                     for c in current_state.values()
                 ]
             except:
                 logger.exception("Failed to get snapshot")
+
+        yield defer.gatherResults(
+            [handle_room(e) for e in room_list],
+            consumeErrors=True
+        )
 
         ret = {
             "rooms": rooms_ret,

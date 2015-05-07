@@ -18,14 +18,17 @@ import sys
 import os
 import subprocess
 import signal
+import yaml
 
 SYNAPSE = ["python", "-B", "-m", "synapse.app.homeserver"]
 
 CONFIGFILE = "homeserver.yaml"
-PIDFILE = "homeserver.pid"
 
 GREEN = "\x1b[1;32m"
 NORMAL = "\x1b[m"
+
+CONFIG = yaml.load(open(CONFIGFILE))
+PIDFILE = CONFIG["pid_file"]
 
 
 def start():
@@ -40,7 +43,7 @@ def start():
         sys.exit(1)
     print "Starting ...",
     args = SYNAPSE
-    args.extend(["--daemonize", "-c", CONFIGFILE, "--pid-file", PIDFILE])
+    args.extend(["--daemonize", "-c", CONFIGFILE])
     subprocess.check_call(args)
     print GREEN + "started" + NORMAL
 

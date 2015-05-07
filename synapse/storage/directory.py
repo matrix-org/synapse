@@ -13,15 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, cached
 
 from synapse.api.errors import SynapseError
 
 from twisted.internet import defer
 
 from collections import namedtuple
-
-import sqlite3
 
 
 RoomAliasMapping = namedtuple(
@@ -48,6 +46,7 @@ class DirectoryStore(SQLBaseStore):
             {"room_alias": room_alias.to_string()},
             "room_id",
             allow_none=True,
+            desc="get_association_from_room_alias",
         )
 
         if not room_id:
@@ -58,6 +57,7 @@ class DirectoryStore(SQLBaseStore):
             "room_alias_servers",
             {"room_alias": room_alias.to_string()},
             "server",
+            desc="get_association_from_room_alias",
         )
 
         if not servers:
@@ -87,8 +87,9 @@ class DirectoryStore(SQLBaseStore):
                     "room_alias": room_alias.to_string(),
                     "room_id": room_id,
                 },
+                desc="create_room_alias_association",
             )
-        except sqlite3.IntegrityError:
+        except self.database_engine.module.IntegrityError:
             raise SynapseError(
                 409, "Room alias %s already exists" % room_alias.to_string()
             )
@@ -100,23 +101,29 @@ class DirectoryStore(SQLBaseStore):
                 {
                     "room_alias": room_alias.to_string(),
                     "server": server,
-                }
+                },
+                desc="create_room_alias_association",
             )
+        self.get_aliases_for_room.invalidate(room_id)
 
+    @defer.inlineCallbacks
     def delete_room_alias(self, room_alias):
-        return self.runInteraction(
+        room_id = yield self.runInteraction(
             "delete_room_alias",
             self._delete_room_alias_txn,
             room_alias,
         )
 
+        self.get_aliases_for_room.invalidate(room_id)
+        defer.returnValue(room_id)
+
     def _delete_room_alias_txn(self, txn, room_alias):
-        cursor = txn.execute(
+        txn.execute(
             "SELECT room_id FROM room_aliases WHERE room_alias = ?",
             (room_alias.to_string(),)
         )
 
-        res = cursor.fetchone()
+        res = txn.fetchone()
         if res:
             room_id = res[0]
         else:
@@ -134,9 +141,11 @@ class DirectoryStore(SQLBaseStore):
 
         return room_id
 
+    @cached()
     def get_aliases_for_room(self, room_id):
         return self._simple_select_onecol(
             "room_aliases",
             {"room_id": room_id},
             "room_alias",
+            desc="get_aliases_for_room",
         )

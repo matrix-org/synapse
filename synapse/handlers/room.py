@@ -124,7 +124,7 @@ class RoomCreationHandler(BaseHandler):
         msg_handler = self.hs.get_handlers().message_handler
 
         for event in creation_events:
-            yield msg_handler.create_and_send_event(event)
+            yield msg_handler.create_and_send_event(event, ratelimit=False)
 
         if "name" in config:
             name = config["name"]
@@ -134,7 +134,7 @@ class RoomCreationHandler(BaseHandler):
                 "sender": user_id,
                 "state_key": "",
                 "content": {"name": name},
-            })
+            }, ratelimit=False)
 
         if "topic" in config:
             topic = config["topic"]
@@ -144,7 +144,7 @@ class RoomCreationHandler(BaseHandler):
                 "sender": user_id,
                 "state_key": "",
                 "content": {"topic": topic},
-            })
+            }, ratelimit=False)
 
         for invitee in invite_list:
             yield msg_handler.create_and_send_event({
@@ -153,7 +153,7 @@ class RoomCreationHandler(BaseHandler):
                 "room_id": room_id,
                 "sender": user_id,
                 "content": {"membership": Membership.INVITE},
-            })
+            }, ratelimit=False)
 
         result = {"room_id": room_id}
 
@@ -213,7 +213,8 @@ class RoomCreationHandler(BaseHandler):
                 "state_default": 50,
                 "ban": 50,
                 "kick": 50,
-                "redact": 50
+                "redact": 50,
+                "invite": 0,
             },
         )
 
@@ -309,25 +310,6 @@ class RoomMemberHandler(BaseHandler):
         # TODO snapshot this list to return on subsequent requests when
         # paginating
         defer.returnValue(chunk_data)
-
-    @defer.inlineCallbacks
-    def get_room_member(self, room_id, member_user_id, auth_user_id):
-        """Retrieve a room member from a room.
-
-        Args:
-            room_id : The room the member is in.
-            member_user_id : The member's user ID
-            auth_user_id : The user ID of the user making this request.
-        Returns:
-            The room member, or None if this member does not exist.
-        Raises:
-            SynapseError if something goes wrong.
-        """
-        yield self.auth.check_joined_room(room_id, auth_user_id)
-
-        member = yield self.store.get_room_member(user_id=member_user_id,
-                                                  room_id=room_id)
-        defer.returnValue(member)
 
     @defer.inlineCallbacks
     def change_membership(self, event, context, do_auth=True):
@@ -547,11 +529,19 @@ class RoomListHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_public_room_list(self):
         chunk = yield self.store.get_rooms(is_public=True)
-        for room in chunk:
-            joined_users = yield self.store.get_users_in_room(
-                room_id=room["room_id"],
-            )
-            room["num_joined_members"] = len(joined_users)
+        results = yield defer.gatherResults(
+            [
+                self.store.get_users_in_room(
+                    room_id=room["room_id"],
+                )
+                for room in chunk
+            ],
+            consumeErrors=True,
+        )
+
+        for i, room in enumerate(chunk):
+            room["num_joined_members"] = len(results[i])
+
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
 

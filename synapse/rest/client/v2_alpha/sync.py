@@ -15,7 +15,9 @@
 
 from twisted.internet import defer
 
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import (
+    RestServlet, parse_string, parse_integer, parse_boolean
+)
 from synapse.handlers.sync import SyncConfig
 from synapse.types import StreamToken
 from synapse.events.utils import (
@@ -87,20 +89,20 @@ class SyncRestServlet(RestServlet):
     def on_GET(self, request):
         user, client = yield self.auth.get_user_by_req(request)
 
-        timeout = self.parse_integer(request, "timeout", default=0)
-        limit = self.parse_integer(request, "limit", required=True)
-        gap = self.parse_boolean(request, "gap", default=True)
-        sort = self.parse_string(
+        timeout = parse_integer(request, "timeout", default=0)
+        limit = parse_integer(request, "limit", required=True)
+        gap = parse_boolean(request, "gap", default=True)
+        sort = parse_string(
             request, "sort", default="timeline,asc",
             allowed_values=self.ALLOWED_SORT
         )
-        since = self.parse_string(request, "since")
-        set_presence = self.parse_string(
+        since = parse_string(request, "since")
+        set_presence = parse_string(
             request, "set_presence", default="online",
             allowed_values=self.ALLOWED_PRESENCE
         )
-        backfill = self.parse_boolean(request, "backfill", default=False)
-        filter_id = self.parse_string(request, "filter", default=None)
+        backfill = parse_boolean(request, "backfill", default=False)
+        filter_id = parse_string(request, "filter", default=None)
 
         logger.info(
             "/sync: user=%r, timeout=%r, limit=%r, gap=%r, sort=%r, since=%r,"

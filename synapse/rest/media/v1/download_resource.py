@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .base_resource import BaseMediaResource
+from .base_resource import BaseMediaResource, parse_media_id
+from synapse.http.server import request_handler
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
@@ -28,15 +29,10 @@ class DownloadResource(BaseMediaResource):
         self._async_render_GET(request)
         return NOT_DONE_YET
 
-    @BaseMediaResource.catch_errors
+    @request_handler
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
-        try:
-            server_name, media_id = request.postpath
-        except:
-            self._respond_404(request)
-            return
-
+        server_name, media_id = parse_media_id(request)
         if server_name == self.server_name:
             yield self._respond_local_file(request, media_id)
         else:

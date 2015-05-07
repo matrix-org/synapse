@@ -20,19 +20,22 @@ from .database import DatabaseConfig
 from .ratelimiting import RatelimitConfig
 from .repository import ContentRepositoryConfig
 from .captcha import CaptchaConfig
-from .email import EmailConfig
 from .voip import VoipConfig
 from .registration import RegistrationConfig
 from .metrics import MetricsConfig
+from .appservice import AppServiceConfig
+from .key import KeyConfig
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
-                       EmailConfig, VoipConfig, RegistrationConfig,
-                       MetricsConfig,):
+                       VoipConfig, RegistrationConfig,
+                       MetricsConfig, AppServiceConfig, KeyConfig,):
     pass
 
 
 if __name__ == '__main__':
     import sys
-    HomeServerConfig.load_config("Generate config", sys.argv[1:], "HomeServer")
+    sys.stdout.write(
+        HomeServerConfig().generate_config(sys.argv[1], sys.argv[2])[0]
+    )

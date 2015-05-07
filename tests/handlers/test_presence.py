@@ -194,8 +194,13 @@ class MockedDatastorePresenceTestCase(PresenceTestCase):
         return datastore
 
     def setUp_datastore_federation_mocks(self, datastore):
+        retry_timings_res = {
+            "destination": "",
+            "retry_last_ts": 0,
+            "retry_interval": 0,
+        }
         datastore.get_destination_retry_timings.return_value = (
-            defer.succeed(DestinationsTable.EntryType("", 0, 0))
+            defer.succeed(retry_timings_res)
         )
 
         def get_received_txn_response(*args):
@@ -876,6 +881,71 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
         self.assertEquals(
             {"presence": ONLINE, "last_active_ago": 3000},
             state
+        )
+
+    @defer.inlineCallbacks
+    def test_recv_remote_offline(self):
+        """ Various tests relating to SYN-261 """
+        potato_set = self.handler._remote_recvmap.setdefault(self.u_potato,
+                set())
+        potato_set.add(self.u_apple)
+
+        self.room_members = [self.u_banana, self.u_potato]
+
+        self.assertEquals(self.event_source.get_current_key(), 0)
+
+        yield self.mock_federation_resource.trigger("PUT",
+            "/_matrix/federation/v1/send/1000000/",
+            _make_edu_json("elsewhere", "m.presence",
+                content={
+                    "push": [
+                        {"user_id": "@potato:remote",
+                         "presence": "offline"},
+                    ],
+                }
+            )
+        )
+
+        self.assertEquals(self.event_source.get_current_key(), 1)
+
+        (events, _) = yield self.event_source.get_new_events_for_user(
+            self.u_apple, 0, None
+        )
+        self.assertEquals(events,
+            [
+                {"type": "m.presence",
+                 "content": {
+                     "user_id": "@potato:remote",
+                     "presence": OFFLINE,
+                }}
+            ]
+        )
+
+        yield self.mock_federation_resource.trigger("PUT",
+            "/_matrix/federation/v1/send/1000001/",
+            _make_edu_json("elsewhere", "m.presence",
+                content={
+                    "push": [
+                        {"user_id": "@potato:remote",
+                         "presence": "online"},
+                    ],
+                }
+            )
+        )
+
+        self.assertEquals(self.event_source.get_current_key(), 2)
+
+        (events, _) = yield self.event_source.get_new_events_for_user(
+            self.u_apple, 0, None
+        )
+        self.assertEquals(events,
+            [
+                {"type": "m.presence",
+                 "content": {
+                     "user_id": "@potato:remote",
+                     "presence": ONLINE,
+                }}
+            ]
         )
 
     @defer.inlineCallbacks

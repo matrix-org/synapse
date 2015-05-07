@@ -417,13 +417,13 @@ class FederationServer(FederationBase):
                 pdu.internal_metadata.outlier = True
             elif min_depth and pdu.depth > min_depth:
                 if get_missing and prevs - seen:
-                    latest_tuples = yield self.store.get_latest_events_in_room(
+                    latest = yield self.store.get_latest_event_ids_in_room(
                         pdu.room_id
                     )
 
                     # We add the prev events that we have seen to the latest
                     # list to ensure the remote server doesn't give them to us
-                    latest = set(e_id for e_id, _, _ in latest_tuples)
+                    latest = set(latest)
                     latest |= seen
 
                     missing_events = yield self.get_missing_events(

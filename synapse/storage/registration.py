@@ -15,8 +15,6 @@
 
 from twisted.internet import defer
 
-from sqlite3 import IntegrityError
-
 from synapse.api.errors import StoreError, Codes
 
 from ._base import SQLBaseStore, cached
@@ -39,16 +37,16 @@ class RegistrationStore(SQLBaseStore):
         Raises:
             StoreError if there was a problem adding this.
         """
-        row = yield self._simple_select_one("users", {"name": user_id}, ["id"])
-        if not row:
-            raise StoreError(400, "Bad user ID supplied.")
-        row_id = row["id"]
+        next_id = yield self._access_tokens_id_gen.get_next()
+
         yield self._simple_insert(
             "access_tokens",
             {
-                "user_id": row_id,
+                "id": next_id,
+                "user_id": user_id,
                 "token": token
-            }
+            },
+            desc="add_access_token_to_user",
         )
 
     @defer.inlineCallbacks
@@ -70,32 +68,72 @@ class RegistrationStore(SQLBaseStore):
     def _register(self, txn, user_id, token, password_hash):
         now = int(self.clock.time())
 
+        next_id = self._access_tokens_id_gen.get_next_txn(txn)
+
         try:
             txn.execute("INSERT INTO users(name, password_hash, creation_ts) "
                         "VALUES (?,?,?)",
                         [user_id, password_hash, now])
-        except IntegrityError:
+        except self.database_engine.module.IntegrityError:
             raise StoreError(
                 400, "User ID already taken.", errcode=Codes.USER_IN_USE
             )
 
         # it's possible for this to get a conflict, but only for a single user
         # since tokens are namespaced based on their user ID
-        txn.execute("INSERT INTO access_tokens(user_id, token) " +
-                    "VALUES (?,?)", [txn.lastrowid, token])
-
-    def get_user_by_id(self, user_id):
-        query = ("SELECT users.name, users.password_hash FROM users"
-                 " WHERE users.name = ?")
-        return self._execute(
-            "get_user_by_id", self.cursor_to_dict, query, user_id
+        txn.execute(
+            "INSERT INTO access_tokens(id, user_id, token)"
+            " VALUES (?,?,?)",
+            (next_id, user_id, token,)
         )
 
+    def get_user_by_id(self, user_id):
+        return self._simple_select_one(
+            table="users",
+            keyvalues={
+                "name": user_id,
+            },
+            retcols=["name", "password_hash"],
+            allow_none=True,
+        )
+
+    @defer.inlineCallbacks
+    def user_set_password_hash(self, user_id, password_hash):
+        """
+        NB. This does *not* evict any cache because the one use for this
+            removes most of the entries subsequently anyway so it would be
+            pointless. Use flush_user separately.
+        """
+        yield self._simple_update_one('users', {
+            'name': user_id
+        }, {
+            'password_hash': password_hash
+        })
+
+    @defer.inlineCallbacks
+    def user_delete_access_tokens_apart_from(self, user_id, token_id):
+        yield self.runInteraction(
+            "user_delete_access_tokens_apart_from",
+            self._user_delete_access_tokens_apart_from, user_id, token_id
+        )
+
+    def _user_delete_access_tokens_apart_from(self, txn, user_id, token_id):
+        txn.execute(
+            "DELETE FROM access_tokens WHERE user_id = ? AND id != ?",
+            (user_id, token_id)
+        )
+
+    @defer.inlineCallbacks
+    def flush_user(self, user_id):
+        rows = yield self._execute(
+            'flush_user', None,
+            "SELECT token FROM access_tokens WHERE user_id = ?",
+            user_id
+        )
+        for r in rows:
+            self.get_user_by_token.invalidate(r)
+
     @cached()
-    # TODO(paul): Currently there's no code to invalidate this cache. That
-    #   means if/when we ever add internal ways to invalidate access tokens or
-    #   change whether a user is a server admin, those will need to invoke
-    #      store.get_user_by_token.invalidate(token)
     def get_user_by_token(self, token):
         """Get a user from the given access token.
 
@@ -120,6 +158,7 @@ class RegistrationStore(SQLBaseStore):
             keyvalues={"name": user.to_string()},
             retcol="admin",
             allow_none=True,
+            desc="is_server_admin",
         )
 
         defer.returnValue(res if res else False)
@@ -129,13 +168,49 @@ class RegistrationStore(SQLBaseStore):
             "SELECT users.name, users.admin,"
             " access_tokens.device_id, access_tokens.id as token_id"
             " FROM users"
-            " INNER JOIN access_tokens on users.id = access_tokens.user_id"
+            " INNER JOIN access_tokens on users.name = access_tokens.user_id"
             " WHERE token = ?"
         )
 
-        cursor = txn.execute(sql, (token,))
-        rows = self.cursor_to_dict(cursor)
+        txn.execute(sql, (token,))
+        rows = self.cursor_to_dict(txn)
         if rows:
             return rows[0]
 
-        raise StoreError(404, "Token not found.")
+        return None
+
+    @defer.inlineCallbacks
+    def user_add_threepid(self, user_id, medium, address, validated_at, added_at):
+        yield self._simple_upsert("user_threepids", {
+            "user_id": user_id,
+            "medium": medium,
+            "address": address,
+        }, {
+            "validated_at": validated_at,
+            "added_at": added_at,
+        })
+
+    @defer.inlineCallbacks
+    def user_get_threepids(self, user_id):
+        ret = yield self._simple_select_list(
+            "user_threepids", {
+                "user_id": user_id
+            },
+            ['medium', 'address', 'validated_at', 'added_at'],
+            'user_get_threepids'
+        )
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def get_user_id_by_threepid(self, medium, address):
+        ret = yield self._simple_select_one(
+            "user_threepids",
+            {
+                "medium": medium,
+                "address": address
+            },
+            ['user_id'], True, 'get_user_id_by_threepid'
+        )
+        if ret:
+            defer.returnValue(ret['user_id'])
+        defer.returnValue(None)

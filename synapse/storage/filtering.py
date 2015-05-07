@@ -31,6 +31,7 @@ class FilteringStore(SQLBaseStore):
             },
             retcol="filter_json",
             allow_none=False,
+            desc="get_user_filter",
         )
 
         defer.returnValue(json.loads(def_json))

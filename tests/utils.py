@@ -17,6 +17,7 @@ from synapse.http.server import HttpServer
 from synapse.api.errors import cs_error, CodeMessageException, StoreError
 from synapse.api.constants import EventTypes
 from synapse.storage import prepare_database
+from synapse.storage.engines import create_engine
 from synapse.server import HomeServer
 
 from synapse.util.logcontext import LoggingContext
@@ -44,18 +45,23 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.event_cache_size = 1
         config.disable_registration = False
 
+    if "clock" not in kargs:
+        kargs["clock"] = MockClock()
+
     if datastore is None:
         db_pool = SQLiteMemoryDbPool()
         yield db_pool.prepare()
         hs = HomeServer(
             name, db_pool=db_pool, config=config,
             version_string="Synapse/tests",
+            database_engine=create_engine("sqlite3"),
             **kargs
         )
     else:
         hs = HomeServer(
             name, db_pool=None, datastore=datastore, config=config,
             version_string="Synapse/tests",
+            database_engine=create_engine("sqlite3"),
             **kargs
         )
 
@@ -227,7 +233,10 @@ class SQLiteMemoryDbPool(ConnectionPool, object):
         )
 
     def prepare(self):
-        return self.runWithConnection(prepare_database)
+        engine = create_engine("sqlite3")
+        return self.runWithConnection(
+            lambda conn: prepare_database(conn, engine)
+        )
 
 
 class MemoryDataStore(object):

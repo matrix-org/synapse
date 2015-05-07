@@ -32,3 +32,22 @@ def run_on_reactor():
     iteration of the main loop
     """
     return sleep(0)
+
+
+def create_observer(deferred):
+    """Creates a deferred that observes the result or failure of the given
+     deferred *without* affecting the given deferred.
+    """
+    d = defer.Deferred()
+
+    def callback(r):
+        d.callback(r)
+        return r
+
+    def errback(f):
+        d.errback(f)
+        return f
+
+    deferred.addCallbacks(callback, errback)
+
+    return d

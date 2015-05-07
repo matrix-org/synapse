@@ -1,10 +1,24 @@
+# Copyright 2015 OpenMarket Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 from distutils.version import LooseVersion
 
 logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
-    "syutil>=0.0.3": ["syutil"],
+    "syutil>=0.0.6": ["syutil>=0.0.6"],
     "Twisted==14.0.2": ["twisted==14.0.2"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
@@ -19,7 +33,7 @@ REQUIREMENTS = {
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {
-        "matrix_angular_sdk>=0.6.5": ["syweb>=0.6.5"],
+        "matrix_angular_sdk>=0.6.6": ["syweb>=0.6.6"],
     }
 }
 
@@ -43,13 +57,13 @@ DEPENDENCY_LINKS = [
     ),
     github_link(
         project="matrix-org/syutil",
-        version="v0.0.3",
-        egg="syutil-0.0.3",
+        version="v0.0.6",
+        egg="syutil-0.0.6",
     ),
     github_link(
         project="matrix-org/matrix-angular-sdk",
-        version="v0.6.5",
-        egg="matrix_angular_sdk-0.6.5",
+        version="v0.6.6",
+        egg="matrix_angular_sdk-0.6.6",
     ),
 ]
 

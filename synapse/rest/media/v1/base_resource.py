@@ -18,18 +18,32 @@ from .thumbnailer import Thumbnailer
 from synapse.http.server import respond_with_json
 from synapse.util.stringutils import random_string
 from synapse.api.errors import (
-    cs_exception, CodeMessageException, cs_error, Codes, SynapseError
+    cs_error, Codes, SynapseError
 )
 
 from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.protocols.basic import FileSender
 
+from synapse.util.async import create_observer
+
 import os
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def parse_media_id(request):
+    try:
+        server_name, media_id = request.postpath
+        return (server_name, media_id)
+    except:
+        raise SynapseError(
+            404,
+            "Invalid media id token %r" % (request.postpath,),
+            Codes.UNKNOWN,
+        )
 
 
 class BaseMediaResource(Resource):
@@ -45,73 +59,8 @@ class BaseMediaResource(Resource):
         self.max_upload_size = hs.config.max_upload_size
         self.max_image_pixels = hs.config.max_image_pixels
         self.filepaths = filepaths
+        self.version_string = hs.version_string
         self.downloads = {}
-
-    @staticmethod
-    def catch_errors(request_handler):
-        @defer.inlineCallbacks
-        def wrapped_request_handler(self, request):
-            try:
-                yield request_handler(self, request)
-            except CodeMessageException as e:
-                logger.info("Responding with error: %r", e)
-                respond_with_json(
-                    request, e.code, cs_exception(e), send_cors=True
-                )
-            except:
-                logger.exception(
-                    "Failed handle request %s.%s on %r",
-                    request_handler.__module__,
-                    request_handler.__name__,
-                    self,
-                )
-                respond_with_json(
-                    request,
-                    500,
-                    {"error": "Internal server error"},
-                    send_cors=True
-                )
-        return wrapped_request_handler
-
-    @staticmethod
-    def _parse_media_id(request):
-        try:
-            server_name, media_id = request.postpath
-            return (server_name, media_id)
-        except:
-            raise SynapseError(
-                404,
-                "Invalid media id token %r" % (request.postpath,),
-                Codes.UNKNOWN,
-            )
-
-    @staticmethod
-    def _parse_integer(request, arg_name, default=None):
-        try:
-            if default is None:
-                return int(request.args[arg_name][0])
-            else:
-                return int(request.args.get(arg_name, [default])[0])
-        except:
-            raise SynapseError(
-                400,
-                "Missing integer argument %r" % (arg_name,),
-                Codes.UNKNOWN,
-            )
-
-    @staticmethod
-    def _parse_string(request, arg_name, default=None):
-        try:
-            if default is None:
-                return request.args[arg_name][0]
-            else:
-                return request.args.get(arg_name, [default])[0]
-        except:
-            raise SynapseError(
-                400,
-                "Missing string argument %r" % (arg_name,),
-                Codes.UNKNOWN,
-            )
 
     def _respond_404(self, request):
         respond_with_json(
@@ -140,7 +89,7 @@ class BaseMediaResource(Resource):
             def callback(media_info):
                 del self.downloads[key]
                 return media_info
-        return download
+        return create_observer(download)
 
     @defer.inlineCallbacks
     def _get_remote_media_impl(self, server_name, media_id):

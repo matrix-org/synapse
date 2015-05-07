@@ -16,19 +16,18 @@ CREATE TABLE IF NOT EXISTS users(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     password_hash TEXT,
-    creation_ts INTEGER,
-    admin BOOL DEFAULT 0 NOT NULL,
-    UNIQUE(name) ON CONFLICT ROLLBACK
+    creation_ts BIGINT,
+    admin SMALLINT DEFAULT 0 NOT NULL,
+    UNIQUE(name)
 );
 
 CREATE TABLE IF NOT EXISTS access_tokens(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
     device_id TEXT,
     token TEXT NOT NULL,
-    last_used INTEGER,
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    UNIQUE(token) ON CONFLICT ROLLBACK
+    last_used BIGINT,
+    UNIQUE(token)
 );
 
 CREATE TABLE IF NOT EXISTS user_ips (
@@ -37,9 +36,8 @@ CREATE TABLE IF NOT EXISTS user_ips (
     device_id TEXT,
     ip TEXT NOT NULL,
     user_agent TEXT NOT NULL,
-    last_seen INTEGER NOT NULL,
-    CONSTRAINT user_ip UNIQUE (user, access_token, ip, user_agent) ON CONFLICT REPLACE
+    last_seen BIGINT NOT NULL,
+    UNIQUE (user, access_token, ip, user_agent)
 );
 
-CREATE INDEX IF NOT EXISTS user_ips_user ON user_ips(user);
-
+CREATE INDEX user_ips_user ON user_ips(user);
