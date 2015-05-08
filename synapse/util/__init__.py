@@ -54,7 +54,8 @@ class Clock(object):
                 LoggingContext.thread_local.current_context = current_context
                 callback()
 
-        return reactor.callLater(delay, wrapped_callback)
+        with PreserveLoggingContext():
+            return reactor.callLater(delay, wrapped_callback)
 
     def cancel_call_later(self, timer):
         timer.cancel()

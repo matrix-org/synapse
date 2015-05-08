@@ -132,6 +132,13 @@ class PreserveLoggingContext(object):
         """Restores the current logging context"""
         LoggingContext.thread_local.current_context = self.current_context
 
+        if self.current_context is not LoggingContext.sentinel:
+            if self.current_context.parent_context is None:
+                logger.warn(
+                    "Restoring dead context: %s",
+                    self.current_context,
+                )
+
 
 def preserve_context_over_fn(fn, *args, **kwargs):
     """Takes a function and invokes it with the given arguments, but removes
@@ -169,6 +176,8 @@ def preserve_context_over_deferred(deferred):
             res = d.errback(failure)
         return res
 
-    deferred.addCallbacks(cb, eb)
+    if deferred.called:
+        return deferred
 
+    deferred.addCallbacks(cb, eb)
     return d
