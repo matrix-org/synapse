@@ -1,4 +1,4 @@
-Upgrading to v0.x.x
+Upgrading to v0.9.0
 ===================
 
 Application services have had a breaking API change in this version.

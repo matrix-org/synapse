@@ -82,13 +82,13 @@ complete, restart synapse.  For instance::
     cp homeserver.db homeserver.db.snapshot
     ./synctl start
 
-Assuming your database config file (as described in the section *Synapse
-config*) is named ``database_config.yaml`` and the SQLite snapshot is at
+Assuming your new config file (as described in the section *Synapse config*)
+is named ``homeserver-postgres.yaml`` and the SQLite snapshot is at
 ``homeserver.db.snapshot`` then simply run::
 
     python scripts/port_from_sqlite_to_postgres.py \
         --sqlite-database homeserver.db.snapshot \
-        --postgres-config database_config.yaml
+        --postgres-config homeserver-postgres.yaml
 
 The flag ``--curses`` displays a coloured curses progress UI.
 

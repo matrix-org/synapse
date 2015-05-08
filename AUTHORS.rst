@@ -35,3 +35,6 @@ Turned to Dust <dwinslow86 at gmail.com>
 
 Brabo <brabo at riseup.net>
  * Installation instruction fixes
+
+Ivan Shapovalov <intelfx100 at gmail.com>
+ * contrib/systemd: a sample systemd unit file and a logger configuration
