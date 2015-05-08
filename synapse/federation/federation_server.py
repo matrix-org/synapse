@@ -20,7 +20,6 @@ from .federation_base import FederationBase
 from .units import Transaction, Edu
 
 from synapse.util.logutils import log_function
-from synapse.util.logcontext import PreserveLoggingContext
 from synapse.events import FrozenEvent
 import synapse.metrics
 
@@ -123,29 +122,28 @@ class FederationServer(FederationBase):
 
         logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
-        with PreserveLoggingContext():
-            results = []
+        results = []
 
-            for pdu in pdu_list:
-                d = self._handle_new_pdu(transaction.origin, pdu)
+        for pdu in pdu_list:
+            d = self._handle_new_pdu(transaction.origin, pdu)
 
-                try:
-                    yield d
-                    results.append({})
-                except FederationError as e:
-                    self.send_failure(e, transaction.origin)
-                    results.append({"error": str(e)})
-                except Exception as e:
-                    results.append({"error": str(e)})
-                    logger.exception("Failed to handle PDU")
+            try:
+                yield d
+                results.append({})
+            except FederationError as e:
+                self.send_failure(e, transaction.origin)
+                results.append({"error": str(e)})
+            except Exception as e:
+                results.append({"error": str(e)})
+                logger.exception("Failed to handle PDU")
 
-            if hasattr(transaction, "edus"):
-                for edu in [Edu(**x) for x in transaction.edus]:
-                    self.received_edu(
-                        transaction.origin,
-                        edu.edu_type,
-                        edu.content
-                    )
+        if hasattr(transaction, "edus"):
+            for edu in [Edu(**x) for x in transaction.edus]:
+                self.received_edu(
+                    transaction.origin,
+                    edu.edu_type,
+                    edu.content
+                )
 
             for failure in getattr(transaction, "pdu_failures", []):
                 logger.info("Got failure %r", failure)

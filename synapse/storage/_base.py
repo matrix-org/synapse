@@ -18,7 +18,7 @@ from synapse.api.errors import StoreError
 from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event
 from synapse.util.logutils import log_function
-from synapse.util.logcontext import PreserveLoggingContext, LoggingContext
+from synapse.util.logcontext import preserve_context_over_fn, LoggingContext
 from synapse.util.lrucache import LruCache
 import synapse.metrics
 
@@ -419,10 +419,11 @@ class SQLBaseStore(object):
                     self._txn_perf_counters.update(desc, start, end)
                     sql_txn_timer.inc_by(duration, desc)
 
-        with PreserveLoggingContext():
-            result = yield self._db_pool.runWithConnection(
-                inner_func, *args, **kwargs
-            )
+        result = yield preserve_context_over_fn(
+            self._db_pool.runWithConnection,
+            inner_func, *args, **kwargs
+        )
+
         for after_callback, after_args in after_callbacks:
             after_callback(*after_args)
         defer.returnValue(result)

@@ -154,14 +154,13 @@ class ProfileHandler(BaseHandler):
         if not self.hs.is_mine(user):
             defer.returnValue(None)
 
-        with PreserveLoggingContext():
-            (displayname, avatar_url) = yield defer.gatherResults(
-                [
-                    self.store.get_profile_displayname(user.localpart),
-                    self.store.get_profile_avatar_url(user.localpart),
-                ],
-                consumeErrors=True
-            )
+        (displayname, avatar_url) = yield defer.gatherResults(
+            [
+                self.store.get_profile_displayname(user.localpart),
+                self.store.get_profile_avatar_url(user.localpart),
+            ],
+            consumeErrors=True
+        )
 
         state["displayname"] = displayname
         state["avatar_url"] = avatar_url
