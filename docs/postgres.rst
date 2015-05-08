@@ -88,7 +88,7 @@ is named ``homeserver-postgres.yaml`` and the SQLite snapshot is at
 
     python scripts/port_from_sqlite_to_postgres.py \
         --sqlite-database homeserver.db.snapshot \
-        --postgres-config database_config.yaml
+        --postgres-config homeserver-postgres.yaml
 
 The flag ``--curses`` displays a coloured curses progress UI.
 
