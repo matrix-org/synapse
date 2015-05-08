@@ -723,6 +723,9 @@ if __name__ == "__main__":
 
     postgres_config = yaml.safe_load(args.postgres_config)
 
+    if "database" in postgres_config:
+        postgres_config = postgres_config["database"]
+
     if "name" not in postgres_config:
         sys.stderr.write("Malformed database config: no 'name'")
         sys.exit(2)
