@@ -17,7 +17,6 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
 from synapse.api.constants import EventTypes, Membership
-from synapse.util.logcontext import PreserveLoggingContext
 from synapse.types import UserID
 
 from ._base import BaseHandler

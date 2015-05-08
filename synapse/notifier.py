@@ -16,7 +16,6 @@
 from twisted.internet import defer
 
 from synapse.util.logutils import log_function
-from synapse.util.logcontext import preserve_context_over_deferred
 from synapse.types import StreamToken
 import synapse.metrics
 
@@ -224,8 +223,8 @@ class Notifier(object):
             logger.exception("Failed to notify listener", failure)
 
         yield defer.DeferredList(
-                [notify(l).addErrback(eb) for l in listeners],
-                consumeErrors=True,
+            [notify(l).addErrback(eb) for l in listeners],
+            consumeErrors=True,
         )
 
     @defer.inlineCallbacks
