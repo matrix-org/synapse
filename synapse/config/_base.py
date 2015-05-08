@@ -157,7 +157,7 @@ class Config(object):
 
             server_name = config_args.server_name
             if not server_name:
-                print "Most specify a server_name to a generate config for."
+                print "Must specify a server_name to a generate config for."
                 sys.exit(1)
             (config_path,) = config_args.config_path
             if not os.path.exists(config_dir_path):

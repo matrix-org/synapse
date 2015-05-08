@@ -27,20 +27,21 @@ CONFIGFILE = "homeserver.yaml"
 GREEN = "\x1b[1;32m"
 NORMAL = "\x1b[m"
 
+if not os.path.exists(CONFIGFILE):
+    sys.stderr.write(
+        "No config file found\n"
+        "To generate a config file, run '%s -c %s --generate-config"
+        " --server-name=<server name>'\n" % (
+            " ".join(SYNAPSE), CONFIGFILE
+        )
+    )
+    sys.exit(1)
+
 CONFIG = yaml.load(open(CONFIGFILE))
 PIDFILE = CONFIG["pid_file"]
 
 
 def start():
-    if not os.path.exists(CONFIGFILE):
-        sys.stderr.write(
-            "No config file found\n"
-            "To generate a config file, run '%s -c %s --generate-config"
-            " --server-name=<server name>'\n" % (
-                " ".join(SYNAPSE), CONFIGFILE
-            )
-        )
-        sys.exit(1)
     print "Starting ...",
     args = SYNAPSE
     args.extend(["--daemonize", "-c", CONFIGFILE])

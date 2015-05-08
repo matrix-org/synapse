@@ -496,11 +496,31 @@ class SynapseSite(Site):
 
 
 def run(hs):
+    PROFILE_SYNAPSE = False
+    if PROFILE_SYNAPSE:
+        def profile(func):
+            from cProfile import Profile
+            from threading import current_thread
+
+            def profiled(*args, **kargs):
+                profile = Profile()
+                profile.enable()
+                func(*args, **kargs)
+                profile.disable()
+                ident = current_thread().ident
+                profile.dump_stats("/tmp/%s.%s.%i.pstat" % (
+                    hs.hostname, func.__name__, ident
+                ))
+
+            return profiled
+
+        from twisted.python.threadpool import ThreadPool
+        ThreadPool._worker = profile(ThreadPool._worker)
+        reactor.run = profile(reactor.run)
 
     def in_thread():
         with LoggingContext("run"):
             change_resource_limit(hs.config.soft_file_limit)
-
             reactor.run()
 
     if hs.config.daemonize:
