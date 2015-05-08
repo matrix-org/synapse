@@ -27,6 +27,6 @@ CREATE TABLE IF NOT EXISTS new_server_keys_json (
 INSERT INTO new_server_keys_json
     SELECT server_name, key_id, from_server,ts_added_ms, ts_valid_until_ms, key_json FROM server_keys_json ;
 
-DROP TABLE new_server_keys_json;
+DROP TABLE server_keys_json;
 
 ALTER TABLE new_server_keys_json RENAME TO server_keys_json;
