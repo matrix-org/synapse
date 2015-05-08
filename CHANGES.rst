@@ -10,6 +10,8 @@ General:
 * Fix race in caches that occasionally caused some presence updates to be
   dropped - SYN-369.
 * Check server name has not changed on restart.
+* Add a sample systemd unit file and a logger configuration in
+  contrib/systemd. Contributed Ivan Shapovalov.
 
 Federation:
 
