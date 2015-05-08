@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS new_server_keys_json (
     ts_added_ms BIGINT NOT NULL, -- When the keys were fetched
     ts_valid_until_ms BIGINT NOT NULL, -- When this version of the keys exipires.
     key_json bytea NOT NULL, -- JSON certificate for the remote server.
-    CONSTRAINT uniqueness UNIQUE (server_name, key_id, from_server)
+    CONSTRAINT server_keys_json_uniqueness UNIQUE (server_name, key_id, from_server)
 );
 
 INSERT INTO new_server_keys_json
