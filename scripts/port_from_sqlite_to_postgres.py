@@ -106,7 +106,7 @@ class Store(object):
                     try:
                         txn = conn.cursor()
                         return func(
-                            LoggingTransaction(txn, desc, self.database_engine),
+                            LoggingTransaction(txn, desc, self.database_engine, []),
                             *args, **kwargs
                         )
                     except self.database_engine.module.DatabaseError as e:
@@ -378,9 +378,7 @@ class Porter(object):
 
         for i, row in enumerate(rows):
             rows[i] = tuple(
-                self.postgres_store.database_engine.encode_parameter(
-                    conv(j, col)
-                )
+                conv(j, col)
                 for j, col in enumerate(row)
                 if j > 0
             )
