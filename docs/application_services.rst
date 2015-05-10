@@ -20,7 +20,7 @@ The format of the AS configuration file is as follows:
 
     url: <base url of AS>
     as_token: <token AS will add to requests to HS>
-    hs_token: <token HS will ad to requests to AS>
+    hs_token: <token HS will add to requests to AS>
     sender_localpart: <localpart of AS user>
     namespaces:
       users:  # List of users we're interested in
