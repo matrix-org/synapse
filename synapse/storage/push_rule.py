@@ -211,7 +211,7 @@ class PushRuleStore(SQLBaseStore):
         yield self._simple_upsert(
             PushRuleEnableTable.table_name,
             {'user_name': user_name, 'rule_id': rule_id},
-            {'enabled': enabled},
+            {'enabled': 1 if enabled else 0},
             desc="set_push_rule_enabled",
         )
 
