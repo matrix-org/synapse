@@ -120,6 +120,7 @@ class PushRuleStore(SQLBaseStore):
             del new_rule['after']
         new_rule['priority_class'] = priority_class
         new_rule['user_name'] = user_name
+        new_rule['id'] = self._push_rule_id_gen.get_next_txn(txn)
 
         # check if the priority before/after is free
         new_rule_priority = base_rule_priority
@@ -153,12 +154,11 @@ class PushRuleStore(SQLBaseStore):
 
             txn.execute(sql, (user_name, priority_class, new_rule_priority))
 
-        # now insert the new rule
-        sql = "INSERT INTO "+PushRuleTable.table_name+" ("
-        sql += ",".join(new_rule.keys())+") VALUES ("
-        sql += ", ".join(["?" for _ in new_rule.keys()])+")"
-
-        txn.execute(sql, new_rule.values())
+        self._simple_insert_txn(
+            txn,
+            table=PushRuleTable.table_name,
+            values=new_rule,
+        )
 
     def _add_push_rule_highest_priority_txn(self, txn, user_name,
                                             priority_class, **kwargs):
@@ -177,17 +177,16 @@ class PushRuleStore(SQLBaseStore):
 
         # and insert the new rule
         new_rule = copy.copy(kwargs)
-        if 'id' in new_rule:
-            del new_rule['id']
+        new_rule['id'] = self._push_rule_id_gen.get_next_txn(txn)
         new_rule['user_name'] = user_name
         new_rule['priority_class'] = priority_class
         new_rule['priority'] = new_prio
 
-        sql = "INSERT INTO "+PushRuleTable.table_name+" ("
-        sql += ",".join(new_rule.keys())+") VALUES ("
-        sql += ", ".join(["?" for _ in new_rule.keys()])+")"
-
-        txn.execute(sql, new_rule.values())
+        self._simple_insert_txn(
+            txn,
+            table=PushRuleTable.table_name,
+            values=new_rule,
+        )
 
     @defer.inlineCallbacks
     def delete_push_rule(self, user_name, rule_id):

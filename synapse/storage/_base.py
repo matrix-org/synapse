@@ -308,6 +308,7 @@ class SQLBaseStore(object):
         self._state_groups_id_gen = IdGenerator("state_groups", "id", self)
         self._access_tokens_id_gen = IdGenerator("access_tokens", "id", self)
         self._pushers_id_gen = IdGenerator("pushers", "id", self)
+        self._push_rule_id_gen = IdGenerator("push_rules", "id", self)
 
     def start_profiling(self):
         self._previous_loop_ts = self._clock.time_msec()
