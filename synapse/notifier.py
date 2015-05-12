@@ -316,7 +316,7 @@ class Notifier(object):
                     user, getattr(from_token, keyname), limit,
                 )
                 events.extend(stuff)
-                end_token = from_token.copy_and_replace(keyname, new_key)
+                end_token = end_token.copy_and_replace(keyname, new_key)
 
             if events:
                 defer.returnValue((events, (from_token, end_token)))
