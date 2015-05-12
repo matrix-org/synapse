@@ -314,6 +314,7 @@ class FederationHandler(BaseHandler):
 
         likely_domains = [
             domain for domain, depth in curr_domains
+            if domain is not self.server_name
         ]
 
         @defer.inlineCallbacks
@@ -363,6 +364,7 @@ class FederationHandler(BaseHandler):
         # from the time.
 
         tried_domains = set(likely_domains)
+        tried_domains.add(self.server_name)
 
         event_ids = list(extremities.keys())
 
