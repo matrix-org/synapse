@@ -31,6 +31,7 @@ for port in 8080 8081 8082; do
     #rm $DIR/etc/$port.config
     python -m synapse.app.homeserver \
         --generate-config \
+        --enable_registration \
         -H "localhost:$https_port" \
         --config-path "$DIR/etc/$port.config" \
 

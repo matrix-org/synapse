@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from synapse.api.errors import CodeMessageException
+from synapse.util.logcontext import preserve_context_over_fn
 from syutil.jsonutil import encode_canonical_json
 import synapse.metrics
 
@@ -61,7 +62,10 @@ class SimpleHttpClient(object):
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
         outgoing_requests_counter.inc(method)
-        d = self.agent.request(method, *args, **kwargs)
+        d = preserve_context_over_fn(
+            self.agent.request,
+            method, *args, **kwargs
+        )
 
         def _cb(response):
             incoming_responses_counter.inc(method, response.code)
