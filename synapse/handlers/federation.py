@@ -274,7 +274,7 @@ class FederationHandler(BaseHandler):
         if current_depth > max_depth:
             logger.debug(
                 "Not backfilling as we don't need to. %d < %d",
-                current_depth, max_depth,
+                max_depth, current_depth,
             )
             return
 
@@ -364,10 +364,10 @@ class FederationHandler(BaseHandler):
         event_ids = list(extremities.keys())
 
         states = yield defer.gatherResults([
-            self.state_handler.resolve_state_groups([e])[1]
+            self.state_handler.resolve_state_groups([e])
             for e in event_ids
         ])
-        states = dict(zip(event_ids, states))
+        states = dict(zip(event_ids, [s[1] for s in states]))
 
         for e_id, _ in sorted_extremeties_tuple:
             likely_domains = get_domains_from_state(states[e_id])[0]
