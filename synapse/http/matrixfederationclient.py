@@ -22,7 +22,7 @@ from twisted.web._newclient import ResponseDone
 
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util.async import sleep
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.logcontext import preserve_context_over_fn
 import synapse.metrics
 
 from syutil.jsonutil import encode_canonical_json
@@ -144,22 +144,22 @@ class MatrixFederationHttpClient(object):
                 producer = body_callback(method, url_bytes, headers_dict)
 
             try:
-                with PreserveLoggingContext():
-                    request_deferred = self.agent.request(
-                        destination,
-                        endpoint,
-                        method,
-                        path_bytes,
-                        param_bytes,
-                        query_bytes,
-                        Headers(headers_dict),
-                        producer
-                    )
+                request_deferred = preserve_context_over_fn(
+                    self.agent.request,
+                    destination,
+                    endpoint,
+                    method,
+                    path_bytes,
+                    param_bytes,
+                    query_bytes,
+                    Headers(headers_dict),
+                    producer
+                )
 
-                    response = yield self.clock.time_bound_deferred(
-                        request_deferred,
-                        time_out=60,
-                    )
+                response = yield self.clock.time_bound_deferred(
+                    request_deferred,
+                    time_out=60,
+                )
 
                 logger.debug("Got response to %s", method)
                 break

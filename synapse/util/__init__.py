@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.logcontext import LoggingContext
+from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 
 from twisted.internet import defer, reactor, task
 
@@ -21,6 +21,12 @@ import time
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def unwrapFirstError(failure):
+    # defer.gatherResults and DeferredLists wrap failures.
+    failure.trap(defer.FirstError)
+    return failure.value.subFailure
 
 
 class Clock(object):
@@ -50,9 +56,12 @@ class Clock(object):
         current_context = LoggingContext.current_context()
 
         def wrapped_callback():
-            LoggingContext.thread_local.current_context = current_context
-            callback()
-        return reactor.callLater(delay, wrapped_callback)
+            with PreserveLoggingContext():
+                LoggingContext.thread_local.current_context = current_context
+                callback()
+
+        with PreserveLoggingContext():
+            return reactor.callLater(delay, wrapped_callback)
 
     def cancel_call_later(self, timer):
         timer.cancel()

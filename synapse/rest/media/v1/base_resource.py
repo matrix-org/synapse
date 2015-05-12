@@ -25,7 +25,7 @@ from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.protocols.basic import FileSender
 
-from synapse.util.async import create_observer
+from synapse.util.async import ObservableDeferred
 
 import os
 
@@ -83,13 +83,17 @@ class BaseMediaResource(Resource):
         download = self.downloads.get(key)
         if download is None:
             download = self._get_remote_media_impl(server_name, media_id)
+            download = ObservableDeferred(
+                download,
+                consumeErrors=True
+            )
             self.downloads[key] = download
 
             @download.addBoth
             def callback(media_info):
                 del self.downloads[key]
                 return media_info
-        return create_observer(download)
+        return download.observe()
 
     @defer.inlineCallbacks
     def _get_remote_media_impl(self, server_name, media_id):
