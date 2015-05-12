@@ -370,7 +370,7 @@ class FederationHandler(BaseHandler):
         states = dict(zip(event_ids, [s[1] for s in states]))
 
         for e_id, _ in sorted_extremeties_tuple:
-            likely_domains = get_domains_from_state(states[e_id])[0]
+            likely_domains = get_domains_from_state(states[e_id])
 
             success = yield try_backfill([
                 dom for dom in likely_domains
