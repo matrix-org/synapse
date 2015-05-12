@@ -343,7 +343,6 @@ class EventFederationStore(SQLBaseStore):
                 for e_id, _ in prev_events
             ])
 
-
             # Also delete from the backwards extremities table all ones that
             # reference events that we have already seen
             query = (
@@ -351,7 +350,6 @@ class EventFederationStore(SQLBaseStore):
                 " WHERE event_id = ? AND room_id = ?"
             )
             txn.executemany(query, [(e_id, room_id) for e_id, _ in prev_events])
-
 
             txn.call_after(
                 self.get_latest_event_ids_in_room.invalidate, room_id
