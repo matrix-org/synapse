@@ -361,10 +361,13 @@ class FederationHandler(BaseHandler):
 
         tried_domains = set(likely_domains)
 
-        states = yield defer.gatherResults({
-            e: self.state_handler.resolve_state_groups([e])[1]
-            for e in extremities.keys()
-        })
+        event_ids = list(extremities.keys())
+
+        states = yield defer.gatherResults([
+            self.state_handler.resolve_state_groups([e])[1]
+            for e in event_ids
+        ])
+        states = dict(zip(event_ids, states))
 
         for e_id, _ in sorted_extremeties_tuple:
             likely_domains = get_domains_from_state(states[e_id])[0]
