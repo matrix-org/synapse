@@ -325,7 +325,7 @@ class FederationHandler(BaseHandler):
                     )
                 except SynapseError:
                     logger.info(
-                        "Failed to backfil from %s because %s",
+                        "Failed to backfill from %s because %s",
                         dom, e,
                     )
                     continue
@@ -334,7 +334,7 @@ class FederationHandler(BaseHandler):
                         raise
 
                     logger.info(
-                        "Failed to backfil from %s because %s",
+                        "Failed to backfill from %s because %s",
                         dom, e,
                     )
                     continue
@@ -342,8 +342,8 @@ class FederationHandler(BaseHandler):
                     logger.info(e.message)
                     continue
                 except Exception as e:
-                    logger.info(
-                        "Failed to backfil from %s because %s",
+                    logger.warn(
+                        "Failed to backfill from %s because %s",
                         dom, e,
                     )
                     continue
