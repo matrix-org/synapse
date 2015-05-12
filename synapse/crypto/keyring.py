@@ -26,7 +26,7 @@ from synapse.api.errors import SynapseError, Codes
 
 from synapse.util.retryutils import get_retry_limiter
 
-from synapse.util.async import create_observer
+from synapse.util.async import ObservableDeferred
 
 from OpenSSL import crypto
 
@@ -111,6 +111,10 @@ class Keyring(object):
 
         if download is None:
             download = self._get_server_verify_key_impl(server_name, key_ids)
+            download = ObservableDeferred(
+                download,
+                consumeErrors=True
+            )
             self.key_downloads[server_name] = download
 
             @download.addBoth
@@ -118,7 +122,7 @@ class Keyring(object):
                 del self.key_downloads[server_name]
                 return ret
 
-        r = yield create_observer(download)
+        r = yield download.observe()
         defer.returnValue(r)
 
     @defer.inlineCallbacks

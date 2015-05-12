@@ -21,7 +21,7 @@ from ._base import BaseHandler
 from synapse.types import UserID, RoomAlias, RoomID
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import StoreError, SynapseError
-from synapse.util import stringutils
+from synapse.util import stringutils, unwrapFirstError
 from synapse.util.async import run_on_reactor
 from synapse.events.utils import serialize_event
 
@@ -537,7 +537,7 @@ class RoomListHandler(BaseHandler):
                 for room in chunk
             ],
             consumeErrors=True,
-        )
+        ).addErrback(unwrapFirstError)
 
         for i, room in enumerate(chunk):
             room["num_joined_members"] = len(results[i])
@@ -577,8 +577,8 @@ class RoomEventSource(object):
 
         defer.returnValue((events, end_key))
 
-    def get_current_key(self):
-        return self.store.get_room_events_max_id()
+    def get_current_key(self, direction='f'):
+        return self.store.get_room_events_max_id(direction)
 
     @defer.inlineCallbacks
     def get_pagination_rows(self, user, config, key):

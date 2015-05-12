@@ -16,7 +16,6 @@
 from twisted.internet import defer
 
 from synapse.util.logutils import log_function
-from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.async import run_on_reactor
 from synapse.types import StreamToken
 import synapse.metrics
@@ -196,12 +195,11 @@ class Notifier(object):
 
         logger.debug("on_new_room_event listeners %s", user_streams)
 
-        with PreserveLoggingContext():
-            for user_stream in user_streams:
-                try:
-                    user_stream.notify(new_token)
-                except:
-                    logger.exception("Failed to notify listener")
+        for user_stream in user_streams:
+            try:
+                user_stream.notify(new_token)
+            except:
+                logger.exception("Failed to notify listener")
 
     @defer.inlineCallbacks
     @log_function
@@ -223,12 +221,11 @@ class Notifier(object):
         for room in rooms:
             user_streams |= self.room_to_user_streams.get(room, set())
 
-        with PreserveLoggingContext():
-            for user_stream in user_streams:
-                try:
-                    user_streams.notify(new_token)
-                except:
-                    logger.exception("Failed to notify listener")
+        for user_stream in user_streams:
+            try:
+                user_streams.notify(new_token)
+            except:
+                logger.exception("Failed to notify listener")
 
     @defer.inlineCallbacks
     def wait_for_events(self, user, rooms, timeout, callback,

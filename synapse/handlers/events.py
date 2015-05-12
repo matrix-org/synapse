@@ -15,7 +15,6 @@
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.logutils import log_function
 from synapse.types import UserID
 from synapse.events.utils import serialize_event
@@ -81,10 +80,9 @@ class EventStreamHandler(BaseHandler):
                 # thundering herds on restart.
                 timeout = random.randint(int(timeout*0.9), int(timeout*1.1))
 
-            with PreserveLoggingContext():
-                events, tokens = yield self.notifier.get_events_for(
-                    auth_user, room_ids, pagin_config, timeout
-                )
+            events, tokens = yield self.notifier.get_events_for(
+                auth_user, room_ids, pagin_config, timeout
+            )
 
             time_now = self.clock.time_msec()
 

@@ -17,7 +17,7 @@
 from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError
 )
-from synapse.util.logcontext import LoggingContext
+from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 import synapse.metrics
 
 from syutil.jsonutil import (
@@ -85,7 +85,9 @@ def request_handler(request_handler):
                     "Received request: %s %s",
                     request.method, request.path
                 )
-                yield request_handler(self, request)
+                d = request_handler(self, request)
+                with PreserveLoggingContext():
+                    yield d
                 code = request.code
             except CodeMessageException as e:
                 code = e.code
