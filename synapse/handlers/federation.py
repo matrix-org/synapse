@@ -18,7 +18,7 @@
 from ._base import BaseHandler
 
 from synapse.api.errors import (
-    AuthError, FederationError, StoreError,
+    AuthError, FederationError, StoreError, CodeMessageException, SynapseError,
 )
 from synapse.api.constants import EventTypes, Membership, RejectedReason
 from synapse.util.logutils import log_function
@@ -28,6 +28,8 @@ from synapse.crypto.event_signing import (
     compute_event_signature, add_hashes_and_signatures,
 )
 from synapse.types import UserID
+
+from synapse.util.retryutils import NotRetryingDestination
 
 from twisted.internet import defer
 
@@ -251,15 +253,15 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def maybe_backfill(self, room_id, current_depth):
-        """Checks the database to see if we should backfill before paginating
+        """Checks the database to see if we should backfill before paginating,
+        and if so do.
         """
         extremities = yield self.store.get_oldest_events_with_depth_in_room(
             room_id
         )
 
-        logger.debug("Got extremeties: %r", extremities)
-
         if not extremities:
+            logger.debug("Not backfilling as no extremeties found.")
             return
 
         # Check if we reached a point where we should start backfilling.
@@ -269,14 +271,17 @@ class FederationHandler(BaseHandler):
         )
         max_depth = sorted_extremeties_tuple[0][1]
 
-        logger.debug("max_depth: %r", max_depth)
         if current_depth > max_depth:
+            logger.debug(
+                "Not backfilling as we don't need to. %d < %d",
+                current_depth, max_depth,
+            )
             return
 
         # Now we need to decide which hosts to hit first.
 
-        # First we try hosts that are already in the room, that were around
-        # at the time. TODO: HEURISTIC ALERT.
+        # First we try hosts that are already in the room
+        # TODO: HEURISTIC ALERT.
 
         curr_state = yield self.state_handler.get_current_state(room_id)
 
@@ -304,8 +309,6 @@ class FederationHandler(BaseHandler):
 
         curr_domains = get_domains_from_state(curr_state)
 
-        logger.debug("curr_domains: %r", curr_domains)
-
         likely_domains = [
             domain for domain, depth in curr_domains
         ]
@@ -314,11 +317,36 @@ class FederationHandler(BaseHandler):
         def try_backfill(domains):
             # TODO: Should we try multiple of these at a time?
             for dom in domains:
-                events = yield self.backfill(
-                    dom, room_id,
-                    limit=100,
-                    extremities=[e for e in extremities.keys()]
-                )
+                try:
+                    events = yield self.backfill(
+                        dom, room_id,
+                        limit=100,
+                        extremities=[e for e in extremities.keys()]
+                    )
+                except SynapseError:
+                    logger.info(
+                        "Failed to backfil from %s because %s",
+                        dom, e,
+                    )
+                    continue
+                except CodeMessageException as e:
+                    if 400 <= e.code < 500:
+                        raise
+
+                    logger.info(
+                        "Failed to backfil from %s because %s",
+                        dom, e,
+                    )
+                    continue
+                except NotRetryingDestination as e:
+                    logger.info(e.message)
+                    continue
+                except Exception as e:
+                    logger.info(
+                        "Failed to backfil from %s because %s",
+                        dom, e,
+                    )
+                    continue
 
                 if events:
                     defer.returnValue(True)
