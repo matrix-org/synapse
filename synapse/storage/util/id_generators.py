@@ -78,14 +78,18 @@ class StreamIdGenerator(object):
         self._current_max = None
         self._unfinished_ids = deque()
 
-    def get_next_txn(self, txn):
+    @defer.inlineCallbacks
+    def get_next(self, store):
         """
         Usage:
-            with stream_id_gen.get_next_txn(txn) as stream_id:
+            with yield stream_id_gen.get_next as stream_id:
                 # ... persist event ...
         """
         if not self._current_max:
-            self._get_or_compute_current_max(txn)
+            yield store.runInteraction(
+                "_compute_current_max",
+                self._get_or_compute_current_max,
+            )
 
         with self._lock:
             self._current_max += 1
@@ -101,7 +105,7 @@ class StreamIdGenerator(object):
                 with self._lock:
                     self._unfinished_ids.remove(next_id)
 
-        return manager()
+        defer.returnValue(manager())
 
     @defer.inlineCallbacks
     def get_max_token(self, store):
