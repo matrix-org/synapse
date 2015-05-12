@@ -23,6 +23,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def unwrapFirstError(failure):
+    # defer.gatherResults and DeferredLists wrap failures.
+    failure.trap(defer.FirstError)
+    return failure.value.subFailure
+
+
 class Clock(object):
     """A small utility that obtains current time-of-day so that time may be
     mocked during unit-tests.

@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
 from synapse.api.constants import EventTypes, Membership
 from synapse.types import UserID
+from synapse.util import unwrapFirstError
 
 from ._base import BaseHandler
 
@@ -159,7 +160,7 @@ class ProfileHandler(BaseHandler):
                 self.store.get_profile_avatar_url(user.localpart),
             ],
             consumeErrors=True
-        )
+        ).addErrback(unwrapFirstError)
 
         state["displayname"] = displayname
         state["avatar_url"] = avatar_url

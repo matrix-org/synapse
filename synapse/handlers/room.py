@@ -21,7 +21,7 @@ from ._base import BaseHandler
 from synapse.types import UserID, RoomAlias, RoomID
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import StoreError, SynapseError
-from synapse.util import stringutils
+from synapse.util import stringutils, unwrapFirstError
 from synapse.util.async import run_on_reactor
 from synapse.events.utils import serialize_event
 
@@ -537,7 +537,7 @@ class RoomListHandler(BaseHandler):
                 for room in chunk
             ],
             consumeErrors=True,
-        )
+        ).addErrback(unwrapFirstError)
 
         for i, room in enumerate(chunk):
             room["num_joined_members"] = len(results[i])

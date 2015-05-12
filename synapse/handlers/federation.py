@@ -21,6 +21,7 @@ from synapse.api.errors import (
     AuthError, FederationError, StoreError,
 )
 from synapse.api.constants import EventTypes, Membership, RejectedReason
+from synapse.util import unwrapFirstError
 from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
@@ -926,7 +927,7 @@ class FederationHandler(BaseHandler):
                     if d in have_events and not have_events[d]
                 ],
                 consumeErrors=True
-            )
+            ).addErrback(unwrapFirstError)
 
             if different_events:
                 local_view = dict(auth_events)
