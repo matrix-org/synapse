@@ -294,7 +294,7 @@ class Notifier(object):
             def _timeout_listener():
                 timed_out[0] = True
                 timer[0] = None
-                listener[0].notify(user_stream)
+                listener[0].notify(from_token)
 
             # We create multiple notification listeners so we have to manage
             # canceling the timeout ourselves.
@@ -329,11 +329,15 @@ class Notifier(object):
         limit = pagination_config.limit
 
         @defer.inlineCallbacks
-        def check_for_updates(start_token, end_token):
+        def check_for_updates(before_token, after_token):
             events = []
             end_token = from_token
             for name, source in self.event_sources.sources.items():
                 keyname = "%s_key" % name
+                before_id = getattr(before_token, keyname)
+                after_id = getattr(after_token, keyname)
+                if before_id == after_id:
+                    continue
                 stuff, new_key = yield source.get_new_events_for_user(
                     user, getattr(from_token, keyname), limit,
                 )
