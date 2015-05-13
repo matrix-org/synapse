@@ -103,11 +103,17 @@ class StateStore(SQLBaseStore):
                 for row in rows
             ]
 
-        for vals in states.values():
+        @defer.inlineCallbacks
+        def c(vals):
             vals[:] = yield self.runInteraction(
                 "_get_state_groups_ev",
                 fetch_events, vals
             )
+
+        yield defer.gatherResults(
+            [c(vals) for vals in states.values()],
+            consumeErrors=True,
+        )
 
         defer.returnValue(states)
 
