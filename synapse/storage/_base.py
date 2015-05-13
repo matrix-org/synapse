@@ -1002,7 +1002,10 @@ class SQLBaseStore(object):
                     e.event_id, check_redacted, get_prev_content, e
                 )
 
-        return [event_map[e_id] for e_id in events if e_id in event_map]
+        return [
+            event_map[e_id] for e_id in events
+            if e_id in event_map and event_id[e_id]
+        ]
 
     def _get_event_from_row_txn(self, txn, internal_metadata, js, redacted,
                                 check_redacted=True, get_prev_content=False,
