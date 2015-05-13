@@ -28,6 +28,7 @@ from twisted.internet import defer
 
 from collections import namedtuple, OrderedDict
 import functools
+import itertools
 import simplejson as json
 import sys
 import time
@@ -875,11 +876,15 @@ class SQLBaseStore(object):
 
     def _get_events_txn(self, txn, event_ids, check_redacted=True,
                         get_prev_content=False):
-        return self._fetch_events_txn(
-            txn, event_ids,
-            check_redacted=check_redacted,
-            get_prev_content=get_prev_content,
-        )
+        N = 50  # Only fetch 100 events at a time.
+        return list(itertools.chain(*[
+            self._fetch_events_txn(
+                txn, event_ids[i*N:(i+1)*N],
+                check_redacted=check_redacted,
+                get_prev_content=get_prev_content,
+            )
+            for i in range(1 + len(event_ids) / N)
+        ]))
 
     def _invalidate_get_event_cache(self, event_id):
         for check_redacted in (False, True):
