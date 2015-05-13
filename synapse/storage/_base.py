@@ -961,7 +961,7 @@ class SQLBaseStore(object):
                 if allow_rejected or not ret.rejected_reason:
                     event_map[event_id] = ret
                 else:
-                    return None
+                    event_map[event_id] = None
             except KeyError:
                 pass
 
