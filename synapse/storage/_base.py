@@ -918,10 +918,10 @@ class SQLBaseStore(object):
             start_time = update_counter("event_cache", start_time)
 
         sql = (
-            "SELECT e.internal_metadata, e.json, r.event_id, rej.reason "
+            "SELECT e.internal_metadata, e.json, r.redacts, rej.event_id "
             "FROM event_json as e "
+            "LEFT JOIN rejections as rej USING (event_id) "
             "LEFT JOIN redactions as r ON e.event_id = r.redacts "
-            "LEFT JOIN rejections as rej on rej.event_id = e.event_id  "
             "WHERE e.event_id = ? "
             "LIMIT 1 "
         )
@@ -967,6 +967,14 @@ class SQLBaseStore(object):
         internal_metadata = json.loads(internal_metadata)
         start_time = update_counter("decode_internal", start_time)
 
+        if rejected_reason:
+            rejected_reason = self._simple_select_one_onecol_txn(
+                txn,
+                table="rejections",
+                keyvalues={"event_id": rejected_reason},
+                retcol="reason",
+            )
+
         ev = FrozenEvent(
             d,
             internal_metadata_dict=internal_metadata,
@@ -977,12 +985,19 @@ class SQLBaseStore(object):
         if check_redacted and redacted:
             ev = prune_event(ev)
 
-            ev.unsigned["redacted_by"] = redacted
+            redaction_id = self._simple_select_one_onecol_txn(
+                txn,
+                table="redactions",
+                keyvalues={"redacts": ev.event_id},
+                retcol="event_id",
+            )
+
+            ev.unsigned["redacted_by"] = redaction_id
             # Get the redaction event.
 
             because = self._get_event_txn(
                 txn,
-                redacted,
+                redaction_id,
                 check_redacted=False
             )
 
