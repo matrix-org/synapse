@@ -867,9 +867,9 @@ class SQLBaseStore(object):
         return self.runInteraction("_simple_max_id", func)
 
     def _get_events(self, event_ids, check_redacted=True,
-                    get_prev_content=False):
+                    get_prev_content=False, desc="_get_events"):
         return self.runInteraction(
-            "_get_events", self._get_events_txn, event_ids,
+            desc, self._get_events_txn, event_ids,
             check_redacted=check_redacted, get_prev_content=get_prev_content,
         )
 

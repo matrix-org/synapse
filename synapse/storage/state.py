@@ -43,6 +43,7 @@ class StateStore(SQLBaseStore):
       * `state_groups_state`: Maps state group to state events.
     """
 
+    @defer.inlineCallbacks
     def get_state_groups(self, event_ids):
         """ Get the state groups for the given list of event_ids
 
@@ -71,16 +72,21 @@ class StateStore(SQLBaseStore):
                     retcol="event_id",
                 )
 
-                state = self._get_events_txn(txn, state_ids)
+                # state = self._get_events_txn(txn, state_ids)
 
-                res[group] = state
+                res[group] = state_ids
 
             return res
 
-        return self.runInteraction(
+        states = yield self.runInteraction(
             "get_state_groups",
             f,
         )
+
+        for vals in states.values():
+            vals[:] = yield self._get_events(vals, desc="_get_state_groups_ev")
+
+        defer.returnValue(states)
 
     def _store_state_groups_txn(self, txn, event, context):
         if context.current_state is None:
