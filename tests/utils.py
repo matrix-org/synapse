@@ -197,6 +197,9 @@ class MockClock(object):
 
         return t
 
+    def looping_call(self, function, interval):
+        pass
+
     def cancel_call_later(self, timer):
         if timer[2]:
             raise Exception("Cannot cancel an expired timer")

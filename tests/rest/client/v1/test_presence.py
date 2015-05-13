@@ -271,6 +271,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 "call_later",
                 "cancel_call_later",
                 "time_msec",
+                "looping_call",
             ]),
         )
 
