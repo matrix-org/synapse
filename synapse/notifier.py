@@ -82,9 +82,10 @@ class _NotifierUserStream(object):
         self.current_token = self.current_token.copy_and_replace(
             stream_key, stream_id
         )
-        for listener in self.listeners:
+        listeners = self.listeners
+        self.listeners = set()
+        for listener in listeners:
             listener.notify(self.current_token)
-        self.listeners.clear()
 
     def remove(self, notifier):
         """ Remove this listener from all the indexes in the Notifier
@@ -202,7 +203,7 @@ class Notifier(object):
         user_streams = room_user_streams.copy()
 
         for user in extra_users:
-            user_stream = self.user_to_user_stream.get(user)
+            user_stream = self.user_to_user_stream.get(str(user))
             if user_stream is not None:
                 user_streams.add(user_stream)
 
@@ -288,12 +289,18 @@ class Notifier(object):
 
         timer = [None]
 
+        if result:
+            user_stream.listeners.discard(listener[0])
+            defer.returnValue(result)
+            return
+
         if timeout:
             timed_out = [False]
 
             def _timeout_listener():
                 timed_out[0] = True
                 timer[0] = None
+                user_stream.listeners.discard(listener[0])
                 listener[0].notify(from_token)
 
             # We create multiple notification listeners so we have to manage
