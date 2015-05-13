@@ -873,9 +873,7 @@ class SQLBaseStore(object):
         N = 50  # Only fetch 100 events at a time.
 
         ds = [
-            self.runInteraction(
-                desc,
-                self._fetch_events_txn,
+            self._fetch_events(
                 event_ids[i*N:(i+1)*N],
                 check_redacted=check_redacted,
                 get_prev_content=get_prev_content,
