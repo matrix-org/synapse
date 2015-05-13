@@ -145,8 +145,8 @@ class Notifier(object):
 
             for x in self.room_to_user_streams.values():
                 all_user_streams |= x
-            for x in self.user_to_user_streams.values():
-                all_user_streams |= x
+            for x in self.user_to_user_stream:
+                all_user_streams.add(x)
             for x in self.appservice_to_user_streams.values():
                 all_user_streams |= x
 
