@@ -83,8 +83,31 @@ class StateStore(SQLBaseStore):
             f,
         )
 
+        def fetch_events(txn, events):
+            sql = (
+                "SELECT e.internal_metadata, e.json, r.event_id, rej.reason "
+                " FROM event_json as e"
+                " LEFT JOIN redactions as r ON e.event_id = r.redacts"
+                " LEFT JOIN rejections as rej on rej.event_id = e.event_id"
+                " WHERE e.event_id IN (%s)"
+            ) % (",".join(["?"]*len(events)),)
+
+            txn.execute(sql, events)
+            rows = txn.fetchall()
+
+            return [
+                self._get_event_from_row_txn(
+                    txn, row[0], row[1], row[2],
+                    rejected_reason=row[3],
+                )
+                for row in rows
+            ]
+
         for vals in states.values():
-            vals[:] = yield self._get_events(vals, desc="_get_state_groups_ev")
+            vals[:] = yield self.runInteraction(
+                "_get_state_groups_ev",
+                fetch_events, vals
+            )
 
         defer.returnValue(states)
 
