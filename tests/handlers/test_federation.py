@@ -83,7 +83,7 @@ class FederationTestCase(unittest.TestCase):
             "hashes": {"sha256":"AcLrgtUIqqwaGoHhrEvYG1YLDIsVPYJdSRGhkp3jJp8"},
         })
 
-        self.datastore.persist_event.return_value = defer.succeed(None)
+        self.datastore.persist_event.return_value = defer.succeed((1,1))
         self.datastore.get_room.return_value = defer.succeed(True)
         self.auth.check_host_in_room.return_value = defer.succeed(True)
 
@@ -126,5 +126,5 @@ class FederationTestCase(unittest.TestCase):
         self.auth.check.assert_called_once_with(ANY, auth_events={})
 
         self.notifier.on_new_room_event.assert_called_once_with(
-            ANY, extra_users=[]
+            ANY, 1, 1, extra_users=[]
         )

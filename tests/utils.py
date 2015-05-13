@@ -355,7 +355,7 @@ class MemoryDataStore(object):
         return []
 
     def get_room_events_max_id(self):
-        return 0  # TODO (erikj)
+        return "s0"  # TODO (erikj)
 
     def get_send_event_level(self, room_id):
         return defer.succeed(0)

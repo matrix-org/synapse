@@ -105,7 +105,9 @@ class BaseHandler(object):
         if not suppress_auth:
             self.auth.check(event, auth_events=context.current_state)
 
-        yield self.store.persist_event(event, context=context)
+        (event_stream_id, max_stream_id) = yield self.store.persist_event(
+            event, context=context
+        )
 
         federation_handler = self.hs.get_handlers().federation_handler
 
@@ -142,7 +144,8 @@ class BaseHandler(object):
         with PreserveLoggingContext():
             # Don't block waiting on waking up all the listeners.
             notify_d = self.notifier.on_new_room_event(
-                event, extra_users=extra_users
+                event, event_stream_id, max_stream_id,
+                extra_users=extra_users
             )
 
         def log_failure(f):
