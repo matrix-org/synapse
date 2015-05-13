@@ -1004,7 +1004,7 @@ class SQLBaseStore(object):
 
         return [
             event_map[e_id] for e_id in events
-            if e_id in event_map and event_id[e_id]
+            if e_id in event_map and event_map[e_id]
         ]
 
     def _get_event_from_row_txn(self, txn, internal_metadata, js, redacted,
