@@ -26,6 +26,7 @@ from synapse.util.async import run_on_reactor
 from synapse.events.utils import serialize_event
 
 import logging
+import string
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,10 @@ class RoomCreationHandler(BaseHandler):
         self.ratelimit(user_id)
 
         if "room_alias_name" in config:
+            for wchar in string.whitespace:
+                if wchar in config["room_alias_name"]:
+                    raise SynapseError(400, "Invalid characters in room alias")
+
             room_alias = RoomAlias.create(
                 config["room_alias_name"],
                 self.hs.hostname,
