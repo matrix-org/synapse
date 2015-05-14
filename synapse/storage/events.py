@@ -506,41 +506,39 @@ class EventsStore(SQLBaseStore):
 
         def do_fetch(txn):
             event_list = []
-            try:
-                with self._event_fetch_lock:
-                    event_list = self._event_fetch_list
-                    self._event_fetch_list = []
+            while True:
+                try:
+                    with self._event_fetch_lock:
+                        event_list = self._event_fetch_list
+                        self._event_fetch_list = []
 
-                    if not event_list:
-                        return
+                        if not event_list:
+                            return
 
-                event_id_lists = zip(*event_list)[0]
-                event_ids = [
-                    item for sublist in event_id_lists for item in sublist
-                ]
-                rows = self._fetch_event_rows(txn, event_ids)
+                    event_id_lists = zip(*event_list)[0]
+                    event_ids = [
+                        item for sublist in event_id_lists for item in sublist
+                    ]
+                    rows = self._fetch_event_rows(txn, event_ids)
 
-                row_dict = {
-                    r["event_id"]: r
-                    for r in rows
-                }
+                    row_dict = {
+                        r["event_id"]: r
+                        for r in rows
+                    }
 
-                for ids, d in event_list:
-                    d.callback(
-                        [
-                            row_dict[i] for i in ids
-                            if i in row_dict
-                        ]
-                    )
-            except Exception as e:
-                for _, d in event_list:
-                    try:
-                        reactor.callFromThread(d.errback, e)
-                    except:
-                        pass
-            finally:
-                with self._event_fetch_lock:
-                    self._event_fetch_ongoing = False
+                    for ids, d in event_list:
+                        d.callback(
+                            [
+                                row_dict[i] for i in ids
+                                if i in row_dict
+                            ]
+                        )
+                except Exception as e:
+                    for _, d in event_list:
+                        try:
+                            reactor.callFromThread(d.errback, e)
+                        except:
+                            pass
 
         def cb(rows):
             return defer.gatherResults([
@@ -561,12 +559,12 @@ class EventsStore(SQLBaseStore):
                 (events, d)
             )
 
-            if not self._event_fetch_ongoing:
+            if self._event_fetch_ongoing < 3:
+                self._event_fetch_ongoing += 1
                 self.runInteraction(
                     "do_fetch",
                     do_fetch
                 )
-                self._event_fetch_ongoing = True
 
         res = yield d
 

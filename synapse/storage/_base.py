@@ -301,7 +301,7 @@ class SQLBaseStore(object):
 
         self._event_fetch_lock = threading.Lock()
         self._event_fetch_list = []
-        self._event_fetch_ongoing = False
+        self._event_fetch_ongoing = 0
 
         self.database_engine = hs.database_engine
 
