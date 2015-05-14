@@ -566,6 +566,7 @@ class EventsStore(SQLBaseStore):
                     "do_fetch",
                     do_fetch
                 )
+                self._event_fetch_ongoing = True
 
         res = yield d
 
