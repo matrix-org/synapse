@@ -496,9 +496,7 @@ class PresenceHandler(BaseHandler):
                 # We want to tell the person that just came online
                 # presence state of people they are interested in?
                 self.push_update_to_clients(
-                    observed_user=target_user,
                     users_to_push=[user],
-                    statuscache=self._get_or_offline_usercache(target_user),
                 )
 
         deferreds = []
@@ -712,10 +710,7 @@ class PresenceHandler(BaseHandler):
                 continue
 
             self.push_update_to_clients(
-                observed_user=user,
-                users_to_push=observers,
-                room_ids=room_ids,
-                statuscache=statuscache,
+                users_to_push=observers, room_ids=room_ids
             )
 
             user_id = user.to_string()
@@ -779,10 +774,7 @@ class PresenceHandler(BaseHandler):
         localusers = set(localusers)
 
         self.push_update_to_clients(
-            observed_user=observed_user,
-            users_to_push=localusers,
-            room_ids=room_ids,
-            statuscache=statuscache,
+            users_to_push=localusers, room_ids=room_ids
         )
 
         remote_domains = set(remote_domains)
@@ -807,8 +799,12 @@ class PresenceHandler(BaseHandler):
 
         defer.returnValue((localusers, remote_domains))
 
-    def push_update_to_clients(self, observed_user, users_to_push=[],
-                               room_ids=[], statuscache=None):
+    def push_update_to_clients(self, users_to_push=[], room_ids=[]):
+        """Notify clients of a new presence event.
+        Args:
+            users_to_push(list): List of users to notify.
+            room_ids(list): List of room_ids to notify.
+        """
         with PreserveLoggingContext():
             self.notifier.on_new_user_event(
                 users_to_push,

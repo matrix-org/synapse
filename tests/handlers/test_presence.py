@@ -1097,12 +1097,8 @@ class PresencePollingTestCase(MockedDatastorePresenceTestCase):
 
         # apple should see both banana and clementine currently offline
         self.mock_update_client.assert_has_calls([
-                call(users_to_push=[self.u_apple],
-                    observed_user=self.u_banana,
-                    statuscache=ANY),
-                call(users_to_push=[self.u_apple],
-                    observed_user=self.u_clementine,
-                    statuscache=ANY),
+            call(users_to_push=[self.u_apple]),
+            call(users_to_push=[self.u_apple]),
         ], any_order=True)
 
         # Gut-wrenching tests
@@ -1121,13 +1117,8 @@ class PresencePollingTestCase(MockedDatastorePresenceTestCase):
 
         # apple and banana should now both see each other online
         self.mock_update_client.assert_has_calls([
-                call(users_to_push=set([self.u_apple]),
-                    observed_user=self.u_banana,
-                    room_ids=[],
-                    statuscache=ANY),
-                call(users_to_push=[self.u_banana],
-                    observed_user=self.u_apple,
-                    statuscache=ANY),
+            call(users_to_push=set([self.u_apple]), room_ids=[]),
+            call(users_to_push=[self.u_banana]),
         ], any_order=True)
 
         self.assertTrue("apple" in self.handler._local_pushmap)
@@ -1143,10 +1134,7 @@ class PresencePollingTestCase(MockedDatastorePresenceTestCase):
 
         # banana should now be told apple is offline
         self.mock_update_client.assert_has_calls([
-                call(users_to_push=set([self.u_banana, self.u_apple]),
-                    observed_user=self.u_apple,
-                    room_ids=[],
-                    statuscache=ANY),
+            call(users_to_push=set([self.u_banana, self.u_apple]), room_ids=[]),
         ], any_order=True)
 
         self.assertFalse("banana" in self.handler._local_pushmap)
