@@ -48,6 +48,7 @@ class EventsStore(SQLBaseStore):
             @contextmanager
             def stream_ordering_manager():
                 yield stream_ordering
+            stream_ordering_manager = stream_ordering_manager()
 
         try:
             with stream_ordering_manager as stream_ordering:
