@@ -80,16 +80,16 @@ class Clock(object):
     def stop_looping_call(self, loop):
         loop.stop()
 
-    def call_later(self, delay, callback):
+    def call_later(self, delay, callback, *args, **kwargs):
         current_context = LoggingContext.current_context()
 
-        def wrapped_callback():
+        def wrapped_callback(*args, **kwargs):
             with PreserveLoggingContext():
                 LoggingContext.thread_local.current_context = current_context
-                callback()
+                callback(*args, **kwargs)
 
         with PreserveLoggingContext():
-            return reactor.callLater(delay, wrapped_callback)
+            return reactor.callLater(delay, wrapped_callback, *args, **kwargs)
 
     def cancel_call_later(self, timer):
         timer.cancel()

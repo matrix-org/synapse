@@ -299,6 +299,10 @@ class SQLBaseStore(object):
         self._get_event_cache = Cache("*getEvent*", keylen=3, lru=True,
                                       max_entries=hs.config.event_cache_size)
 
+        self._event_fetch_lock = threading.Lock()
+        self._event_fetch_list = []
+        self._event_fetch_ongoing = False
+
         self.database_engine = hs.database_engine
 
         self._stream_id_gen = StreamIdGenerator()
