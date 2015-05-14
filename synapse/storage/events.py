@@ -420,23 +420,13 @@ class EventsStore(SQLBaseStore):
                 if e_id in event_map and event_map[e_id]
             ])
 
-        if not txn:
-            missing_events = yield self.runInteraction(
-                "_get_events",
-                self._fetch_events_txn,
-                missing_events_ids,
-                check_redacted=check_redacted,
-                get_prev_content=get_prev_content,
-                allow_rejected=allow_rejected,
-            )
-        else:
-            missing_events = yield self._fetch_events(
-                txn,
-                missing_events_ids,
-                check_redacted=check_redacted,
-                get_prev_content=get_prev_content,
-                allow_rejected=allow_rejected,
-            )
+        missing_events = yield self._fetch_events(
+            txn,
+            missing_events_ids,
+            check_redacted=check_redacted,
+            get_prev_content=get_prev_content,
+            allow_rejected=allow_rejected,
+        )
 
         event_map.update(missing_events)
 
