@@ -445,7 +445,6 @@ class EventsStore(SQLBaseStore):
             if e_id in event_map and event_map[e_id]
         ])
 
-
     def _get_events_txn(self, txn, event_ids, check_redacted=True,
                         get_prev_content=False, allow_rejected=False):
         return unwrap_deferred(self._get_events(
@@ -494,7 +493,7 @@ class EventsStore(SQLBaseStore):
         return event_map
 
     def _fetch_events_txn(self, txn, events, check_redacted=True,
-                      get_prev_content=False, allow_rejected=False):
+                          get_prev_content=False, allow_rejected=False):
         return unwrap_deferred(self._fetch_events(
             txn, events,
             check_redacted=check_redacted,
