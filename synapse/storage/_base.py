@@ -883,6 +883,12 @@ class SQLBaseStore(object):
 
         missing_events_ids = [e for e in event_ids if e not in event_map]
 
+        if not missing_events_ids:
+            defer.returnValue([
+                event_map[e_id] for e_id in event_ids
+                if e_id in event_map and event_map[e_id]
+            ])
+
         def get_missing(txn):
             missing_events = unwrap_deferred(self._fetch_events(
                 txn,
