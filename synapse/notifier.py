@@ -252,7 +252,7 @@ class Notifier(object):
         user_streams = set()
 
         for user in users:
-            user_stream = self.user_to_user_stream.get(user)
+            user_stream = self.user_to_user_stream.get(str(user))
             if user_stream is not None:
                 user_streams.add(user_stream)
 
@@ -317,7 +317,7 @@ class Notifier(object):
                 timed_out[0] = True
                 timer[0] = None
                 user_stream.listeners.discard(listener[0])
-                listener[0].notify(from_token)
+                listener[0].notify(current_token)
 
             # We create multiple notification listeners so we have to manage
             # canceling the timeout ourselves.
