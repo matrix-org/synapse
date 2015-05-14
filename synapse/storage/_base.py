@@ -973,16 +973,20 @@ class SQLBaseStore(object):
                 res = yield self._execute("_fetch_events", None, sql, *evs)
                 rows.extend(res)
 
-        res = []
-        for row in rows:
-            e = yield self._get_event_from_row(
-                txn,
-                row[0], row[1], row[2],
-                check_redacted=check_redacted,
-                get_prev_content=get_prev_content,
-                rejected_reason=row[3],
-            )
-            res.append(e)
+        res = yield defer.gatherResults(
+            [
+                defer.maybeDeferred(
+                    self._get_event_from_row,
+                    txn,
+                    row[0], row[1], row[2],
+                    check_redacted=check_redacted,
+                    get_prev_content=get_prev_content,
+                    rejected_reason=row[3],
+                )
+                for row in rows
+            ],
+            consumeErrors=True,
+        )
 
         for e in res:
             self._get_event_cache.prefill(
