@@ -394,7 +394,6 @@ class PresenceHandler(BaseHandler):
         Args:
             observed_user(UserID): The local user whose presence is requested.
             observer_user(UserID): The remote or local user requesting presence.
-
         """
         accept = yield self._should_accept_invite(observed_user, observer_user)
 
@@ -444,8 +443,9 @@ class PresenceHandler(BaseHandler):
         local user's presence list.
 
         Args:
-            observed_user: The local or remote user to remove from the list.
-            observer_user: The local owner of the presence list.
+            observed_user(UserID): The local or remote user to remove from the
+                list.
+            observer_user(UserID): The local owner of the presence list.
         Returns:
             A Deferred.
         """
@@ -461,8 +461,9 @@ class PresenceHandler(BaseHandler):
         unsubscribe the local user from updates that user.
 
         Args:
-            observed_user: The local or remote user to remove from the list.
-            observer_user: The local owner of the presence list.
+            observed_user(UserId): The local or remote user to remove from the
+                list.
+            observer_user(UserId): The local owner of the presence list.
         Returns:
             A Deferred.
         """
@@ -585,6 +586,7 @@ class PresenceHandler(BaseHandler):
 
     def _start_polling_local(self, user, target_user):
         """Subscribe a local user to presence updates for a local user
+
         Args:
             user(UserId): The local user that wishes for updates.
             target_user(UserId): The local users whose updates are wanted.
@@ -598,7 +600,8 @@ class PresenceHandler(BaseHandler):
 
     def _start_polling_remote(self, user, domain, remoteusers):
         """Subscribe a local user to presence updates for remote users on a
-        given domain.
+        given remote domain.
+
         Args:
             user(UserID): The local user that wishes for updates.
             domain(str): The remote server the local user wants updates from.
@@ -630,6 +633,7 @@ class PresenceHandler(BaseHandler):
         """Unsubscribe a local user from presence updates from a local or
         remote user. If no target user is supplied then unsubscribe the user
         from all presence updates that the user had subscribed to.
+
         Args:
             user(UserID): The local user that no longer wishes for updates.
             target_user(UserID or None): The user whose updates are no longer
@@ -667,6 +671,7 @@ class PresenceHandler(BaseHandler):
     def _stop_polling_local(self, user, target_user):
         """Unsubscribe a local user from presence updates from a local user on
         this server.
+
         Args:
             user(UserID): The local user that no longer wishes for updates.
             target_user(UserID): The user whose updates are no longer wanted.
@@ -685,6 +690,7 @@ class PresenceHandler(BaseHandler):
     def _stop_polling_remote(self, user, domain, remoteusers):
         """Unsubscribe a local user from presence updates from remote users on
         a given domain.
+
         Args:
             user(UserID): The local user that no longer wishes for updates.
             domain(str): The remote server to unsubscribe from.
@@ -720,6 +726,7 @@ class PresenceHandler(BaseHandler):
         subscribed to the presence of the local user.
         Also pushes that update to any local user or remote domain that shares
         a room with the local user.
+
         Args:
             user(UserID): The local user whose presence was updated.
             statuscache(UserPresenceCache): Cache of the user's presence state
@@ -763,6 +770,7 @@ class PresenceHandler(BaseHandler):
         updates to the remote server.
         For unsubscribe request in the "unpoll" list stop pushing presence
         updates to the remote server.
+
         Args:
             orgin(str): The source of this m.presence EDU.
             content(dict): The content of this m.presence EDU.
@@ -869,6 +877,7 @@ class PresenceHandler(BaseHandler):
                                         remote_domains=[]):
         """Notify local clients and remote servers of a change in the presence
         of a user.
+
         Args:
             observed_user(UserID): The user to push the presence state for.
             statuscache(UserPresenceCache): The cache for the presence state to
@@ -919,6 +928,7 @@ class PresenceHandler(BaseHandler):
 
     def push_update_to_clients(self, users_to_push=[], room_ids=[]):
         """Notify clients of a new presence event.
+
         Args:
             users_to_push([UserID]): List of users to notify.
             room_ids([str]): List of room_ids to notify.
@@ -937,6 +947,7 @@ class PresenceHandler(BaseHandler):
         The last_active is replaced with last_active_ago in case the wallclock
         time on the remote server is different to the time on this server.
         Sends an EDU to the remote server with the current presence state.
+
         Args:
             user(UserID): The user to push the presence state for.
             destination(str): The remote server to send state to.
