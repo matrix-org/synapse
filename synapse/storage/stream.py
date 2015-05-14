@@ -224,7 +224,7 @@ class StreamStore(SQLBaseStore):
 
         return self.runInteraction("get_room_events_stream", f)
 
-    @log_function
+    @defer.inlineCallbacks
     def paginate_room_events(self, room_id, from_key, to_key=None,
                              direction='b', limit=-1,
                              with_feedback=False):
@@ -286,17 +286,18 @@ class StreamStore(SQLBaseStore):
                 # TODO (erikj): We should work out what to do here instead.
                 next_token = to_key if to_key else from_key
 
-            events = self._get_events_txn(
-                txn,
-                [r["event_id"] for r in rows],
-                get_prev_content=True
-            )
+            return rows, next_token,
 
-            self._set_before_and_after(events, rows)
+        rows, token = yield self.runInteraction("paginate_room_events", f)
 
-            return events, next_token,
+        events = yield self._get_events(
+            [r["event_id"] for r in rows],
+            get_prev_content=True
+        )
 
-        return self.runInteraction("paginate_room_events", f)
+        self._set_before_and_after(events, rows)
+
+        defer.returnValue((events, token))
 
     @defer.inlineCallbacks
     def get_recent_events_for_room(self, room_id, limit, end_token,

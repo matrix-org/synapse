@@ -72,8 +72,6 @@ class StateStore(SQLBaseStore):
                     retcol="event_id",
                 )
 
-                # state = self._get_events_txn(txn, state_ids)
-
                 res[group] = state_ids
 
             return res
