@@ -85,7 +85,7 @@ class StateStore(SQLBaseStore):
 
         @defer.inlineCallbacks
         def c(vals):
-            vals[:] = yield self._fetch_events(vals, get_prev_content=False)
+            vals[:] = yield self._get_events(vals, get_prev_content=False)
 
         yield defer.gatherResults(
             [
