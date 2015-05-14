@@ -883,20 +883,30 @@ class SQLBaseStore(object):
 
         missing_events = [e for e in event_ids if e not in event_map]
 
-        missing_events = yield self._fetch_events(
-            txn,
-            missing_events,
-            check_redacted=check_redacted,
-            get_prev_content=get_prev_content,
-            allow_rejected=allow_rejected,
-        )
+        def get_missing(txn=None):
+            missing_events = yield self._fetch_events(
+                txn,
+                missing_events,
+                check_redacted=check_redacted,
+                get_prev_content=get_prev_content,
+                allow_rejected=allow_rejected,
+            )
 
-        event_map.update(missing_events)
+            event_map.update(missing_events)
 
-        defer.returnValue([
-            event_map[e_id] for e_id in event_ids
-            if e_id in event_map and event_map[e_id]
-        ])
+            defer.returnValue([
+                event_map[e_id] for e_id in event_ids
+                if e_id in event_map and event_map[e_id]
+            ])
+
+        if missing_events and get_prev_content and not txn:
+            if get_prev_content and not txn:
+                # If we want prev_content then lets just jump into a txn.
+                res = yield self.runInteraction("_get_events", get_missing)
+                defer.returnValue(res)
+
+        defer.returnValue(get_missing())
+
 
     def _get_events_txn(self, txn, event_ids, check_redacted=True,
                         get_prev_content=False, allow_rejected=False):
