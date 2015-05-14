@@ -81,14 +81,15 @@ class _NotifierUserStream(object):
         self.last_notified_ms = time_now_ms
 
     def notify(self, stream_key, stream_id, time_now_ms):
-        self.last_notified_ms = time_now_ms
         self.current_token = self.current_token.copy_and_replace(
             stream_key, stream_id
         )
-        listeners = self.listeners
-        self.listeners = set()
-        for listener in listeners:
-            listener.notify(self.current_token)
+        if self.listeners:
+            self.last_notified_ms = time_now_ms
+            listeners = self.listeners
+            self.listeners = set()
+            for listener in listeners:
+                listener.notify(self.current_token)
 
     def remove(self, notifier):
         """ Remove this listener from all the indexes in the Notifier
