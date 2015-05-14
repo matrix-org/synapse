@@ -317,6 +317,13 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def user_joined_room(self, user, room_id):
+        """Called via the distributor whenever a user joins a room.
+        Notifies the new member of the presence of the current members.
+        Notifies the current members of the room of the new member's presence.
+        Args:
+            user(UserID): The user who joined the room.
+            room_id(str): The room id the user joined.
+        """
         if self.hs.is_mine(user):
             statuscache = self._get_or_make_usercache(user)
 
@@ -344,6 +351,7 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def send_invite(self, observer_user, observed_user):
+        """Request the presence of a local or remote user for a local user"""
         if not self.hs.is_mine(observer_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
@@ -378,6 +386,16 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def invite_presence(self, observed_user, observer_user):
+        """Handles a m.presence_invite EDU. A remote or local user has
+        requested presence updates for a local user. If the invite is accepted
+        then allow the local or remote user to see the presence of the local
+        user.
+
+        Args:
+            observed_user(UserID): The local user whose presence is requested.
+            observer_user(UserID): The remote or local user requesting presence.
+
+        """
         accept = yield self._should_accept_invite(observed_user, observer_user)
 
         if accept:
@@ -404,6 +422,14 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def accept_presence(self, observed_user, observer_user):
+        """Handles a m.presence_accept EDU. Mark a presence invite from a
+        local or remote user as accepted in a local user's presence list.
+        Starts polling for presence updates from the local or remote user.
+
+        Args:
+            observed_user(UserID): The user to update in the presence list.
+            observer_user(UserID): The owner of the presence list to update.
+        """
         yield self.store.set_presence_list_accepted(
             observer_user.localpart, observed_user.to_string()
         )
@@ -414,6 +440,15 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def deny_presence(self, observed_user, observer_user):
+        """Handle a m.presence_deny EDU. Removes a local or remote user from a
+        local user's presence list.
+
+        Args:
+            observed_user: The local or remote user to remove from the list.
+            observer_user: The local owner of the presence list.
+        Returns:
+            A Deferred.
+        """
         yield self.store.del_presence_list(
             observer_user.localpart, observed_user.to_string()
         )
@@ -422,6 +457,15 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def drop(self, observed_user, observer_user):
+        """Remove a local or remote user from a local user's presence list and
+        unsubscribe the local user from updates that user.
+
+        Args:
+            observed_user: The local or remote user to remove from the list.
+            observer_user: The local owner of the presence list.
+        Returns:
+            A Deferred.
+        """
         if not self.hs.is_mine(observer_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
@@ -435,6 +479,16 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_presence_list(self, observer_user, accepted=None):
+        """Get the presence list for a local user. The retured list includes
+        the current presence state for each user listed.
+
+        Args:
+            observer_user(UserID): The local user whose presence list to fetch.
+            accepted(bool or None): If not none then only include users who
+                have or have not accepted the presence invite request.
+        Returns:
+            A Deferred list of presence state events.
+        """
         if not self.hs.is_mine(observer_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
@@ -456,6 +510,23 @@ class PresenceHandler(BaseHandler):
     @defer.inlineCallbacks
     @log_function
     def start_polling_presence(self, user, target_user=None, state=None):
+        """Subscribe a local user to presence updates from a local or remote
+        user. If no target_user is supplied then subscribe to all users stored
+        in the presence list for the local user.
+
+        Additonally this pushes the current presence state of this user to all
+        target_users. That state can be provided directly or will be read from
+        the stored state for the local user.
+
+        Also this attempts to notify the local user of the current state of
+        any local target users.
+
+        Args:
+            user(UserID): The local user that whishes for presence updates.
+            target_user(UserID): The local or remote user whose updates are
+                wanted.
+            state(dict): Optional presence state for the local user.
+        """
         logger.debug("Start polling for presence from %s", user)
 
         if target_user:
@@ -513,6 +584,11 @@ class PresenceHandler(BaseHandler):
         yield defer.DeferredList(deferreds, consumeErrors=True)
 
     def _start_polling_local(self, user, target_user):
+        """Subscribe a local user to presence updates for a local user
+        Args:
+            user(UserId): The local user that wishes for updates.
+            target_user(UserId): The local users whose updates are wanted.
+        """
         target_localpart = target_user.localpart
 
         if target_localpart not in self._local_pushmap:
@@ -521,6 +597,16 @@ class PresenceHandler(BaseHandler):
         self._local_pushmap[target_localpart].add(user)
 
     def _start_polling_remote(self, user, domain, remoteusers):
+        """Subscribe a local user to presence updates for remote users on a
+        given domain.
+        Args:
+            user(UserID): The local user that wishes for updates.
+            domain(str): The remote server the local user wants updates from.
+            remoteusers(UserID): The remote users that local user wants to be
+                told about.
+        Returns:
+            A Deferred.
+        """
         to_poll = set()
 
         for u in remoteusers:
@@ -541,6 +627,16 @@ class PresenceHandler(BaseHandler):
 
     @log_function
     def stop_polling_presence(self, user, target_user=None):
+        """Unsubscribe a local user from presence updates from a local or
+        remote user. If no target user is supplied then unsubscribe the user
+        from all presence updates that the user had subscribed to.
+        Args:
+            user(UserID): The local user that no longer wishes for updates.
+            target_user(UserID or None): The user whose updates are no longer
+                wanted.
+        Returns:
+            A Deferred.
+        """
         logger.debug("Stop polling for presence from %s", user)
 
         if not target_user or self.hs.is_mine(target_user):
@@ -569,6 +665,12 @@ class PresenceHandler(BaseHandler):
         return defer.DeferredList(deferreds, consumeErrors=True)
 
     def _stop_polling_local(self, user, target_user):
+        """Unsubscribe a local user from presence updates from a local user on
+        this server.
+        Args:
+            user(UserID): The local user that no longer wishes for updates.
+            target_user(UserID): The user whose updates are no longer wanted.
+        """
         for localpart in self._local_pushmap.keys():
             if target_user and localpart != target_user.localpart:
                 continue
@@ -581,6 +683,16 @@ class PresenceHandler(BaseHandler):
 
     @log_function
     def _stop_polling_remote(self, user, domain, remoteusers):
+        """Unsubscribe a local user from presence updates from remote users on
+        a given domain.
+        Args:
+            user(UserID): The local user that no longer wishes for updates.
+            domain(str): The remote server to unsubscribe from.
+            remoteusers([UserID]): The users on that remote server that the
+                local user no longer wishes to be updated about.
+        Returns:
+            A Deferred.
+        """
         to_unpoll = set()
 
         for u in remoteusers:
@@ -602,6 +714,18 @@ class PresenceHandler(BaseHandler):
     @defer.inlineCallbacks
     @log_function
     def push_presence(self, user, statuscache):
+        """
+        Notify local and remote users of a change in presence of a local user.
+        Pushes the update to local clients and remote domains that are directly
+        subscribed to the presence of the local user.
+        Also pushes that update to any local user or remote domain that shares
+        a room with the local user.
+        Args:
+            user(UserID): The local user whose presence was updated.
+            statuscache(UserPresenceCache): Cache of the user's presence state
+        Returns:
+            A Deferred.
+        """
         assert(self.hs.is_mine(user))
 
         logger.debug("Pushing presence update from %s", user)
@@ -629,44 +753,22 @@ class PresenceHandler(BaseHandler):
         yield self.distributor.fire("user_presence_changed", user, statuscache)
 
     @defer.inlineCallbacks
-    def _push_presence_remote(self, user, destination, state=None):
-        if state is None:
-            state = yield self.store.get_presence_state(user.localpart)
-            del state["mtime"]
-            state["presence"] = state.pop("state")
-
-            if user in self._user_cachemap:
-                state["last_active"] = (
-                    self._user_cachemap[user].get_state()["last_active"]
-                )
-
-            yield self.distributor.fire(
-                "collect_presencelike_data", user, state
-            )
-
-        if "last_active" in state:
-            state = dict(state)
-            state["last_active_ago"] = int(
-                self.clock.time_msec() - state.pop("last_active")
-            )
-
-        user_state = {
-            "user_id": user.to_string(),
-        }
-        user_state.update(**state)
-
-        yield self.federation.send_edu(
-            destination=destination,
-            edu_type="m.presence",
-            content={
-                "push": [
-                    user_state,
-                ],
-            }
-        )
-
-    @defer.inlineCallbacks
     def incoming_presence(self, origin, content):
+        """Handle an incoming m.presence EDU.
+        For each presence update in the "push" list update our local cache and
+        notify the appropriate local clients. Only clients that share a room
+        or are directly subscribed to the presence for a user should be
+        notified of the update.
+        For each subscription request in the "poll" list start pushing presence
+        updates to the remote server.
+        For unsubscribe request in the "unpoll" list stop pushing presence
+        updates to the remote server.
+        Args:
+            orgin(str): The source of this m.presence EDU.
+            content(dict): The content of this m.presence EDU.
+        Returns:
+            A Deferred.
+        """
         deferreds = []
 
         for push in content.get("push", []):
@@ -765,6 +867,22 @@ class PresenceHandler(BaseHandler):
     def push_update_to_local_and_remote(self, observed_user, statuscache,
                                         users_to_push=[], room_ids=[],
                                         remote_domains=[]):
+        """Notify local clients and remote servers of a change in the presence
+        of a user.
+        Args:
+            observed_user(UserID): The user to push the presence state for.
+            statuscache(UserPresenceCache): The cache for the presence state to
+                push.
+            users_to_push([UserID]): A list of local and remote users to
+                notify.
+            room_ids([str]): Notify the local and remote occupants of these
+                rooms.
+            remote_domains([str]): A list of remote servers to notify in
+                addition to those implied by the users_to_push and the
+                room_ids.
+        Returns:
+            A Deferred.
+        """
 
         localusers, remoteusers = partitionbool(
             users_to_push,
@@ -802,14 +920,59 @@ class PresenceHandler(BaseHandler):
     def push_update_to_clients(self, users_to_push=[], room_ids=[]):
         """Notify clients of a new presence event.
         Args:
-            users_to_push(list): List of users to notify.
-            room_ids(list): List of room_ids to notify.
+            users_to_push([UserID]): List of users to notify.
+            room_ids([str]): List of room_ids to notify.
         """
         with PreserveLoggingContext():
             self.notifier.on_new_user_event(
                 users_to_push,
                 room_ids,
             )
+
+    @defer.inlineCallbacks
+    def _push_presence_remote(self, user, destination, state=None):
+        """Push a user's presence to a remote server. If a presence state event
+        that event is sent. Otherwise a new state event is constructed from the
+        stored presence state.
+        The last_active is replaced with last_active_ago in case the wallclock
+        time on the remote server is different to the time on this server.
+        Sends an EDU to the remote server with the current presence state.
+        Args:
+            user(UserID): The user to push the presence state for.
+            destination(str): The remote server to send state to.
+            state(dict): The state to push, or None to use the current stored
+                state.
+        Returns:
+            A Deferred.
+        """
+        if state is None:
+            state = yield self.store.get_presence_state(user.localpart)
+            del state["mtime"]
+            state["presence"] = state.pop("state")
+
+            if user in self._user_cachemap:
+                state["last_active"] = (
+                    self._user_cachemap[user].get_state()["last_active"]
+                )
+
+            yield self.distributor.fire(
+                "collect_presencelike_data", user, state
+            )
+
+        if "last_active" in state:
+            state = dict(state)
+            state["last_active_ago"] = int(
+                self.clock.time_msec() - state.pop("last_active")
+            )
+
+        user_state = {"user_id": user.to_string(), }
+        user_state.update(state)
+
+        yield self.federation.send_edu(
+            destination=destination,
+            edu_type="m.presence",
+            content={"push": [user_state, ], }
+        )
 
 
 class PresenceEventSource(object):
