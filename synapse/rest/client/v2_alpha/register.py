@@ -82,8 +82,10 @@ class RegisterRestServlet(RestServlet):
                 [LoginType.EMAIL_IDENTITY]
             ]
 
+        result = None
         if service:
             is_application_server = True
+            params = body
         elif 'mac' in body:
             # Check registration-specific shared secret auth
             if 'username' not in body:
@@ -92,6 +94,7 @@ class RegisterRestServlet(RestServlet):
                 body['username'], body['mac']
             )
             is_using_shared_secret = True
+            params = body
         else:
             authed, result, params = yield self.auth_handler.check_auth(
                 flows, body, self.hs.get_ip_from_request(request)
@@ -118,7 +121,7 @@ class RegisterRestServlet(RestServlet):
             password=new_password
         )
 
-        if LoginType.EMAIL_IDENTITY in result:
+        if result and LoginType.EMAIL_IDENTITY in result:
             threepid = result[LoginType.EMAIL_IDENTITY]
 
             for reqd in ['medium', 'address', 'validated_at']:
