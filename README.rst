@@ -117,7 +117,7 @@ Installing prerequisites on Mac OS X::
     
 To install the synapse homeserver run::
 
-    $ virtualenv ~/.synapse
+    $ virtualenv -p python2.7 ~/.synapse
     $ source ~/.synapse/bin/activate
     $ pip install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
 
