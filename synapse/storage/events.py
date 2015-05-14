@@ -513,6 +513,7 @@ class EventsStore(SQLBaseStore):
                         self._event_fetch_list = []
 
                         if not event_list:
+                            self._event_fetch_ongoing -= 1
                             return
 
                     event_id_lists = zip(*event_list)[0]
@@ -527,7 +528,8 @@ class EventsStore(SQLBaseStore):
                     }
 
                     for ids, d in event_list:
-                        d.callback(
+                        reactor.callFromThread(
+                            d.callback,
                             [
                                 row_dict[i] for i in ids
                                 if i in row_dict
