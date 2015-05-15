@@ -506,6 +506,7 @@ class EventsStore(SQLBaseStore):
             try:
                 with self._event_fetch_lock:
                     tot = 0
+                    j = 0
                     for j, lst in enumerate(self._event_fetch_list):
                         if tot > 200:
                             break
