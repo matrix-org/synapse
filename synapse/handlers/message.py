@@ -303,27 +303,18 @@ class MessageHandler(BaseHandler):
             if event.membership != Membership.JOIN:
                 return
             try:
-                # (messages, token), current_state = yield defer.gatherResults(
-                #     [
-                #         self.store.get_recent_events_for_room(
-                #             event.room_id,
-                #             limit=limit,
-                #             end_token=now_token.room_key,
-                #         ),
-                #         self.state_handler.get_current_state(
-                #             event.room_id
-                #         ),
-                #     ]
-                # ).addErrback(unwrapFirstError)
-
-                messages, token = yield self.store.get_recent_events_for_room(
-                    event.room_id,
-                    limit=limit,
-                    end_token=now_token.room_key,
-                )
-                current_state = yield self.state_handler.get_current_state(
-                    event.room_id
-                )
+                (messages, token), current_state = yield defer.gatherResults(
+                    [
+                        self.store.get_recent_events_for_room(
+                            event.room_id,
+                            limit=limit,
+                            end_token=now_token.room_key,
+                        ),
+                        self.state_handler.get_current_state(
+                            event.room_id
+                        ),
+                    ]
+                ).addErrback(unwrapFirstError)
 
                 start_token = now_token.copy_and_replace("room_key", token[0])
                 end_token = now_token.copy_and_replace("room_key", token[1])
