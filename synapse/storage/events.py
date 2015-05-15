@@ -421,14 +421,12 @@ class EventsStore(SQLBaseStore):
             ])
 
         if not txn:
-            logger.debug("enqueue before")
             missing_events = yield self._enqueue_events(
                 missing_events_ids,
                 check_redacted=check_redacted,
                 get_prev_content=get_prev_content,
                 allow_rejected=allow_rejected,
             )
-            logger.debug("enqueue after")
         else:
             missing_events = self._fetch_events_txn(
                 txn,
