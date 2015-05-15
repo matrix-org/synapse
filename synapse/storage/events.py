@@ -529,20 +529,18 @@ class EventsStore(SQLBaseStore):
 
                 logger.debug("do_fetch got events: %r", row_dict.keys())
 
-                def fire(evs):
-                    for ids, d in evs:
+                def fire(lst, res):
+                    for ids, d in lst:
                         if not d.called:
                             try:
-                                d.callback(
-                                    [
-                                        row_dict[i]
-                                        for i in ids
-                                        if i in row_dict
-                                    ]
-                                )
+                                d.callback([
+                                    res[i]
+                                    for i in ids
+                                    if i in res
+                                ])
                             except:
                                 logger.exception("Failed to callback")
-                reactor.callFromThread(fire, event_list)
+                reactor.callFromThread(fire, event_list, row_dict)
             except Exception as e:
                 logger.exception("do_fetch")
 
