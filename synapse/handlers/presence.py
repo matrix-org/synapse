@@ -320,6 +320,7 @@ class PresenceHandler(BaseHandler):
         """Called via the distributor whenever a user joins a room.
         Notifies the new member of the presence of the current members.
         Notifies the current members of the room of the new member's presence.
+
         Args:
             user(UserID): The user who joined the room.
             room_id(str): The room id the user joined.
