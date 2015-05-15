@@ -222,7 +222,7 @@ class FederationClient(FederationBase):
                         for p in transaction_data["pdus"]
                     ]
 
-                    if pdu_list:
+                    if pdu_list and pdu_list[0]:
                         pdu = pdu_list[0]
 
                         # Check signatures are correct.
@@ -255,7 +255,7 @@ class FederationClient(FederationBase):
                 )
                 continue
 
-        if self._get_pdu_cache is not None:
+        if self._get_pdu_cache is not None and pdu:
             self._get_pdu_cache[event_id] = pdu
 
         defer.returnValue(pdu)
@@ -475,6 +475,9 @@ class FederationClient(FederationBase):
             limit (int): Maximum number of events to return.
             min_depth (int): Minimum depth of events tor return.
         """
+        logger.debug("get_missing_events: latest_events: %r", latest_events)
+        logger.debug("get_missing_events: earliest_events_ids: %r", earliest_events_ids)
+
         try:
             content = yield self.transport_layer.get_missing_events(
                 destination=destination,
@@ -485,6 +488,8 @@ class FederationClient(FederationBase):
                 min_depth=min_depth,
             )
 
+            logger.debug("get_missing_events: Got content: %r", content)
+
             events = [
                 self.event_from_pdu_json(e)
                 for e in content.get("events", [])
@@ -493,6 +498,8 @@ class FederationClient(FederationBase):
             signed_events = yield self._check_sigs_and_hash_and_fetch(
                 destination, events, outlier=False
             )
+
+            logger.debug("get_missing_events: signed_events: %r", signed_events)
 
             have_gotten_all_from_destination = True
         except HttpResponseException as e:
@@ -518,6 +525,8 @@ class FederationClient(FederationBase):
             # Are we missing any?
 
             seen_events = set(earliest_events_ids)
+
+            logger.debug("get_missing_events: signed_events2: %r", signed_events)
             seen_events.update(e.event_id for e in signed_events)
 
             missing_events = {}
@@ -561,7 +570,7 @@ class FederationClient(FederationBase):
 
             res = yield defer.DeferredList(deferreds, consumeErrors=True)
             for (result, val), (e_id, _) in zip(res, ordered_missing):
-                if result:
+                if result and val:
                     signed_events.append(val)
                 else:
                     failed_to_fetch.add(e_id)

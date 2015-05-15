@@ -357,10 +357,12 @@ class StreamStore(SQLBaseStore):
             "get_recent_events_for_room", get_recent_events_for_room_txn
         )
 
+        logger.debug("stream before")
         events = yield self._get_events(
             [r["event_id"] for r in rows],
             get_prev_content=True
         )
+        logger.debug("stream after")
 
         self._set_before_and_after(events, rows)
 
