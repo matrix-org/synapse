@@ -159,11 +159,12 @@ class StateStore(SQLBaseStore):
                 args = (room_id, )
 
             txn.execute(sql, args)
-            results = self.cursor_to_dict(txn)
+            results = txn.fetchall()
 
-            return self._parse_events_txn(txn, results)
+            return [r[0] for r in results]
 
-        events = yield self.runInteraction("get_current_state", f)
+        event_ids = yield self.runInteraction("get_current_state", f)
+        events = yield self._get_events(event_ids)
         defer.returnValue(events)
 
 

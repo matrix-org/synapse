@@ -594,7 +594,6 @@ class EventsStore(SQLBaseStore):
             ],
             consumeErrors=True
         )
-        logger.debug("gatherResults after")
 
         defer.returnValue({
             e.event_id: e
