@@ -21,6 +21,7 @@ from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event
 from synapse.util import unwrap_deferred
 
+from synapse.util.logcontext import preserve_context_over_deferred
 from synapse.util.logutils import log_function
 from synapse.api.constants import EventTypes
 from synapse.crypto.event_signing import compute_event_reference_hash
@@ -587,7 +588,7 @@ class EventsStore(SQLBaseStore):
             )
 
         logger.debug("events_d before")
-        rows = yield events_d
+        rows = yield preserve_context_over_deferred(events_d)
         logger.debug("events_d after")
 
         res = yield defer.gatherResults(
