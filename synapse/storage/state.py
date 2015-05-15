@@ -164,7 +164,7 @@ class StateStore(SQLBaseStore):
             return [r[0] for r in results]
 
         event_ids = yield self.runInteraction("get_current_state", f)
-        events = yield self._get_events(event_ids)
+        events = yield self._get_events(event_ids, get_prev_content=False)
         defer.returnValue(events)
 
 
