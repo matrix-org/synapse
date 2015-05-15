@@ -506,13 +506,11 @@ class EventsStore(SQLBaseStore):
         i = 0
         while True:
             try:
-                logger.debug("do_fetch getting lock")
                 with self._event_fetch_lock:
-                    logger.debug("do_fetch go lock: %r", self._event_fetch_list)
                     event_list = self._event_fetch_list
                     self._event_fetch_list = []
                     if not event_list:
-                        if self.database_engine.single_threaded or i > 5:
+                        if self.database_engine.single_threaded or i > 3:
                             self._event_fetch_ongoing -= 1
                             return
                         else:
@@ -534,8 +532,6 @@ class EventsStore(SQLBaseStore):
                     r["event_id"]: r
                     for r in rows
                 }
-
-                logger.debug("do_fetch got events: %r", row_dict.keys())
 
                 def fire(lst, res):
                     for ids, d in lst:
@@ -567,16 +563,14 @@ class EventsStore(SQLBaseStore):
             defer.returnValue({})
 
         events_d = defer.Deferred()
-        logger.debug("enqueueueueue getting lock")
         with self._event_fetch_lock:
-            logger.debug("enqueue go lock")
             self._event_fetch_list.append(
                 (events, events_d)
             )
 
-            self._event_fetch_lock.notify_all()
+            self._event_fetch_lock.notify()
 
-            if self._event_fetch_ongoing < 1:
+            if self._event_fetch_ongoing < 3:
                 self._event_fetch_ongoing += 1
                 should_start = True
             else:
@@ -587,9 +581,7 @@ class EventsStore(SQLBaseStore):
                 self._do_fetch
             )
 
-        logger.debug("events_d before")
         rows = yield preserve_context_over_deferred(events_d)
-        logger.debug("events_d after")
 
         res = yield defer.gatherResults(
             [
