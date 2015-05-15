@@ -91,9 +91,9 @@ class EventsStore(SQLBaseStore):
         """
         events = yield self._get_events(
             [event_id],
-            check_redacted=True,
-            get_prev_content=False,
-            allow_rejected=False,
+            check_redacted=check_redacted,
+            get_prev_content=get_prev_content,
+            allow_rejected=allow_rejected,
         )
 
         if not events and not allow_none:
