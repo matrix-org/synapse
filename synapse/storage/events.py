@@ -502,6 +502,7 @@ class EventsStore(SQLBaseStore):
 
     def _do_fetch(self, conn):
         event_list = []
+        i = 0
         while True:
             try:
                 logger.debug("do_fetch getting lock")
@@ -510,8 +511,14 @@ class EventsStore(SQLBaseStore):
                     event_list = self._event_fetch_list
                     self._event_fetch_list = []
                     if not event_list:
-                        self._event_fetch_ongoing -= 1
-                        return
+                        if self.database_engine.single_threaded or i > 5:
+                            self._event_fetch_ongoing -= 1
+                            return
+                        else:
+                            self._event_fetch_lock.wait(0.1)
+                            i += 1
+                            continue
+                    i = 0
 
                 event_id_lists = zip(*event_list)[0]
                 event_ids = [
@@ -565,6 +572,8 @@ class EventsStore(SQLBaseStore):
             self._event_fetch_list.append(
                 (events, events_d)
             )
+
+            self._event_fetch_lock.notify_all()
 
             if self._event_fetch_ongoing < 1:
                 self._event_fetch_ongoing += 1
