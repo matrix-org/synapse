@@ -27,7 +27,6 @@ from twisted.internet import defer
 
 from collections import namedtuple, OrderedDict
 
-import contextlib
 import functools
 import sys
 import time

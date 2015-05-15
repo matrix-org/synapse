@@ -629,7 +629,7 @@ class EventsStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _fetch_events(self, txn, events, check_redacted=True,
-                     get_prev_content=False, allow_rejected=False):
+                      get_prev_content=False, allow_rejected=False):
         if not events:
             defer.returnValue({})
 
