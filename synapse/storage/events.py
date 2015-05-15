@@ -505,8 +505,15 @@ class EventsStore(SQLBaseStore):
         while True:
             try:
                 with self._event_fetch_lock:
-                    event_list = self._event_fetch_list
-                    self._event_fetch_list = []
+                    tot = 0
+                    for j, lst in enumerate(self._event_fetch_list):
+                        if tot > 200:
+                            break
+                        tot += len(lst[0])
+
+                    event_list = self._event_fetch_list[:j+1]
+                    self._event_fetch_list = self._event_fetch_list[j+1:]
+
                     if not event_list:
                         if self.database_engine.single_threaded or i > 3:
                             self._event_fetch_ongoing -= 1
