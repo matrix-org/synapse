@@ -209,19 +209,11 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         ], presence)
 
         self.mock_update_client.assert_has_calls([
-            call(users_to_push=set([self.u_apple, self.u_banana, self.u_clementine]),
-                room_ids=[],
-                observed_user=self.u_apple,
-                statuscache=ANY), # self-reflection
+            call(
+                users_to_push={self.u_apple, self.u_banana, self.u_clementine},
+                room_ids=[]
+            ),
         ], any_order=True)
-
-        statuscache = self.mock_update_client.call_args[1]["statuscache"]
-        self.assertEquals({
-            "presence": ONLINE,
-            "last_active": 1000000, # MockClock
-            "displayname": "Frank",
-            "avatar_url": "http://foo",
-        }, statuscache.state)
 
         self.mock_update_client.reset_mock()
 
@@ -232,20 +224,11 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 self.u_apple, "I am an Apple")
 
         self.mock_update_client.assert_has_calls([
-            call(users_to_push=set([self.u_apple, self.u_banana, self.u_clementine]),
+            call(
+                users_to_push={self.u_apple, self.u_banana, self.u_clementine},
                 room_ids=[],
-                observed_user=self.u_apple,
-                statuscache=ANY), # self-reflection
+            ),
         ], any_order=True)
-
-        statuscache = self.mock_update_client.call_args[1]["statuscache"]
-        self.assertEquals({
-            "presence": ONLINE,
-            "last_active": 1000000, # MockClock
-            "displayname": "I am an Apple",
-            "avatar_url": "http://foo",
-        }, statuscache.state)
-
 
     @defer.inlineCallbacks
     def test_push_remote(self):
@@ -314,13 +297,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         self.mock_update_client.assert_called_with(
             users_to_push=set([self.u_apple]),
             room_ids=[],
-            observed_user=self.u_potato,
-            statuscache=ANY)
-
-        statuscache = self.mock_update_client.call_args[1]["statuscache"]
-        self.assertEquals({"presence": ONLINE,
-                           "displayname": "Frank",
-                           "avatar_url": "http://foo"}, statuscache.state)
+        )
 
         state = yield self.handlers.presence_handler.get_state(self.u_potato,
                 self.u_apple)
