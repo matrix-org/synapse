@@ -415,8 +415,6 @@ class FederationServer(FederationBase):
                 pdu.internal_metadata.outlier = True
             elif min_depth and pdu.depth > min_depth:
                 if get_missing and prevs - seen:
-                    logger.debug("We're missing: %r", prevs-seen)
-
                     latest = yield self.store.get_latest_event_ids_in_room(
                         pdu.room_id
                     )

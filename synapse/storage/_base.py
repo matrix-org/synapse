@@ -15,7 +15,6 @@
 import logging
 
 from synapse.api.errors import StoreError
-
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import preserve_context_over_fn, LoggingContext
 from synapse.util.lrucache import LruCache
