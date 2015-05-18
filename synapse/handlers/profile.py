@@ -88,6 +88,9 @@ class ProfileHandler(BaseHandler):
         if target_user != auth_user:
             raise AuthError(400, "Cannot set another user's displayname")
 
+        if new_displayname == '':
+            new_displayname = None
+
         yield self.store.set_profile_displayname(
             target_user.localpart, new_displayname
         )

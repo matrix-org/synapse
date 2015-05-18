@@ -32,9 +32,9 @@ from synapse.server import HomeServer
 from twisted.internet import reactor
 from twisted.application import service
 from twisted.enterprise import adbapi
-from twisted.web.resource import Resource
+from twisted.web.resource import Resource, EncodingResourceWrapper
 from twisted.web.static import File
-from twisted.web.server import Site
+from twisted.web.server import Site, GzipEncoderFactory
 from twisted.web.http import proxiedLogFormatter, combinedLogFormatter
 from synapse.http.server import JsonResource, RootRedirect
 from synapse.rest.media.v0.content_repository import ContentRepoResource
@@ -69,16 +69,26 @@ import subprocess
 logger = logging.getLogger("synapse.app.homeserver")
 
 
+class GzipFile(File):
+    def getChild(self, path, request):
+        child = File.getChild(self, path, request)
+        return EncodingResourceWrapper(child, [GzipEncoderFactory()])
+
+
+def gz_wrap(r):
+    return EncodingResourceWrapper(r, [GzipEncoderFactory()])
+
+
 class SynapseHomeServer(HomeServer):
 
     def build_http_client(self):
         return MatrixFederationHttpClient(self)
 
     def build_resource_for_client(self):
-        return ClientV1RestResource(self)
+        return gz_wrap(ClientV1RestResource(self))
 
     def build_resource_for_client_v2_alpha(self):
-        return ClientV2AlphaRestResource(self)
+        return gz_wrap(ClientV2AlphaRestResource(self))
 
     def build_resource_for_federation(self):
         return JsonResource(self)
@@ -87,9 +97,10 @@ class SynapseHomeServer(HomeServer):
         import syweb
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
-        return File(webclient_path)  # TODO configurable?
+        return GzipFile(webclient_path)  # TODO configurable?
 
     def build_resource_for_static_content(self):
+        # This is old and should go away: not going to bother adding gzip
         return File("static")
 
     def build_resource_for_content_repo(self):
