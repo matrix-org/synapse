@@ -218,7 +218,9 @@ class TypingNotificationHandler(BaseHandler):
         self._room_serials[room_id] = self._latest_room_serial
 
         with PreserveLoggingContext():
-            self.notifier.on_new_user_event(rooms=[room_id])
+            self.notifier.on_new_user_event(
+                "typing_key", self._latest_room_serial, rooms=[room_id]
+            )
 
 
 class TypingNotificationEventSource(object):

@@ -183,7 +183,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         )
 
         self.on_new_user_event.assert_has_calls([
-            call(rooms=[self.room_id]),
+            call('typing_key', 1, rooms=[self.room_id]),
         ])
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -246,7 +246,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         )
 
         self.on_new_user_event.assert_has_calls([
-            call(rooms=[self.room_id]),
+            call('typing_key', 1, rooms=[self.room_id]),
         ])
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -300,7 +300,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         )
 
         self.on_new_user_event.assert_has_calls([
-            call(rooms=[self.room_id]),
+            call('typing_key', 1, rooms=[self.room_id]),
         ])
 
         yield put_json.await_calls()
@@ -332,7 +332,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         )
 
         self.on_new_user_event.assert_has_calls([
-            call(rooms=[self.room_id]),
+            call('typing_key', 1, rooms=[self.room_id]),
         ])
         self.on_new_user_event.reset_mock()
 
@@ -352,7 +352,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.clock.advance_time(11)
 
         self.on_new_user_event.assert_has_calls([
-            call(rooms=[self.room_id]),
+            call('typing_key', 2, rooms=[self.room_id]),
         ])
 
         self.assertEquals(self.event_source.get_current_key(), 2)
@@ -378,7 +378,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         )
 
         self.on_new_user_event.assert_has_calls([
-            call(rooms=[self.room_id]),
+            call('typing_key', 3, rooms=[self.room_id]),
         ])
         self.on_new_user_event.reset_mock()
 
