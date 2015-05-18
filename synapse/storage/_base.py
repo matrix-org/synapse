@@ -46,7 +46,6 @@ sql_scheduling_timer = metrics.register_distribution("schedule_time")
 
 sql_query_timer = metrics.register_distribution("query_time", labels=["verb"])
 sql_txn_timer = metrics.register_distribution("transaction_time", labels=["desc"])
-sql_getevents_timer = metrics.register_distribution("getEvents_time", labels=["desc"])
 
 caches_by_name = {}
 cache_counter = metrics.register_cache(
