@@ -518,7 +518,6 @@ class FederationClient(FederationBase):
             # Are we missing any?
 
             seen_events = set(earliest_events_ids)
-
             seen_events.update(e.event_id for e in signed_events)
 
             missing_events = {}
