@@ -203,7 +203,7 @@ class Notifier(object):
             max_room_stream_id(int): The highest stream_id below which all
                 events have been persisted.
         """
-        pending = sorted(self.pending_new_room_events)
+        pending = self.pending_new_room_events
         self.pending_new_room_events = []
         for room_stream_id, event, extra_users in pending:
             if room_stream_id > max_room_stream_id:
