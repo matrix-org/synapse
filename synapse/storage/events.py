@@ -643,6 +643,9 @@ class EventsStore(SQLBaseStore):
                 events,
             )
 
+        if not allow_rejected:
+            rows[:] = [r for r in rows if not r["rejects"]]
+
         res = yield defer.gatherResults(
             [
                 defer.maybeDeferred(
