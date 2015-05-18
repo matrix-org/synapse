@@ -42,55 +42,77 @@ def count(func, l):
 
 class _NotificationListener(object):
     """ This represents a single client connection to the events stream.
-
     The events stream handler will have yielded to the deferred, so to
     notify the handler it is sufficient to resolve the deferred.
+    """
+
+    def __init__(self, deferred):
+        self.deferred = deferred
+
+    def notified(self):
+        return self.deferred.called
+
+    def notify(self, token):
+        """ Inform whoever is listening about the new events.
+        """
+        try:
+            self.deferred.callback(token)
+        except defer.AlreadyCalledError:
+            pass
+
+
+class _NotifierUserStream(object):
+    """This represents a user connected to the event stream.
+    It tracks the most recent stream token for that user.
+    At a given point a user may have a number of streams listening for
+    events.
 
     This listener will also keep track of which rooms it is listening in
     so that it can remove itself from the indexes in the Notifier class.
     """
 
-    def __init__(self, user, rooms, deferred, appservice=None):
-        self.user = user
+    def __init__(self, user, rooms, current_token, time_now_ms,
+                 appservice=None):
+        self.user = str(user)
         self.appservice = appservice
-        self.deferred = deferred
-        self.rooms = rooms
-        self.timer = None
+        self.listeners = set()
+        self.rooms = set(rooms)
+        self.current_token = current_token
+        self.last_notified_ms = time_now_ms
 
-    def notified(self):
-        return self.deferred.called
+    def notify(self, stream_key, stream_id, time_now_ms):
+        """Notify any listeners for this user of a new event from an
+        event source.
+        Args:
+            stream_key(str): The stream the event came from.
+            stream_id(str): The new id for the stream the event came from.
+            time_now_ms(int): The current time in milliseconds.
+        """
+        self.current_token = self.current_token.copy_and_advance(
+            stream_key, stream_id
+        )
+        if self.listeners:
+            self.last_notified_ms = time_now_ms
+            listeners = self.listeners
+            self.listeners = set()
+            for listener in listeners:
+                listener.notify(self.current_token)
 
-    def notify(self, notifier):
-        """ Inform whoever is listening about the new events. This will
-        also remove this listener from all the indexes in the Notifier
+    def remove(self, notifier):
+        """ Remove this listener from all the indexes in the Notifier
         it knows about.
         """
 
-        try:
-            self.deferred.callback(None)
-        except defer.AlreadyCalledError:
-            pass
-
-        # Should the following be done be using intrusively linked lists?
-        # -- erikj
-
         for room in self.rooms:
-            lst = notifier.room_to_listeners.get(room, set())
+            lst = notifier.room_to_user_streams.get(room, set())
             lst.discard(self)
 
-        notifier.user_to_listeners.get(self.user, set()).discard(self)
+        notifier.user_to_user_stream.pop(self.user)
 
         if self.appservice:
-            notifier.appservice_to_listeners.get(
+            notifier.appservice_to_user_streams.get(
                 self.appservice, set()
             ).discard(self)
-
-        # Cancel the timeout for this notifer if one exists.
-        if self.timer is not None:
-            try:
-                notifier.clock.cancel_call_later(self.timer)
-            except:
-                logger.warn("Failed to cancel notifier timer")
 
 
 class Notifier(object):
@@ -100,14 +122,18 @@ class Notifier(object):
     Primarily used from the /events stream.
     """
 
+    UNUSED_STREAM_EXPIRY_MS = 10 * 60 * 1000
+
     def __init__(self, hs):
         self.hs = hs
 
-        self.room_to_listeners = {}
-        self.user_to_listeners = {}
-        self.appservice_to_listeners = {}
+        self.user_to_user_stream = {}
+        self.room_to_user_streams = {}
+        self.appservice_to_user_streams = {}
 
         self.event_sources = hs.get_event_sources()
+        self.store = hs.get_datastore()
+        self.pending_new_room_events = []
 
         self.clock = hs.get_clock()
 
@@ -115,46 +141,80 @@ class Notifier(object):
             "user_joined_room", self._user_joined_room
         )
 
+        self.clock.looping_call(
+            self.remove_expired_streams, self.UNUSED_STREAM_EXPIRY_MS
+        )
+
         # This is not a very cheap test to perform, but it's only executed
         # when rendering the metrics page, which is likely once per minute at
         # most when scraping it.
         def count_listeners():
-            all_listeners = set()
+            all_user_streams = set()
 
-            for x in self.room_to_listeners.values():
-                all_listeners |= x
-            for x in self.user_to_listeners.values():
-                all_listeners |= x
-            for x in self.appservice_to_listeners.values():
-                all_listeners |= x
+            for x in self.room_to_user_streams.values():
+                all_user_streams |= x
+            for x in self.user_to_user_stream:
+                all_user_streams.add(x)
+            for x in self.appservice_to_user_streams.values():
+                all_user_streams |= x
 
-            return len(all_listeners)
+            return sum(len(stream.listeners) for stream in all_user_streams)
         metrics.register_callback("listeners", count_listeners)
 
         metrics.register_callback(
             "rooms",
-            lambda: count(bool, self.room_to_listeners.values()),
+            lambda: count(bool, self.room_to_user_streams.values()),
         )
         metrics.register_callback(
             "users",
-            lambda: count(bool, self.user_to_listeners.values()),
+            lambda: len(self.user_to_user_stream),
         )
         metrics.register_callback(
             "appservices",
-            lambda: count(bool, self.appservice_to_listeners.values()),
+            lambda: count(bool, self.appservice_to_user_streams.values()),
         )
 
     @log_function
     @defer.inlineCallbacks
-    def on_new_room_event(self, event, extra_users=[]):
+    def on_new_room_event(self, event, room_stream_id, max_room_stream_id,
+                          extra_users=[]):
         """ Used by handlers to inform the notifier something has happened
         in the room, room event wise.
 
         This triggers the notifier to wake up any listeners that are
         listening to the room, and any listeners for the users in the
         `extra_users` param.
+
+        The events can be peristed out of order. The notifier will wait
+        until all previous events have been persisted before notifying
+        the client streams.
         """
         yield run_on_reactor()
+
+        self.pending_new_room_events.append((
+            room_stream_id, event, extra_users
+        ))
+        self._notify_pending_new_room_events(max_room_stream_id)
+
+    def _notify_pending_new_room_events(self, max_room_stream_id):
+        """Notify for the room events that were queued waiting for a previous
+        event to be persisted.
+        Args:
+            max_room_stream_id(int): The highest stream_id below which all
+                events have been persisted.
+        """
+        pending = self.pending_new_room_events
+        self.pending_new_room_events = []
+        for room_stream_id, event, extra_users in pending:
+            if room_stream_id > max_room_stream_id:
+                self.pending_new_room_events.append((
+                    room_stream_id, event, extra_users
+                ))
+            else:
+                self._on_new_room_event(event, room_stream_id, extra_users)
+
+    def _on_new_room_event(self, event, room_stream_id, extra_users=[]):
+        """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
         self.hs.get_handlers().appservice_handler.notify_interested_services(
             event
@@ -162,70 +222,61 @@ class Notifier(object):
 
         room_id = event.room_id
 
-        room_listeners = self.room_to_listeners.get(room_id, set())
+        room_user_streams = self.room_to_user_streams.get(room_id, set())
 
-        _discard_if_notified(room_listeners)
-
-        listeners = room_listeners.copy()
+        user_streams = room_user_streams.copy()
 
         for user in extra_users:
-            user_listeners = self.user_to_listeners.get(user, set())
+            user_stream = self.user_to_user_stream.get(str(user))
+            if user_stream is not None:
+                user_streams.add(user_stream)
 
-            _discard_if_notified(user_listeners)
-
-            listeners |= user_listeners
-
-        for appservice in self.appservice_to_listeners:
+        for appservice in self.appservice_to_user_streams:
             # TODO (kegan): Redundant appservice listener checks?
-            # App services will already be in the room_to_listeners set, but
+            # App services will already be in the room_to_user_streams set, but
             # that isn't enough. They need to be checked here in order to
             # receive *invites* for users they are interested in. Does this
-            # make the room_to_listeners check somewhat obselete?
+            # make the room_to_user_streams check somewhat obselete?
             if appservice.is_interested(event):
-                app_listeners = self.appservice_to_listeners.get(
+                app_user_streams = self.appservice_to_user_streams.get(
                     appservice, set()
                 )
+                user_streams |= app_user_streams
 
-                _discard_if_notified(app_listeners)
+        logger.debug("on_new_room_event listeners %s", user_streams)
 
-                listeners |= app_listeners
-
-        logger.debug("on_new_room_event listeners %s", listeners)
-
-        for listener in listeners:
+        time_now_ms = self.clock.time_msec()
+        for user_stream in user_streams:
             try:
-                listener.notify(self)
+                user_stream.notify(
+                    "room_key", "s%d" % (room_stream_id,), time_now_ms
+                )
             except:
                 logger.exception("Failed to notify listener")
 
     @defer.inlineCallbacks
     @log_function
-    def on_new_user_event(self, users=[], rooms=[]):
+    def on_new_user_event(self, stream_key, new_token, users=[], rooms=[]):
         """ Used to inform listeners that something has happend
         presence/user event wise.
 
         Will wake up all listeners for the given users and rooms.
         """
         yield run_on_reactor()
-        listeners = set()
+        user_streams = set()
 
         for user in users:
-            user_listeners = self.user_to_listeners.get(user, set())
-
-            _discard_if_notified(user_listeners)
-
-            listeners |= user_listeners
+            user_stream = self.user_to_user_stream.get(str(user))
+            if user_stream is not None:
+                user_streams.add(user_stream)
 
         for room in rooms:
-            room_listeners = self.room_to_listeners.get(room, set())
+            user_streams |= self.room_to_user_streams.get(room, set())
 
-            _discard_if_notified(room_listeners)
-
-            listeners |= room_listeners
-
-        for listener in listeners:
+        time_now_ms = self.clock.time_msec()
+        for user_stream in user_streams:
             try:
-                listener.notify(self)
+                user_stream.notify(stream_key, new_token, time_now_ms)
             except:
                 logger.exception("Failed to notify listener")
 
@@ -237,22 +288,41 @@ class Notifier(object):
         """
 
         deferred = defer.Deferred()
-        appservice = yield self.hs.get_datastore().get_app_service_by_user_id(
-            user.to_string()
-        )
+        time_now_ms = self.clock.time_msec()
 
-        listener = [_NotificationListener(
-            user=user,
-            rooms=rooms,
-            deferred=deferred,
-            appservice=appservice,
-        )]
+        user = str(user)
+        user_stream = self.user_to_user_stream.get(user)
+        if user_stream is None:
+            appservice = yield self.store.get_app_service_by_user_id(user)
+            current_token = yield self.event_sources.get_current_token()
+            rooms = yield self.store.get_rooms_for_user(user)
+            user_stream = _NotifierUserStream(
+                user=user,
+                rooms=rooms,
+                appservice=appservice,
+                current_token=current_token,
+                time_now_ms=time_now_ms,
+            )
+            self._register_with_keys(user_stream)
+        else:
+            current_token = user_stream.current_token
 
-        if timeout:
-            self._register_with_keys(listener[0])
+        listener = [_NotificationListener(deferred)]
 
-        result = yield callback()
+        if timeout and not current_token.is_after(from_token):
+            user_stream.listeners.add(listener[0])
+
+        if current_token.is_after(from_token):
+            result = yield callback(from_token, current_token)
+        else:
+            result = None
+
         timer = [None]
+
+        if result:
+            user_stream.listeners.discard(listener[0])
+            defer.returnValue(result)
+            return
 
         if timeout:
             timed_out = [False]
@@ -260,23 +330,20 @@ class Notifier(object):
             def _timeout_listener():
                 timed_out[0] = True
                 timer[0] = None
-                listener[0].notify(self)
+                user_stream.listeners.discard(listener[0])
+                listener[0].notify(current_token)
 
             # We create multiple notification listeners so we have to manage
             # canceling the timeout ourselves.
             timer[0] = self.clock.call_later(timeout/1000., _timeout_listener)
 
             while not result and not timed_out[0]:
-                yield deferred
+                new_token = yield deferred
                 deferred = defer.Deferred()
-                listener[0] = _NotificationListener(
-                    user=user,
-                    rooms=rooms,
-                    deferred=deferred,
-                    appservice=appservice,
-                )
-                self._register_with_keys(listener[0])
-                result = yield callback()
+                listener[0] = _NotificationListener(deferred)
+                user_stream.listeners.add(listener[0])
+                result = yield callback(current_token, new_token)
+                current_token = new_token
 
         if timer[0] is not None:
             try:
@@ -299,11 +366,15 @@ class Notifier(object):
         limit = pagination_config.limit
 
         @defer.inlineCallbacks
-        def check_for_updates():
+        def check_for_updates(before_token, after_token):
             events = []
             end_token = from_token
             for name, source in self.event_sources.sources.items():
                 keyname = "%s_key" % name
+                before_id = getattr(before_token, keyname)
+                after_id = getattr(after_token, keyname)
+                if before_id == after_id:
+                    continue
                 stuff, new_key = yield source.get_new_events_for_user(
                     user, getattr(from_token, keyname), limit,
                 )
@@ -325,34 +396,36 @@ class Notifier(object):
         defer.returnValue(result)
 
     @log_function
-    def _register_with_keys(self, listener):
-        for room in listener.rooms:
-            s = self.room_to_listeners.setdefault(room, set())
-            s.add(listener)
+    def remove_expired_streams(self):
+        time_now_ms = self.clock.time_msec()
+        expired_streams = []
+        expire_before_ts = time_now_ms - self.UNUSED_STREAM_EXPIRY_MS
+        for stream in self.user_to_user_stream.values():
+            if stream.listeners:
+                continue
+            if stream.last_notified_ms < expire_before_ts:
+                expired_streams.append(stream)
 
-        self.user_to_listeners.setdefault(listener.user, set()).add(listener)
+        for expired_stream in expired_streams:
+            expired_stream.remove(self)
 
-        if listener.appservice:
-            self.appservice_to_listeners.setdefault(
-                listener.appservice, set()
-            ).add(listener)
+    @log_function
+    def _register_with_keys(self, user_stream):
+        self.user_to_user_stream[user_stream.user] = user_stream
+
+        for room in user_stream.rooms:
+            s = self.room_to_user_streams.setdefault(room, set())
+            s.add(user_stream)
+
+        if user_stream.appservice:
+            self.appservice_to_user_stream.setdefault(
+                user_stream.appservice, set()
+            ).add(user_stream)
 
     def _user_joined_room(self, user, room_id):
-        new_listeners = self.user_to_listeners.get(user, set())
-
-        listeners = self.room_to_listeners.setdefault(room_id, set())
-        listeners |= new_listeners
-
-        for l in new_listeners:
-            l.rooms.add(room_id)
-
-
-def _discard_if_notified(listener_set):
-    """Remove any 'stale' listeners from the given set.
-    """
-    to_discard = set()
-    for l in listener_set:
-        if l.notified():
-            to_discard.add(l)
-
-    listener_set -= to_discard
+        user = str(user)
+        new_user_stream = self.user_to_user_stream.get(user)
+        if new_user_stream is not None:
+            room_streams = self.room_to_user_streams.setdefault(room_id, set())
+            room_streams.add(new_user_stream)
+            new_user_stream.rooms.add(room_id)

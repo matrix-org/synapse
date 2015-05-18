@@ -69,6 +69,9 @@ class EventsStore(SQLBaseStore):
         except _RollbackButIsFineException:
             pass
 
+        max_persisted_id = yield self._stream_id_gen.get_max_token(self)
+        defer.returnValue((stream_ordering, max_persisted_id))
+
     @defer.inlineCallbacks
     def get_event(self, event_id, check_redacted=True,
                   get_prev_content=False, allow_rejected=False,

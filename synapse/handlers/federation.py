@@ -160,7 +160,7 @@ class FederationHandler(BaseHandler):
                     )
 
         try:
-            yield self._handle_new_event(
+            _, event_stream_id, max_stream_id = yield self._handle_new_event(
                 origin,
                 event,
                 state=state,
@@ -203,7 +203,8 @@ class FederationHandler(BaseHandler):
 
             with PreserveLoggingContext():
                 d = self.notifier.on_new_room_event(
-                    event, extra_users=extra_users
+                    event, event_stream_id, max_stream_id,
+                    extra_users=extra_users
                 )
 
             def log_failure(f):
@@ -563,7 +564,7 @@ class FederationHandler(BaseHandler):
                 if e.event_id in auth_ids
             }
 
-            yield self._handle_new_event(
+            _, event_stream_id, max_stream_id = yield self._handle_new_event(
                 origin,
                 new_event,
                 state=state,
@@ -573,7 +574,8 @@ class FederationHandler(BaseHandler):
 
             with PreserveLoggingContext():
                 d = self.notifier.on_new_room_event(
-                    new_event, extra_users=[joinee]
+                    new_event, event_stream_id, max_stream_id,
+                    extra_users=[joinee]
                 )
 
             def log_failure(f):
@@ -639,7 +641,9 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
-        context = yield self._handle_new_event(origin, event)
+        context, event_stream_id, max_stream_id = yield self._handle_new_event(
+            origin, event
+        )
 
         logger.debug(
             "on_send_join_request: After _handle_new_event: %s, sigs: %s",
@@ -655,7 +659,7 @@ class FederationHandler(BaseHandler):
 
         with PreserveLoggingContext():
             d = self.notifier.on_new_room_event(
-                event, extra_users=extra_users
+                event, event_stream_id, max_stream_id, extra_users=extra_users
             )
 
         def log_failure(f):
@@ -729,7 +733,7 @@ class FederationHandler(BaseHandler):
 
         context = yield self.state_handler.compute_event_context(event)
 
-        yield self.store.persist_event(
+        event_stream_id, max_stream_id = yield self.store.persist_event(
             event,
             context=context,
             backfilled=False,
@@ -738,7 +742,8 @@ class FederationHandler(BaseHandler):
         target_user = UserID.from_string(event.state_key)
         with PreserveLoggingContext():
             d = self.notifier.on_new_room_event(
-                event, extra_users=[target_user],
+                event, event_stream_id, max_stream_id,
+                extra_users=[target_user],
             )
 
         def log_failure(f):
@@ -916,7 +921,7 @@ class FederationHandler(BaseHandler):
             )
             raise
 
-        yield self.store.persist_event(
+        event_stream_id, max_stream_id = yield self.store.persist_event(
             event,
             context=context,
             backfilled=backfilled,
@@ -924,7 +929,7 @@ class FederationHandler(BaseHandler):
             current_state=current_state,
         )
 
-        defer.returnValue(context)
+        defer.returnValue((context, event_stream_id, max_stream_id))
 
     @defer.inlineCallbacks
     def on_query_auth(self, origin, event_id, remote_auth_chain, rejects,
