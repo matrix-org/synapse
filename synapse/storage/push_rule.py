@@ -204,11 +204,21 @@ class PushRuleStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def set_push_rule_enabled(self, user_name, rule_id, enabled):
-        yield self._simple_upsert(
+        ret = yield self.runInteraction(
+            "_set_push_rule_enabled_txn",
+            self._set_push_rule_enabled_txn,
+            user_name, rule_id, enabled
+        )
+        defer.returnValue(ret)
+
+    def _set_push_rule_enabled_txn(self, txn, user_name, rule_id, enabled):
+        new_id = self._push_rules_enable_id_gen.get_next_txn(txn)
+        self._simple_upsert_txn(
+            txn,
             PushRuleEnableTable.table_name,
             {'user_name': user_name, 'rule_id': rule_id},
             {'enabled': 1 if enabled else 0},
-            desc="set_push_rule_enabled",
+            {'id': new_id},
         )
 
 
