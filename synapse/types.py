@@ -119,6 +119,7 @@ class StreamToken(
     @property
     def room_stream_id(self):
         # TODO(markjh): Awful hack to work around hacks in the presence tests
+        # which assume that the keys are integers.
         if type(self.room_key) is int:
             return self.room_key
         else:
@@ -131,6 +132,22 @@ class StreamToken(
             or (int(other_token.presence_key) < int(self.presence_key))
             or (int(other_token.typing_key) < int(self.typing_key))
         )
+
+    def copy_and_advance(self, key, new_value):
+        """Advance the given key in the token to a new value if and only if the
+        new value is after the old value.
+        """
+        new_token = self.copy_and_replace(key, new_value)
+        if key == "room_key":
+            new_id = new_token.room_stream_id
+            old_id = self.room_stream_id
+        else:
+            new_id = int(getattr(new_token, key))
+            old_id = int(getattr(self, key))
+        if old_id < new_id:
+            return new_token
+        else:
+            return self
 
     def copy_and_replace(self, key, new_value):
         d = self._asdict()

@@ -88,7 +88,7 @@ class _NotifierUserStream(object):
             stream_id(str): The new id for the stream the event came from.
             time_now_ms(int): The current time in milliseconds.
         """
-        self.current_token = self.current_token.copy_and_replace(
+        self.current_token = self.current_token.copy_and_advance(
             stream_key, stream_id
         )
         if self.listeners:
@@ -192,7 +192,7 @@ class Notifier(object):
         yield run_on_reactor()
 
         self.pending_new_room_events.append((
-            event, room_stream_id, extra_users
+            room_stream_id, event, extra_users
         ))
         self._notify_pending_new_room_events(max_room_stream_id)
 
@@ -205,10 +205,10 @@ class Notifier(object):
         """
         pending = sorted(self.pending_new_room_events)
         self.pending_new_room_events = []
-        for event, room_stream_id, extra_users in pending:
+        for room_stream_id, event, extra_users in pending:
             if room_stream_id > max_room_stream_id:
                 self.pending_new_room_events.append((
-                    event, room_stream_id, extra_users
+                    room_stream_id, event, extra_users
                 ))
             else:
                 self._on_new_room_event(event, room_stream_id, extra_users)
