@@ -97,7 +97,13 @@ class SynapseHomeServer(HomeServer):
         import syweb
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
-        return GzipFile(webclient_path)  # TODO configurable?
+        # GZip is disabled here due to
+        # https://twistedmatrix.com/trac/ticket/7678
+        # (It can stay enabled for the API resources: they call
+        # write() with the whole body and then finish() straight
+        # after and so do not trigger the bug.
+        # return GzipFile(webclient_path)  # TODO configurable?
+        return File(webclient_path)  # TODO configurable?
 
     def build_resource_for_static_content(self):
         # This is old and should go away: not going to bother adding gzip
