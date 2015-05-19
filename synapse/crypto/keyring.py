@@ -144,8 +144,8 @@ class Keyring(object):
                 )
 
         perspective_results = yield defer.gatherResults([
-            get_key(name, keys)
-            for name, keys in self.perspective_servers.items()
+            get_key(p_name, p_keys)
+            for p_name, p_keys in self.perspective_servers.items()
         ])
 
         for results in perspective_results:
