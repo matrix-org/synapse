@@ -378,7 +378,7 @@ class EventFederationStore(SQLBaseStore):
             room_id, repr(event_list), limit
         )
 
-        event_results = event_list
+        event_results = set(event_list)
 
         front = event_list
 
