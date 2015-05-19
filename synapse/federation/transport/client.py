@@ -50,7 +50,7 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def get_event(self, destination, event_id):
+    def get_event(self, destination, event_id, timeout=None):
         """ Requests the pdu with give id and origin from the given server.
 
         Args:
@@ -65,7 +65,7 @@ class TransportLayerClient(object):
                      destination, event_id)
 
         path = PREFIX + "/event/%s/" % (event_id, )
-        return self.client.get_json(destination, path=path)
+        return self.client.get_json(destination, path=path, timeout=timeout)
 
     @log_function
     def backfill(self, destination, room_id, event_tuples, limit):
