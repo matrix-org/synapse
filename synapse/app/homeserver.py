@@ -85,10 +85,10 @@ class SynapseHomeServer(HomeServer):
         return MatrixFederationHttpClient(self)
 
     def build_resource_for_client(self):
-        return ClientV1RestResource(self)
+        return gz_wrap(ClientV1RestResource(self))
 
     def build_resource_for_client_v2_alpha(self):
-        return ClientV2AlphaRestResource(self)
+        return gz_wrap(ClientV2AlphaRestResource(self))
 
     def build_resource_for_federation(self):
         return JsonResource(self)
@@ -97,6 +97,12 @@ class SynapseHomeServer(HomeServer):
         import syweb
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
+        # GZip is disabled here due to
+        # https://twistedmatrix.com/trac/ticket/7678
+        # (It can stay enabled for the API resources: they call
+        # write() with the whole body and then finish() straight
+        # after and so do not trigger the bug.
+        # return GzipFile(webclient_path)  # TODO configurable?
         return File(webclient_path)  # TODO configurable?
 
     def build_resource_for_static_content(self):

@@ -47,7 +47,10 @@ def convert_v1_to_v2(server_name, valid_until, keys, certificate):
     return {
         "old_verify_keys": {},
         "server_name": server_name,
-        "verify_keys": keys,
+        "verify_keys": {
+            key_id: {"key": key}
+            for key_id, key in keys.items()
+        },
         "valid_until_ts": valid_until,
         "tls_fingerprints": [fingerprint(certificate)],
     }
