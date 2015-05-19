@@ -924,9 +924,12 @@ class FederationHandler(BaseHandler):
         # This is a hack to fix some old rooms where the initial join event
         # didn't reference the create event in its auth events.
         if event.type == EventTypes.Member and not event.auth_events:
-            if len(event.prev_events) == 1:
-                c = yield self.store.get_event(event.prev_events[0][0])
-                if c.type == EventTypes.Create:
+            if len(event.prev_events) == 1 and event.depth < 5:
+                c = yield self.store.get_event(
+                    event.prev_events[0][0],
+                    allow_none=True,
+                )
+                if c and c.type == EventTypes.Create:
                     auth_events[(c.type, c.state_key)] = c
 
         try:
