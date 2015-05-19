@@ -344,6 +344,8 @@ class PresenceHandler(BaseHandler):
         curr_users = yield rm_handler.get_room_members(room_id)
 
         for local_user in [c for c in curr_users if self.hs.is_mine(c)]:
+            statuscache = self._get_or_offline_usercache(local_user)
+            statuscache.update({}, serial=self._user_cachemap_latest_serial)
             self.push_update_to_local_and_remote(
                 observed_user=local_user,
                 users_to_push=[user],
@@ -936,6 +938,8 @@ class PresenceHandler(BaseHandler):
         """
         with PreserveLoggingContext():
             self.notifier.on_new_user_event(
+                "presence_key",
+                self._user_cachemap_latest_serial,
                 users_to_push,
                 room_ids,
             )

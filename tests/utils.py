@@ -197,6 +197,9 @@ class MockClock(object):
 
         return t
 
+    def looping_call(self, function, interval):
+        pass
+
     def cancel_call_later(self, timer):
         if timer[2]:
             raise Exception("Cannot cancel an expired timer")
@@ -355,7 +358,7 @@ class MemoryDataStore(object):
         return []
 
     def get_room_events_max_id(self):
-        return 0  # TODO (erikj)
+        return "s0"  # TODO (erikj)
 
     def get_send_event_level(self, room_id):
         return defer.succeed(0)

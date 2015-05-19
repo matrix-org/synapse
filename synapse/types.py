@@ -70,6 +70,8 @@ class DomainSpecificString(
         """Return a string encoding the fields of the structure object."""
         return "%s%s:%s" % (self.SIGIL, self.localpart, self.domain)
 
+    __str__ = to_string
+
     @classmethod
     def create(cls, localpart, domain,):
         return cls(localpart=localpart, domain=domain)
@@ -107,13 +109,45 @@ class StreamToken(
     def from_string(cls, string):
         try:
             keys = string.split(cls._SEPARATOR)
-
             return cls(*keys)
         except:
             raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
         return self._SEPARATOR.join([str(k) for k in self])
+
+    @property
+    def room_stream_id(self):
+        # TODO(markjh): Awful hack to work around hacks in the presence tests
+        # which assume that the keys are integers.
+        if type(self.room_key) is int:
+            return self.room_key
+        else:
+            return int(self.room_key[1:].split("-")[-1])
+
+    def is_after(self, other_token):
+        """Does this token contain events that the other doesn't?"""
+        return (
+            (other_token.room_stream_id < self.room_stream_id)
+            or (int(other_token.presence_key) < int(self.presence_key))
+            or (int(other_token.typing_key) < int(self.typing_key))
+        )
+
+    def copy_and_advance(self, key, new_value):
+        """Advance the given key in the token to a new value if and only if the
+        new value is after the old value.
+        """
+        new_token = self.copy_and_replace(key, new_value)
+        if key == "room_key":
+            new_id = new_token.room_stream_id
+            old_id = self.room_stream_id
+        else:
+            new_id = int(getattr(new_token, key))
+            old_id = int(getattr(self, key))
+        if old_id < new_id:
+            return new_token
+        else:
+            return self
 
     def copy_and_replace(self, key, new_value):
         d = self._asdict()
