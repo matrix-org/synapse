@@ -159,7 +159,7 @@ class Keyring(object):
         )
 
         with limiter:
-            if keys is None:
+            if not keys:
                 try:
                     keys = yield self.get_server_verify_key_v2_direct(
                         server_name, key_ids
@@ -171,7 +171,7 @@ class Keyring(object):
                         type(e).__name__, str(e.message),
                     )
 
-            if keys is None:
+            if not keys:
                 keys = yield self.get_server_verify_key_v1_direct(
                     server_name, key_ids
                 )
