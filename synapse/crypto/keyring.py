@@ -312,8 +312,9 @@ class Keyring(object):
         time_now_ms = self.clock.time_msec()
         response_keys = {}
         verify_keys = {}
-        for key_id, key_base64 in response_json["verify_keys"].items():
+        for key_id, key_data in response_json["verify_keys"].items():
             if is_signing_algorithm_supported(key_id):
+                key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)
                 verify_key = decode_verify_key_bytes(key_id, key_bytes)
                 verify_key.time_added = time_now_ms
