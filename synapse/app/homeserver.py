@@ -85,10 +85,10 @@ class SynapseHomeServer(HomeServer):
         return MatrixFederationHttpClient(self)
 
     def build_resource_for_client(self):
-        return gz_wrap(ClientV1RestResource(self))
+        return ClientV1RestResource(self)
 
     def build_resource_for_client_v2_alpha(self):
-        return gz_wrap(ClientV2AlphaRestResource(self))
+        return ClientV2AlphaRestResource(self)
 
     def build_resource_for_federation(self):
         return JsonResource(self)
@@ -97,7 +97,7 @@ class SynapseHomeServer(HomeServer):
         import syweb
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
-        return GzipFile(webclient_path)  # TODO configurable?
+        return File(webclient_path)  # TODO configurable?
 
     def build_resource_for_static_content(self):
         # This is old and should go away: not going to bother adding gzip
