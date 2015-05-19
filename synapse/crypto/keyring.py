@@ -188,7 +188,7 @@ class Keyring(object):
             # TODO(mark): Set the minimum_valid_until_ts to that needed by
             # the events being validated or the current time if validating
             # an incoming request.
-            responses = yield self.client.post_json(
+            query_response = yield self.client.post_json(
                 destination=perspective_name,
                 path=b"/_matrix/key/v2/query",
                 data={
@@ -203,6 +203,8 @@ class Keyring(object):
             )
 
         keys = {}
+
+        responses = query_response["server_keys"]
 
         for response in responses:
             if (u"signatures" not in response
