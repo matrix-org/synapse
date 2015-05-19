@@ -164,12 +164,17 @@ class Keyring(object):
                     keys = yield self.get_server_verify_key_v2_direct(
                         server_name, key_ids
                     )
-                except:
-                    pass
+                except Exception as e:
+                    logging.info(
+                        "Unable to getting key %r for %r directly: %s %s",
+                        key_ids, server_name,
+                        type(e).__name__, str(e.message),
+                    )
 
-            keys = yield self.get_server_verify_key_v1_direct(
-                server_name, key_ids
-            )
+            if keys is None:
+                keys = yield self.get_server_verify_key_v1_direct(
+                    server_name, key_ids
+                )
 
         for key_id in key_ids:
             if key_id in keys:
