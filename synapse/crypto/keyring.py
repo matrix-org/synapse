@@ -129,23 +129,24 @@ class Keyring(object):
     def _get_server_verify_key_impl(self, server_name, key_ids):
         keys = None
 
-        perspective_results = []
-        for perspective_name, perspective_keys in self.perspective_servers.items():
-            @defer.inlineCallbacks
-            def get_key():
-                try:
-                    result = yield self.get_server_verify_key_v2_indirect(
-                        server_name, key_ids, perspective_name, perspective_keys
-                    )
-                    defer.returnValue(result)
-                except:
-                    logging.info(
-                        "Unable to getting key %r for %r from %r",
-                        key_ids, server_name, perspective_name,
-                    )
-            perspective_results.append(get_key())
+        @defer.inlineCallbacks
+        def get_key(perspective_name, perspective_keys):
+            try:
+                result = yield self.get_server_verify_key_v2_indirect(
+                    server_name, key_ids, perspective_name, perspective_keys
+                )
+                defer.returnValue(result)
+            except Exception as e:
+                logging.info(
+                    "Unable to getting key %r for %r from %r: %s %s",
+                    key_ids, server_name, perspective_name,
+                    type(e).__name__, str(e.message),
+                )
 
-        perspective_results = yield defer.gatherResults(perspective_results)
+        perspective_results = yield defer.gatherResults([
+            get_key(name, keys)
+            for name, keys in self.perspective_servers.items()
+        ])
 
         for results in perspective_results:
             if results is not None:
@@ -311,9 +312,8 @@ class Keyring(object):
         time_now_ms = self.clock.time_msec()
         response_keys = {}
         verify_keys = {}
-        for key_id, key_data in response_json["verify_keys"].items():
+        for key_id, key_base64 in response_json["verify_keys"].items():
             if is_signing_algorithm_supported(key_id):
-                key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)
                 verify_key = decode_verify_key_bytes(key_id, key_bytes)
                 verify_key.time_added = time_now_ms
