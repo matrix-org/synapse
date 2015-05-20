@@ -592,7 +592,6 @@ class EventsStore(SQLBaseStore):
         res = yield defer.gatherResults(
             [
                 self._get_event_from_row(
-                    None,
                     row["internal_metadata"], row["json"], row["redacts"],
                     check_redacted=check_redacted,
                     get_prev_content=get_prev_content,
@@ -647,13 +646,13 @@ class EventsStore(SQLBaseStore):
             rows[:] = [r for r in rows if not r["rejects"]]
 
         res = [
-            unwrap_deferred(self._get_event_from_row(
+            self._get_event_from_row_txn(
                 txn,
                 row["internal_metadata"], row["json"], row["redacts"],
                 check_redacted=check_redacted,
                 get_prev_content=get_prev_content,
                 rejected_reason=row["rejects"],
-            ))
+            )
             for row in rows
         ]
 
@@ -663,17 +662,64 @@ class EventsStore(SQLBaseStore):
         }
 
     @defer.inlineCallbacks
-    def _get_event_from_row(self, txn, internal_metadata, js, redacted,
+    def _get_event_from_row(self, internal_metadata, js, redacted,
                             check_redacted=True, get_prev_content=False,
                             rejected_reason=None):
-        """This is called when we have a row from the database that we want to
-        convert into an event. Depending on the given options it may do more
-        database ops to fill in extra information (e.g. previous content or
-        rejection reason.)
+        d = json.loads(js)
+        internal_metadata = json.loads(internal_metadata)
 
-        `txn` may be None, and if so this creates new transactions for each
-        database op.
-        """
+        if rejected_reason:
+            rejected_reason = yield self._simple_select_one_onecol(
+                table="rejections",
+                keyvalues={"event_id": rejected_reason},
+                retcol="reason",
+                desc="_get_event_from_row",
+            )
+
+        ev = FrozenEvent(
+            d,
+            internal_metadata_dict=internal_metadata,
+            rejected_reason=rejected_reason,
+        )
+
+        if check_redacted and redacted:
+            ev = prune_event(ev)
+
+            redaction_id = yield self._simple_select_one_onecol(
+                table="redactions",
+                keyvalues={"redacts": ev.event_id},
+                retcol="event_id",
+                desc="_get_event_from_row",
+            )
+
+            ev.unsigned["redacted_by"] = redaction_id
+            # Get the redaction event.
+
+            because = yield self.get_event(
+                redaction_id,
+                check_redacted=False
+            )
+
+            if because:
+                ev.unsigned["redacted_because"] = because
+
+        if get_prev_content and "replaces_state" in ev.unsigned:
+            prev = yield self.get_event(
+                ev.unsigned["replaces_state"],
+                get_prev_content=False,
+            )
+            if prev:
+                ev.unsigned["prev_content"] = prev.get_dict()["content"]
+
+        self._get_event_cache.prefill(
+            ev.event_id, check_redacted, get_prev_content, ev
+        )
+
+        defer.returnValue(ev)
+
+    def _get_event_from_row_txn(self, txn, internal_metadata, js, redacted,
+                            check_redacted=True, get_prev_content=False,
+                            rejected_reason=None):
         d = json.loads(js)
         internal_metadata = json.loads(internal_metadata)
 
