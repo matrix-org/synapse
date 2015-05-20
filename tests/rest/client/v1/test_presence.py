@@ -295,6 +295,9 @@ class PresenceEventStreamTestCase(unittest.TestCase):
             else:
                 return []
         hs.handlers.room_member_handler.get_joined_rooms_for_user = get_rooms_for_user
+        hs.handlers.room_member_handler.get_room_members = (
+            lambda r: self.room_members if r == "a-room" else []
+        )
 
         self.mock_datastore = hs.get_datastore()
         self.mock_datastore.get_app_service_by_token = Mock(return_value=None)
