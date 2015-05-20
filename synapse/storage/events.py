@@ -718,8 +718,8 @@ class EventsStore(SQLBaseStore):
         defer.returnValue(ev)
 
     def _get_event_from_row_txn(self, txn, internal_metadata, js, redacted,
-                            check_redacted=True, get_prev_content=False,
-                            rejected_reason=None):
+                                check_redacted=True, get_prev_content=False,
+                                rejected_reason=None):
         d = json.loads(js)
         internal_metadata = json.loads(internal_metadata)
 
