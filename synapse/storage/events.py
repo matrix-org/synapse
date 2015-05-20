@@ -723,23 +723,8 @@ class EventsStore(SQLBaseStore):
         d = json.loads(js)
         internal_metadata = json.loads(internal_metadata)
 
-        def select(txn, *args, **kwargs):
-            if txn:
-                return self._simple_select_one_onecol_txn(txn, *args, **kwargs)
-            else:
-                return self._simple_select_one_onecol(
-                    *args,
-                    desc="_get_event_from_row", **kwargs
-                )
-
-        def get_event(txn, *args, **kwargs):
-            if txn:
-                return self._get_event_txn(txn, *args, **kwargs)
-            else:
-                return self.get_event(*args, **kwargs)
-
         if rejected_reason:
-            rejected_reason = yield select(
+            rejected_reason = self._simple_select_one_onecol_txn(
                 txn,
                 table="rejections",
                 keyvalues={"event_id": rejected_reason},
@@ -755,7 +740,7 @@ class EventsStore(SQLBaseStore):
         if check_redacted and redacted:
             ev = prune_event(ev)
 
-            redaction_id = yield select(
+            redaction_id = self._simple_select_one_onecol_txn(
                 txn,
                 table="redactions",
                 keyvalues={"redacts": ev.event_id},
@@ -765,7 +750,7 @@ class EventsStore(SQLBaseStore):
             ev.unsigned["redacted_by"] = redaction_id
             # Get the redaction event.
 
-            because = yield get_event(
+            because = self._get_event_txn(
                 txn,
                 redaction_id,
                 check_redacted=False
@@ -775,7 +760,7 @@ class EventsStore(SQLBaseStore):
                 ev.unsigned["redacted_because"] = because
 
         if get_prev_content and "replaces_state" in ev.unsigned:
-            prev = yield get_event(
+            prev = self._get_event_txn(
                 txn,
                 ev.unsigned["replaces_state"],
                 get_prev_content=False,
@@ -787,7 +772,7 @@ class EventsStore(SQLBaseStore):
             ev.event_id, check_redacted, get_prev_content, ev
         )
 
-        defer.returnValue(ev)
+        return ev
 
     def _parse_events(self, rows):
         return self.runInteraction(
