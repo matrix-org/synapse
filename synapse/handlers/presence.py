@@ -1084,14 +1084,14 @@ class PresenceEventSource(object):
         clock = self.clock
         latest_serial = 0
 
+        user_ids_to_check = {user}
         presence_list = yield presence.store.get_presence_list(
             user.localpart, accepted=True
         )
-        if presence_list is None:
-            presence_list = ()
-        user_ids_to_check = set(
-            UserID.from_string(p["observed_user_id"]) for p in presence_list
-        )
+        if presence_list is not None:
+            user_ids_to_check |= set(
+                UserID.from_string(p["observed_user_id"]) for p in presence_list
+            )
         room_ids = yield presence.get_joined_rooms_for_user(user)
         for room_id in set(room_ids) & set(presence._room_serials):
             if presence._room_serials[room_id] > from_key:
@@ -1142,8 +1142,6 @@ class PresenceEventSource(object):
     def get_pagination_rows(self, user, pagination_config, key):
         # TODO (erikj): Does this make sense? Ordering?
 
-        observer_user = user
-
         from_key = int(pagination_config.from_key)
 
         if pagination_config.to_key:
@@ -1158,11 +1156,10 @@ class PresenceEventSource(object):
         presence_list = yield presence.store.get_presence_list(
             user.localpart, accepted=True
         )
-        if presence_list is None:
-            presence_list = ()
-        user_ids_to_check |= set(
-            UserID.from_string(p["observed_user_id"]) for p in presence_list
-        )
+        if presence_list is not None:
+            user_ids_to_check |= set(
+                UserID.from_string(p["observed_user_id"]) for p in presence_list
+            )
         room_ids = yield presence.get_joined_rooms_for_user(user)
         for room_id in set(room_ids) & set(presence._room_serials):
             if presence._room_serials[room_id] >= from_key:
