@@ -168,7 +168,11 @@ class FederationClient(FederationBase):
         for i, pdu in enumerate(pdus):
             pdus[i] = yield self._check_sigs_and_hash(pdu)
 
-            # FIXME: We should handle signature failures more gracefully.
+        # FIXME: We should handle signature failures more gracefully.
+        pdus[:] = yield defer.gatherResults(
+            [self._check_sigs_and_hash(pdu) for pdu in pdus],
+            consumeErrors=True,
+        ).addErrback(unwrapFirstError)
 
         defer.returnValue(pdus)
 
