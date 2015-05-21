@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from ._base import SQLBaseStore, cached
 from syutil.base64util import encode_base64
 
@@ -33,16 +35,7 @@ class EventFederationStore(SQLBaseStore):
     """
 
     def get_auth_chain(self, event_ids):
-        return self.runInteraction(
-            "get_auth_chain",
-            self._get_auth_chain_txn,
-            event_ids
-        )
-
-    def _get_auth_chain_txn(self, txn, event_ids):
-        results = self._get_auth_chain_ids_txn(txn, event_ids)
-
-        return self._get_events_txn(txn, results)
+        return self.get_auth_chain_ids(event_ids).addCallback(self._get_events)
 
     def get_auth_chain_ids(self, event_ids):
         return self.runInteraction(
@@ -369,7 +362,7 @@ class EventFederationStore(SQLBaseStore):
         return self.runInteraction(
             "get_backfill_events",
             self._get_backfill_events, room_id, event_list, limit
-        )
+        ).addCallback(self._get_events)
 
     def _get_backfill_events(self, txn, room_id, event_list, limit):
         logger.debug(
@@ -415,15 +408,25 @@ class EventFederationStore(SQLBaseStore):
             front = new_front
             event_results += new_front
 
-        return self._get_events_txn(txn, event_results)
+        return event_results
 
+    @defer.inlineCallbacks
     def get_missing_events(self, room_id, earliest_events, latest_events,
                            limit, min_depth):
-        return self.runInteraction(
+        ids = yield self.runInteraction(
             "get_missing_events",
             self._get_missing_events,
             room_id, earliest_events, latest_events, limit, min_depth
         )
+
+        events = yield self._get_events(ids)
+
+        events = sorted(
+            [ev for ev in events if ev.depth >= min_depth],
+            key=lambda e: e.depth,
+        )
+
+        defer.returnValue(events[:limit])
 
     def _get_missing_events(self, txn, room_id, earliest_events, latest_events,
                             limit, min_depth):
@@ -456,14 +459,7 @@ class EventFederationStore(SQLBaseStore):
             front = new_front
             event_results |= new_front
 
-        events = self._get_events_txn(txn, event_results)
-
-        events = sorted(
-            [ev for ev in events if ev.depth >= min_depth],
-            key=lambda e: e.depth,
-        )
-
-        return events[:limit]
+        return event_results
 
     def clean_room_for_join(self, room_id):
         return self.runInteraction(
