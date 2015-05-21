@@ -19,7 +19,7 @@ from ._base import SQLBaseStore, cached
 from syutil.base64util import encode_base64
 
 import logging
-from Queue import PriorityQueue
+from Queue import PriorityQueue, Empty
 
 
 logger = logging.getLogger(__name__)
@@ -398,7 +398,10 @@ class EventFederationStore(SQLBaseStore):
                 queue.put(row)
 
         while not queue.empty() and len(event_results) < limit:
-            _, event_id = queue.get_nowait()
+            try:
+                _, event_id = queue.get_nowait()
+            except Empty:
+                break
 
             event_results.add(event_id)
 
