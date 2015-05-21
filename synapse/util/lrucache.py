@@ -20,7 +20,6 @@ import threading
 
 class LruCache(object):
     """Least-recently-used cache."""
-    # TODO(mjark) Add mutex for linked list for thread safety.
     def __init__(self, max_size):
         cache = {}
         list_root = []
@@ -106,6 +105,12 @@ class LruCache(object):
                 return default
 
         @synchronized
+        def cache_clear():
+            list_root[NEXT] = list_root
+            list_root[PREV] = list_root
+            cache.clear()
+
+        @synchronized
         def cache_len():
             return len(cache)
 
@@ -120,6 +125,7 @@ class LruCache(object):
         self.pop = cache_pop
         self.len = cache_len
         self.contains = cache_contains
+        self.clear = cache_clear
 
     def __getitem__(self, key):
         result = self.get(key, self.sentinel)
