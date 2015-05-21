@@ -296,6 +296,7 @@ class Notifier(object):
             appservice = yield self.store.get_app_service_by_user_id(user)
             current_token = yield self.event_sources.get_current_token()
             rooms = yield self.store.get_rooms_for_user(user)
+            rooms = [room.room_id for room in rooms]
             user_stream = _NotifierUserStream(
                 user=user,
                 rooms=rooms,

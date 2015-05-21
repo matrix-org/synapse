@@ -29,6 +29,8 @@ from synapse.rest.client.v1 import events
 from synapse.types import UserID
 from synapse.util.async import run_on_reactor
 
+from collections import namedtuple
+
 
 OFFLINE = PresenceState.OFFLINE
 UNAVAILABLE = PresenceState.UNAVAILABLE
@@ -302,7 +304,10 @@ class PresenceEventStreamTestCase(unittest.TestCase):
             return_value=defer.succeed(None)
         )
         self.mock_datastore.get_rooms_for_user = (
-            lambda u: get_rooms_for_user(UserID.from_string(u))
+            lambda u: [
+                namedtuple("Room", "room_id")(r)
+                for r in get_rooms_for_user(UserID.from_string(u))
+            ]
         )
 
         def get_profile_displayname(user_id):
