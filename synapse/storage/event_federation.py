@@ -390,11 +390,6 @@ class EventFederationStore(SQLBaseStore):
         queue = PriorityQueue()
 
         for event_id in event_list:
-            txn.execute(
-                query,
-                (room_id, event_id, limit - len(event_results))
-            )
-
             depth = self._simple_select_one_onecol_txn(
                 txn,
                 table="events",
