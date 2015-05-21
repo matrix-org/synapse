@@ -394,8 +394,16 @@ class EventFederationStore(SQLBaseStore):
                 (room_id, event_id, limit - len(event_results))
             )
 
-            for row in txn.fetchall():
-                queue.put((-row[0], row[1]))
+            depth = self._simple_select_one_onecol_txn(
+                txn,
+                table="events",
+                keyvalues={
+                    "event_id": event_id,
+                },
+                retcol="depth"
+            )
+
+            queue.put((-depth, event_id))
 
         while not queue.empty() and len(event_results) < limit:
             try:
