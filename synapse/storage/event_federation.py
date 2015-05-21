@@ -364,7 +364,11 @@ class EventFederationStore(SQLBaseStore):
         return self.runInteraction(
             "get_backfill_events",
             self._get_backfill_events, room_id, event_list, limit
-        ).addCallback(self._get_events)
+        ).addCallback(
+            self._get_events
+        ).addCallback(
+            lambda l: l.sort(key=lambda e: -e.depth)
+        )
 
     def _get_backfill_events(self, txn, room_id, event_list, limit):
         logger.debug(
