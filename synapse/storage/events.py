@@ -107,6 +107,8 @@ class EventsStore(SQLBaseStore):
         # We purposefully do this first since if we include a `current_state`
         # key, we *want* to update the `current_state_events` table
         if current_state:
+            txn.call_after(self.get_current_state_for_key.invalidate_all)
+
             self._simple_delete_txn(
                 txn,
                 table="current_state_events",
@@ -335,6 +337,10 @@ class EventsStore(SQLBaseStore):
             )
 
             if is_new_state and not context.rejected:
+                txn.call_after(
+                    self.get_current_state_for_key.invalidate,
+                    event.room_id, event.type, event.state_key
+                )
                 self._simple_upsert_txn(
                     txn,
                     "current_state_events",

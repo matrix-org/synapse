@@ -124,6 +124,11 @@ class Cache(object):
         self.sequence += 1
         self.cache.pop(keyargs, None)
 
+    def invalidate_all(self):
+        self.check_thread()
+        self.sequence += 1
+        self.cache.clear()
+
 
 def cached(max_entries=1000, num_args=1, lru=False):
     """ A method decorator that applies a memoizing cache around the function.
