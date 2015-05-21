@@ -35,6 +35,16 @@ import simplejson as json
 logger = logging.getLogger(__name__)
 
 
+# These values are used in the `enqueus_event` and `_do_fetch` methods to
+# control how we batch/bulk fetch events from the database.
+# The values are plucked out of thing air to make initial sync run faster
+# on jki.re
+# TODO: Make these configurable.
+EVENT_QUEUE_THREADS = 3  # Max number of threads that will fetch events
+EVENT_QUEUE_ITERATIONS = 3  # No. times we block waiting for events
+EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for events
+
+
 class EventsStore(SQLBaseStore):
     @defer.inlineCallbacks
     @log_function
@@ -518,11 +528,12 @@ class EventsStore(SQLBaseStore):
                     self._event_fetch_list = []
 
                     if not event_list:
-                        if self.database_engine.single_threaded or i > 3:
+                        single_threaded = self.database_engine.single_threaded
+                        if single_threaded or i > EVENT_QUEUE_ITERATIONS:
                             self._event_fetch_ongoing -= 1
                             return
                         else:
-                            self._event_fetch_lock.wait(0.1)
+                            self._event_fetch_lock.wait(EVENT_QUEUE_TIMEOUT_S)
                             i += 1
                             continue
                     i = 0
@@ -584,7 +595,7 @@ class EventsStore(SQLBaseStore):
 
             self._event_fetch_lock.notify()
 
-            if self._event_fetch_ongoing < 3:
+            if self._event_fetch_ongoing < EVENT_QUEUE_THREADS:
                 self._event_fetch_ongoing += 1
                 should_start = True
             else:
