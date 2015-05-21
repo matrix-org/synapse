@@ -218,9 +218,7 @@ class PushRuleStore(SQLBaseStore):
             {'enabled': 1 if enabled else 0},
             desc="set_push_rule_enabled",
         )
-        txn.call_after(
-            self.get_push_rules_enabled_for_user.invalidate, user_name
-        )
+        self.get_push_rules_enabled_for_user.invalidate(user_name)
 
 
 class RuleNotFoundException(Exception):

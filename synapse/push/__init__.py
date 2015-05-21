@@ -287,8 +287,6 @@ class Pusher(object):
                 logger.warn("Neither notify nor dont_notify in actions: adding default")
                 actions.extend(Pusher.DEFAULT_ACTIONS)
 
-            logger.info("FNARG: %r", actions)
-
             if 'dont_notify' in actions:
                 logger.debug(
                     "%s for %s: dont_notify",
