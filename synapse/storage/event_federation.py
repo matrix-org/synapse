@@ -395,7 +395,7 @@ class EventFederationStore(SQLBaseStore):
             )
 
             for row in txn.fetchall():
-                queue.put(row)
+                queue.put((-row[0], row[1]))
 
         while not queue.empty() and len(event_results) < limit:
             try:
@@ -411,7 +411,7 @@ class EventFederationStore(SQLBaseStore):
             )
 
             for row in txn.fetchall():
-                queue.put(row)
+                queue.put((-row[0], row[1]))
 
         return event_results
 
