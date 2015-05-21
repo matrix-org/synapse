@@ -411,6 +411,9 @@ class EventFederationStore(SQLBaseStore):
             except Empty:
                 break
 
+            if event_id in event_results:
+                continue
+
             event_results.add(event_id)
 
             txn.execute(
