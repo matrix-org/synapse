@@ -383,6 +383,7 @@ class EventFederationStore(SQLBaseStore):
             " ON prev_event_id = events.event_id"
             " AND event_edges.room_id = events.room_id"
             " WHERE event_edges.room_id = ? AND event_edges.event_id = ?"
+            " AND event_edges.is_state = ?"
             " LIMIT ?"
         )
 
@@ -418,7 +419,7 @@ class EventFederationStore(SQLBaseStore):
 
             txn.execute(
                 query,
-                (room_id, event_id, limit - len(event_results))
+                (room_id, event_id, False, limit - len(event_results))
             )
 
             for row in txn.fetchall():
