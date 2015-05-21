@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 # TODO: Make these configurable.
 EVENT_QUEUE_THREADS = 3  # Max number of threads that will fetch events
 EVENT_QUEUE_ITERATIONS = 3  # No. times we block waiting for events
-EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for events
+EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for requests for events
 
 
 class EventsStore(SQLBaseStore):
