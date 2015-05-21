@@ -84,25 +84,20 @@ class Pusher(object):
 
         rules = baserules.list_with_base_rules(rawrules, user)
 
+        room_id = ev['room_id']
+
         # get *our* member event for display name matching
-        member_events_for_room = yield self.store.get_current_state(
-            room_id=ev['room_id'],
-            event_type='m.room.member',
-            state_key=None
-        )
         my_display_name = None
-        room_member_count = 0
-        for mev in member_events_for_room:
-            if mev.content['membership'] != 'join':
-                continue
+        our_member_event = yield self.store.get_current_state(
+            room_id=room_id,
+            event_type='m.room.member',
+            state_key=self.user_name,
+        )
+        if our_member_event:
+            my_display_name = our_member_event[0].content.get("displayname")
 
-            # This loop does two things:
-            # 1) Find our current display name
-            if mev.state_key == self.user_name and 'displayname' in mev.content:
-                my_display_name = mev.content['displayname']
-
-            # and 2) Get the number of people in that room
-            room_member_count += 1
+        room_members = yield self.store.get_users_in_room(room_id)
+        room_member_count = len(room_members)
 
         for r in rules:
             if r['rule_id'] in enabled_map:

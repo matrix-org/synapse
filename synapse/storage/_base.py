@@ -180,6 +180,7 @@ def cached(max_entries=1000, num_args=1, lru=False):
                 defer.returnValue(ret)
 
         wrapped.invalidate = cache.invalidate
+        wrapped.invalidate_all = cache.invalidate_all
         wrapped.prefill = cache.prefill
         return wrapped
 

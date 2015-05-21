@@ -108,6 +108,10 @@ class EventsStore(SQLBaseStore):
         # key, we *want* to update the `current_state_events` table
         if current_state:
             txn.call_after(self.get_current_state_for_key.invalidate_all)
+            txn.call_after(self.get_rooms_for_user.invalidate_all)
+            txn.call_after(self.get_users_in_room.invalidate, event.room_id)
+            txn.call_after(self.get_joined_hosts_for_room.invalidate, event.room_id)
+            txn.call_after(self.get_room_name_and_aliases, event.room_id)
 
             self._simple_delete_txn(
                 txn,
@@ -116,13 +120,6 @@ class EventsStore(SQLBaseStore):
             )
 
             for s in current_state:
-                if s.type == EventTypes.Member:
-                    txn.call_after(
-                        self.get_rooms_for_user.invalidate, s.state_key
-                    )
-                    txn.call_after(
-                        self.get_joined_hosts_for_room.invalidate, s.room_id
-                    )
                 self._simple_insert_txn(
                     txn,
                     "current_state_events",
@@ -341,6 +338,14 @@ class EventsStore(SQLBaseStore):
                     self.get_current_state_for_key.invalidate,
                     event.room_id, event.type, event.state_key
                 )
+
+                if (event.type == EventTypes.Name
+                        or event.type == EventTypes.Aliases):
+                    txn.call_after(
+                        self.get_room_name_and_aliases.invalidate,
+                        event.room_id
+                    )
+
                 self._simple_upsert_txn(
                     txn,
                     "current_state_events",
