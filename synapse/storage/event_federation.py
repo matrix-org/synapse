@@ -411,7 +411,8 @@ class EventFederationStore(SQLBaseStore):
             )
 
             for row in txn.fetchall():
-                queue.put((-row[0], row[1]))
+                if row[1] not in event_results:
+                    queue.put((-row[0], row[1]))
 
         return event_results
 
