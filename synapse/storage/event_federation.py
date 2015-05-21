@@ -367,7 +367,7 @@ class EventFederationStore(SQLBaseStore):
         ).addCallback(
             self._get_events
         ).addCallback(
-            lambda l: l.sort(key=lambda e: -e.depth)
+            lambda l: sorted(l, key=lambda e: -e.depth)
         )
 
     def _get_backfill_events(self, txn, room_id, event_list, limit):
