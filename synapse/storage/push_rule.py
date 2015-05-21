@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
-
-from ._base import SQLBaseStore, Table
+from ._base import SQLBaseStore, cached
 from twisted.internet import defer
 
 import logging
@@ -41,6 +39,7 @@ class PushRuleStore(SQLBaseStore):
 
         defer.returnValue(rows)
 
+    @cached()
     @defer.inlineCallbacks
     def get_push_rules_enabled_for_user(self, user_name):
         results = yield self._simple_select_list(
@@ -151,6 +150,10 @@ class PushRuleStore(SQLBaseStore):
 
             txn.execute(sql, (user_name, priority_class, new_rule_priority))
 
+        txn.call_after(
+            self.get_push_rules_enabled_for_user.invalidate, user_name
+        )
+
         self._simple_insert_txn(
             txn,
             table=PushRuleTable.table_name,
@@ -179,6 +182,10 @@ class PushRuleStore(SQLBaseStore):
         new_rule['priority_class'] = priority_class
         new_rule['priority'] = new_prio
 
+        txn.call_after(
+            self.get_push_rules_enabled_for_user.invalidate, user_name
+        )
+
         self._simple_insert_txn(
             txn,
             table=PushRuleTable.table_name,
@@ -201,6 +208,7 @@ class PushRuleStore(SQLBaseStore):
             {'user_name': user_name, 'rule_id': rule_id},
             desc="delete_push_rule",
         )
+        self.get_push_rules_enabled_for_user.invalidate(user_name)
 
     @defer.inlineCallbacks
     def set_push_rule_enabled(self, user_name, rule_id, enabled):
@@ -210,6 +218,7 @@ class PushRuleStore(SQLBaseStore):
             {'enabled': 1 if enabled else 0},
             desc="set_push_rule_enabled",
         )
+        self.get_push_rules_enabled_for_user.invalidate(user_name)
 
 
 class RuleNotFoundException(Exception):
@@ -220,7 +229,7 @@ class InconsistentRuleException(Exception):
     pass
 
 
-class PushRuleTable(Table):
+class PushRuleTable(object):
     table_name = "push_rules"
 
     fields = [
@@ -233,10 +242,8 @@ class PushRuleTable(Table):
         "actions",
     ]
 
-    EntryType = collections.namedtuple("PushRuleEntry", fields)
 
-
-class PushRuleEnableTable(Table):
+class PushRuleEnableTable(object):
     table_name = "push_rules_enable"
 
     fields = [

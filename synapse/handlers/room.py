@@ -531,9 +531,7 @@ class RoomListHandler(BaseHandler):
         chunk = yield self.store.get_rooms(is_public=True)
         results = yield defer.gatherResults(
             [
-                self.store.get_users_in_room(
-                    room_id=room["room_id"],
-                )
+                self.store.get_users_in_room(room["room_id"])
                 for room in chunk
             ],
             consumeErrors=True,
