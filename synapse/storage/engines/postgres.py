@@ -19,6 +19,8 @@ from ._base import IncorrectDatabaseSetup
 
 
 class PostgresEngine(object):
+    single_threaded = False
+
     def __init__(self, database_module):
         self.module = database_module
         self.module.extensions.register_type(self.module.extensions.UNICODE)

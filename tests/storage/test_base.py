@@ -33,8 +33,9 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.db_pool = Mock(spec=["runInteraction"])
         self.mock_txn = Mock()
-        self.mock_conn = Mock(spec_set=["cursor"])
+        self.mock_conn = Mock(spec_set=["cursor", "rollback", "commit"])
         self.mock_conn.cursor.return_value = self.mock_txn
+        self.mock_conn.rollback.return_value = None
         # Our fake runInteraction just runs synchronously inline
 
         def runInteraction(func, *args, **kwargs):
