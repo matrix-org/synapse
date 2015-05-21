@@ -372,7 +372,7 @@ class EventFederationStore(SQLBaseStore):
             room_id, repr(event_list), limit
         )
 
-        event_results = set(event_list)
+        event_results = set()
 
         # We want to make sure that we do a breadth-first, "depth" ordered
         # search.
