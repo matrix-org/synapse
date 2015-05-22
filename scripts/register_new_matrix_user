@@ -33,9 +33,10 @@ def request_registration(user, password, server_location, shared_secret):
     ).hexdigest()
 
     data = {
-        "username": user,
+        "user": user,
         "password": password,
         "mac": mac,
+        "type": "org.matrix.login.shared_secret",
     }
 
     server_location = server_location.rstrip("/")
@@ -43,7 +44,7 @@ def request_registration(user, password, server_location, shared_secret):
     print "Sending registration request..."
 
     req = urllib2.Request(
-        "%s/_matrix/client/v2_alpha/register" % (server_location,),
+        "%s/_matrix/client/api/v1/register" % (server_location,),
         data=json.dumps(data),
         headers={'Content-Type': 'application/json'}
     )
