@@ -521,20 +521,26 @@ class PresenceHandler(BaseHandler):
         if not self.hs.is_mine(observer_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
-        presence = yield self.store.get_presence_list(
+        presence_list = yield self.store.get_presence_list(
             observer_user.localpart, accepted=accepted
         )
 
-        for p in presence:
-            observed_user = UserID.from_string(p.pop("observed_user_id"))
-            p["observed_user"] = observed_user
-            p.update(self._get_or_offline_usercache(observed_user).get_state())
-            if "last_active" in p:
-                p["last_active_ago"] = int(
-                    self.clock.time_msec() - p.pop("last_active")
+        results = []
+        for row in presence_list:
+            observed_user = UserID.from_string(row["observed_user_id"])
+            result = {
+                "observed_user": observed_user, "accepted": row["accepted"]
+            }
+            result.update(
+                self._get_or_offline_usercache(observed_user).get_state()
+            )
+            if "last_active" in result:
+                result["last_active_ago"] = int(
+                    self.clock.time_msec() - result.pop("last_active")
                 )
+            results.append(result)
 
-        defer.returnValue(presence)
+        defer.returnValue(results)
 
     @defer.inlineCallbacks
     @log_function
