@@ -277,11 +277,11 @@ class SynapseHomeServer(HomeServer):
                     config,
                     metrics_resource,
                 ),
-                interface=config.metrics_interface,
+                interface=config.metrics_bind_host,
             )
             logger.info(
                 "Metrics now running on %s port %d",
-                config.metrics_interface, config.metrics_port,
+                config.metrics_bind_host, config.metrics_port,
             )
 
     def run_startup_checks(self, db_conn, database_engine):
