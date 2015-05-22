@@ -233,7 +233,7 @@ class MockedDatastorePresenceTestCase(PresenceTestCase):
             if not user_localpart in self.PRESENCE_LIST:
                 return defer.succeed([])
             return defer.succeed([
-                {"observed_user_id": u} for u in
+                {"observed_user_id": u, "accepted": accepted} for u in
                 self.PRESENCE_LIST[user_localpart]])
         datastore.get_presence_list = get_presence_list
 
@@ -734,10 +734,12 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
 
         self.assertEquals(
             [
-                {"observed_user": self.u_banana, 
-                 "presence": OFFLINE},
+                {"observed_user": self.u_banana,
+                 "presence": OFFLINE,
+                 "accepted": True},
                 {"observed_user": self.u_clementine,
-                 "presence": OFFLINE},
+                 "presence": OFFLINE,
+                 "accepted": True},
             ],
             presence
         )
@@ -758,9 +760,11 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
         self.assertEquals([
                 {"observed_user": self.u_banana,
                  "presence": ONLINE,
-                 "last_active_ago": 2000},
+                 "last_active_ago": 2000,
+                 "accepted": True},
                 {"observed_user": self.u_clementine,
-                 "presence": OFFLINE},
+                 "presence": OFFLINE,
+                 "accepted": True},
         ], presence)
 
         (events, _) = yield self.event_source.get_new_events_for_user(
