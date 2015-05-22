@@ -277,7 +277,7 @@ class SynapseHomeServer(HomeServer):
                     config,
                     metrics_resource,
                 ),
-                interface="127.0.0.1",
+                interface=config.metrics_interface,
             )
             logger.info("Metrics now running on 127.0.0.1 port %d", config.metrics_port)
 
