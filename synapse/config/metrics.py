@@ -20,6 +20,7 @@ class MetricsConfig(Config):
     def read_config(self, config):
         self.enable_metrics = config["enable_metrics"]
         self.metrics_port = config.get("metrics_port")
+        self.metrics_bind_host = config.get("metrics_bind_host", "127.0.0.1")
 
     def default_config(self, config_dir_path, server_name):
         return """\
@@ -28,6 +29,9 @@ class MetricsConfig(Config):
         # Enable collection and rendering of performance metrics
         enable_metrics: False
 
-        # Separate port to accept metrics requests on (on localhost)
+        # Separate port to accept metrics requests on
         # metrics_port: 8081
+
+        # Which host to bind the metric listener to
+        # metrics_bind_host: 127.0.0.1
         """
