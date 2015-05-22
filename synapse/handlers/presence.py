@@ -1140,7 +1140,6 @@ class PresenceEventSource(object):
                 user_ids_to_check |= set(joined)
 
         updates = []
-        # TODO(paul): use a DeferredList ? How to limit concurrency.
         for observed_user in user_ids_to_check & set(cachemap):
             if not (to_key < cachemap[observed_user].serial <= from_key):
                 continue
