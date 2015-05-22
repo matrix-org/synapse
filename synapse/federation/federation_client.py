@@ -165,9 +165,6 @@ class FederationClient(FederationBase):
             for p in transaction_data["pdus"]
         ]
 
-        for i, pdu in enumerate(pdus):
-            pdus[i] = yield self._check_sigs_and_hash(pdu)
-
         # FIXME: We should handle signature failures more gracefully.
         pdus[:] = yield defer.gatherResults(
             [self._check_sigs_and_hash(pdu) for pdu in pdus],
