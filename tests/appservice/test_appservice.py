@@ -217,18 +217,9 @@ class ApplicationServiceTestCase(unittest.TestCase):
             _regex("@irc_.*")
         )
         join_list = [
-            Mock(
-                type="m.room.member", room_id="!foo:bar", sender="@alice:here",
-                state_key="@alice:here"
-            ),
-            Mock(
-                type="m.room.member", room_id="!foo:bar", sender="@irc_fo:here",
-                state_key="@irc_fo:here"  # AS user
-            ),
-            Mock(
-                type="m.room.member", room_id="!foo:bar", sender="@bob:here",
-                state_key="@bob:here"
-            )
+            "@alice:here",
+            "@irc_fo:here",  # AS user
+            "@bob:here",
         ]
 
         self.event.sender = "@xmpp_foobar:matrix.org"
