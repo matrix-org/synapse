@@ -1,3 +1,9 @@
+Changes in synapse v0.9.0-r5 (2015-05-21)
+=========================================
+
+* Add more database caches to reduce amount of work done for each pusher. This
+  radically reduces CPU usage when multiple pushers are set up in the same room.
+
 Changes in synapse v0.9.0 (2015-05-07)
 ======================================
 
