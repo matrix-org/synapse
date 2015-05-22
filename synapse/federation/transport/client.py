@@ -57,6 +57,8 @@ class TransportLayerClient(object):
             destination (str): The host name of the remote home server we want
                 to get the state from.
             event_id (str): The id of the event being requested.
+            timeout (int): How long to try (in ms) the destination for before
+                giving up. None indicates no timeout.
 
         Returns:
             Deferred: Results in a dict received from the remote homeserver.

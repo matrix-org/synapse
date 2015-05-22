@@ -345,6 +345,9 @@ class MatrixFederationHttpClient(object):
             path (str): The HTTP path.
             args (dict): A dictionary used to create query strings, defaults to
                 None.
+            timeout (int): How long to try (in ms) the destination for before
+                giving up. None indicates no timeout and that the request will
+                be retried.
         Returns:
             Deferred: Succeeds when we get *any* HTTP response.
 
