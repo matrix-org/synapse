@@ -517,30 +517,59 @@ class FederationHandler(BaseHandler):
                 # FIXME
                 pass
 
+            auth_ids_to_deferred = {}
+
+            def process_auth_ev(ev):
+                auth_ids = [e_id for e_id, _ in ev.auth_events]
+
+                prev_ds = [
+                    auth_ids_to_deferred[i]
+                    for i in auth_ids
+                    if i in auth_ids_to_deferred
+                ]
+
+                d = defer.Deferred()
+
+                auth_ids_to_deferred[ev.event_id] = d
+
+                @defer.inlineCallbacks
+                def f(*_):
+                    ev.internal_metadata.outlier = True
+
+                    try:
+                        auth = {
+                            (e.type, e.state_key): e for e in auth_chain
+                            if e.event_id in auth_ids
+                        }
+
+                        yield self._handle_new_event(
+                            origin, ev, auth_events=auth
+                        )
+                    except:
+                        logger.exception(
+                            "Failed to handle auth event %s",
+                            ev.event_id,
+                        )
+
+                    d.callback(None)
+
+                if prev_ds:
+                    dx = defer.DeferredList(prev_ds)
+                    dx.addBoth(f)
+                else:
+                    f()
+
             for e in auth_chain:
-                e.internal_metadata.outlier = True
-
                 if e.event_id == event.event_id:
-                    continue
+                    return
+                process_auth_ev(e)
 
-                try:
-                    auth_ids = [e_id for e_id, _ in e.auth_events]
-                    auth = {
-                        (e.type, e.state_key): e for e in auth_chain
-                        if e.event_id in auth_ids
-                    }
-                    yield self._handle_new_event(
-                        origin, e, auth_events=auth
-                    )
-                except:
-                    logger.exception(
-                        "Failed to handle auth event %s",
-                        e.event_id,
-                    )
+            yield defer.DeferredList(auth_ids_to_deferred.values())
 
-            for e in state:
+            @defer.inlineCallbacks
+            def handle_state(e):
                 if e.event_id == event.event_id:
-                    continue
+                    return
 
                 e.internal_metadata.outlier = True
                 try:
@@ -557,6 +586,8 @@ class FederationHandler(BaseHandler):
                         "Failed to handle state event %s",
                         e.event_id,
                     )
+
+            yield defer.DeferredList([handle_state(e) for e in state])
 
             auth_ids = [e_id for e_id, _ in event.auth_events]
             auth_events = {
@@ -893,9 +924,12 @@ class FederationHandler(BaseHandler):
         # This is a hack to fix some old rooms where the initial join event
         # didn't reference the create event in its auth events.
         if event.type == EventTypes.Member and not event.auth_events:
-            if len(event.prev_events) == 1:
-                c = yield self.store.get_event(event.prev_events[0][0])
-                if c.type == EventTypes.Create:
+            if len(event.prev_events) == 1 and event.depth < 5:
+                c = yield self.store.get_event(
+                    event.prev_events[0][0],
+                    allow_none=True,
+                )
+                if c and c.type == EventTypes.Create:
                     auth_events[(c.type, c.state_key)] = c
 
         try:

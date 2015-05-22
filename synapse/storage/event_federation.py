@@ -330,12 +330,13 @@ class EventFederationStore(SQLBaseStore):
                 " WHERE event_id = ? AND room_id = ?"
                 " )"
                 " AND NOT EXISTS ("
-                " SELECT 1 FROM events WHERE event_id = ? AND room_id = ?"
+                " SELECT 1 FROM events WHERE event_id = ? AND room_id = ? "
+                " AND outlier = ?"
                 " )"
             )
 
             txn.executemany(query, [
-                (e_id, room_id, e_id, room_id, e_id, room_id, )
+                (e_id, room_id, e_id, room_id, e_id, room_id, False)
                 for e_id, _ in prev_events
             ])
 
