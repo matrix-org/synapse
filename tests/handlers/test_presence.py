@@ -624,6 +624,7 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
     """
     PRESENCE_LIST = {
             'apple': [ "@banana:test", "@clementine:test" ],
+            'banana': [ "@apple:test" ],
     }
 
     @defer.inlineCallbacks
@@ -836,12 +837,7 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
 
     @defer.inlineCallbacks
     def test_recv_remote(self):
-        # TODO(paul): Gut-wrenching
-        potato_set = self.handler._remote_recvmap.setdefault(self.u_potato,
-                set())
-        potato_set.add(self.u_apple)
-
-        self.room_members = [self.u_banana, self.u_potato]
+        self.room_members = [self.u_apple, self.u_banana, self.u_potato]
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
@@ -886,11 +882,8 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
     @defer.inlineCallbacks
     def test_recv_remote_offline(self):
         """ Various tests relating to SYN-261 """
-        potato_set = self.handler._remote_recvmap.setdefault(self.u_potato,
-                set())
-        potato_set.add(self.u_apple)
 
-        self.room_members = [self.u_banana, self.u_potato]
+        self.room_members = [self.u_apple, self.u_banana, self.u_potato]
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
