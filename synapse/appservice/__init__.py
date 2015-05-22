@@ -148,8 +148,8 @@ class ApplicationService(object):
                 and self.is_interested_in_user(event.state_key)):
             return True
         # check joined member events
-        for member in member_list:
-            if self.is_interested_in_user(member.state_key):
+        for user_id in member_list:
+            if self.is_interested_in_user(user_id):
                 return True
         return False
 
@@ -173,7 +173,7 @@ class ApplicationService(object):
             restrict_to(str): The namespace to restrict regex tests to.
             aliases_for_event(list): A list of all the known room aliases for
             this event.
-            member_list(list): A list of all joined room members in this room.
+            member_list(list): A list of all joined user_ids in this room.
         Returns:
             bool: True if this service would like to know about this event.
         """
