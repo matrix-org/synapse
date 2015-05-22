@@ -279,7 +279,10 @@ class SynapseHomeServer(HomeServer):
                 ),
                 interface=config.metrics_interface,
             )
-            logger.info("Metrics now running on 127.0.0.1 port %d", config.metrics_port)
+            logger.info(
+                "Metrics now running on %s port %d",
+                config.metrics_interface, config.metrics_port,
+            )
 
     def run_startup_checks(self, db_conn, database_engine):
         all_users_native = are_all_users_on_domain(
