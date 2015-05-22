@@ -101,8 +101,8 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         self.datastore.get_profile_avatar_url = get_profile_avatar_url
 
         self.presence_list = [
-            {"observed_user_id": "@banana:test"},
-            {"observed_user_id": "@clementine:test"},
+            {"observed_user_id": "@banana:test", "accepted": True},
+            {"observed_user_id": "@clementine:test", "accepted": True},
         ]
         def get_presence_list(user_localpart, accepted=None):
             return defer.succeed(self.presence_list)
@@ -144,8 +144,8 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_set_my_state(self):
         self.presence_list = [
-            {"observed_user_id": "@banana:test"},
-            {"observed_user_id": "@clementine:test"},
+            {"observed_user_id": "@banana:test", "accepted": True},
+            {"observed_user_id": "@clementine:test", "accepted": True},
         ]
 
         mocked_set = self.datastore.set_presence_state
@@ -167,8 +167,8 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
         self.mock_get_joined.side_effect = get_joined
 
         self.presence_list = [
-            {"observed_user_id": "@banana:test"},
-            {"observed_user_id": "@clementine:test"},
+            {"observed_user_id": "@banana:test", "accepted": True},
+            {"observed_user_id": "@clementine:test", "accepted": True},
         ]
 
         self.datastore.set_presence_state.return_value = defer.succeed(
@@ -203,9 +203,11 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 "presence": ONLINE,
                 "last_active_ago": 0,
                 "displayname": "Frank",
-                "avatar_url": "http://foo"},
+                "avatar_url": "http://foo",
+                "accepted": True},
             {"observed_user": self.u_clementine,
-                "presence": OFFLINE}
+                "presence": OFFLINE,
+                "accepted": True}
         ], presence)
 
         self.mock_update_client.assert_has_calls([
@@ -233,7 +235,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_push_remote(self):
         self.presence_list = [
-            {"observed_user_id": "@potato:remote"},
+            {"observed_user_id": "@potato:remote", "accepted": True},
         ]
 
         self.datastore.set_presence_state.return_value = defer.succeed(

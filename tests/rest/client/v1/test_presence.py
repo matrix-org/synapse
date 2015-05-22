@@ -183,7 +183,7 @@ class PresenceListTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_my_list(self):
         self.datastore.get_presence_list.return_value = defer.succeed(
-            [{"observed_user_id": "@banana:test"}],
+            [{"observed_user_id": "@banana:test", "accepted": True}],
         )
 
         (code, response) = yield self.mock_resource.trigger("GET",
@@ -191,7 +191,7 @@ class PresenceListTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         self.assertEquals([
-            {"user_id": "@banana:test", "presence": OFFLINE},
+            {"user_id": "@banana:test", "presence": OFFLINE, "accepted": True},
         ], response)
 
         self.datastore.get_presence_list.assert_called_with(
