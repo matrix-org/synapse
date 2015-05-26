@@ -8,7 +8,7 @@ General:
   paginate history the server does not have - SYN-36
 * Fix bug where we couldn't disable non-default pushrules - SYN-378
 * Fix bug with ``register_new_user`` script - SYN-359
-* Improve performance of fetching events from the database. This improves both
+* Improve performance of fetching events from the database, this improves both
   initialSync and sending of events.
 * Improve performance of event streams, allowing synapse to handle more
   simultaneous connected clients.
