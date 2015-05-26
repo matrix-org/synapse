@@ -6,8 +6,8 @@ General:
 * Add support for backfilling when a client paginates. This allows servers to
   request history for a room from remote servers when a client tries to
   paginate history the server does not have - SYN-36
-* Fix bug where we couldn't disable non-default pushrules - SYN-378
-* Fix bug with ``register_new_user`` script - SYN-359
+* Fix bug where you couldn't disable non-default pushrules - SYN-378
+* Fix ``register_new_user`` script - SYN-359
 * Improve performance of fetching events from the database, this improves both
   initialSync and sending of events.
 * Improve performance of event streams, allowing synapse to handle more
