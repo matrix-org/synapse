@@ -76,7 +76,7 @@ class Pusher(object):
 
         rules = []
         for rawrule in rawrules:
-            rule = dict(rawrules)
+            rule = dict(rawrule)
             rule['conditions'] = json.loads(rawrule['conditions'])
             rule['actions'] = json.loads(rawrule['actions'])
             rules.append(rule)
