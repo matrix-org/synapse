@@ -92,7 +92,7 @@ class SyncHandler(BaseHandler):
             result = yield self.current_sync_for_user(sync_config, since_token)
             defer.returnValue(result)
         else:
-            def current_sync_callback():
+            def current_sync_callback(before_token, after_token):
                 return self.current_sync_for_user(sync_config, since_token)
 
             rm_handler = self.hs.get_handlers().room_member_handler

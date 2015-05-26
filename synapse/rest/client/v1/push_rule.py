@@ -118,11 +118,14 @@ class PushRuleRestServlet(ClientV1RestServlet):
             user.to_string()
         )
 
-        for r in rawrules:
-            r["conditions"] = json.loads(r["conditions"])
-            r["actions"] = json.loads(r["actions"])
+        ruleslist = []
+        for rawrule in rawrules:
+            rule = dict(rawrule)
+            rule["conditions"] = json.loads(rawrule["conditions"])
+            rule["actions"] = json.loads(rawrule["actions"])
+            ruleslist.append(rule)
 
-        ruleslist = baserules.list_with_base_rules(rawrules, user)
+        ruleslist = baserules.list_with_base_rules(ruleslist, user)
 
         rules = {'global': {}, 'device': {}}
 

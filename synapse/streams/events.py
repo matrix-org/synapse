@@ -31,7 +31,7 @@ class NullSource(object):
     def get_new_events_for_user(self, user, from_key, limit):
         return defer.succeed(([], from_key))
 
-    def get_current_key(self):
+    def get_current_key(self, direction='f'):
         return defer.succeed(0)
 
     def get_pagination_rows(self, user, pagination_config, key):
@@ -52,10 +52,10 @@ class EventSources(object):
         }
 
     @defer.inlineCallbacks
-    def get_current_token(self):
+    def get_current_token(self, direction='f'):
         token = StreamToken(
             room_key=(
-                yield self.sources["room"].get_current_key()
+                yield self.sources["room"].get_current_key(direction)
             ),
             presence_key=(
                 yield self.sources["presence"].get_current_key()

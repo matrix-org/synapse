@@ -20,6 +20,8 @@ from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID
 
+from synapse.util.logcontext import PreserveLoggingContext
+
 import logging
 
 
@@ -103,7 +105,9 @@ class BaseHandler(object):
         if not suppress_auth:
             self.auth.check(event, auth_events=context.current_state)
 
-        yield self.store.persist_event(event, context=context)
+        (event_stream_id, max_stream_id) = yield self.store.persist_event(
+            event, context=context
+        )
 
         federation_handler = self.hs.get_handlers().federation_handler
 
@@ -137,10 +141,12 @@ class BaseHandler(object):
                     "Failed to get destination from event %s", s.event_id
                 )
 
-        # Don't block waiting on waking up all the listeners.
-        notify_d = self.notifier.on_new_room_event(
-            event, extra_users=extra_users
-        )
+        with PreserveLoggingContext():
+            # Don't block waiting on waking up all the listeners.
+            notify_d = self.notifier.on_new_room_event(
+                event, event_stream_id, max_stream_id,
+                extra_users=extra_users
+            )
 
         def log_failure(f):
             logger.warn(

@@ -22,7 +22,7 @@ from twisted.web._newclient import ResponseDone
 
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util.async import sleep
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.logcontext import preserve_context_over_fn
 import synapse.metrics
 
 from syutil.jsonutil import encode_canonical_json
@@ -110,7 +110,8 @@ class MatrixFederationHttpClient(object):
     @defer.inlineCallbacks
     def _create_request(self, destination, method, path_bytes,
                         body_callback, headers_dict={}, param_bytes=b"",
-                        query_bytes=b"", retry_on_dns_fail=True):
+                        query_bytes=b"", retry_on_dns_fail=True,
+                        timeout=None):
         """ Creates and sends a request to the given url
         """
         headers_dict[b"User-Agent"] = [self.version_string]
@@ -144,22 +145,22 @@ class MatrixFederationHttpClient(object):
                 producer = body_callback(method, url_bytes, headers_dict)
 
             try:
-                with PreserveLoggingContext():
-                    request_deferred = self.agent.request(
-                        destination,
-                        endpoint,
-                        method,
-                        path_bytes,
-                        param_bytes,
-                        query_bytes,
-                        Headers(headers_dict),
-                        producer
-                    )
+                request_deferred = preserve_context_over_fn(
+                    self.agent.request,
+                    destination,
+                    endpoint,
+                    method,
+                    path_bytes,
+                    param_bytes,
+                    query_bytes,
+                    Headers(headers_dict),
+                    producer
+                )
 
-                    response = yield self.clock.time_bound_deferred(
-                        request_deferred,
-                        time_out=60,
-                    )
+                response = yield self.clock.time_bound_deferred(
+                    request_deferred,
+                    time_out=timeout/1000. if timeout else 60,
+                )
 
                 logger.debug("Got response to %s", method)
                 break
@@ -181,7 +182,7 @@ class MatrixFederationHttpClient(object):
                     _flatten_response_never_received(e),
                 )
 
-                if retries_left:
+                if retries_left and not timeout:
                     yield sleep(2 ** (5 - retries_left))
                     retries_left -= 1
                 else:
@@ -334,7 +335,8 @@ class MatrixFederationHttpClient(object):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
-    def get_json(self, destination, path, args={}, retry_on_dns_fail=True):
+    def get_json(self, destination, path, args={}, retry_on_dns_fail=True,
+                 timeout=None):
         """ GETs some json from the given host homeserver and path
 
         Args:
@@ -343,6 +345,9 @@ class MatrixFederationHttpClient(object):
             path (str): The HTTP path.
             args (dict): A dictionary used to create query strings, defaults to
                 None.
+            timeout (int): How long to try (in ms) the destination for before
+                giving up. None indicates no timeout and that the request will
+                be retried.
         Returns:
             Deferred: Succeeds when we get *any* HTTP response.
 
@@ -370,7 +375,8 @@ class MatrixFederationHttpClient(object):
             path.encode("ascii"),
             query_bytes=query_bytes,
             body_callback=body_callback,
-            retry_on_dns_fail=retry_on_dns_fail
+            retry_on_dns_fail=retry_on_dns_fail,
+            timeout=timeout,
         )
 
         if 200 <= response.code < 300:

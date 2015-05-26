@@ -22,6 +22,7 @@ from synapse.api.constants import EventTypes
 from synapse.types import RoomAlias
 
 import logging
+import string
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,10 @@ class DirectoryHandler(BaseHandler):
     @defer.inlineCallbacks
     def _create_association(self, room_alias, room_id, servers=None):
         # general association creation for both human users and app services
+
+        for wchar in string.whitespace:
+                if wchar in room_alias.localpart:
+                    raise SynapseError(400, "Invalid characters in room alias")
 
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")

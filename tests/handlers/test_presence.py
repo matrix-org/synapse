@@ -233,7 +233,7 @@ class MockedDatastorePresenceTestCase(PresenceTestCase):
             if not user_localpart in self.PRESENCE_LIST:
                 return defer.succeed([])
             return defer.succeed([
-                {"observed_user_id": u} for u in
+                {"observed_user_id": u, "accepted": accepted} for u in
                 self.PRESENCE_LIST[user_localpart]])
         datastore.get_presence_list = get_presence_list
 
@@ -624,6 +624,7 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
     """
     PRESENCE_LIST = {
             'apple': [ "@banana:test", "@clementine:test" ],
+            'banana': [ "@apple:test" ],
     }
 
     @defer.inlineCallbacks
@@ -733,10 +734,12 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
 
         self.assertEquals(
             [
-                {"observed_user": self.u_banana, 
-                 "presence": OFFLINE},
+                {"observed_user": self.u_banana,
+                 "presence": OFFLINE,
+                 "accepted": True},
                 {"observed_user": self.u_clementine,
-                 "presence": OFFLINE},
+                 "presence": OFFLINE,
+                 "accepted": True},
             ],
             presence
         )
@@ -757,9 +760,11 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
         self.assertEquals([
                 {"observed_user": self.u_banana,
                  "presence": ONLINE,
-                 "last_active_ago": 2000},
+                 "last_active_ago": 2000,
+                 "accepted": True},
                 {"observed_user": self.u_clementine,
-                 "presence": OFFLINE},
+                 "presence": OFFLINE,
+                 "accepted": True},
         ], presence)
 
         (events, _) = yield self.event_source.get_new_events_for_user(
@@ -836,12 +841,7 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
 
     @defer.inlineCallbacks
     def test_recv_remote(self):
-        # TODO(paul): Gut-wrenching
-        potato_set = self.handler._remote_recvmap.setdefault(self.u_potato,
-                set())
-        potato_set.add(self.u_apple)
-
-        self.room_members = [self.u_banana, self.u_potato]
+        self.room_members = [self.u_apple, self.u_banana, self.u_potato]
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
@@ -886,11 +886,8 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
     @defer.inlineCallbacks
     def test_recv_remote_offline(self):
         """ Various tests relating to SYN-261 """
-        potato_set = self.handler._remote_recvmap.setdefault(self.u_potato,
-                set())
-        potato_set.add(self.u_apple)
 
-        self.room_members = [self.u_banana, self.u_potato]
+        self.room_members = [self.u_apple, self.u_banana, self.u_potato]
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
@@ -1097,12 +1094,8 @@ class PresencePollingTestCase(MockedDatastorePresenceTestCase):
 
         # apple should see both banana and clementine currently offline
         self.mock_update_client.assert_has_calls([
-                call(users_to_push=[self.u_apple],
-                    observed_user=self.u_banana,
-                    statuscache=ANY),
-                call(users_to_push=[self.u_apple],
-                    observed_user=self.u_clementine,
-                    statuscache=ANY),
+            call(users_to_push=[self.u_apple]),
+            call(users_to_push=[self.u_apple]),
         ], any_order=True)
 
         # Gut-wrenching tests
@@ -1121,13 +1114,8 @@ class PresencePollingTestCase(MockedDatastorePresenceTestCase):
 
         # apple and banana should now both see each other online
         self.mock_update_client.assert_has_calls([
-                call(users_to_push=set([self.u_apple]),
-                    observed_user=self.u_banana,
-                    room_ids=[],
-                    statuscache=ANY),
-                call(users_to_push=[self.u_banana],
-                    observed_user=self.u_apple,
-                    statuscache=ANY),
+            call(users_to_push=set([self.u_apple]), room_ids=[]),
+            call(users_to_push=[self.u_banana]),
         ], any_order=True)
 
         self.assertTrue("apple" in self.handler._local_pushmap)
@@ -1143,10 +1131,7 @@ class PresencePollingTestCase(MockedDatastorePresenceTestCase):
 
         # banana should now be told apple is offline
         self.mock_update_client.assert_has_calls([
-                call(users_to_push=set([self.u_banana, self.u_apple]),
-                    observed_user=self.u_apple,
-                    room_ids=[],
-                    statuscache=ANY),
+            call(users_to_push=set([self.u_banana, self.u_apple]), room_ids=[]),
         ], any_order=True)
 
         self.assertFalse("banana" in self.handler._local_pushmap)

@@ -17,6 +17,8 @@ from synapse.storage import prepare_database, prepare_sqlite3_database
 
 
 class Sqlite3Engine(object):
+    single_threaded = True
+
     def __init__(self, database_module):
         self.module = database_module
 

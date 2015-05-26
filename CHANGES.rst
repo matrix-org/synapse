@@ -1,3 +1,30 @@
+Changes in synapse v0.9.1 (2015-05-26)
+======================================
+
+General:
+
+* Add support for backfilling when a client paginates. This allows servers to
+  request history for a room from remote servers when a client tries to
+  paginate history the server does not have - SYN-36
+* Fix bug where you couldn't disable non-default pushrules - SYN-378
+* Fix ``register_new_user`` script - SYN-359
+* Improve performance of fetching events from the database, this improves both
+  initialSync and sending of events.
+* Improve performance of event streams, allowing synapse to handle more
+  simultaneous connected clients.
+
+Federation:
+
+* Fix bug with existing backfill implementation where it returned the wrong
+  selection of events in some circumstances.
+* Improve performance of joining remote rooms.
+
+Configuration:
+
+* Add support for changing the bind host of the metrics listener via the
+  ``metrics_bind_host`` option.
+ 
+
 Changes in synapse v0.9.0-r5 (2015-05-21)
 =========================================
 

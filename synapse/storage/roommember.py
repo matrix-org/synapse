@@ -77,16 +77,16 @@ class RoomMemberStore(SQLBaseStore):
         Returns:
             Deferred: Results in a MembershipEvent or None.
         """
-        def f(txn):
-            events = self._get_members_events_txn(
-                txn,
-                room_id,
-                user_id=user_id,
-            )
-
-            return events[0] if events else None
-
-        return self.runInteraction("get_room_member", f)
+        return self.runInteraction(
+            "get_room_member",
+            self._get_members_events_txn,
+            room_id,
+            user_id=user_id,
+        ).addCallback(
+            self._get_events
+        ).addCallback(
+            lambda events: events[0] if events else None
+        )
 
     @cached()
     def get_users_in_room(self, room_id):
@@ -112,15 +112,12 @@ class RoomMemberStore(SQLBaseStore):
         Returns:
             list of namedtuples representing the members in this room.
         """
-
-        def f(txn):
-            return self._get_members_events_txn(
-                txn,
-                room_id,
-                membership=membership,
-            )
-
-        return self.runInteraction("get_room_members", f)
+        return self.runInteraction(
+            "get_room_members",
+            self._get_members_events_txn,
+            room_id,
+            membership=membership,
+        ).addCallback(self._get_events)
 
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         """ Get all the rooms for this user where the membership for this user
@@ -192,14 +189,14 @@ class RoomMemberStore(SQLBaseStore):
         return self.runInteraction(
             "get_members_query", self._get_members_events_txn,
             where_clause, where_values
-        )
+        ).addCallbacks(self._get_events)
 
     def _get_members_events_txn(self, txn, room_id, membership=None, user_id=None):
         rows = self._get_members_rows_txn(
             txn,
             room_id, membership, user_id,
         )
-        return self._get_events_txn(txn, [r["event_id"] for r in rows])
+        return [r["event_id"] for r in rows]
 
     def _get_members_rows_txn(self, txn, room_id, membership=None, user_id=None):
         where_clause = "c.room_id = ?"

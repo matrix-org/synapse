@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, cached
+
+from twisted.internet import defer
 
 
 class PresenceStore(SQLBaseStore):
@@ -87,31 +89,48 @@ class PresenceStore(SQLBaseStore):
             desc="add_presence_list_pending",
         )
 
+    @defer.inlineCallbacks
     def set_presence_list_accepted(self, observer_localpart, observed_userid):
-        return self._simple_update_one(
+        result = yield self._simple_update_one(
             table="presence_list",
             keyvalues={"user_id": observer_localpart,
                        "observed_user_id": observed_userid},
             updatevalues={"accepted": True},
             desc="set_presence_list_accepted",
         )
+        self.get_presence_list_accepted.invalidate(observer_localpart)
+        defer.returnValue(result)
 
     def get_presence_list(self, observer_localpart, accepted=None):
-        keyvalues = {"user_id": observer_localpart}
-        if accepted is not None:
-            keyvalues["accepted"] = accepted
+        if accepted:
+            return self.get_presence_list_accepted(observer_localpart)
+        else:
+            keyvalues = {"user_id": observer_localpart}
+            if accepted is not None:
+                keyvalues["accepted"] = accepted
 
+            return self._simple_select_list(
+                table="presence_list",
+                keyvalues=keyvalues,
+                retcols=["observed_user_id", "accepted"],
+                desc="get_presence_list",
+            )
+
+    @cached()
+    def get_presence_list_accepted(self, observer_localpart):
         return self._simple_select_list(
             table="presence_list",
-            keyvalues=keyvalues,
+            keyvalues={"user_id": observer_localpart, "accepted": True},
             retcols=["observed_user_id", "accepted"],
-            desc="get_presence_list",
+            desc="get_presence_list_accepted",
         )
 
+    @defer.inlineCallbacks
     def del_presence_list(self, observer_localpart, observed_userid):
-        return self._simple_delete_one(
+        yield self._simple_delete_one(
             table="presence_list",
             keyvalues={"user_id": observer_localpart,
                        "observed_user_id": observed_userid},
             desc="del_presence_list",
         )
+        self.get_presence_list_accepted.invalidate(observer_localpart)

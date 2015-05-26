@@ -74,15 +74,18 @@ class Pusher(object):
 
         rawrules = yield self.store.get_push_rules_for_user(self.user_name)
 
-        for r in rawrules:
-            r['conditions'] = json.loads(r['conditions'])
-            r['actions'] = json.loads(r['actions'])
+        rules = []
+        for rawrule in rawrules:
+            rule = dict(rawrule)
+            rule['conditions'] = json.loads(rawrule['conditions'])
+            rule['actions'] = json.loads(rawrule['actions'])
+            rules.append(rule)
 
         enabled_map = yield self.store.get_push_rules_enabled_for_user(self.user_name)
 
         user = UserID.from_string(self.user_name)
 
-        rules = baserules.list_with_base_rules(rawrules, user)
+        rules = baserules.list_with_base_rules(rules, user)
 
         room_id = ev['room_id']
 

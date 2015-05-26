@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.logcontext import LoggingContext
+from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 
 from twisted.internet import defer, reactor, task
 
@@ -21,6 +21,40 @@ import time
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def unwrapFirstError(failure):
+    # defer.gatherResults and DeferredLists wrap failures.
+    failure.trap(defer.FirstError)
+    return failure.value.subFailure
+
+
+def unwrap_deferred(d):
+    """Given a deferred that we know has completed, return its value or raise
+    the failure as an exception
+    """
+    if not d.called:
+        raise RuntimeError("deferred has not finished")
+
+    res = []
+
+    def f(r):
+        res.append(r)
+        return r
+    d.addCallback(f)
+
+    if res:
+        return res[0]
+
+    def f(r):
+        res.append(r)
+        return r
+    d.addErrback(f)
+
+    if res:
+        res[0].raiseException()
+    else:
+        raise RuntimeError("deferred did not call callbacks")
 
 
 class Clock(object):
@@ -46,13 +80,16 @@ class Clock(object):
     def stop_looping_call(self, loop):
         loop.stop()
 
-    def call_later(self, delay, callback):
+    def call_later(self, delay, callback, *args, **kwargs):
         current_context = LoggingContext.current_context()
 
-        def wrapped_callback():
-            LoggingContext.thread_local.current_context = current_context
-            callback()
-        return reactor.callLater(delay, wrapped_callback)
+        def wrapped_callback(*args, **kwargs):
+            with PreserveLoggingContext():
+                LoggingContext.thread_local.current_context = current_context
+                callback(*args, **kwargs)
+
+        with PreserveLoggingContext():
+            return reactor.callLater(delay, wrapped_callback, *args, **kwargs)
 
     def cancel_call_later(self, timer):
         timer.cancel()

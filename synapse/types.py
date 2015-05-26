@@ -70,6 +70,8 @@ class DomainSpecificString(
         """Return a string encoding the fields of the structure object."""
         return "%s%s:%s" % (self.SIGIL, self.localpart, self.domain)
 
+    __str__ = to_string
+
     @classmethod
     def create(cls, localpart, domain,):
         return cls(localpart=localpart, domain=domain)
@@ -107,7 +109,6 @@ class StreamToken(
     def from_string(cls, string):
         try:
             keys = string.split(cls._SEPARATOR)
-
             return cls(*keys)
         except:
             raise SynapseError(400, "Invalid Token")
@@ -115,10 +116,95 @@ class StreamToken(
     def to_string(self):
         return self._SEPARATOR.join([str(k) for k in self])
 
+    @property
+    def room_stream_id(self):
+        # TODO(markjh): Awful hack to work around hacks in the presence tests
+        # which assume that the keys are integers.
+        if type(self.room_key) is int:
+            return self.room_key
+        else:
+            return int(self.room_key[1:].split("-")[-1])
+
+    def is_after(self, other_token):
+        """Does this token contain events that the other doesn't?"""
+        return (
+            (other_token.room_stream_id < self.room_stream_id)
+            or (int(other_token.presence_key) < int(self.presence_key))
+            or (int(other_token.typing_key) < int(self.typing_key))
+        )
+
+    def copy_and_advance(self, key, new_value):
+        """Advance the given key in the token to a new value if and only if the
+        new value is after the old value.
+        """
+        new_token = self.copy_and_replace(key, new_value)
+        if key == "room_key":
+            new_id = new_token.room_stream_id
+            old_id = self.room_stream_id
+        else:
+            new_id = int(getattr(new_token, key))
+            old_id = int(getattr(self, key))
+        if old_id < new_id:
+            return new_token
+        else:
+            return self
+
     def copy_and_replace(self, key, new_value):
         d = self._asdict()
         d[key] = new_value
         return StreamToken(**d)
+
+
+class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
+    """Tokens are positions between events. The token "s1" comes after event 1.
+
+            s0    s1
+            |     |
+        [0] V [1] V [2]
+
+    Tokens can either be a point in the live event stream or a cursor going
+    through historic events.
+
+    When traversing the live event stream events are ordered by when they
+    arrived at the homeserver.
+
+    When traversing historic events the events are ordered by their depth in
+    the event graph "topological_ordering" and then by when they arrived at the
+    homeserver "stream_ordering".
+
+    Live tokens start with an "s" followed by the "stream_ordering" id of the
+    event it comes after. Historic tokens start with a "t" followed by the
+    "topological_ordering" id of the event it comes after, follewed by "-",
+    followed by the "stream_ordering" id of the event it comes after.
+    """
+    __slots__ = []
+
+    @classmethod
+    def parse(cls, string):
+        try:
+            if string[0] == 's':
+                return cls(topological=None, stream=int(string[1:]))
+            if string[0] == 't':
+                parts = string[1:].split('-', 1)
+                return cls(topological=int(parts[0]), stream=int(parts[1]))
+        except:
+            pass
+        raise SynapseError(400, "Invalid token %r" % (string,))
+
+    @classmethod
+    def parse_stream_token(cls, string):
+        try:
+            if string[0] == 's':
+                return cls(topological=None, stream=int(string[1:]))
+        except:
+            pass
+        raise SynapseError(400, "Invalid token %r" % (string,))
+
+    def __str__(self):
+        if self.topological is not None:
+            return "t%d-%d" % (self.topological, self.stream)
+        else:
+            return "s%d" % (self.stream,)
 
 
 ClientInfo = namedtuple("ClientInfo", ("device_id", "token_id"))

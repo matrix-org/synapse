@@ -24,6 +24,8 @@ from synapse.crypto.event_signing import check_event_content_hash
 
 from synapse.api.errors import SynapseError
 
+from synapse.util import unwrapFirstError
+
 import logging
 
 
@@ -78,6 +80,7 @@ class FederationBase(object):
                             destinations=[pdu.origin],
                             event_id=pdu.event_id,
                             outlier=outlier,
+                            timeout=10000,
                         )
 
                         if new_pdu:
@@ -94,7 +97,7 @@ class FederationBase(object):
         yield defer.gatherResults(
             [do(pdu) for pdu in pdus],
             consumeErrors=True
-        )
+        ).addErrback(unwrapFirstError)
 
         defer.returnValue(signed_pdus)
 

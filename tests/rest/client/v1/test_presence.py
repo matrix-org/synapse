@@ -27,6 +27,9 @@ from synapse.handlers.presence import PresenceHandler
 from synapse.rest.client.v1 import presence
 from synapse.rest.client.v1 import events
 from synapse.types import UserID
+from synapse.util.async import run_on_reactor
+
+from collections import namedtuple
 
 
 OFFLINE = PresenceState.OFFLINE
@@ -180,7 +183,7 @@ class PresenceListTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_my_list(self):
         self.datastore.get_presence_list.return_value = defer.succeed(
-            [{"observed_user_id": "@banana:test"}],
+            [{"observed_user_id": "@banana:test", "accepted": True}],
         )
 
         (code, response) = yield self.mock_resource.trigger("GET",
@@ -188,7 +191,7 @@ class PresenceListTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         self.assertEquals([
-            {"user_id": "@banana:test", "presence": OFFLINE},
+            {"user_id": "@banana:test", "presence": OFFLINE, "accepted": True},
         ], response)
 
         self.datastore.get_presence_list.assert_called_with(
@@ -264,11 +267,13 @@ class PresenceEventStreamTestCase(unittest.TestCase):
             datastore=Mock(spec=[
                 "set_presence_state",
                 "get_presence_list",
+                "get_rooms_for_user",
             ]),
             clock=Mock(spec=[
                 "call_later",
                 "cancel_call_later",
                 "time_msec",
+                "looping_call",
             ]),
         )
 
@@ -292,11 +297,20 @@ class PresenceEventStreamTestCase(unittest.TestCase):
             else:
                 return []
         hs.handlers.room_member_handler.get_joined_rooms_for_user = get_rooms_for_user
+        hs.handlers.room_member_handler.get_room_members = (
+            lambda r: self.room_members if r == "a-room" else []
+        )
 
         self.mock_datastore = hs.get_datastore()
         self.mock_datastore.get_app_service_by_token = Mock(return_value=None)
         self.mock_datastore.get_app_service_by_user_id = Mock(
             return_value=defer.succeed(None)
+        )
+        self.mock_datastore.get_rooms_for_user = (
+            lambda u: [
+                namedtuple("Room", "room_id")(r)
+                for r in get_rooms_for_user(UserID.from_string(u))
+            ]
         )
 
         def get_profile_displayname(user_id):
@@ -350,19 +364,19 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         self.mock_datastore.set_presence_state.return_value = defer.succeed(
             {"state": ONLINE}
         )
-        self.mock_datastore.get_presence_list.return_value = defer.succeed(
-            []
-        )
+        self.mock_datastore.get_presence_list.return_value = defer.succeed([])
 
         yield self.presence.set_state(self.u_banana, self.u_banana,
             state={"presence": ONLINE}
         )
 
+        yield run_on_reactor()
+
         (code, response) = yield self.mock_resource.trigger("GET",
-                "/events?from=0_1_0&timeout=0", None)
+                "/events?from=s0_1_0&timeout=0", None)
 
         self.assertEquals(200, code)
-        self.assertEquals({"start": "0_1_0", "end": "0_2_0", "chunk": [
+        self.assertEquals({"start": "s0_1_0", "end": "s0_2_0", "chunk": [
             {"type": "m.presence",
              "content": {
                  "user_id": "@banana:test",

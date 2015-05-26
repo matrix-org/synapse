@@ -87,6 +87,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
 
+        self.datastore.persist_event.return_value = (1,1)
+
     @defer.inlineCallbacks
     def test_invite(self):
         room_id = "!foo:red"
@@ -160,7 +162,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             event, context=context,
         )
         self.notifier.on_new_room_event.assert_called_once_with(
-            event, extra_users=[UserID.from_string(target_user_id)]
+            event, 1, 1, extra_users=[UserID.from_string(target_user_id)]
         )
         self.assertFalse(self.datastore.get_room.called)
         self.assertFalse(self.datastore.store_room.called)
@@ -226,7 +228,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             event, context=context
         )
         self.notifier.on_new_room_event.assert_called_once_with(
-            event, extra_users=[user]
+            event, 1, 1, extra_users=[user]
         )
 
         join_signal_observer.assert_called_with(
@@ -304,7 +306,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             event, context=context
         )
         self.notifier.on_new_room_event.assert_called_once_with(
-            event, extra_users=[user]
+            event, 1, 1, extra_users=[user]
         )
 
         leave_signal_observer.assert_called_with(
