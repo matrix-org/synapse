@@ -534,7 +534,7 @@ def run(hs):
 
                 end = int(time.time()*1000)
 
-                if end - start > 10:
+                if end - start > 100:
                     ident = current_thread().ident
                     name = "/tmp/%s.%s.%i.%d-%d.%d" % (
                         hs.hostname, func.__name__, ident, start, end, end-start
