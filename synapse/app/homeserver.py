@@ -536,8 +536,8 @@ def run(hs):
 
                 if end - start > 10:
                     ident = current_thread().ident
-                    name = "/tmp/%s.%s.%i.%d-%d" % (
-                        hs.hostname, func.__name__, ident, start, end
+                    name = "/tmp/%s.%s.%i.%d-%d.%d" % (
+                        hs.hostname, func.__name__, ident, start, end, end-start
                     )
                     # profile.dump_stats(name + ".pstat")
                     html = profile.output_html()
