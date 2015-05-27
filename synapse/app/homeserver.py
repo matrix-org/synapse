@@ -519,26 +519,30 @@ def run(hs):
     PROFILE_SYNAPSE = True
     if PROFILE_SYNAPSE:
         def profile(func):
-            from cProfile import Profile
+            from pyinstrument import Profiler
             from threading import current_thread
             import time
 
             def profiled(*args, **kargs):
-                profile = Profile()
+                profile = Profiler()
 
                 start = int(time.time()*1000)
 
-                profile.enable()
+                profile.start()
                 func(*args, **kargs)
-                profile.disable()
+                profile.stop()
 
                 end = int(time.time()*1000)
 
-                if end - start > 100:
+                if end - start > 10:
                     ident = current_thread().ident
-                    profile.dump_stats("/tmp/%s.%s.%i.%d-%d.pstat" % (
+                    name = "/tmp/%s.%s.%i.%d-%d" % (
                         hs.hostname, func.__name__, ident, start, end
-                    ))
+                    )
+                    # profile.dump_stats(name + ".pstat")
+                    html = profile.output_html()
+                    with open(name + ".html", "w") as f:
+                        f.write(html)
 
             return profiled
 
