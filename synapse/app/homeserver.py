@@ -516,27 +516,35 @@ class SynapseSite(Site):
 
 
 def run(hs):
-    PROFILE_SYNAPSE = False
+    PROFILE_SYNAPSE = True
     if PROFILE_SYNAPSE:
         def profile(func):
             from cProfile import Profile
             from threading import current_thread
+            import time
 
             def profiled(*args, **kargs):
                 profile = Profile()
+
+                start = int(time.time()*1000)
+
                 profile.enable()
                 func(*args, **kargs)
                 profile.disable()
-                ident = current_thread().ident
-                profile.dump_stats("/tmp/%s.%s.%i.pstat" % (
-                    hs.hostname, func.__name__, ident
-                ))
+
+                end = int(time.time()*1000)
+
+                if end - start > 100:
+                    ident = current_thread().ident
+                    profile.dump_stats("/tmp/%s.%s.%i.%d-%d.pstat" % (
+                        hs.hostname, func.__name__, ident, start, end
+                    ))
 
             return profiled
 
-        from twisted.python.threadpool import ThreadPool
-        ThreadPool._worker = profile(ThreadPool._worker)
-        reactor.run = profile(reactor.run)
+        # from twisted.python.threadpool import ThreadPool
+        # ThreadPool._worker = profile(ThreadPool._worker)
+        reactor.runUntilCurrent = profile(reactor.runUntilCurrent)
 
     def in_thread():
         with LoggingContext("run"):
