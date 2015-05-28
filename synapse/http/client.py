@@ -20,7 +20,8 @@ import synapse.metrics
 
 from twisted.internet import defer, reactor
 from twisted.web.client import (
-    Agent, readBody, FileBodyProducer, PartialDownloadError
+    Agent, readBody, FileBodyProducer, PartialDownloadError,
+    HTTPConnectionPool,
 )
 from twisted.web.http_headers import Headers
 
@@ -55,7 +56,8 @@ class SimpleHttpClient(object):
         # The default context factory in Twisted 14.0.0 (which we require) is
         # BrowserLikePolicyForHTTPS which will do regular cert validation
         # 'like a browser'
-        self.agent = Agent(reactor)
+        pool = HTTPConnectionPool(reactor)
+        self.agent = Agent(reactor, pool)
         self.version_string = hs.version_string
 
     def request(self, method, *args, **kwargs):
