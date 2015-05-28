@@ -104,6 +104,7 @@ class MatrixFederationHttpClient(object):
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
         pool = HTTPConnectionPool(reactor)
+        pool.maxPersistentPerHost = 10
         self.agent = MatrixFederationHttpAgent(reactor, pool)
         self.clock = hs.get_clock()
         self.version_string = hs.version_string

@@ -57,6 +57,7 @@ class SimpleHttpClient(object):
         # BrowserLikePolicyForHTTPS which will do regular cert validation
         # 'like a browser'
         pool = HTTPConnectionPool(reactor)
+        pool.maxPersistentPerHost = 10
         self.agent = Agent(reactor, pool)
         self.version_string = hs.version_string
 
