@@ -16,7 +16,7 @@
 
 from twisted.internet import defer, reactor, protocol
 from twisted.internet.error import DNSLookupError
-from twisted.web.client import readBody, _AgentBase, _URI
+from twisted.web.client import readBody, _AgentBase, _URI, HTTPConnectionPool
 from twisted.web.http_headers import Headers
 from twisted.web._newclient import ResponseDone
 
@@ -103,7 +103,8 @@ class MatrixFederationHttpClient(object):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
-        self.agent = MatrixFederationHttpAgent(reactor)
+        pool = HTTPConnectionPool(reactor)
+        self.agent = MatrixFederationHttpAgent(reactor, pool)
         self.clock = hs.get_clock()
         self.version_string = hs.version_string
 
