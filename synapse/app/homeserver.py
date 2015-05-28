@@ -516,26 +516,36 @@ class SynapseSite(Site):
 
 
 def run(hs):
-    PROFILE_SYNAPSE = False
+    PROFILE_SYNAPSE = True
     if PROFILE_SYNAPSE:
         def profile(func):
             from cProfile import Profile
             from threading import current_thread
 
+            from theseus import Tracer
+
             def profiled(*args, **kargs):
-                profile = Profile()
-                profile.enable()
-                func(*args, **kargs)
-                profile.disable()
-                ident = current_thread().ident
-                profile.dump_stats("/tmp/%s.%s.%i.pstat" % (
-                    hs.hostname, func.__name__, ident
-                ))
+                try:
+                    t = Tracer()
+                    t.install()
+
+                    func(*args, **kargs)
+
+                    ident = current_thread().ident
+                    name = "/tmp/%s.%s.%i.callgrind" % (
+                        hs.hostname, func.__name__, ident
+                    )
+
+                    with open(name, 'wb') as outfile:
+                        t.write_data(outfile)
+                except:
+                    logger.exception("WIBBLE")
+                    raise
 
             return profiled
 
-        from twisted.python.threadpool import ThreadPool
-        ThreadPool._worker = profile(ThreadPool._worker)
+        # from twisted.python.threadpool import ThreadPool
+        # ThreadPool._worker = profile(ThreadPool._worker)
         reactor.run = profile(reactor.run)
 
     def in_thread():
