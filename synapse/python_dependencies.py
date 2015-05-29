@@ -30,6 +30,7 @@ REQUIREMENTS = {
     "frozendict>=0.4": ["frozendict"],
     "pillow": ["PIL"],
     "pydenticon": ["pydenticon"],
+    "ujson": ["ujson"],
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {

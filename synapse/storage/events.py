@@ -17,7 +17,7 @@ from _base import SQLBaseStore, _RollbackButIsFineException
 
 from twisted.internet import defer, reactor
 
-from synapse.events import FrozenEvent
+from synapse.events import FrozenEvent, USE_FROZEN_DICTS
 from synapse.events.utils import prune_event
 
 from synapse.util.logcontext import preserve_context_over_deferred
@@ -26,11 +26,11 @@ from synapse.api.constants import EventTypes
 from synapse.crypto.event_signing import compute_event_reference_hash
 
 from syutil.base64util import decode_base64
-from syutil.jsonutil import encode_canonical_json
+from syutil.jsonutil import encode_json
 from contextlib import contextmanager
 
 import logging
-import simplejson as json
+import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -166,8 +166,9 @@ class EventsStore(SQLBaseStore):
             allow_none=True,
         )
 
-        metadata_json = encode_canonical_json(
-            event.internal_metadata.get_dict()
+        metadata_json = encode_json(
+            event.internal_metadata.get_dict(),
+            using_frozen_dicts=USE_FROZEN_DICTS
         ).decode("UTF-8")
 
         # If we have already persisted this event, we don't need to do any
@@ -235,12 +236,14 @@ class EventsStore(SQLBaseStore):
                 "event_id": event.event_id,
                 "room_id": event.room_id,
                 "internal_metadata": metadata_json,
-                "json": encode_canonical_json(event_dict).decode("UTF-8"),
+                "json": encode_json(
+                    event_dict, using_frozen_dicts=USE_FROZEN_DICTS
+                ).decode("UTF-8"),
             },
         )
 
-        content = encode_canonical_json(
-            event.content
+        content = encode_json(
+            event.content, using_frozen_dicts=USE_FROZEN_DICTS
         ).decode("UTF-8")
 
         vals = {
@@ -266,8 +269,8 @@ class EventsStore(SQLBaseStore):
             ]
         }
 
-        vals["unrecognized_keys"] = encode_canonical_json(
-            unrec
+        vals["unrecognized_keys"] = encode_json(
+            unrec, using_frozen_dicts=USE_FROZEN_DICTS
         ).decode("UTF-8")
 
         sql = (
