@@ -19,9 +19,10 @@ from synapse.api.errors import (
 )
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 import synapse.metrics
+import synapse.events
 
 from syutil.jsonutil import (
-    encode_canonical_json, encode_pretty_printed_json
+    encode_canonical_json, encode_pretty_printed_json, encode_json
 )
 
 from twisted.internet import defer
@@ -168,9 +169,10 @@ class JsonResource(HttpServer, resource.Resource):
 
     _PathEntry = collections.namedtuple("_PathEntry", ["pattern", "callback"])
 
-    def __init__(self, hs):
+    def __init__(self, hs, canonical_json=True):
         resource.Resource.__init__(self)
 
+        self.canonical_json = canonical_json
         self.clock = hs.get_clock()
         self.path_regexs = {}
         self.version_string = hs.version_string
@@ -256,6 +258,7 @@ class JsonResource(HttpServer, resource.Resource):
             response_code_message=response_code_message,
             pretty_print=_request_user_agent_is_curl(request),
             version_string=self.version_string,
+            canonical_json=self.canonical_json,
         )
 
 
@@ -277,11 +280,17 @@ class RootRedirect(resource.Resource):
 
 def respond_with_json(request, code, json_object, send_cors=False,
                       response_code_message=None, pretty_print=False,
-                      version_string=""):
+                      version_string="", canonical_json=True):
     if pretty_print:
         json_bytes = encode_pretty_printed_json(json_object) + "\n"
     else:
-        json_bytes = encode_canonical_json(json_object)
+        if canonical_json:
+            json_bytes = encode_canonical_json(json_object)
+        else:
+            json_bytes = encode_json(
+                json_object, using_frozen_dicts=synapse.events.USE_FROZEN_DICTS
+            )
+            logger.debug("json_bytes: %r %r", json_object, json_bytes)
 
     return respond_with_json_bytes(
         request, code, json_bytes,
