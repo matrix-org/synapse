@@ -187,8 +187,8 @@ class AuthHandler(BaseHandler):
         # each request
         try:
             client = SimpleHttpClient(self.hs)
-            data = yield client.post_urlencoded_get_json(
-                "https://www.google.com/recaptcha/api/siteverify",
+            resp_body = yield client.post_urlencoded_get_json(
+                self.hs.config.recaptcha_siteverify_api,
                 args={
                     'secret': self.hs.config.recaptcha_private_key,
                     'response': user_response,
@@ -198,7 +198,7 @@ class AuthHandler(BaseHandler):
         except PartialDownloadError as pde:
             # Twisted is silly
             data = pde.response
-        resp_body = simplejson.loads(data)
+            resp_body = simplejson.loads(data)
         if 'success' in resp_body and resp_body['success']:
             defer.returnValue(True)
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
