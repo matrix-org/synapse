@@ -199,6 +199,7 @@ class AuthHandler(BaseHandler):
             # Twisted is silly
             data = pde.response
             resp_body = simplejson.loads(data)
+
         if 'success' in resp_body and resp_body['success']:
             defer.returnValue(True)
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
