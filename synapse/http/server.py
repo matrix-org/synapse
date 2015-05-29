@@ -290,7 +290,6 @@ def respond_with_json(request, code, json_object, send_cors=False,
             json_bytes = encode_json(
                 json_object, using_frozen_dicts=synapse.events.USE_FROZEN_DICTS
             )
-            logger.debug("json_bytes: %r %r", json_object, json_bytes)
 
     return respond_with_json_bytes(
         request, code, json_bytes,
