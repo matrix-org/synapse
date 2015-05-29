@@ -28,6 +28,7 @@ class ServerConfig(Config):
         self.web_client = config["web_client"]
         self.soft_file_limit = config["soft_file_limit"]
         self.daemonize = config.get("daemonize")
+        self.use_frozen_dicts = config.get("use_frozen_dicts", True)
 
         # Attempt to guess the content_addr for the v0 content repostitory
         content_addr = config.get("content_addr")
