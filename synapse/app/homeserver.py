@@ -523,21 +523,21 @@ def run(hs):
     PROFILE_SYNAPSE = True
     if PROFILE_SYNAPSE:
         def profile(func):
-            from cProfile import Profile
+            from pyinstrument import Profiler
             from threading import current_thread
             import time
             import resource
 
             def profiled(*args, **kargs):
-                profile = Profile()
+                profile = Profiler()
 
                 rusage = resource.getrusage(resource.RUSAGE_SELF)
                 start_utime = rusage.ru_utime * 1000
                 start = int(time.time()*1000)
 
-                profile.enable()
+                profile.start()
                 func(*args, **kargs)
-                profile.disable()
+                profile.stop()
 
                 end = int(time.time()*1000)
                 rusage = resource.getrusage(resource.RUSAGE_SELF)
@@ -545,11 +545,14 @@ def run(hs):
 
                 if end_utime - start_utime > 50:
                     ident = current_thread().ident
-                    name = "/tmp/%s.%s.%i.%d-%d.%d-%d.pstat" % (
+                    name = "/tmp/%s.%s.%i.%d-%d.%d-%d" % (
                         hs.hostname, func.__name__, ident, start, end,
                         end-start, end_utime - start_utime,
                     )
-                    profile.dump_stats(name)
+                    # profile.dump_stats(name + ".html")
+                    html = profile.output_html()
+                    with open(name + ".html", "w") as f:
+                        f.write(html)
 
             return profiled
 
