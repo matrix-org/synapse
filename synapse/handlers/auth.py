@@ -188,7 +188,7 @@ class AuthHandler(BaseHandler):
         try:
             client = SimpleHttpClient(self.hs)
             resp_body = yield client.post_urlencoded_get_json(
-                "https://www.google.com/recaptcha/api/siteverify",
+                self.hs.config.recaptcha_siteverify_api,
                 args={
                     'secret': self.hs.config.recaptcha_private_key,
                     'response': user_response,
