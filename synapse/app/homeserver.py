@@ -519,36 +519,40 @@ def run(hs):
     PROFILE_SYNAPSE = True
     if PROFILE_SYNAPSE:
         def profile(func):
-            from pyinstrument import Profiler
+            from cProfile import Profile
             from threading import current_thread
             import time
+            import resource
 
             def profiled(*args, **kargs):
-                profile = Profiler()
+                profile = Profile()
 
+                rusage = resource.getrusage(resource.RUSAGE_SELF)
+                start_utime = rusage.ru_utime * 1000
                 start = int(time.time()*1000)
 
-                profile.start()
+                profile.enable()
                 func(*args, **kargs)
-                profile.stop()
+                profile.disable()
 
                 end = int(time.time()*1000)
+                rusage = resource.getrusage(resource.RUSAGE_SELF)
+                end_utime = rusage.ru_utime * 1000
 
-                if end - start > 100:
+                if end_utime - start_utime > 50:
                     ident = current_thread().ident
-                    name = "/tmp/%s.%s.%i.%d-%d.%d" % (
-                        hs.hostname, func.__name__, ident, start, end, end-start
+                    name = "/tmp/%s.%s.%i.%d-%d.%d-%d.pstat" % (
+                        hs.hostname, func.__name__, ident, start, end,
+                        end-start, end_utime - start_utime,
                     )
-                    # profile.dump_stats(name + ".pstat")
-                    html = profile.output_html()
-                    with open(name + ".html", "w") as f:
-                        f.write(html)
+                    profile.dump_stats(name)
 
             return profiled
 
         # from twisted.python.threadpool import ThreadPool
         # ThreadPool._worker = profile(ThreadPool._worker)
         reactor.runUntilCurrent = profile(reactor.runUntilCurrent)
+        reactor.doIteration = profile(reactor.doIteration)
 
     def in_thread():
         with LoggingContext("run"):
