@@ -21,3 +21,5 @@ handlers:
 root:
     level: INFO
     handlers: [journal]
+
+disable_existing_loggers: False
