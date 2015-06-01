@@ -522,19 +522,20 @@ class SynapseSite(Site):
 def run(hs):
     def prof(f):
         import synapse.handlers.room
+        from synapse.handlers.room import RoomMemberHandler
         import time
         def g(*args, **kwargs):
             start = int(time.time()*1000)
             f(*args, **kwargs)
             end = int(time.time()*1000)
 
-            if synapse.handlers.room.total_time > 50:
+            if RoomMemberHandler.total_time > 0:
                 logger.info(
                     "Total time in get_room_members: %d ms / %d ms",
-                    int(total_time*1000),
+                    int(RoomMemberHandler.total_time*1000),
                     end - start
                 )
-            synapse.handlers.room.total_time = 0
+            RoomMemberHandler.total_time = 0
         return g
 
     reactor.runUntilCurrent = prof(reactor.runUntilCurrent)

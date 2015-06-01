@@ -237,13 +237,14 @@ class RoomCreationHandler(BaseHandler):
         ]
 
 import time
-total_time = 0
 
 class RoomMemberHandler(BaseHandler):
     # TODO(paul): This handler currently contains a messy conflation of
     #   low-level API that works on UserID objects and so on, and REST-level
     #   API that takes ID strings and returns pagination chunks. These concerns
     #   ought to be separated out a lot better.
+
+    total_time = 0
 
     def __init__(self, hs):
         super(RoomMemberHandler, self).__init__(hs)
@@ -262,8 +263,7 @@ class RoomMemberHandler(BaseHandler):
         users = [UserID.from_string(u) for u in users]
         end = time.time()
 
-        global total_time
-        total_time += end-start
+        RoomMemberHandler.total_time += end-start
 
         defer.returnValue(users)
 
