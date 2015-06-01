@@ -530,7 +530,7 @@ def run(hs):
             f(*args, **kwargs)
             end = int(time.time()*1000)
 
-            if RoomMemberHandler.total_time > 0:
+            if RoomMemberHandler.total_time > 0.001:
                 logger.info(
                     "Total time in get_room_members: %s %d ms / %d ms",
                     f.__name__,
