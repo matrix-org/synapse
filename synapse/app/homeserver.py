@@ -525,20 +525,22 @@ def run(hs):
         from synapse.handlers.room import RoomMemberHandler
         import time
         def g(*args, **kwargs):
+            RoomMemberHandler.total_time = 0
             start = int(time.time()*1000)
             f(*args, **kwargs)
             end = int(time.time()*1000)
 
             if RoomMemberHandler.total_time > 0:
                 logger.info(
-                    "Total time in get_room_members: %d ms / %d ms",
+                    "Total time in get_room_members: %s %d ms / %d ms",
+                    f.__name__,
                     int(RoomMemberHandler.total_time*1000),
                     end - start
                 )
-            RoomMemberHandler.total_time = 0
         return g
 
     reactor.runUntilCurrent = prof(reactor.runUntilCurrent)
+    reactor.doIteration = prof(reactor.doIteration)
 
     PROFILE_SYNAPSE = False
     if PROFILE_SYNAPSE:
