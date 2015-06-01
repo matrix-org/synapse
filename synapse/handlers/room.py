@@ -236,6 +236,8 @@ class RoomCreationHandler(BaseHandler):
             join_rules_event,
         ]
 
+import time
+total_time = 0
 
 class RoomMemberHandler(BaseHandler):
     # TODO(paul): This handler currently contains a messy conflation of
@@ -256,7 +258,14 @@ class RoomMemberHandler(BaseHandler):
     def get_room_members(self, room_id):
         users = yield self.store.get_users_in_room(room_id)
 
-        defer.returnValue([UserID.from_string(u) for u in users])
+        start = time.time()
+        users = [UserID.from_string(u) for u in users]
+        end = time.time()
+
+        global total_time
+        total_time += end-start
+
+        defer.returnValue(users)
 
     @defer.inlineCallbacks
     def fetch_room_distributions_into(self, room_id, localusers=None,
