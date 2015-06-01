@@ -252,7 +252,6 @@ class RoomMemberHandler(BaseHandler):
         self.distributor.declare("user_joined_room")
         self.distributor.declare("user_left_room")
 
-    @defer.inlineCallbacks
     def get_room_members(self, room_id):
         return self.store.get_user_objs_in_room(room_id)
 
