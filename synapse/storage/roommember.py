@@ -67,6 +67,7 @@ class RoomMemberStore(SQLBaseStore):
         txn.call_after(self.get_rooms_for_user.invalidate, target_user_id)
         txn.call_after(self.get_joined_hosts_for_room.invalidate, event.room_id)
         txn.call_after(self.get_users_in_room.invalidate, event.room_id)
+        txn.call_after(self.get_user_objs_in_room.invalidate, event.room_id)
 
     def get_room_member(self, user_id, room_id):
         """Retrieve the current state of a room member.
@@ -100,6 +101,12 @@ class RoomMemberStore(SQLBaseStore):
 
             return [r["user_id"] for r in rows]
         return self.runInteraction("get_users_in_room", f)
+
+    @cached()
+    def get_user_objs_in_room(self, room_id):
+        return self.get_users_in_room(room_id).addCallback(
+            lambda users: [UserID.from_string(u) for u in users]
+        )
 
     def get_room_members(self, room_id, membership=None):
         """Retrieve the current room member list for a room.

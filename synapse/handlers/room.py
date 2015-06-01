@@ -255,17 +255,8 @@ class RoomMemberHandler(BaseHandler):
         self.distributor.declare("user_joined_room")
         self.distributor.declare("user_left_room")
 
-    @defer.inlineCallbacks
     def get_room_members(self, room_id):
-        users = yield self.store.get_users_in_room(room_id)
-
-        start = time.time()
-        users = [UserID.from_string(u) for u in users]
-        end = time.time()
-
-        RoomMemberHandler.total_time += end-start
-
-        defer.returnValue(users)
+        return self.store.get_user_objs_in_room(room_id)
 
     @defer.inlineCallbacks
     def fetch_room_distributions_into(self, room_id, localusers=None,
