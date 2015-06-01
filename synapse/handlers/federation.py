@@ -262,7 +262,13 @@ class FederationHandler(BaseHandler):
 
         yield defer.gatherResults(
             [
-                self._handle_new_event(dest, a)
+                self._handle_new_event(
+                    dest, a,
+                    auth_events={
+                        (e.type, e.state_key): e for e in auth_events
+                        if e.event_id in [a_id for a_id, _ in a.auth_events]
+                    }
+                )
                 for a in auth_events.values()
             ],
             consumeErrors=True,
@@ -274,6 +280,10 @@ class FederationHandler(BaseHandler):
                     dest, event_map[e_id],
                     state=events_to_state[e_id],
                     backfilled=True,
+                    auth_events={
+                        (e.type, e.state_key): e for e in auth_events
+                        if e.event_id in [a_id for a_id, _ in a.auth_events]
+                    }
                 )
                 for e_id in events_to_state
             ],
