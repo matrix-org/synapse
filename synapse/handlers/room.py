@@ -254,9 +254,7 @@ class RoomMemberHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_room_members(self, room_id):
-        users = yield self.store.get_users_in_room(room_id)
-
-        defer.returnValue([UserID.from_string(u) for u in users])
+        return self.store.get_user_objs_in_room(room_id)
 
     @defer.inlineCallbacks
     def fetch_room_distributions_into(self, room_id, localusers=None,

@@ -128,6 +128,7 @@ class EventsStore(SQLBaseStore):
             txn.call_after(self.get_current_state_for_key.invalidate_all)
             txn.call_after(self.get_rooms_for_user.invalidate_all)
             txn.call_after(self.get_users_in_room.invalidate, event.room_id)
+            txn.call_after(self.get_user_objs_in_room.invalidate, event.room_id)
             txn.call_after(self.get_joined_hosts_for_room.invalidate, event.room_id)
             txn.call_after(self.get_room_name_and_aliases, event.room_id)
 

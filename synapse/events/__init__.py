@@ -131,7 +131,7 @@ class FrozenEvent(EventBase):
         if USE_FROZEN_DICTS:
             frozen_dict = freeze(event_dict)
         else:
-            frozen_dict = dict(event_dict)
+            frozen_dict = event_dict
 
         super(FrozenEvent, self).__init__(
             frozen_dict,

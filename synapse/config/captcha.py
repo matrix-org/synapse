@@ -26,6 +26,7 @@ class CaptchaConfig(Config):
             config["captcha_ip_origin_is_x_forwarded"]
         )
         self.captcha_bypass_secret = config.get("captcha_bypass_secret")
+        self.recaptcha_siteverify_api = config["recaptcha_siteverify_api"]
 
     def default_config(self, config_dir_path, server_name):
         return """\
@@ -48,4 +49,7 @@ class CaptchaConfig(Config):
 
         # A secret key used to bypass the captcha test entirely.
         #captcha_bypass_secret: "YOUR_SECRET_HERE"
+
+        # The API endpoint to use for verifying m.login.recaptcha responses.
+        recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
         """
