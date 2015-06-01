@@ -736,7 +736,8 @@ class EventsStore(SQLBaseStore):
 
             because = yield self.get_event(
                 redaction_id,
-                check_redacted=False
+                check_redacted=False,
+                allow_none=True,
             )
 
             if because:
@@ -746,6 +747,7 @@ class EventsStore(SQLBaseStore):
             prev = yield self.get_event(
                 ev.unsigned["replaces_state"],
                 get_prev_content=False,
+                allow_none=True,
             )
             if prev:
                 ev.unsigned["prev_content"] = prev.get_dict()["content"]
