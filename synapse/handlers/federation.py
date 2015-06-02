@@ -284,6 +284,7 @@ class FederationHandler(BaseHandler):
                     [dest],
                     event_id,
                     outlier=True,
+                    timeout=10000,
                 )
                 for event_id in missing_auth
             ],
