@@ -271,9 +271,10 @@ class FederationHandler(BaseHandler):
                 self._handle_new_event(
                     dest, a,
                     auth_events={
-                        (e.type, e.state_key): e for e in auth_events
-                        if e.event_id in [a_id for a_id, _ in a.auth_events]
-                    }
+                        (auth_events[a_id].type, auth_events[a_id].state_key):
+                        auth_events[a_id]
+                        for a_id, _ in a.auth_events
+                    },
                 )
                 for a in auth_events.values()
                 if a.event_id not in seen_events
@@ -286,9 +287,10 @@ class FederationHandler(BaseHandler):
                 self._handle_new_event(
                     dest, s,
                     auth_events={
-                        (e.type, e.state_key): e for e in auth_events
-                        if e.event_id in [a_id for a_id, _ in s.auth_events]
-                    }
+                        (auth_events[a_id].type, auth_events[a_id].state_key):
+                        auth_events[a_id]
+                        for a_id, _ in s.auth_events
+                    },
                 )
                 for s in state_events.values()
                 if s.event_id not in seen_events
@@ -303,9 +305,10 @@ class FederationHandler(BaseHandler):
                     state=events_to_state[e_id],
                     backfilled=True,
                     auth_events={
-                        (e.type, e.state_key): e for e in auth_events
-                        if e.event_id in [a_id for a_id, _ in a.auth_events]
-                    }
+                        (auth_events[a_id].type, auth_events[a_id].state_key):
+                        auth_events[a_id]
+                        for a_id, _ in event_map[e_id].auth_events
+                    },
                 )
                 for e_id in events_to_state
             ],
