@@ -118,7 +118,7 @@ class FederationBase(object):
             )
         except SynapseError:
             logger.warn(
-                "Signature check failed for %s, redacting",
+                "Signature check failed for %s",
                 pdu.event_id,
             )
             raise
