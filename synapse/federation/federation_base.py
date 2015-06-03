@@ -18,8 +18,6 @@ from twisted.internet import defer
 
 from synapse.events.utils import prune_event
 
-from syutil.jsonutil import encode_canonical_json
-
 from synapse.crypto.event_signing import check_event_content_hash
 
 from synapse.api.errors import SynapseError
@@ -120,16 +118,15 @@ class FederationBase(object):
             )
         except SynapseError:
             logger.warn(
-                "Signature check failed for %s redacted to %s",
-                encode_canonical_json(pdu.get_pdu_json()),
-                encode_canonical_json(redacted_pdu_json),
+                "Signature check failed for %s",
+                pdu.event_id,
             )
             raise
 
         if not check_event_content_hash(pdu):
             logger.warn(
-                "Event content has been tampered, redacting %s, %s",
-                pdu.event_id, encode_canonical_json(pdu.get_dict())
+                "Event content has been tampered, redacting.",
+                pdu.event_id,
             )
             defer.returnValue(redacted_event)
 
