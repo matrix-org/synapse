@@ -106,7 +106,7 @@ class StateHandler(object):
         defer.returnValue(state)
 
     @defer.inlineCallbacks
-    def compute_event_context(self, event, old_state=None):
+    def compute_event_context(self, event, old_state=None, outlier=False):
         """ Fills out the context with the `current state` of the graph. The
         `current state` here is defined to be the state of the event graph
         just before the event - i.e. it never includes `event`
@@ -119,9 +119,20 @@ class StateHandler(object):
         Returns:
             an EventContext
         """
+        yield run_on_reactor()
+
         context = EventContext()
 
-        yield run_on_reactor()
+        if outlier:
+            if old_state:
+                context.current_state = {
+                    (s.type, s.state_key): s for s in old_state
+                }
+            else:
+                context.current_state = {}
+            context.prev_state_events = []
+            context.state_group = None
+            defer.returnValue(context)
 
         if old_state:
             context.current_state = {

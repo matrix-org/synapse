@@ -100,7 +100,7 @@ class FederationTestCase(unittest.TestCase):
             return defer.succeed({})
         self.datastore.have_events.side_effect = have_events
 
-        def annotate(ev, old_state=None):
+        def annotate(ev, old_state=None, outlier=False):
             context = Mock()
             context.current_state = {}
             context.auth_events = {}
@@ -120,7 +120,7 @@ class FederationTestCase(unittest.TestCase):
         )
 
         self.state_handler.compute_event_context.assert_called_once_with(
-            ANY, old_state=None,
+            ANY, old_state=None, outlier=False
         )
 
         self.auth.check.assert_called_once_with(ANY, auth_events={})

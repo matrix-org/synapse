@@ -900,8 +900,10 @@ class FederationHandler(BaseHandler):
             event.event_id, event.signatures,
         )
 
+        outlier = event.internal_metadata.is_outlier()
+
         context = yield self.state_handler.compute_event_context(
-            event, old_state=state
+            event, old_state=state, outlier=outlier,
         )
 
         if not auth_events:
@@ -912,7 +914,7 @@ class FederationHandler(BaseHandler):
             event.event_id, auth_events,
         )
 
-        is_new_state = not event.internal_metadata.is_outlier()
+        is_new_state = not outlier
 
         # This is a hack to fix some old rooms where the initial join event
         # didn't reference the create event in its auth events.
