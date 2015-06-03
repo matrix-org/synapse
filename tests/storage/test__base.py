@@ -96,73 +96,84 @@ class CacheDecoratorTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_passthrough(self):
-        @cached()
-        def func(self, key):
-            return key
+        class A(object):
+            @cached()
+            def func(self, key):
+                return key
 
-        self.assertEquals((yield func(self, "foo")), "foo")
-        self.assertEquals((yield func(self, "bar")), "bar")
+        a = A()
+
+        self.assertEquals((yield a.func("foo")), "foo")
+        self.assertEquals((yield a.func("bar")), "bar")
 
     @defer.inlineCallbacks
     def test_hit(self):
         callcount = [0]
 
-        @cached()
-        def func(self, key):
-            callcount[0] += 1
-            return key
+        class A(object):
+            @cached()
+            def func(self, key):
+                callcount[0] += 1
+                return key
 
-        yield func(self, "foo")
+        a = A()
+        yield a.func("foo")
 
         self.assertEquals(callcount[0], 1)
 
-        self.assertEquals((yield func(self, "foo")), "foo")
+        self.assertEquals((yield a.func("foo")), "foo")
         self.assertEquals(callcount[0], 1)
 
     @defer.inlineCallbacks
     def test_invalidate(self):
         callcount = [0]
 
-        @cached()
-        def func(self, key):
-            callcount[0] += 1
-            return key
+        class A(object):
+            @cached()
+            def func(self, key):
+                callcount[0] += 1
+                return key
 
-        yield func(self, "foo")
+        a = A()
+        yield a.func("foo")
 
         self.assertEquals(callcount[0], 1)
 
-        func.invalidate("foo")
+        a.func.invalidate("foo")
 
-        yield func(self, "foo")
+        yield a.func("foo")
 
         self.assertEquals(callcount[0], 2)
 
     def test_invalidate_missing(self):
-        @cached()
-        def func(self, key):
-            return key
+        class A(object):
+            @cached()
+            def func(self, key):
+                return key
 
-        func.invalidate("what")
+        A().func.invalidate("what")
 
     @defer.inlineCallbacks
     def test_max_entries(self):
         callcount = [0]
 
-        @cached(max_entries=10)
-        def func(self, key):
-            callcount[0] += 1
-            return key
+        class A(object):
+            @cached(max_entries=10)
+            def func(self, key):
+                callcount[0] += 1
+                return key
 
-        for k in range(0,12):
-            yield func(self, k)
+        a = A()
+
+        for k in range(0, 12):
+            yield a.func(k)
 
         self.assertEquals(callcount[0], 12)
 
         # There must have been at least 2 evictions, meaning if we calculate
         # all 12 values again, we must get called at least 2 more times
         for k in range(0,12):
-            yield func(self, k)
+            yield a.func(k)
 
         self.assertTrue(callcount[0] >= 14,
             msg="Expected callcount >= 14, got %d" % (callcount[0]))
@@ -171,12 +182,15 @@ class CacheDecoratorTestCase(unittest.TestCase):
     def test_prefill(self):
         callcount = [0]
 
-        @cached()
-        def func(self, key):
-            callcount[0] += 1
-            return key
+        class A(object):
+            @cached()
+            def func(self, key):
+                callcount[0] += 1
+                return key
 
-        func.prefill("foo", 123)
+        a = A()
 
-        self.assertEquals((yield func(self, "foo")), 123)
+        a.func.prefill("foo", 123)
+
+        self.assertEquals((yield a.func("foo")), 123)
         self.assertEquals(callcount[0], 0)
