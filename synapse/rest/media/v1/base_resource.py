@@ -22,7 +22,7 @@ from synapse.api.errors import (
     cs_error, Codes, SynapseError
 )
 
-from twisted.internet import defer
+from twisted.internet import defer, threads
 from twisted.web.resource import Resource
 from twisted.protocols.basic import FileSender
 
@@ -274,57 +274,65 @@ class BaseMediaResource(Resource):
         if not requirements:
             return
 
+        remote_thumbnails = []
+
         input_path = self.filepaths.remote_media_filepath(server_name, file_id)
         thumbnailer = Thumbnailer(input_path)
         m_width = thumbnailer.width
         m_height = thumbnailer.height
 
-        if m_width * m_height >= self.max_image_pixels:
-            logger.info(
-                "Image too large to thumbnail %r x %r > %r",
-                m_width, m_height, self.max_image_pixels
-            )
-            return
+        def generate_thumbnails():
+            if m_width * m_height >= self.max_image_pixels:
+                logger.info(
+                    "Image too large to thumbnail %r x %r > %r",
+                    m_width, m_height, self.max_image_pixels
+                )
+                return
 
-        scales = set()
-        crops = set()
-        for r_width, r_height, r_method, r_type in requirements:
-            if r_method == "scale":
-                t_width, t_height = thumbnailer.aspect(r_width, r_height)
-                scales.add((
-                    min(m_width, t_width), min(m_height, t_height), r_type,
-                ))
-            elif r_method == "crop":
-                crops.add((r_width, r_height, r_type))
+            scales = set()
+            crops = set()
+            for r_width, r_height, r_method, r_type in requirements:
+                if r_method == "scale":
+                    t_width, t_height = thumbnailer.aspect(r_width, r_height)
+                    scales.add((
+                        min(m_width, t_width), min(m_height, t_height), r_type,
+                    ))
+                elif r_method == "crop":
+                    crops.add((r_width, r_height, r_type))
 
-        for t_width, t_height, t_type in scales:
-            t_method = "scale"
-            t_path = self.filepaths.remote_media_thumbnail(
-                server_name, file_id, t_width, t_height, t_type, t_method
-            )
-            self._makedirs(t_path)
-            t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
-            yield self.store.store_remote_media_thumbnail(
-                server_name, media_id, file_id,
-                t_width, t_height, t_type, t_method, t_len
-            )
+            for t_width, t_height, t_type in scales:
+                t_method = "scale"
+                t_path = self.filepaths.remote_media_thumbnail(
+                    server_name, file_id, t_width, t_height, t_type, t_method
+                )
+                self._makedirs(t_path)
+                t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
+                remote_thumbnails.append([
+                    server_name, media_id, file_id,
+                    t_width, t_height, t_type, t_method, t_len
+                ])
 
-        for t_width, t_height, t_type in crops:
-            if (t_width, t_height, t_type) in scales:
-                # If the aspect ratio of the cropped thumbnail matches a purely
-                # scaled one then there is no point in calculating a separate
-                # thumbnail.
-                continue
-            t_method = "crop"
-            t_path = self.filepaths.remote_media_thumbnail(
-                server_name, file_id, t_width, t_height, t_type, t_method
-            )
-            self._makedirs(t_path)
-            t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
-            yield self.store.store_remote_media_thumbnail(
-                server_name, media_id, file_id,
-                t_width, t_height, t_type, t_method, t_len
-            )
+            for t_width, t_height, t_type in crops:
+                if (t_width, t_height, t_type) in scales:
+                    # If the aspect ratio of the cropped thumbnail matches a purely
+                    # scaled one then there is no point in calculating a separate
+                    # thumbnail.
+                    continue
+                t_method = "crop"
+                t_path = self.filepaths.remote_media_thumbnail(
+                    server_name, file_id, t_width, t_height, t_type, t_method
+                )
+                self._makedirs(t_path)
+                t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
+                remote_thumbnails.append([
+                    server_name, media_id, file_id,
+                    t_width, t_height, t_type, t_method, t_len
+                ])
+
+        yield threads.deferToThread(generate_thumbnails)
+
+        for r in remote_thumbnails:
+            yield self.store.store_remote_media_thumbnail(*r)
 
         defer.returnValue({
             "width": m_width,
