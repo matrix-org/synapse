@@ -15,6 +15,7 @@
 
 from .thumbnailer import Thumbnailer
 
+from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.http.server import respond_with_json
 from synapse.util.stringutils import random_string
 from synapse.api.errors import (
@@ -52,7 +53,7 @@ class BaseMediaResource(Resource):
     def __init__(self, hs, filepaths):
         Resource.__init__(self)
         self.auth = hs.get_auth()
-        self.client = hs.get_http_client()
+        self.client = MatrixFederationHttpClient(hs)
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
