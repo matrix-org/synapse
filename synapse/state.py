@@ -124,6 +124,9 @@ class StateHandler(object):
         context = EventContext()
 
         if outlier:
+            # If this is an outlier, then we know it shouldn't have any current
+            # state. Certainly store.get_current_state won't return any, and
+            # persisting the event won't store the state group.
             if old_state:
                 context.current_state = {
                     (s.type, s.state_key): s for s in old_state
