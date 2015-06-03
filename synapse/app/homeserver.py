@@ -87,10 +87,16 @@ class SynapseHomeServer(HomeServer):
         return MatrixFederationHttpClient(self)
 
     def build_resource_for_client(self):
-        return gz_wrap(ClientV1RestResource(self))
+        res = ClientV1RestResource(self)
+        if self.config.gzip_responses:
+            res = gz_wrap(res)
+        return res
 
     def build_resource_for_client_v2_alpha(self):
-        return gz_wrap(ClientV2AlphaRestResource(self))
+        res = ClientV2AlphaRestResource(self)
+        if self.config.gzip_responses:
+            res = gz_wrap(res)
+        return res
 
     def build_resource_for_federation(self):
         return JsonResource(self)
