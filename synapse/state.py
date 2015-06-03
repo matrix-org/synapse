@@ -155,10 +155,6 @@ class StateHandler(object):
         context.current_state = curr_state
         context.state_group = group if not event.is_state() else None
 
-        prev_state = yield self.store.add_event_hashes(
-            prev_state
-        )
-
         if event.is_state():
             key = (event.type, event.state_key)
             if key in context.current_state:

@@ -78,7 +78,9 @@ class BaseHandler(object):
         context = yield state_handler.compute_event_context(builder)
 
         if builder.is_state():
-            builder.prev_state = context.prev_state_events
+            builder.prev_state = yield self.store.add_event_hashes(
+                context.prev_state_events
+            )
 
         yield self.auth.add_auth_events(builder, context)
 
