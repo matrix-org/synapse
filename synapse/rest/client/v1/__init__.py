@@ -25,7 +25,7 @@ class ClientV1RestResource(JsonResource):
     """A resource for version 1 of the matrix client API."""
 
     def __init__(self, hs):
-        JsonResource.__init__(self, hs)
+        JsonResource.__init__(self, hs, canonical_json=False)
         self.register_servlets(self, hs)
 
     @staticmethod

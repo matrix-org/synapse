@@ -28,6 +28,8 @@ class ServerConfig(Config):
         self.web_client = config["web_client"]
         self.soft_file_limit = config["soft_file_limit"]
         self.daemonize = config.get("daemonize")
+        self.use_frozen_dicts = config.get("use_frozen_dicts", True)
+        self.gzip_responses = config["gzip_responses"]
 
         # Attempt to guess the content_addr for the v0 content repostitory
         content_addr = config.get("content_addr")
@@ -85,6 +87,11 @@ class ServerConfig(Config):
         # Turn on the twisted telnet manhole service on localhost on the given
         # port.
         #manhole: 9000
+
+        # Should synapse compress HTTP responses to clients that support it?
+        # This should be disabled if running synapse behind a load balancer
+        # that can do automatic compression.
+        gzip_responses: True
         """ % locals()
 
     def read_arguments(self, args):

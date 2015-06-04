@@ -54,6 +54,8 @@ from synapse.rest.client.v1 import ClientV1RestResource
 from synapse.rest.client.v2_alpha import ClientV2AlphaRestResource
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 
+from synapse import events
+
 from daemonize import Daemonize
 import twisted.manhole.telnet
 
@@ -85,10 +87,16 @@ class SynapseHomeServer(HomeServer):
         return MatrixFederationHttpClient(self)
 
     def build_resource_for_client(self):
-        return gz_wrap(ClientV1RestResource(self))
+        res = ClientV1RestResource(self)
+        if self.config.gzip_responses:
+            res = gz_wrap(res)
+        return res
 
     def build_resource_for_client_v2_alpha(self):
-        return gz_wrap(ClientV2AlphaRestResource(self))
+        res = ClientV2AlphaRestResource(self)
+        if self.config.gzip_responses:
+            res = gz_wrap(res)
+        return res
 
     def build_resource_for_federation(self):
         return JsonResource(self)
@@ -414,6 +422,8 @@ def setup(config_options):
 
     logger.info("Server hostname: %s", config.server_name)
     logger.info("Server version: %s", version_string)
+
+    events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     if re.search(":[0-9]+$", config.server_name):
         domain_with_port = config.server_name

@@ -16,6 +16,12 @@
 from synapse.util.frozenutils import freeze
 
 
+# Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
+# bugs where we accidentally share e.g. signature dicts. However, converting
+# a dict to frozen_dicts is expensive.
+USE_FROZEN_DICTS = True
+
+
 class _EventInternalMetadata(object):
     def __init__(self, internal_metadata_dict):
         self.__dict__ = dict(internal_metadata_dict)
@@ -122,7 +128,10 @@ class FrozenEvent(EventBase):
 
         unsigned = dict(event_dict.pop("unsigned", {}))
 
-        frozen_dict = freeze(event_dict)
+        if USE_FROZEN_DICTS:
+            frozen_dict = freeze(event_dict)
+        else:
+            frozen_dict = event_dict
 
         super(FrozenEvent, self).__init__(
             frozen_dict,
