@@ -1,3 +1,26 @@
+Changes in synapse v0.9.2 (2015-06-12)
+======================================
+
+General:
+
+* Use ultrajson for json deserialisation, and for serialisation when a
+  canonical encoding is not required. Ultrajson is significantly faster
+  than simplejson in some circumstances.
+* Use connection pools for outgoing HTTP connections.
+* Process thumbnails on separate threads.
+
+Configuration:
+
+* Add option to disable HTTP response compression.
+
+Federation:
+
+* Improve resilience of backfill by ensuring we fetch any missing auth events.
+* Improve performance of backfill and joining remote rooms by removing
+  unnecessary computations. This included handling events we'd previously
+  handled as well as attempting to compute the current state for outliers.
+
+
 Changes in synapse v0.9.1 (2015-05-26)
 ======================================
 
