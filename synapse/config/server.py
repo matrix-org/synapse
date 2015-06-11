@@ -61,14 +61,6 @@ class ServerConfig(Config):
         # e.g. matrix.org, localhost:8080, etc.
         server_name: "%(server_name)s"
 
-        # The port to listen for HTTPS requests on.
-        # For when matrix traffic is sent directly to synapse.
-        bind_port: %(bind_port)s
-
-        # The port to listen for HTTP requests on.
-        # For when matrix traffic passes through loadbalancer that unwraps TLS.
-        unsecure_port: %(unsecure_port)s
-
         # Local interface to listen on.
         # The empty string will cause synapse to listen on all interfaces.
         bind_host: ""
@@ -92,6 +84,30 @@ class ServerConfig(Config):
         # This should be disabled if running synapse behind a load balancer
         # that can do automatic compression.
         gzip_responses: True
+
+        listeners:
+            # For when matrix traffic is sent directly to synapse.
+            secure:
+                # The type of
+                type: http_resource
+
+                # The port to listen for HTTPS requests on.
+                port: %(bind_port)s
+
+                # Is this a TLS socket?
+                tls: true
+
+                # Local interface to listen on.
+                # The empty string will cause synapse to listen on all interfaces.
+                bind_address: ""
+
+            # For when matrix traffic passes through loadbalancer that unwraps TLS.
+            unsecure:
+                port: %(unsecure_port)s
+                tls: false
+                bind_address: ""
+
+
         """ % locals()
 
     def read_arguments(self, args):
