@@ -20,26 +20,73 @@ class ServerConfig(Config):
 
     def read_config(self, config):
         self.server_name = config["server_name"]
-        self.bind_port = config["bind_port"]
-        self.bind_host = config["bind_host"]
-        self.unsecure_port = config["unsecure_port"]
         self.manhole = config.get("manhole")
         self.pid_file = self.abspath(config.get("pid_file"))
         self.web_client = config["web_client"]
         self.soft_file_limit = config["soft_file_limit"]
         self.daemonize = config.get("daemonize")
         self.use_frozen_dicts = config.get("use_frozen_dicts", True)
-        self.gzip_responses = config["gzip_responses"]
+
+        self.listeners = config.get("listeners", [])
+
+        bind_port = config.get("bind_port")
+        if bind_port:
+            self.listeners = []
+            bind_host = config.get("bind_host", "")
+            gzip_responses = config.get("gzip_responses", True)
+
+            self.listeners.append({
+                "port": bind_port,
+                "bind_address": bind_host,
+                "tls": True,
+                "type": "http",
+                "resources": [
+                    {
+                        "names": ["client", "webclient"],
+                        "compress": gzip_responses,
+                    },
+                    {
+                        "names": ["federation"],
+                        "compress": False,
+                    }
+                ]
+            })
+
+            unsecure_port = config.get("unsecure_port", bind_port - 400)
+            if unsecure_port:
+                self.listeners.append({
+                    "port": unsecure_port,
+                    "bind_address": bind_host,
+                    "tls": False,
+                    "type": "http",
+                    "resources": [
+                        {
+                            "names": ["client", "webclient"],
+                            "compress": gzip_responses,
+                        },
+                        {
+                            "names": ["federation"],
+                            "compress": False,
+                        }
+                    ]
+                })
 
         # Attempt to guess the content_addr for the v0 content repostitory
         content_addr = config.get("content_addr")
         if not content_addr:
+            for listener in self.listeners:
+                if listener["type"] == "http" and not listener.get("tls", False):
+                    unsecure_port = listener["port"]
+                    break
+            else:
+                raise RuntimeError("Could not determine 'content_addr'")
+
             host = self.server_name
             if ':' not in host:
-                host = "%s:%d" % (host, self.unsecure_port)
+                host = "%s:%d" % (host, unsecure_port)
             else:
                 host = host.split(':')[0]
-                host = "%s:%d" % (host, self.unsecure_port)
+                host = "%s:%d" % (host, unsecure_port)
             content_addr = "http://%s" % (host,)
 
         self.content_addr = content_addr
@@ -61,9 +108,17 @@ class ServerConfig(Config):
         # e.g. matrix.org, localhost:8080, etc.
         server_name: "%(server_name)s"
 
+        # The port to listen for HTTPS requests on.
+        # For when matrix traffic is sent directly to synapse.
+        # bind_port: %(bind_port)s
+
+        # The port to listen for HTTP requests on.
+        # For when matrix traffic passes through loadbalancer that unwraps TLS.
+        # unsecure_port: %(unsecure_port)s
+
         # Local interface to listen on.
         # The empty string will cause synapse to listen on all interfaces.
-        bind_host: ""
+        # bind_host: ""
 
         # When running as a daemon, the file to store the pid in
         pid_file: %(pid_file)s
@@ -83,31 +138,30 @@ class ServerConfig(Config):
         # Should synapse compress HTTP responses to clients that support it?
         # This should be disabled if running synapse behind a load balancer
         # that can do automatic compression.
-        gzip_responses: True
+        # gzip_responses: True
 
         listeners:
-            # For when matrix traffic is sent directly to synapse.
-            secure:
-                # The type of
-                type: http_resource
+          - port: %(unsecure_port)s
+            tls: false
+            bind_address: ''
+            type: http
 
-                # The port to listen for HTTPS requests on.
-                port: %(bind_port)s
+            resources:
+              - names: [client, webclient]
+                compress: true
+              - names: [federation]
+                compress: false
 
-                # Is this a TLS socket?
-                tls: true
+          - port: %(bind_port)s
+            tls: true
+            bind_address: ''
+            type: http
 
-                # Local interface to listen on.
-                # The empty string will cause synapse to listen on all interfaces.
-                bind_address: ""
-
-            # For when matrix traffic passes through loadbalancer that unwraps TLS.
-            unsecure:
-                port: %(unsecure_port)s
-                tls: false
-                bind_address: ""
-
-
+            resources:
+              - names: [client, webclient]
+                compress: true
+              - names: [federation]
+                compress: false
         """ % locals()
 
     def read_arguments(self, args):

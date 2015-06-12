@@ -87,16 +87,10 @@ class SynapseHomeServer(HomeServer):
         return MatrixFederationHttpClient(self)
 
     def build_resource_for_client(self):
-        res = ClientV1RestResource(self)
-        if self.config.gzip_responses:
-            res = gz_wrap(res)
-        return res
+        return ClientV1RestResource(self)
 
     def build_resource_for_client_v2_alpha(self):
-        res = ClientV2AlphaRestResource(self)
-        if self.config.gzip_responses:
-            res = gz_wrap(res)
-        return res
+        return ClientV2AlphaRestResource(self)
 
     def build_resource_for_federation(self):
         return JsonResource(self)
@@ -145,49 +139,102 @@ class SynapseHomeServer(HomeServer):
             **self.db_config.get("args", {})
         )
 
-    def start_listening(self):
-        config = self.get_config()
+    def _listener_http(self, config, listener_config):
+        port = listener_config["port"]
+        bind_address = listener_config.get("bind_address", "")
+        tls = listener_config.get("tls", False)
 
-        if not config.no_tls and config.bind_port is not None:
+        if tls and config.no_tls:
+            return
+
+        metrics_resource = self.get_resource_for_metrics()
+
+        resources = {}
+        for res in listener_config["resources"]:
+            for name in res["names"]:
+                if name == "client":
+                    if res["compress"]:
+                        client_v1 = gz_wrap(self.get_resource_for_client())
+                        client_v2 = gz_wrap(self.get_resource_for_client_v2_alpha())
+                    else:
+                        client_v1 = self.get_resource_for_client()
+                        client_v2 = self.get_resource_for_client_v2_alpha()
+
+                    resources.update({
+                        CLIENT_PREFIX: client_v1,
+                        CLIENT_V2_ALPHA_PREFIX: client_v2,
+                    })
+
+                if name == "federation":
+                    resources.update({
+                        FEDERATION_PREFIX: self.get_resource_for_federation(),
+                    })
+
+                if name in ["static", "client"]:
+                    resources.update({
+                        STATIC_PREFIX: self.get_resource_for_static_content(),
+                    })
+
+                if name in ["media", "federation", "client"]:
+                    resources.update({
+                        MEDIA_PREFIX: self.get_resource_for_media_repository(),
+                        CONTENT_REPO_PREFIX: self.get_resource_for_content_repo(),
+                    })
+
+                if name in ["keys", "federation"]:
+                    resources.update({
+                        SERVER_KEY_PREFIX: self.get_resource_for_server_key(),
+                        SERVER_KEY_V2_PREFIX: self.get_resource_for_server_key_v2(),
+                    })
+
+                if name == "webclient":
+                    resources[WEB_CLIENT_PREFIX] = self.get_resource_for_web_client()
+
+                if name == "metrics" and metrics_resource:
+                    resources[METRICS_PREFIX] = metrics_resource
+
+        root_resource = create_resource_tree(resources)
+        if tls:
             reactor.listenSSL(
-                config.bind_port,
+                port,
                 SynapseSite(
                     "synapse.access.https",
                     config,
-                    self.root_resource,
+                    root_resource,
                 ),
                 self.tls_context_factory,
-                interface=config.bind_host
+                interface=bind_address
             )
-            logger.info("Synapse now listening on port %d", config.bind_port)
-
-        if config.unsecure_port is not None:
+        else:
             reactor.listenTCP(
-                config.unsecure_port,
+                port,
                 SynapseSite(
-                    "synapse.access.http",
+                    "synapse.access.https",
                     config,
-                    self.root_resource,
+                    root_resource,
                 ),
-                interface=config.bind_host
+                interface=bind_address
             )
-            logger.info("Synapse now listening on port %d", config.unsecure_port)
+        logger.info("Synapse now listening on port %d", port)
 
-        metrics_resource = self.get_resource_for_metrics()
-        if metrics_resource and config.metrics_port is not None:
-            reactor.listenTCP(
-                config.metrics_port,
-                SynapseSite(
-                    "synapse.access.metrics",
-                    config,
-                    metrics_resource,
-                ),
-                interface=config.metrics_bind_host,
-            )
-            logger.info(
-                "Metrics now running on %s port %d",
-                config.metrics_bind_host, config.metrics_port,
-            )
+    def start_listening(self):
+        config = self.get_config()
+
+        for listener in config.listeners:
+            if listener["type"] == "http":
+                self._listener_http(config, listener)
+            elif listener["type"] == "manhole":
+                f = twisted.manhole.telnet.ShellFactory()
+                f.username = "matrix"
+                f.password = "rabbithole"
+                f.namespace['hs'] = self
+                reactor.listenTCP(
+                    listener["port"],
+                    f,
+                    interface=listener.get("bind_address", '127.0.0.1')
+                )
+            else:
+                logger.warn("Unrecognized listener type: %s", listener["type"])
 
     def run_startup_checks(self, db_conn, database_engine):
         all_users_native = are_all_users_on_domain(
@@ -322,11 +369,6 @@ def setup(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    if re.search(":[0-9]+$", config.server_name):
-        domain_with_port = config.server_name
-    else:
-        domain_with_port = "%s:%s" % (config.server_name, config.bind_port)
-
     tls_context_factory = context_factory.ServerContextFactory(config)
 
     database_engine = create_engine(config.database_config["name"])
@@ -334,7 +376,6 @@ def setup(config_options):
 
     hs = SynapseHomeServer(
         config.server_name,
-        domain_with_port=domain_with_port,
         upload_dir=os.path.abspath("uploads"),
         db_config=config.database_config,
         tls_context_factory=tls_context_factory,
@@ -342,29 +383,6 @@ def setup(config_options):
         content_addr=config.content_addr,
         version_string=version_string,
         database_engine=database_engine,
-    )
-
-    resources = {
-        CLIENT_PREFIX: hs.get_resource_for_client(),
-        CLIENT_V2_ALPHA_PREFIX: hs.get_resource_for_client_v2_alpha(),
-        FEDERATION_PREFIX: hs.get_resource_for_federation(),
-        CONTENT_REPO_PREFIX: hs.get_resource_for_content_repo(),
-        SERVER_KEY_PREFIX: hs.get_resource_for_server_key(),
-        SERVER_KEY_V2_PREFIX: hs.get_resource_for_server_key_v2(),
-        MEDIA_PREFIX: hs.get_resource_for_media_repository(),
-        STATIC_PREFIX: hs.get_resource_for_static_content(),
-    }
-
-    if config.web_client:
-        resources[WEB_CLIENT_PREFIX] = hs.get_resource_for_web_client()
-
-    metrics_resource = hs.get_resource_for_metrics()
-    if config.metrics_port is None and metrics_resource is not None:
-        resources[METRICS_PREFIX] = metrics_resource
-
-    hs.root_resource = create_resource_tree(
-        resources,
-        redirect_root_to_web_client=True,
     )
 
     logger.info("Preparing database: %r...", config.database_config)
