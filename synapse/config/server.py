@@ -20,7 +20,6 @@ class ServerConfig(Config):
 
     def read_config(self, config):
         self.server_name = config["server_name"]
-        self.manhole = config.get("manhole")
         self.pid_file = self.abspath(config.get("pid_file"))
         self.web_client = config["web_client"]
         self.soft_file_limit = config["soft_file_limit"]
@@ -35,6 +34,8 @@ class ServerConfig(Config):
             bind_host = config.get("bind_host", "")
             gzip_responses = config.get("gzip_responses", True)
 
+            names = ["client", "webclient"] if self.web_client else ["client"]
+
             self.listeners.append({
                 "port": bind_port,
                 "bind_address": bind_host,
@@ -42,7 +43,7 @@ class ServerConfig(Config):
                 "type": "http",
                 "resources": [
                     {
-                        "names": ["client", "webclient"],
+                        "names": names,
                         "compress": gzip_responses,
                     },
                     {
@@ -61,7 +62,7 @@ class ServerConfig(Config):
                     "type": "http",
                     "resources": [
                         {
-                            "names": ["client", "webclient"],
+                            "names": names,
                             "compress": gzip_responses,
                         },
                         {
@@ -70,6 +71,29 @@ class ServerConfig(Config):
                         }
                     ]
                 })
+
+        manhole = config.get("manhole")
+        if manhole:
+            self.listeners.append({
+                "port": manhole,
+                "bind_address": "127.0.0.1",
+                "type": "manhole",
+            })
+
+        metrics_port = config.get("metrics_port")
+        if metrics_port:
+            self.listeners.append({
+                "port": metrics_port,
+                "bind_address": config.get("metrics_bind_host", "127.0.0.1"),
+                "tls": False,
+                "type": "http",
+                "resources": [
+                    {
+                        "names": ["metrics"],
+                        "compress": False,
+                    },
+                ]
+            })
 
         # Attempt to guess the content_addr for the v0 content repostitory
         content_addr = config.get("content_addr")

@@ -408,13 +408,6 @@ def setup(config_options):
 
     logger.info("Database prepared in %r.", config.database_config)
 
-    if config.manhole:
-        f = twisted.manhole.telnet.ShellFactory()
-        f.username = "matrix"
-        f.password = "rabbithole"
-        f.namespace['hs'] = hs
-        reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
-
     hs.start_listening()
 
     hs.get_pusherpool().start()
