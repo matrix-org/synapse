@@ -4,7 +4,7 @@ Changes in synapse v0.9.2 (2015-06-12)
 General:
 
 * Use ultrajson for json (de)serialisation when a canonical encoding is not
-  required. Ultrajson is significantly faster than simplejson in some
+  required. Ultrajson is significantly faster than simplejson in certain
   circumstances.
 * Use connection pools for outgoing HTTP connections.
 * Process thumbnails on separate threads.
