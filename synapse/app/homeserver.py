@@ -34,7 +34,7 @@ from twisted.application import service
 from twisted.enterprise import adbapi
 from twisted.web.resource import Resource, EncodingResourceWrapper
 from twisted.web.static import File
-from twisted.web.server import Site, GzipEncoderFactory
+from twisted.web.server import Site, GzipEncoderFactory, Request
 from twisted.web.http import proxiedLogFormatter, combinedLogFormatter
 from synapse.http.server import JsonResource, RootRedirect
 from synapse.rest.media.v0.content_repository import ContentRepoResource
@@ -199,7 +199,7 @@ class SynapseHomeServer(HomeServer):
                 port,
                 SynapseSite(
                     "synapse.access.https",
-                    config,
+                    listener_config,
                     root_resource,
                 ),
                 self.tls_context_factory,
@@ -210,7 +210,7 @@ class SynapseHomeServer(HomeServer):
                 port,
                 SynapseSite(
                     "synapse.access.https",
-                    config,
+                    listener_config,
                     root_resource,
                 ),
                 interface=bind_address
@@ -441,6 +441,28 @@ class SynapseService(service.Service):
         return self._port.stopListening()
 
 
+class XForwardedForRequest(Request):
+    def __init__(self, *args, **kw):
+        Request.__init__(self, *args, **kw)
+
+    """
+    Add a layer on top of another request that only uses the value of an
+    X-Forwarded-For header as the result of C{getClientIP}.
+    """
+    def getClientIP(self):
+        """
+        @return: The client address (the first address) in the value of the
+            I{X-Forwarded-For header}.  If the header is not present, return
+            C{b"-"}.
+        """
+        return self.requestHeaders.getRawHeaders(
+            b"x-forwarded-for", [b"-"])[0].split(b",")[0].strip()
+
+
+def XForwardedFactory(*args, **kwargs):
+    return XForwardedForRequest(*args, **kwargs)
+
+
 class SynapseSite(Site):
     """
     Subclass of a twisted http Site that does access logging with python's
@@ -448,7 +470,8 @@ class SynapseSite(Site):
     """
     def __init__(self, logger_name, config, resource, *args, **kwargs):
         Site.__init__(self, resource, *args, **kwargs)
-        if config.captcha_ip_origin_is_x_forwarded:
+        if config.get("x_forwarded", False):
+            self.requestFactory = XForwardedFactory
             self._log_formatter = proxiedLogFormatter
         else:
             self._log_formatter = combinedLogFormatter

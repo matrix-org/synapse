@@ -157,6 +157,8 @@ class ServerConfig(Config):
             bind_address: ''
             type: http
 
+            x_forwarded: False
+
             resources:
               - names: [client, webclient]
                 compress: true
