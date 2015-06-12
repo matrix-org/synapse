@@ -63,7 +63,6 @@ import synapse
 
 import logging
 import os
-import re
 import resource
 import subprocess
 
@@ -532,8 +531,9 @@ def create_resource_tree(desired_tree, redirect_root_to_web_client=True):
             # to be replaced with the desired resource.
             existing_dummy_resource = resource_mappings[res_id]
             for child_name in existing_dummy_resource.listNames():
-                child_res_id = _resource_id(existing_dummy_resource,
-                                                 child_name)
+                child_res_id = _resource_id(
+                    existing_dummy_resource, child_name
+                )
                 child_resource = resource_mappings[child_res_id]
                 # steal the children
                 res.putChild(child_name, child_resource)
