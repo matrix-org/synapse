@@ -11,7 +11,7 @@ General:
 
 Configuration:
 
-* Add option to disable HTTP response compression.
+* Add option, ``gzip_responses``, to disable HTTP response compression.
 
 Federation:
 
