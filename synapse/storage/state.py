@@ -81,19 +81,23 @@ class StateStore(SQLBaseStore):
             f,
         )
 
-        @defer.inlineCallbacks
-        def c(vals):
-            vals[:] = yield self._get_events(vals, get_prev_content=False)
-
-        yield defer.gatherResults(
+        state_list = yield defer.gatherResults(
             [
-                c(vals)
-                for vals in states.values()
+                self._fetch_events_for_group(group, vals)
+                for group, vals in states.items()
             ],
             consumeErrors=True,
         )
 
-        defer.returnValue(states)
+        defer.returnValue(dict(state_list))
+
+    @cached(num_args=1)
+    def _fetch_events_for_group(self, state_group, events):
+        return self._get_events(
+            events, get_prev_content=False
+        ).addCallback(
+            lambda evs: (state_group, evs)
+        )
 
     def _store_state_groups_txn(self, txn, event, context):
         if context.current_state is None:

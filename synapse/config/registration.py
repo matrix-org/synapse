@@ -39,7 +39,7 @@ class RegistrationConfig(Config):
         ## Registration ##
 
         # Enable registration for new users.
-        enable_registration: True
+        enable_registration: False
 
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.

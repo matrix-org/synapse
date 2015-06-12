@@ -106,7 +106,7 @@ class StateHandler(object):
         defer.returnValue(state)
 
     @defer.inlineCallbacks
-    def compute_event_context(self, event, old_state=None):
+    def compute_event_context(self, event, old_state=None, outlier=False):
         """ Fills out the context with the `current state` of the graph. The
         `current state` here is defined to be the state of the event graph
         just before the event - i.e. it never includes `event`
@@ -119,9 +119,23 @@ class StateHandler(object):
         Returns:
             an EventContext
         """
+        yield run_on_reactor()
+
         context = EventContext()
 
-        yield run_on_reactor()
+        if outlier:
+            # If this is an outlier, then we know it shouldn't have any current
+            # state. Certainly store.get_current_state won't return any, and
+            # persisting the event won't store the state group.
+            if old_state:
+                context.current_state = {
+                    (s.type, s.state_key): s for s in old_state
+                }
+            else:
+                context.current_state = {}
+            context.prev_state_events = []
+            context.state_group = None
+            defer.returnValue(context)
 
         if old_state:
             context.current_state = {
@@ -154,10 +168,6 @@ class StateHandler(object):
 
         context.current_state = curr_state
         context.state_group = group if not event.is_state() else None
-
-        prev_state = yield self.store.add_event_hashes(
-            prev_state
-        )
 
         if event.is_state():
             key = (event.type, event.state_key)
