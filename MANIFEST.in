@@ -5,6 +5,7 @@ include *.rst
 include demo/README
 
 recursive-include synapse/storage/schema *.sql
+recursive-include synapse/storage/schema *.py
 
 recursive-include demo *.dh
 recursive-include demo *.py
