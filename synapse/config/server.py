@@ -132,18 +132,6 @@ class ServerConfig(Config):
         # e.g. matrix.org, localhost:8080, etc.
         server_name: "%(server_name)s"
 
-        # The port to listen for HTTPS requests on.
-        # For when matrix traffic is sent directly to synapse.
-        # bind_port: %(bind_port)s
-
-        # The port to listen for HTTP requests on.
-        # For when matrix traffic passes through loadbalancer that unwraps TLS.
-        # unsecure_port: %(unsecure_port)s
-
-        # Local interface to listen on.
-        # The empty string will cause synapse to listen on all interfaces.
-        # bind_host: ""
-
         # When running as a daemon, the file to store the pid in
         pid_file: %(pid_file)s
 
@@ -155,39 +143,65 @@ class ServerConfig(Config):
         # hard limit.
         soft_file_limit: 0
 
-        # Turn on the twisted telnet manhole service on localhost on the given
-        # port.
-        #manhole: 9000
-
-        # Should synapse compress HTTP responses to clients that support it?
-        # This should be disabled if running synapse behind a load balancer
-        # that can do automatic compression.
-        # gzip_responses: True
-
+        # List of ports that Synapse should listen on, their purpose and their
+        # configuration.
         listeners:
-          - port: %(unsecure_port)s
+          # Main HTTPS listener
+          # For when matrix traffic is sent directly to synapse.
+          -
+            # The port to listen for HTTPS requests on.
+            port: %(bind_port)s
+
+            # Local interface to listen on.
+            # The empty string will cause synapse to listen on all interfaces.
+            bind_address: ''
+
+            # This is a 'http' listener, allows us to specify 'resources'.
+            type: http
+
+            tls: true
+
+            # Use the X-Forwarded-For (XFF) header as the client IP and not the
+            # actual client IP.
+            x_forwarded: false
+
+            # List of HTTP resources to serve on this listener.
+            resources:
+              -
+                # List of resources to host on this listener.
+                names:
+                  - client     # The client-server APIs, both v1 and v2
+                  - webclient  # The bundled webclient.
+
+                # Should synapse compress HTTP responses to clients that support it?
+                # This should be disabled if running synapse behind a load balancer
+                # that can do automatic compression.
+                compress: true
+
+              - names: [federation]  # Federation APIs
+                compress: false
+
+          # Unsecure HTTP listener,
+          # For when matrix traffic passes through loadbalancer that unwraps TLS.
+          -
+            port: %(unsecure_port)s
             tls: false
             bind_address: ''
             type: http
 
-            resources:
-              - names: [client, webclient]
-                compress: true
-              - names: [federation]
-                compress: false
-
-          - port: %(bind_port)s
-            tls: true
-            bind_address: ''
-            type: http
-
-            x_forwarded: False
+            x_forwarded: false
 
             resources:
               - names: [client, webclient]
                 compress: true
               - names: [federation]
                 compress: false
+
+          # Turn on the twisted telnet manhole service on localhost on the given
+          # port.
+          # - port: 9000
+          #   bind_address: 127.0.0.1
+          #   type: manhole
         """ % locals()
 
     def read_arguments(self, args):
