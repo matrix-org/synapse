@@ -183,8 +183,7 @@ class ServerConfig(Config):
 
           # Unsecure HTTP listener,
           # For when matrix traffic passes through loadbalancer that unwraps TLS.
-          -
-            port: %(unsecure_port)s
+          - port: %(unsecure_port)s
             tls: false
             bind_address: ''
             type: http
