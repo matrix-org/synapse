@@ -143,6 +143,7 @@ class SynapseHomeServer(HomeServer):
         port = listener_config["port"]
         bind_address = listener_config.get("bind_address", "")
         tls = listener_config.get("tls", False)
+        site_tag = listener_config.get("tag", port)
 
         if tls and config.no_tls:
             return
@@ -199,6 +200,7 @@ class SynapseHomeServer(HomeServer):
                 port,
                 SynapseSite(
                     "synapse.access.https",
+                    site_tag,
                     listener_config,
                     root_resource,
                 ),
@@ -210,6 +212,7 @@ class SynapseHomeServer(HomeServer):
                 port,
                 SynapseSite(
                     "synapse.access.https",
+                    site_tag,
                     listener_config,
                     root_resource,
                 ),
@@ -458,6 +461,9 @@ class SynapseRequest(Request):
             self.uri
         )
 
+    def get_user_agent(self):
+        return self.requestHeaders.getRawHeaders("User-Agent", [None])[-1]
+
 
 class XForwardedForRequest(SynapseRequest):
     def __init__(self, *args, **kw):
@@ -494,11 +500,11 @@ class SynapseSite(Site):
     Subclass of a twisted http Site that does access logging with python's
     standard logging
     """
-    def __init__(self, logger_name, config, resource, *args, **kwargs):
+    def __init__(self, logger_name, tag, config, resource, *args, **kwargs):
         Site.__init__(self, resource, *args, **kwargs)
 
         proxied = config.get("x_forwarded", False)
-        self.requestFactory = SynapseRequestFactory(None, proxied)
+        self.requestFactory = SynapseRequestFactory(tag, proxied)
 
         if proxied:
             self._log_formatter = proxiedLogFormatter

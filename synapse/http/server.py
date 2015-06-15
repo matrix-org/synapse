@@ -125,8 +125,18 @@ def request_handler(request_handler):
                 code = str(code) if code else "-"
                 end = self.clock.time_msec()
                 logger.info(
-                    "Processed request: %dms %s %s %s",
-                    end-start, code, request.method, request.path
+                    "%s - %s - {%s}"
+                    " Processed request: %dms %sB %s \"%s %s %s\" \"%s\"",
+                    request.getClientIP(),
+                    request.site_tag,
+                    request.authenticated_entity,
+                    end-start,
+                    request.sentLength,
+                    code,
+                    request.method,
+                    request.get_redacted_uri(),
+                    request.clientproto,
+                    request.get_user_agent(),
                 )
     return wrapped_request_handler
 
