@@ -79,65 +79,39 @@ def request_handler(request_handler):
         _next_request_id += 1
         with LoggingContext(request_id) as request_context:
             request_context.request = request_id
-            code = None
-            start = self.clock.time_msec()
-            try:
-                logger.info(
-                    "%s - Received request: %s %s",
-                    request.getClientIP(),
-                    request.method,
-                    request.get_redacted_uri()
-                )
-                d = request_handler(self, request)
-                with PreserveLoggingContext():
-                    yield d
-                code = request.code
-            except CodeMessageException as e:
-                code = e.code
-                if isinstance(e, SynapseError):
-                    logger.info(
-                        "%s SynapseError: %s - %s", request, code, e.msg
+            with request.processing():
+                try:
+                    d = request_handler(self, request)
+                    with PreserveLoggingContext():
+                        yield d
+                except CodeMessageException as e:
+                    code = e.code
+                    if isinstance(e, SynapseError):
+                        logger.info(
+                            "%s SynapseError: %s - %s", request, code, e.msg
+                        )
+                    else:
+                        logger.exception(e)
+                    outgoing_responses_counter.inc(request.method, str(code))
+                    respond_with_json(
+                        request, code, cs_exception(e), send_cors=True,
+                        pretty_print=_request_user_agent_is_curl(request),
+                        version_string=self.version_string,
                     )
-                else:
-                    logger.exception(e)
-                outgoing_responses_counter.inc(request.method, str(code))
-                respond_with_json(
-                    request, code, cs_exception(e), send_cors=True,
-                    pretty_print=_request_user_agent_is_curl(request),
-                    version_string=self.version_string,
-                )
-            except:
-                code = 500
-                logger.exception(
-                    "Failed handle request %s.%s on %r: %r",
-                    request_handler.__module__,
-                    request_handler.__name__,
-                    self,
-                    request
-                )
-                respond_with_json(
-                    request,
-                    500,
-                    {"error": "Internal server error"},
-                    send_cors=True
-                )
-            finally:
-                code = str(code) if code else "-"
-                end = self.clock.time_msec()
-                logger.info(
-                    "%s - %s - {%s}"
-                    " Processed request: %dms %sB %s \"%s %s %s\" \"%s\"",
-                    request.getClientIP(),
-                    request.site_tag,
-                    request.authenticated_entity,
-                    end-start,
-                    request.sentLength,
-                    code,
-                    request.method,
-                    request.get_redacted_uri(),
-                    request.clientproto,
-                    request.get_user_agent(),
-                )
+                except:
+                    logger.exception(
+                        "Failed handle request %s.%s on %r: %r",
+                        request_handler.__module__,
+                        request_handler.__name__,
+                        self,
+                        request
+                    )
+                    respond_with_json(
+                        request,
+                        500,
+                        {"error": "Internal server error"},
+                        send_cors=True
+                    )
     return wrapped_request_handler
 
 

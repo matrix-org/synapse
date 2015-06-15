@@ -35,7 +35,6 @@ from twisted.enterprise import adbapi
 from twisted.web.resource import Resource, EncodingResourceWrapper
 from twisted.web.static import File
 from twisted.web.server import Site, GzipEncoderFactory, Request
-from twisted.web.http import proxiedLogFormatter, combinedLogFormatter
 from synapse.http.server import JsonResource, RootRedirect
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
@@ -61,11 +60,13 @@ import twisted.manhole.telnet
 
 import synapse
 
+import contextlib
 import logging
 import os
 import re
 import resource
 import subprocess
+import time
 
 
 logger = logging.getLogger("synapse.app.homeserver")
@@ -438,10 +439,11 @@ class SynapseService(service.Service):
 
 
 class SynapseRequest(Request):
-    def __init__(self, site_tag, *args, **kw):
+    def __init__(self, site, *args, **kw):
         Request.__init__(self, *args, **kw)
-        self.site_tag = site_tag
+        self.site = site
         self.authenticated_entity = None
+        self.start_time = 0
 
     def __repr__(self):
         # We overwrite this so that we don't log ``access_token``
@@ -451,7 +453,7 @@ class SynapseRequest(Request):
             self.method,
             self.get_redacted_uri(),
             self.clientproto,
-            self.site_tag,
+            self.site.site_tag,
         )
 
     def get_redacted_uri(self):
@@ -463,6 +465,38 @@ class SynapseRequest(Request):
 
     def get_user_agent(self):
         return self.requestHeaders.getRawHeaders("User-Agent", [None])[-1]
+
+    def started_processing(self):
+        self.site.access_logger.info(
+            "%s - %s - Received request: %s %s",
+            self.getClientIP(),
+            self.site.site_tag,
+            self.method,
+            self.get_redacted_uri()
+        )
+        self.start_time = int(time.time() * 1000)
+
+    def finished_processing(self):
+        self.site.access_logger.info(
+            "%s - %s - {%s}"
+            " Processed request: %dms %sB %s \"%s %s %s\" \"%s\"",
+            self.getClientIP(),
+            self.site.site_tag,
+            self.authenticated_entity,
+            int(time.time() * 1000) - self.start_time,
+            self.sentLength,
+            self.code,
+            self.method,
+            self.get_redacted_uri(),
+            self.clientproto,
+            self.get_user_agent(),
+        )
+
+    @contextlib.contextmanager
+    def processing(self):
+        self.started_processing()
+        yield
+        self.finished_processing()
 
 
 class XForwardedForRequest(SynapseRequest):
@@ -484,15 +518,15 @@ class XForwardedForRequest(SynapseRequest):
 
 
 class SynapseRequestFactory(object):
-    def __init__(self, site_tag, x_forwarded_for):
-        self.site_tag = site_tag
+    def __init__(self, site, x_forwarded_for):
+        self.site = site
         self.x_forwarded_for = x_forwarded_for
 
     def __call__(self, *args, **kwargs):
         if self.x_forwarded_for:
-            return XForwardedForRequest(self.site_tag, *args, **kwargs)
+            return XForwardedForRequest(self.site, *args, **kwargs)
         else:
-            return SynapseRequest(self.site_tag, *args, **kwargs)
+            return SynapseRequest(self.site, *args, **kwargs)
 
 
 class SynapseSite(Site):
@@ -500,21 +534,17 @@ class SynapseSite(Site):
     Subclass of a twisted http Site that does access logging with python's
     standard logging
     """
-    def __init__(self, logger_name, tag, config, resource, *args, **kwargs):
+    def __init__(self, logger_name, site_tag, config, resource, *args, **kwargs):
         Site.__init__(self, resource, *args, **kwargs)
 
-        proxied = config.get("x_forwarded", False)
-        self.requestFactory = SynapseRequestFactory(tag, proxied)
+        self.site_tag = site_tag
 
-        if proxied:
-            self._log_formatter = proxiedLogFormatter
-        else:
-            self._log_formatter = combinedLogFormatter
+        proxied = config.get("x_forwarded", False)
+        self.requestFactory = SynapseRequestFactory(self, proxied)
         self.access_logger = logging.getLogger(logger_name)
 
     def log(self, request):
-        line = self._log_formatter(self._logDateTime, request)
-        self.access_logger.info(line)
+        pass
 
 
 def create_resource_tree(desired_tree, redirect_root_to_web_client=True):
