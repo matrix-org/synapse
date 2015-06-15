@@ -1,17 +1,22 @@
+Changes in synapse v0.9.2-r2 (2015-06-15)
+=========================================
+
+Fix packaging so that schema delta python files get included in the package.
+
 Changes in synapse v0.9.2 (2015-06-12)
 ======================================
 
 General:
 
-* Use ultrajson for json deserialisation, and for serialisation when a
-  canonical encoding is not required. Ultrajson is significantly faster
-  than simplejson in some circumstances.
+* Use ultrajson for json (de)serialisation when a canonical encoding is not
+  required. Ultrajson is significantly faster than simplejson in certain
+  circumstances.
 * Use connection pools for outgoing HTTP connections.
 * Process thumbnails on separate threads.
 
 Configuration:
 
-* Add option to disable HTTP response compression.
+* Add option, ``gzip_responses``, to disable HTTP response compression.
 
 Federation:
 
