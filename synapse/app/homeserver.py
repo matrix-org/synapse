@@ -63,6 +63,7 @@ import synapse
 
 import logging
 import os
+import re
 import resource
 import subprocess
 
@@ -433,9 +434,34 @@ class SynapseService(service.Service):
         return self._port.stopListening()
 
 
-class XForwardedForRequest(Request):
-    def __init__(self, *args, **kw):
+class SynapseRequest(Request):
+    def __init__(self, site_tag, *args, **kw):
         Request.__init__(self, *args, **kw)
+        self.site_tag = site_tag
+        self.authenticated_entity = None
+
+    def __repr__(self):
+        # We overwrite this so that we don't log ``access_token``
+        return '<%s at 0x%x method=%s uri=%s clientproto=%s site=%s>' % (
+            self.__class__.__name__,
+            id(self),
+            self.method,
+            self.get_redacted_uri(),
+            self.clientproto,
+            self.site_tag,
+        )
+
+    def get_redacted_uri(self):
+        return re.sub(
+            r'(\?.*access_token=)[^&]*(.*)$',
+            r'\1<redacted>\2',
+            self.uri
+        )
+
+
+class XForwardedForRequest(SynapseRequest):
+    def __init__(self, *args, **kw):
+        SynapseRequest.__init__(self, *args, **kw)
 
     """
     Add a layer on top of another request that only uses the value of an
@@ -451,8 +477,16 @@ class XForwardedForRequest(Request):
             b"x-forwarded-for", [b"-"])[0].split(b",")[0].strip()
 
 
-def XForwardedFactory(*args, **kwargs):
-    return XForwardedForRequest(*args, **kwargs)
+class SynapseRequestFactory(object):
+    def __init__(self, site_tag, x_forwarded_for):
+        self.site_tag = site_tag
+        self.x_forwarded_for = x_forwarded_for
+
+    def __call__(self, *args, **kwargs):
+        if self.x_forwarded_for:
+            return XForwardedForRequest(self.site_tag, *args, **kwargs)
+        else:
+            return SynapseRequest(self.site_tag, *args, **kwargs)
 
 
 class SynapseSite(Site):
@@ -462,8 +496,11 @@ class SynapseSite(Site):
     """
     def __init__(self, logger_name, config, resource, *args, **kwargs):
         Site.__init__(self, resource, *args, **kwargs)
-        if config.get("x_forwarded", False):
-            self.requestFactory = XForwardedFactory
+
+        proxied = config.get("x_forwarded", False)
+        self.requestFactory = SynapseRequestFactory(None, proxied)
+
+        if proxied:
             self._log_formatter = proxiedLogFormatter
         else:
             self._log_formatter = combinedLogFormatter

@@ -32,7 +32,6 @@ from twisted.web.util import redirectTo
 
 import collections
 import logging
-import re
 import urllib
 
 logger = logging.getLogger(__name__)
@@ -83,18 +82,11 @@ def request_handler(request_handler):
             code = None
             start = self.clock.time_msec()
             try:
-                request_uri = request.uri
-
-                # Don't log access_tokens
-                request_uri = re.sub(
-                    r'(\?.*access_token=)[^&]*(.*)$',
-                    r'\1<redacted>\2',
-                    request_uri
-                )
-
                 logger.info(
                     "%s - Received request: %s %s",
-                    request.getClientIP(), request.method, request_uri
+                    request.getClientIP(),
+                    request.method,
+                    request.get_redacted_uri()
                 )
                 d = request_handler(self, request)
                 with PreserveLoggingContext():
