@@ -396,20 +396,20 @@ class MessageHandler(BaseHandler):
         ]
 
         presence_handler = self.hs.get_handlers().presence_handler
-        presence = []
-        for m in room_members:
-            try:
-                member_presence = yield presence_handler.get_state(
+        presence_defs = yield defer.DeferredList(
+            [
+                presence_handler.get_state(
                     target_user=UserID.from_string(m.user_id),
                     auth_user=auth_user,
                     as_event=True,
                     check_auth=False,
                 )
-                presence.append(member_presence)
-            except SynapseError:
-                logger.exception(
-                    "Failed to get member presence of %r", m.user_id
-                )
+                for m in room_members
+            ],
+            consumeErrors=True,
+        )
+
+        presence = [p for success, p in presence_defs if success]
 
         time_now = self.clock.time_msec()
 
