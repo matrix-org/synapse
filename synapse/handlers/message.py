@@ -403,6 +403,7 @@ class MessageHandler(BaseHandler):
                     target_user=UserID.from_string(m.user_id),
                     auth_user=auth_user,
                     as_event=True,
+                    check_auth=False,
                 )
                 presence.append(member_presence)
             except SynapseError:
