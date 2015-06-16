@@ -41,6 +41,7 @@ class PresenceStore(SQLBaseStore):
             keyvalues={"user_id": user_localpart},
             retcols=["state", "status_msg", "mtime"],
             desc="get_presence_state",
+            allow_none=True,
         )
 
     def set_presence_state(self, user_localpart, new_state):
