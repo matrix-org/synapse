@@ -21,6 +21,7 @@ from synapse.types import StreamToken
 import synapse.metrics
 
 import logging
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -46,8 +47,9 @@ class _NotificationListener(object):
     notify the handler it is sufficient to resolve the deferred.
     """
 
-    def __init__(self, deferred):
+    def __init__(self, deferred, timeout):
         self.deferred = deferred
+        self.created = int(time.time() * 1000)
 
     def notified(self):
         return self.deferred.called
@@ -308,7 +310,7 @@ class Notifier(object):
         else:
             current_token = user_stream.current_token
 
-        listener = [_NotificationListener(deferred)]
+        listener = [_NotificationListener(deferred, timeout)]
 
         if timeout and not current_token.is_after(from_token):
             user_stream.listeners.add(listener[0])
@@ -341,7 +343,7 @@ class Notifier(object):
             while not result and not timed_out[0]:
                 new_token = yield deferred
                 deferred = defer.Deferred()
-                listener[0] = _NotificationListener(deferred)
+                listener[0] = _NotificationListener(deferred, timeout)
                 user_stream.listeners.add(listener[0])
                 result = yield callback(current_token, new_token)
                 current_token = new_token
