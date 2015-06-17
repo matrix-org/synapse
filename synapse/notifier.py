@@ -99,7 +99,10 @@ class _NotifierUserStream(object):
             listeners = self.listeners
             self.listeners = set()
             for listener in listeners:
-                listener.notify(self.current_token)
+                try:
+                    listener.notify(self.current_token)
+                except:
+                    logger.exception("Failed to notify listener")
 
     def remove(self, notifier):
         """ Remove this listener from all the indexes in the Notifier
