@@ -58,6 +58,49 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
+    def test_query_user_exists_unknown_user(self):
+        user_id = "@someone:anywhere"
+        services = [self._mkservice(is_interested=True)]
+        services[0].is_interested_in_user = Mock(return_value=True)
+        self.mock_store.get_app_services = Mock(return_value=services)
+        self.mock_store.get_user_by_id = Mock(return_value=None)
+
+        event = Mock(
+            sender=user_id,
+            type="m.room.message",
+            room_id="!foo:bar"
+        )
+        self.mock_as_api.push = Mock()
+        self.mock_as_api.query_user = Mock()
+        yield self.handler.notify_interested_services(event)
+        self.mock_as_api.query_user.assert_called_once_with(
+            services[0], user_id
+        )
+
+    @defer.inlineCallbacks
+    def test_query_user_exists_known_user(self):
+        user_id = "@someone:anywhere"
+        services = [self._mkservice(is_interested=True)]
+        services[0].is_interested_in_user = Mock(return_value=True)
+        self.mock_store.get_app_services = Mock(return_value=services)
+        self.mock_store.get_user_by_id = Mock(return_value={
+            "name": user_id
+        })
+
+        event = Mock(
+            sender=user_id,
+            type="m.room.message",
+            room_id="!foo:bar"
+        )
+        self.mock_as_api.push = Mock()
+        self.mock_as_api.query_user = Mock()
+        yield self.handler.notify_interested_services(event)
+        self.assertFalse(
+            self.mock_as_api.query_user.called,
+            "query_user called when it shouldn't have been."
+        )
+
+    @defer.inlineCallbacks
     def test_query_room_alias_exists(self):
         room_alias_str = "#foo:bar"
         room_alias = Mock()
