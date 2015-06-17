@@ -50,6 +50,7 @@ class _NotificationListener(object):
     def __init__(self, deferred, timeout):
         self.deferred = deferred
         self.created = int(time.time() * 1000)
+        self.timeout = timeout
 
     def notified(self):
         return self.deferred.called
