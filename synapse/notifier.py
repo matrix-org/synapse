@@ -314,10 +314,10 @@ class Notifier(object):
         else:
             current_token = user_stream.current_token
 
-        listener = [_NotificationListener(deferred, timeout)]
+        listeners = [_NotificationListener(deferred, timeout)]
 
         if timeout and not current_token.is_after(from_token):
-            user_stream.listeners.add(listener[0])
+            user_stream.listeners.update(listeners)
 
         if current_token.is_after(from_token):
             result = yield callback(from_token, current_token)
@@ -327,7 +327,7 @@ class Notifier(object):
         timer = [None]
 
         if result:
-            user_stream.listeners.discard(listener[0])
+            user_stream.listeners.difference_update(listeners)
             defer.returnValue(result)
             return
 
@@ -337,8 +337,9 @@ class Notifier(object):
             def _timeout_listener():
                 timed_out[0] = True
                 timer[0] = None
-                user_stream.listeners.discard(listener[0])
-                listener[0].notify(current_token)
+                user_stream.listeners.difference_update(listeners)
+                for listener in listeners:
+                    listener.notify(current_token)
 
             # We create multiple notification listeners so we have to manage
             # canceling the timeout ourselves.
@@ -346,9 +347,12 @@ class Notifier(object):
 
             while not result and not timed_out[0]:
                 new_token = yield deferred
+
                 deferred = defer.Deferred()
-                listener[0] = _NotificationListener(deferred, timeout)
-                user_stream.listeners.add(listener[0])
+                listener = _NotificationListener(deferred, timeout)
+                listeners.append(listener)
+                user_stream.listeners.add(listener)
+
                 result = yield callback(current_token, new_token)
                 current_token = new_token
 
