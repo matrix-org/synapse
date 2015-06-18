@@ -77,6 +77,14 @@ class RoomCreationHandler(BaseHandler):
 
         is_public = config.get("visibility", None) == "public"
 
+        # By default, all public-joinable rooms are published. Allow overriding
+        # that decision.
+        # TODO(paul): Specify 'published' key
+        if "published" in config:
+            published = config["published"]
+        else:
+            published = is_public
+
         if room_id:
             # Ensure room_id is the correct type
             room_id_obj = RoomID.from_string(room_id)
@@ -86,7 +94,7 @@ class RoomCreationHandler(BaseHandler):
             yield self.store.store_room(
                 room_id=room_id,
                 room_creator_user_id=user_id,
-                is_public=is_public
+                published=published,
             )
         else:
             # autogen room IDs and try to create it. We may clash, so just
@@ -103,7 +111,7 @@ class RoomCreationHandler(BaseHandler):
                     yield self.store.store_room(
                         room_id=gen_room_id.to_string(),
                         room_creator_user_id=user_id,
-                        is_public=is_public
+                        published=published,
                     )
                     room_id = gen_room_id.to_string()
                     break

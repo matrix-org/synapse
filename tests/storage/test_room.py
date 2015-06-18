@@ -39,7 +39,7 @@ class RoomStoreTestCase(unittest.TestCase):
 
         yield self.store.store_room(self.room.to_string(),
             room_creator_user_id=self.u_creator.to_string(),
-            is_public=True
+            published=True,
         )
 
     @defer.inlineCallbacks
@@ -91,7 +91,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
         yield self.store.store_room(self.room.to_string(),
             room_creator_user_id="@creator:text",
-            is_public=True
+            published=False,
         )
 
     @defer.inlineCallbacks

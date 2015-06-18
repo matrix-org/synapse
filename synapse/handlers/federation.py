@@ -189,7 +189,7 @@ class FederationHandler(BaseHandler):
                 yield self.store.store_room(
                     room_id=event.room_id,
                     room_creator_user_id="",
-                    is_public=False,
+                    published=False,
                 )
             except StoreError:
                 logger.exception("Failed to store room.")
@@ -594,7 +594,7 @@ class FederationHandler(BaseHandler):
                 yield self.store.store_room(
                     room_id=room_id,
                     room_creator_user_id="",
-                    is_public=False
+                    published=False,
                 )
             except:
                 # FIXME

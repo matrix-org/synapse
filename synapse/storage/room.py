@@ -34,14 +34,14 @@ OpsLevel = collections.namedtuple(
 class RoomStore(SQLBaseStore):
 
     @defer.inlineCallbacks
-    def store_room(self, room_id, room_creator_user_id, is_public):
+    def store_room(self, room_id, room_creator_user_id, published):
         """Stores a room.
 
         Args:
             room_id (str): The desired room ID, can be None.
             room_creator_user_id (str): The user ID of the room creator.
-            is_public (bool): True to indicate that this room should appear in
-            public room lists.
+            published (bool): True to indicate that this room should appear in
+                published room lists.
         Raises:
             StoreError if the room could not be stored.
         """
@@ -51,7 +51,8 @@ class RoomStore(SQLBaseStore):
                 {
                     "room_id": room_id,
                     "creator": room_creator_user_id,
-                    "is_public": is_public,
+                    # TODO(paul): rename this table in the SQL schema
+                    "is_public": published,
                 },
                 desc="store_room",
             )
