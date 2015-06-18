@@ -86,11 +86,9 @@ class RoomStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_rooms(self, is_public):
-        """Retrieve a list of all public rooms.
+    def get_published_rooms(self):
+        """Retrieve a list of all published rooms.
 
-        Args:
-            is_public (bool): True if the rooms returned should be public.
         Returns:
             A list of room dicts containing at least a "room_id" key, a
             "topic" key if one is set, and a "name" key if one is set
@@ -119,14 +117,14 @@ class RoomStore(SQLBaseStore):
                 " FROM rooms AS r"
                 " LEFT JOIN (%(topic)s) AS t ON t.room_id = r.room_id"
                 " LEFT JOIN (%(name)s) AS n ON n.room_id = r.room_id"
-                " WHERE r.is_public = ?"
+                " WHERE r.is_public"
                 " GROUP BY r.room_id"
             ) % {
                 "topic": topic_subquery,
                 "name": name_subquery,
             }
 
-            txn.execute(sql, (is_public,))
+            txn.execute(sql)
 
             rows = txn.fetchall()
 

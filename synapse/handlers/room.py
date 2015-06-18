@@ -533,7 +533,7 @@ class RoomListHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_published_rooms(self):
-        chunk = yield self.store.get_rooms(is_public=True)
+        chunk = yield self.store.get_published_rooms()
         results = yield defer.gatherResults(
             [
                 self.store.get_users_in_room(room["room_id"])

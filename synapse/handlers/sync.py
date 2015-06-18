@@ -147,8 +147,7 @@ class SyncHandler(BaseHandler):
             membership_list=[Membership.INVITE, Membership.JOIN]
         )
 
-        # TODO (mjark): Does public mean "published"?
-        published_rooms = yield self.store.get_rooms(is_public=True)
+        published_rooms = yield self.store.get_published_rooms()
         published_room_ids = set(r["room_id"] for r in published_rooms)
 
         rooms = []
@@ -231,8 +230,7 @@ class SyncHandler(BaseHandler):
         rm_handler = self.hs.get_handlers().room_member_handler
         room_ids = yield rm_handler.get_joined_rooms_for_user(sync_config.user)
 
-        # TODO (mjark): Does public mean "published"?
-        published_rooms = yield self.store.get_rooms(is_public=True)
+        published_rooms = yield self.store.get_published_rooms()
         published_room_ids = set(r["room_id"] for r in published_rooms)
 
         room_events, _ = yield self.store.get_room_events_stream(

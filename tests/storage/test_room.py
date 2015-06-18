@@ -52,10 +52,10 @@ class RoomStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_get_rooms(self):
-        # get_rooms does an INNER JOIN on the room_aliases table :(
+    def test_get_published_rooms(self):
+        # get_published_rooms does an INNER JOIN on the room_aliases table :(
 
-        rooms = yield self.store.get_rooms(is_public=True)
+        rooms = yield self.store.get_published_rooms()
         # Should be empty before we add the alias
         self.assertEquals([], rooms)
 
@@ -65,7 +65,7 @@ class RoomStoreTestCase(unittest.TestCase):
             servers=["test"]
         )
 
-        rooms = yield self.store.get_rooms(is_public=True)
+        rooms = yield self.store.get_published_rooms()
 
         self.assertEquals(1, len(rooms))
         self.assertEquals({
