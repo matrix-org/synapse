@@ -278,7 +278,7 @@ class MessageHandler(BaseHandler):
             user, pagination_config.get_source_config("presence"), None
         )
 
-        public_room_ids = yield self.store.get_public_room_ids()
+        published_room_ids = yield self.store.get_published_room_ids()
 
         limit = pagin_config.limit
         if limit is None:
@@ -290,7 +290,8 @@ class MessageHandler(BaseHandler):
                 "room_id": event.room_id,
                 "membership": event.membership,
                 "visibility": (
-                    "public" if event.room_id in public_room_ids
+                    # TODO(paul): This should be specified as "published"
+                    "public" if event.room_id in published_room_ids
                     else "private"
                 ),
             }
