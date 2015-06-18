@@ -558,6 +558,70 @@ class RoomsCreateTestCase(RestTestCase):
         self.assertEquals(200, code)
         self.assertTrue("room_id" in response)
 
+        (code, response) = yield self.mock_resource.trigger(
+            "GET",
+            "/publicRooms",
+            "")
+        self.assertEquals(200, code)
+        self.assertEquals({
+            "start": "START",
+            "end": "END",
+            "chunk": [],
+        }, response)
+
+    @defer.inlineCallbacks
+    def test_post_room_visibility_public_key(self):
+        (code, response) = yield self.mock_resource.trigger(
+            "POST",
+            "/createRoom",
+            '{"visibility":"public", '
+            '"room_alias_name": "my-alias-test"}')
+        self.assertEquals(200, code)
+        self.assertTrue("room_id" in response)
+
+        room_id = response["room_id"]
+
+        (code, response) = yield self.mock_resource.trigger(
+            "GET",
+            "/publicRooms",
+            "")
+        self.assertEquals(200, code)
+        self.assertEquals({
+            "chunk": [
+                {
+                    "room_id": room_id,
+                    "name": None,
+                    "topic": None,
+                    "num_joined_members": 1,
+                    "aliases": ["#my-alias-test:red"],
+                },
+            ],
+            "start": "START",
+            "end": "END",
+        }, response)
+
+    @defer.inlineCallbacks
+    def test_post_room_visibility_public_unpublished_key(self):
+        (code, response) = yield self.mock_resource.trigger(
+            "POST",
+            "/createRoom",
+            '{"visibility":"public", '
+            '"room_alias_name": "my-alias-test", '
+            '"published": false}')
+        self.assertEquals(200, code)
+        self.assertTrue("room_id" in response)
+
+        (code, response) = yield self.mock_resource.trigger(
+            "GET",
+            "/publicRooms",
+            "")
+        self.assertEquals(200, code)
+        self.assertEquals({
+            "chunk": [],
+            "start": "START",
+            "end": "END",
+        }, response)
+
     @defer.inlineCallbacks
     def test_post_room_custom_key(self):
         # POST with custom config keys, expect new room id
