@@ -350,13 +350,14 @@ class Notifier(object):
             while not result and not timed_out[0]:
                 new_token = yield deferred
 
-                deferred = defer.Deferred()
-                listener = _NotificationListener(deferred, timeout)
-                listeners.append(listener)
-                user_stream.listeners.add(listener)
-
                 result = yield callback(current_token, new_token)
                 current_token = new_token
+
+                if not result:
+                    deferred = defer.Deferred()
+                    listener = _NotificationListener(deferred, timeout)
+                    listeners.append(listener)
+                    user_stream.listeners.add(listener)
 
         if timer[0] is not None:
             try:
