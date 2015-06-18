@@ -48,13 +48,7 @@ class _NotificationListener(object):
     __slots__ = ["deferred"]
 
     def __init__(self, deferred):
-        object.__setattr__(self, "deferred", deferred)
-
-    def __getattr__(self, name):
-        return getattr(self.deferred, name)
-
-    def __setattr__(self, name, value):
-        setattr(self.deferred, name, value)
+        self.deferred = deferred
 
 
 class _NotifierUserStream(object):
@@ -313,14 +307,12 @@ class Notifier(object):
         if timeout:
             listener = None
             timer = self.clock.call_later(
-                timeout/1000., lambda: listener.cancel()
+                timeout/1000., lambda: listener.deferred.cancel()
             )
 
             prev_token = from_token
             while not result:
                 try:
-                    # We need to start listening to the streams *before* doing
-                    # the callback, as otherwise we may miss something.
                     current_token = user_stream.current_token
 
                     result = yield callback(prev_token, current_token)
