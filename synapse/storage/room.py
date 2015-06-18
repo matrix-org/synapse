@@ -145,7 +145,7 @@ class RoomStore(SQLBaseStore):
             return rows
 
         rows = yield self.runInteraction(
-            "get_rooms", f
+            "get_published_rooms", f
         )
 
         ret = [
