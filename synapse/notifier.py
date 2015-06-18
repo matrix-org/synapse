@@ -305,8 +305,9 @@ class Notifier(object):
 
         result = None
         if timeout:
-            listener = None  # Will be set to a _NotificationListener that
-                             # we'll be waiting on. Allows us to cancel it.
+            # Will be set to a _NotificationListener that we'll be waiting on.
+            # Allows us to cancel it.
+            listener = None
 
             def timed_out():
                 if listener:
