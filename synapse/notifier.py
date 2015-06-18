@@ -51,6 +51,7 @@ class _NotificationListener(object):
         self.deferred = deferred
         self.created = int(time.time() * 1000)
         self.timeout = timeout
+        self.notified = False
 
     def notified(self):
         return self.deferred.called
@@ -58,6 +59,7 @@ class _NotificationListener(object):
     def notify(self, token):
         """ Inform whoever is listening about the new events.
         """
+        self.notified = True
         try:
             self.deferred.callback(token)
         except defer.AlreadyCalledError:
