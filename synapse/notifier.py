@@ -305,10 +305,13 @@ class Notifier(object):
 
         result = None
         if timeout:
-            listener = None
-            timer = self.clock.call_later(
-                timeout/1000., lambda: listener.deferred.cancel()
-            )
+            listener = None  # Will be set to a _NotificationListener that
+                             # we'll be waiting on. Allows us to cancel it.
+
+            def timed_out():
+                if listener:
+                    listener.deferred.cancel()
+            timer = self.clock.call_later(timeout/1000., timed_out)
 
             prev_token = from_token
             while not result:
@@ -319,6 +322,10 @@ class Notifier(object):
                     if result:
                         break
 
+                    # Now we wait for the _NotifierUserStream to be told there
+                    # is a new token.
+                    # We need to supply the token we supplied to callback so
+                    # that we don't miss any current_token updates.
                     prev_token = current_token
                     listener = user_stream.new_listener(prev_token)
                     yield listener.deferred
