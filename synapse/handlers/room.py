@@ -532,7 +532,7 @@ class RoomMemberHandler(BaseHandler):
 class RoomListHandler(BaseHandler):
 
     @defer.inlineCallbacks
-    def get_public_room_list(self):
+    def get_published_rooms(self):
         chunk = yield self.store.get_rooms(is_public=True)
         results = yield defer.gatherResults(
             [

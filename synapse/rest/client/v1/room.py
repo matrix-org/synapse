@@ -273,12 +273,13 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
 # TODO: Needs unit testing
 class PublicRoomListRestServlet(ClientV1RestServlet):
+    # TODO(paul): Can't rename this now but 'v2 ought to call this publishedRooms
     PATTERN = client_path_pattern("/publicRooms$")
 
     @defer.inlineCallbacks
     def on_GET(self, request):
         handler = self.handlers.room_list_handler
-        data = yield handler.get_public_room_list()
+        data = yield handler.get_published_rooms()
         defer.returnValue((200, data))
 
 
