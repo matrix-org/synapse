@@ -35,11 +35,13 @@ from syutil.crypto.jsonsign import sign_json
 
 import simplejson as json
 import logging
+import sys
 import urllib
 import urlparse
 
 
 logger = logging.getLogger(__name__)
+outbound_logger = logging.getLogger("synapse.http.outbound")
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
@@ -109,6 +111,8 @@ class MatrixFederationHttpClient(object):
         self.clock = hs.get_clock()
         self.version_string = hs.version_string
 
+        self._next_id = 1
+
     @defer.inlineCallbacks
     def _create_request(self, destination, method, path_bytes,
                         body_callback, headers_dict={}, param_bytes=b"",
@@ -123,8 +127,13 @@ class MatrixFederationHttpClient(object):
             ("", "", path_bytes, param_bytes, query_bytes, "",)
         )
 
-        logger.info("Sending request to %s: %s %s",
-                    destination, method, url_bytes)
+        txn_id = "%s-%s" % (method, self._next_id)
+        self._next_id = (self._next_id + 1) % (sys.maxint - 1)
+
+        outbound_logger.info(
+            "{%s} [%s] Sending request: %s %s",
+            txn_id, destination, method, url_bytes
+        )
 
         logger.debug(
             "Types: %s",
@@ -141,63 +150,72 @@ class MatrixFederationHttpClient(object):
 
         endpoint = self._getEndpoint(reactor, destination)
 
-        while True:
-            producer = None
-            if body_callback:
-                producer = body_callback(method, url_bytes, headers_dict)
+        log_result = None
+        try:
+            while True:
+                producer = None
+                if body_callback:
+                    producer = body_callback(method, url_bytes, headers_dict)
 
-            try:
-                request_deferred = preserve_context_over_fn(
-                    self.agent.request,
-                    destination,
-                    endpoint,
-                    method,
-                    path_bytes,
-                    param_bytes,
-                    query_bytes,
-                    Headers(headers_dict),
-                    producer
-                )
-
-                response = yield self.clock.time_bound_deferred(
-                    request_deferred,
-                    time_out=timeout/1000. if timeout else 60,
-                )
-
-                logger.debug("Got response to %s", method)
-                break
-            except Exception as e:
-                if not retry_on_dns_fail and isinstance(e, DNSLookupError):
-                    logger.warn(
-                        "DNS Lookup failed to %s with %s",
+                try:
+                    request_deferred = preserve_context_over_fn(
+                        self.agent.request,
                         destination,
-                        e
+                        endpoint,
+                        method,
+                        path_bytes,
+                        param_bytes,
+                        query_bytes,
+                        Headers(headers_dict),
+                        producer
                     )
-                    raise
 
-                logger.warn(
-                    "Sending request failed to %s: %s %s: %s - %s",
-                    destination,
-                    method,
-                    url_bytes,
-                    type(e).__name__,
-                    _flatten_response_never_received(e),
-                )
+                    response = yield self.clock.time_bound_deferred(
+                        request_deferred,
+                        time_out=timeout/1000. if timeout else 60,
+                    )
 
-                if retries_left and not timeout:
-                    yield sleep(2 ** (5 - retries_left))
-                    retries_left -= 1
-                else:
-                    raise
+                    logger.debug("{%s} Got response to %s", txn_id, method)
+                    log_result = "%d %s" % (response.code, response.phrase,)
+                    break
+                except Exception as e:
+                    if not retry_on_dns_fail and isinstance(e, DNSLookupError):
+                        logger.warn(
+                            "DNS Lookup failed to %s with %s",
+                            destination,
+                            e
+                        )
+                        log_result = "DNS Lookup failed to %s with %s" % (
+                            destination, e
+                        )
+                        raise
 
-        logger.info(
-            "Received response %d %s for %s: %s %s",
-            response.code,
-            response.phrase,
-            destination,
-            method,
-            url_bytes
-        )
+                    logger.warn(
+                        "{%s} Sending request failed to %s: %s %s: %s - %s",
+                        txn_id,
+                        destination,
+                        method,
+                        url_bytes,
+                        type(e).__name__,
+                        _flatten_response_never_received(e),
+                    )
+
+                    log_result = "%s - %s" % (
+                        type(e).__name__, _flatten_response_never_received(e),
+                    )
+
+                    if retries_left and not timeout:
+                        yield sleep(2 ** (5 - retries_left))
+                        retries_left -= 1
+                    else:
+                        raise
+        finally:
+            outbound_logger.info(
+                "{%s} [%s] Result: %s",
+                txn_id,
+                destination,
+                log_result,
+            )
 
         if 200 <= response.code < 300:
             pass
