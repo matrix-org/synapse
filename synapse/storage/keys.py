@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from _base import SQLBaseStore
+from _base import SQLBaseStore, cached
 
 from twisted.internet import defer
 
@@ -71,6 +71,25 @@ class KeyStore(SQLBaseStore):
             desc="store_server_certificate",
         )
 
+    @cached(num_args=2)
+    @defer.inlineCallbacks
+    def get_server_verify_key(self, server_name, key_id):
+        key_bytes = yield self._simple_select_one_onecol(
+            table="server_signature_keys",
+            keyvalues={
+                "server_name": server_name,
+                "key_id": key_id
+            },
+            retcol="verify_key",
+            desc="get_server_verify_key",
+            allow_none=True,
+        )
+
+        if key_bytes:
+            defer.returnValue(decode_verify_key_bytes(key_id, str(key_bytes)))
+        else:
+            defer.returnValue(None)
+
     @defer.inlineCallbacks
     def get_server_verify_keys(self, server_name, key_ids):
         """Retrieve the NACL verification key for a given server for the given
@@ -99,6 +118,7 @@ class KeyStore(SQLBaseStore):
             keys.append(key)
         defer.returnValue(keys)
 
+    @defer.inlineCallbacks
     def store_server_verify_key(self, server_name, from_server, time_now_ms,
                                 verify_key):
         """Stores a NACL verification key for the given server.
@@ -109,11 +129,12 @@ class KeyStore(SQLBaseStore):
             ts_now_ms (int): The time now in milliseconds
             verification_key (VerifyKey): The NACL verify key.
         """
-        return self._simple_upsert(
+        key_id = "%s:%s" % (verify_key.alg, verify_key.version)
+        yield self._simple_upsert(
             table="server_signature_keys",
             keyvalues={
                 "server_name": server_name,
-                "key_id": "%s:%s" % (verify_key.alg, verify_key.version),
+                "key_id": key_id,
             },
             values={
                 "from_server": from_server,
@@ -122,6 +143,8 @@ class KeyStore(SQLBaseStore):
             },
             desc="store_server_verify_key",
         )
+
+        self.get_server_verify_key.invalidate(server_name, key_id)
 
     def store_server_keys_json(self, server_name, key_id, from_server,
                                ts_now_ms, ts_expires_ms, key_json_bytes):
