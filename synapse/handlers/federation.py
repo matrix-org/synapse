@@ -1066,14 +1066,24 @@ class FederationHandler(BaseHandler):
     @log_function
     def do_auth(self, origin, event, context, auth_events):
         # Check if we have all the auth events.
-        have_events = yield self.store.have_events(
-            [e_id for e_id, _ in event.auth_events]
-        )
-
+        current_state = set(e.event_id for e in auth_events.values())
         event_auth_events = set(e_id for e_id, _ in event.auth_events)
+
+        if event_auth_events - current_state:
+            have_events = yield self.store.have_events(
+                event_auth_events - current_state
+            )
+        else:
+            have_events = {}
+
+        have_events.update({
+            e.event_id: ""
+            for e in auth_events.values()
+        })
+
         seen_events = set(have_events.keys())
 
-        missing_auth = event_auth_events - seen_events
+        missing_auth = event_auth_events - seen_events - current_state
 
         if missing_auth:
             logger.info("Missing auth: %s", missing_auth)
