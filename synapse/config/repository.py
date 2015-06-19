@@ -21,12 +21,17 @@ class ContentRepositoryConfig(Config):
         self.max_upload_size = self.parse_size(config["max_upload_size"])
         self.max_image_pixels = self.parse_size(config["max_image_pixels"])
         self.media_store_path = self.ensure_directory(config["media_store_path"])
+        self.uploads_path = self.ensure_directory(config["uploads_path"])
 
     def default_config(self, config_dir_path, server_name):
         media_store = self.default_path("media_store")
+        uploads_path = self.default_path("uploads")
         return """
         # Directory where uploaded images and attachments are stored.
         media_store_path: "%(media_store)s"
+
+        # Directory where in-progress uploads are stored.
+        uploads_path: "%(uploads_path)s"
 
         # The largest allowed upload size in bytes
         max_upload_size: "10M"

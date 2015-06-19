@@ -370,6 +370,8 @@ class Auth(object):
                     user_agent=user_agent
                 )
 
+            request.authenticated_entity = user.to_string()
+
             defer.returnValue((user, ClientInfo(device_id, token_id)))
         except KeyError:
             raise AuthError(

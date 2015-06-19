@@ -35,7 +35,6 @@ from twisted.enterprise import adbapi
 from twisted.web.resource import Resource, EncodingResourceWrapper
 from twisted.web.static import File
 from twisted.web.server import Site, GzipEncoderFactory, Request
-from twisted.web.http import proxiedLogFormatter, combinedLogFormatter
 from synapse.http.server import JsonResource, RootRedirect
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
@@ -61,10 +60,13 @@ import twisted.manhole.telnet
 
 import synapse
 
+import contextlib
 import logging
 import os
+import re
 import resource
 import subprocess
+import time
 
 
 logger = logging.getLogger("synapse.app.homeserver")
@@ -112,7 +114,7 @@ class SynapseHomeServer(HomeServer):
 
     def build_resource_for_content_repo(self):
         return ContentRepoResource(
-            self, self.upload_dir, self.auth, self.content_addr
+            self, self.config.uploads_path, self.auth, self.content_addr
         )
 
     def build_resource_for_media_repository(self):
@@ -142,6 +144,7 @@ class SynapseHomeServer(HomeServer):
         port = listener_config["port"]
         bind_address = listener_config.get("bind_address", "")
         tls = listener_config.get("tls", False)
+        site_tag = listener_config.get("tag", port)
 
         if tls and config.no_tls:
             return
@@ -197,7 +200,8 @@ class SynapseHomeServer(HomeServer):
             reactor.listenSSL(
                 port,
                 SynapseSite(
-                    "synapse.access.https",
+                    "synapse.access.https.%s" % (site_tag,),
+                    site_tag,
                     listener_config,
                     root_resource,
                 ),
@@ -208,7 +212,8 @@ class SynapseHomeServer(HomeServer):
             reactor.listenTCP(
                 port,
                 SynapseSite(
-                    "synapse.access.https",
+                    "synapse.access.http.%s" % (site_tag,),
+                    site_tag,
                     listener_config,
                     root_resource,
                 ),
@@ -375,7 +380,6 @@ def setup(config_options):
 
     hs = SynapseHomeServer(
         config.server_name,
-        upload_dir=os.path.abspath("uploads"),
         db_config=config.database_config,
         tls_context_factory=tls_context_factory,
         config=config,
@@ -433,9 +437,70 @@ class SynapseService(service.Service):
         return self._port.stopListening()
 
 
-class XForwardedForRequest(Request):
-    def __init__(self, *args, **kw):
+class SynapseRequest(Request):
+    def __init__(self, site, *args, **kw):
         Request.__init__(self, *args, **kw)
+        self.site = site
+        self.authenticated_entity = None
+        self.start_time = 0
+
+    def __repr__(self):
+        # We overwrite this so that we don't log ``access_token``
+        return '<%s at 0x%x method=%s uri=%s clientproto=%s site=%s>' % (
+            self.__class__.__name__,
+            id(self),
+            self.method,
+            self.get_redacted_uri(),
+            self.clientproto,
+            self.site.site_tag,
+        )
+
+    def get_redacted_uri(self):
+        return re.sub(
+            r'(\?.*access_token=)[^&]*(.*)$',
+            r'\1<redacted>\2',
+            self.uri
+        )
+
+    def get_user_agent(self):
+        return self.requestHeaders.getRawHeaders("User-Agent", [None])[-1]
+
+    def started_processing(self):
+        self.site.access_logger.info(
+            "%s - %s - Received request: %s %s",
+            self.getClientIP(),
+            self.site.site_tag,
+            self.method,
+            self.get_redacted_uri()
+        )
+        self.start_time = int(time.time() * 1000)
+
+    def finished_processing(self):
+        self.site.access_logger.info(
+            "%s - %s - {%s}"
+            " Processed request: %dms %sB %s \"%s %s %s\" \"%s\"",
+            self.getClientIP(),
+            self.site.site_tag,
+            self.authenticated_entity,
+            int(time.time() * 1000) - self.start_time,
+            self.sentLength,
+            self.code,
+            self.method,
+            self.get_redacted_uri(),
+            self.clientproto,
+            self.get_user_agent(),
+        )
+
+    @contextlib.contextmanager
+    def processing(self):
+        self.started_processing()
+        yield
+        self.finished_processing()
+
+
+class XForwardedForRequest(SynapseRequest):
+    def __init__(self, *args, **kw):
+        SynapseRequest.__init__(self, *args, **kw)
 
     """
     Add a layer on top of another request that only uses the value of an
@@ -451,8 +516,16 @@ class XForwardedForRequest(Request):
             b"x-forwarded-for", [b"-"])[0].split(b",")[0].strip()
 
 
-def XForwardedFactory(*args, **kwargs):
-    return XForwardedForRequest(*args, **kwargs)
+class SynapseRequestFactory(object):
+    def __init__(self, site, x_forwarded_for):
+        self.site = site
+        self.x_forwarded_for = x_forwarded_for
+
+    def __call__(self, *args, **kwargs):
+        if self.x_forwarded_for:
+            return XForwardedForRequest(self.site, *args, **kwargs)
+        else:
+            return SynapseRequest(self.site, *args, **kwargs)
 
 
 class SynapseSite(Site):
@@ -460,18 +533,17 @@ class SynapseSite(Site):
     Subclass of a twisted http Site that does access logging with python's
     standard logging
     """
-    def __init__(self, logger_name, config, resource, *args, **kwargs):
+    def __init__(self, logger_name, site_tag, config, resource, *args, **kwargs):
         Site.__init__(self, resource, *args, **kwargs)
-        if config.get("x_forwarded", False):
-            self.requestFactory = XForwardedFactory
-            self._log_formatter = proxiedLogFormatter
-        else:
-            self._log_formatter = combinedLogFormatter
+
+        self.site_tag = site_tag
+
+        proxied = config.get("x_forwarded", False)
+        self.requestFactory = SynapseRequestFactory(self, proxied)
         self.access_logger = logging.getLogger(logger_name)
 
     def log(self, request):
-        line = self._log_formatter(self._logDateTime, request)
-        self.access_logger.info(line)
+        pass
 
 
 def create_resource_tree(desired_tree, redirect_root_to_web_client=True):
