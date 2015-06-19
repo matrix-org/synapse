@@ -104,7 +104,7 @@ class _NotifierUserStream(object):
             ).discard(self)
 
     def count_listeners(self):
-        return len(self.noify_deferred.observers())
+        return len(self.notify_deferred.observers())
 
     def new_listener(self, token):
         """Returns a deferred that is resolved when there is a new token
