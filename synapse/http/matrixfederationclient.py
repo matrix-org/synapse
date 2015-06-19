@@ -135,15 +135,6 @@ class MatrixFederationHttpClient(object):
             txn_id, destination, method, url_bytes
         )
 
-        logger.debug(
-            "Types: %s",
-            [
-                type(destination), type(method), type(path_bytes),
-                type(param_bytes),
-                type(query_bytes)
-            ]
-        )
-
         # XXX: Would be much nicer to retry only at the transaction-layer
         # (once we have reliable transactions in place)
         retries_left = 5
@@ -175,7 +166,6 @@ class MatrixFederationHttpClient(object):
                         time_out=timeout/1000. if timeout else 60,
                     )
 
-                    logger.debug("{%s} Got response to %s", txn_id, method)
                     log_result = "%d %s" % (response.code, response.phrase,)
                     break
                 except Exception as e:
