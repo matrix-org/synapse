@@ -109,7 +109,7 @@ class SimpleHttpClient(object):
             bodyProducer=FileBodyProducer(StringIO(query_bytes))
         )
 
-        body = yield readBody(response)
+        body = yield preserve_context_over_fn(readBody, response)
 
         defer.returnValue(json.loads(body))
 
@@ -128,7 +128,7 @@ class SimpleHttpClient(object):
             bodyProducer=FileBodyProducer(StringIO(json_str))
         )
 
-        body = yield readBody(response)
+        body = yield preserve_context_over_fn(readBody, response)
 
         defer.returnValue(json.loads(body))
 
@@ -161,7 +161,7 @@ class SimpleHttpClient(object):
             })
         )
 
-        body = yield readBody(response)
+        body = yield preserve_context_over_fn(readBody, response)
 
         if 200 <= response.code < 300:
             defer.returnValue(json.loads(body))
@@ -204,7 +204,7 @@ class SimpleHttpClient(object):
             bodyProducer=FileBodyProducer(StringIO(json_str))
         )
 
-        body = yield readBody(response)
+        body = yield preserve_context_over_fn(readBody, response)
 
         if 200 <= response.code < 300:
             defer.returnValue(json.loads(body))
@@ -238,7 +238,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
         )
 
         try:
-            body = yield readBody(response)
+            body = yield preserve_context_over_fn(readBody, response)
             defer.returnValue(body)
         except PartialDownloadError as e:
             # twisted dislikes google's response, no content length.

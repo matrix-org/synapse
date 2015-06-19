@@ -127,7 +127,7 @@ class MatrixFederationHttpClient(object):
             ("", "", path_bytes, param_bytes, query_bytes, "",)
         )
 
-        txn_id = "%s-%s" % (method, self._next_id)
+        txn_id = "%s-O-%s" % (method, self._next_id)
         self._next_id = (self._next_id + 1) % (sys.maxint - 1)
 
         outbound_logger.info(
@@ -139,7 +139,9 @@ class MatrixFederationHttpClient(object):
         # (once we have reliable transactions in place)
         retries_left = 5
 
-        endpoint = self._getEndpoint(reactor, destination)
+        endpoint = preserve_context_over_fn(
+            self._getEndpoint, reactor, destination
+        )
 
         log_result = None
         try:
@@ -149,21 +151,25 @@ class MatrixFederationHttpClient(object):
                     producer = body_callback(method, url_bytes, headers_dict)
 
                 try:
-                    request_deferred = preserve_context_over_fn(
-                        self.agent.request,
-                        destination,
-                        endpoint,
-                        method,
-                        path_bytes,
-                        param_bytes,
-                        query_bytes,
-                        Headers(headers_dict),
-                        producer
-                    )
+                    def send_request():
+                        request_deferred = self.agent.request(
+                            destination,
+                            endpoint,
+                            method,
+                            path_bytes,
+                            param_bytes,
+                            query_bytes,
+                            Headers(headers_dict),
+                            producer
+                        )
 
-                    response = yield self.clock.time_bound_deferred(
-                        request_deferred,
-                        time_out=timeout/1000. if timeout else 60,
+                        return self.clock.time_bound_deferred(
+                            request_deferred,
+                            time_out=timeout/1000. if timeout else 60,
+                        )
+
+                    response = yield preserve_context_over_fn(
+                        send_request,
                     )
 
                     log_result = "%d %s" % (response.code, response.phrase,)
@@ -212,7 +218,7 @@ class MatrixFederationHttpClient(object):
         else:
             # :'(
             # Update transactions table?
-            body = yield readBody(response)
+            body = yield preserve_context_over_fn(readBody, response)
             raise HttpResponseException(
                 response.code, response.phrase, body
             )
@@ -292,10 +298,7 @@ class MatrixFederationHttpClient(object):
                     "Content-Type not application/json"
                 )
 
-        logger.debug("Getting resp body")
-        body = yield readBody(response)
-        logger.debug("Got resp body")
-
+        body = yield preserve_context_over_fn(readBody, response)
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
@@ -338,9 +341,7 @@ class MatrixFederationHttpClient(object):
                     "Content-Type not application/json"
                 )
 
-        logger.debug("Getting resp body")
-        body = yield readBody(response)
-        logger.debug("Got resp body")
+        body = yield preserve_context_over_fn(readBody, response)
 
         defer.returnValue(json.loads(body))
 
@@ -398,9 +399,7 @@ class MatrixFederationHttpClient(object):
                     "Content-Type not application/json"
                 )
 
-        logger.debug("Getting resp body")
-        body = yield readBody(response)
-        logger.debug("Got resp body")
+        body = yield preserve_context_over_fn(readBody, response)
 
         defer.returnValue(json.loads(body))
 
@@ -443,7 +442,10 @@ class MatrixFederationHttpClient(object):
         headers = dict(response.headers.getAllRawHeaders())
 
         try:
-            length = yield _readBodyToFile(response, output_stream, max_size)
+            length = yield preserve_context_over_fn(
+                _readBodyToFile,
+                response, output_stream, max_size
+            )
         except:
             logger.exception("Failed to download body")
             raise
