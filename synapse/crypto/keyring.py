@@ -101,10 +101,10 @@ class Keyring(object):
             server_name(str): The name of the server to fetch a key for.
             keys_ids (list of str): The key_ids to check for.
         """
-        cached = yield self.store.get_server_verify_key(server_name, key_ids[0])
+        cached = yield self.store.get_server_verify_keys(server_name, key_ids)
 
         if cached:
-            defer.returnValue(cached)
+            defer.returnValue(cached[0])
             return
 
         download = self.key_downloads.get(server_name)
