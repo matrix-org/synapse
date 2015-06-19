@@ -200,7 +200,7 @@ class SynapseHomeServer(HomeServer):
             reactor.listenSSL(
                 port,
                 SynapseSite(
-                    "synapse.access.https",
+                    "synapse.access.https.%s" % (site_tag,),
                     site_tag,
                     listener_config,
                     root_resource,
@@ -212,7 +212,7 @@ class SynapseHomeServer(HomeServer):
             reactor.listenTCP(
                 port,
                 SynapseSite(
-                    "synapse.access.https",
+                    "synapse.access.http.%s" % (site_tag,),
                     site_tag,
                     listener_config,
                     root_resource,
