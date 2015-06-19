@@ -25,7 +25,6 @@ from synapse.util.logutils import log_function
 from synapse.api.constants import EventTypes
 from synapse.crypto.event_signing import compute_event_reference_hash
 
-from syutil.base64util import decode_base64
 from syutil.jsonutil import encode_json
 from contextlib import contextmanager
 
