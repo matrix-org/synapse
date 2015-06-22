@@ -416,6 +416,19 @@ class EventsStore(SQLBaseStore):
     def _persist_events_txn(self, txn, events_and_contexts, backfilled,
                             is_new_state=True):
 
+        if len(events_and_contexts) > 100:
+            chunks = [
+                events_and_contexts[x:x+100]
+                for x in xrange(0, len(events_and_contexts), 100)
+            ]
+
+            for chunk in chunks:
+                self._persist_events_txn(
+                    txn,
+                    chunk, backfilled, is_new_state,
+                )
+            return
+
         # Remove the any existing cache entries for the event_ids
         for event, _ in events_and_contexts:
             txn.call_after(self._invalidate_get_event_cache, event.event_id)
