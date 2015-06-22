@@ -356,6 +356,25 @@ class EventFederationStore(SQLBaseStore):
         For the given event, update the event edges table and forward and
         backward extremities tables.
         """
+        logger.debug(
+            "_handle_mult_prev_events event[0]: %s",
+            events[0],
+        )
+        logger.debug(
+            "_handle_mult_prev_events thing: %s",
+            [
+                [e_id for e_id, _ in ev.prev_events]
+                for ev in events
+            ],
+        )
+        logger.debug(
+            "_handle_mult_prev_events thing2: %s",
+            [
+                (ev.event_id, e_id)
+                for ev in events
+                for e_id, _ in ev.prev_events
+            ],
+        )
         self._simple_insert_many_txn(
             txn,
             table="event_edges",
@@ -366,7 +385,8 @@ class EventFederationStore(SQLBaseStore):
                     "room_id": ev.room_id,
                     "is_state": False,
                 }
-                for e_id in [e_id for ev in events for e_id, _ in ev.prev_events]
+                for ev in events
+                for e_id, _ in ev.prev_events
             ],
         )
 
@@ -412,11 +432,6 @@ class EventFederationStore(SQLBaseStore):
             " AND outlier = ?"
             " )"
         )
-
-        prev_events = [
-            e_id for ev in events for e_id, _ in ev.prev_events
-            if not ev.internal_metadata.is_outlier()
-        ]
 
         txn.executemany(query, [
             (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id, False)

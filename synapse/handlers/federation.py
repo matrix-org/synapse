@@ -995,6 +995,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _handle_new_events(self, origin, event_infos, backfilled=False):
+        logger.debug("_handle_new_events: %r", event_infos)
         contexts = yield defer.gatherResults(
             [
                 self._prep_event(
@@ -1008,6 +1009,8 @@ class FederationHandler(BaseHandler):
             ]
         )
 
+        logger.debug("_handle_new_events2: %d, %d", len(event_infos), len(contexts))
+
         yield self.store.persist_events(
             [
                 (ev_info["event"], context)
@@ -1016,6 +1019,8 @@ class FederationHandler(BaseHandler):
             backfilled=backfilled,
             is_new_state=(not backfilled),
         )
+
+        logger.debug("_handle_new_events3: %r", event_infos)
 
     @defer.inlineCallbacks
     def _prep_event(self, origin, event, state=None, backfilled=False,
