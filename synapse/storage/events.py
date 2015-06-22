@@ -45,6 +45,17 @@ EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for requests for events
 
 
 class EventsStore(SQLBaseStore):
+    def persist_events(self, events_and_contexts, backfilled=False,
+                       is_new_state=True):
+        return defer.gatherResults([
+            self.persist_event(
+                event, context,
+                backfilled=backfilled,
+                is_new_state=is_new_state,
+            )
+            for event, context in events_and_contexts
+        ])
+
     @defer.inlineCallbacks
     @log_function
     def persist_event(self, event, context, backfilled=False,
