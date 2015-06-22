@@ -675,7 +675,7 @@ class EventsStore(SQLBaseStore):
 
         if is_new_state:
             for event, _ in state_events_and_contexts:
-                if not context.rejected:
+                if not context.rejected and not event.internal_metadata.is_outlier():
                     txn.call_after(
                         self.get_current_state_for_key.invalidate,
                         event.room_id, event.type, event.state_key

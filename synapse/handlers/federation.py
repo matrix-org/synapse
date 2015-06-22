@@ -156,7 +156,11 @@ class FederationHandler(BaseHandler):
                 }]
                 seen_ids.add(e.event_id)
 
-            yield self._handle_new_events(origin, event_infos)
+            yield self._handle_new_events(
+                origin,
+                event_infos,
+                outliers=True
+            )
 
         try:
             _, event_stream_id, max_stream_id = yield self._handle_new_event(
@@ -613,7 +617,7 @@ class FederationHandler(BaseHandler):
                     }
                 })
 
-            yield self._handle_new_events(origin, ev_infos)
+            yield self._handle_new_events(origin, ev_infos, outliers=True)
 
             auth_ids = [e_id for e_id, _ in event.auth_events]
             auth_events = {
@@ -994,8 +998,8 @@ class FederationHandler(BaseHandler):
         defer.returnValue((context, event_stream_id, max_stream_id))
 
     @defer.inlineCallbacks
-    def _handle_new_events(self, origin, event_infos, backfilled=False):
-        logger.debug("_handle_new_events: %r", event_infos)
+    def _handle_new_events(self, origin, event_infos, backfilled=False,
+                           outliers=False):
         contexts = yield defer.gatherResults(
             [
                 self._prep_event(
@@ -1009,18 +1013,14 @@ class FederationHandler(BaseHandler):
             ]
         )
 
-        logger.debug("_handle_new_events2: %d, %d", len(event_infos), len(contexts))
-
         yield self.store.persist_events(
             [
                 (ev_info["event"], context)
                 for ev_info, context in itertools.izip(event_infos, contexts)
             ],
             backfilled=backfilled,
-            is_new_state=(not backfilled),
+            is_new_state=(not outliers and not backfilled),
         )
-
-        logger.debug("_handle_new_events3: %r", event_infos)
 
     @defer.inlineCallbacks
     def _prep_event(self, origin, event, state=None, backfilled=False,
