@@ -70,13 +70,19 @@ class EventsStore(SQLBaseStore):
             for (event, _), stream in zip(events_and_contexts, stream_orderings):
                 event.internal_metadata.stream_ordering = stream
 
-            yield self.runInteraction(
-                "persist_events",
-                self._persist_events_txn,
-                events_and_contexts=events_and_contexts,
-                backfilled=backfilled,
-                is_new_state=is_new_state,
-            )
+            chunks = [
+                events_and_contexts[x:x+100]
+                for x in xrange(0, len(events_and_contexts), 100)
+            ]
+
+            for chunk in chunks:
+                yield self.runInteraction(
+                    "persist_events",
+                    self._persist_events_txn,
+                    events_and_contexts=chunk,
+                    backfilled=backfilled,
+                    is_new_state=is_new_state,
+                )
 
     @defer.inlineCallbacks
     @log_function
@@ -415,19 +421,6 @@ class EventsStore(SQLBaseStore):
     @log_function
     def _persist_events_txn(self, txn, events_and_contexts, backfilled,
                             is_new_state=True):
-
-        if len(events_and_contexts) > 100:
-            chunks = [
-                events_and_contexts[x:x+100]
-                for x in xrange(0, len(events_and_contexts), 100)
-            ]
-
-            for chunk in chunks:
-                self._persist_events_txn(
-                    txn,
-                    chunk, backfilled, is_new_state,
-                )
-            return
 
         # Remove the any existing cache entries for the event_ids
         for event, _ in events_and_contexts:
