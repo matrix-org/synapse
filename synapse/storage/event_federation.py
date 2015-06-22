@@ -356,25 +356,6 @@ class EventFederationStore(SQLBaseStore):
         For the given event, update the event edges table and forward and
         backward extremities tables.
         """
-        logger.debug(
-            "_handle_mult_prev_events event[0]: %s",
-            events[0],
-        )
-        logger.debug(
-            "_handle_mult_prev_events thing: %s",
-            [
-                [e_id for e_id, _ in ev.prev_events]
-                for ev in events
-            ],
-        )
-        logger.debug(
-            "_handle_mult_prev_events thing2: %s",
-            [
-                (ev.event_id, e_id)
-                for ev in events
-                for e_id, _ in ev.prev_events
-            ],
-        )
         self._simple_insert_many_txn(
             txn,
             table="event_edges",
