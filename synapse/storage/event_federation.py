@@ -49,14 +49,22 @@ class EventFederationStore(SQLBaseStore):
         results = set()
 
         base_sql = (
-            "SELECT auth_id FROM event_auth WHERE event_id = ?"
+            "SELECT auth_id FROM event_auth WHERE event_id IN (%s)"
         )
 
         front = set(event_ids)
         while front:
             new_front = set()
-            for f in front:
-                txn.execute(base_sql, (f,))
+            front_list = list(front)
+            chunks = [
+                front_list[x:x+100]
+                for x in xrange(0, len(front), 100)
+            ]
+            for chunk in chunks:
+                txn.execute(
+                    base_sql % (",".join(["?"] * len(chunk)),),
+                    chunk
+                )
                 new_front.update([r[0] for r in txn.fetchall()])
 
             new_front -= results
