@@ -51,9 +51,6 @@ class FederationBase(object):
         Returns:
             Deferred : A list of PDUs that have valid signatures and hashes.
         """
-
-        signed_pdus = []
-
         deferreds = self._check_sigs_and_hashes(pdus)
 
         def callback(pdu):
