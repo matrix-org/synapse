@@ -380,17 +380,14 @@ class FederationClient(FederationBase):
                     for p in content.get("auth_chain", [])
                 ]
 
-                signed_state, signed_auth = yield defer.gatherResults(
-                    [
-                        self._check_sigs_and_hash_and_fetch(
-                            destination, state, outlier=True
-                        ),
-                        self._check_sigs_and_hash_and_fetch(
-                            destination, auth_chain, outlier=True
-                        )
-                    ],
-                    consumeErrors=True
-                ).addErrback(unwrapFirstError)
+                valid_pdus = yield self._check_sigs_and_hash_and_fetch(
+                    destination, state + auth_chain,
+                    outlier=True,
+                    include_none=True,
+                )
+
+                signed_state = [p for p in valid_pdus[:len(state)] if p]
+                signed_auth = [p for p in valid_pdus[len(state):] if p]
 
                 auth_chain.sort(key=lambda e: e.depth)
 
