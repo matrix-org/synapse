@@ -53,47 +53,50 @@ class FederationBase(object):
 
         signed_pdus = []
 
-        @defer.inlineCallbacks
-        def do(pdu):
-            try:
-                new_pdu = yield self._check_sigs_and_hash(pdu)
+        deferreds = self._check_sigs_and_hashes(pdus)
+
+        def callback(pdu):
+            signed_pdus.append(pdu)
+
+        def errback(failure, pdu):
+            failure.trap(SynapseError)
+
+            # Check local db.
+            new_pdu = yield self.store.get_event(
+                pdu.event_id,
+                allow_rejected=True,
+                allow_none=True,
+            )
+            if new_pdu:
                 signed_pdus.append(new_pdu)
-            except SynapseError:
-                # FIXME: We should handle signature failures more gracefully.
+                return
 
-                # Check local db.
-                new_pdu = yield self.store.get_event(
-                    pdu.event_id,
-                    allow_rejected=True,
-                    allow_none=True,
-                )
-                if new_pdu:
-                    signed_pdus.append(new_pdu)
-                    return
+            # Check pdu.origin
+            if pdu.origin != origin:
+                try:
+                    new_pdu = yield self.get_pdu(
+                        destinations=[pdu.origin],
+                        event_id=pdu.event_id,
+                        outlier=outlier,
+                        timeout=10000,
+                    )
 
-                # Check pdu.origin
-                if pdu.origin != origin:
-                    try:
-                        new_pdu = yield self.get_pdu(
-                            destinations=[pdu.origin],
-                            event_id=pdu.event_id,
-                            outlier=outlier,
-                            timeout=10000,
-                        )
+                    if new_pdu:
+                        signed_pdus.append(new_pdu)
+                        return
+                except:
+                    pass
 
-                        if new_pdu:
-                            signed_pdus.append(new_pdu)
-                            return
-                    except:
-                        pass
+            logger.warn(
+                "Failed to find copy of %s with valid signature",
+                pdu.event_id,
+            )
 
-                logger.warn(
-                    "Failed to find copy of %s with valid signature",
-                    pdu.event_id,
-                )
+        for pdu, deferred in zip(pdus, deferreds):
+            deferred.addCallbacks(callback, errback, errbackArgs=[pdu])
 
         yield defer.gatherResults(
-            [do(pdu) for pdu in pdus],
+            deferreds,
             consumeErrors=True
         ).addErrback(unwrapFirstError)
 

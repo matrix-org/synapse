@@ -243,14 +243,17 @@ class Keyring(object):
                     type(e).__name__, str(e.message),
                 )
 
-        results = yield defer.gatherResults([
-            get_key(p_name, p_keys)
-            for p_name, p_keys in self.perspective_servers.items()
-        ])
+        results = yield defer.gatherResults(
+            [
+                get_key(p_name, p_keys)
+                for p_name, p_keys in self.perspective_servers.items()
+            ],
+            consumeErrors=True,
+        ).addErrback(unwrapFirstError)
 
         union_of_keys = {}
         for result in results:
-            for server_name, keys in results.items():
+            for server_name, keys in result.items():
                 union_of_keys.setdefault(server_name, {}).update(keys)
 
         defer.returnValue(union_of_keys)
