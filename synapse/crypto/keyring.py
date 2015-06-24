@@ -371,7 +371,7 @@ class Keyring(object):
                 perspective_name, response
             )
 
-            for server_name, response_keys in processed_response:
+            for server_name, response_keys in processed_response.items():
                 keys.setdefault(server_name, {}).update(response_keys)
 
         for server_name, response_keys in keys.items():
