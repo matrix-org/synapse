@@ -237,11 +237,12 @@ class Keyring(object):
                 )
                 defer.returnValue(result)
             except Exception as e:
-                logger.info(
+                logger.exception(
                     "Unable to get key from %r: %s %s",
                     perspective_name,
                     type(e).__name__, str(e.message),
                 )
+                defer.returnValue({})
 
         results = yield defer.gatherResults(
             [
