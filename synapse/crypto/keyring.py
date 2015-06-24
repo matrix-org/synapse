@@ -378,7 +378,7 @@ class Keyring(object):
             yield self.store_keys(
                 server_name=server_name,
                 from_server=perspective_name,
-                verify_keys=keys,
+                verify_keys=response_keys,
             )
 
         defer.returnValue(keys)
