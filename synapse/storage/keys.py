@@ -101,7 +101,11 @@ class KeyStore(SQLBaseStore):
             (list of VerifyKey): The verification keys.
         """
         keys = yield self.get_all_server_verify_keys(server_name)
-        defer.returnValue([keys[k] for k in key_ids if k in keys])
+        defer.returnValue({
+            k: keys[k]
+            for k in key_ids
+            if k in keys and keys[k]
+        })
 
     @defer.inlineCallbacks
     def store_server_verify_key(self, server_name, from_server, time_now_ms,
