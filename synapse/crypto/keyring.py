@@ -64,20 +64,21 @@ class Keyring(object):
         group_ids = []
 
         next_group_id = 0
+        deferreds = {}
 
         for server_name, json_object in server_and_json:
             logger.debug("Verifying for %s", server_name)
-            key_ids = signature_ids(json_object, server_name)
-            if not key_ids:
-                raise SynapseError(
-                    400,
-                    "Not signed with a supported algorithm",
-                    Codes.UNAUTHORIZED,
-                )
-
             group_id = next_group_id
             next_group_id += 1
             group_ids.append(group_id)
+
+            key_ids = signature_ids(json_object, server_name)
+            if not key_ids:
+                deferreds[group_id] = defer.fail(SynapseError(
+                    400,
+                    "Not signed with a supported algorithm",
+                    Codes.UNAUTHORIZED,
+                ))
 
             group = KeyGroup(server_name, group_id, key_ids)
 
@@ -124,9 +125,9 @@ class Keyring(object):
                     Codes.UNAUTHORIZED,
                 )
 
-        deferreds = self.get_server_verify_keys(
+        deferreds.update(self.get_server_verify_keys(
             group_id_to_group
-        )
+        ))
 
         logger.info(
             "Deferred count: %d vs. %d",
