@@ -461,47 +461,47 @@ class Keyring(object):
                 old_verify_keys[key_id] = verify_key
 
         results = {}
-        for server_name, keys_dict in response_json["signatures"].items():
-            for key_id in keys_dict:
-                if key_id not in response_json["verify_keys"]:
-                    raise ValueError(
-                        "Key response must include verification keys for all"
-                        " signatures"
-                    )
-                if key_id in verify_keys:
-                    verify_signed_json(
-                        response_json,
-                        server_name,
-                        verify_keys[key_id]
-                    )
-
-            signed_key_json = sign_json(
-                response_json,
-                self.config.server_name,
-                self.config.signing_key[0],
-            )
-
-            signed_key_json_bytes = encode_canonical_json(signed_key_json)
-            ts_valid_until_ms = signed_key_json[u"valid_until_ts"]
-
-            updated_key_ids = set(requested_ids)
-            updated_key_ids.update(verify_keys)
-            updated_key_ids.update(old_verify_keys)
-
-            response_keys.update(verify_keys)
-            response_keys.update(old_verify_keys)
-
-            for key_id in updated_key_ids:
-                yield self.store.store_server_keys_json(
-                    server_name=server_name,
-                    key_id=key_id,
-                    from_server=server_name,
-                    ts_now_ms=time_now_ms,
-                    ts_expires_ms=ts_valid_until_ms,
-                    key_json_bytes=signed_key_json_bytes,
+        server_name = response_json["server_name"]
+        for key_id in response_json["signatures"].get(server_name, {}):
+            if key_id not in response_json["verify_keys"]:
+                raise ValueError(
+                    "Key response must include verification keys for all"
+                    " signatures"
+                )
+            if key_id in verify_keys:
+                verify_signed_json(
+                    response_json,
+                    server_name,
+                    verify_keys[key_id]
                 )
 
-            results[server_name] = response_keys
+        signed_key_json = sign_json(
+            response_json,
+            self.config.server_name,
+            self.config.signing_key[0],
+        )
+
+        signed_key_json_bytes = encode_canonical_json(signed_key_json)
+        ts_valid_until_ms = signed_key_json[u"valid_until_ts"]
+
+        updated_key_ids = set(requested_ids)
+        updated_key_ids.update(verify_keys)
+        updated_key_ids.update(old_verify_keys)
+
+        response_keys.update(verify_keys)
+        response_keys.update(old_verify_keys)
+
+        for key_id in updated_key_ids:
+            yield self.store.store_server_keys_json(
+                server_name=server_name,
+                key_id=key_id,
+                from_server=server_name,
+                ts_now_ms=time_now_ms,
+                ts_expires_ms=ts_valid_until_ms,
+                key_json_bytes=signed_key_json_bytes,
+            )
+
+        results[server_name] = response_keys
 
         defer.returnValue(results)
 
