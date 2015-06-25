@@ -76,31 +76,16 @@ class EventsStore(SQLBaseStore):
                 for x in xrange(0, len(events_and_contexts), 100)
             ]
 
-            if is_new_state:
-                # If is_new_state then we have to do chunks in order
-                for chunk in chunks:
-                    yield self.runInteraction(
-                        "persist_events",
-                        self._persist_events_txn,
-                        events_and_contexts=chunk,
-                        backfilled=backfilled,
-                        is_new_state=is_new_state,
-                    )
-            else:
-                # Otherwise, do them sequentially
-                yield defer.gatherResults(
-                    [
-                        self.runInteraction(
-                            "persist_events",
-                            self._persist_events_txn,
-                            events_and_contexts=chunk,
-                            backfilled=backfilled,
-                            is_new_state=is_new_state,
-                        )
-                        for chunk in chunks
-                    ],
-                    consumeErrors=True,
-                ).addErrback(unwrapFirstError)
+            for chunk in chunks:
+                # We can't easily parallelize these since different chunks
+                # might contain the same event. :()
+                yield self.runInteraction(
+                    "persist_events",
+                    self._persist_events_txn,
+                    events_and_contexts=chunk,
+                    backfilled=backfilled,
+                    is_new_state=is_new_state,
+                )
 
     @defer.inlineCallbacks
     @log_function
