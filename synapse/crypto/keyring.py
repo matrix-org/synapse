@@ -291,10 +291,13 @@ class Keyring(object):
 
             defer.returnValue(keys)
 
-        results = yield defer.gatherResults([
-            get_key(server_name, key_ids)
-            for server_name, key_ids in server_name_and_key_ids
-        ])
+        results = yield defer.gatherResults(
+            [
+                get_key(server_name, key_ids)
+                for server_name, key_ids in server_name_and_key_ids
+            ],
+            consumeErrors=True,
+        ).addErrback(unwrapFirstError)
 
         merged = {}
         for result in results:
