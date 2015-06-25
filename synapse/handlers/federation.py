@@ -598,10 +598,6 @@ class FederationHandler(BaseHandler):
                 # FIXME
                 pass
 
-            # yield self._handle_auth_events(
-            #     origin, [e for e in auth_chain if e.event_id != event.event_id]
-            # )
-
             ev_infos = []
             for e in itertools.chain(state, auth_chain):
                 if e.event_id == event.event_id:
