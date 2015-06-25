@@ -410,9 +410,6 @@ class FederationClient(FederationBase):
                     if p.event_id in valid_pdus_map
                 ]
 
-                logger.info("signed_state: %r", [p.event_id for p in signed_state])
-                logger.info("signed_auth: %r", [p.event_id for p in signed_auth])
-
                 # NB: We *need* to copy to ensure that we don't have multiple
                 # references being passed on, as that causes... issues.
                 for s in signed_state:
