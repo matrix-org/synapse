@@ -150,10 +150,10 @@ class FederationHandler(BaseHandler):
                     (e.type, e.state_key): e for e in auth_chain
                     if e.event_id in auth_ids
                 }
-                event_infos.append[{
+                event_infos.append({
                     "event": e,
                     "auth_events": auth,
-                }]
+                })
                 seen_ids.add(e.event_id)
 
             yield self._handle_new_events(
