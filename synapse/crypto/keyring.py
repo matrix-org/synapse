@@ -58,7 +58,16 @@ class Keyring(object):
         )[0]
 
     def verify_json_objects_for_server(self, server_and_json):
-        server_to_key_groupings = {}
+        """Bulk verfies signatures of json objects, bulk fetching keys as
+        necessary.
+
+        Args:
+            server_and_json (list): List of pairs of (server_name, json_object)
+
+        Returns:
+            list of deferreds indicating success or failure to verify each
+            json object's signature for the given server_name.
+        """
         group_id_to_json = {}
         group_id_to_group = {}
         group_ids = []
@@ -84,7 +93,6 @@ class Keyring(object):
 
             group_id_to_group[group_id] = group
             group_id_to_json[group_id] = json_object
-            server_to_key_groupings.setdefault(server_name, []).append(group)
 
         @defer.inlineCallbacks
         def handle_key_deferred(group, deferred):
