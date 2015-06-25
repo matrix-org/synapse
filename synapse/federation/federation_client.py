@@ -30,6 +30,7 @@ import synapse.metrics
 
 from synapse.util.retryutils import get_retry_limiter, NotRetryingDestination
 
+import copy
 import itertools
 import logging
 import random
@@ -380,14 +381,42 @@ class FederationClient(FederationBase):
                     for p in content.get("auth_chain", [])
                 ]
 
+                pdus = {
+                    p.event_id: p
+                    for p in itertools.chain(state, auth_chain)
+                }
+
                 valid_pdus = yield self._check_sigs_and_hash_and_fetch(
-                    destination, state + auth_chain,
+                    destination, pdus.values(),
                     outlier=True,
-                    include_none=True,
                 )
 
-                signed_state = [p for p in valid_pdus[:len(state)] if p]
-                signed_auth = [p for p in valid_pdus[len(state):] if p]
+                valid_pdus_map = {
+                    p.event_id: p
+                    for p in valid_pdus
+                }
+
+                # NB: We *need* to copy to ensure that we don't have multiple
+                # references being passed on, as that causes... issues.
+                signed_state = [
+                    copy.copy(valid_pdus_map[p.event_id])
+                    for p in state
+                    if p.event_id in valid_pdus_map
+                ]
+
+                signed_auth = [
+                    valid_pdus_map[p.event_id]
+                    for p in auth_chain
+                    if p.event_id in valid_pdus_map
+                ]
+
+                logger.info("signed_state: %r", [p.event_id for p in signed_state])
+                logger.info("signed_auth: %r", [p.event_id for p in signed_auth])
+
+                # NB: We *need* to copy to ensure that we don't have multiple
+                # references being passed on, as that causes... issues.
+                for s in signed_state:
+                    s.internal_metadata = copy.deepcopy(s.internal_metadata)
 
                 auth_chain.sort(key=lambda e: e.depth)
 
