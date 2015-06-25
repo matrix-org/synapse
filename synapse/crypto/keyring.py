@@ -495,15 +495,20 @@ class Keyring(object):
         response_keys.update(verify_keys)
         response_keys.update(old_verify_keys)
 
-        for key_id in updated_key_ids:
-            yield self.store.store_server_keys_json(
-                server_name=server_name,
-                key_id=key_id,
-                from_server=server_name,
-                ts_now_ms=time_now_ms,
-                ts_expires_ms=ts_valid_until_ms,
-                key_json_bytes=signed_key_json_bytes,
-            )
+        yield defer.gatherResults(
+            [
+                self.store.store_server_keys_json(
+                    server_name=server_name,
+                    key_id=key_id,
+                    from_server=server_name,
+                    ts_now_ms=time_now_ms,
+                    ts_expires_ms=ts_valid_until_ms,
+                    key_json_bytes=signed_key_json_bytes,
+                )
+                for key_id in updated_key_ids
+            ],
+            consumeErrors=True,
+        ).addErrback(unwrapFirstError)
 
         results[server_name] = response_keys
 
@@ -591,8 +596,13 @@ class Keyring(object):
         Returns:
             A deferred that completes when the keys are stored.
         """
-        for key_id, key in verify_keys.items():
-            # TODO(markjh): Store whether the keys have expired.
-            yield self.store.store_server_verify_key(
-                server_name, server_name, key.time_added, key
-            )
+        # TODO(markjh): Store whether the keys have expired.
+        yield defer.gatherResults(
+            [
+                self.store.store_server_verify_key(
+                    server_name, server_name, key.time_added, key
+                )
+                for key_id, key in verify_keys.items()
+            ],
+            consumeErrors=True,
+        ).addErrback(unwrapFirstError)

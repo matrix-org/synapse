@@ -78,7 +78,7 @@ class EventsStore(SQLBaseStore):
 
             for chunk in chunks:
                 # We can't easily parallelize these since different chunks
-                # might contain the same event. :()
+                # might contain the same event. :(
                 yield self.runInteraction(
                     "persist_events",
                     self._persist_events_txn,
