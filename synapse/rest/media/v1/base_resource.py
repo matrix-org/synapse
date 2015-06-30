@@ -27,6 +27,7 @@ from twisted.web.resource import Resource
 from twisted.protocols.basic import FileSender
 
 from synapse.util.async import ObservableDeferred
+from synapse.util.stringutils import is_ascii
 
 import os
 
@@ -135,6 +136,8 @@ class BaseMediaResource(Resource):
             if content_disposition:
                 _, params = cgi.parse_header(content_disposition[0],)
                 upload_name = params.get("filename", None)
+                if upload_name and not is_ascii(upload_name):
+                    upload_name = None
             else:
                 upload_name = None
 
