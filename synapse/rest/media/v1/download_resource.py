@@ -47,10 +47,12 @@ class DownloadResource(BaseMediaResource):
 
         media_type = media_info["media_type"]
         media_length = media_info["media_length"]
+        upload_name = media_info["upload_name"]
         file_path = self.filepaths.local_media_filepath(media_id)
 
         yield self._respond_with_file(
-            request, media_type, file_path, media_length
+            request, media_type, file_path, media_length,
+            upload_name=upload_name,
         )
 
     @defer.inlineCallbacks
@@ -60,11 +62,13 @@ class DownloadResource(BaseMediaResource):
         media_type = media_info["media_type"]
         media_length = media_info["media_length"]
         filesystem_id = media_info["filesystem_id"]
+        upload_name = media_info["upload_name"]
 
         file_path = self.filepaths.remote_media_filepath(
             server_name, filesystem_id
         )
 
         yield self._respond_with_file(
-            request, media_type, file_path, media_length
+            request, media_type, file_path, media_length,
+            upload_name=upload_name,
         )

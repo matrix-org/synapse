@@ -30,6 +30,7 @@ from synapse.util.async import ObservableDeferred
 
 import os
 
+import cgi
 import logging
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,9 @@ logger = logging.getLogger(__name__)
 
 def parse_media_id(request):
     try:
-        server_name, media_id = request.postpath
+        # This allows users to append e.g. /test.png to the URL. Useful for
+        # clients that parse the URL to see content type.
+        server_name, media_id = request.postpath[:2]
         return (server_name, media_id)
     except:
         raise SynapseError(
@@ -128,12 +131,19 @@ class BaseMediaResource(Resource):
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
 
+            content_disposition = headers.get("Content-Disposition", None)
+            if content_disposition:
+                _, params = cgi.parse_header(content_disposition[0],)
+                upload_name = params.get("filename", None)
+            else:
+                upload_name = None
+
             yield self.store.store_cached_remote_media(
                 origin=server_name,
                 media_id=media_id,
                 media_type=media_type,
                 time_now_ms=self.clock.time_msec(),
-                upload_name=None,
+                upload_name=upload_name,
                 media_length=length,
                 filesystem_id=file_id,
             )
@@ -144,7 +154,7 @@ class BaseMediaResource(Resource):
         media_info = {
             "media_type": media_type,
             "media_length": length,
-            "upload_name": None,
+            "upload_name": upload_name,
             "created_ts": time_now_ms,
             "filesystem_id": file_id,
         }
@@ -157,11 +167,16 @@ class BaseMediaResource(Resource):
 
     @defer.inlineCallbacks
     def _respond_with_file(self, request, media_type, file_path,
-                           file_size=None):
+                           file_size=None, upload_name=None):
         logger.debug("Responding with %r", file_path)
 
         if os.path.isfile(file_path):
             request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
+            if upload_name:
+                request.setHeader(
+                    b"Content-Disposition",
+                    b"inline; filename=%s" % (upload_name.encode("utf-8"),),
+                )
 
             # cache for at least a day.
             # XXX: we might want to turn this off for data we don't want to
