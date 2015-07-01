@@ -1,5 +1,10 @@
-Changes in synapse v0.9.3 (2015-XX-XX)
+Changes in synapse v0.9.3 (2015-07-01)
 ======================================
+
+No changes from v0.9.3 Release Candidate 1.
+
+Changes in synapse v0.9.3-rc1 (2015-06-23)
+==========================================
 
 General:
 
