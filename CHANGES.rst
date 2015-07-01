@@ -1,3 +1,26 @@
+Changes in synapse v0.9.3 (2015-07-01)
+======================================
+
+No changes from v0.9.3 Release Candidate 1.
+
+Changes in synapse v0.9.3-rc1 (2015-06-23)
+==========================================
+
+General:
+
+* Fix a memory leak in the notifier. (SYN-412)
+* Improve performance of room initial sync. (SYN-418)
+* General improvements to logging.
+* Remove ``access_token`` query params from ``INFO`` level logging.
+
+Configuration:
+
+* Add support for specifying and configuring multiple listeners. (SYN-389)
+
+Application services:
+
+* Fix bug where synapse failed to send user queries to application services.
+
 Changes in synapse v0.9.2-r2 (2015-06-15)
 =========================================
 

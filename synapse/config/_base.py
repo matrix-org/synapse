@@ -148,7 +148,7 @@ class Config(object):
             if not config_args.config_path:
                 config_parser.error(
                     "Must supply a config file.\nA config file can be automatically"
-                    " generated using \"--generate-config -h SERVER_NAME"
+                    " generated using \"--generate-config -H SERVER_NAME"
                     " -c CONFIG-FILE\""
                 )
 
@@ -209,7 +209,7 @@ class Config(object):
         if not config_args.config_path:
             config_parser.error(
                 "Must supply a config file.\nA config file can be automatically"
-                " generated using \"--generate-config -h SERVER_NAME"
+                " generated using \"--generate-config -H SERVER_NAME"
                 " -c CONFIG-FILE\""
             )
 

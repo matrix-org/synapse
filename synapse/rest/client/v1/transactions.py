@@ -39,10 +39,10 @@ class HttpTransactionStore(object):
             A tuple of (HTTP response code, response content) or None.
         """
         try:
-            logger.debug("get_response Key: %s TxnId: %s", key, txn_id)
+            logger.debug("get_response TxnId: %s", txn_id)
             (last_txn_id, response) = self.transactions[key]
             if txn_id == last_txn_id:
-                logger.info("get_response: Returning a response for %s", key)
+                logger.info("get_response: Returning a response for %s", txn_id)
                 return response
         except KeyError:
             pass
@@ -58,7 +58,7 @@ class HttpTransactionStore(object):
             txn_id (str): The transaction ID for this request.
             response (tuple): A tuple of (HTTP response code, response content)
         """
-        logger.debug("store_response Key: %s TxnId: %s", key, txn_id)
+        logger.debug("store_response TxnId: %s", txn_id)
         self.transactions[key] = (txn_id, response)
 
     def store_client_transaction(self, request, txn_id, response):

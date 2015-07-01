@@ -132,16 +132,8 @@ class BaseHomeServer(object):
         setattr(BaseHomeServer, "get_%s" % (depname), _get)
 
     def get_ip_from_request(self, request):
-        # May be an X-Forwarding-For header depending on config
-        ip_addr = request.getClientIP()
-        if self.config.captcha_ip_origin_is_x_forwarded:
-            # use the header
-            if request.requestHeaders.hasHeader("X-Forwarded-For"):
-                ip_addr = request.requestHeaders.getRawHeaders(
-                    "X-Forwarded-For"
-                )[0]
-
-        return ip_addr
+        # X-Forwarded-For is handled by our custom request type.
+        return request.getClientIP()
 
     def is_mine(self, domain_specific_string):
         return domain_specific_string.domain == self.hostname

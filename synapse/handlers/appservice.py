@@ -177,7 +177,7 @@ class ApplicationServicesHandler(object):
             return
 
         user_info = yield self.store.get_user_by_id(user_id)
-        if not user_info:
+        if user_info:
             defer.returnValue(False)
             return
 
