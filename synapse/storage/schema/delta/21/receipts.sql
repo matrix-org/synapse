@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS receipts_linearized (
     event_id TEXT NOT NULL
 );
 
-CREATE INDEX receipts_linearized_room_tuple ON receipts_graph(
+CREATE INDEX receipts_linearized_room_tuple ON receipts_linearized(
   room_id, receipt_type, user_id
+);
+
+CREATE INDEX receipts_linearized_id ON receipts_linearized(
+  stream_id
 );
