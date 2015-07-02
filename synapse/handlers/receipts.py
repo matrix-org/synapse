@@ -88,7 +88,7 @@ class ReceiptsHandler(BaseHandler):
             self._latest_serial = max(self._latest_serial, stream_id)
 
             with PreserveLoggingContext():
-                self.notifier.on_new_user_event(
+                self.notifier.on_new_event(
                     "recei[t_key", self._latest_serial, rooms=[room_id]
                 )
 
@@ -102,7 +102,7 @@ class ReceiptsHandler(BaseHandler):
 
             receipt["remotedomains"] = remotedomains
 
-            self.notifier.on_new_user_event(
+            self.notifier.on_new_event(
                 "receipt_key", self._latest_room_serial, rooms=[room_id]
             )
 

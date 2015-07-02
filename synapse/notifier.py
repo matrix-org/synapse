@@ -221,16 +221,7 @@ class Notifier(object):
             event
         )
 
-        room_id = event.room_id
-
-        room_user_streams = self.room_to_user_streams.get(room_id, set())
-
-        user_streams = room_user_streams.copy()
-
-        for user in extra_users:
-            user_stream = self.user_to_user_stream.get(str(user))
-            if user_stream is not None:
-                user_streams.add(user_stream)
+        app_streams = set()
 
         for appservice in self.appservice_to_user_streams:
             # TODO (kegan): Redundant appservice listener checks?
@@ -242,24 +233,20 @@ class Notifier(object):
                 app_user_streams = self.appservice_to_user_streams.get(
                     appservice, set()
                 )
-                user_streams |= app_user_streams
+                app_streams |= app_user_streams
 
-        logger.debug("on_new_room_event listeners %s", user_streams)
-
-        time_now_ms = self.clock.time_msec()
-        for user_stream in user_streams:
-            try:
-                user_stream.notify(
-                    "room_key", "s%d" % (room_stream_id,), time_now_ms
-                )
-            except:
-                logger.exception("Failed to notify listener")
+        self.on_new_event(
+            "room_key", room_stream_id,
+            users=extra_users,
+            rooms=[event.room_id],
+            extra_streams=app_streams,
+        )
 
     @defer.inlineCallbacks
     @log_function
-    def on_new_user_event(self, stream_key, new_token, users=[], rooms=[]):
-        """ Used to inform listeners that something has happend
-        presence/user event wise.
+    def on_new_event(self, stream_key, new_token, users=[], rooms=[],
+                     extra_streams=set()):
+        """ Used to inform listeners that something has happend event wise.
 
         Will wake up all listeners for the given users and rooms.
         """
