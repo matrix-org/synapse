@@ -75,6 +75,8 @@ class EventTypes(object):
     Redaction = "m.room.redaction"
     Feedback = "m.room.message.feedback"
 
+    RoomHistoryVisibility = "m.room.history_visibility"
+
     # These are used for validation
     Message = "m.room.message"
     Topic = "m.room.topic"
