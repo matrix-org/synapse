@@ -62,7 +62,8 @@ class EventSources(object):
             ),
             typing_key=(
                 yield self.sources["typing"].get_current_key()
-            )
+            ),
+            receipt_key="0",
         )
         defer.returnValue(token)
 

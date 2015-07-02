@@ -100,7 +100,7 @@ class EventID(DomainSpecificString):
 class StreamToken(
     namedtuple(
         "Token",
-        ("room_key", "presence_key", "typing_key")
+        ("room_key", "presence_key", "typing_key", "receipt_key")
     )
 ):
     _SEPARATOR = "_"
@@ -109,6 +109,9 @@ class StreamToken(
     def from_string(cls, string):
         try:
             keys = string.split(cls._SEPARATOR)
+            if len(keys) == len(cls._fields) - 1:
+                # i.e. old token from before receipt_key
+                keys.append("0")
             return cls(*keys)
         except:
             raise SynapseError(400, "Invalid Token")
@@ -131,6 +134,7 @@ class StreamToken(
             (other_token.room_stream_id < self.room_stream_id)
             or (int(other_token.presence_key) < int(self.presence_key))
             or (int(other_token.typing_key) < int(self.typing_key))
+            or (int(other_token.receipt_key) < int(self.receipt_key))
         )
 
     def copy_and_advance(self, key, new_value):
