@@ -36,7 +36,7 @@ class ThumbnailResource(BaseMediaResource):
     @request_handler
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
-        server_name, media_id = parse_media_id(request)
+        server_name, media_id, _ = parse_media_id(request)
         width = parse_integer(request, "width")
         height = parse_integer(request, "height")
         method = parse_string(request, "method", "scale")
