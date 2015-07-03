@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 AuthEventTypes = (
     EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,
-    EventTypes.JoinRules,
+    EventTypes.JoinRules, EventTypes.RoomHistoryVisibility,
 )
 
 
