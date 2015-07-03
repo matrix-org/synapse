@@ -42,7 +42,10 @@ def parse_media_id(request):
         # This allows users to append e.g. /test.png to the URL. Useful for
         # clients that parse the URL to see content type.
         server_name, media_id = request.postpath[:2]
-        return (server_name, media_id)
+        if len(request.postpath) > 2 and is_ascii(request.postpath[-1]):
+            return server_name, media_id, request.postpath[-1]
+        else:
+            return server_name, media_id, None
     except:
         raise SynapseError(
             404,

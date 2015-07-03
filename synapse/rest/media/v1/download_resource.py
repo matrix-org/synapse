@@ -32,14 +32,16 @@ class DownloadResource(BaseMediaResource):
     @request_handler
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
-        server_name, media_id = parse_media_id(request)
+        server_name, media_id, name = parse_media_id(request)
         if server_name == self.server_name:
-            yield self._respond_local_file(request, media_id)
+            yield self._respond_local_file(request, media_id, name)
         else:
-            yield self._respond_remote_file(request, server_name, media_id)
+            yield self._respond_remote_file(
+                request, server_name, media_id, name
+            )
 
     @defer.inlineCallbacks
-    def _respond_local_file(self, request, media_id):
+    def _respond_local_file(self, request, media_id, name):
         media_info = yield self.store.get_local_media(media_id)
         if not media_info:
             self._respond_404(request)
@@ -47,7 +49,7 @@ class DownloadResource(BaseMediaResource):
 
         media_type = media_info["media_type"]
         media_length = media_info["media_length"]
-        upload_name = media_info["upload_name"]
+        upload_name = name if name else media_info["upload_name"]
         file_path = self.filepaths.local_media_filepath(media_id)
 
         yield self._respond_with_file(
@@ -56,13 +58,13 @@ class DownloadResource(BaseMediaResource):
         )
 
     @defer.inlineCallbacks
-    def _respond_remote_file(self, request, server_name, media_id):
+    def _respond_remote_file(self, request, server_name, media_id, name):
         media_info = yield self._get_remote_media(server_name, media_id)
 
         media_type = media_info["media_type"]
         media_length = media_info["media_length"]
         filesystem_id = media_info["filesystem_id"]
-        upload_name = media_info["upload_name"]
+        upload_name = name if name else media_info["upload_name"]
 
         file_path = self.filepaths.remote_media_filepath(
             server_name, filesystem_id
