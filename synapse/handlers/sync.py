@@ -293,6 +293,36 @@ class SyncHandler(BaseHandler):
         ))
 
     @defer.inlineCallbacks
+    def _filter_events_for_client(self, user_id, room_id, events):
+        states = yield self.store.get_state_for_events(
+            room_id, [e.event_id for e in events],
+        )
+
+        events_and_states = zip(events, states)
+
+        def allowed(event_and_state):
+            event, state = event_and_state
+
+            if event.type == EventTypes.RoomHistoryVisibility:
+                return True
+
+            membership = state.get((EventTypes.Member, user_id), None)
+            if membership and membership.membership == Membership.JOIN:
+                return True
+
+            history = state.get((EventTypes.RoomHistoryVisibility, ''), None)
+            if history and history.content.get("visibility", None) == "after_join":
+                return False
+
+            return True
+
+        events_and_states = filter(allowed, events_and_states)
+        defer.returnValue([
+            ev
+            for ev, _ in events_and_states
+        ])
+
+    @defer.inlineCallbacks
     def load_filtered_recents(self, room_id, sync_config, now_token,
                               since_token=None):
         limited = True
@@ -313,6 +343,9 @@ class SyncHandler(BaseHandler):
             (room_key, _) = keys
             end_key = "s" + room_key.split('-')[-1]
             loaded_recents = sync_config.filter.filter_room_events(events)
+            loaded_recents = yield self._filter_events_for_client(
+                sync_config.user.to_string(), room_id, loaded_recents,
+            )
             loaded_recents.extend(recents)
             recents = loaded_recents
             if len(events) <= load_limit:
