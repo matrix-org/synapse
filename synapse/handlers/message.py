@@ -149,13 +149,29 @@ class MessageHandler(BaseHandler):
             if event.type == EventTypes.RoomHistoryVisibility:
                 return True
 
-            membership = state.get((EventTypes.Member, user_id), None)
-            if membership and membership.membership == Membership.JOIN:
+            membership_ev = state.get((EventTypes.Member, user_id), None)
+            if membership_ev:
+                membership = membership_ev.membership
+            else:
+                membership = Membership.LEAVE
+
+            if membership == Membership.JOIN:
                 return True
 
             history = state.get((EventTypes.RoomHistoryVisibility, ''), None)
-            if history and history.content.get("visibility", None) == "after_join":
-                return False
+            if history:
+                visibility = history.content.get("history_visibility", "shared")
+            else:
+                visibility = "shared"
+
+            if visibility == "public":
+                return True
+            elif visibility == "shared":
+                return True
+            elif visibility == "joined":
+                return membership == Membership.JOIN
+            elif visibility == "invited":
+                return membership == Membership.INVITE
 
             return True
 

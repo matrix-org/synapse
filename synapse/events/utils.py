@@ -75,7 +75,7 @@ def prune_event(event):
     elif event_type == EventTypes.Aliases:
         add_fields("aliases")
     elif event_type == EventTypes.RoomHistoryVisibility:
-        add_fields("visibility")
+        add_fields("history_visibility")
 
     allowed_fields = {
         k: v

@@ -239,22 +239,28 @@ class FederationHandler(BaseHandler):
                 return event
 
             history = state.get((EventTypes.RoomHistoryVisibility, ''), None)
-            if history and history.content.get("visibility", None) == "after_join":
-                for ev in state.values():
-                    if ev.type != EventTypes.Member:
-                        continue
-                    try:
-                        domain = UserID.from_string(ev.state_key).domain
-                    except:
-                        continue
+            if history:
+                visibility = history.content.get("history_visibility", "shared")
+                if visibility in ["invited", "joined"]:
+                    for ev in state.values():
+                        if ev.type != EventTypes.Member:
+                            continue
+                        try:
+                            domain = UserID.from_string(ev.state_key).domain
+                        except:
+                            continue
 
-                    if domain != server_name:
-                        continue
+                        if domain != server_name:
+                            continue
 
-                    if ev.membership == Membership.JOIN:
-                        return event
-                else:
-                    return prune_event(event)
+                        memtype = ev.membership
+                        if memtype == Membership.JOIN:
+                            return event
+                        elif memtype == Membership.INVITE:
+                            if visibility == "invited":
+                                return event
+                    else:
+                        return prune_event(event)
 
             return event
 
