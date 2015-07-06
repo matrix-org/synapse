@@ -575,6 +575,7 @@ class Auth(object):
         levels_to_check = [
             ("users_default", []),
             ("events_default", []),
+            ("state_default", []),
             ("ban", []),
             ("redact", []),
             ("kick", []),
