@@ -408,10 +408,12 @@ class EventFederationStore(SQLBaseStore):
                 keyvalues={
                     "event_id": event_id,
                 },
-                retcol="depth"
+                retcol="depth",
+                allow_none=True,
             )
 
-            queue.put((-depth, event_id))
+            if depth:
+                queue.put((-depth, event_id))
 
         while not queue.empty() and len(event_results) < limit:
             try:
