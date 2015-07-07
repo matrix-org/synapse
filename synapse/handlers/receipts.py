@@ -37,7 +37,8 @@ class ReceiptsHandler(BaseHandler):
             "m.receipt", self._received_remote_receipt
         )
 
-        self._latest_serial = 0
+        # self._earliest_cached_serial = 0
+        # self._rooms_to_latest_serial = {}
 
     @defer.inlineCallbacks
     def received_client_receipt(self, room_id, receipt_type, user_id,
@@ -53,8 +54,10 @@ class ReceiptsHandler(BaseHandler):
             "event_ids": [event_id],
         }
 
-        yield self._handle_new_receipts([receipt])
-        self._push_remotes([receipt])
+        is_new = yield self._handle_new_receipts([receipt])
+
+        if is_new:
+            self._push_remotes([receipt])
 
     @defer.inlineCallbacks
     def _received_remote_receipt(self, origin, content):
@@ -81,33 +84,24 @@ class ReceiptsHandler(BaseHandler):
             user_id = receipt["user_id"]
             event_ids = receipt["event_ids"]
 
-            stream_id, max_persisted_id = yield self.store.insert_receipt(
+            res = yield self.store.insert_receipt(
                 room_id, receipt_type, user_id, event_ids,
             )
 
-            # TODO: Use max_persisted_id
+            if not res:
+                # res will be None if this read receipt is 'old'
+                defer.returnValue(False)
 
-            self._latest_serial = max(self._latest_serial, stream_id)
+            stream_id, max_persisted_id = res
 
             with PreserveLoggingContext():
                 self.notifier.on_new_event(
-                    "receipt_key", self._latest_serial, rooms=[room_id]
+                    "receipt_key", max_persisted_id, rooms=[room_id]
                 )
 
-            localusers = set()
-            remotedomains = set()
+            defer.returnValue(True)
 
-            rm_handler = self.hs.get_handlers().room_member_handler
-            yield rm_handler.fetch_room_distributions_into(
-                room_id, localusers=localusers, remotedomains=remotedomains
-            )
-
-            receipt["remotedomains"] = remotedomains
-
-            self.notifier.on_new_event(
-                "receipt_key", self._latest_room_serial, rooms=[room_id]
-            )
-
+    @defer.inlineCallbacks
     def _push_remotes(self, receipts):
         # TODO: Some of this stuff should be coallesced.
         for receipt in receipts:
@@ -115,7 +109,15 @@ class ReceiptsHandler(BaseHandler):
             receipt_type = receipt["receipt_type"]
             user_id = receipt["user_id"]
             event_ids = receipt["event_ids"]
-            remotedomains = receipt["remotedomains"]
+
+            remotedomains = set()
+
+            rm_handler = self.hs.get_handlers().room_member_handler
+            yield rm_handler.fetch_room_distributions_into(
+                room_id, localusers=None, remotedomains=remotedomains
+            )
+
+            logger.debug("Sending receipt to: %r", remotedomains)
 
             for domain in remotedomains:
                 self.federation.send_edu(
@@ -130,3 +132,40 @@ class ReceiptsHandler(BaseHandler):
                         },
                     },
                 )
+
+
+class ReceiptEventSource(object):
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def get_new_events_for_user(self, user, from_key, limit):
+        from_key = int(from_key)
+        to_key = yield self.get_current_key()
+
+        rooms = yield self.store.get_rooms_for_user(user.to_string())
+        rooms = [room.room_id for room in rooms]
+        content = {}
+        for room_id in rooms:
+            result = yield self.store.get_linearized_receipts_for_room(
+                room_id, from_key, to_key
+            )
+            if result:
+                content[room_id] = result
+
+        if not content:
+            defer.returnValue(([], to_key))
+
+        event = {
+            "type": "m.receipt",
+            "content": content,
+        }
+
+        defer.returnValue(([event], to_key))
+
+    def get_current_key(self, direction='f'):
+        return self.store.get_max_receipt_stream_id()
+
+    @defer.inlineCallbacks
+    def get_pagination_rows(self, user, config, key):
+        defer.returnValue(([{}], 0))

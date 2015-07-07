@@ -17,17 +17,33 @@ from ._base import SQLBaseStore, cached
 
 from twisted.internet import defer
 
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 
 class ReceiptsStore(SQLBaseStore):
 
-    @cached
     @defer.inlineCallbacks
-    def get_linearized_receipts_for_room(self, room_id):
-        rows = yield self._simple_select_list(
-            table="receipts_linearized",
-            keyvalues={"room_id": room_id},
-            retcols=["receipt_type", "user_id", "event_id"],
-            desc="get_linearized_receipts_for_room",
+    def get_linearized_receipts_for_room(self, room_id, from_key, to_key):
+        def f(txn):
+            sql = (
+                "SELECT * FROM receipts_linearized WHERE"
+                " room_id = ? AND stream_id > ? AND stream_id <= ?"
+            )
+
+            txn.execute(
+                sql,
+                (room_id, from_key, to_key)
+            )
+
+            rows = self.cursor_to_dict(txn)
+
+            return rows
+
+        rows = yield self.runInteraction(
+            "get_linearized_receipts_for_room", f
         )
 
         result = {}
@@ -39,6 +55,9 @@ class ReceiptsStore(SQLBaseStore):
             ).append(row["user_id"])
 
         defer.returnValue(result)
+
+    def get_max_receipt_stream_id(self):
+        return self._receipts_id_gen.get_max_token(self)
 
     @cached
     @defer.inlineCallbacks
@@ -62,11 +81,38 @@ class ReceiptsStore(SQLBaseStore):
 
     def insert_linearized_receipt_txn(self, txn, room_id, receipt_type,
                                       user_id, event_id, stream_id):
+
+        # We don't want to clobber receipts for more recent events, so we
+        # have to compare orderings of existing receipts
+        sql = (
+            "SELECT topological_ordering, stream_ordering, event_id FROM events"
+            " INNER JOIN receipts_linearized as r USING (event_id, room_id)"
+            " WHERE r.room_id = ? AND r.receipt_type = ? AND r.user_id = ?"
+        )
+
+        txn.execute(sql, (room_id, receipt_type, user_id))
+        results = txn.fetchall()
+
+        if results:
+            res = self._simple_select_one_txn(
+                txn,
+                table="events",
+                retcols=["topological_ordering", "stream_ordering"],
+                keyvalues={"event_id": event_id},
+            )
+            topological_ordering = int(res["topological_ordering"])
+            stream_ordering = int(res["stream_ordering"])
+
+            for to, so, _ in results:
+                if int(to) > topological_ordering:
+                    return False
+                elif int(to) == topological_ordering and int(so) >= stream_ordering:
+                    return False
+
         self._simple_delete_txn(
             txn,
             table="receipts_linearized",
             keyvalues={
-                "stream_id": stream_id,
                 "room_id": room_id,
                 "receipt_type": receipt_type,
                 "user_id": user_id,
@@ -84,6 +130,8 @@ class ReceiptsStore(SQLBaseStore):
                 "event_id": event_id,
             }
         )
+
+        return True
 
     @defer.inlineCallbacks
     def insert_receipt(self, room_id, receipt_type, user_id, event_ids):
@@ -115,12 +163,15 @@ class ReceiptsStore(SQLBaseStore):
 
         stream_id_manager = yield self._receipts_id_gen.get_next(self)
         with stream_id_manager as stream_id:
-            yield self.runInteraction(
+            have_persisted = yield self.runInteraction(
                 "insert_linearized_receipt",
                 self.insert_linearized_receipt_txn,
                 room_id, receipt_type, user_id, linearized_event_id,
                 stream_id=stream_id,
             )
+
+            if not have_persisted:
+                defer.returnValue(None)
 
         yield self.insert_graph_receipt(
             room_id, receipt_type, user_id, event_ids

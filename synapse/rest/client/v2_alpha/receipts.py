@@ -28,7 +28,7 @@ class ReceiptRestServlet(RestServlet):
     PATTERN = client_v2_pattern(
         "/rooms/(?P<room_id>[^/]*)"
         "/receipt/(?P<receipt_type>[^/]*)"
-        "/(?P<event_id>[^/])*"
+        "/(?P<event_id>[^/]*)$"
     )
 
     def __init__(self, hs):
@@ -41,7 +41,6 @@ class ReceiptRestServlet(RestServlet):
     def on_POST(self, request, room_id, receipt_type, event_id):
         user, client = yield self.auth.get_user_by_req(request)
 
-        # TODO: STUFF
         yield self.receipts_handler.received_client_receipt(
             room_id,
             receipt_type,
