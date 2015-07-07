@@ -31,6 +31,7 @@ REQUIREMENTS = {
     "pillow": ["PIL"],
     "pydenticon": ["pydenticon"],
     "ujson": ["ujson"],
+    "pysaml2": ["saml2"],
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {
