@@ -31,6 +31,8 @@ class ReceiptsHandler(BaseHandler):
     def __init__(self, hs):
         super(ReceiptsHandler, self).__init__(hs)
 
+        self.hs = hs
+        self.federation = hs.get_replication_layer()
         self.federation.register_edu_handler(
             "m.receipt", self._received_remote_receipt
         )
@@ -89,13 +91,13 @@ class ReceiptsHandler(BaseHandler):
 
             with PreserveLoggingContext():
                 self.notifier.on_new_event(
-                    "recei[t_key", self._latest_serial, rooms=[room_id]
+                    "receipt_key", self._latest_serial, rooms=[room_id]
                 )
 
             localusers = set()
             remotedomains = set()
 
-            rm_handler = self.homeserver.get_handlers().room_member_handler
+            rm_handler = self.hs.get_handlers().room_member_handler
             yield rm_handler.fetch_room_distributions_into(
                 room_id, localusers=localusers, remotedomains=remotedomains
             )

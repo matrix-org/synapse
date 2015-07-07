@@ -18,7 +18,7 @@ from ._base import SQLBaseStore, cached
 from twisted.internet import defer
 
 
-class ReceiptStore(SQLBaseStore):
+class ReceiptsStore(SQLBaseStore):
 
     @cached
     @defer.inlineCallbacks
@@ -77,6 +77,7 @@ class ReceiptStore(SQLBaseStore):
             txn,
             table="receipts_linearized",
             values={
+                "stream_id": stream_id,
                 "room_id": room_id,
                 "receipt_type": receipt_type,
                 "user_id": user_id,
@@ -109,16 +110,16 @@ class ReceiptStore(SQLBaseStore):
                     return None
 
             linearized_event_id = yield self.runInteraction(
-                graph_to_linear, desc="insert_receipt_conv"
+                "insert_receipt_conv", graph_to_linear
             )
 
-        stream_id_manager = yield self._stream_id_gen.get_next(self)
-        with stream_id_manager() as stream_id:
+        stream_id_manager = yield self._receipts_id_gen.get_next(self)
+        with stream_id_manager as stream_id:
             yield self.runInteraction(
+                "insert_linearized_receipt",
                 self.insert_linearized_receipt_txn,
                 room_id, receipt_type, user_id, linearized_event_id,
                 stream_id=stream_id,
-                desc="insert_linearized_receipt"
             )
 
         yield self.insert_graph_receipt(
@@ -131,9 +132,9 @@ class ReceiptStore(SQLBaseStore):
     def insert_graph_receipt(self, room_id, receipt_type,
                              user_id, event_ids):
         return self.runInteraction(
+            "insert_graph_receipt",
             self.insert_graph_receipt_txn,
             room_id, receipt_type, user_id, event_ids,
-            desc="insert_graph_receipt"
         )
 
     def insert_graph_receipt_txn(self, txn, room_id, receipt_type,

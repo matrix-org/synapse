@@ -38,6 +38,8 @@ from .state import StateStore
 from .signatures import SignatureStore
 from .filtering import FilteringStore
 
+from .receipts import ReceiptsStore
+
 
 import fnmatch
 import imp
@@ -74,6 +76,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 PushRuleStore,
                 ApplicationServiceTransactionStore,
                 EventsStore,
+                ReceiptsStore,
                 ):
 
     def __init__(self, hs):
