@@ -37,8 +37,7 @@ class ReceiptsHandler(BaseHandler):
             "m.receipt", self._received_remote_receipt
         )
 
-        # self._earliest_cached_serial = 0
-        # self._rooms_to_latest_serial = {}
+        self._receipt_cache = None
 
     @defer.inlineCallbacks
     def received_client_receipt(self, room_id, receipt_type, user_id,
@@ -162,17 +161,9 @@ class ReceiptEventSource(object):
 
         rooms = yield self.store.get_rooms_for_user(user.to_string())
         rooms = [room.room_id for room in rooms]
-        events = []
-        for room_id in rooms:
-            content = yield self.store.get_linearized_receipts_for_room(
-                room_id, from_key, to_key
-            )
-            if content:
-                events.append({
-                    "type": "m.receipt",
-                    "room_id": room_id,
-                    "content": content,
-                })
+        events = yield self.store.get_linearized_receipts_for_rooms(
+            rooms, from_key, to_key
+        )
 
         defer.returnValue((events, to_key))
 
@@ -190,16 +181,8 @@ class ReceiptEventSource(object):
 
         rooms = yield self.store.get_rooms_for_user(user.to_string())
         rooms = [room.room_id for room in rooms]
-        events = []
-        for room_id in rooms:
-            content = yield self.store.get_linearized_receipts_for_room(
-                room_id, from_key, to_key
-            )
-            if content:
-                events.append({
-                    "type": "m.receipt",
-                    "room_id": room_id,
-                    "content": content,
-                })
+        events = yield self.store.get_linearized_receipts_for_rooms(
+            rooms, from_key, to_key
+        )
 
         defer.returnValue((events, to_key))
