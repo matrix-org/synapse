@@ -28,15 +28,26 @@ class ReceiptsStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_linearized_receipts_for_room(self, room_id, from_key, to_key):
         def f(txn):
-            sql = (
-                "SELECT * FROM receipts_linearized WHERE"
-                " room_id = ? AND stream_id > ? AND stream_id <= ?"
-            )
+            if from_key:
+                sql = (
+                    "SELECT * FROM receipts_linearized WHERE"
+                    " room_id = ? AND stream_id > ? AND stream_id <= ?"
+                )
 
-            txn.execute(
-                sql,
-                (room_id, from_key, to_key)
-            )
+                txn.execute(
+                    sql,
+                    (room_id, from_key, to_key)
+                )
+            else:
+                sql = (
+                    "SELECT * FROM receipts_linearized WHERE"
+                    " room_id = ? AND stream_id <= ?"
+                )
+
+                txn.execute(
+                    sql,
+                    (room_id, to_key)
+                )
 
             rows = self.cursor_to_dict(txn)
 

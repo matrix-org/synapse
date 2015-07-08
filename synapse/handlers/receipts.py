@@ -133,6 +133,24 @@ class ReceiptsHandler(BaseHandler):
                     },
                 )
 
+    @defer.inlineCallbacks
+    def get_receipts_for_room(self, room_id, to_key):
+        result = yield self.store.get_linearized_receipts_for_room(
+            room_id, None, to_key
+        )
+
+        if not result:
+            defer.returnValue([])
+
+        event = {
+            "type": "m.receipt",
+            "content": {
+                room_id: result,
+            },
+        }
+
+        defer.returnValue([event])
+
 
 class ReceiptEventSource(object):
     def __init__(self, hs):
@@ -168,4 +186,29 @@ class ReceiptEventSource(object):
 
     @defer.inlineCallbacks
     def get_pagination_rows(self, user, config, key):
-        defer.returnValue(([{}], 0))
+        to_key = int(config.from_key)
+
+        if config.to_key:
+            from_key = int(config.to_key)
+        else:
+            from_key = None
+
+        rooms = yield self.store.get_rooms_for_user(user.to_string())
+        rooms = [room.room_id for room in rooms]
+        content = {}
+        for room_id in rooms:
+            result = yield self.store.get_linearized_receipts_for_room(
+                room_id, from_key, to_key
+            )
+            if result:
+                content[room_id] = result
+
+        if not content:
+            defer.returnValue(([], to_key))
+
+        event = {
+            "type": "m.receipt",
+            "content": content,
+        }
+
+        defer.returnValue(([event], to_key))
