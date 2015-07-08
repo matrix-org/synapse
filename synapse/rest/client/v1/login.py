@@ -45,7 +45,8 @@ class LoginRestServlet(ClientV1RestServlet):
         self.idp_redirect_url = hs.config.saml2_config['idp_redirect_url']
 
     def on_GET(self, request):
-        return (200, {"flows": [{"type": LoginRestServlet.PASS_TYPE}, {"type": LoginRestServlet.SAML2_TYPE}]})
+        return (200, {"flows": [{"type": LoginRestServlet.PASS_TYPE},
+                                {"type": LoginRestServlet.SAML2_TYPE}]})
 
     def on_OPTIONS(self, request):
         return (200, {})
@@ -60,9 +61,10 @@ class LoginRestServlet(ClientV1RestServlet):
             elif login_submission["type"] == LoginRestServlet.SAML2_TYPE:
                 relay_state = ""
                 if "relay_state" in login_submission:
-                    relay_state = "&RelayState="+urllib.quote(login_submission["relay_state"])
+                    relay_state = "&RelayState="+urllib.quote(
+                                  login_submission["relay_state"])
                 result = {
-                    "uri": "%s%s"%(self.idp_redirect_url, relay_state)
+                    "uri": "%s%s" % (self.idp_redirect_url, relay_state)
                 }
                 defer.returnValue((200, result))
             else:
@@ -119,6 +121,7 @@ class PasswordResetRestServlet(ClientV1RestServlet):
                 "Missing keys. Requires 'email' and 'user_id'."
             )
 
+
 class SAML2RestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/login/saml2")
 
@@ -133,25 +136,35 @@ class SAML2RestServlet(ClientV1RestServlet):
             conf = config.SPConfig()
             conf.load_file(self.sp_config)
             SP = Saml2Client(conf)
-            saml2_auth = SP.parse_authn_request_response(request.args['SAMLResponse'][0], BINDING_HTTP_POST)
-        except Exception, e: # Not authenticated
+            saml2_auth = SP.parse_authn_request_response(
+                            request.args['SAMLResponse'][0], BINDING_HTTP_POST)
+        except Exception, e:        # Not authenticated
             logger = logging.getLogger(__name__)
             logger.exception(e)
-        if  saml2_auth and saml2_auth.status_ok() and not saml2_auth.not_signed:
+        if saml2_auth and saml2_auth.status_ok() and not saml2_auth.not_signed:
             username = saml2_auth.name_id.text
             handler = self.handlers.registration_handler
             (user_id, token) = yield handler.register_saml2(username)
             # Forward to the RelayState callback along with ava
             if 'RelayState' in request.args:
-                request.redirect(urllib.unquote(request.args['RelayState'][0])+'?status=authenticated&access_token='+token+'&user_id='+user_id+'&ava='+urllib.quote(json.dumps(saml2_auth.ava)))
+                request.redirect(urllib.unquote(
+                                 request.args['RelayState'][0]) +
+                                 '?status=authenticated&access_token=' +
+                                 token + '&user_id=' + user_id + '&ava=' +
+                                 urllib.quote(json.dumps(saml2_auth.ava)))
                 request.finish()
                 defer.returnValue(None)
-            defer.returnValue((200, {"status":"authenticated", "user_id": user_id, "token": token, "ava":saml2_auth.ava}))
+            defer.returnValue((200, {"status": "authenticated",
+                                     "user_id": user_id, "token": token,
+                                     "ava": saml2_auth.ava}))
         elif 'RelayState' in request.args:
-            request.redirect(urllib.unquote(request.args['RelayState'][0])+'?status=not_authenticated')
+            request.redirect(urllib.unquote(
+                             request.args['RelayState'][0]) +
+                             '?status=not_authenticated')
             request.finish()
             defer.returnValue(None)
-        defer.returnValue((200, {"status":"not_authenticated"}))
+        defer.returnValue((200, {"status": "not_authenticated"}))
+
 
 def _parse_json(request):
     try:
