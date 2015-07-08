@@ -207,7 +207,7 @@ class JsonResource(HttpServer, resource.Resource):
             incoming_requests_counter.inc(request.method, servlet_classname)
 
             args = [
-                urllib.unquote(u).decode("UTF-8") for u in m.groups()
+                urllib.unquote(u).decode("UTF-8") if u else u for u in m.groups()
             ]
 
             callback_return = yield callback(request, *args)
