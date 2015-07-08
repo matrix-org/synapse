@@ -25,16 +25,9 @@ GENERATE_DH_PARAMS = False
 class TlsConfig(Config):
     def read_config(self, config):
         self.tls_certificate = self.read_tls_certificate(
-            config.get("tls_certificate_path"),
-            "tls_certificate"
+            config.get("tls_certificate_path")
         )
-
-        tls_certificate_chain_path = config.get("tls_certificate_chain_path")
-
-        if tls_certificate_chain_path and os.path.exists(tls_certificate_chain_path):
-            self.tls_certificate_chain_file = tls_certificate_chain_path
-        else:
-            self.tls_certificate_chain = None
+        self.tls_certificate_file = config.get("tls_certificate_path");
 
         self.no_tls = config.get("no_tls", False)
 
@@ -53,21 +46,16 @@ class TlsConfig(Config):
         base_key_name = os.path.join(config_dir_path, server_name)
 
         tls_certificate_path = base_key_name + ".tls.crt"
-        tls_certificate_chain_path = base_key_name + ".tls.chain.crt"
         tls_private_key_path = base_key_name + ".tls.key"
         tls_dh_params_path = base_key_name + ".tls.dh"
 
         return """\
-        # PEM encoded X509 certificate for TLS
+        # PEM encoded X509 certificate for TLS.
+        # You can replace the self-signed certificate that synapse
+        # autogenerates on launch with your own SSL certificate + key pair
+        # if you like.  Any required intermediary certificates can be
+        # appended after the primary certificate in hierarchical order.
         tls_certificate_path: "%(tls_certificate_path)s"
-
-        # PEM encoded X509 intermediary certificate file for TLS (optional)
-        # This *must* be a concatenation of the tls_certificate pointed to
-        # by tls_certificate_path followed by the intermediary certificates
-        # in hierarchical order.  If specified this option overrides the
-        # tls_certificate_path parameter.
-        #
-        # tls_certificate_chain_path: "%(tls_certificate_chain_path)s"
 
         # PEM encoded private key for TLS
         tls_private_key_path: "%(tls_private_key_path)s"
@@ -79,8 +67,8 @@ class TlsConfig(Config):
         no_tls: False
         """ % locals()
 
-    def read_tls_certificate(self, cert_path, config_name):
-        cert_pem = self.read_file(cert_path, config_name)
+    def read_tls_certificate(self, cert_path):
+        cert_pem = self.read_file(cert_path, "tls_certificate")
         return crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
 
     def read_tls_private_key(self, private_key_path):
