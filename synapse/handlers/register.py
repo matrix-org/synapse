@@ -220,7 +220,6 @@ class RegistrationHandler(BaseHandler):
             # Ignore Registration errors
             logger.exception(e)
         defer.returnValue((user_id, token))
-        
 
     @defer.inlineCallbacks
     def register_email(self, threepidCreds):

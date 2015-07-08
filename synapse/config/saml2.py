@@ -15,6 +15,7 @@
 
 from ._base import Config
 
+
 class SAML2Config(Config):
     def read_config(self, config):
         self.saml2_config = config["saml2_config"]
@@ -24,4 +25,4 @@ class SAML2Config(Config):
         saml2_config:
             config_path: "%s/sp_conf.py"
             idp_redirect_url: "http://%s/idp"
-        """%(config_dir_path, server_name)
+        """ % (config_dir_path, server_name)
