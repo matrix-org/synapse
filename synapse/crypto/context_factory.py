@@ -35,7 +35,7 @@ class ServerContextFactory(ssl.ContextFactory):
             _ecCurve = _OpenSSLECCurve(_defaultCurveName)
             _ecCurve.addECKeyToContext(context)
         except:
-            logger.exception("Failed to enable eliptic curve for TLS")
+            logger.exception("Failed to enable elliptic curve for TLS")
         context.set_options(SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3)
         context.use_certificate(config.tls_certificate)
         if config.tls_certificate_chain:
