@@ -38,8 +38,8 @@ class ServerContextFactory(ssl.ContextFactory):
             logger.exception("Failed to enable elliptic curve for TLS")
         context.set_options(SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3)
         context.use_certificate(config.tls_certificate)
-        if config.tls_certificate_chain:
-            context.use_certificate_chain_file(config.tls_certificate_chain)
+        if config.tls_certificate_chain_file:
+            context.use_certificate_chain_file(config.tls_certificate_chain_file)
 
         if not config.no_tls:
             context.use_privatekey(config.tls_private_key)

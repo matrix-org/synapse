@@ -32,10 +32,7 @@ class TlsConfig(Config):
         tls_certificate_chain_path = config.get("tls_certificate_chain_path")
 
         if tls_certificate_chain_path and os.path.exists(tls_certificate_chain_path):
-            self.tls_certificate_chain = self.read_tls_certificate(
-                config.get("tls_certificate_chain_path"),
-                "tls_certificate_chain"
-            )
+            self.tls_certificate_chain_file = tls_certificate_chain_path
         else:
             self.tls_certificate_chain = None
 
