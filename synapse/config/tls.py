@@ -62,6 +62,11 @@ class TlsConfig(Config):
         tls_certificate_path: "%(tls_certificate_path)s"
 
         # PEM encoded X509 intermediary certificate file for TLS (optional)
+        # This *must* be a concatenation of the tls_certificate pointed to
+        # by tls_certificate_path followed by the intermediary certificates
+        # in hierarchical order.  If specified this option overrides the
+        # tls_certificate_path parameter.
+        #
         # tls_certificate_chain_path: "%(tls_certificate_chain_path)s"
 
         # PEM encoded private key for TLS
