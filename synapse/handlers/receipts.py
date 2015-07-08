@@ -144,9 +144,8 @@ class ReceiptsHandler(BaseHandler):
 
         event = {
             "type": "m.receipt",
-            "content": {
-                room_id: result,
-            },
+            "room_id": room_id,
+            "content": result,
         }
 
         defer.returnValue([event])
@@ -163,23 +162,19 @@ class ReceiptEventSource(object):
 
         rooms = yield self.store.get_rooms_for_user(user.to_string())
         rooms = [room.room_id for room in rooms]
-        content = {}
+        events = []
         for room_id in rooms:
-            result = yield self.store.get_linearized_receipts_for_room(
+            content = yield self.store.get_linearized_receipts_for_room(
                 room_id, from_key, to_key
             )
-            if result:
-                content[room_id] = result
+            if content:
+                events.append({
+                    "type": "m.receipt",
+                    "room_id": room_id,
+                    "content": content,
+                })
 
-        if not content:
-            defer.returnValue(([], to_key))
-
-        event = {
-            "type": "m.receipt",
-            "content": content,
-        }
-
-        defer.returnValue(([event], to_key))
+        defer.returnValue((events, to_key))
 
     def get_current_key(self, direction='f'):
         return self.store.get_max_receipt_stream_id()
@@ -195,20 +190,16 @@ class ReceiptEventSource(object):
 
         rooms = yield self.store.get_rooms_for_user(user.to_string())
         rooms = [room.room_id for room in rooms]
-        content = {}
+        events = []
         for room_id in rooms:
-            result = yield self.store.get_linearized_receipts_for_room(
+            content = yield self.store.get_linearized_receipts_for_room(
                 room_id, from_key, to_key
             )
-            if result:
-                content[room_id] = result
+            if content:
+                events.append({
+                    "type": "m.receipt",
+                    "room_id": room_id,
+                    "content": content,
+                })
 
-        if not content:
-            defer.returnValue(([], to_key))
-
-        event = {
-            "type": "m.receipt",
-            "content": content,
-        }
-
-        defer.returnValue(([event], to_key))
+        defer.returnValue((events, to_key))
