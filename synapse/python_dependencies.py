@@ -31,6 +31,7 @@ REQUIREMENTS = {
     "pillow": ["PIL"],
     "pydenticon": ["pydenticon"],
     "ujson": ["ujson"],
+    "blist": ["blist"],
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {
