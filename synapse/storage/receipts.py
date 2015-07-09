@@ -21,6 +21,7 @@ from synapse.util import unwrapFirstError
 
 from blist import sorteddict
 import logging
+import ujson as json
 
 
 logger = logging.getLogger(__name__)
@@ -91,8 +92,8 @@ class ReceiptsStore(SQLBaseStore):
             content.setdefault(
                 row["event_id"], {}
             ).setdefault(
-                row["receipt_type"], []
-            ).append(row["user_id"])
+                row["receipt_type"], {}
+            )[row["user_id"]] = json.loads(row["data"])
 
         defer.returnValue([{
             "type": "m.receipt",
@@ -124,7 +125,7 @@ class ReceiptsStore(SQLBaseStore):
         defer.returnValue(result)
 
     def insert_linearized_receipt_txn(self, txn, room_id, receipt_type,
-                                      user_id, event_id, stream_id):
+                                      user_id, event_id, data, stream_id):
 
         # We don't want to clobber receipts for more recent events, so we
         # have to compare orderings of existing receipts
@@ -172,13 +173,14 @@ class ReceiptsStore(SQLBaseStore):
                 "receipt_type": receipt_type,
                 "user_id": user_id,
                 "event_id": event_id,
+                "data": json.dumps(data),
             }
         )
 
         return True
 
     @defer.inlineCallbacks
-    def insert_receipt(self, room_id, receipt_type, user_id, event_ids):
+    def insert_receipt(self, room_id, receipt_type, user_id, event_ids, data):
         if not event_ids:
             return
 
@@ -214,6 +216,7 @@ class ReceiptsStore(SQLBaseStore):
                 "insert_linearized_receipt",
                 self.insert_linearized_receipt_txn,
                 room_id, receipt_type, user_id, linearized_event_id,
+                data,
                 stream_id=stream_id,
             )
 
@@ -221,22 +224,22 @@ class ReceiptsStore(SQLBaseStore):
                 defer.returnValue(None)
 
         yield self.insert_graph_receipt(
-            room_id, receipt_type, user_id, event_ids
+            room_id, receipt_type, user_id, event_ids, data
         )
 
         max_persisted_id = yield self._stream_id_gen.get_max_token(self)
         defer.returnValue((stream_id, max_persisted_id))
 
-    def insert_graph_receipt(self, room_id, receipt_type,
-                             user_id, event_ids):
+    def insert_graph_receipt(self, room_id, receipt_type, user_id, event_ids,
+                             data):
         return self.runInteraction(
             "insert_graph_receipt",
             self.insert_graph_receipt_txn,
-            room_id, receipt_type, user_id, event_ids,
+            room_id, receipt_type, user_id, event_ids, data
         )
 
     def insert_graph_receipt_txn(self, txn, room_id, receipt_type,
-                                 user_id, event_ids):
+                                 user_id, event_ids, data):
         self._simple_delete_txn(
             txn,
             table="receipts_graph",
@@ -246,18 +249,16 @@ class ReceiptsStore(SQLBaseStore):
                 "user_id": user_id,
             }
         )
-        self._simple_insert_many_txn(
+        self._simple_insert_txn(
             txn,
             table="receipts_graph",
-            values=[
-                {
-                    "room_id": room_id,
-                    "receipt_type": receipt_type,
-                    "user_id": user_id,
-                    "event_id": event_id,
-                }
-                for event_id in event_ids
-            ],
+            values={
+                "room_id": room_id,
+                "receipt_type": receipt_type,
+                "user_id": user_id,
+                "event_ids": json.dumps(event_ids),
+                "data": json.dumps(data),
+            }
         )
 
 

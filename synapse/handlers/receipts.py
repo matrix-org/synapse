@@ -36,6 +36,7 @@ class ReceiptsHandler(BaseHandler):
         self.federation.register_edu_handler(
             "m.receipt", self._received_remote_receipt
         )
+        self.clock = self.hs.get_clock()
 
         self._receipt_cache = None
 
@@ -51,6 +52,9 @@ class ReceiptsHandler(BaseHandler):
             "receipt_type": receipt_type,
             "user_id": user_id,
             "event_ids": [event_id],
+            "data": {
+                "ts": self.clock.time_msec()
+            }
         }
 
         is_new = yield self._handle_new_receipts([receipt])
@@ -65,12 +69,12 @@ class ReceiptsHandler(BaseHandler):
                 "room_id": room_id,
                 "receipt_type": receipt_type,
                 "user_id": user_id,
-                "event_ids": [event_id],
+                "event_ids": user_values["event_ids"],
+                "data": user_values.get("data", {}),
             }
             for room_id, room_values in content.items()
-            for event_id, ev_values in room_values.items()
-            for receipt_type, users in ev_values.items()
-            for user_id in users
+            for receipt_type, users in room_values.items()
+            for user_id, user_values in users.items()
         ]
 
         yield self._handle_new_receipts(receipts)
@@ -82,9 +86,10 @@ class ReceiptsHandler(BaseHandler):
             receipt_type = receipt["receipt_type"]
             user_id = receipt["user_id"]
             event_ids = receipt["event_ids"]
+            data = receipt["data"]
 
             res = yield self.store.insert_receipt(
-                room_id, receipt_type, user_id, event_ids,
+                room_id, receipt_type, user_id, event_ids, data
             )
 
             if not res:
@@ -108,6 +113,7 @@ class ReceiptsHandler(BaseHandler):
             receipt_type = receipt["receipt_type"]
             user_id = receipt["user_id"]
             event_ids = receipt["event_ids"]
+            data = receipt["data"]
 
             remotedomains = set()
 
@@ -124,10 +130,12 @@ class ReceiptsHandler(BaseHandler):
                     edu_type="m.receipt",
                     content={
                         room_id: {
-                            event_id: {
-                                receipt_type: [user_id]
+                            receipt_type: {
+                                user_id: {
+                                    "event_ids": event_ids,
+                                    "data": data,
+                                }
                             }
-                            for event_id in event_ids
                         },
                     },
                 )

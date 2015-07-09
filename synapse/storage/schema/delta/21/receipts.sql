@@ -18,11 +18,9 @@ CREATE TABLE IF NOT EXISTS receipts_graph(
     room_id TEXT NOT NULL,
     receipt_type TEXT NOT NULL,
     user_id TEXT NOT NULL,
-    event_id TEXT NOT NULL
-);
-
-CREATE INDEX receipts_graph_room_tuple ON receipts_graph(
-  room_id, receipt_type, user_id
+    event_ids TEXT NOT NULL,
+    data TEXT NOT NULL,
+    CONSTRAINT receipts_graph_uniqueness UNIQUE (room_id, receipt_type, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS receipts_linearized (
@@ -30,11 +28,9 @@ CREATE TABLE IF NOT EXISTS receipts_linearized (
     room_id TEXT NOT NULL,
     receipt_type TEXT NOT NULL,
     user_id TEXT NOT NULL,
-    event_id TEXT NOT NULL
-);
-
-CREATE INDEX receipts_linearized_room_tuple ON receipts_linearized(
-  room_id, receipt_type, user_id
+    event_id TEXT NOT NULL,
+    data TEXT NOT NULL,
+    CONSTRAINT receipts_linearized_uniqueness UNIQUE (room_id, receipt_type, user_id)
 );
 
 CREATE INDEX receipts_linearized_id ON receipts_linearized(
