@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains handlers for federation events."""
-
 from ._base import BaseHandler
 
 from twisted.internet import defer
