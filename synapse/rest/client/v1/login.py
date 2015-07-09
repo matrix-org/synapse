@@ -20,19 +20,15 @@ from synapse.types import UserID
 from base import ClientV1RestServlet, client_path_pattern
 
 import simplejson as json
-import cgi
 import urllib
 
 import logging
-from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
-from saml2.metadata import create_metadata_string
 from saml2 import config
 from saml2.client import Saml2Client
-from saml2.httputil import ServiceError
-from saml2.samlp import Extensions
-from saml2.extension.pefim import SPCertEnc
-from saml2.s_utils import rndstr
+
+
+logger = logging.getLogger(__name__)
 
 
 class LoginRestServlet(ClientV1RestServlet):
@@ -137,9 +133,8 @@ class SAML2RestServlet(ClientV1RestServlet):
             conf.load_file(self.sp_config)
             SP = Saml2Client(conf)
             saml2_auth = SP.parse_authn_request_response(
-                            request.args['SAMLResponse'][0], BINDING_HTTP_POST)
+                request.args['SAMLResponse'][0], BINDING_HTTP_POST)
         except Exception, e:        # Not authenticated
-            logger = logging.getLogger(__name__)
             logger.exception(e)
         if saml2_auth and saml2_auth.status_ok() and not saml2_auth.not_signed:
             username = saml2_auth.name_id.text
