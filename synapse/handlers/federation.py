@@ -242,6 +242,10 @@ class FederationHandler(BaseHandler):
             if history:
                 visibility = history.content.get("history_visibility", "shared")
                 if visibility in ["invited", "joined"]:
+                    # We now loop through all state events looking for
+                    # membership states for the requesting server to determine
+                    # if the server is either in the room or has been invited
+                    # into the room.
                     for ev in state.values():
                         if ev.type != EventTypes.Member:
                             continue
