@@ -188,6 +188,7 @@ class ReceiptsStore(SQLBaseStore):
             linearized_event_id = event_ids[0]
         else:
             # we need to points in graph -> linearized form.
+            # TODO: Make this better.
             def graph_to_linear(txn):
                 query = (
                     "SELECT event_id WHERE room_id = ? AND stream_ordering IN ("
@@ -200,8 +201,7 @@ class ReceiptsStore(SQLBaseStore):
                 if rows:
                     return rows[0][0]
                 else:
-                    # TODO: ARGH?!
-                    return None
+                    raise RuntimeError("Unrecognized event_ids: %r" % (event_ids,))
 
             linearized_event_id = yield self.runInteraction(
                 "insert_receipt_conv", graph_to_linear
