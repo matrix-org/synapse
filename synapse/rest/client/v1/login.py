@@ -39,10 +39,13 @@ class LoginRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__(hs)
         self.idp_redirect_url = hs.config.saml2_config['idp_redirect_url']
+        self.saml2_enabled = hs.config.saml2_config['enabled']
 
     def on_GET(self, request):
-        return (200, {"flows": [{"type": LoginRestServlet.PASS_TYPE},
-                                {"type": LoginRestServlet.SAML2_TYPE}]})
+        flows = [{"type": LoginRestServlet.PASS_TYPE}]
+        if self.saml2_enabled:
+            flows.append({"type": LoginRestServlet.SAML2_TYPE})
+        return (200, {"flows": flows})
 
     def on_OPTIONS(self, request):
         return (200, {})
@@ -54,7 +57,8 @@ class LoginRestServlet(ClientV1RestServlet):
             if login_submission["type"] == LoginRestServlet.PASS_TYPE:
                 result = yield self.do_password_login(login_submission)
                 defer.returnValue(result)
-            elif login_submission["type"] == LoginRestServlet.SAML2_TYPE:
+            elif self.saml2_enabled and (login_submission["type"] ==
+                                         LoginRestServlet.SAML2_TYPE):
                 relay_state = ""
                 if "relay_state" in login_submission:
                     relay_state = "&RelayState="+urllib.quote(
@@ -173,5 +177,6 @@ def _parse_json(request):
 
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
-    SAML2RestServlet(hs).register(http_server)
+    if hs.config.saml2_config['enabled']:
+        SAML2RestServlet(hs).register(http_server)
     # TODO PasswordResetRestServlet(hs).register(http_server)
