@@ -27,7 +27,7 @@ class TlsConfig(Config):
         self.tls_certificate = self.read_tls_certificate(
             config.get("tls_certificate_path")
         )
-        self.tls_certificate_file = config.get("tls_certificate_path");
+        self.tls_certificate_file = config.get("tls_certificate_path")
 
         self.no_tls = config.get("no_tls", False)
 
