@@ -55,14 +55,8 @@ class EndToEndKeyStore(SQLBaseStore):
             return result
         return self.runInteraction("get_e2e_device_keys", _get_e2e_device_keys)
 
-    def add_e2e_one_time_keys(self, user_id, device_id, time_now, valid_until,
-                              key_list):
+    def add_e2e_one_time_keys(self, user_id, device_id, time_now, key_list):
         def _add_e2e_one_time_keys(txn):
-            sql = (
-                "DELETE FROM e2e_one_time_keys_json"
-                " WHERE user_id = ? AND device_id = ? AND valid_until_ms < ?"
-            )
-            txn.execute(sql, (user_id, device_id, time_now))
             for (algorithm, key_id, json_bytes) in key_list:
                 self._simple_upsert_txn(
                     txn, table="e2e_one_time_keys_json",
@@ -74,7 +68,6 @@ class EndToEndKeyStore(SQLBaseStore):
                     },
                     values={
                         "ts_added_ms": time_now,
-                        "valid_until_ms": valid_until,
                         "key_json": json_bytes,
                     }
                 )
@@ -82,7 +75,7 @@ class EndToEndKeyStore(SQLBaseStore):
             "add_e2e_one_time_keys", _add_e2e_one_time_keys
         )
 
-    def count_e2e_one_time_keys(self, user_id, device_id, time_now):
+    def count_e2e_one_time_keys(self, user_id, device_id):
         """ Count the number of one time keys the server has for a device
         Returns:
             Dict mapping from algorithm to number of keys for that algorithm.
@@ -90,10 +83,10 @@ class EndToEndKeyStore(SQLBaseStore):
         def _count_e2e_one_time_keys(txn):
             sql = (
                 "SELECT algorithm, COUNT(key_id) FROM e2e_one_time_keys_json"
-                " WHERE user_id = ? AND device_id = ? AND valid_until_ms >= ?"
+                " WHERE user_id = ? AND device_id = ?"
                 " GROUP BY algorithm"
             )
-            txn.execute(sql, (user_id, device_id, time_now))
+            txn.execute(sql, (user_id, device_id))
             result = {}
             for algorithm, key_count in txn.fetchall():
                 result[algorithm] = key_count
@@ -102,13 +95,12 @@ class EndToEndKeyStore(SQLBaseStore):
             "count_e2e_one_time_keys", _count_e2e_one_time_keys
         )
 
-    def take_e2e_one_time_keys(self, query_list, time_now):
+    def take_e2e_one_time_keys(self, query_list):
         """Take a list of one time keys out of the database"""
         def _take_e2e_one_time_keys(txn):
             sql = (
                 "SELECT key_id, key_json FROM e2e_one_time_keys_json"
                 " WHERE user_id = ? AND device_id = ? AND algorithm = ?"
-                " AND valid_until_ms > ?"
                 " LIMIT 1"
             )
             result = {}
@@ -116,7 +108,7 @@ class EndToEndKeyStore(SQLBaseStore):
             for user_id, device_id, algorithm in query_list:
                 user_result = result.setdefault(user_id, {})
                 device_result = user_result.setdefault(device_id, {})
-                txn.execute(sql, (user_id, device_id, algorithm, time_now))
+                txn.execute(sql, (user_id, device_id, algorithm))
                 for key_id, key_json in txn.fetchall():
                     device_result[algorithm + ":" + key_id] = key_json
                     delete.append((user_id, device_id, algorithm, key_id))

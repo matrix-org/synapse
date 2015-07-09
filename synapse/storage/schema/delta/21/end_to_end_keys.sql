@@ -29,7 +29,6 @@ CREATE TABLE IF NOT EXISTS e2e_one_time_keys_json (
     algorithm TEXT NOT NULL, -- Which algorithm this one-time key is for.
     key_id TEXT NOT NULL, -- An id for suppressing duplicate uploads.
     ts_added_ms BIGINT NOT NULL, -- When this key was uploaded.
-    valid_until_ms BIGINT NOT NULL, -- When this key is valid until.
     key_json TEXT NOT NULL, -- The key as a JSON blob.
     CONSTRAINT uniqueness UNIQUE (user_id, device_id, algorithm, key_id)
 );

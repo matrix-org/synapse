@@ -50,7 +50,6 @@ class KeyUploadServlet(RestServlet):
       "one_time_keys": {
         "<algorithm>:<key_id>": "<key_base64>"
       },
-      "one_time_keys_valid_for": <millisecond duration>,
     }
     """
     PATTERN = client_v2_pattern("/keys/upload/(?P<device_id>[^/]*)")
@@ -87,13 +86,10 @@ class KeyUploadServlet(RestServlet):
             )
 
         one_time_keys = body.get("one_time_keys", None)
-        one_time_keys_valid_for = body.get("one_time_keys_valid_for", None)
         if one_time_keys:
-            valid_until = int(one_time_keys_valid_for) + time_now
             logger.info(
-                "Adding %d one_time_keys for device %r for user %r at %d"
-                " valid_until %d",
-                len(one_time_keys), device_id, user_id, time_now, valid_until
+                "Adding %d one_time_keys for device %r for user %r at %d",
+                len(one_time_keys), device_id, user_id, time_now
             )
             key_list = []
             for key_id, key_json in one_time_keys.items():
@@ -103,23 +99,18 @@ class KeyUploadServlet(RestServlet):
                 ))
 
             yield self.store.add_e2e_one_time_keys(
-                user_id, device_id, time_now, valid_until, key_list
+                user_id, device_id, time_now, key_list
             )
 
-        result = yield self.store.count_e2e_one_time_keys(
-            user_id, device_id, time_now
-        )
+        result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
         defer.returnValue((200, {"one_time_key_counts": result}))
 
     @defer.inlineCallbacks
     def on_GET(self, request, device_id):
         auth_user, client_info = yield self.auth.get_user_by_req(request)
         user_id = auth_user.to_string()
-        time_now = self.clock.time_msec()
 
-        result = yield self.store.count_e2e_one_time_keys(
-            user_id, device_id, time_now
-        )
+        result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
         defer.returnValue((200, {"one_time_key_counts": result}))
 
 
@@ -249,9 +240,8 @@ class OneTimeKeyServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, device_id, algorithm):
         yield self.auth.get_user_by_req(request)
-        time_now = self.clock.time_msec()
         results = yield self.store.take_e2e_one_time_keys(
-            [(user_id, device_id, algorithm)], time_now
+            [(user_id, device_id, algorithm)]
         )
         defer.returnValue(self.json_result(request, results))
 
@@ -266,8 +256,7 @@ class OneTimeKeyServlet(RestServlet):
         for user_id, device_keys in body.get("one_time_keys", {}).items():
             for device_id, algorithm in device_keys.items():
                 query.append((user_id, device_id, algorithm))
-        time_now = self.clock.time_msec()
-        results = yield self.store.take_e2e_one_time_keys(query, time_now)
+        results = yield self.store.take_e2e_one_time_keys(query)
         defer.returnValue(self.json_result(request, results))
 
     def json_result(self, request, results):
