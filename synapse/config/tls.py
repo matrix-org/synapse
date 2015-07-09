@@ -27,6 +27,7 @@ class TlsConfig(Config):
         self.tls_certificate = self.read_tls_certificate(
             config.get("tls_certificate_path")
         )
+        self.tls_certificate_file = config.get("tls_certificate_path")
 
         self.no_tls = config.get("no_tls", False)
 
@@ -49,7 +50,11 @@ class TlsConfig(Config):
         tls_dh_params_path = base_key_name + ".tls.dh"
 
         return """\
-        # PEM encoded X509 certificate for TLS
+        # PEM encoded X509 certificate for TLS.
+        # You can replace the self-signed certificate that synapse
+        # autogenerates on launch with your own SSL certificate + key pair
+        # if you like.  Any required intermediary certificates can be
+        # appended after the primary certificate in hierarchical order.
         tls_certificate_path: "%(tls_certificate_path)s"
 
         # PEM encoded private key for TLS
