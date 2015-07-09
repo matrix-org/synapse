@@ -53,7 +53,7 @@ class ReceiptsHandler(BaseHandler):
             "user_id": user_id,
             "event_ids": [event_id],
             "data": {
-                "ts": self.clock.time_msec()
+                "ts": int(self.clock.time_msec()),
             }
         }
 
