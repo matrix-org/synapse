@@ -41,11 +41,11 @@ class KeyUploadServlet(RestServlet):
           "m.olm.curve25519-aes-sha256",
         ]
         "keys": {
-          "<algorithm>:<key_id>": "<key_base64>",
+          "<algorithm>:<device_id>": "<key_base64>",
         },
         "signatures:" {
-          "<user_id>/<device_id>" {
-            "<algorithm>:<key_id>": "<signature_base64>"
+          "<user_id>" {
+            "<algorithm>:<device_id>": "<signature_base64>"
       } } },
       "one_time_keys": {
         "<algorithm>:<key_id>": "<key_base64>"
