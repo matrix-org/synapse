@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS e2e_device_keys_json (
     device_id TEXT NOT NULL, -- Which of the user's devices these keys are for.
     ts_added_ms BIGINT NOT NULL, -- When the keys were uploaded.
     key_json TEXT NOT NULL, -- The keys for the device as a JSON blob.
-    CONSTRAINT uniqueness UNIQUE (user_id, device_id)
+    CONSTRAINT e2e_device_keys_json_uniqueness UNIQUE (user_id, device_id)
 );
 
 
@@ -30,5 +30,5 @@ CREATE TABLE IF NOT EXISTS e2e_one_time_keys_json (
     key_id TEXT NOT NULL, -- An id for suppressing duplicate uploads.
     ts_added_ms BIGINT NOT NULL, -- When this key was uploaded.
     key_json TEXT NOT NULL, -- The key as a JSON blob.
-    CONSTRAINT uniqueness UNIQUE (user_id, device_id, algorithm, key_id)
+    CONSTRAINT e2e_one_time_keys_json_uniqueness UNIQUE (user_id, device_id, algorithm, key_id)
 );
