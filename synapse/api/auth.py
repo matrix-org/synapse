@@ -187,6 +187,9 @@ class Auth(object):
             join_rule = JoinRules.INVITE
 
         user_level = self._get_user_power_level(event.user_id, auth_events)
+        target_level = self._get_user_power_level(
+            target_user_id, auth_events
+        )
 
         # FIXME (erikj): What should we do here as the default?
         ban_level = self._get_named_level(auth_events, "ban", 50)
@@ -258,12 +261,12 @@ class Auth(object):
             elif target_user_id != event.user_id:
                 kick_level = self._get_named_level(auth_events, "kick", 50)
 
-                if user_level < kick_level:
+                if user_level < kick_level or user_level < target_level:
                     raise AuthError(
                         403, "You cannot kick user %s." % target_user_id
                     )
         elif Membership.BAN == membership:
-            if user_level < ban_level:
+            if user_level < ban_level or user_level < target_level:
                 raise AuthError(403, "You don't have permission to ban")
         else:
             raise AuthError(500, "Unknown membership %s" % membership)
