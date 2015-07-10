@@ -38,8 +38,8 @@ class LoginRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__(hs)
-        self.idp_redirect_url = hs.config.saml2_config['idp_redirect_url']
-        self.saml2_enabled = hs.config.saml2_config['enabled']
+        self.idp_redirect_url = hs.config.saml2_idp_redirect_url
+        self.saml2_enabled = hs.config.saml2_enabled
 
     def on_GET(self, request):
         flows = [{"type": LoginRestServlet.PASS_TYPE}]
@@ -127,7 +127,7 @@ class SAML2RestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(SAML2RestServlet, self).__init__(hs)
-        self.sp_config = hs.config.saml2_config['config_path']
+        self.sp_config = hs.config.saml2_config_path
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -177,6 +177,6 @@ def _parse_json(request):
 
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
-    if hs.config.saml2_config['enabled']:
+    if hs.config.saml2_enabled:
         SAML2RestServlet(hs).register(http_server)
     # TODO PasswordResetRestServlet(hs).register(http_server)
