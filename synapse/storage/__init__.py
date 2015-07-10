@@ -37,6 +37,7 @@ from .rejections import RejectionsStore
 from .state import StateStore
 from .signatures import SignatureStore
 from .filtering import FilteringStore
+from .end_to_end_keys import EndToEndKeyStore
 
 
 import fnmatch
@@ -51,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 20
+SCHEMA_VERSION = 21
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -74,6 +75,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 PushRuleStore,
                 ApplicationServiceTransactionStore,
                 EventsStore,
+                EndToEndKeyStore,
                 ):
 
     def __init__(self, hs):
