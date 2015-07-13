@@ -19,7 +19,9 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 from synapse.types import UserID, RoomAlias, RoomID
-from synapse.api.constants import EventTypes, Membership, JoinRules
+from synapse.api.constants import (
+    EventTypes, Membership, JoinRules, RoomCreationPreset,
+)
 from synapse.api.errors import StoreError, SynapseError
 from synapse.util import stringutils, unwrapFirstError
 from synapse.util.async import run_on_reactor
@@ -32,6 +34,19 @@ logger = logging.getLogger(__name__)
 
 
 class RoomCreationHandler(BaseHandler):
+
+    PRESETS_DICT = {
+        RoomCreationPreset.PrivateChat: {
+            "join_rules": JoinRules.INVITE,
+            "history_visibility": "invited",
+            "everyone_ops": False,
+        },
+        RoomCreationPreset.PublicChat: {
+            "join_rules": JoinRules.PUBLIC,
+            "history_visibility": "shared",
+            "everyone_ops": False,
+        },
+    }
 
     @defer.inlineCallbacks
     def create_room(self, user_id, room_id, config):
@@ -121,9 +136,18 @@ class RoomCreationHandler(BaseHandler):
                 servers=[self.hs.hostname],
             )
 
+        preset_config = config.get(
+            "preset",
+            RoomCreationPreset.PublicChat
+            if is_public
+            else RoomCreationPreset.PrivateChat
+        )
+
         user = UserID.from_string(user_id)
         creation_events = self._create_events_for_new_room(
-            user, room_id, is_public=is_public
+            user, room_id,
+            preset_config=preset_config,
+            invite_list=invite_list,
         )
 
         msg_handler = self.hs.get_handlers().message_handler
@@ -170,7 +194,10 @@ class RoomCreationHandler(BaseHandler):
 
         defer.returnValue(result)
 
-    def _create_events_for_new_room(self, creator, room_id, is_public=False):
+    def _create_events_for_new_room(self, creator, room_id, preset_config,
+                                    invite_list):
+        config = RoomCreationHandler.PRESETS_DICT[preset_config]
+
         creator_id = creator.to_string()
 
         event_keys = {
@@ -203,37 +230,48 @@ class RoomCreationHandler(BaseHandler):
             },
         )
 
+        power_level_content = {
+            "users": {
+                creator.to_string(): 100,
+            },
+            "users_default": 0,
+            "events": {
+                EventTypes.Name: 100,
+                EventTypes.PowerLevels: 100,
+                EventTypes.RoomHistoryVisibility: 100,
+            },
+            "events_default": 0,
+            "state_default": 50,
+            "ban": 50,
+            "kick": 50,
+            "redact": 50,
+            "invite": 0,
+        }
+
+        if config["everyone_ops"]:
+            for invitee in invite_list:
+                power_level_content["users"][invitee] = 100
+
         power_levels_event = create(
             etype=EventTypes.PowerLevels,
-            content={
-                "users": {
-                    creator.to_string(): 100,
-                },
-                "users_default": 0,
-                "events": {
-                    EventTypes.Name: 100,
-                    EventTypes.PowerLevels: 100,
-                    EventTypes.RoomHistoryVisibility: 100,
-                },
-                "events_default": 0,
-                "state_default": 50,
-                "ban": 50,
-                "kick": 50,
-                "redact": 50,
-                "invite": 0,
-            },
+            content=power_level_content,
         )
 
-        join_rule = JoinRules.PUBLIC if is_public else JoinRules.INVITE
         join_rules_event = create(
             etype=EventTypes.JoinRules,
-            content={"join_rule": join_rule},
+            content={"join_rule": config["join_rules"]},
+        )
+
+        history_event = create(
+            etype=EventTypes.RoomHistoryVisibility,
+            content={"history_visibility": config["history_visibility"]}
         )
 
         return [
             creation_event,
             join_event,
             power_levels_event,
+            history_event,
             join_rules_event,
         ]
 

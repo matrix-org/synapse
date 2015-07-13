@@ -87,3 +87,8 @@ class RejectedReason(object):
     AUTH_ERROR = "auth_error"
     REPLACED = "replaced"
     NOT_ANCESTOR = "not_ancestor"
+
+
+class RoomCreationPreset(object):
+    PrivateChat = "private_chat"
+    PublicChat = "public_chat"
