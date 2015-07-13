@@ -32,7 +32,8 @@ logger = logging.getLogger(__name__)
 
 class FederationBase(object):
     @defer.inlineCallbacks
-    def _check_sigs_and_hash_and_fetch(self, origin, pdus, outlier=False):
+    def _check_sigs_and_hash_and_fetch(self, origin, pdus, outlier=False,
+                                       include_none=False):
         """Takes a list of PDUs and checks the signatures and hashs of each
         one. If a PDU fails its signature check then we check if we have it in
         the database and if not then request if from the originating server of
@@ -50,84 +51,108 @@ class FederationBase(object):
         Returns:
             Deferred : A list of PDUs that have valid signatures and hashes.
         """
+        deferreds = self._check_sigs_and_hashes(pdus)
 
-        signed_pdus = []
+        def callback(pdu):
+            return pdu
 
-        @defer.inlineCallbacks
-        def do(pdu):
-            try:
-                new_pdu = yield self._check_sigs_and_hash(pdu)
-                signed_pdus.append(new_pdu)
-            except SynapseError:
-                # FIXME: We should handle signature failures more gracefully.
+        def errback(failure, pdu):
+            failure.trap(SynapseError)
+            return None
 
+        def try_local_db(res, pdu):
+            if not res:
                 # Check local db.
-                new_pdu = yield self.store.get_event(
+                return self.store.get_event(
                     pdu.event_id,
                     allow_rejected=True,
                     allow_none=True,
                 )
-                if new_pdu:
-                    signed_pdus.append(new_pdu)
-                    return
+            return res
 
-                # Check pdu.origin
-                if pdu.origin != origin:
-                    try:
-                        new_pdu = yield self.get_pdu(
-                            destinations=[pdu.origin],
-                            event_id=pdu.event_id,
-                            outlier=outlier,
-                            timeout=10000,
-                        )
+        def try_remote(res, pdu):
+            if not res and pdu.origin != origin:
+                return self.get_pdu(
+                    destinations=[pdu.origin],
+                    event_id=pdu.event_id,
+                    outlier=outlier,
+                    timeout=10000,
+                ).addErrback(lambda e: None)
+            return res
 
-                        if new_pdu:
-                            signed_pdus.append(new_pdu)
-                            return
-                    except:
-                        pass
-
+        def warn(res, pdu):
+            if not res:
                 logger.warn(
                     "Failed to find copy of %s with valid signature",
                     pdu.event_id,
                 )
+            return res
 
-        yield defer.gatherResults(
-            [do(pdu) for pdu in pdus],
+        for pdu, deferred in zip(pdus, deferreds):
+            deferred.addCallbacks(
+                callback, errback, errbackArgs=[pdu]
+            ).addCallback(
+                try_local_db, pdu
+            ).addCallback(
+                try_remote, pdu
+            ).addCallback(
+                warn, pdu
+            )
+
+        valid_pdus = yield defer.gatherResults(
+            deferreds,
             consumeErrors=True
         ).addErrback(unwrapFirstError)
 
-        defer.returnValue(signed_pdus)
+        if include_none:
+            defer.returnValue(valid_pdus)
+        else:
+            defer.returnValue([p for p in valid_pdus if p])
 
-    @defer.inlineCallbacks
     def _check_sigs_and_hash(self, pdu):
-        """Throws a SynapseError if the PDU does not have the correct
+        return self._check_sigs_and_hashes([pdu])[0]
+
+    def _check_sigs_and_hashes(self, pdus):
+        """Throws a SynapseError if a PDU does not have the correct
         signatures.
 
         Returns:
             FrozenEvent: Either the given event or it redacted if it failed the
             content hash check.
         """
-        # Check signatures are correct.
-        redacted_event = prune_event(pdu)
-        redacted_pdu_json = redacted_event.get_pdu_json()
 
-        try:
-            yield self.keyring.verify_json_for_server(
-                pdu.origin, redacted_pdu_json
-            )
-        except SynapseError:
+        redacted_pdus = [
+            prune_event(pdu)
+            for pdu in pdus
+        ]
+
+        deferreds = self.keyring.verify_json_objects_for_server([
+            (p.origin, p.get_pdu_json())
+            for p in redacted_pdus
+        ])
+
+        def callback(_, pdu, redacted):
+            if not check_event_content_hash(pdu):
+                logger.warn(
+                    "Event content has been tampered, redacting %s: %s",
+                    pdu.event_id, pdu.get_pdu_json()
+                )
+                return redacted
+            return pdu
+
+        def errback(failure, pdu):
+            failure.trap(SynapseError)
             logger.warn(
                 "Signature check failed for %s",
                 pdu.event_id,
             )
-            raise
+            return failure
 
-        if not check_event_content_hash(pdu):
-            logger.warn(
-                "Event content has been tampered, redacting.",
-                pdu.event_id,
+        for deferred, pdu, redacted in zip(deferreds, pdus, redacted_pdus):
+            deferred.addCallbacks(
+                callback, errback,
+                callbackArgs=[pdu, redacted],
+                errbackArgs=[pdu],
             )
-            defer.returnValue(redacted_event)
 
-        defer.returnValue(pdu)
+        return deferreds
