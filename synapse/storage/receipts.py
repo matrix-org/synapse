@@ -35,6 +35,8 @@ class ReceiptsStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_linearized_receipts_for_rooms(self, room_ids, from_key, to_key):
+        """Get receipts for multiple rooms for sending to clients.
+        """
         room_ids = set(room_ids)
 
         if from_key:
@@ -54,6 +56,8 @@ class ReceiptsStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_linearized_receipts_for_room(self, room_id, from_key, to_key):
+        """Get receipts for a single room for sending to clients.
+        """
         def f(txn):
             if from_key:
                 sql = (
@@ -107,6 +111,8 @@ class ReceiptsStore(SQLBaseStore):
     @cached
     @defer.inlineCallbacks
     def get_graph_receipts_for_room(self, room_id):
+        """Get receipts for sending to remote servers.
+        """
         rows = yield self._simple_select_list(
             table="receipts_graph",
             keyvalues={"room_id": room_id},
@@ -181,6 +187,11 @@ class ReceiptsStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def insert_receipt(self, room_id, receipt_type, user_id, event_ids, data):
+        """Insert a receipt, either from local client or remote server.
+
+        Automatically does conversion between linearized and graph
+        representations.
+        """
         if not event_ids:
             return
 

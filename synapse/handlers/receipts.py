@@ -41,10 +41,9 @@ class ReceiptsHandler(BaseHandler):
     @defer.inlineCallbacks
     def received_client_receipt(self, room_id, receipt_type, user_id,
                                 event_id):
-        # 1. Persist.
-        # 2. Notify local clients
-        # 3. Notify remote servers
-
+        """Called when a client tells us a local user has read up to the given
+        event_id in the room.
+        """
         receipt = {
             "room_id": room_id,
             "receipt_type": receipt_type,
@@ -62,6 +61,8 @@ class ReceiptsHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _received_remote_receipt(self, origin, content):
+        """Called when we receive an EDU of type m.receipt from a remote HS.
+        """
         receipts = [
             {
                 "room_id": room_id,
@@ -79,6 +80,8 @@ class ReceiptsHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _handle_new_receipts(self, receipts):
+        """Takes a list of receipts, stores them and informs the notifier.
+        """
         for receipt in receipts:
             room_id = receipt["room_id"]
             receipt_type = receipt["receipt_type"]
@@ -105,6 +108,9 @@ class ReceiptsHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _push_remotes(self, receipts):
+        """Given a list of receipts, works out which remote servers should be
+        poked and pokes them.
+        """
         # TODO: Some of this stuff should be coallesced.
         for receipt in receipts:
             room_id = receipt["room_id"]
@@ -140,6 +146,8 @@ class ReceiptsHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_receipts_for_room(self, room_id, to_key):
+        """Gets all receipts for a room, upto the given key.
+        """
         result = yield self.store.get_linearized_receipts_for_room(
             room_id, None, to_key
         )
