@@ -37,6 +37,7 @@ from .rejections import RejectionsStore
 from .state import StateStore
 from .signatures import SignatureStore
 from .filtering import FilteringStore
+from .end_to_end_keys import EndToEndKeyStore
 
 from .receipts import ReceiptsStore
 
@@ -77,6 +78,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 ApplicationServiceTransactionStore,
                 EventsStore,
                 ReceiptsStore,
+                EndToEndKeyStore,
                 ):
 
     def __init__(self, hs):

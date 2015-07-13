@@ -20,6 +20,7 @@ from . import (
     register,
     auth,
     receipts,
+    keys,
 )
 
 from synapse.http.server import JsonResource
@@ -40,3 +41,4 @@ class ClientV2AlphaRestResource(JsonResource):
         register.register_servlets(hs, client_resource)
         auth.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)
+        keys.register_servlets(hs, client_resource)

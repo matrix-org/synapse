@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 AuthEventTypes = (
     EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,
-    EventTypes.JoinRules,
+    EventTypes.JoinRules, EventTypes.RoomHistoryVisibility,
 )
 
 
@@ -575,6 +575,7 @@ class Auth(object):
         levels_to_check = [
             ("users_default", []),
             ("events_default", []),
+            ("state_default", []),
             ("ban", []),
             ("redact", []),
             ("kick", []),
