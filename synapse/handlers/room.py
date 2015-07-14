@@ -36,12 +36,12 @@ logger = logging.getLogger(__name__)
 class RoomCreationHandler(BaseHandler):
 
     PRESETS_DICT = {
-        RoomCreationPreset.PrivateChat: {
+        RoomCreationPreset.PRIVATE_CHAT: {
             "join_rules": JoinRules.INVITE,
             "history_visibility": "invited",
             "everyone_ops": False,
         },
-        RoomCreationPreset.PublicChat: {
+        RoomCreationPreset.PUBLIC_CHAT: {
             "join_rules": JoinRules.PUBLIC,
             "history_visibility": "shared",
             "everyone_ops": False,
@@ -138,9 +138,9 @@ class RoomCreationHandler(BaseHandler):
 
         preset_config = config.get(
             "preset",
-            RoomCreationPreset.PublicChat
+            RoomCreationPreset.PUBLIC_CHAT
             if is_public
-            else RoomCreationPreset.PrivateChat
+            else RoomCreationPreset.PRIVATE_CHAT
         )
 
         user = UserID.from_string(user_id)

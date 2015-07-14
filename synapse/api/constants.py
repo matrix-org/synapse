@@ -90,5 +90,5 @@ class RejectedReason(object):
 
 
 class RoomCreationPreset(object):
-    PrivateChat = "private_chat"
-    PublicChat = "public_chat"
+    PRIVATE_CHAT = "private_chat"
+    PUBLIC_CHAT = "public_chat"
