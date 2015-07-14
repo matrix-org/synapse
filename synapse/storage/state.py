@@ -100,16 +100,23 @@ class StateStore(SQLBaseStore):
         )
 
     def _store_state_groups_txn(self, txn, event, context):
-        if context.current_state is None:
-            return
+        return self._store_mult_state_groups_txn(txn, [(event, context)])
 
-        state_events = dict(context.current_state)
+    def _store_mult_state_groups_txn(self, txn, events_and_contexts):
+        state_groups = {}
+        for event, context in events_and_contexts:
+            if context.current_state is None:
+                continue
 
-        if event.is_state():
-            state_events[(event.type, event.state_key)] = event
+            if context.state_group is not None:
+                state_groups[event.event_id] = context.state_group
+                continue
 
-        state_group = context.state_group
-        if not state_group:
+            state_events = dict(context.current_state)
+
+            if event.is_state():
+                state_events[(event.type, event.state_key)] = event
+
             state_group = self._state_groups_id_gen.get_next_txn(txn)
             self._simple_insert_txn(
                 txn,
@@ -135,14 +142,19 @@ class StateStore(SQLBaseStore):
                     for state in state_events.values()
                 ],
             )
+            state_groups[event.event_id] = state_group
 
-        self._simple_insert_txn(
+        self._simple_insert_many_txn(
             txn,
             table="event_to_state_groups",
-            values={
-                "state_group": state_group,
-                "event_id": event.event_id,
-            },
+            values=[
+                {
+                    "state_group": state_groups[event.event_id],
+                    "event_id": event.event_id,
+                }
+                for event, context in events_and_contexts
+                if context.current_state is not None
+            ],
         )
 
     @defer.inlineCallbacks
