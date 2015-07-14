@@ -39,12 +39,12 @@ class RoomCreationHandler(BaseHandler):
         RoomCreationPreset.PRIVATE_CHAT: {
             "join_rules": JoinRules.INVITE,
             "history_visibility": "invited",
-            "everyone_ops": False,
+            "original_invitees_have_ops": False,
         },
         RoomCreationPreset.PUBLIC_CHAT: {
             "join_rules": JoinRules.PUBLIC,
             "history_visibility": "shared",
-            "everyone_ops": False,
+            "original_invitees_have_ops": False,
         },
     }
 
@@ -248,7 +248,7 @@ class RoomCreationHandler(BaseHandler):
             "invite": 0,
         }
 
-        if config["everyone_ops"]:
+        if config["original_invitees_have_ops"]:
             for invitee in invite_list:
                 power_level_content["users"][invitee] = 100
 
