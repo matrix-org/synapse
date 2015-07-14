@@ -207,9 +207,9 @@ class KeyQueryServlet(RestServlet):
 
 class OneTimeKeyServlet(RestServlet):
     """
-    GET /keys/take/<user-id>/<device-id>/<algorithm> HTTP/1.1
+    GET /keys/claim/<user-id>/<device-id>/<algorithm> HTTP/1.1
 
-    POST /keys/take HTTP/1.1
+    POST /keys/claim HTTP/1.1
     {
       "one_time_keys": {
         "<user_id>": {
@@ -226,7 +226,7 @@ class OneTimeKeyServlet(RestServlet):
 
     """
     PATTERN = client_v2_pattern(
-        "/keys/take(?:/?|(?:/"
+        "/keys/claim(?:/?|(?:/"
         "(?P<user_id>[^/]*)/(?P<device_id>[^/]*)/(?P<algorithm>[^/]*)"
         ")?)"
     )
@@ -240,7 +240,7 @@ class OneTimeKeyServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, device_id, algorithm):
         yield self.auth.get_user_by_req(request)
-        results = yield self.store.take_e2e_one_time_keys(
+        results = yield self.store.claim_e2e_one_time_keys(
             [(user_id, device_id, algorithm)]
         )
         defer.returnValue(self.json_result(request, results))
@@ -256,7 +256,7 @@ class OneTimeKeyServlet(RestServlet):
         for user_id, device_keys in body.get("one_time_keys", {}).items():
             for device_id, algorithm in device_keys.items():
                 query.append((user_id, device_id, algorithm))
-        results = yield self.store.take_e2e_one_time_keys(query)
+        results = yield self.store.claim_e2e_one_time_keys(query)
         defer.returnValue(self.json_result(request, results))
 
     def json_result(self, request, results):

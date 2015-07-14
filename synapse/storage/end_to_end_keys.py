@@ -95,9 +95,9 @@ class EndToEndKeyStore(SQLBaseStore):
             "count_e2e_one_time_keys", _count_e2e_one_time_keys
         )
 
-    def take_e2e_one_time_keys(self, query_list):
+    def claim_e2e_one_time_keys(self, query_list):
         """Take a list of one time keys out of the database"""
-        def _take_e2e_one_time_keys(txn):
+        def _claim_e2e_one_time_keys(txn):
             sql = (
                 "SELECT key_id, key_json FROM e2e_one_time_keys_json"
                 " WHERE user_id = ? AND device_id = ? AND algorithm = ?"
@@ -121,5 +121,5 @@ class EndToEndKeyStore(SQLBaseStore):
                 txn.execute(sql, (user_id, device_id, algorithm, key_id))
             return result
         return self.runInteraction(
-            "take_e2e_one_time_keys", _take_e2e_one_time_keys
+            "claim_e2e_one_time_keys", _claim_e2e_one_time_keys
         )
