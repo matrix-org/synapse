@@ -34,8 +34,17 @@ class ReceiptsStore(SQLBaseStore):
         self._receipts_stream_cache = _RoomStreamChangeCache()
 
     @defer.inlineCallbacks
-    def get_linearized_receipts_for_rooms(self, room_ids, from_key, to_key):
+    def get_linearized_receipts_for_rooms(self, room_ids, to_key, from_key=None):
         """Get receipts for multiple rooms for sending to clients.
+
+        Args:
+            room_ids (list): List of room_ids.
+            to_key (int): Max stream id to fetch receipts upto.
+            from_key (int): Min stream id to fetch receipts from. None fetches
+                from the start.
+
+        Returns:
+            list: A list of receipts.
         """
         room_ids = set(room_ids)
 
@@ -46,7 +55,9 @@ class ReceiptsStore(SQLBaseStore):
 
         results = yield defer.gatherResults(
             [
-                self.get_linearized_receipts_for_room(room_id, from_key, to_key)
+                self.get_linearized_receipts_for_room(
+                    room_id, to_key, from_key=from_key
+                )
                 for room_id in room_ids
             ],
             consumeErrors=True,
@@ -55,8 +66,17 @@ class ReceiptsStore(SQLBaseStore):
         defer.returnValue([ev for res in results for ev in res])
 
     @defer.inlineCallbacks
-    def get_linearized_receipts_for_room(self, room_id, from_key, to_key):
+    def get_linearized_receipts_for_room(self, room_id, to_key, from_key=None):
         """Get receipts for a single room for sending to clients.
+
+        Args:
+            room_ids (str): The room id.
+            to_key (int): Max stream id to fetch receipts upto.
+            from_key (int): Min stream id to fetch receipts from. None fetches
+                from the start.
+
+        Returns:
+            list: A list of receipts.
         """
         def f(txn):
             if from_key:
@@ -288,6 +308,9 @@ class _RoomStreamChangeCache(object):
 
     @defer.inlineCallbacks
     def get_rooms_changed(self, store, room_ids, key):
+        """Returns subset of room ids that have had new receipts since the
+        given key. If the key is too old it will just return the given list.
+        """
         if key > (yield self._get_earliest_key(store)):
             keys = self._cache.keys()
             i = keys.bisect_right(key)
@@ -302,6 +325,8 @@ class _RoomStreamChangeCache(object):
 
     @defer.inlineCallbacks
     def room_has_changed(self, store, room_id, key):
+        """Informs the cache that the room has been changed at the given key.
+        """
         if key > (yield self._get_earliest_key(store)):
             old_key = self._room_to_key.get(room_id, None)
             if old_key:

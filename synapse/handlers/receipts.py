@@ -149,7 +149,8 @@ class ReceiptsHandler(BaseHandler):
         """Gets all receipts for a room, upto the given key.
         """
         result = yield self.store.get_linearized_receipts_for_room(
-            room_id, None, to_key
+            room_id,
+            to_key=to_key,
         )
 
         if not result:
@@ -176,7 +177,9 @@ class ReceiptEventSource(object):
         rooms = yield self.store.get_rooms_for_user(user.to_string())
         rooms = [room.room_id for room in rooms]
         events = yield self.store.get_linearized_receipts_for_rooms(
-            rooms, from_key, to_key
+            rooms,
+            from_key=from_key,
+            to_key=to_key,
         )
 
         defer.returnValue((events, to_key))
@@ -196,7 +199,9 @@ class ReceiptEventSource(object):
         rooms = yield self.store.get_rooms_for_user(user.to_string())
         rooms = [room.room_id for room in rooms]
         events = yield self.store.get_linearized_receipts_for_rooms(
-            rooms, from_key, to_key
+            rooms,
+            from_key=from_key,
+            to_key=to_key,
         )
 
         defer.returnValue((events, to_key))
