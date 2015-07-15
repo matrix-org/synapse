@@ -57,16 +57,18 @@ class RegisterRestServlet(RestServlet):
         yield run_on_reactor()
 
         body = parse_request_allow_empty(request)
-        # we do basic sanity checks here because the auth layerwill store these in sessions
+        # we do basic sanity checks here because the auth
+        # layer will store these in sessions
         if 'password' in body:
-            print "%r" % (body['password'])
-            if (not isinstance(body['password'], str) and
-                    not isinstance(body['password'], unicode)) or len(body['password']) > 512:
+            if ((not isinstance(body['password'], str) and
+                    not isinstance(body['password'], unicode)) or
+                    len(body['password']) > 512):
                 raise SynapseError(400, "Invalid password")
 
         if 'username' in body:
-            if (not isinstance(body['username'], str) and
-                    not isinstance(body['username'], unicode)) or len(body['username']) > 512:
+            if ((not isinstance(body['username'], str) and
+                    not isinstance(body['username'], unicode)) or
+                    len(body['username']) > 512):
                 raise SynapseError(400, "Invalid username")
             desired_username = body['username']
             yield self.registration_handler.check_username(desired_username)
