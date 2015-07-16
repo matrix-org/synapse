@@ -19,12 +19,15 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 from synapse.types import UserID, RoomAlias, RoomID
-from synapse.api.constants import EventTypes, Membership, JoinRules
+from synapse.api.constants import (
+    EventTypes, Membership, JoinRules, RoomCreationPreset,
+)
 from synapse.api.errors import StoreError, SynapseError
 from synapse.util import stringutils, unwrapFirstError
 from synapse.util.async import run_on_reactor
 from synapse.events.utils import serialize_event
 
+from collections import OrderedDict
 import logging
 import string
 
@@ -32,6 +35,19 @@ logger = logging.getLogger(__name__)
 
 
 class RoomCreationHandler(BaseHandler):
+
+    PRESETS_DICT = {
+        RoomCreationPreset.PRIVATE_CHAT: {
+            "join_rules": JoinRules.INVITE,
+            "history_visibility": "invited",
+            "original_invitees_have_ops": False,
+        },
+        RoomCreationPreset.PUBLIC_CHAT: {
+            "join_rules": JoinRules.PUBLIC,
+            "history_visibility": "shared",
+            "original_invitees_have_ops": False,
+        },
+    }
 
     @defer.inlineCallbacks
     def create_room(self, user_id, room_id, config):
@@ -121,9 +137,25 @@ class RoomCreationHandler(BaseHandler):
                 servers=[self.hs.hostname],
             )
 
+        preset_config = config.get(
+            "preset",
+            RoomCreationPreset.PUBLIC_CHAT
+            if is_public
+            else RoomCreationPreset.PRIVATE_CHAT
+        )
+
+        raw_initial_state = config.get("initial_state", [])
+
+        initial_state = OrderedDict()
+        for val in raw_initial_state:
+            initial_state[(val["type"], val.get("state_key", ""))] = val["content"]
+
         user = UserID.from_string(user_id)
         creation_events = self._create_events_for_new_room(
-            user, room_id, is_public=is_public
+            user, room_id,
+            preset_config=preset_config,
+            invite_list=invite_list,
+            initial_state=initial_state,
         )
 
         msg_handler = self.hs.get_handlers().message_handler
@@ -170,7 +202,10 @@ class RoomCreationHandler(BaseHandler):
 
         defer.returnValue(result)
 
-    def _create_events_for_new_room(self, creator, room_id, is_public=False):
+    def _create_events_for_new_room(self, creator, room_id, preset_config,
+                                    invite_list, initial_state):
+        config = RoomCreationHandler.PRESETS_DICT[preset_config]
+
         creator_id = creator.to_string()
 
         event_keys = {
@@ -203,9 +238,10 @@ class RoomCreationHandler(BaseHandler):
             },
         )
 
-        power_levels_event = create(
-            etype=EventTypes.PowerLevels,
-            content={
+        returned_events = [creation_event, join_event]
+
+        if (EventTypes.PowerLevels, '') not in initial_state:
+            power_level_content = {
                 "users": {
                     creator.to_string(): 100,
                 },
@@ -221,21 +257,43 @@ class RoomCreationHandler(BaseHandler):
                 "kick": 50,
                 "redact": 50,
                 "invite": 0,
-            },
-        )
+            }
 
-        join_rule = JoinRules.PUBLIC if is_public else JoinRules.INVITE
-        join_rules_event = create(
-            etype=EventTypes.JoinRules,
-            content={"join_rule": join_rule},
-        )
+            if config["original_invitees_have_ops"]:
+                for invitee in invite_list:
+                    power_level_content["users"][invitee] = 100
 
-        return [
-            creation_event,
-            join_event,
-            power_levels_event,
-            join_rules_event,
-        ]
+            power_levels_event = create(
+                etype=EventTypes.PowerLevels,
+                content=power_level_content,
+            )
+
+            returned_events.append(power_levels_event)
+
+        if (EventTypes.JoinRules, '') not in initial_state:
+            join_rules_event = create(
+                etype=EventTypes.JoinRules,
+                content={"join_rule": config["join_rules"]},
+            )
+
+            returned_events.append(join_rules_event)
+
+        if (EventTypes.RoomHistoryVisibility, '') not in initial_state:
+            history_event = create(
+                etype=EventTypes.RoomHistoryVisibility,
+                content={"history_visibility": config["history_visibility"]}
+            )
+
+            returned_events.append(history_event)
+
+        for (etype, state_key), content in initial_state.items():
+            returned_events.append(create(
+                etype=etype,
+                state_key=state_key,
+                content=content,
+            ))
+
+        return returned_events
 
 
 class RoomMemberHandler(BaseHandler):
