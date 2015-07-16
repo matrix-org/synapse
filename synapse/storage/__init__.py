@@ -39,6 +39,8 @@ from .signatures import SignatureStore
 from .filtering import FilteringStore
 from .end_to_end_keys import EndToEndKeyStore
 
+from .receipts import ReceiptsStore
+
 
 import fnmatch
 import imp
@@ -75,6 +77,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 PushRuleStore,
                 ApplicationServiceTransactionStore,
                 EventsStore,
+                ReceiptsStore,
                 EndToEndKeyStore,
                 ):
 

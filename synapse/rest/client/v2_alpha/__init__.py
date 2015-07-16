@@ -19,6 +19,7 @@ from . import (
     account,
     register,
     auth,
+    receipts,
     keys,
 )
 
@@ -39,4 +40,5 @@ class ClientV2AlphaRestResource(JsonResource):
         account.register_servlets(hs, client_resource)
         register.register_servlets(hs, client_resource)
         auth.register_servlets(hs, client_resource)
+        receipts.register_servlets(hs, client_resource)
         keys.register_servlets(hs, client_resource)
