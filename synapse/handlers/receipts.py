@@ -174,6 +174,9 @@ class ReceiptEventSource(object):
         from_key = int(from_key)
         to_key = yield self.get_current_key()
 
+        if from_key == to_key:
+            defer.returnValue(([], to_key))
+
         rooms = yield self.store.get_rooms_for_user(user.to_string())
         rooms = [room.room_id for room in rooms]
         events = yield self.store.get_linearized_receipts_for_rooms(
