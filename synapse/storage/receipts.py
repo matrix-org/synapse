@@ -300,7 +300,7 @@ class _RoomStreamChangeCache(object):
     may have changed since that key. If the key is too old then the cache
     will simply return all rooms.
     """
-    def __init__(self, size_of_cache=1000):
+    def __init__(self, size_of_cache=10000):
         self._size_of_cache = size_of_cache
         self._room_to_key = {}
         self._cache = sorteddict()
