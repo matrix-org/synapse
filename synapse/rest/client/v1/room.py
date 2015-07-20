@@ -413,7 +413,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 raise SynapseError(400, "Missing user_id key.")
             state_key = content["user_id"]
             # make sure it looks like a user ID; it'll throw if it's invalid.
-            UserID.from_string(state_key);
+            UserID.from_string(state_key)
 
             if membership_action == "kick":
                 membership_action = "leave"
