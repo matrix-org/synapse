@@ -352,10 +352,10 @@ class Notifier(object):
                 after_id = getattr(after_token, keyname)
                 if before_id == after_id:
                     continue
-                stuff, new_key = yield source.get_new_events_for_user(
+                new_events, new_key = yield source.get_new_events_for_user(
                     user, getattr(from_token, keyname), limit,
                 )
-                events.extend(stuff)
+                events.extend(new_events)
                 end_token = end_token.copy_and_replace(keyname, new_key)
 
             if events:
