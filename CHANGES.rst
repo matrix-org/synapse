@@ -9,6 +9,7 @@ General:
   (SPEC-134)
 * Add SAML2 login/registration support. (Thanks Muthu Subramanian!)
 * Add Content-Disposition headers to content repository responses. (SYN-150)
+* Add client side key management APIs for end to end encryption.
 * Change power level semantics so that you cannot kick, ban or change power
   levels of users that have equal or greater power level than you. (SYN-192)
 * Improve performance by bulk inserting events where appropriate.
