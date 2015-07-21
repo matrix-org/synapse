@@ -1,3 +1,23 @@
+Changes in synapse v0.9.4-rc1 (2015-07-21)
+==========================================
+
+General:
+
+* Add basic implementation of receipts.
+* Add support for configuration presets in room creation API.
+* Add auth event that limits the visibility of history for new users.
+* Add SAML2 login/registration support.
+* Add Content-Disposition headers to content repository responses.
+* Change power level semantics so that you cannot kick, ban or change power
+  levels of users that have equal or greater power level than you.
+* Bulk insert events where appropriate.
+* Bulk verify signatures where appropriate.
+
+
+Configuration:
+
+* Add support for including TLS certifcate chains.
+
 Changes in synapse v0.9.3 (2015-07-01)
 ======================================
 
