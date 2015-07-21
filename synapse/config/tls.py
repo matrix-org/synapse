@@ -96,7 +96,7 @@ class TlsConfig(Config):
                 )
 
         if not os.path.exists(tls_certificate_path):
-            with open(tls_certificate_path, "w") as certifcate_file:
+            with open(tls_certificate_path, "w") as certificate_file:
                 cert = crypto.X509()
                 subject = cert.get_subject()
                 subject.CN = config["server_name"]
@@ -111,7 +111,7 @@ class TlsConfig(Config):
 
                 cert_pem = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
 
-                certifcate_file.write(cert_pem)
+                certificate_file.write(cert_pem)
 
         if not os.path.exists(tls_dh_params_path):
             if GENERATE_DH_PARAMS:

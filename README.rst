@@ -122,7 +122,10 @@ To install the synapse homeserver run::
     $ pip install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
 
 This installs synapse, along with the libraries it uses, into a virtual
-environment under ``~/.synapse``.
+environment under ``~/.synapse``.  Feel free to pick a different directory
+if you prefer.
+
+In case of problems, please see the _Troubleshooting section below.
 
 Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
 above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
