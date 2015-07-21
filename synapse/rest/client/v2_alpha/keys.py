@@ -180,7 +180,7 @@ class KeyQueryServlet(RestServlet):
             else:
                 for device_id in device_ids:
                     query.append((user_id, device_id))
-        results = yield self.store.get_e2e_device_keys([(user_id, device_id)])
+        results = yield self.store.get_e2e_device_keys(query)
         defer.returnValue(self.json_result(request, results))
 
     @defer.inlineCallbacks
