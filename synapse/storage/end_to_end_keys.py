@@ -52,6 +52,7 @@ class EndToEndKeyStore(SQLBaseStore):
                 )
                 for row in rows:
                     user_result[row["device_id"]] = row["key_json"]
+                result[user_id] = user_result
             return result
         return self.runInteraction("get_e2e_device_keys", _get_e2e_device_keys)
 
