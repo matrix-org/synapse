@@ -226,6 +226,89 @@ class BaseMediaResource(Resource):
             return ()
 
     @defer.inlineCallbacks
+    def _generate_local_exact_thumbnail(self, media_id, t_width, t_height,
+                                        t_method, t_type):
+        input_path = self.filepaths.local_media_filepath(media_id)
+
+        def thumbnail():
+            thumbnailer = Thumbnailer(input_path)
+            m_width = thumbnailer.width
+            m_height = thumbnailer.height
+
+            if m_width * m_height >= self.max_image_pixels:
+                logger.info(
+                    "Image too large to thumbnail %r x %r > %r",
+                    m_width, m_height, self.max_image_pixels
+                )
+                return
+
+            t_path = self.filepaths.local_media_thumbnail(
+                media_id, t_width, t_height, t_type, t_method
+            )
+            self._makedirs(t_path)
+
+            if t_method == "crop":
+                t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
+            elif t_method == "scale":
+                t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
+            else:
+                t_len = None
+
+            return t_len, t_path
+
+        res = yield threads.deferToThread(thumbnail)
+
+        if res:
+            t_len, t_path = res
+            yield self.store.store_local_thumbnail(
+                media_id, t_width, t_height, t_type, t_method, t_len
+            )
+
+            defer.returnValue(t_path)
+
+    @defer.inlineCallbacks
+    def _generate_remote_exact_thumbnail(self, server_name, file_id, media_id,
+                                         t_width, t_height, t_method, t_type):
+        input_path = self.filepaths.remote_media_filepath(server_name, file_id)
+
+        def thumbnail():
+            thumbnailer = Thumbnailer(input_path)
+            m_width = thumbnailer.width
+            m_height = thumbnailer.height
+
+            if m_width * m_height >= self.max_image_pixels:
+                logger.info(
+                    "Image too large to thumbnail %r x %r > %r",
+                    m_width, m_height, self.max_image_pixels
+                )
+                return
+
+            t_path = self.filepaths.remote_media_thumbnail(
+                media_id, t_width, t_height, t_type, t_method
+            )
+            self._makedirs(t_path)
+
+            if t_method == "crop":
+                t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
+            elif t_method == "scale":
+                t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
+            else:
+                t_len = None
+
+            return t_path, t_len
+
+        res = yield threads.deferToThread(thumbnail)
+
+        if res:
+            t_path, t_len = res
+            yield self.store.store_remote_media_thumbnail(
+                server_name, media_id, file_id,
+                t_width, t_height, t_type, t_method, t_len
+            )
+
+            defer.returnValue(t_path)
+
+    @defer.inlineCallbacks
     def _generate_local_thumbnails(self, media_id, media_info):
         media_type = media_info["media_type"]
         requirements = self._get_thumbnail_requirements(media_type)
