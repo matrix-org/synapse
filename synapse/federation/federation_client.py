@@ -134,6 +134,40 @@ class FederationClient(FederationBase):
             destination, query_type, args, retry_on_dns_fail=retry_on_dns_fail
         )
 
+    @log_function
+    def query_client_keys(self, destination, content, retry_on_dns_fail=True):
+        """Query device keys for a device hosted on a remote server.
+
+        Args:
+            destination (str): Domain name of the remote homeserver
+            content (dict): The query content.
+
+        Returns:
+            a Deferred which will eventually yield a JSON object from the
+            response
+        """
+        sent_queries_counter.inc("client_device_keys")
+        return self.transport_layer.query_client_keys(
+            destination, content, retry_on_dns_fail=retry_on_dns_fail
+        )
+
+    @log_function
+    def claim_client_keys(self, destination, content, retry_on_dns_fail=True):
+        """Claims one-time keys for a device hosted on a remote server.
+
+        Args:
+            destination (str): Domain name of the remote homeserver
+            content (dict): The query content.
+
+        Returns:
+            a Deferred which will eventually yield a JSON object from the
+            response
+        """
+        sent_queries_counter.inc("client_one_time_keys")
+        return self.transport_layer.claim_client_keys(
+            destination, content, retry_on_dns_fail=retry_on_dns_fail
+        )
+
     @defer.inlineCallbacks
     @log_function
     def backfill(self, dest, context, limit, extremities):

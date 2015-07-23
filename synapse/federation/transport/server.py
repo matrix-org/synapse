@@ -325,6 +325,24 @@ class FederationInviteServlet(BaseFederationServlet):
         defer.returnValue((200, content))
 
 
+class FederationClientKeysQueryServlet(BaseFederationServlet):
+    PATH = "/client_keys/query"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content):
+        response = yield self.handler.on_client_key_query(origin, content)
+        defer.returnValue((200, response))
+
+
+class FederationClientKeysClaimServlet(BaseFederationServlet):
+    PATH = "/client_keys/claim"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content):
+        response = yield self.handler.on_client_key_claim(origin, content)
+        defer.returnValue((200, response))
+
+
 class FederationQueryAuthServlet(BaseFederationServlet):
     PATH = "/query_auth/([^/]*)/([^/]*)"
 
@@ -373,4 +391,6 @@ SERVLET_CLASSES = (
     FederationQueryAuthServlet,
     FederationGetMissingEventsServlet,
     FederationEventAuthServlet,
+    FederationClientKeysQueryServlet,
+    FederationClientKeysClaimServlet,
 )
