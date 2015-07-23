@@ -131,6 +131,8 @@ class ThumbnailResource(BaseMediaResource):
             server_name, media_id,
         )
 
+        file_id = media_info["filesystem_id"]
+
         for info in thumbnail_infos:
             t_w = info["thumbnail_width"] == desired_width
             t_h = info["thumbnail_height"] == desired_height
@@ -139,20 +141,22 @@ class ThumbnailResource(BaseMediaResource):
 
             if t_w and t_h and t_method and t_type:
                 file_path = self.filepaths.remote_media_thumbnail(
-                    media_id, desired_width, desired_height, desired_type, desired_method,
+                    server_name, file_id, desired_width, desired_height,
+                    desired_type, desired_method,
                 )
                 yield self._respond_with_file(request, desired_type, file_path)
+                return
 
         logger.debug("We don't have a local thumbnail of that size. Generating")
 
         # Okay, so we generate one.
-        path = yield self._generate_remote_exact_thumbnail(
-            server_name, media_id, desired_width, desired_height,
-            desired_method, desired_type
+        file_path = yield self._generate_remote_exact_thumbnail(
+            server_name, file_id, media_id, desired_width,
+            desired_height, desired_method, desired_type
         )
 
-        if path:
-            yield self._respond_with_file(request, t_type, file_path)
+        if file_path:
+            yield self._respond_with_file(request, desired_type, file_path)
         else:
             yield self._respond_default_thumbnail(
                 request, media_info, desired_width, desired_height,

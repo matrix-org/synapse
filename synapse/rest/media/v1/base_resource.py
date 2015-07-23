@@ -284,7 +284,7 @@ class BaseMediaResource(Resource):
                 return
 
             t_path = self.filepaths.remote_media_thumbnail(
-                media_id, t_width, t_height, t_type, t_method
+                server_name, file_id, t_width, t_height, t_type, t_method
             )
             self._makedirs(t_path)
 
