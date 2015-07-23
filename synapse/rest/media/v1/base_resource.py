@@ -244,43 +244,52 @@ class BaseMediaResource(Resource):
             )
             return
 
-        scales = set()
-        crops = set()
-        for r_width, r_height, r_method, r_type in requirements:
-            if r_method == "scale":
-                t_width, t_height = thumbnailer.aspect(r_width, r_height)
-                scales.add((
-                    min(m_width, t_width), min(m_height, t_height), r_type,
+        local_thumbnails = []
+
+        def generate_thumbnails():
+            scales = set()
+            crops = set()
+            for r_width, r_height, r_method, r_type in requirements:
+                if r_method == "scale":
+                    t_width, t_height = thumbnailer.aspect(r_width, r_height)
+                    scales.add((
+                        min(m_width, t_width), min(m_height, t_height), r_type,
+                    ))
+                elif r_method == "crop":
+                    crops.add((r_width, r_height, r_type))
+
+            for t_width, t_height, t_type in scales:
+                t_method = "scale"
+                t_path = self.filepaths.local_media_thumbnail(
+                    media_id, t_width, t_height, t_type, t_method
+                )
+                self._makedirs(t_path)
+                t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
+
+                local_thumbnails.append((
+                    media_id, t_width, t_height, t_type, t_method, t_len
                 ))
-            elif r_method == "crop":
-                crops.add((r_width, r_height, r_type))
 
-        for t_width, t_height, t_type in scales:
-            t_method = "scale"
-            t_path = self.filepaths.local_media_thumbnail(
-                media_id, t_width, t_height, t_type, t_method
-            )
-            self._makedirs(t_path)
-            t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
-            yield self.store.store_local_thumbnail(
-                media_id, t_width, t_height, t_type, t_method, t_len
-            )
+            for t_width, t_height, t_type in crops:
+                if (t_width, t_height, t_type) in scales:
+                    # If the aspect ratio of the cropped thumbnail matches a purely
+                    # scaled one then there is no point in calculating a separate
+                    # thumbnail.
+                    continue
+                t_method = "crop"
+                t_path = self.filepaths.local_media_thumbnail(
+                    media_id, t_width, t_height, t_type, t_method
+                )
+                self._makedirs(t_path)
+                t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
+                local_thumbnails.append((
+                    media_id, t_width, t_height, t_type, t_method, t_len
+                ))
 
-        for t_width, t_height, t_type in crops:
-            if (t_width, t_height, t_type) in scales:
-                # If the aspect ratio of the cropped thumbnail matches a purely
-                # scaled one then there is no point in calculating a separate
-                # thumbnail.
-                continue
-            t_method = "crop"
-            t_path = self.filepaths.local_media_thumbnail(
-                media_id, t_width, t_height, t_type, t_method
-            )
-            self._makedirs(t_path)
-            t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
-            yield self.store.store_local_thumbnail(
-                media_id, t_width, t_height, t_type, t_method, t_len
-            )
+        yield threads.deferToThread(generate_thumbnails)
+
+        for l in local_thumbnails:
+            yield self.store.store_local_thumbnail(*l)
 
         defer.returnValue({
             "width": m_width,
