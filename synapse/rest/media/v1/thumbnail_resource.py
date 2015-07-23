@@ -162,11 +162,12 @@ class ThumbnailResource(BaseMediaResource):
                 t_method = info["thumbnail_method"]
                 if t_method == "scale" or t_method == "crop":
                     aspect_quality = abs(d_w * t_h - d_h * t_w)
+                    min_quality = 0 if d_w <= t_w and d_h <= t_h else 1
                     size_quality = abs((d_w - t_w) * (d_h - t_h))
                     type_quality = desired_type != info["thumbnail_type"]
                     length_quality = info["thumbnail_length"]
                     info_list.append((
-                        aspect_quality, size_quality, type_quality,
+                        aspect_quality, min_quality, size_quality, type_quality,
                         length_quality, info
                     ))
             if info_list:
