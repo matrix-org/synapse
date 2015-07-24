@@ -135,7 +135,7 @@ class FederationClient(FederationBase):
         )
 
     @log_function
-    def query_client_keys(self, destination, content, retry_on_dns_fail=True):
+    def query_client_keys(self, destination, content):
         """Query device keys for a device hosted on a remote server.
 
         Args:
@@ -147,12 +147,10 @@ class FederationClient(FederationBase):
             response
         """
         sent_queries_counter.inc("client_device_keys")
-        return self.transport_layer.query_client_keys(
-            destination, content, retry_on_dns_fail=retry_on_dns_fail
-        )
+        return self.transport_layer.query_client_keys(destination, content)
 
     @log_function
-    def claim_client_keys(self, destination, content, retry_on_dns_fail=True):
+    def claim_client_keys(self, destination, content):
         """Claims one-time keys for a device hosted on a remote server.
 
         Args:
@@ -164,9 +162,7 @@ class FederationClient(FederationBase):
             response
         """
         sent_queries_counter.inc("client_one_time_keys")
-        return self.transport_layer.claim_client_keys(
-            destination, content, retry_on_dns_fail=retry_on_dns_fail
-        )
+        return self.transport_layer.claim_client_keys(destination, content)
 
     @defer.inlineCallbacks
     @log_function

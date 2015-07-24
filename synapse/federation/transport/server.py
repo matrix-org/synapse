@@ -326,20 +326,20 @@ class FederationInviteServlet(BaseFederationServlet):
 
 
 class FederationClientKeysQueryServlet(BaseFederationServlet):
-    PATH = "/client_keys/query"
+    PATH = "/user/keys/query"
 
     @defer.inlineCallbacks
-    def on_POST(self, origin, content):
-        response = yield self.handler.on_client_key_query(origin, content)
+    def on_POST(self, origin, content, query):
+        response = yield self.handler.on_query_client_keys(origin, content)
         defer.returnValue((200, response))
 
 
 class FederationClientKeysClaimServlet(BaseFederationServlet):
-    PATH = "/client_keys/claim"
+    PATH = "/user/keys/claim"
 
     @defer.inlineCallbacks
-    def on_POST(self, origin, content):
-        response = yield self.handler.on_client_key_claim(origin, content)
+    def on_POST(self, origin, content, query):
+        response = yield self.handler.on_claim_client_keys(origin, content)
         defer.returnValue((200, response))
 
 

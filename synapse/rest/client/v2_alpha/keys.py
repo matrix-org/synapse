@@ -202,7 +202,7 @@ class KeyQueryServlet(RestServlet):
                     for device_id in device_ids:
                         local_query.append((user_id, device_id))
             else:
-                remote_queries.set_default(user.domain, {})[user_id] = list(
+                remote_queries.setdefault(user.domain, {})[user_id] = list(
                     device_ids
                 )
         results = yield self.store.get_e2e_device_keys(local_query)
@@ -218,7 +218,7 @@ class KeyQueryServlet(RestServlet):
             remote_result = yield self.federation.query_client_keys(
                 destination, {"device_keys": device_keys}
             )
-            for user_id, keys in remote_result.items():
+            for user_id, keys in remote_result["device_keys"].items():
                 if user_id in device_keys:
                     json_result[user_id] = keys
         defer.returnValue((200, {"device_keys": json_result}))
@@ -286,7 +286,7 @@ class OneTimeKeyServlet(RestServlet):
                 for device_id, algorithm in device_keys.items():
                     local_query.append((user_id, device_id, algorithm))
             else:
-                remote_queries.set_default(user.domain, {})[user_id] = (
+                remote_queries.setdefault(user.domain, {})[user_id] = (
                     device_keys
                 )
         results = yield self.store.claim_e2e_one_time_keys(local_query)
@@ -300,10 +300,10 @@ class OneTimeKeyServlet(RestServlet):
                     }
 
         for destination, device_keys in remote_queries.items():
-            remote_result = yield self.federation.query_client_keys(
+            remote_result = yield self.federation.claim_client_keys(
                 destination, {"one_time_keys": device_keys}
             )
-            for user_id, keys in remote_result.items():
+            for user_id, keys in remote_result["one_time_keys"].items():
                 if user_id in device_keys:
                     json_result[user_id] = keys
 

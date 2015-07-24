@@ -247,7 +247,7 @@ class TransportLayerClient(object):
         Returns:
             A dict containg the device keys.
         """
-        path = PREFIX + "/client_keys/query"
+        path = PREFIX + "/user/keys/query"
 
         content = yield self.client.post_json(
             destination=destination,
@@ -283,7 +283,7 @@ class TransportLayerClient(object):
             A dict containg the one-time keys.
         """
 
-        path = PREFIX + "/client_keys/claim"
+        path = PREFIX + "/user/keys/claim"
 
         content = yield self.client.post_json(
             destination=destination,
