@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from _base import SQLBaseStore, cached
+from _base import SQLBaseStore, cachedInlineCallbacks
 
 from twisted.internet import defer
 
@@ -71,8 +71,7 @@ class KeyStore(SQLBaseStore):
             desc="store_server_certificate",
         )
 
-    @cached()
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks()
     def get_all_server_verify_keys(self, server_name):
         rows = yield self._simple_select_list(
             table="server_signature_keys",
