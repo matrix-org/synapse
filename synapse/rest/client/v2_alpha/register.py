@@ -82,7 +82,9 @@ class RegisterRestServlet(RestServlet):
 
         # == Application Service Registration ==
         if appservice:
-            result = yield self._do_appservice_registration(desired_username)
+            result = yield self._do_appservice_registration(
+                desired_username, request.args["access_token"][0]
+            )
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
 
@@ -166,9 +168,9 @@ class RegisterRestServlet(RestServlet):
         return 200, {}
 
     @defer.inlineCallbacks
-    def _do_appservice_registration(self, username):
-        (user_id, token) = yield self.registration_handler.register(
-            localpart=username
+    def _do_appservice_registration(self, username, as_token):
+        (user_id, token) = yield self.registration_handler.appservice_register(
+            username, as_token
         )
         defer.returnValue(self._create_registration_details(user_id, token))
 

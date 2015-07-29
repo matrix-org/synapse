@@ -58,7 +58,9 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.appservice = {
             "id": "1234"
         }
-        self.registration_handler.register = Mock(return_value=(user_id, token))
+        self.registration_handler.appservice_register = Mock(
+            return_value=(user_id, token)
+        )
         result = yield self.servlet.on_POST(self.request)
         self.assertEquals(result, (200, {
             "user_id": user_id,
