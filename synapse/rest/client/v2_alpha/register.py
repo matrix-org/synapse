@@ -102,7 +102,8 @@ class RegisterRestServlet(RestServlet):
         if self.hs.config.disable_registration:
             raise SynapseError(403, "Registration has been disabled")
 
-        yield self.registration_handler.check_username(desired_username)
+        if desired_username is not None:
+            yield self.registration_handler.check_username(desired_username)
 
         if self.hs.config.enable_registration_captcha:
             flows = [
