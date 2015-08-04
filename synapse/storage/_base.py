@@ -71,6 +71,11 @@ class Cache(object):
         self.thread = None
         caches_by_name[name] = self.cache
 
+        class Sentinel(object):
+            __slots__ = []
+
+        self.sentinel = Sentinel()
+
     def check_thread(self):
         expected_thread = self.thread
         if expected_thread is None:
@@ -85,9 +90,10 @@ class Cache(object):
         if len(keyargs) != self.keylen:
             raise ValueError("Expected a key to have %d items", self.keylen)
 
-        if keyargs in self.cache:
+        val = self.cache.get(keyargs, self.sentinel)
+        if val is not self.sentinel:
             cache_counter.inc_hits(self.name)
-            return self.cache[keyargs]
+            return val
 
         cache_counter.inc_misses(self.name)
         raise KeyError()

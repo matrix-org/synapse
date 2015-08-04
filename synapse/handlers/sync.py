@@ -295,7 +295,11 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def _filter_events_for_client(self, user_id, room_id, events):
         states = yield self.store.get_state_for_events(
-            room_id, [e.event_id for e in events],
+            room_id, frozenset(e.event_id for e in events),
+            types=(
+                (EventTypes.RoomHistoryVisibility, ""),
+                (EventTypes.Member, user_id),
+            )
         )
 
         events_and_states = zip(events, states)

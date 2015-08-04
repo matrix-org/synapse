@@ -230,7 +230,11 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
         states = yield self.store.get_state_for_events(
-            room_id, [e.event_id for e in events],
+            room_id, frozenset(e.event_id for e in events),
+            types=(
+                (EventTypes.RoomHistoryVisibility, ""),
+                (EventTypes.Member, None),
+            )
         )
 
         events_and_states = zip(events, states)
