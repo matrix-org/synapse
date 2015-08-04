@@ -265,6 +265,21 @@ class StateStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_state_for_events(self, room_id, event_ids, types):
+        """Given a list of event_ids and type tuples, return a list of state
+        dicts for each event. The state dicts will only have the type/state_keys
+        that are in the `types` list.
+
+        Args:
+            room_id (str)
+            event_ids (list)
+            types (list): List of (type, state_key) tuples which are used to
+                filter the state fetched. `state_key` may be None, which matches
+                any `state_key`
+
+        Returns:
+            deferred: A list of dicts corresponding to the event_ids given.
+            The dicts are mappings from (type, state_key) -> state_events
+        """
         set_types = frozenset(types)
         res = yield defer.gatherResults(
             [
