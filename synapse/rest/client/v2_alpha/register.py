@@ -224,9 +224,10 @@ class RegisterRestServlet(RestServlet):
             if k not in body:
                 absent.append(k)
 
-        existingUid = self.hs.get_datastore().get_user_id_by_threepid(
+        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
         )
+
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
