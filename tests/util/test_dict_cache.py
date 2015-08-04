@@ -17,7 +17,7 @@
 from twisted.internet import defer
 from tests import unittest
 
-from synapse.storage.util.caches import DictionaryCache
+from synapse.util.dictionary_cache import DictionaryCache
 
 
 class DictCacheTestCase(unittest.TestCase):
