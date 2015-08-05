@@ -45,52 +45,38 @@ class StateStore(SQLBaseStore):
     """
 
     @defer.inlineCallbacks
-    def get_state_groups(self, event_ids):
+    def get_state_groups(self, room_id, event_ids):
         """ Get the state groups for the given list of event_ids
 
         The return value is a dict mapping group names to lists of events.
         """
 
-        def f(txn):
-            groups = set()
-            for event_id in event_ids:
-                group = self._simple_select_one_onecol_txn(
-                    txn,
-                    table="event_to_state_groups",
-                    keyvalues={"event_id": event_id},
-                    retcol="state_group",
-                    allow_none=True,
-                )
-                if group:
-                    groups.add(group)
-
-            res = {}
-            for group in groups:
-                state_ids = self._simple_select_onecol_txn(
-                    txn,
-                    table="state_groups_state",
-                    keyvalues={"state_group": group},
-                    retcol="event_id",
-                )
-
-                res[group] = state_ids
-
-            return res
-
-        states = yield self.runInteraction(
-            "get_state_groups",
-            f,
-        )
-
-        state_list = yield defer.gatherResults(
+        event_and_groups = yield defer.gatherResults(
             [
-                self._fetch_events_for_group(group, vals)
-                for group, vals in states.items()
+                self._get_state_group_for_event(
+                    room_id, event_id,
+                ).addCallback(lambda group, event_id: (event_id, group), event_id)
+                for event_id in event_ids
             ],
             consumeErrors=True,
-        )
+        ).addErrback(unwrapFirstError)
 
-        defer.returnValue(dict(state_list))
+        groups = set(group for _, group in event_and_groups if group)
+
+        group_to_state = yield defer.gatherResults(
+            [
+                self._get_state_for_group(
+                    group,
+                ).addCallback(lambda state_dict, group: (group, state_dict), group)
+                for group in groups
+            ],
+            consumeErrors=True,
+        ).addErrback(unwrapFirstError)
+
+        defer.returnValue({
+            group: state_map.values()
+            for group, state_map in group_to_state
+        })
 
     @cached(num_args=1)
     def _fetch_events_for_group(self, key, events):
@@ -207,16 +193,25 @@ class StateStore(SQLBaseStore):
         events = yield self._get_events(event_ids, get_prev_content=False)
         defer.returnValue(events)
 
-    @cached(num_args=3, lru=True)
-    def _get_state_groups_from_group(self, room_id, group, types):
+    @cached(num_args=2, lru=True, max_entries=10000)
+    def _get_state_groups_from_group(self, group, types):
         def f(txn):
+            if types is not None:
+                where_clause = "AND (%s)" % (
+                    " OR ".join(["(type = ? AND state_key = ?)"] * len(types)),
+                )
+            else:
+                where_clause = ""
+
             sql = (
                 "SELECT event_id FROM state_groups_state WHERE"
-                " room_id = ? AND state_group = ? AND (%s)"
-            ) % (" OR ".join(["(type = ? AND state_key = ?)"] * len(types)),)
+                " state_group = ? %s"
+            ) % (where_clause,)
 
-            args = [room_id, group]
-            args.extend([i for typ in types for i in typ])
+            args = [group]
+            if types is not None:
+                args.extend([i for typ in types for i in typ])
+
             txn.execute(sql, args)
 
             return group, [
@@ -229,7 +224,7 @@ class StateStore(SQLBaseStore):
             f,
         )
 
-    @cached(num_args=3, lru=True, max_entries=100000)
+    @cached(num_args=3, lru=True, max_entries=20000)
     def _get_state_for_event_id(self, room_id, event_id, types):
         def f(txn):
             type_and_state_sql = " OR ".join([
@@ -280,46 +275,112 @@ class StateStore(SQLBaseStore):
             deferred: A list of dicts corresponding to the event_ids given.
             The dicts are mappings from (type, state_key) -> state_events
         """
-        set_types = frozenset(types)
-        res = yield defer.gatherResults(
+        event_and_groups = yield defer.gatherResults(
             [
-                self._get_state_for_event_id(
-                    room_id, event_id, set_types,
-                )
+                self._get_state_group_for_event(
+                    room_id, event_id,
+                ).addCallback(lambda group, event_id: (event_id, group), event_id)
                 for event_id in event_ids
             ],
             consumeErrors=True,
         ).addErrback(unwrapFirstError)
 
-        event_to_state_ids = dict(res)
+        groups = set(group for _, group in event_and_groups)
 
-        event_dict = yield self._get_events(
+        res = yield defer.gatherResults(
             [
-                item
-                for lst in event_to_state_ids.values()
-                for item in lst
+                self._get_state_for_group(
+                    group, types
+                ).addCallback(lambda state_dict, group: (group, state_dict), group)
+                for group in groups
             ],
-            get_prev_content=False
-        ).addCallback(
-            lambda evs: {ev.event_id: ev for ev in evs}
-        )
+            consumeErrors=True,
+        ).addErrback(unwrapFirstError)
+
+        group_to_state = dict(res)
 
         event_to_state = {
-            event_id: {
-                (ev.type, ev.state_key): ev
-                for ev in [
-                    event_dict[state_id]
-                    for state_id in state_ids
-                    if state_id in event_dict
-                ]
-            }
-            for event_id, state_ids in event_to_state_ids.items()
+            event_id: group_to_state[group]
+            for event_id, group in event_and_groups
         }
 
         defer.returnValue([
             event_to_state[event]
             for event in event_ids
         ])
+
+    @cached(num_args=2, lru=True, max_entries=100000)
+    def _get_state_group_for_event(self, room_id, event_id):
+        return self._simple_select_one_onecol(
+            table="event_to_state_groups",
+            keyvalues={
+                "event_id": event_id,
+            },
+            retcol="state_group",
+            allow_none=True,
+            desc="_get_state_group_for_event",
+        )
+
+    @defer.inlineCallbacks
+    def _get_state_for_group(self, group, types=None):
+        is_all, state_dict = self._state_group_cache.get(group)
+
+        type_to_key = {}
+        missing_types = set()
+        if types is not None:
+            for typ, state_key in types:
+                if state_key is None:
+                    type_to_key[typ] = None
+                    missing_types.add((typ, state_key))
+                else:
+                    if type_to_key.get(typ, object()) is not None:
+                        type_to_key.setdefault(typ, set()).add(state_key)
+
+                    if (typ, state_key) not in state_dict:
+                        missing_types.add((typ, state_key))
+
+        if is_all and types is None:
+            defer.returnValue(state_dict)
+
+        if is_all or (types is not None and not missing_types):
+            def include(typ, state_key):
+                sentinel = object()
+                valid_state_keys = type_to_key.get(typ, sentinel)
+                if valid_state_keys is sentinel:
+                    return False
+                if valid_state_keys is None:
+                    return True
+                if state_key in valid_state_keys:
+                    return True
+                return False
+
+            defer.returnValue({
+                k: v
+                for k, v in state_dict.items()
+                if include(k[0], k[1])
+            })
+
+        # Okay, so we have some missing_types, lets fetch them.
+        cache_seq_num = self._state_group_cache.sequence
+        _, state_ids = yield self._get_state_groups_from_group(
+            group,
+            frozenset(types) if types else None
+        )
+        state_events = yield self._get_events(state_ids, get_prev_content=False)
+        state_dict = {
+            (e.type, e.state_key): e
+            for e in state_events
+        }
+
+        # Update the cache
+        self._state_group_cache.update(
+            cache_seq_num,
+            key=group,
+            value=state_dict,
+            full=(types is None),
+        )
+
+        defer.returnValue(state_dict)
 
 
 def _make_group_id(clock):

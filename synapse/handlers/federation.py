@@ -507,7 +507,7 @@ class FederationHandler(BaseHandler):
         event_ids = list(extremities.keys())
 
         states = yield defer.gatherResults([
-            self.state_handler.resolve_state_groups([e])
+            self.state_handler.resolve_state_groups(room_id, [e])
             for e in event_ids
         ])
         states = dict(zip(event_ids, [s[1] for s in states]))
