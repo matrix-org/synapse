@@ -58,7 +58,7 @@ cache_counter = metrics.register_cache(
 
 class Cache(object):
 
-    def __init__(self, name, max_entries=1000, keylen=1, lru=False):
+    def __init__(self, name, max_entries=1000, keylen=1, lru=True):
         if lru:
             self.cache = LruCache(max_size=max_entries)
             self.max_entries = None
@@ -158,7 +158,7 @@ class CacheDescriptor(object):
     which can be used to insert values into the cache specifically, without
     calling the calculation function.
     """
-    def __init__(self, orig, max_entries=1000, num_args=1, lru=False):
+    def __init__(self, orig, max_entries=1000, num_args=1, lru=True):
         self.orig = orig
 
         self.max_entries = max_entries
@@ -209,7 +209,7 @@ class CacheDescriptor(object):
         return wrapped
 
 
-def cached(max_entries=1000, num_args=1, lru=False):
+def cached(max_entries=1000, num_args=1, lru=True):
     return lambda orig: CacheDescriptor(
         orig,
         max_entries=max_entries,
