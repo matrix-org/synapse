@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore, cached
+from ._base import SQLBaseStore, cachedInlineCallbacks
 
 from twisted.internet import defer
 
@@ -128,8 +128,7 @@ class ReceiptsStore(SQLBaseStore):
     def get_max_receipt_stream_id(self):
         return self._receipts_id_gen.get_max_token(self)
 
-    @cached
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks()
     def get_graph_receipts_for_room(self, room_id):
         """Get receipts for sending to remote servers.
         """

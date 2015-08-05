@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore, cached
+from ._base import SQLBaseStore, cachedInlineCallbacks
 from twisted.internet import defer
 
 import logging
@@ -23,8 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class PushRuleStore(SQLBaseStore):
-    @cached()
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks()
     def get_push_rules_for_user(self, user_name):
         rows = yield self._simple_select_list(
             table=PushRuleTable.table_name,
@@ -41,8 +40,7 @@ class PushRuleStore(SQLBaseStore):
 
         defer.returnValue(rows)
 
-    @cached()
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks()
     def get_push_rules_enabled_for_user(self, user_name):
         results = yield self._simple_select_list(
             table=PushRuleEnableTable.table_name,
