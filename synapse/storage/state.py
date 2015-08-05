@@ -229,7 +229,7 @@ class StateStore(SQLBaseStore):
             f,
         )
 
-    @cached(num_args=3, lru=True, max_entries=100000)
+    @cached(num_args=3, lru=True, max_entries=10000)
     def _get_state_for_event_id(self, room_id, event_id, types):
         def f(txn):
             type_and_state_sql = " OR ".join([
