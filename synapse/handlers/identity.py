@@ -44,7 +44,7 @@ class IdentityHandler(BaseHandler):
         http_client = SimpleHttpClient(self.hs)
         # XXX: make this configurable!
         # trustedIdServers = ['matrix.org', 'localhost:8090']
-        trustedIdServers = ['matrix.org']
+        trustedIdServers = ['matrix.org', 'vector.im']
 
         if 'id_server' in creds:
             id_server = creds['id_server']
