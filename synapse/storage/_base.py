@@ -205,8 +205,14 @@ class CacheDescriptor(object):
                     self.function_to_call,
                     obj, *args, **kwargs
                 )
-                ret = ObservableDeferred(ret, consumeErrors=False)
 
+                def onErr(f):
+                    cache.invalidate(*keyargs)
+                    return f
+
+                ret.addErrback(onErr)
+
+                ret = ObservableDeferred(ret, consumeErrors=False)
                 cache.update(sequence, *(keyargs + [ret]))
 
                 return ret.observe()
