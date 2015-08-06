@@ -15,6 +15,7 @@
 import logging
 
 from synapse.api.errors import StoreError
+from synapse.util.async import ObservableDeferred
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import preserve_context_over_fn, LoggingContext
 from synapse.util.lrucache import LruCache
@@ -190,33 +191,27 @@ class CacheDescriptor(object):
         )
 
         @functools.wraps(self.orig)
-        @defer.inlineCallbacks
         def wrapped(*args, **kwargs):
             arg_dict = inspect.getcallargs(self.orig, obj, *args, **kwargs)
             keyargs = [arg_dict[arg_nm] for arg_nm in self.arg_names]
             try:
                 cached_result = cache.get(*keyargs)
-                if DEBUG_CACHES:
-                    actual_result = yield self.function_to_call(obj, *args, **kwargs)
-                    if actual_result != cached_result:
-                        logger.error(
-                            "Stale cache entry %s%r: cached: %r, actual %r",
-                            self.orig.__name__, keyargs,
-                            cached_result, actual_result,
-                        )
-                        raise ValueError("Stale cache entry")
-                defer.returnValue(cached_result)
+                return cached_result.observe()
             except KeyError:
                 # Get the sequence number of the cache before reading from the
                 # database so that we can tell if the cache is invalidated
                 # while the SELECT is executing (SYN-369)
                 sequence = cache.sequence
 
-                ret = yield self.function_to_call(obj, *args, **kwargs)
+                ret = defer.maybeDeferred(
+                    self.function_to_call,
+                    obj, *args, **kwargs
+                )
+                ret = ObservableDeferred(ret, consumeErrors=False)
 
                 cache.update(sequence, *(keyargs + [ret]))
 
-                defer.returnValue(ret)
+                return ret.observe()
 
         wrapped.invalidate = cache.invalidate
         wrapped.invalidate_all = cache.invalidate_all
