@@ -139,6 +139,11 @@ class Config(object):
             help="Generate a config file for the server name"
         )
         config_parser.add_argument(
+            "--generate-keys",
+            action="store_true",
+            help="Generate any missing key files then exit"
+        )
+        config_parser.add_argument(
             "-H", "--server-name",
             help="The server name to generate a config file for"
         )
@@ -229,5 +234,9 @@ class Config(object):
         obj.invoke_all("read_config", config)
 
         obj.invoke_all("read_arguments", args)
+
+        if config_args.generate_keys:
+            obj.invoke_all("generate_files", config)
+            sys.exit(0)
 
         return obj

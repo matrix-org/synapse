@@ -186,8 +186,8 @@ class CacheDescriptor(object):
             try:
                 cached_result_d = self.cache.get(keyargs)
 
+                observer = cached_result_d.observe()
                 if DEBUG_CACHES:
-
                     @defer.inlineCallbacks
                     def check_result(cached_result):
                         actual_result = yield self.function_to_call(obj, *args, **kwargs)
@@ -198,9 +198,10 @@ class CacheDescriptor(object):
                                 cached_result, actual_result,
                             )
                             raise ValueError("Stale cache entry")
-                    cached_result_d.observe().addCallback(check_result)
+                        defer.returnValue(cached_result)
+                    observer.addCallback(check_result)
 
-                return cached_result_d.observe()
+                return observer
             except KeyError:
                 # Get the sequence number of the cache before reading from the
                 # database so that we can tell if the cache is invalidated

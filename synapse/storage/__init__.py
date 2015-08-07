@@ -354,6 +354,11 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
                     )
                 logger.debug("Running script %s", relative_path)
                 module.run_upgrade(cur, database_engine)
+            elif ext == ".pyc":
+                # Sometimes .pyc files turn up anyway even though we've
+                # disabled their generation; e.g. from distribution package
+                # installers. Silently skip it
+                pass
             elif ext == ".sql":
                 # A plain old .sql file, just read and execute it
                 logger.debug("Applying schema %s", relative_path)
