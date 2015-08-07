@@ -657,7 +657,8 @@ def run(hs):
 
     if hs.config.daemonize:
 
-        print hs.config.pid_file
+        if hs.config.print_pidfile:
+            print hs.config.pid_file
 
         daemon = Daemonize(
             app="synapse-homeserver",
