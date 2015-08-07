@@ -192,7 +192,6 @@ class StateStore(SQLBaseStore):
         events = yield self._get_events(event_ids, get_prev_content=False)
         defer.returnValue(events)
 
-    @cached(num_args=2, lru=True, max_entries=10000)
     def _get_state_groups_from_group(self, group, types):
         def f(txn):
             if types is not None:
