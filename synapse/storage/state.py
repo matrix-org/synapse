@@ -65,7 +65,6 @@ class StateStore(SQLBaseStore):
             for group, state_map in group_to_state.items()
         })
 
-    @cached(num_args=1)
     def _fetch_events_for_group(self, key, events):
         return self._get_events(
             events, get_prev_content=False
