@@ -405,10 +405,14 @@ class MessageHandler(BaseHandler):
             except:
                 logger.exception("Failed to get snapshot")
 
-        yield defer.gatherResults(
-            [handle_room(e) for e in room_list],
-            consumeErrors=True
-        ).addErrback(unwrapFirstError)
+        # Only do N rooms at once
+        n = 5
+        d_list = [handle_room(e) for e in room_list]
+        for ds in [d_list[i:i + n] for i in range(0, len(d_list), n)]:
+            yield defer.gatherResults(
+                ds,
+                consumeErrors=True
+            ).addErrback(unwrapFirstError)
 
         ret = {
             "rooms": rooms_ret,
