@@ -151,11 +151,11 @@ class PushRuleStore(SQLBaseStore):
             txn.execute(sql, (user_name, priority_class, new_rule_priority))
 
         txn.call_after(
-            self.get_push_rules_for_user.invalidate, user_name
+            self.get_push_rules_for_user.invalidate, (user_name,)
         )
 
         txn.call_after(
-            self.get_push_rules_enabled_for_user.invalidate, user_name
+            self.get_push_rules_enabled_for_user.invalidate, (user_name,)
         )
 
         self._simple_insert_txn(
@@ -187,10 +187,10 @@ class PushRuleStore(SQLBaseStore):
         new_rule['priority'] = new_prio
 
         txn.call_after(
-            self.get_push_rules_for_user.invalidate, user_name
+            self.get_push_rules_for_user.invalidate, (user_name,)
         )
         txn.call_after(
-            self.get_push_rules_enabled_for_user.invalidate, user_name
+            self.get_push_rules_enabled_for_user.invalidate, (user_name,)
         )
 
         self._simple_insert_txn(
@@ -216,8 +216,8 @@ class PushRuleStore(SQLBaseStore):
             desc="delete_push_rule",
         )
 
-        self.get_push_rules_for_user.invalidate(user_name)
-        self.get_push_rules_enabled_for_user.invalidate(user_name)
+        self.get_push_rules_for_user.invalidate((user_name,))
+        self.get_push_rules_enabled_for_user.invalidate((user_name,))
 
     @defer.inlineCallbacks
     def set_push_rule_enabled(self, user_name, rule_id, enabled):
@@ -238,10 +238,10 @@ class PushRuleStore(SQLBaseStore):
             {'id': new_id},
         )
         txn.call_after(
-            self.get_push_rules_for_user.invalidate, user_name
+            self.get_push_rules_for_user.invalidate, (user_name,)
         )
         txn.call_after(
-            self.get_push_rules_enabled_for_user.invalidate, user_name
+            self.get_push_rules_enabled_for_user.invalidate, (user_name,)
         )
 
 

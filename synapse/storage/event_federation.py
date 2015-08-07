@@ -362,7 +362,7 @@ class EventFederationStore(SQLBaseStore):
 
         for room_id in events_by_room:
             txn.call_after(
-                self.get_latest_event_ids_in_room.invalidate, room_id
+                self.get_latest_event_ids_in_room.invalidate, (room_id,)
             )
 
     def get_backfill_events(self, room_id, event_list, limit):
@@ -505,4 +505,4 @@ class EventFederationStore(SQLBaseStore):
         query = "DELETE FROM event_forward_extremities WHERE room_id = ?"
 
         txn.execute(query, (room_id,))
-        txn.call_after(self.get_latest_event_ids_in_room.invalidate, room_id)
+        txn.call_after(self.get_latest_event_ids_in_room.invalidate, (room_id,))
