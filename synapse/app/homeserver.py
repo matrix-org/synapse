@@ -98,7 +98,7 @@ class SynapseHomeServer(HomeServer):
 
     def build_resource_for_web_client(self):
         import syweb
-        syweb_path = os.path.dirname(syweb.__file__)
+        syweb_path = syweb.installed_location()
         webclient_path = os.path.join(syweb_path, "webclient")
         # GZip is disabled here due to
         # https://twistedmatrix.com/trac/ticket/7678
