@@ -86,8 +86,8 @@ class Cache(object):
                     "Cache objects can only be accessed from the main thread"
                 )
 
-    def get(self, keyargs, default=_CacheSentinel):
-        val = self.cache.get(keyargs, _CacheSentinel)
+    def get(self, key, default=_CacheSentinel):
+        val = self.cache.get(key, _CacheSentinel)
         if val is not _CacheSentinel:
             cache_counter.inc_hits(self.name)
             return val
@@ -99,29 +99,29 @@ class Cache(object):
         else:
             return default
 
-    def update(self, sequence, keyargs, value):
+    def update(self, sequence, key, value):
         self.check_thread()
         if self.sequence == sequence:
             # Only update the cache if the caches sequence number matches the
             # number that the cache had before the SELECT was started (SYN-369)
-            self.prefill(keyargs, value)
+            self.prefill(key, value)
 
-    def prefill(self, keyargs, value):
+    def prefill(self, key, value):
         if self.max_entries is not None:
             while len(self.cache) >= self.max_entries:
                 self.cache.popitem(last=False)
 
-        self.cache[keyargs] = value
+        self.cache[key] = value
 
-    def invalidate(self, keyargs):
+    def invalidate(self, key):
         self.check_thread()
-        if not isinstance(keyargs, tuple):
+        if not isinstance(key, tuple):
             raise ValueError("keyargs must be a tuple.")
 
         # Increment the sequence number so that any SELECT statements that
         # raced with the INSERT don't update the cache (SYN-369)
         self.sequence += 1
-        self.cache.pop(keyargs, None)
+        self.cache.pop(key, None)
 
     def invalidate_all(self):
         self.check_thread()
