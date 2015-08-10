@@ -26,6 +26,9 @@ DictionaryEntry = namedtuple("DictionaryEntry", ("full", "value"))
 
 
 class DictionaryCache(object):
+    """Caches key -> dictionary lookups, supporting caching partial dicts, i.e.
+    fetching a subset of dictionary keys for a particular key.
+    """
 
     def __init__(self, name, max_entries=1000):
         self.cache = LruCache(max_size=max_entries)
