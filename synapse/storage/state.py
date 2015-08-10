@@ -433,7 +433,10 @@ class StateStore(SQLBaseStore):
                 key: None
                 for key in missing_types
             }
-            evs = [state_events[e_id] for e_id in state_ids]
+            evs = [
+                state_events[e_id] for e_id in state_ids
+                if e_id in state_events  # This can happen if event is rejected.
+            ]
             state_dict.update({
                 (e.type, e.state_key): e
                 for e in evs
