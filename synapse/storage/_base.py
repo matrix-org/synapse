@@ -234,6 +234,12 @@ class CacheDescriptor(object):
 
 
 class CacheListDescriptor(object):
+    """Wraps an existing cache to support bulk fetching of keys.
+
+    Given a list of keys it looks in the cache to find any hits, then passes
+    the list of missing keys to the wrapped fucntion.
+    """
+
     def __init__(self, orig, cache, list_name, num_args=1, inlineCallbacks=False):
         self.orig = orig
 
