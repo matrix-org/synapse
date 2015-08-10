@@ -98,7 +98,7 @@ class PresenceStore(SQLBaseStore):
             updatevalues={"accepted": True},
             desc="set_presence_list_accepted",
         )
-        self.get_presence_list_accepted.invalidate(observer_localpart)
+        self.get_presence_list_accepted.invalidate((observer_localpart,))
         defer.returnValue(result)
 
     def get_presence_list(self, observer_localpart, accepted=None):
@@ -133,4 +133,4 @@ class PresenceStore(SQLBaseStore):
                        "observed_user_id": observed_userid},
             desc="del_presence_list",
         )
-        self.get_presence_list_accepted.invalidate(observer_localpart)
+        self.get_presence_list_accepted.invalidate((observer_localpart,))
