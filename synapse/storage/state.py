@@ -323,7 +323,8 @@ class StateStore(SQLBaseStore):
             desc="_get_state_group_for_event",
         )
 
-    @cachedList(cache=_get_state_group_for_event.cache, list_name="event_ids", num_args=2)
+    @cachedList(cache=_get_state_group_for_event.cache, list_name="event_ids",
+                num_args=2)
     def _get_state_group_for_events(self, room_id, event_ids):
         def f(txn):
             results = {}
