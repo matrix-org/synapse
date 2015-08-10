@@ -171,34 +171,9 @@ class StateStore(SQLBaseStore):
         events = yield self._get_events(event_ids, get_prev_content=False)
         defer.returnValue(events)
 
-    def _get_state_groups_from_group(self, group, types):
-        def f(txn):
-            if types is not None:
-                where_clause = "AND (%s)" % (
-                    " OR ".join(["(type = ? AND state_key = ?)"] * len(types)),
-                )
-            else:
-                where_clause = ""
-
-            sql = (
-                "SELECT event_id FROM state_groups_state WHERE"
-                " state_group = ? %s"
-            ) % (where_clause,)
-
-            args = [group]
-            if types is not None:
-                args.extend([i for typ in types for i in typ])
-
-            txn.execute(sql, args)
-
-            return [r[0] for r in txn.fetchall()]
-
-        return self.runInteraction(
-            "_get_state_groups_from_group",
-            f,
-        )
-
     def _get_state_groups_from_groups(self, groups_and_types):
+        """Returns dictionary state_group -> state event ids
+        """
         def f(txn):
             results = {}
             for group, types in groups_and_types:
@@ -229,41 +204,6 @@ class StateStore(SQLBaseStore):
 
         return self.runInteraction(
             "_get_state_groups_from_groups",
-            f,
-        )
-
-    @cached(num_args=3, lru=True, max_entries=10000)
-    def _get_state_for_event_id(self, room_id, event_id, types):
-        def f(txn):
-            type_and_state_sql = " OR ".join([
-                "(type = ? AND state_key = ?)"
-                if typ[1] is not None
-                else "type = ?"
-                for typ in types
-            ])
-
-            sql = (
-                "SELECT e.event_id, sg.state_group, sg.event_id"
-                " FROM state_groups_state as sg"
-                " INNER JOIN event_to_state_groups as e"
-                " ON e.state_group = sg.state_group"
-                " WHERE e.event_id = ? AND (%s)"
-            ) % (type_and_state_sql,)
-
-            args = [event_id]
-            for typ, state_key in types:
-                args.extend(
-                    [typ, state_key] if state_key is not None else [typ]
-                )
-            txn.execute(sql, args)
-
-            return event_id, [
-                r[0]
-                for r in txn.fetchall()
-            ]
-
-        return self.runInteraction(
-            "_get_state_for_event_id",
             f,
         )
 
@@ -319,6 +259,8 @@ class StateStore(SQLBaseStore):
     @cachedList(cache=_get_state_group_for_event.cache, list_name="event_ids",
                 num_args=2)
     def _get_state_group_for_events(self, room_id, event_ids):
+        """Returns mapping event_id -> state_group
+        """
         def f(txn):
             results = {}
             for event_id in event_ids:
@@ -340,6 +282,8 @@ class StateStore(SQLBaseStore):
         )
 
     def _get_state_for_group_from_cache(self, group, types=None):
+        """Checks if group is in cache. See `_get_state_for_groups`
+        """
         is_all, state_dict = self._state_group_cache.get(group)
 
         type_to_key = {}
@@ -382,6 +326,11 @@ class StateStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _get_state_for_groups(self, groups, types=None):
+        """Given list of groups returns dict of group -> list of state events
+        with matching types. `types` is a list of `(type, state_key)`, where
+        a `state_key` of None matches all state_keys. If `types` is None then
+        all events are returned.
+        """
         results = {}
         missing_groups_and_types = []
         for group in groups:
