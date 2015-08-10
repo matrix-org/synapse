@@ -65,13 +65,6 @@ class StateStore(SQLBaseStore):
             for group, state_map in group_to_state.items()
         })
 
-    def _fetch_events_for_group(self, key, events):
-        return self._get_events(
-            events, get_prev_content=False
-        ).addCallback(
-            lambda evs: (key, evs)
-        )
-
     def _store_state_groups_txn(self, txn, event, context):
         return self._store_mult_state_groups_txn(txn, [(event, context)])
 
