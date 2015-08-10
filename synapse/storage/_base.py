@@ -116,7 +116,9 @@ class Cache(object):
     def invalidate(self, key):
         self.check_thread()
         if not isinstance(key, tuple):
-            raise ValueError("keyargs must be a tuple.")
+            raise TypeError(
+                "The cache key must be a tuple not %r" % (type(key),)
+            )
 
         # Increment the sequence number so that any SELECT statements that
         # raced with the INSERT don't update the cache (SYN-369)
