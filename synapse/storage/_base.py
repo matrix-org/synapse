@@ -182,9 +182,9 @@ class CacheDescriptor(object):
         @functools.wraps(self.orig)
         def wrapped(*args, **kwargs):
             arg_dict = inspect.getcallargs(self.orig, obj, *args, **kwargs)
-            keyargs = tuple(arg_dict[arg_nm] for arg_nm in self.arg_names)
+            cache_key = tuple(arg_dict[arg_nm] for arg_nm in self.arg_names)
             try:
-                cached_result_d = self.cache.get(keyargs)
+                cached_result_d = self.cache.get(cache_key)
 
                 observer = cached_result_d.observe()
                 if DEBUG_CACHES:
@@ -194,7 +194,7 @@ class CacheDescriptor(object):
                         if actual_result != cached_result:
                             logger.error(
                                 "Stale cache entry %s%r: cached: %r, actual %r",
-                                self.orig.__name__, keyargs,
+                                self.orig.__name__, cache_key,
                                 cached_result, actual_result,
                             )
                             raise ValueError("Stale cache entry")
@@ -214,13 +214,13 @@ class CacheDescriptor(object):
                 )
 
                 def onErr(f):
-                    self.cache.invalidate(keyargs)
+                    self.cache.invalidate(cache_key)
                     return f
 
                 ret.addErrback(onErr)
 
                 ret = ObservableDeferred(ret, consumeErrors=True)
-                self.cache.update(sequence, keyargs, ret)
+                self.cache.update(sequence, cache_key, ret)
 
                 return ret.observe()
 
