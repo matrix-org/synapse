@@ -315,6 +315,8 @@ class CacheListDescriptor(object):
 
                 ret_d = ObservableDeferred(ret_d)
 
+                # We need to create deferreds for each arg in the list so that
+                # we can insert the new deferred into the cache.
                 for arg in missing:
                     observer = ret_d.observe()
                     observer.addCallback(lambda r, arg: r[arg], arg)
