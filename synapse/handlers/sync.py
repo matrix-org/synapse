@@ -294,7 +294,7 @@ class SyncHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _filter_events_for_client(self, user_id, room_id, events):
-        states = yield self.store.get_state_for_events(
+        event_id_to_state = yield self.store.get_state_for_events(
             room_id, frozenset(e.event_id for e in events),
             types=(
                 (EventTypes.RoomHistoryVisibility, ""),
@@ -302,7 +302,8 @@ class SyncHandler(BaseHandler):
             )
         )
 
-        events_and_states = zip(events, states)
+        for ev, state in event_id_to_state.items():
+            logger.info("event_id: %r, state: %r", ev, state)
 
         def allowed(event_and_state):
             event, state = event_and_state
@@ -335,10 +336,18 @@ class SyncHandler(BaseHandler):
                 return membership == Membership.INVITE
 
             return True
-        events_and_states = filter(allowed, events_and_states)
+
+        event_and_state = filter(
+            allowed,
+            [
+                (e, event_id_to_state[e.event_id])
+                for e in events
+            ]
+        )
+
         defer.returnValue([
             ev
-            for ev, _ in events_and_states
+            for ev, _ in event_and_state
         ])
 
     @defer.inlineCallbacks
