@@ -32,6 +32,7 @@ from .appservice import ApplicationServicesHandler
 from .sync import SyncHandler
 from .auth import AuthHandler
 from .identity import IdentityHandler
+from .receipts import ReceiptsHandler
 
 
 class Handlers(object):
@@ -57,6 +58,7 @@ class Handlers(object):
         self.directory_handler = DirectoryHandler(hs)
         self.typing_notification_handler = TypingNotificationHandler(hs)
         self.admin_handler = AdminHandler(hs)
+        self.receipts_handler = ReceiptsHandler(hs)
         asapi = ApplicationServiceApi(hs)
         self.appservice_handler = ApplicationServicesHandler(
             hs, asapi, AppServiceScheduler(

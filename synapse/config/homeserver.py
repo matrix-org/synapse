@@ -25,12 +25,13 @@ from .registration import RegistrationConfig
 from .metrics import MetricsConfig
 from .appservice import AppServiceConfig
 from .key import KeyConfig
+from .saml2 import SAML2Config
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
-                       VoipConfig, RegistrationConfig,
-                       MetricsConfig, AppServiceConfig, KeyConfig,):
+                       VoipConfig, RegistrationConfig, MetricsConfig,
+                       AppServiceConfig, KeyConfig, SAML2Config, ):
     pass
 
 

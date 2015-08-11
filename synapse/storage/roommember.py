@@ -35,38 +35,28 @@ RoomsForUser = namedtuple(
 
 class RoomMemberStore(SQLBaseStore):
 
-    def _store_room_member_txn(self, txn, event):
+    def _store_room_members_txn(self, txn, events):
         """Store a room member in the database.
         """
-        try:
-            target_user_id = event.state_key
-        except:
-            logger.exception(
-                "Failed to parse target_user_id=%s", target_user_id
-            )
-            raise
-
-        logger.debug(
-            "_store_room_member_txn: target_user_id=%s, membership=%s",
-            target_user_id,
-            event.membership,
-        )
-
-        self._simple_insert_txn(
+        self._simple_insert_many_txn(
             txn,
-            "room_memberships",
-            {
-                "event_id": event.event_id,
-                "user_id": target_user_id,
-                "sender": event.user_id,
-                "room_id": event.room_id,
-                "membership": event.membership,
-            }
+            table="room_memberships",
+            values=[
+                {
+                    "event_id": event.event_id,
+                    "user_id": event.state_key,
+                    "sender": event.user_id,
+                    "room_id": event.room_id,
+                    "membership": event.membership,
+                }
+                for event in events
+            ]
         )
 
-        txn.call_after(self.get_rooms_for_user.invalidate, target_user_id)
-        txn.call_after(self.get_joined_hosts_for_room.invalidate, event.room_id)
-        txn.call_after(self.get_users_in_room.invalidate, event.room_id)
+        for event in events:
+            txn.call_after(self.get_rooms_for_user.invalidate, (event.state_key,))
+            txn.call_after(self.get_joined_hosts_for_room.invalidate, (event.room_id,))
+            txn.call_after(self.get_users_in_room.invalidate, (event.room_id,))
 
     def get_room_member(self, user_id, room_id):
         """Retrieve the current state of a room member.
@@ -88,7 +78,7 @@ class RoomMemberStore(SQLBaseStore):
             lambda events: events[0] if events else None
         )
 
-    @cached()
+    @cached(max_entries=5000)
     def get_users_in_room(self, room_id):
         def f(txn):
 
@@ -164,7 +154,7 @@ class RoomMemberStore(SQLBaseStore):
             RoomsForUser(**r) for r in self.cursor_to_dict(txn)
         ]
 
-    @cached()
+    @cached(max_entries=5000)
     def get_joined_hosts_for_room(self, room_id):
         return self.runInteraction(
             "get_joined_hosts_for_room",
