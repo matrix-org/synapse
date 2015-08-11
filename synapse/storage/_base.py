@@ -288,6 +288,8 @@ class CacheListDescriptor(object):
             keyargs = [arg_dict[arg_nm] for arg_nm in self.arg_names]
             list_args = arg_dict[self.list_name]
 
+            # cached is a dict arg -> deferred, where deferred results in a
+            # 2-tuple (`arg`, `result`)
             cached = {}
             missing = []
             for arg in list_args:
