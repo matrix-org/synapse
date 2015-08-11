@@ -17,7 +17,8 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError, Codes
 
-from ._base import SQLBaseStore, cached
+from ._base import SQLBaseStore
+from synapse.util.caches.descriptors import cached
 
 
 class RegistrationStore(SQLBaseStore):

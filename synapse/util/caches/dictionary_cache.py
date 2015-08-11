@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.lrucache import LruCache
+from synapse.util.caches.lrucache import LruCache
 from collections import namedtuple
 import threading
 import logging
