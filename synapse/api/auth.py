@@ -357,7 +357,7 @@ class Auth(object):
                 )
                 return
             except KeyError:
-                pass # normal users won't have the user_id query parameter set.
+                pass  # normal users won't have the user_id query parameter set.
 
             user_info = yield self.get_user_by_token(access_token)
             user = user_info["user"]
