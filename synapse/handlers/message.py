@@ -145,9 +145,6 @@ class MessageHandler(BaseHandler):
             )
         )
 
-        for ev, state in event_id_to_state.items():
-            logger.info("event_id: %r, state: %r", ev, state)
-
         def allowed(event_and_state):
             event, state = event_and_state
 
