@@ -44,6 +44,11 @@ class Auth(object):
     def check(self, event, auth_events):
         """ Checks if this event is correctly authed.
 
+        Args:
+            event: the event being checked.
+            auth_events (dict: event-key -> event): the existing room state.
+
+
         Returns:
             True if the auth checks pass.
         """
@@ -319,7 +324,7 @@ class Auth(object):
         Returns:
             tuple : of UserID and device string:
                 User ID object of the user making the request
-                Client ID object of the client instance the user is using
+                ClientInfo object of the client instance the user is using
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -352,7 +357,7 @@ class Auth(object):
                 )
                 return
             except KeyError:
-                pass  # normal users won't have this query parameter set
+                pass # normal users won't have the user_id query parameter set.
 
             user_info = yield self.get_user_by_token(access_token)
             user = user_info["user"]
