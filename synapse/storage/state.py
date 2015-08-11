@@ -316,10 +316,10 @@ class StateStore(SQLBaseStore):
             for event_id, state_ids in event_to_state_ids.items()
         }
 
-        defer.returnValue([
-            event_to_state[event]
+        defer.returnValue({
+            event: event_to_state[event]
             for event in event_ids
-        ])
+        })
 
 
 def _make_group_id(clock):

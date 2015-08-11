@@ -229,15 +229,13 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
-        states = yield self.store.get_state_for_events(
+        events_to_state = yield self.store.get_state_for_events(
             room_id, frozenset(e.event_id for e in events),
             types=(
                 (EventTypes.RoomHistoryVisibility, ""),
                 (EventTypes.Member, None),
             )
         )
-
-        events_and_states = zip(events, states)
 
         def redact_disallowed(event_and_state):
             event, state = event_and_state
@@ -275,9 +273,10 @@ class FederationHandler(BaseHandler):
 
             return event
 
-        res = map(redact_disallowed, events_and_states)
-
-        logger.info("_filter_events_for_server %r", res)
+        res = map(redact_disallowed, [
+            (e, events_to_state[e.event_id])
+            for e in events
+        ])
 
         defer.returnValue(res)
 
