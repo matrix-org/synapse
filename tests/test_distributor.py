@@ -73,8 +73,8 @@ class DistributorTestCase(unittest.TestCase):
             yield d
             self.assertTrue(d.called)
 
-            observers[0].assert_called_once("Go")
-            observers[1].assert_called_once("Go")
+            observers[0].assert_called_once_with("Go")
+            observers[1].assert_called_once_with("Go")
 
             self.assertEquals(mock_logger.warning.call_count, 1)
             self.assertIsInstance(mock_logger.warning.call_args[0][0],
