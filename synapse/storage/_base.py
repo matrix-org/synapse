@@ -241,6 +241,15 @@ class CacheListDescriptor(object):
     """
 
     def __init__(self, orig, cache, list_name, num_args=1, inlineCallbacks=False):
+        """
+        Args:
+            orig (function)
+            cache (Cache)
+            list_name (str): Name of the argument which is the bulk lookup list
+            num_args (int)
+            inlineCallbacks (bool): Whether orig is a generator that should
+                be wrapped by defer.inlineCallbacks
+        """
         self.orig = orig
 
         if inlineCallbacks:
