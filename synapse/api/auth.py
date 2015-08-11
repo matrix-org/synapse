@@ -521,23 +521,22 @@ class Auth(object):
 
         # Check state_key
         if hasattr(event, "state_key"):
-            if not event.state_key.startswith("_"):
-                if event.state_key.startswith("@"):
-                    if event.state_key != event.user_id:
+            if event.state_key.startswith("@"):
+                if event.state_key != event.user_id:
+                    raise AuthError(
+                        403,
+                        "You are not allowed to set others state"
+                    )
+                else:
+                    sender_domain = UserID.from_string(
+                        event.user_id
+                    ).domain
+
+                    if sender_domain != event.state_key:
                         raise AuthError(
                             403,
                             "You are not allowed to set others state"
                         )
-                    else:
-                        sender_domain = UserID.from_string(
-                            event.user_id
-                        ).domain
-
-                        if sender_domain != event.state_key:
-                            raise AuthError(
-                                403,
-                                "You are not allowed to set others state"
-                            )
 
         return True
 
