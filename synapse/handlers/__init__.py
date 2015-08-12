@@ -22,7 +22,6 @@ from .room import (
 from .message import MessageHandler
 from .events import EventStreamHandler, EventHandler
 from .federation import FederationHandler
-from .login import LoginHandler
 from .profile import ProfileHandler
 from .presence import PresenceHandler
 from .directory import DirectoryHandler
@@ -54,7 +53,6 @@ class Handlers(object):
         self.profile_handler = ProfileHandler(hs)
         self.presence_handler = PresenceHandler(hs)
         self.room_list_handler = RoomListHandler(hs)
-        self.login_handler = LoginHandler(hs)
         self.directory_handler = DirectoryHandler(hs)
         self.typing_notification_handler = TypingNotificationHandler(hs)
         self.admin_handler = AdminHandler(hs)

@@ -50,7 +50,6 @@ class RegisterRestServlet(RestServlet):
         self.auth_handler = hs.get_handlers().auth_handler
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
-        self.login_handler = hs.get_handlers().login_handler
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -143,7 +142,7 @@ class RegisterRestServlet(RestServlet):
                 if reqd not in threepid:
                     logger.info("Can't add incomplete 3pid")
                 else:
-                    yield self.login_handler.add_threepid(
+                    yield self.auth_handler.add_threepid(
                         user_id,
                         threepid['medium'],
                         threepid['address'],
