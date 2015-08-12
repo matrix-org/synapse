@@ -43,14 +43,25 @@ class ThumbnailResource(BaseMediaResource):
         m_type = parse_string(request, "type", "image/png")
 
         if server_name == self.server_name:
-            yield self._select_or_generate_local_thumbnail(
-                request, media_id, width, height, method, m_type
-            )
+            if self.dynamic_thumbnails:
+                yield self._select_or_generate_local_thumbnail(
+                    request, media_id, width, height, method, m_type
+                )
+            else:
+                yield self._respond_local_thumbnail(
+                    request, media_id, width, height, method, m_type
+                )
         else:
-            yield self._select_or_generate_remote_thumbnail(
-                request, server_name, media_id,
-                width, height, method, m_type
-            )
+            if self.dynamic_thumbnails:
+                yield self._select_or_generate_remote_thumbnail(
+                    request, server_name, media_id,
+                    width, height, method, m_type
+                )
+            else:
+                yield self._respond_remote_thumbnail(
+                    request, server_name, media_id,
+                    width, height, method, m_type
+                )
 
     @defer.inlineCallbacks
     def _respond_local_thumbnail(self, request, media_id, width, height,

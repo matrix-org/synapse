@@ -69,6 +69,7 @@ class BaseMediaResource(Resource):
         self.filepaths = filepaths
         self.version_string = hs.version_string
         self.downloads = {}
+        self.dynamic_thumbnails = hs.config.dynamic_thumbnails
 
     def _respond_404(self, request):
         respond_with_json(

@@ -22,6 +22,7 @@ class ContentRepositoryConfig(Config):
         self.max_image_pixels = self.parse_size(config["max_image_pixels"])
         self.media_store_path = self.ensure_directory(config["media_store_path"])
         self.uploads_path = self.ensure_directory(config["uploads_path"])
+        self.dynamic_thumbnails = config["dynamic_thumbnails"]
 
     def default_config(self, config_dir_path, server_name):
         media_store = self.default_path("media_store")
@@ -38,4 +39,11 @@ class ContentRepositoryConfig(Config):
 
         # Maximum number of pixels that will be thumbnailed
         max_image_pixels: "32M"
+
+        # Whether to generate new thumbnails on the fly to precisely match
+        # the resolution requested by the client. If true then whenever
+        # a new resolution is requested by the client the server will
+        # generate a new thumbnail. If false the server will pick a thumbnail
+        # from a precalcualted list.
+        dynamic_thumbnails: false
         """ % locals()
