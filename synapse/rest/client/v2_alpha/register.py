@@ -224,15 +224,15 @@ class RegisterRestServlet(RestServlet):
             if k not in body:
                 absent.append(k)
 
+        if len(absent) > 0:
+            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
         )
 
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
-
-        if len(absent) > 0:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
         defer.returnValue((200, ret))
