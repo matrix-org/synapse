@@ -334,17 +334,10 @@ class SyncHandler(BaseHandler):
 
             return True
 
-        event_and_state = filter(
-            allowed,
-            [
-                (e, event_id_to_state[e.event_id])
-                for e in events
-            ]
-        )
-
         defer.returnValue([
-            ev
-            for ev, _ in event_and_state
+            event
+            for event in events
+            if allowed(event, event_id_to_state[event.event_id])
         ])
 
     @defer.inlineCallbacks
