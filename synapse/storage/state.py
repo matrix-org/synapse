@@ -412,6 +412,10 @@ class StateStore(SQLBaseStore):
 
         for group, state_ids in group_state_dict.items():
             if types:
+                # We delibrately put key -> None mappings into the cache to
+                # cache absence of the key, on the assumption that if we've
+                # explicitly asked for some types then we will probably ask
+                # for them again.
                 state_dict = {
                     key: None
                     for key in types
