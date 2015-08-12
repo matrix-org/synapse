@@ -406,9 +406,9 @@ class MessageHandler(BaseHandler):
         # Only do N rooms at once
         n = 5
         d_list = [handle_room(e) for e in room_list]
-        for ds in [d_list[i:i + n] for i in range(0, len(d_list), n)]:
+        for i in range(0, len(d_list), n):
             yield defer.gatherResults(
-                ds,
+                d_list[i:i + n],
                 consumeErrors=True
             ).addErrback(unwrapFirstError)
 
