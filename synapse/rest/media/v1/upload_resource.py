@@ -15,7 +15,7 @@
 
 from synapse.http.server import respond_with_json, request_handler
 
-from synapse.util.stringutils import random_string
+from synapse.util.stringutils import random_string, is_ascii
 from synapse.api.errors import SynapseError
 
 from twisted.web.server import NOT_DONE_YET
@@ -84,6 +84,12 @@ class UploadResource(BaseMediaResource):
                 code=413,
             )
 
+        upload_name = request.args.get("filename", None)
+        if upload_name:
+            upload_name = upload_name[0]
+            if upload_name and not is_ascii(upload_name):
+                raise SynapseError(400, "filename must be ascii")
+
         headers = request.requestHeaders
 
         if headers.hasHeader("Content-Type"):
@@ -99,7 +105,7 @@ class UploadResource(BaseMediaResource):
         # TODO(markjh): parse content-dispostion
 
         content_uri = yield self.create_content(
-            media_type, None, request.content.read(),
+            media_type, upload_name, request.content.read(),
             content_length, auth_user
         )
 

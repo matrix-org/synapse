@@ -18,6 +18,7 @@ from twisted.internet import defer
 from _base import SQLBaseStore
 
 from syutil.base64util import encode_base64
+from synapse.crypto.event_signing import compute_event_reference_hash
 
 
 class SignatureStore(SQLBaseStore):
@@ -101,23 +102,26 @@ class SignatureStore(SQLBaseStore):
         txn.execute(query, (event_id, ))
         return {k: v for k, v in txn.fetchall()}
 
-    def _store_event_reference_hash_txn(self, txn, event_id, algorithm,
-                                        hash_bytes):
+    def _store_event_reference_hashes_txn(self, txn, events):
         """Store a hash for a PDU
         Args:
             txn (cursor):
-            event_id (str): Id for the Event.
-            algorithm (str): Hashing algorithm.
-            hash_bytes (bytes): Hash function output bytes.
+            events (list): list of Events.
         """
-        self._simple_insert_txn(
+
+        vals = []
+        for event in events:
+            ref_alg, ref_hash_bytes = compute_event_reference_hash(event)
+            vals.append({
+                "event_id": event.event_id,
+                "algorithm": ref_alg,
+                "hash": buffer(ref_hash_bytes),
+            })
+
+        self._simple_insert_many_txn(
             txn,
-            "event_reference_hashes",
-            {
-                "event_id": event_id,
-                "algorithm": algorithm,
-                "hash": buffer(hash_bytes),
-            },
+            table="event_reference_hashes",
+            values=vals,
         )
 
     def _get_event_signatures_txn(self, txn, event_id):

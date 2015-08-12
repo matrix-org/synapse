@@ -183,7 +183,17 @@ class EventStreamPermissionsTestCase(RestTestCase):
         )
         self.assertEquals(200, code, msg=str(response))
 
-        self.assertEquals(0, len(response["chunk"]))
+        # We may get a presence event for ourselves down
+        self.assertEquals(
+            0,
+            len([
+                c for c in response["chunk"]
+                if not (
+                    c.get("type") == "m.presence"
+                    and c["content"].get("user_id") == self.user_id
+                )
+            ])
+        )
 
         # joined room (expect all content for room)
         yield self.join(room=room_id, user=self.user_id, tok=self.token)

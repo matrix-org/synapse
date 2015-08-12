@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 AuthEventTypes = (
     EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,
-    EventTypes.JoinRules,
+    EventTypes.JoinRules, EventTypes.RoomHistoryVisibility,
 )
 
 
@@ -43,6 +43,11 @@ class Auth(object):
 
     def check(self, event, auth_events):
         """ Checks if this event is correctly authed.
+
+        Args:
+            event: the event being checked.
+            auth_events (dict: event-key -> event): the existing room state.
+
 
         Returns:
             True if the auth checks pass.
@@ -187,6 +192,9 @@ class Auth(object):
             join_rule = JoinRules.INVITE
 
         user_level = self._get_user_power_level(event.user_id, auth_events)
+        target_level = self._get_user_power_level(
+            target_user_id, auth_events
+        )
 
         # FIXME (erikj): What should we do here as the default?
         ban_level = self._get_named_level(auth_events, "ban", 50)
@@ -258,12 +266,12 @@ class Auth(object):
             elif target_user_id != event.user_id:
                 kick_level = self._get_named_level(auth_events, "kick", 50)
 
-                if user_level < kick_level:
+                if user_level < kick_level or user_level <= target_level:
                     raise AuthError(
                         403, "You cannot kick user %s." % target_user_id
                     )
         elif Membership.BAN == membership:
-            if user_level < ban_level:
+            if user_level < ban_level or user_level <= target_level:
                 raise AuthError(403, "You don't have permission to ban")
         else:
             raise AuthError(500, "Unknown membership %s" % membership)
@@ -316,7 +324,7 @@ class Auth(object):
         Returns:
             tuple : of UserID and device string:
                 User ID object of the user making the request
-                Client ID object of the client instance the user is using
+                ClientInfo object of the client instance the user is using
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -349,7 +357,7 @@ class Auth(object):
                 )
                 return
             except KeyError:
-                pass  # normal users won't have this query parameter set
+                pass  # normal users won't have the user_id query parameter set.
 
             user_info = yield self.get_user_by_token(access_token)
             user = user_info["user"]
@@ -518,23 +526,22 @@ class Auth(object):
 
         # Check state_key
         if hasattr(event, "state_key"):
-            if not event.state_key.startswith("_"):
-                if event.state_key.startswith("@"):
-                    if event.state_key != event.user_id:
+            if event.state_key.startswith("@"):
+                if event.state_key != event.user_id:
+                    raise AuthError(
+                        403,
+                        "You are not allowed to set others state"
+                    )
+                else:
+                    sender_domain = UserID.from_string(
+                        event.user_id
+                    ).domain
+
+                    if sender_domain != event.state_key:
                         raise AuthError(
                             403,
                             "You are not allowed to set others state"
                         )
-                    else:
-                        sender_domain = UserID.from_string(
-                            event.user_id
-                        ).domain
-
-                        if sender_domain != event.state_key:
-                            raise AuthError(
-                                403,
-                                "You are not allowed to set others state"
-                            )
 
         return True
 
@@ -573,25 +580,26 @@ class Auth(object):
 
         # Check other levels:
         levels_to_check = [
-            ("users_default", []),
-            ("events_default", []),
-            ("ban", []),
-            ("redact", []),
-            ("kick", []),
-            ("invite", []),
+            ("users_default", None),
+            ("events_default", None),
+            ("state_default", None),
+            ("ban", None),
+            ("redact", None),
+            ("kick", None),
+            ("invite", None),
         ]
 
         old_list = current_state.content.get("users")
         for user in set(old_list.keys() + user_list.keys()):
             levels_to_check.append(
-                (user, ["users"])
+                (user, "users")
             )
 
         old_list = current_state.content.get("events")
         new_list = event.content.get("events")
         for ev_id in set(old_list.keys() + new_list.keys()):
             levels_to_check.append(
-                (ev_id, ["events"])
+                (ev_id, "events")
             )
 
         old_state = current_state.content
@@ -599,12 +607,10 @@ class Auth(object):
 
         for level_to_check, dir in levels_to_check:
             old_loc = old_state
-            for d in dir:
-                old_loc = old_loc.get(d, {})
-
             new_loc = new_state
-            for d in dir:
-                new_loc = new_loc.get(d, {})
+            if dir:
+                old_loc = old_loc.get(dir, {})
+                new_loc = new_loc.get(dir, {})
 
             if level_to_check in old_loc:
                 old_level = int(old_loc[level_to_check])
@@ -619,6 +625,14 @@ class Auth(object):
             if new_level is not None and old_level is not None:
                 if new_level == old_level:
                     continue
+
+            if dir == "users" and level_to_check != event.user_id:
+                if old_level == user_level:
+                    raise AuthError(
+                        403,
+                        "You don't have permission to remove ops level equal "
+                        "to your own"
+                    )
 
             if old_level > user_level or new_level > user_level:
                 raise AuthError(
