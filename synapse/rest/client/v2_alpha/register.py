@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 class RegisterRestServlet(RestServlet):
-    PATTERN = client_v2_pattern("/register*")
+    PATTERN = client_v2_pattern("/register")
 
     def __init__(self, hs):
         super(RegisterRestServlet, self).__init__()
