@@ -42,6 +42,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "get_room",
                 "store_room",
                 "get_latest_events_in_room",
+                "add_event_hashes",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
@@ -88,6 +89,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.ratelimiter.send_message.return_value = (True, 0)
 
         self.datastore.persist_event.return_value = (1,1)
+        self.datastore.add_event_hashes.return_value = []
 
     @defer.inlineCallbacks
     def test_invite(self):

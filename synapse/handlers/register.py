@@ -73,7 +73,8 @@ class RegistrationHandler(BaseHandler):
             localpart : The local part of the user ID to register. If None,
               one will be randomly generated.
             password (str) : The password to assign to this user so they can
-            login again.
+            login again. This can be None which means they cannot login again
+            via a password (e.g. the user is an application service user).
         Returns:
             A tuple of (user_id, access_token).
         Raises:
@@ -191,6 +192,35 @@ class RegistrationHandler(BaseHandler):
             )
         else:
             logger.info("Valid captcha entered from %s", ip)
+
+    @defer.inlineCallbacks
+    def register_saml2(self, localpart):
+        """
+        Registers email_id as SAML2 Based Auth.
+        """
+        if urllib.quote(localpart) != localpart:
+            raise SynapseError(
+                400,
+                "User ID must only contain characters which do not"
+                " require URL encoding."
+                )
+        user = UserID(localpart, self.hs.hostname)
+        user_id = user.to_string()
+
+        yield self.check_user_id_is_valid(user_id)
+        token = self._generate_token(user_id)
+        try:
+            yield self.store.register(
+                user_id=user_id,
+                token=token,
+                password_hash=None
+            )
+            yield self.distributor.fire("registered_user", user)
+        except Exception, e:
+            yield self.store.add_access_token_to_user(user_id, token)
+            # Ignore Registration errors
+            logger.exception(e)
+        defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
     def register_email(self, threepidCreds):

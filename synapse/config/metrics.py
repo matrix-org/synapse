@@ -28,10 +28,4 @@ class MetricsConfig(Config):
 
         # Enable collection and rendering of performance metrics
         enable_metrics: False
-
-        # Separate port to accept metrics requests on
-        # metrics_port: 8081
-
-        # Which host to bind the metric listener to
-        # metrics_bind_host: 127.0.0.1
         """

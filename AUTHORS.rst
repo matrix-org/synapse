@@ -38,3 +38,10 @@ Brabo <brabo at riseup.net>
 
 Ivan Shapovalov <intelfx100 at gmail.com>
  * contrib/systemd: a sample systemd unit file and a logger configuration
+
+Eric Myhre <hash at exultant.us>
+ * Fix bug where ``media_store_path`` config option was ignored by v0 content
+   repository API.
+
+Muthu Subramanian <muthu.subramanian.karunanidhi at ericsson.com>
+ * Add SAML2 support for registration and logins.

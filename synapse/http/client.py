@@ -61,21 +61,31 @@ class SimpleHttpClient(object):
         self.agent = Agent(reactor, pool=pool)
         self.version_string = hs.version_string
 
-    def request(self, method, *args, **kwargs):
+    def request(self, method, uri, *args, **kwargs):
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
         outgoing_requests_counter.inc(method)
         d = preserve_context_over_fn(
             self.agent.request,
-            method, *args, **kwargs
+            method, uri, *args, **kwargs
         )
+
+        logger.info("Sending request %s %s", method, uri)
 
         def _cb(response):
             incoming_responses_counter.inc(method, response.code)
+            logger.info(
+                "Received response to  %s %s: %s",
+                method, uri, response.code
+            )
             return response
 
         def _eb(failure):
             incoming_responses_counter.inc(method, "ERR")
+            logger.info(
+                "Error sending request to  %s %s: %s %s",
+                method, uri, failure.type, failure.getErrorMessage()
+            )
             return failure
 
         d.addCallbacks(_cb, _eb)
@@ -84,7 +94,9 @@ class SimpleHttpClient(object):
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}):
+        # TODO: Do we ever want to log message contents?
         logger.debug("post_urlencoded_get_json args: %s", args)
+
         query_bytes = urllib.urlencode(args, True)
 
         response = yield self.request(
@@ -97,7 +109,7 @@ class SimpleHttpClient(object):
             bodyProducer=FileBodyProducer(StringIO(query_bytes))
         )
 
-        body = yield readBody(response)
+        body = yield preserve_context_over_fn(readBody, response)
 
         defer.returnValue(json.loads(body))
 
@@ -105,7 +117,7 @@ class SimpleHttpClient(object):
     def post_json_get_json(self, uri, post_json):
         json_str = encode_canonical_json(post_json)
 
-        logger.info("HTTP POST %s -> %s", json_str, uri)
+        logger.debug("HTTP POST %s -> %s", json_str, uri)
 
         response = yield self.request(
             "POST",
@@ -116,7 +128,7 @@ class SimpleHttpClient(object):
             bodyProducer=FileBodyProducer(StringIO(json_str))
         )
 
-        body = yield readBody(response)
+        body = yield preserve_context_over_fn(readBody, response)
 
         defer.returnValue(json.loads(body))
 
@@ -149,7 +161,7 @@ class SimpleHttpClient(object):
             })
         )
 
-        body = yield readBody(response)
+        body = yield preserve_context_over_fn(readBody, response)
 
         if 200 <= response.code < 300:
             defer.returnValue(json.loads(body))
@@ -192,7 +204,7 @@ class SimpleHttpClient(object):
             bodyProducer=FileBodyProducer(StringIO(json_str))
         )
 
-        body = yield readBody(response)
+        body = yield preserve_context_over_fn(readBody, response)
 
         if 200 <= response.code < 300:
             defer.returnValue(json.loads(body))
@@ -226,7 +238,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
         )
 
         try:
-            body = yield readBody(response)
+            body = yield preserve_context_over_fn(readBody, response)
             defer.returnValue(body)
         except PartialDownloadError as e:
             # twisted dislikes google's response, no content length.

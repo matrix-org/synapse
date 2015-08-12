@@ -33,3 +33,12 @@ def random_string_with_symbols(length):
     return ''.join(
         random.choice(_string_with_symbols) for _ in xrange(length)
     )
+
+
+def is_ascii(s):
+    try:
+        s.encode("ascii")
+    except UnicodeDecodeError:
+        return False
+    else:
+        return True

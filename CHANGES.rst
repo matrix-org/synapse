@@ -1,3 +1,54 @@
+Changes in synapse v0.9.3 (2015-07-01)
+======================================
+
+No changes from v0.9.3 Release Candidate 1.
+
+Changes in synapse v0.9.3-rc1 (2015-06-23)
+==========================================
+
+General:
+
+* Fix a memory leak in the notifier. (SYN-412)
+* Improve performance of room initial sync. (SYN-418)
+* General improvements to logging.
+* Remove ``access_token`` query params from ``INFO`` level logging.
+
+Configuration:
+
+* Add support for specifying and configuring multiple listeners. (SYN-389)
+
+Application services:
+
+* Fix bug where synapse failed to send user queries to application services.
+
+Changes in synapse v0.9.2-r2 (2015-06-15)
+=========================================
+
+Fix packaging so that schema delta python files get included in the package.
+
+Changes in synapse v0.9.2 (2015-06-12)
+======================================
+
+General:
+
+* Use ultrajson for json (de)serialisation when a canonical encoding is not
+  required. Ultrajson is significantly faster than simplejson in certain
+  circumstances.
+* Use connection pools for outgoing HTTP connections.
+* Process thumbnails on separate threads.
+
+Configuration:
+
+* Add option, ``gzip_responses``, to disable HTTP response compression.
+
+Federation:
+
+* Improve resilience of backfill by ensuring we fetch any missing auth events.
+* Improve performance of backfill and joining remote rooms by removing
+  unnecessary computations. This included handling events we'd previously
+  handled as well as attempting to compute the current state for outliers.
+
+
 Changes in synapse v0.9.1 (2015-05-26)
 ======================================
 

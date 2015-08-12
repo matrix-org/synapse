@@ -46,7 +46,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
             (yield self.store.get_user_by_id(self.user_id))
         )
 
-        result = yield self.store.get_user_by_token(self.tokens[1])
+        result = yield self.store.get_user_by_token(self.tokens[0])
 
         self.assertDictContainsSubset(
             {

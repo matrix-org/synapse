@@ -191,24 +191,24 @@ class PresenceHandler(BaseHandler):
         defer.returnValue(False)
 
     @defer.inlineCallbacks
-    def get_state(self, target_user, auth_user, as_event=False):
+    def get_state(self, target_user, auth_user, as_event=False, check_auth=True):
         if self.hs.is_mine(target_user):
-            visible = yield self.is_presence_visible(
-                observer_user=auth_user,
-                observed_user=target_user
-            )
+            if check_auth:
+                visible = yield self.is_presence_visible(
+                    observer_user=auth_user,
+                    observed_user=target_user
+                )
 
-            if not visible:
-                raise SynapseError(404, "Presence information not visible")
-            state = yield self.store.get_presence_state(target_user.localpart)
-            if "mtime" in state:
-                del state["mtime"]
-            state["presence"] = state.pop("state")
+                if not visible:
+                    raise SynapseError(404, "Presence information not visible")
 
             if target_user in self._user_cachemap:
-                cached_state = self._user_cachemap[target_user].get_state()
-                if "last_active" in cached_state:
-                    state["last_active"] = cached_state["last_active"]
+                state = self._user_cachemap[target_user].get_state()
+            else:
+                state = yield self.store.get_presence_state(target_user.localpart)
+                if "mtime" in state:
+                    del state["mtime"]
+                state["presence"] = state.pop("state")
         else:
             # TODO(paul): Have remote server send us permissions set
             state = self._get_or_offline_usercache(target_user).get_state()
@@ -992,7 +992,7 @@ class PresenceHandler(BaseHandler):
             room_ids([str]): List of room_ids to notify.
         """
         with PreserveLoggingContext():
-            self.notifier.on_new_user_event(
+            self.notifier.on_new_event(
                 "presence_key",
                 self._user_cachemap_latest_serial,
                 users_to_push,

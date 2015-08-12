@@ -72,7 +72,10 @@ class StreamIdGenerator(object):
         with stream_id_gen.get_next_txn(txn) as stream_id:
             # ... persist event ...
     """
-    def __init__(self):
+    def __init__(self, table, column):
+        self.table = table
+        self.column = column
+
         self._lock = threading.Lock()
 
         self._current_max = None
@@ -108,6 +111,37 @@ class StreamIdGenerator(object):
         defer.returnValue(manager())
 
     @defer.inlineCallbacks
+    def get_next_mult(self, store, n):
+        """
+        Usage:
+            with yield stream_id_gen.get_next(store, n) as stream_ids:
+                # ... persist events ...
+        """
+        if not self._current_max:
+            yield store.runInteraction(
+                "_compute_current_max",
+                self._get_or_compute_current_max,
+            )
+
+        with self._lock:
+            next_ids = range(self._current_max + 1, self._current_max + n + 1)
+            self._current_max += n
+
+            for next_id in next_ids:
+                self._unfinished_ids.append(next_id)
+
+        @contextlib.contextmanager
+        def manager():
+            try:
+                yield next_ids
+            finally:
+                with self._lock:
+                    for next_id in next_ids:
+                        self._unfinished_ids.remove(next_id)
+
+        defer.returnValue(manager())
+
+    @defer.inlineCallbacks
     def get_max_token(self, store):
         """Returns the maximum stream id such that all stream ids less than or
         equal to it have been successfully persisted.
@@ -126,7 +160,7 @@ class StreamIdGenerator(object):
 
     def _get_or_compute_current_max(self, txn):
         with self._lock:
-            txn.execute("SELECT MAX(stream_ordering) FROM events")
+            txn.execute("SELECT MAX(%s) FROM %s" % (self.column, self.table))
             rows = txn.fetchall()
             val, = rows[0]
 

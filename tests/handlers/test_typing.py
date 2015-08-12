@@ -66,8 +66,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.mock_federation_resource = MockHttpResource()
 
-        mock_notifier = Mock(spec=["on_new_user_event"])
-        self.on_new_user_event = mock_notifier.on_new_user_event
+        mock_notifier = Mock(spec=["on_new_event"])
+        self.on_new_event = mock_notifier.on_new_event
 
         self.auth = Mock(spec=[])
 
@@ -182,7 +182,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
             timeout=20000,
         )
 
-        self.on_new_user_event.assert_has_calls([
+        self.on_new_event.assert_has_calls([
             call('typing_key', 1, rooms=[self.room_id]),
         ])
 
@@ -245,7 +245,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
             )
         )
 
-        self.on_new_user_event.assert_has_calls([
+        self.on_new_event.assert_has_calls([
             call('typing_key', 1, rooms=[self.room_id]),
         ])
 
@@ -299,7 +299,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
             room_id=self.room_id,
         )
 
-        self.on_new_user_event.assert_has_calls([
+        self.on_new_event.assert_has_calls([
             call('typing_key', 1, rooms=[self.room_id]),
         ])
 
@@ -331,10 +331,10 @@ class TypingNotificationsTestCase(unittest.TestCase):
             timeout=10000,
         )
 
-        self.on_new_user_event.assert_has_calls([
+        self.on_new_event.assert_has_calls([
             call('typing_key', 1, rooms=[self.room_id]),
         ])
-        self.on_new_user_event.reset_mock()
+        self.on_new_event.reset_mock()
 
         self.assertEquals(self.event_source.get_current_key(), 1)
         events = yield self.event_source.get_new_events_for_user(self.u_apple, 0, None)
@@ -351,7 +351,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.clock.advance_time(11)
 
-        self.on_new_user_event.assert_has_calls([
+        self.on_new_event.assert_has_calls([
             call('typing_key', 2, rooms=[self.room_id]),
         ])
 
@@ -377,10 +377,10 @@ class TypingNotificationsTestCase(unittest.TestCase):
             timeout=10000,
         )
 
-        self.on_new_user_event.assert_has_calls([
+        self.on_new_event.assert_has_calls([
             call('typing_key', 3, rooms=[self.room_id]),
         ])
-        self.on_new_user_event.reset_mock()
+        self.on_new_event.reset_mock()
 
         self.assertEquals(self.event_source.get_current_key(), 3)
         events = yield self.event_source.get_new_events_for_user(self.u_apple, 0, None)

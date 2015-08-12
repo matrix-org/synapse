@@ -34,8 +34,7 @@ from twisted.application import service
 from twisted.enterprise import adbapi
 from twisted.web.resource import Resource, EncodingResourceWrapper
 from twisted.web.static import File
-from twisted.web.server import Site, GzipEncoderFactory
-from twisted.web.http import proxiedLogFormatter, combinedLogFormatter
+from twisted.web.server import Site, GzipEncoderFactory, Request
 from synapse.http.server import JsonResource, RootRedirect
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
@@ -61,11 +60,13 @@ import twisted.manhole.telnet
 
 import synapse
 
+import contextlib
 import logging
 import os
 import re
 import resource
 import subprocess
+import time
 
 
 logger = logging.getLogger("synapse.app.homeserver")
@@ -87,10 +88,10 @@ class SynapseHomeServer(HomeServer):
         return MatrixFederationHttpClient(self)
 
     def build_resource_for_client(self):
-        return gz_wrap(ClientV1RestResource(self))
+        return ClientV1RestResource(self)
 
     def build_resource_for_client_v2_alpha(self):
-        return gz_wrap(ClientV2AlphaRestResource(self))
+        return ClientV2AlphaRestResource(self)
 
     def build_resource_for_federation(self):
         return JsonResource(self)
@@ -113,7 +114,7 @@ class SynapseHomeServer(HomeServer):
 
     def build_resource_for_content_repo(self):
         return ContentRepoResource(
-            self, self.upload_dir, self.auth, self.content_addr
+            self, self.config.uploads_path, self.auth, self.content_addr
         )
 
     def build_resource_for_media_repository(self):
@@ -139,152 +140,105 @@ class SynapseHomeServer(HomeServer):
             **self.db_config.get("args", {})
         )
 
-    def create_resource_tree(self, redirect_root_to_web_client):
-        """Create the resource tree for this Home Server.
+    def _listener_http(self, config, listener_config):
+        port = listener_config["port"]
+        bind_address = listener_config.get("bind_address", "")
+        tls = listener_config.get("tls", False)
+        site_tag = listener_config.get("tag", port)
 
-        This in unduly complicated because Twisted does not support putting
-        child resources more than 1 level deep at a time.
-
-        Args:
-            web_client (bool): True to enable the web client.
-            redirect_root_to_web_client (bool): True to redirect '/' to the
-            location of the web client. This does nothing if web_client is not
-            True.
-        """
-        config = self.get_config()
-        web_client = config.web_client
-
-        # list containing (path_str, Resource) e.g:
-        # [ ("/aaa/bbb/cc", Resource1), ("/aaa/dummy", Resource2) ]
-        desired_tree = [
-            (CLIENT_PREFIX, self.get_resource_for_client()),
-            (CLIENT_V2_ALPHA_PREFIX, self.get_resource_for_client_v2_alpha()),
-            (FEDERATION_PREFIX, self.get_resource_for_federation()),
-            (CONTENT_REPO_PREFIX, self.get_resource_for_content_repo()),
-            (SERVER_KEY_PREFIX, self.get_resource_for_server_key()),
-            (SERVER_KEY_V2_PREFIX, self.get_resource_for_server_key_v2()),
-            (MEDIA_PREFIX, self.get_resource_for_media_repository()),
-            (STATIC_PREFIX, self.get_resource_for_static_content()),
-        ]
-
-        if web_client:
-            logger.info("Adding the web client.")
-            desired_tree.append((WEB_CLIENT_PREFIX,
-                                self.get_resource_for_web_client()))
-
-        if web_client and redirect_root_to_web_client:
-            self.root_resource = RootRedirect(WEB_CLIENT_PREFIX)
-        else:
-            self.root_resource = Resource()
+        if tls and config.no_tls:
+            return
 
         metrics_resource = self.get_resource_for_metrics()
-        if config.metrics_port is None and metrics_resource is not None:
-            desired_tree.append((METRICS_PREFIX, metrics_resource))
 
-        # ideally we'd just use getChild and putChild but getChild doesn't work
-        # unless you give it a Request object IN ADDITION to the name :/ So
-        # instead, we'll store a copy of this mapping so we can actually add
-        # extra resources to existing nodes. See self._resource_id for the key.
-        resource_mappings = {}
-        for full_path, res in desired_tree:
-            logger.info("Attaching %s to path %s", res, full_path)
-            last_resource = self.root_resource
-            for path_seg in full_path.split('/')[1:-1]:
-                if path_seg not in last_resource.listNames():
-                    # resource doesn't exist, so make a "dummy resource"
-                    child_resource = Resource()
-                    last_resource.putChild(path_seg, child_resource)
-                    res_id = self._resource_id(last_resource, path_seg)
-                    resource_mappings[res_id] = child_resource
-                    last_resource = child_resource
-                else:
-                    # we have an existing Resource, use that instead.
-                    res_id = self._resource_id(last_resource, path_seg)
-                    last_resource = resource_mappings[res_id]
+        resources = {}
+        for res in listener_config["resources"]:
+            for name in res["names"]:
+                if name == "client":
+                    if res["compress"]:
+                        client_v1 = gz_wrap(self.get_resource_for_client())
+                        client_v2 = gz_wrap(self.get_resource_for_client_v2_alpha())
+                    else:
+                        client_v1 = self.get_resource_for_client()
+                        client_v2 = self.get_resource_for_client_v2_alpha()
 
-            # ===========================
-            # now attach the actual desired resource
-            last_path_seg = full_path.split('/')[-1]
+                    resources.update({
+                        CLIENT_PREFIX: client_v1,
+                        CLIENT_V2_ALPHA_PREFIX: client_v2,
+                    })
 
-            # if there is already a resource here, thieve its children and
-            # replace it
-            res_id = self._resource_id(last_resource, last_path_seg)
-            if res_id in resource_mappings:
-                # there is a dummy resource at this path already, which needs
-                # to be replaced with the desired resource.
-                existing_dummy_resource = resource_mappings[res_id]
-                for child_name in existing_dummy_resource.listNames():
-                    child_res_id = self._resource_id(existing_dummy_resource,
-                                                     child_name)
-                    child_resource = resource_mappings[child_res_id]
-                    # steal the children
-                    res.putChild(child_name, child_resource)
+                if name == "federation":
+                    resources.update({
+                        FEDERATION_PREFIX: self.get_resource_for_federation(),
+                    })
 
-            # finally, insert the desired resource in the right place
-            last_resource.putChild(last_path_seg, res)
-            res_id = self._resource_id(last_resource, last_path_seg)
-            resource_mappings[res_id] = res
+                if name in ["static", "client"]:
+                    resources.update({
+                        STATIC_PREFIX: self.get_resource_for_static_content(),
+                    })
 
-        return self.root_resource
+                if name in ["media", "federation", "client"]:
+                    resources.update({
+                        MEDIA_PREFIX: self.get_resource_for_media_repository(),
+                        CONTENT_REPO_PREFIX: self.get_resource_for_content_repo(),
+                    })
 
-    def _resource_id(self, resource, path_seg):
-        """Construct an arbitrary resource ID so you can retrieve the mapping
-        later.
+                if name in ["keys", "federation"]:
+                    resources.update({
+                        SERVER_KEY_PREFIX: self.get_resource_for_server_key(),
+                        SERVER_KEY_V2_PREFIX: self.get_resource_for_server_key_v2(),
+                    })
 
-        If you want to represent resource A putChild resource B with path C,
-        the mapping should looks like _resource_id(A,C) = B.
+                if name == "webclient":
+                    resources[WEB_CLIENT_PREFIX] = self.get_resource_for_web_client()
 
-        Args:
-            resource (Resource): The *parent* Resource
-            path_seg (str): The name of the child Resource to be attached.
-        Returns:
-            str: A unique string which can be a key to the child Resource.
-        """
-        return "%s-%s" % (resource, path_seg)
+                if name == "metrics" and metrics_resource:
+                    resources[METRICS_PREFIX] = metrics_resource
+
+        root_resource = create_resource_tree(resources)
+        if tls:
+            reactor.listenSSL(
+                port,
+                SynapseSite(
+                    "synapse.access.https.%s" % (site_tag,),
+                    site_tag,
+                    listener_config,
+                    root_resource,
+                ),
+                self.tls_context_factory,
+                interface=bind_address
+            )
+        else:
+            reactor.listenTCP(
+                port,
+                SynapseSite(
+                    "synapse.access.http.%s" % (site_tag,),
+                    site_tag,
+                    listener_config,
+                    root_resource,
+                ),
+                interface=bind_address
+            )
+        logger.info("Synapse now listening on port %d", port)
 
     def start_listening(self):
         config = self.get_config()
 
-        if not config.no_tls and config.bind_port is not None:
-            reactor.listenSSL(
-                config.bind_port,
-                SynapseSite(
-                    "synapse.access.https",
-                    config,
-                    self.root_resource,
-                ),
-                self.tls_context_factory,
-                interface=config.bind_host
-            )
-            logger.info("Synapse now listening on port %d", config.bind_port)
-
-        if config.unsecure_port is not None:
-            reactor.listenTCP(
-                config.unsecure_port,
-                SynapseSite(
-                    "synapse.access.http",
-                    config,
-                    self.root_resource,
-                ),
-                interface=config.bind_host
-            )
-            logger.info("Synapse now listening on port %d", config.unsecure_port)
-
-        metrics_resource = self.get_resource_for_metrics()
-        if metrics_resource and config.metrics_port is not None:
-            reactor.listenTCP(
-                config.metrics_port,
-                SynapseSite(
-                    "synapse.access.metrics",
-                    config,
-                    metrics_resource,
-                ),
-                interface=config.metrics_bind_host,
-            )
-            logger.info(
-                "Metrics now running on %s port %d",
-                config.metrics_bind_host, config.metrics_port,
-            )
+        for listener in config.listeners:
+            if listener["type"] == "http":
+                self._listener_http(config, listener)
+            elif listener["type"] == "manhole":
+                f = twisted.manhole.telnet.ShellFactory()
+                f.username = "matrix"
+                f.password = "rabbithole"
+                f.namespace['hs'] = self
+                reactor.listenTCP(
+                    listener["port"],
+                    f,
+                    interface=listener.get("bind_address", '127.0.0.1')
+                )
+            else:
+                logger.warn("Unrecognized listener type: %s", listener["type"])
 
     def run_startup_checks(self, db_conn, database_engine):
         all_users_native = are_all_users_on_domain(
@@ -419,11 +373,6 @@ def setup(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    if re.search(":[0-9]+$", config.server_name):
-        domain_with_port = config.server_name
-    else:
-        domain_with_port = "%s:%s" % (config.server_name, config.bind_port)
-
     tls_context_factory = context_factory.ServerContextFactory(config)
 
     database_engine = create_engine(config.database_config["name"])
@@ -431,18 +380,12 @@ def setup(config_options):
 
     hs = SynapseHomeServer(
         config.server_name,
-        domain_with_port=domain_with_port,
-        upload_dir=os.path.abspath("uploads"),
         db_config=config.database_config,
         tls_context_factory=tls_context_factory,
         config=config,
         content_addr=config.content_addr,
         version_string=version_string,
         database_engine=database_engine,
-    )
-
-    hs.create_resource_tree(
-        redirect_root_to_web_client=True,
     )
 
     logger.info("Preparing database: %r...", config.database_config)
@@ -469,13 +412,6 @@ def setup(config_options):
 
     logger.info("Database prepared in %r.", config.database_config)
 
-    if config.manhole:
-        f = twisted.manhole.telnet.ShellFactory()
-        f.username = "matrix"
-        f.password = "rabbithole"
-        f.namespace['hs'] = hs
-        reactor.listenTCP(config.manhole, f, interface='127.0.0.1')
-
     hs.start_listening()
 
     hs.get_pusherpool().start()
@@ -501,22 +437,194 @@ class SynapseService(service.Service):
         return self._port.stopListening()
 
 
+class SynapseRequest(Request):
+    def __init__(self, site, *args, **kw):
+        Request.__init__(self, *args, **kw)
+        self.site = site
+        self.authenticated_entity = None
+        self.start_time = 0
+
+    def __repr__(self):
+        # We overwrite this so that we don't log ``access_token``
+        return '<%s at 0x%x method=%s uri=%s clientproto=%s site=%s>' % (
+            self.__class__.__name__,
+            id(self),
+            self.method,
+            self.get_redacted_uri(),
+            self.clientproto,
+            self.site.site_tag,
+        )
+
+    def get_redacted_uri(self):
+        return re.sub(
+            r'(\?.*access_token=)[^&]*(.*)$',
+            r'\1<redacted>\2',
+            self.uri
+        )
+
+    def get_user_agent(self):
+        return self.requestHeaders.getRawHeaders("User-Agent", [None])[-1]
+
+    def started_processing(self):
+        self.site.access_logger.info(
+            "%s - %s - Received request: %s %s",
+            self.getClientIP(),
+            self.site.site_tag,
+            self.method,
+            self.get_redacted_uri()
+        )
+        self.start_time = int(time.time() * 1000)
+
+    def finished_processing(self):
+        self.site.access_logger.info(
+            "%s - %s - {%s}"
+            " Processed request: %dms %sB %s \"%s %s %s\" \"%s\"",
+            self.getClientIP(),
+            self.site.site_tag,
+            self.authenticated_entity,
+            int(time.time() * 1000) - self.start_time,
+            self.sentLength,
+            self.code,
+            self.method,
+            self.get_redacted_uri(),
+            self.clientproto,
+            self.get_user_agent(),
+        )
+
+    @contextlib.contextmanager
+    def processing(self):
+        self.started_processing()
+        yield
+        self.finished_processing()
+
+
+class XForwardedForRequest(SynapseRequest):
+    def __init__(self, *args, **kw):
+        SynapseRequest.__init__(self, *args, **kw)
+
+    """
+    Add a layer on top of another request that only uses the value of an
+    X-Forwarded-For header as the result of C{getClientIP}.
+    """
+    def getClientIP(self):
+        """
+        @return: The client address (the first address) in the value of the
+            I{X-Forwarded-For header}.  If the header is not present, return
+            C{b"-"}.
+        """
+        return self.requestHeaders.getRawHeaders(
+            b"x-forwarded-for", [b"-"])[0].split(b",")[0].strip()
+
+
+class SynapseRequestFactory(object):
+    def __init__(self, site, x_forwarded_for):
+        self.site = site
+        self.x_forwarded_for = x_forwarded_for
+
+    def __call__(self, *args, **kwargs):
+        if self.x_forwarded_for:
+            return XForwardedForRequest(self.site, *args, **kwargs)
+        else:
+            return SynapseRequest(self.site, *args, **kwargs)
+
+
 class SynapseSite(Site):
     """
     Subclass of a twisted http Site that does access logging with python's
     standard logging
     """
-    def __init__(self, logger_name, config, resource, *args, **kwargs):
+    def __init__(self, logger_name, site_tag, config, resource, *args, **kwargs):
         Site.__init__(self, resource, *args, **kwargs)
-        if config.captcha_ip_origin_is_x_forwarded:
-            self._log_formatter = proxiedLogFormatter
-        else:
-            self._log_formatter = combinedLogFormatter
+
+        self.site_tag = site_tag
+
+        proxied = config.get("x_forwarded", False)
+        self.requestFactory = SynapseRequestFactory(self, proxied)
         self.access_logger = logging.getLogger(logger_name)
 
     def log(self, request):
-        line = self._log_formatter(self._logDateTime, request)
-        self.access_logger.info(line)
+        pass
+
+
+def create_resource_tree(desired_tree, redirect_root_to_web_client=True):
+    """Create the resource tree for this Home Server.
+
+    This in unduly complicated because Twisted does not support putting
+    child resources more than 1 level deep at a time.
+
+    Args:
+        web_client (bool): True to enable the web client.
+        redirect_root_to_web_client (bool): True to redirect '/' to the
+        location of the web client. This does nothing if web_client is not
+        True.
+    """
+    if redirect_root_to_web_client and WEB_CLIENT_PREFIX in desired_tree:
+        root_resource = RootRedirect(WEB_CLIENT_PREFIX)
+    else:
+        root_resource = Resource()
+
+    # ideally we'd just use getChild and putChild but getChild doesn't work
+    # unless you give it a Request object IN ADDITION to the name :/ So
+    # instead, we'll store a copy of this mapping so we can actually add
+    # extra resources to existing nodes. See self._resource_id for the key.
+    resource_mappings = {}
+    for full_path, res in desired_tree.items():
+        logger.info("Attaching %s to path %s", res, full_path)
+        last_resource = root_resource
+        for path_seg in full_path.split('/')[1:-1]:
+            if path_seg not in last_resource.listNames():
+                # resource doesn't exist, so make a "dummy resource"
+                child_resource = Resource()
+                last_resource.putChild(path_seg, child_resource)
+                res_id = _resource_id(last_resource, path_seg)
+                resource_mappings[res_id] = child_resource
+                last_resource = child_resource
+            else:
+                # we have an existing Resource, use that instead.
+                res_id = _resource_id(last_resource, path_seg)
+                last_resource = resource_mappings[res_id]
+
+        # ===========================
+        # now attach the actual desired resource
+        last_path_seg = full_path.split('/')[-1]
+
+        # if there is already a resource here, thieve its children and
+        # replace it
+        res_id = _resource_id(last_resource, last_path_seg)
+        if res_id in resource_mappings:
+            # there is a dummy resource at this path already, which needs
+            # to be replaced with the desired resource.
+            existing_dummy_resource = resource_mappings[res_id]
+            for child_name in existing_dummy_resource.listNames():
+                child_res_id = _resource_id(
+                    existing_dummy_resource, child_name
+                )
+                child_resource = resource_mappings[child_res_id]
+                # steal the children
+                res.putChild(child_name, child_resource)
+
+        # finally, insert the desired resource in the right place
+        last_resource.putChild(last_path_seg, res)
+        res_id = _resource_id(last_resource, last_path_seg)
+        resource_mappings[res_id] = res
+
+    return root_resource
+
+
+def _resource_id(resource, path_seg):
+    """Construct an arbitrary resource ID so you can retrieve the mapping
+    later.
+
+    If you want to represent resource A putChild resource B with path C,
+    the mapping should looks like _resource_id(A,C) = B.
+
+    Args:
+        resource (Resource): The *parent* Resource
+        path_seg (str): The name of the child Resource to be attached.
+    Returns:
+        str: A unique string which can be a key to the child Resource.
+    """
+    return "%s-%s" % (resource, path_seg)
 
 
 def run(hs):
@@ -549,7 +657,8 @@ def run(hs):
 
     if hs.config.daemonize:
 
-        print hs.config.pid_file
+        if hs.config.print_pidfile:
+            print hs.config.pid_file
 
         daemon = Daemonize(
             app="synapse-homeserver",

@@ -93,6 +93,9 @@ class TransportLayerServer(object):
 
         yield self.keyring.verify_json_for_server(origin, json_request)
 
+        logger.info("Request from %s", origin)
+        request.authenticated_entity = origin
+
         defer.returnValue((origin, content))
 
     @log_function
