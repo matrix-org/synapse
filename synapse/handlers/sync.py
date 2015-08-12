@@ -302,9 +302,7 @@ class SyncHandler(BaseHandler):
             )
         )
 
-        def allowed(event_and_state):
-            event, state = event_and_state
-
+        def allowed(event, state):
             if event.type == EventTypes.RoomHistoryVisibility:
                 return True
 
