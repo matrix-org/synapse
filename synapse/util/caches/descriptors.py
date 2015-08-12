@@ -341,6 +341,33 @@ def cachedInlineCallbacks(max_entries=1000, num_args=1, lru=False):
 
 
 def cachedList(cache, list_name, num_args=1, inlineCallbacks=False):
+    """Creates a descriptor that wraps a function in a `CacheListDescriptor`.
+
+    Used to do batch lookups for an already created cache. A single argument
+    is specified as a list that is iterated through to lookup keys in the
+    original cache. A new list consisting of the keys that weren't in the cache
+    get passed to the original function, the result of which is stored in the
+    cache.
+
+    Args:
+        cache (Cache): The underlying cache to use.
+        list_name (str): The name of the argument that is the list to use to
+            do batch lookups in the cache.
+        num_args (int): Number of arguments to use as the key in the cache.
+        inlineCallbacks (bool): Should the function be wrapped in an
+            `defer.inlineCallbacks`?
+
+    Example:
+
+        class Example(object):
+            @cached(num_args=2)
+            def do_something(self, first_arg):
+                ...
+
+            @cachedList(do_something.cache, list_name="second_args", num_args=2)
+            def batch_do_something(self, first_arg, second_args):
+                ...
+    """
     return lambda orig: CacheListDescriptor(
         orig,
         cache=cache,
