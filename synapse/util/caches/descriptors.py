@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,8 @@ import logging
 from synapse.util.async import ObservableDeferred
 from synapse.util import unwrapFirstError
 from synapse.util.caches.lrucache import LruCache
-import synapse.metrics
+
+from . import caches_by_name, DEBUG_CACHES, cache_counter
 
 from twisted.internet import defer
 
@@ -28,18 +29,6 @@ import inspect
 import threading
 
 logger = logging.getLogger(__name__)
-
-
-DEBUG_CACHES = False
-
-metrics = synapse.metrics.get_metrics_for("synapse.util.caches")
-
-caches_by_name = {}
-cache_counter = metrics.register_cache(
-    "cache",
-    lambda: {(name,): len(caches_by_name[name]) for name in caches_by_name.keys()},
-    labels=["name"],
-)
 
 
 _CacheSentinel = object()

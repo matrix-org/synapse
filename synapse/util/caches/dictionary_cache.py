@@ -15,6 +15,7 @@
 
 from synapse.util.caches.lrucache import LruCache
 from collections import namedtuple
+from . import caches_by_name, cache_counter
 import threading
 import logging
 
@@ -42,6 +43,7 @@ class DictionaryCache(object):
             __slots__ = []
 
         self.sentinel = Sentinel()
+        caches_by_name[name] = self.cache
 
     def check_thread(self):
         expected_thread = self.thread
@@ -54,25 +56,21 @@ class DictionaryCache(object):
                 )
 
     def get(self, key, dict_keys=None):
-        try:
-            entry = self.cache.get(key, self.sentinel)
-            if entry is not self.sentinel:
-                # cache_counter.inc_hits(self.name)
+        entry = self.cache.get(key, self.sentinel)
+        if entry is not self.sentinel:
+            cache_counter.inc_hits(self.name)
 
-                if dict_keys is None:
-                    return DictionaryEntry(entry.full, dict(entry.value))
-                else:
-                    return DictionaryEntry(entry.full, {
-                        k: entry.value[k]
-                        for k in dict_keys
-                        if k in entry.value
-                    })
+            if dict_keys is None:
+                return DictionaryEntry(entry.full, dict(entry.value))
+            else:
+                return DictionaryEntry(entry.full, {
+                    k: entry.value[k]
+                    for k in dict_keys
+                    if k in entry.value
+                })
 
-            # cache_counter.inc_misses(self.name)
-            return DictionaryEntry(False, {})
-        except:
-            logger.exception("get failed")
-            raise
+        cache_counter.inc_misses(self.name)
+        return DictionaryEntry(False, {})
 
     def invalidate(self, key):
         self.check_thread()
@@ -88,18 +86,14 @@ class DictionaryCache(object):
         self.cache.clear()
 
     def update(self, sequence, key, value, full=False):
-        try:
-            self.check_thread()
-            if self.sequence == sequence:
-                # Only update the cache if the caches sequence number matches the
-                # number that the cache had before the SELECT was started (SYN-369)
-                if full:
-                    self._insert(key, value)
-                else:
-                    self._update_or_insert(key, value)
-        except:
-            logger.exception("update failed")
-            raise
+        self.check_thread()
+        if self.sequence == sequence:
+            # Only update the cache if the caches sequence number matches the
+            # number that the cache had before the SELECT was started (SYN-369)
+            if full:
+                self._insert(key, value)
+            else:
+                self._update_or_insert(key, value)
 
     def _update_or_insert(self, key, value):
         entry = self.cache.setdefault(key, DictionaryEntry(False, {}))
