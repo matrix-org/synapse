@@ -385,12 +385,12 @@ class StateStore(SQLBaseStore):
 
         if not missing_groups_and_types:
             defer.returnValue({
-                k: {
-                    key: ev
-                    for key, ev in state.items()
-                    if ev
+                group: {
+                    type_tuple: event
+                    for type_tuple, event in state.items()
+                    if event
                 }
-                for k, state in results.items()
+                for group, state in results.items()
             })
 
         # Okay, so we have some missing_types, lets fetch them.
