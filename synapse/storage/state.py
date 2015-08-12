@@ -410,6 +410,8 @@ class StateStore(SQLBaseStore):
             for e in state_events
         }
 
+        # Now we want to update the cache with all the things we fetched
+        # from the database.
         for group, state_ids in group_state_dict.items():
             if types:
                 # We delibrately put key -> None mappings into the cache to
@@ -433,7 +435,6 @@ class StateStore(SQLBaseStore):
                 for e in evs
             })
 
-            # Update the cache
             self._state_group_cache.update(
                 cache_seq_num,
                 key=group,
