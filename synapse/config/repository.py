@@ -14,6 +14,27 @@
 # limitations under the License.
 
 from ._base import Config
+from collections import namedtuple
+
+ThumbnailRequirement = namedtuple(
+    "ThumbnailRequirement", ["width", "height", "method", "media_type"]
+)
+
+def parse_thumbnail_requirements(thumbnail_sizes):
+    requirements = {}
+    for size in thumbnail_sizes:
+        width = size["width"]
+        height = size["height"]
+        method = size["method"]
+        jpeg_thumbnail = ThumbnailRequirement(width, height, method, "image/jpeg")
+        png_thumbnail = ThumbnailRequirement(width, height, method, "image/png")
+        requirements.setdefault("image/jpeg", []).append(jpeg_thumbnail)
+        requirements.setdefault("image/gif", []).append(png_thumbnail)
+        requirements.setdefault("image/png", []).append(png_thumbnail)
+    return {
+        media_type: tuple(thumbnails)
+        for media_type, thumbnails in requirements.items()
+    }
 
 
 class ContentRepositoryConfig(Config):
@@ -23,6 +44,9 @@ class ContentRepositoryConfig(Config):
         self.media_store_path = self.ensure_directory(config["media_store_path"])
         self.uploads_path = self.ensure_directory(config["uploads_path"])
         self.dynamic_thumbnails = config["dynamic_thumbnails"]
+        self.thumbnail_requirements = parse_thumbnail_requirements(
+            config["thumbnail_sizes"]
+        )
 
     def default_config(self, config_dir_path, server_name):
         media_store = self.default_path("media_store")
@@ -46,4 +70,19 @@ class ContentRepositoryConfig(Config):
         # generate a new thumbnail. If false the server will pick a thumbnail
         # from a precalcualted list.
         dynamic_thumbnails: false
+
+        # List of thumbnail to precalculate when an image is uploaded.
+        thumbnail_sizes:
+        - width: 32
+          height: 32
+          method: crop
+        - width: 96
+          height: 96
+          method: crop
+        - width: 320
+          height: 240
+          method: scale
+        - width: 640
+          height: 480
+          method: scale
         """ % locals()

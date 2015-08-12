@@ -70,6 +70,7 @@ class BaseMediaResource(Resource):
         self.version_string = hs.version_string
         self.downloads = {}
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
+        self.thumbnail_requirements = hs.config.thumbnail_requirements
 
     def _respond_404(self, request):
         respond_with_json(
@@ -209,22 +210,7 @@ class BaseMediaResource(Resource):
             self._respond_404(request)
 
     def _get_thumbnail_requirements(self, media_type):
-        if media_type == "image/jpeg":
-            return (
-                (32, 32, "crop", "image/jpeg"),
-                (96, 96, "crop", "image/jpeg"),
-                (320, 240, "scale", "image/jpeg"),
-                (640, 480, "scale", "image/jpeg"),
-            )
-        elif (media_type == "image/png") or (media_type == "image/gif"):
-            return (
-                (32, 32, "crop", "image/png"),
-                (96, 96, "crop", "image/png"),
-                (320, 240, "scale", "image/png"),
-                (640, 480, "scale", "image/png"),
-            )
-        else:
-            return ()
+        return self.thumbnail_requirements.get(media_type, ())
 
     def _generate_thumbnail(self, input_path, t_path, t_width, t_height,
                             t_method, t_type):
