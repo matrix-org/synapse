@@ -23,7 +23,6 @@ for port in 8080 8081 8082; do
     #rm $DIR/etc/$port.config
     python -m synapse.app.homeserver \
         --generate-config \
-        --enable_registration \
         -H "localhost:$https_port" \
         --config-path "$DIR/etc/$port.config" \
 
@@ -35,6 +34,8 @@ for port in 8080 8081 8082; do
             perl -p -i -e 's/rc_message_burst_count.*/rc_message_burst_count: 1000/g' $DIR/etc/$port.config
         fi
     fi
+
+    perl -p -i -e 's/^enable_registration:.*/enable_registration: true/g' $DIR/etc/$port.config
 
     python -m synapse.app.homeserver \
         --config-path "$DIR/etc/$port.config" \
