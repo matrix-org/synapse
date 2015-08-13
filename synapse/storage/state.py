@@ -426,14 +426,9 @@ class StateStore(SQLBaseStore):
             else:
                 state_dict = results[group]
 
-            evs = [
-                state_events[e_id] for e_id in state_ids
-                if e_id in state_events  # This can happen if event is rejected.
-            ]
-            state_dict.update({
-                (e.type, e.state_key): e
-                for e in evs
-            })
+            for event_id in state_ids:
+                state_event = state_events[event_id]
+                state_dict[(state_event.type, state_event.state_key)] = state_event
 
             self._state_group_cache.update(
                 cache_seq_num,
