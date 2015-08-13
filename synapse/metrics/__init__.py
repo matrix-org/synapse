@@ -18,8 +18,12 @@ from __future__ import absolute_import
 
 import logging
 from resource import getrusage, getpagesize, RUSAGE_SELF
+import functools
 import os
 import stat
+import time
+
+from twisted.internet import reactor
 
 from .metric import (
     CounterMetric, CallbackMetric, DistributionMetric, CacheMetric
@@ -144,3 +148,28 @@ def _process_fds():
     return counts
 
 get_metrics_for("process").register_callback("fds", _process_fds, labels=["type"])
+
+reactor_metrics = get_metrics_for("reactor")
+tick_time = reactor_metrics.register_distribution("tick_time")
+pending_calls_metric = reactor_metrics.register_distribution("pending_calls")
+
+
+def runUntilCurrentTimer(func):
+
+    @functools.wraps(func)
+    def f(*args, **kwargs):
+        start = time.time() * 1000
+        pending_calls = len(reactor.getDelayedCalls())
+        ret = func(*args, **kwargs)
+        end = time.time() * 1000
+        tick_time.inc_by(end - start)
+        pending_calls_metric.inc_by(pending_calls)
+        return ret
+
+    return f
+
+
+if hasattr(reactor, "runUntilCurrent"):
+    # runUntilCurrent is called when we have pending calls. It is called once
+    # per iteratation after fd polling.
+    reactor.runUntilCurrent = runUntilCurrentTimer(reactor.runUntilCurrent)
