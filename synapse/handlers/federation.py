@@ -237,9 +237,7 @@ class FederationHandler(BaseHandler):
             )
         )
 
-        def redact_disallowed(event_and_state):
-            event, state = event_and_state
-
+        def redact_disallowed(event, state):
             if not state:
                 return event
 
@@ -273,12 +271,10 @@ class FederationHandler(BaseHandler):
 
             return event
 
-        res = map(redact_disallowed, [
-            (e, event_to_state[e.event_id])
+        defer.returnValue([
+            redact_disallowed(e, event_to_state[e.event_id])
             for e in events
         ])
-
-        defer.returnValue(res)
 
     @log_function
     @defer.inlineCallbacks

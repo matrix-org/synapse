@@ -60,7 +60,6 @@ class StateStore(SQLBaseStore):
         )
 
         groups = set(event_to_groups.values())
-
         group_to_state = yield self._get_state_for_groups(groups)
 
         defer.returnValue({
@@ -201,10 +200,7 @@ class StateStore(SQLBaseStore):
 
                 txn.execute(sql, args)
 
-                results[group] = [
-                    r[0]
-                    for r in txn.fetchall()
-                ]
+                results[group] = [r[0] for r in txn.fetchall()]
 
             return results
 
@@ -235,20 +231,14 @@ class StateStore(SQLBaseStore):
         )
 
         groups = set(event_to_groups.values())
-
-        group_to_state = yield self._get_state_for_groups(
-            groups, types
-        )
+        group_to_state = yield self._get_state_for_groups(groups, types)
 
         event_to_state = {
             event_id: group_to_state[group]
             for event_id, group in event_to_groups.items()
         }
 
-        defer.returnValue({
-            event: event_to_state[event]
-            for event in event_ids
-        })
+        defer.returnValue({event: event_to_state[event] for event in event_ids})
 
     @cached(num_args=2, lru=True, max_entries=100000)
     def _get_state_group_for_event(self, room_id, event_id):
@@ -282,10 +272,7 @@ class StateStore(SQLBaseStore):
 
             return results
 
-        return self.runInteraction(
-            "_get_state_group_for_events",
-            f,
-        )
+        return self.runInteraction("_get_state_group_for_events", f)
 
     def _get_some_state_from_cache(self, group, types):
         """Checks if group is in cache. See `_get_state_for_groups`
@@ -332,8 +319,7 @@ class StateStore(SQLBaseStore):
         got_all = not (missing_types or types is None)
 
         return {
-            k: v
-            for k, v in state_dict.items()
+            k: v for k, v in state_dict.items()
             if include(k[0], k[1])
         }, missing_types, got_all
 
@@ -364,20 +350,15 @@ class StateStore(SQLBaseStore):
                 state_dict, missing_types, got_all = self._get_some_state_from_cache(
                     group, types
                 )
-
                 results[group] = state_dict
 
                 if not got_all:
-                    missing_groups_and_types.append((
-                        group,
-                        missing_types
-                    ))
+                    missing_groups_and_types.append((group, missing_types))
         else:
             for group in set(groups):
                 state_dict, got_all = self._get_all_state_from_cache(
                     group
                 )
-
                 results[group] = state_dict
 
                 if not got_all:
@@ -405,10 +386,7 @@ class StateStore(SQLBaseStore):
             get_prev_content=False
         )
 
-        state_events = {
-            e.event_id: e
-            for e in state_events
-        }
+        state_events = {e.event_id: e for e in state_events}
 
         # Now we want to update the cache with all the things we fetched
         # from the database.
@@ -418,22 +396,14 @@ class StateStore(SQLBaseStore):
                 # cache absence of the key, on the assumption that if we've
                 # explicitly asked for some types then we will probably ask
                 # for them again.
-                state_dict = {
-                    key: None
-                    for key in types
-                }
+                state_dict = {key: None for key in types}
                 state_dict.update(results[group])
             else:
                 state_dict = results[group]
 
-            evs = [
-                state_events[e_id] for e_id in state_ids
-                if e_id in state_events  # This can happen if event is rejected.
-            ]
-            state_dict.update({
-                (e.type, e.state_key): e
-                for e in evs
-            })
+            for event_id in state_ids:
+                state_event = state_events[event_id]
+                state_dict[(state_event.type, state_event.state_key)] = state_event
 
             self._state_group_cache.update(
                 cache_seq_num,
@@ -443,9 +413,7 @@ class StateStore(SQLBaseStore):
             )
 
             results[group].update({
-                key: value
-                for key, value in state_dict.items()
-                if value
+                key: value for key, value in state_dict.items() if value
             })
 
         defer.returnValue(results)
