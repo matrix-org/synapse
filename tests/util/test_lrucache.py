@@ -16,7 +16,7 @@
 
 from .. import unittest
 
-from synapse.util.lrucache import LruCache
+from synapse.util.caches.lrucache import LruCache
 
 class LruCacheTestCase(unittest.TestCase):
 
@@ -52,5 +52,3 @@ class LruCacheTestCase(unittest.TestCase):
         cache["key"] = 1
         self.assertEquals(cache.pop("key"), 1)
         self.assertEquals(cache.pop("key"), None)
-
-

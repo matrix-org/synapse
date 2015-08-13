@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.util.async import ObservableDeferred
 
-from synapse.storage._base import Cache, cached
+from synapse.util.caches.descriptors import Cache, cached
 
 
 class CacheTestCase(unittest.TestCase):
