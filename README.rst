@@ -101,25 +101,26 @@ header files for python C extensions.
 
 Installing prerequisites on Ubuntu or Debian::
 
-    $ sudo apt-get install build-essential python2.7-dev libffi-dev \
-                           python-pip python-setuptools sqlite3 \
-                           libssl-dev python-virtualenv libjpeg-dev
+    sudo apt-get install build-essential python2.7-dev libffi-dev \
+                         python-pip python-setuptools sqlite3 \
+                         libssl-dev python-virtualenv libjpeg-dev
                            
 Installing prerequisites on ArchLinux::
 
-    $ sudo pacman -S base-devel python2 python-pip \
-                     python-setuptools python-virtualenv sqlite3
+    sudo pacman -S base-devel python2 python-pip \
+                   python-setuptools python-virtualenv sqlite3
 
 Installing prerequisites on Mac OS X::
 
-    $ xcode-select --install
-    $ sudo pip install virtualenv
+    xcode-select --install
+    sudo easy_install pip
+    sudo pip install virtualenv
     
 To install the synapse homeserver run::
 
-    $ virtualenv -p python2.7 ~/.synapse
-    $ source ~/.synapse/bin/activate
-    $ pip install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+    virtualenv -p python2.7 ~/.synapse
+    source ~/.synapse/bin/activate
+    pip install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
 
 This installs synapse, along with the libraries it uses, into a virtual
 environment under ``~/.synapse``.  Feel free to pick a different directory
@@ -132,8 +133,8 @@ above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
 
 To set up your homeserver, run (in your virtualenv, as before)::
 
-    $ cd ~/.synapse
-    $ python -m synapse.app.homeserver \
+    cd ~/.synapse
+    python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
         --config-path homeserver.yaml \
         --generate-config
@@ -192,9 +193,9 @@ Running Synapse
 To actually run your new homeserver, pick a working directory for Synapse to run 
 (e.g. ``~/.synapse``), and::
 
-    $ cd ~/.synapse
-    $ source ./bin/activate
-    $ synctl start
+    cd ~/.synapse
+    source ./bin/activate
+    synctl start
 
 Platform Specific Instructions
 ==============================
@@ -212,12 +213,12 @@ defaults to python 3, but synapse currently assumes python 2.7 by default:
 
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 )::
 
-    $ sudo pip2.7 install --upgrade pip
+    sudo pip2.7 install --upgrade pip
     
 You also may need to explicitly specify python 2.7 again during the install
 request::
 
-    $ pip2.7 install --process-dependency-links \
+    pip2.7 install --process-dependency-links \
         https://github.com/matrix-org/synapse/tarball/master
     
 If you encounter an error with lib bcrypt causing an Wrong ELF Class:
@@ -225,13 +226,13 @@ ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
 compile it under the right architecture. (This should not be needed if
 installing under virtualenv)::
 
-    $ sudo pip2.7 uninstall py-bcrypt
-    $ sudo pip2.7 install py-bcrypt
+    sudo pip2.7 uninstall py-bcrypt
+    sudo pip2.7 install py-bcrypt
     
 During setup of Synapse you need to call python2.7 directly again::
 
-    $ cd ~/.synapse
-    $ python2.7 -m synapse.app.homeserver \
+    cd ~/.synapse
+    python2.7 -m synapse.app.homeserver \
       --server-name machine.my.domain.name \
       --config-path homeserver.yaml \
       --generate-config
@@ -279,22 +280,22 @@ Synapse requires pip 1.7 or later, so if your OS provides too old a version and
 you get errors about ``error: no such option: --process-dependency-links`` you 
 may need to manually upgrade it::
 
-    $ sudo pip install --upgrade pip
+    sudo pip install --upgrade pip
 
 If pip crashes mid-installation for reason (e.g. lost terminal), pip may
 refuse to run until you remove the temporary installation directory it
 created. To reset the installation::
 
-    $ rm -rf /tmp/pip_install_matrix
+    rm -rf /tmp/pip_install_matrix
 
 pip seems to leak *lots* of memory during installation.  For instance, a Linux 
 host with 512MB of RAM may run out of memory whilst installing Twisted.  If this 
 happens, you will have to individually install the dependencies which are 
 failing, e.g.::
 
-    $ pip install twisted
+    pip install twisted
 
-On OSX, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
+On OS X, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
 will need to export CFLAGS=-Qunused-arguments.
 
 Troubleshooting Running
@@ -310,10 +311,11 @@ correctly, causing all tests to fail with errors about missing "sodium.h". To
 fix try re-installing from PyPI or directly from
 (https://github.com/pyca/pynacl)::
 
-    $ # Install from PyPI
-    $ pip install --user --upgrade --force pynacl
-    $ # Install from github
-    $ pip install --user https://github.com/pyca/pynacl/tarball/master
+    # Install from PyPI
+    pip install --user --upgrade --force pynacl
+    
+    # Install from github
+    pip install --user https://github.com/pyca/pynacl/tarball/master
 
 ArchLinux
 ~~~~~~~~~
@@ -321,7 +323,7 @@ ArchLinux
 If running `$ synctl start` fails with 'returned non-zero exit status 1',
 you will need to explicitly call Python2.7 - either running as::
 
-    $ python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml
+    python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml
     
 ...or by editing synctl with the correct python executable.
 
@@ -331,16 +333,16 @@ Synapse Development
 To check out a synapse for development, clone the git repo into a working
 directory of your choice::
 
-    $ git clone https://github.com/matrix-org/synapse.git
-    $ cd synapse
+    git clone https://github.com/matrix-org/synapse.git
+    cd synapse
 
 Synapse has a number of external dependencies, that are easiest
 to install using pip and a virtualenv::
 
-    $ virtualenv env
-    $ source env/bin/activate
-    $ python synapse/python_dependencies.py | xargs -n1 pip install
-    $ pip install setuptools_trial mock
+    virtualenv env
+    source env/bin/activate
+    python synapse/python_dependencies.py | xargs -n1 pip install
+    pip install setuptools_trial mock
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
@@ -348,7 +350,7 @@ dependencies into a virtual env.
 Once this is done, you may wish to run Synapse's unit tests, to
 check that everything is installed as it should be::
 
-    $ python setup.py test
+    python setup.py test
 
 This should end with a 'PASSED' result::
 
@@ -389,11 +391,11 @@ IDs:
 For the first form, simply pass the required hostname (of the machine) as the
 --server-name parameter::
 
-    $ python -m synapse.app.homeserver \
+    python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
         --config-path homeserver.yaml \
         --generate-config
-    $ python -m synapse.app.homeserver --config-path homeserver.yaml
+    python -m synapse.app.homeserver --config-path homeserver.yaml
 
 Alternatively, you can run ``synctl start`` to guide you through the process.
 
@@ -410,11 +412,11 @@ record would then look something like::
 At this point, you should then run the homeserver with the hostname of this
 SRV record, as that is the name other machines will expect it to have::
 
-    $ python -m synapse.app.homeserver \
+    python -m synapse.app.homeserver \
         --server-name YOURDOMAIN \
         --config-path homeserver.yaml \
         --generate-config
-    $ python -m synapse.app.homeserver --config-path homeserver.yaml
+    python -m synapse.app.homeserver --config-path homeserver.yaml
 
 
 You may additionally want to pass one or more "-v" options, in order to
@@ -428,7 +430,7 @@ private federation (``localhost:8080``, ``localhost:8081`` and
 ``localhost:8082``) which you can then access through the webclient running at
 http://localhost:8080. Simply run::
 
-    $ demo/start.sh
+    demo/start.sh
     
 This is mainly useful just for development purposes.
 
@@ -502,10 +504,10 @@ Building Internal API Documentation
 Before building internal API documentation install sphinx and
 sphinxcontrib-napoleon::
 
-    $ pip install sphinx
-    $ pip install sphinxcontrib-napoleon
+    pip install sphinx
+    pip install sphinxcontrib-napoleon
 
 Building internal API documentation::
 
-    $ python setup.py build_sphinx
+    python setup.py build_sphinx
 

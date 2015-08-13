@@ -162,8 +162,8 @@ class EventsStore(SQLBaseStore):
         if current_state:
             txn.call_after(self.get_current_state_for_key.invalidate_all)
             txn.call_after(self.get_rooms_for_user.invalidate_all)
-            txn.call_after(self.get_users_in_room.invalidate, event.room_id)
-            txn.call_after(self.get_joined_hosts_for_room.invalidate, event.room_id)
+            txn.call_after(self.get_users_in_room.invalidate, (event.room_id,))
+            txn.call_after(self.get_joined_hosts_for_room.invalidate, (event.room_id,))
             txn.call_after(self.get_room_name_and_aliases, event.room_id)
 
             self._simple_delete_txn(
@@ -430,13 +430,13 @@ class EventsStore(SQLBaseStore):
                 if not context.rejected:
                     txn.call_after(
                         self.get_current_state_for_key.invalidate,
-                        event.room_id, event.type, event.state_key
-                        )
+                        (event.room_id, event.type, event.state_key,)
+                    )
 
                     if event.type in [EventTypes.Name, EventTypes.Aliases]:
                         txn.call_after(
                             self.get_room_name_and_aliases.invalidate,
-                            event.room_id
+                            (event.room_id,)
                         )
 
                     self._simple_upsert_txn(
@@ -567,8 +567,9 @@ class EventsStore(SQLBaseStore):
     def _invalidate_get_event_cache(self, event_id):
         for check_redacted in (False, True):
             for get_prev_content in (False, True):
-                self._get_event_cache.invalidate(event_id, check_redacted,
-                                                 get_prev_content)
+                self._get_event_cache.invalidate(
+                    (event_id, check_redacted, get_prev_content)
+                )
 
     def _get_event_txn(self, txn, event_id, check_redacted=True,
                        get_prev_content=False, allow_rejected=False):
@@ -589,7 +590,7 @@ class EventsStore(SQLBaseStore):
         for event_id in events:
             try:
                 ret = self._get_event_cache.get(
-                    event_id, check_redacted, get_prev_content
+                    (event_id, check_redacted, get_prev_content,)
                 )
 
                 if allow_rejected or not ret.rejected_reason:
@@ -822,7 +823,7 @@ class EventsStore(SQLBaseStore):
                 ev.unsigned["prev_content"] = prev.get_dict()["content"]
 
         self._get_event_cache.prefill(
-            ev.event_id, check_redacted, get_prev_content, ev
+            (ev.event_id, check_redacted, get_prev_content), ev
         )
 
         defer.returnValue(ev)
@@ -879,7 +880,7 @@ class EventsStore(SQLBaseStore):
                 ev.unsigned["prev_content"] = prev.get_dict()["content"]
 
         self._get_event_cache.prefill(
-            ev.event_id, check_redacted, get_prev_content, ev
+            (ev.event_id, check_redacted, get_prev_content), ev
         )
 
         return ev

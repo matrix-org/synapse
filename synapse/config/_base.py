@@ -139,10 +139,17 @@ class Config(object):
             help="Generate a config file for the server name"
         )
         config_parser.add_argument(
+            "--generate-keys",
+            action="store_true",
+            help="Generate any missing key files then exit"
+        )
+        config_parser.add_argument(
             "-H", "--server-name",
             help="The server name to generate a config file for"
         )
         config_args, remaining_args = config_parser.parse_known_args(argv)
+
+        generate_keys = config_args.generate_keys
 
         if config_args.generate_config:
             if not config_args.config_path:
@@ -151,51 +158,40 @@ class Config(object):
                     " generated using \"--generate-config -H SERVER_NAME"
                     " -c CONFIG-FILE\""
                 )
-
-            config_dir_path = os.path.dirname(config_args.config_path[0])
-            config_dir_path = os.path.abspath(config_dir_path)
-
-            server_name = config_args.server_name
-            if not server_name:
-                print "Must specify a server_name to a generate config for."
-                sys.exit(1)
             (config_path,) = config_args.config_path
-            if not os.path.exists(config_dir_path):
-                os.makedirs(config_dir_path)
-            if os.path.exists(config_path):
-                print "Config file %r already exists" % (config_path,)
-                yaml_config = cls.read_config_file(config_path)
-                yaml_name = yaml_config["server_name"]
-                if server_name != yaml_name:
-                    print (
-                        "Config file %r has a different server_name: "
-                        " %r != %r" % (config_path, server_name, yaml_name)
-                    )
+            if not os.path.exists(config_path):
+                config_dir_path = os.path.dirname(config_path)
+                config_dir_path = os.path.abspath(config_dir_path)
+
+                server_name = config_args.server_name
+                if not server_name:
+                    print "Must specify a server_name to a generate config for."
                     sys.exit(1)
-                config_bytes, config = obj.generate_config(
-                    config_dir_path, server_name
-                )
-                config.update(yaml_config)
-                print "Generating any missing keys for %r" % (server_name,)
-                obj.invoke_all("generate_files", config)
-                sys.exit(0)
-            with open(config_path, "wb") as config_file:
-                config_bytes, config = obj.generate_config(
-                    config_dir_path, server_name
-                )
-                obj.invoke_all("generate_files", config)
-                config_file.write(config_bytes)
+                if not os.path.exists(config_dir_path):
+                    os.makedirs(config_dir_path)
+                with open(config_path, "wb") as config_file:
+                    config_bytes, config = obj.generate_config(
+                        config_dir_path, server_name
+                    )
+                    obj.invoke_all("generate_files", config)
+                    config_file.write(config_bytes)
                 print (
-                    "A config file has been generated in %s for server name"
-                    " '%s' with corresponding SSL keys and self-signed"
-                    " certificates. Please review this file and customise it to"
-                    " your needs."
+                    "A config file has been generated in %r for server name"
+                    " %r with corresponding SSL keys and self-signed"
+                    " certificates. Please review this file and customise it"
+                    " to your needs."
                 ) % (config_path, server_name)
-            print (
-                "If this server name is incorrect, you will need to regenerate"
-                " the SSL certificates"
-            )
-            sys.exit(0)
+                print (
+                    "If this server name is incorrect, you will need to"
+                    " regenerate the SSL certificates"
+                )
+                sys.exit(0)
+            else:
+                print (
+                    "Config file %r already exists. Generating any missing key"
+                    " files."
+                ) % (config_path,)
+                generate_keys = True
 
         parser = argparse.ArgumentParser(
             parents=[config_parser],
@@ -213,7 +209,7 @@ class Config(object):
                 " -c CONFIG-FILE\""
             )
 
-        config_dir_path = os.path.dirname(config_args.config_path[0])
+        config_dir_path = os.path.dirname(config_args.config_path[-1])
         config_dir_path = os.path.abspath(config_dir_path)
 
         specified_config = {}
@@ -225,6 +221,10 @@ class Config(object):
         _, config = obj.generate_config(config_dir_path, server_name)
         config.pop("log_config")
         config.update(specified_config)
+
+        if generate_keys:
+            obj.invoke_all("generate_files", config)
+            sys.exit(0)
 
         obj.invoke_all("read_config", config)
 
