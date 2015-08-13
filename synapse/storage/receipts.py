@@ -15,6 +15,7 @@
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util.caches import cache_counter, caches_by_name
 
 from twisted.internet import defer
 
@@ -305,6 +306,8 @@ class _RoomStreamChangeCache(object):
         self._room_to_key = {}
         self._cache = sorteddict()
         self._earliest_key = None
+        self.name = "ReceiptsRoomChangeCache"
+        caches_by_name[self.name] = self._cache
 
     @defer.inlineCallbacks
     def get_rooms_changed(self, store, room_ids, key):
@@ -320,6 +323,9 @@ class _RoomStreamChangeCache(object):
             ).intersection(room_ids)
         else:
             result = room_ids
+
+        cache_counter.inc_hits_by(len(result), self.name)
+        cache_counter.inc_misses_by(len(room_ids) - len(result), self.name)
 
         defer.returnValue(result)
 

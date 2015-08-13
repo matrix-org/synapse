@@ -151,5 +151,12 @@ class CacheMetric(object):
     def inc_misses(self, *values):
         self.total.inc(*values)
 
+    def inc_hits_by(self, inc, *values):
+        self.hits.inc_by(inc, *values)
+        self.total.inc_by(inc, *values)
+
+    def inc_misses_by(self, inc, *values):
+        self.total.inc_by(inc, *values)
+
     def render(self):
         return self.hits.render() + self.total.render() + self.size.render()
