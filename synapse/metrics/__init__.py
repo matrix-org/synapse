@@ -158,8 +158,8 @@ def runUntilCurrentTimer(func):
 
     @functools.wraps(func)
     def f(*args, **kwargs):
-        start = time.time() * 1000
         pending_calls = len(reactor.getDelayedCalls())
+        start = time.time() * 1000
         ret = func(*args, **kwargs)
         end = time.time() * 1000
         tick_time.inc_by(end - start)
