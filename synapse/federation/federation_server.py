@@ -323,13 +323,16 @@ class FederationServer(FederationBase):
             else:
                 for device_id in device_ids:
                     query.append((user_id, device_id))
+
         results = yield self.store.get_e2e_device_keys(query)
+
         json_result = {}
         for user_id, device_keys in results.items():
             for device_id, json_bytes in device_keys.items():
                 json_result.setdefault(user_id, {})[device_id] = json.loads(
                     json_bytes
                 )
+
         defer.returnValue({"device_keys": json_result})
 
     @defer.inlineCallbacks
@@ -339,7 +342,9 @@ class FederationServer(FederationBase):
         for user_id, device_keys in content.get("one_time_keys", {}).items():
             for device_id, algorithm in device_keys.items():
                 query.append((user_id, device_id, algorithm))
+
         results = yield self.store.claim_e2e_one_time_keys(query)
+
         json_result = {}
         for user_id, device_keys in results.items():
             for device_id, keys in device_keys.items():
@@ -347,6 +352,7 @@ class FederationServer(FederationBase):
                     json_result.setdefault(user_id, {})[device_id] = {
                         key_id: json.loads(json_bytes)
                     }
+
         defer.returnValue({"one_time_keys": json_result})
 
     @defer.inlineCallbacks
