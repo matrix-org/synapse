@@ -142,7 +142,6 @@ class MatrixFederationHttpClient(object):
                             producer
                         )
 
-
                         return self.clock.time_bound_deferred(
                             request_deferred,
                             time_out=timeout/1000. if timeout else 60,
