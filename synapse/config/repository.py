@@ -20,6 +20,7 @@ ThumbnailRequirement = namedtuple(
     "ThumbnailRequirement", ["width", "height", "method", "media_type"]
 )
 
+
 def parse_thumbnail_requirements(thumbnail_sizes):
     """ Takes a list of dictionaries with "width", "height", and "method" keys
     and creates a map from image media types to the thumbnail size, thumnailing
