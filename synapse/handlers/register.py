@@ -73,7 +73,8 @@ class RegistrationHandler(BaseHandler):
             localpart : The local part of the user ID to register. If None,
               one will be randomly generated.
             password (str) : The password to assign to this user so they can
-            login again.
+            login again. This can be None which means they cannot login again
+            via a password (e.g. the user is an application service user).
         Returns:
             A tuple of (user_id, access_token).
         Raises:

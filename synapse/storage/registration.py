@@ -131,7 +131,7 @@ class RegistrationStore(SQLBaseStore):
             user_id
         )
         for r in rows:
-            self.get_user_by_token.invalidate(r)
+            self.get_user_by_token.invalidate((r,))
 
     @cached()
     def get_user_by_token(self, token):

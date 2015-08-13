@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore, cached
+from ._base import SQLBaseStore, cachedInlineCallbacks
 
 from twisted.internet import defer
 
@@ -91,7 +91,6 @@ class StateStore(SQLBaseStore):
 
         defer.returnValue(dict(state_list))
 
-    @cached(num_args=1)
     def _fetch_events_for_group(self, key, events):
         return self._get_events(
             events, get_prev_content=False
@@ -189,8 +188,7 @@ class StateStore(SQLBaseStore):
         events = yield self._get_events(event_ids, get_prev_content=False)
         defer.returnValue(events)
 
-    @cached(num_args=3)
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks(num_args=3)
     def get_current_state_for_key(self, room_id, event_type, state_key):
         def f(txn):
             sql = (

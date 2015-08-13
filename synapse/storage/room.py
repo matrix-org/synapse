@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 
-from ._base import SQLBaseStore, cached
+from ._base import SQLBaseStore, cachedInlineCallbacks
 
 import collections
 import logging
@@ -186,8 +186,7 @@ class RoomStore(SQLBaseStore):
                 }
             )
 
-    @cached()
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks()
     def get_room_name_and_aliases(self, room_id):
         def f(txn):
             sql = (
