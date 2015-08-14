@@ -36,7 +36,6 @@ class PasswordRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_handlers().auth_handler
-        self.login_handler = hs.get_handlers().login_handler
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -47,7 +46,7 @@ class PasswordRestServlet(RestServlet):
         authed, result, params = yield self.auth_handler.check_auth([
             [LoginType.PASSWORD],
             [LoginType.EMAIL_IDENTITY]
-        ], body)
+        ], body, self.hs.get_ip_from_request(request))
 
         if not authed:
             defer.returnValue((401, result))
@@ -79,7 +78,7 @@ class PasswordRestServlet(RestServlet):
             raise SynapseError(400, "", Codes.MISSING_PARAM)
         new_password = params['new_password']
 
-        yield self.login_handler.set_password(
+        yield self.auth_handler.set_password(
             user_id, new_password, None
         )
 
@@ -95,7 +94,6 @@ class ThreepidRestServlet(RestServlet):
     def __init__(self, hs):
         super(ThreepidRestServlet, self).__init__()
         self.hs = hs
-        self.login_handler = hs.get_handlers().login_handler
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
 
@@ -135,7 +133,7 @@ class ThreepidRestServlet(RestServlet):
                 logger.warn("Couldn't add 3pid: invalid response from ID sevrer")
                 raise SynapseError(500, "Invalid response from ID Server")
 
-        yield self.login_handler.add_threepid(
+        yield self.auth_handler.add_threepid(
             auth_user.to_string(),
             threepid['medium'],
             threepid['address'],
