@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, cachedList
 
 from twisted.internet import defer
 
@@ -36,6 +36,7 @@ class PresenceStore(SQLBaseStore):
             desc="has_presence_state",
         )
 
+    @cached()
     def get_presence_state(self, user_localpart):
         return self._simple_select_one(
             table="presence",
@@ -43,6 +44,23 @@ class PresenceStore(SQLBaseStore):
             retcols=["state", "status_msg", "mtime"],
             desc="get_presence_state",
         )
+
+    @cachedList(get_presence_state.cache, list_name="user_localparts")
+    def get_presence_states(self, user_localparts):
+        def f(txn):
+            results = {}
+            for user_localpart in user_localparts:
+                results[user_localpart] = self._simple_select_one_txn(
+                    txn,
+                    table="presence",
+                    keyvalues={"user_id": user_localpart},
+                    retcols=["state", "status_msg", "mtime"],
+                    desc="get_presence_state",
+                )
+
+            return results
+
+        return self.runInteraction("get_presence_states", f)
 
     def set_presence_state(self, user_localpart, new_state):
         return self._simple_update_one(
