@@ -21,11 +21,14 @@ from twisted.internet import defer
 
 class PresenceStore(SQLBaseStore):
     def create_presence(self, user_localpart):
-        return self._simple_insert(
+        res = self._simple_insert(
             table="presence",
             values={"user_id": user_localpart},
             desc="create_presence",
         )
+
+        self.get_presence_state.invalidate((user_localpart,))
+        return res
 
     def has_presence_state(self, user_localpart):
         return self._simple_select_one(
@@ -65,7 +68,7 @@ class PresenceStore(SQLBaseStore):
         return self.runInteraction("get_presence_states", f)
 
     def set_presence_state(self, user_localpart, new_state):
-        return self._simple_update_one(
+        res = self._simple_update_one(
             table="presence",
             keyvalues={"user_id": user_localpart},
             updatevalues={"state": new_state["state"],
@@ -73,6 +76,9 @@ class PresenceStore(SQLBaseStore):
                           "mtime": self._clock.time_msec()},
             desc="set_presence_state",
         )
+
+        self.get_presence_state.invalidate((user_localpart,))
+        return res
 
     def allow_presence_visible(self, observed_localpart, observer_userid):
         return self._simple_insert(
