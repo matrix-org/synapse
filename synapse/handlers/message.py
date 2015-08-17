@@ -460,20 +460,14 @@ class MessageHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def get_presence():
-            presence_defs = yield defer.DeferredList(
-                [
-                    presence_handler.get_state(
-                        target_user=UserID.from_string(m.user_id),
-                        auth_user=auth_user,
-                        as_event=True,
-                        check_auth=False,
-                    )
-                    for m in room_members
-                ],
-                consumeErrors=True,
+            states = yield presence_handler.get_states(
+                target_users=[UserID.from_string(m.user_id) for m in room_members],
+                auth_user=auth_user,
+                as_event=True,
+                check_auth=False,
             )
 
-            defer.returnValue([p for success, p in presence_defs if success])
+            defer.returnValue(states.values())
 
         receipts_handler = self.hs.get_handlers().receipts_handler
 

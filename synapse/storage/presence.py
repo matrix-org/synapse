@@ -50,13 +50,15 @@ class PresenceStore(SQLBaseStore):
         def f(txn):
             results = {}
             for user_localpart in user_localparts:
-                results[user_localpart] = self._simple_select_one_txn(
+                res = self._simple_select_one_txn(
                     txn,
                     table="presence",
                     keyvalues={"user_id": user_localpart},
                     retcols=["state", "status_msg", "mtime"],
-                    desc="get_presence_state",
+                    allow_none=True,
                 )
+                if res:
+                    results[user_localpart] = res
 
             return results
 
