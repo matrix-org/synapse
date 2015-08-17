@@ -412,9 +412,10 @@ class StateStore(SQLBaseStore):
                 full=(types is None),
             )
 
-            results[group].update({
+            # We replace here to remove all the entries with None values.
+            results[group] = {
                 key: value for key, value in state_dict.items() if value
-            })
+            }
 
         defer.returnValue(results)
 
