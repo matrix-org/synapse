@@ -19,8 +19,6 @@ from synapse.util.caches import cache_counter, caches_by_name
 
 from twisted.internet import defer
 
-from synapse.util import unwrapFirstError
-
 from blist import sorteddict
 import logging
 import ujson as json
