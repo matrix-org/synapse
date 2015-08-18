@@ -163,11 +163,11 @@ def runUntilCurrentTimer(func):
 
         # _newTimedCalls is one long list of *all* pending calls. Below loop
         # is based off of impl of reactor.runUntilCurrent
-        for p in reactor._newTimedCalls:
-            if p.time > now:
+        for delayed_call in reactor._newTimedCalls:
+            if delayed_call.time > now:
                 break
 
-            if p.delayed_time > 0:
+            if delayed_call.delayed_time > 0:
                 continue
 
             num_pending += 1
