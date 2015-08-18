@@ -60,7 +60,7 @@ class RegisterTestCase(unittest.TestCase):
             return caveat == "type = access"
 
         def verify_expiry(caveat):
-            return caveat == "time < 8600"
+            return caveat == "time < 8600000"
 
         v = pymacaroons.Verifier()
         v.satisfy_general(verify_gen)
