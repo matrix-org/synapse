@@ -39,7 +39,7 @@ class PresenceStore(SQLBaseStore):
             desc="has_presence_state",
         )
 
-    @cached()
+    @cached(max_entries=2000)
     def get_presence_state(self, user_localpart):
         return self._simple_select_one(
             table="presence",
