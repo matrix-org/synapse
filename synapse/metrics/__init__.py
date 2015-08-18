@@ -184,7 +184,14 @@ def runUntilCurrentTimer(func):
     return f
 
 
-if hasattr(reactor, "runUntilCurrent") and hasattr(reactor, "_newTimedCalls"):
+try:
+    # Ensure the reactor has all the attributes we expect
+    reactor.runUntilCurrent
+    reactor._newTimedCalls
+    reactor.threadCallQueue
+
     # runUntilCurrent is called when we have pending calls. It is called once
     # per iteratation after fd polling.
     reactor.runUntilCurrent = runUntilCurrentTimer(reactor.runUntilCurrent)
+except AttributeError:
+    pass
