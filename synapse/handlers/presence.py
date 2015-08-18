@@ -268,10 +268,10 @@ class PresenceHandler(BaseHandler):
         )
 
         if check_auth:
-            for u in local_users:
+            for user in local_users:
                 visible = yield self.is_presence_visible(
                     observer_user=auth_user,
-                    observed_user=u
+                    observed_user=user
                 )
 
                 if not visible:
@@ -279,9 +279,9 @@ class PresenceHandler(BaseHandler):
 
         results = {}
         if local_users:
-            for u in local_users:
-                if u in self._user_cachemap:
-                    results[u] = self._user_cachemap[u].get_state()
+            for user in local_users:
+                if user in self._user_cachemap:
+                    results[user] = self._user_cachemap[user].get_state()
 
             local_to_user = {u.localpart: u for u in local_users}
 
@@ -295,9 +295,9 @@ class PresenceHandler(BaseHandler):
                     res["status_msg"] = state["status_msg"]
                 results[local_to_user[local_part]] = res
 
-        for u in remote_users:
+        for user in remote_users:
             # TODO(paul): Have remote server send us permissions set
-            results[u] = self._get_or_offline_usercache(u).get_state()
+            results[user] = self._get_or_offline_usercache(user).get_state()
 
         for state in results.values():
             if "last_active" in state:
