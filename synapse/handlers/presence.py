@@ -192,6 +192,20 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_state(self, target_user, auth_user, as_event=False, check_auth=True):
+        """Get the current presence state of the given user.
+
+        Args:
+            target_user (UserID): The user whose presence we want
+            auth_user (UserID): The user requesting the presence, used for
+                checking if said user is allowed to see the persence of the
+                `target_user`
+            as_event (bool): Format the return as an event or not?
+            check_auth (bool): Perform the auth checks or not?
+
+        Returns:
+            dict: The presence state of the `target_user`, whose format depends
+            on the `as_event` argument.
+        """
         if self.hs.is_mine(target_user):
             if check_auth:
                 visible = yield self.is_presence_visible(
@@ -234,6 +248,20 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_states(self, target_users, auth_user, as_event=False, check_auth=True):
+        """A batched version of the `get_state` method that accepts a list of
+        `target_users`
+
+        Args:
+            target_users (list): The list of UserID's whose presence we want
+            auth_user (UserID): The user requesting the presence, used for
+                checking if said user is allowed to see the persence of the
+                `target_users`
+            as_event (bool): Format the return as an event or not?
+            check_auth (bool): Perform the auth checks or not?
+
+        Returns:
+            dict: A mapping from user -> presence_state
+        """
         local_users, remote_users = partitionbool(
             target_users,
             lambda u: self.hs.is_mine(u)
