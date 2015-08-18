@@ -234,64 +234,60 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_states(self, target_users, auth_user, as_event=False, check_auth=True):
-        try:
-            local_users, remote_users = partitionbool(
-                target_users,
-                lambda u: self.hs.is_mine(u)
-            )
+        local_users, remote_users = partitionbool(
+            target_users,
+            lambda u: self.hs.is_mine(u)
+        )
 
-            if check_auth:
-                for u in local_users:
-                    visible = yield self.is_presence_visible(
-                        observer_user=auth_user,
-                        observed_user=u
-                    )
-
-                    if not visible:
-                        raise SynapseError(404, "Presence information not visible")
-
-            results = {}
-            if local_users:
-                for u in local_users:
-                    if u in self._user_cachemap:
-                        results[u] = self._user_cachemap[u].get_state()
-
-                local_to_user = {u.localpart: u for u in local_users}
-
-                states = yield self.store.get_presence_states(
-                    [u.localpart for u in local_users if u not in results]
+        if check_auth:
+            for u in local_users:
+                visible = yield self.is_presence_visible(
+                    observer_user=auth_user,
+                    observed_user=u
                 )
 
-                for local_part, state in states.items():
-                    res = {"presence": state["state"]}
-                    if "status_msg" in state and state["status_msg"]:
-                        res["status_msg"] = state["status_msg"]
-                    results[local_to_user[local_part]] = res
+                if not visible:
+                    raise SynapseError(404, "Presence information not visible")
 
-            for u in remote_users:
-                # TODO(paul): Have remote server send us permissions set
-                results[u] = self._get_or_offline_usercache(u).get_state()
+        results = {}
+        if local_users:
+            for u in local_users:
+                if u in self._user_cachemap:
+                    results[u] = self._user_cachemap[u].get_state()
 
-            for state in results.values():
-                if "last_active" in state:
-                    state["last_active_ago"] = int(
-                        self.clock.time_msec() - state.pop("last_active")
+            local_to_user = {u.localpart: u for u in local_users}
+
+            states = yield self.store.get_presence_states(
+                [u.localpart for u in local_users if u not in results]
+            )
+
+            for local_part, state in states.items():
+                res = {"presence": state["state"]}
+                if "status_msg" in state and state["status_msg"]:
+                    res["status_msg"] = state["status_msg"]
+                results[local_to_user[local_part]] = res
+
+        for u in remote_users:
+            # TODO(paul): Have remote server send us permissions set
+            results[u] = self._get_or_offline_usercache(u).get_state()
+
+        for state in results.values():
+            if "last_active" in state:
+                state["last_active_ago"] = int(
+                    self.clock.time_msec() - state.pop("last_active")
+                )
+
+        if as_event:
+            for user, state in results.items():
+                content = state
+                content["user_id"] = user.to_string()
+
+                if "last_active" in content:
+                    content["last_active_ago"] = int(
+                        self._clock.time_msec() - content.pop("last_active")
                     )
 
-            if as_event:
-                for user, state in results.items():
-                    content = state
-                    content["user_id"] = user.to_string()
-
-                    if "last_active" in content:
-                        content["last_active_ago"] = int(
-                            self._clock.time_msec() - content.pop("last_active")
-                        )
-
-                    results[user] = {"type": "m.presence", "content": content}
-        except:
-            logger.exception(":(")
-            raise
+                results[user] = {"type": "m.presence", "content": content}
 
         defer.returnValue(results)
 
