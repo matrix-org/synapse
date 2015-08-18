@@ -417,8 +417,7 @@ class StateStore(SQLBaseStore):
         # used for bookkeeping in the cache.
         for group, state_dict in results.items():
             results[group] = {
-                key: event for key, event in state_dict.items()
-                if event
+                key: event for key, event in state_dict.items() if event
             }
 
         defer.returnValue(results)
