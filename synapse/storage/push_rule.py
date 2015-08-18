@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore, cachedInlineCallbacks
+from ._base import SQLBaseStore
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 from twisted.internet import defer
 
 import logging

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
     "syutil>=0.0.7": ["syutil>=0.0.7"],
-    "Twisted==14.0.2": ["twisted==14.0.2"],
+    "Twisted>=15.1.0": ["twisted>=15.1.0"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
     "pyyaml": ["yaml"],

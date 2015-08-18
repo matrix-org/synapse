@@ -17,7 +17,8 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 
-from ._base import SQLBaseStore, cachedInlineCallbacks
+from ._base import SQLBaseStore
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 import collections
 import logging

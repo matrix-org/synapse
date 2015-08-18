@@ -13,18 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore, cached
+from ._base import SQLBaseStore
+from synapse.util.caches.descriptors import cached, cachedList
 
 from twisted.internet import defer
 
 
 class PresenceStore(SQLBaseStore):
     def create_presence(self, user_localpart):
-        return self._simple_insert(
+        res = self._simple_insert(
             table="presence",
             values={"user_id": user_localpart},
             desc="create_presence",
         )
+
+        self.get_presence_state.invalidate((user_localpart,))
+        return res
 
     def has_presence_state(self, user_localpart):
         return self._simple_select_one(
@@ -35,6 +39,7 @@ class PresenceStore(SQLBaseStore):
             desc="has_presence_state",
         )
 
+    @cached()
     def get_presence_state(self, user_localpart):
         return self._simple_select_one(
             table="presence",
@@ -43,8 +48,27 @@ class PresenceStore(SQLBaseStore):
             desc="get_presence_state",
         )
 
+    @cachedList(get_presence_state.cache, list_name="user_localparts")
+    def get_presence_states(self, user_localparts):
+        def f(txn):
+            results = {}
+            for user_localpart in user_localparts:
+                res = self._simple_select_one_txn(
+                    txn,
+                    table="presence",
+                    keyvalues={"user_id": user_localpart},
+                    retcols=["state", "status_msg", "mtime"],
+                    allow_none=True,
+                )
+                if res:
+                    results[user_localpart] = res
+
+            return results
+
+        return self.runInteraction("get_presence_states", f)
+
     def set_presence_state(self, user_localpart, new_state):
-        return self._simple_update_one(
+        res = self._simple_update_one(
             table="presence",
             keyvalues={"user_id": user_localpart},
             updatevalues={"state": new_state["state"],
@@ -52,6 +76,9 @@ class PresenceStore(SQLBaseStore):
                           "mtime": self._clock.time_msec()},
             desc="set_presence_state",
         )
+
+        self.get_presence_state.invalidate((user_localpart,))
+        return res
 
     def allow_presence_visible(self, observed_localpart, observer_userid):
         return self._simple_insert(

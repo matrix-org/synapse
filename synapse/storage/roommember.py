@@ -17,7 +17,8 @@ from twisted.internet import defer
 
 from collections import namedtuple
 
-from ._base import SQLBaseStore, cached
+from ._base import SQLBaseStore
+from synapse.util.caches.descriptors import cached
 
 from synapse.api.constants import Membership
 from synapse.types import UserID

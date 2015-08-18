@@ -36,6 +36,7 @@ what sort order was used:
 from twisted.internet import defer
 
 from ._base import SQLBaseStore
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.api.constants import EventTypes
 from synapse.types import RoomStreamToken
 from synapse.util.logutils import log_function
@@ -299,9 +300,8 @@ class StreamStore(SQLBaseStore):
 
         defer.returnValue((events, token))
 
-    @defer.inlineCallbacks
-    def get_recent_events_for_room(self, room_id, limit, end_token,
-                                   with_feedback=False, from_token=None):
+    @cachedInlineCallbacks(num_args=4)
+    def get_recent_events_for_room(self, room_id, limit, end_token, from_token=None):
         # TODO (erikj): Handle compressed feedback
 
         end_token = RoomStreamToken.parse_stream_token(end_token)
