@@ -398,6 +398,7 @@ class StateStore(SQLBaseStore):
                 # for them again.
                 state_dict = {key: None for key in types}
                 state_dict.update(results[group])
+                results[group] = state_dict
             else:
                 state_dict = results[group]
 
@@ -405,12 +406,10 @@ class StateStore(SQLBaseStore):
                 state_event = state_events[event_id]
                 state_dict[(state_event.type, state_event.state_key)] = state_event
 
-            results[group] = state_dict
-
             self._state_group_cache.update(
                 cache_seq_num,
                 key=group,
-                value=results[group],
+                value=state_dict,
                 full=(types is None),
             )
 
