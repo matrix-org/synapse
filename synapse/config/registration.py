@@ -32,9 +32,11 @@ class RegistrationConfig(Config):
             )
 
         self.registration_shared_secret = config.get("registration_shared_secret")
+        self.macaroon_secret_key = config.get("macaroon_secret_key")
 
     def default_config(self, config_dir, server_name):
         registration_shared_secret = random_string_with_symbols(50)
+        macaroon_secret_key = random_string_with_symbols(50)
         return """\
         ## Registration ##
 
@@ -44,6 +46,8 @@ class RegistrationConfig(Config):
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
         registration_shared_secret: "%(registration_shared_secret)s"
+
+        macaroon_secret_key: "%(macaroon_secret_key)s"
         """ % locals()
 
     def add_arguments(self, parser):
