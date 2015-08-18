@@ -240,7 +240,7 @@ class StateStore(SQLBaseStore):
 
         defer.returnValue({event: event_to_state[event] for event in event_ids})
 
-    @cached(num_args=2, lru=True, max_entries=100000)
+    @cached(num_args=2, lru=True, max_entries=10000)
     def _get_state_group_for_event(self, room_id, event_id):
         return self._simple_select_one_onecol(
             table="event_to_state_groups",
