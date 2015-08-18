@@ -16,8 +16,14 @@ from twisted.internet import defer
 
 import threading
 import logging
+from resource import getrusage, RUSAGE_SELF
+
 
 logger = logging.getLogger(__name__)
+
+
+def _get_cpu_time():
+    return getrusage(RUSAGE_SELF).ru_utime * 1000
 
 
 class LoggingContext(object):
@@ -27,7 +33,10 @@ class LoggingContext(object):
         name (str): Name for the context for debugging.
     """
 
-    __slots__ = ["parent_context", "name", "__dict__"]
+    __slots__ = [
+        "parent_context", "name", "__dict__", "cpu_time", "_current_cpu_time",
+        "_log_time"
+    ]
 
     thread_local = threading.local()
 
@@ -42,11 +51,20 @@ class LoggingContext(object):
         def copy_to(self, record):
             pass
 
+        def resume(self):
+            pass
+
+        def pause(self):
+            pass
+
     sentinel = Sentinel()
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, log_time=False):
         self.parent_context = None
         self.name = name
+        self.cpu_time = 0
+        self._current_cpu_time = 0
+        self._log_time = log_time
 
     def __str__(self):
         return "%s@%x" % (self.name, id(self))
@@ -62,6 +80,7 @@ class LoggingContext(object):
             raise Exception("Attempt to enter logging context multiple times")
         self.parent_context = self.current_context()
         self.thread_local.current_context = self
+        self.resume()
         return self
 
     def __exit__(self, type, value, traceback):
@@ -79,8 +98,23 @@ class LoggingContext(object):
                     self.thread_local.current_context,
                     self
                 )
+        self.pause()
+
+        if self._log_time:
+            logger.info("Elapsed CPU time: %d %r", self.cpu_time, self.name)
+
         self.thread_local.current_context = self.parent_context
         self.parent_context = None
+
+    def resume(self):
+        if self._log_time:
+            self._current_cpu_time = _get_cpu_time()
+
+    def pause(self):
+        if self._log_time:
+            now = _get_cpu_time()
+            self.cpu_time += now - self._current_cpu_time
+            self._current_cpu_time = now
 
     def __getattr__(self, name):
         """Delegate member lookup to parent context"""
@@ -121,15 +155,24 @@ class PreserveLoggingContext(object):
     exited. Used to restore the context after a function using
     @defer.inlineCallbacks is resumed by a callback from the reactor."""
 
-    __slots__ = ["current_context"]
+    __slots__ = ["current_context", "inner_context"]
+
+    def __init__(self, inner_context=LoggingContext.sentinel):
+        object.__setattr__(self, "inner_context", inner_context)
 
     def __enter__(self):
         """Captures the current logging context"""
         self.current_context = LoggingContext.current_context()
-        LoggingContext.thread_local.current_context = LoggingContext.sentinel
+        LoggingContext.thread_local.current_context = self.inner_context
+
+        self.current_context.pause()
+        self.inner_context.resume()
 
     def __exit__(self, type, value, traceback):
         """Restores the current logging context"""
+        self.inner_context.pause()
+        self.current_context.resume()
+
         LoggingContext.thread_local.current_context = self.current_context
 
         if self.current_context is not LoggingContext.sentinel:
@@ -164,8 +207,7 @@ class _PreservingContextDeferred(defer.Deferred):
 
     def _wrap_callback(self, f):
         def g(res, *args, **kwargs):
-            with PreserveLoggingContext():
-                LoggingContext.thread_local.current_context = self._log_context
+            with PreserveLoggingContext(self._log_context):
                 res = f(res, *args, **kwargs)
             return res
         return g

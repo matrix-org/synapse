@@ -77,7 +77,7 @@ def request_handler(request_handler):
         global _next_request_id
         request_id = "%s-%s" % (request.method, _next_request_id)
         _next_request_id += 1
-        with LoggingContext(request_id) as request_context:
+        with LoggingContext(request_id, True) as request_context:
             request_context.request = request_id
             with request.processing():
                 try:
