@@ -158,15 +158,25 @@ class ReceiptsStore(SQLBaseStore):
 
         results = {}
         for row in txn_results:
-            results.setdefault(row["room_id"], {
+            # We want a single event per room, since we want to batch the
+            # receipts by room, event and type.
+            room_event = results.setdefault(row["room_id"], {
                 "type": "m.receipt",
                 "room_id": row["room_id"],
                 "content": {},
-            })["content"].setdefault(
+            })
+
+            # The content is of the form:
+            # {"$foo:bar": { "read": { "@user:host": <receipt> }, .. }, .. }
+            event_id = room_event["content"].setdefault(
                 row["event_id"], {}
-            ).setdefault(
+            )
+
+            receipt_type = event_id.setdefault(
                 row["receipt_type"], {}
-            )[row["user_id"]] = json.loads(row["data"])
+            )
+
+            receipt_type[row["user_id"]] = json.loads(row["data"])
 
         results = {
             room_id: [results[room_id]] if room_id in results else []
