@@ -290,6 +290,8 @@ class PresenceHandler(BaseHandler):
             )
 
             for local_part, state in states.items():
+                if stat is None:
+                    continue
                 res = {"presence": state["state"]}
                 if "status_msg" in state and state["status_msg"]:
                     res["status_msg"] = state["status_msg"]
