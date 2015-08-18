@@ -279,11 +279,11 @@ class RegistrationHandler(BaseHandler):
             identifier = "key",
             key = self.hs.config.macaroon_secret_key)
         macaroon.add_first_party_caveat("gen = 1")
-        macaroon.add_first_party_caveat("user_id = %s" % user_id)
+        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         macaroon.add_first_party_caveat("type = access")
-        now = self.hs.get_clock().time()
-        expiry = now + 60 * 60
-        macaroon.add_first_party_caveat("time < %s" % expiry)
+        now = self.hs.get_clock().time_msec()
+        expiry = now + (60 * 60 * 1000)
+        macaroon.add_first_party_caveat("time < %d" % (expiry,))
 
         return macaroon.serialize()
 
