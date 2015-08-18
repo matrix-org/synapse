@@ -405,16 +405,21 @@ class StateStore(SQLBaseStore):
                 state_event = state_events[event_id]
                 state_dict[(state_event.type, state_event.state_key)] = state_event
 
+            results[group] = state_dict
+
             self._state_group_cache.update(
                 cache_seq_num,
                 key=group,
-                value=state_dict,
+                value=results[group],
                 full=(types is None),
             )
 
-            # We replace here to remove all the entries with None values.
+        # Remove all the entries with None values. The None values were just
+        # used for bookkeeping in the cache.
+        for group, state_dict in results.items():
             results[group] = {
-                key: value for key, value in state_dict.items() if value
+                key: event for key, event in state_dict.items()
+                if event
             }
 
         defer.returnValue(results)
