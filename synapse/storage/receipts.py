@@ -168,13 +168,8 @@ class ReceiptsStore(SQLBaseStore):
 
             # The content is of the form:
             # {"$foo:bar": { "read": { "@user:host": <receipt> }, .. }, .. }
-            event_id = room_event["content"].setdefault(
-                row["event_id"], {}
-            )
-
-            receipt_type = event_id.setdefault(
-                row["receipt_type"], {}
-            )
+            event_entry = room_event["content"].setdefault(row["event_id"], {})
+            receipt_type = event_entry.setdefault(row["receipt_type"], {})
 
             receipt_type[row["user_id"]] = json.loads(row["data"])
 
