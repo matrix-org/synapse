@@ -51,16 +51,16 @@ class RegisterTestCase(unittest.TestCase):
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
         def verify_gen(caveat):
-            return caveat == "gen=1"
+            return caveat == "gen = 1"
 
         def verify_user(caveat):
-            return caveat == "user_id=a_user"
+            return caveat == "user_id = a_user"
 
         def verify_type(caveat):
-            return caveat == "type=access"
+            return caveat == "type = access"
 
         def verify_expiry(caveat):
-            return caveat == "time<8600000"
+            return caveat == "time < 8600000"
 
         v = pymacaroons.Verifier()
         v.satisfy_general(verify_gen)
