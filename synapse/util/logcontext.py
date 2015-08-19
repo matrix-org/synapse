@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 
 
 def _get_cpu_time():
-    return getrusage(RUSAGE_SELF).ru_utime * 1000
+    # Cheekily use RUSAGE_THREAD. THIS IS NOT PORTABLE
+    return getrusage(1).ru_utime * 1000
 
 
 class LoggingContext(object):
