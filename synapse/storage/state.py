@@ -398,6 +398,7 @@ class StateStore(SQLBaseStore):
                 # for them again.
                 state_dict = {key: None for key in types}
                 state_dict.update(results[group])
+                results[group] = state_dict
             else:
                 state_dict = results[group]
 
@@ -412,9 +413,11 @@ class StateStore(SQLBaseStore):
                 full=(types is None),
             )
 
-            # We replace here to remove all the entries with None values.
+        # Remove all the entries with None values. The None values were just
+        # used for bookkeeping in the cache.
+        for group, state_dict in results.items():
             results[group] = {
-                key: value for key, value in state_dict.items() if value
+                key: event for key, event in state_dict.items() if event
             }
 
         defer.returnValue(results)

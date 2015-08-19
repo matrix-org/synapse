@@ -352,6 +352,8 @@ class Auth(object):
                 if not user_id:
                     raise KeyError
 
+                request.authenticated_entity = user_id
+
                 defer.returnValue(
                     (UserID.from_string(user_id), ClientInfo("", ""))
                 )
@@ -425,6 +427,7 @@ class Auth(object):
                     "Unrecognised access token.",
                     errcode=Codes.UNKNOWN_TOKEN
                 )
+            request.authenticated_entity = service.sender
             defer.returnValue(service)
         except KeyError:
             raise AuthError(

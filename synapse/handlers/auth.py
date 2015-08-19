@@ -283,14 +283,15 @@ class AuthHandler(BaseHandler):
             StoreError if there was a problem storing the token.
             LoginError if there was an authentication problem.
         """
-        self._check_password(user_id, password)
+        yield self._check_password(user_id, password)
 
         reg_handler = self.hs.get_handlers().registration_handler
         access_token = reg_handler.generate_token(user_id)
-        logger.info("Adding token %s for user %s", access_token, user_id)
+        logger.info("Logging in user %s", user_id)
         yield self.store.add_access_token_to_user(user_id, access_token)
         defer.returnValue(access_token)
 
+    @defer.inlineCallbacks
     def _check_password(self, user_id, password):
         """Checks that user_id has passed password, raises LoginError if not."""
         user_info = yield self.store.get_user_by_id(user_id=user_id)
