@@ -287,7 +287,7 @@ class AuthHandler(BaseHandler):
 
         reg_handler = self.hs.get_handlers().registration_handler
         access_token = reg_handler.generate_token(user_id)
-        logger.info("Adding token %s for user %s", access_token, user_id)
+        logger.info("Logging in user %s", user_id)
         yield self.store.add_access_token_to_user(user_id, access_token)
         defer.returnValue(access_token)
 
