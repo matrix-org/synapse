@@ -126,12 +126,26 @@ sub on_unknown_event
         if (!$bridgestate->{$room_id}->{gathered_candidates}) {
             $bridgestate->{$room_id}->{gathered_candidates} = 1;
             my $offer = $bridgestate->{$room_id}->{offer};
-            my $candidate_block = "";
+            my $candidate_block = {
+                audio => '',
+                video => '',
+            };
             foreach (@{$event->{content}->{candidates}}) {
-                $candidate_block .= "a=" . $_->{candidate} . "\r\n";
+                if ($_->{sdpMid}) {
+                    $candidate_block->{$_->{sdpMid}} .= "a=" . $_->{candidate} . "\r\n";
+                }
+                else {
+                    $candidate_block->{audio} .= "a=" . $_->{candidate} . "\r\n";
+                    $candidate_block->{video} .= "a=" . $_->{candidate} . "\r\n";
+                }
             }
-            # XXX: collate using the right m= line - for now assume audio call
-            $offer =~ s/(a=rtcp.*[\r\n]+)/$1$candidate_block/;
+
+            # XXX: assumes audio comes first
+            #$offer =~ s/(a=rtcp-mux[\r\n]+)/$1$candidate_block->{audio}/;
+            #$offer =~ s/(a=rtcp-mux[\r\n]+)/$1$candidate_block->{video}/;
+
+            $offer =~ s/(m=video)/$candidate_block->{audio}$1/;
+            $offer =~ s/(.$)/$1\n$candidate_block->{video}$1/;
             
             my $f = send_verto_json_request("verto.invite", {
                 "sdp" => $offer,
@@ -172,22 +186,18 @@ sub on_room_message
     warn "[Matrix] in $room_id: $from: " . $content->{body} . "\n";    
 }
 
-my $verto_connecting = $loop->new_future;
-$bot_verto->connect(
-    %{ $CONFIG{"verto-bot"} },
-    on_connect_error => sub { die "Cannot connect to verto - $_[-1]" },
-    on_resolve_error => sub { die "Cannot resolve to verto - $_[-1]" },        
-)->then( sub { 
-    warn("[Verto] connected to websocket");
-    $verto_connecting->done($bot_verto) if not $verto_connecting->is_done;
-});
-
 Future->needs_all(
     $bot_matrix->login( %{ $CONFIG{"matrix-bot"} } )->then( sub {
         $bot_matrix->start;
     }),
     
-    $verto_connecting,
+    $bot_verto->connect(
+        %{ $CONFIG{"verto-bot"} },
+        on_connect_error => sub { die "Cannot connect to verto - $_[-1]" },
+        on_resolve_error => sub { die "Cannot resolve to verto - $_[-1]" },        
+    )->on_done( sub { 
+        warn("[Verto] connected to websocket");
+    }),
 )->get;
 
 $loop->attach_signal(
