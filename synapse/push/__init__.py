@@ -294,6 +294,12 @@ class Pusher(object):
         if not single_event:
             self.last_token = chunk['end']
             logger.debug("Event stream timeout for pushkey %s", self.pushkey)
+            yield self.store.update_pusher_last_token(
+                self.app_id,
+                self.pushkey,
+                self.user_name,
+                self.last_token
+            )
             return
 
         if not self.alive:
