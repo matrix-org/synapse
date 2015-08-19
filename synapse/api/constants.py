@@ -76,6 +76,7 @@ class EventTypes(object):
     Feedback = "m.room.message.feedback"
 
     RoomHistoryVisibility = "m.room.history_visibility"
+    CanonicalAlias = "m.room.canonical_alias"
 
     # These are used for validation
     Message = "m.room.message"
