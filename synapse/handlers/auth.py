@@ -162,7 +162,7 @@ class AuthHandler(BaseHandler):
         if not user_id.startswith('@'):
             user_id = UserID.create(user_id, self.hs.hostname).to_string()
 
-        self._check_password(user_id, password)
+        yield self._check_password(user_id, password)
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
