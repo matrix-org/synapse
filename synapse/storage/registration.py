@@ -51,6 +51,28 @@ class RegistrationStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
+    def add_refresh_token_to_user(self, user_id, token):
+        """Adds a refresh token for the given user.
+
+        Args:
+            user_id (str): The user ID.
+            token (str): The new refresh token to add.
+        Raises:
+            StoreError if there was a problem adding this.
+        """
+        next_id = yield self._refresh_tokens_id_gen.get_next()
+
+        yield self._simple_insert(
+            "refresh_tokens",
+            {
+                "id": next_id,
+                "user_id": user_id,
+                "token": token
+            },
+            desc="add_refresh_token_to_user",
+        )
+
+    @defer.inlineCallbacks
     def register(self, user_id, token, password_hash):
         """Attempts to register an account.
 
@@ -151,6 +173,46 @@ class RegistrationStore(SQLBaseStore):
             self._query_for_auth,
             token
         )
+
+    def exchange_refresh_token(self, refresh_token, token_generator):
+        """Exchange a refresh token for a new access token and refresh token.
+
+        Doing so invalidates the old refresh token - refresh tokens are single
+        use.
+
+        Args:
+            token (str): The refresh token of a user.
+            token_generator (fn: str -> str): Function which, when given a
+                user ID, returns a unique refresh token for that user. This
+                function must never return the same value twice.
+        Returns:
+            tuple of (user_id, refresh_token)
+        Raises:
+            StoreError if no user was found with that refresh token.
+        """
+        return self.runInteraction(
+            "exchange_refresh_token",
+            self._exchange_refresh_token,
+            refresh_token,
+            token_generator
+        )
+
+    def _exchange_refresh_token(self, txn, old_token, token_generator):
+        sql = "SELECT user_id FROM refresh_tokens WHERE token = ?"
+        txn.execute(sql, (old_token,))
+        rows = self.cursor_to_dict(txn)
+        if not rows:
+            raise StoreError(403, "Did not recognize refresh token")
+        user_id = rows[0]["user_id"]
+
+        # TODO(danielwh): Maybe perform a validation on the macaroon that
+        # macaroon.user_id == user_id.
+
+        new_token = token_generator(user_id)
+        sql = "UPDATE refresh_tokens SET token = ? WHERE token = ?"
+        txn.execute(sql, (new_token, old_token,))
+
+        return user_id, new_token
 
     @defer.inlineCallbacks
     def is_server_admin(self, user):

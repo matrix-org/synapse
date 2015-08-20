@@ -78,13 +78,15 @@ class LoginRestServlet(ClientV1RestServlet):
             login_submission["user"] = UserID.create(
                 login_submission["user"], self.hs.hostname).to_string()
 
-        token = yield self.handlers.auth_handler.login_with_password(
+        auth_handler = self.handlers.auth_handler
+        access_token, refresh_token = yield auth_handler.login_with_password(
             user_id=login_submission["user"],
             password=login_submission["password"])
 
         result = {
             "user_id": login_submission["user"],  # may have changed
-            "access_token": token,
+            "access_token": access_token,
+            "refresh_token": refresh_token,
             "home_server": self.hs.hostname,
         }
 

@@ -279,15 +279,18 @@ class AuthHandler(BaseHandler):
             user_id (str): User ID
             password (str): Password
         Returns:
-            The access token for the user's session.
+            A tuple of:
+              The access token for the user's session.
+              The refresh token for the user's session.
         Raises:
             StoreError if there was a problem storing the token.
             LoginError if there was an authentication problem.
         """
         yield self._check_password(user_id, password)
         logger.info("Logging in user %s", user_id)
-        token = yield self.issue_access_token(user_id)
-        defer.returnValue(token)
+        access_token = yield self.issue_access_token(user_id)
+        refresh_token = yield self.issue_refresh_token(user_id)
+        defer.returnValue((access_token, refresh_token))
 
     @defer.inlineCallbacks
     def _check_password(self, user_id, password):
@@ -304,10 +307,15 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def issue_access_token(self, user_id):
-        reg_handler = self.hs.get_handlers().registration_handler
-        access_token = reg_handler.generate_access_token(user_id)
+        access_token = self.generate_access_token(user_id)
         yield self.store.add_access_token_to_user(user_id, access_token)
         defer.returnValue(access_token)
+
+    @defer.inlineCallbacks
+    def issue_refresh_token(self, user_id):
+        refresh_token = self.generate_refresh_token(user_id)
+        yield self.store.add_refresh_token_to_user(user_id, refresh_token)
+        defer.returnValue(refresh_token)
 
     def generate_access_token(self, user_id):
         macaroon = pymacaroons.Macaroon(
@@ -322,6 +330,23 @@ class AuthHandler(BaseHandler):
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
 
         return macaroon.serialize()
+
+    def generate_refresh_token(self, user_id):
+        m = self._generate_base_macaroon(user_id)
+        m.add_first_party_caveat("type = refresh")
+        # Important to add a nonce, because otherwise every refresh token for a
+        # user will be the same.
+        m.add_first_party_caveat("nonce = %s" % stringutils.random_string_with_symbols(16))
+        return m.serialize()
+
+    def _generate_base_macaroon(self, user_id):
+        macaroon = pymacaroons.Macaroon(
+            location = self.hs.config.server_name,
+            identifier = "key",
+            key = self.hs.config.macaroon_secret_key)
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
+        return macaroon
 
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword):
