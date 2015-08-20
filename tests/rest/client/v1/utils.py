@@ -37,7 +37,7 @@ class RestTestCase(unittest.TestCase):
         self.mock_resource = None
         self.auth_user_id = None
 
-    def mock_get_user_by_token(self, token=None):
+    def mock_get_user_by_access_token(self, token=None):
         return self.auth_user_id
 
     @defer.inlineCallbacks

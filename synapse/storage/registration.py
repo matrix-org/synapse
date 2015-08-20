@@ -132,10 +132,10 @@ class RegistrationStore(SQLBaseStore):
             user_id
         )
         for r in rows:
-            self.get_user_by_token.invalidate((r,))
+            self.get_user_by_access_token.invalidate((r,))
 
     @cached()
-    def get_user_by_token(self, token):
+    def get_user_by_access_token(self, token):
         """Get a user from the given access token.
 
         Args:
@@ -147,7 +147,7 @@ class RegistrationStore(SQLBaseStore):
             StoreError if no user was found.
         """
         return self.runInteraction(
-            "get_user_by_token",
+            "get_user_by_access_token",
             self._query_for_auth,
             token
         )
