@@ -275,9 +275,9 @@ class RegistrationHandler(BaseHandler):
 
     def generate_token(self, user_id):
         macaroon = pymacaroons.Macaroon(
-            location = self.hs.config.server_name,
-            identifier = "key",
-            key = self.hs.config.macaroon_secret_key)
+            location=self.hs.config.server_name,
+            identifier="key",
+            key=self.hs.config.macaroon_secret_key)
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         macaroon.add_first_party_caveat("type = access")
