@@ -70,7 +70,7 @@ class PresenceStateTestCase(unittest.TestCase):
             return defer.succeed([])
         self.datastore.get_presence_list = get_presence_list
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(myid),
                 "admin": False,
@@ -78,7 +78,7 @@ class PresenceStateTestCase(unittest.TestCase):
                 "token_id": 1,
             }
 
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth().get_user_by_access_token = _get_user_by_access_token
 
         room_member_handler = hs.handlers.room_member_handler = Mock(
             spec=[
@@ -159,7 +159,7 @@ class PresenceListTestCase(unittest.TestCase):
             )
         self.datastore.has_presence_state = has_presence_state
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(myid),
                 "admin": False,
@@ -173,7 +173,7 @@ class PresenceListTestCase(unittest.TestCase):
             ]
         )
 
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth().get_user_by_access_token = _get_user_by_access_token
 
         presence.register_servlets(hs, self.mock_resource)
 

@@ -277,7 +277,7 @@ class MemoryDataStore(object):
             raise StoreError(400, "User in use.")
         self.tokens_to_users[token] = user_id
 
-    def get_user_by_token(self, token):
+    def get_user_by_access_token(self, token):
         try:
             return {
                 "name": self.tokens_to_users[token],

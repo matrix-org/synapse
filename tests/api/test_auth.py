@@ -44,7 +44,7 @@ class AuthTestCase(unittest.TestCase):
             "token_id": "ditto",
             "admin": False
         }
-        self.store.get_user_by_token = Mock(return_value=user_info)
+        self.store.get_user_by_access_token = Mock(return_value=user_info)
 
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
@@ -54,7 +54,7 @@ class AuthTestCase(unittest.TestCase):
 
     def test_get_user_by_req_user_bad_token(self):
         self.store.get_app_service_by_token = Mock(return_value=None)
-        self.store.get_user_by_token = Mock(return_value=None)
+        self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
@@ -70,7 +70,7 @@ class AuthTestCase(unittest.TestCase):
             "token_id": "ditto",
             "admin": False
         }
-        self.store.get_user_by_token = Mock(return_value=user_info)
+        self.store.get_user_by_access_token = Mock(return_value=user_info)
 
         request = Mock(args={})
         request.requestHeaders.getRawHeaders = Mock(return_value=[""])
@@ -81,7 +81,7 @@ class AuthTestCase(unittest.TestCase):
     def test_get_user_by_req_appservice_valid_token(self):
         app_service = Mock(token="foobar", url="a_url", sender=self.test_user)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
-        self.store.get_user_by_token = Mock(return_value=None)
+        self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
@@ -91,7 +91,7 @@ class AuthTestCase(unittest.TestCase):
 
     def test_get_user_by_req_appservice_bad_token(self):
         self.store.get_app_service_by_token = Mock(return_value=None)
-        self.store.get_user_by_token = Mock(return_value=None)
+        self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
@@ -102,7 +102,7 @@ class AuthTestCase(unittest.TestCase):
     def test_get_user_by_req_appservice_missing_token(self):
         app_service = Mock(token="foobar", url="a_url", sender=self.test_user)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
-        self.store.get_user_by_token = Mock(return_value=None)
+        self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
         request.requestHeaders.getRawHeaders = Mock(return_value=[""])
@@ -115,7 +115,7 @@ class AuthTestCase(unittest.TestCase):
         app_service = Mock(token="foobar", url="a_url", sender=self.test_user)
         app_service.is_interested_in_user = Mock(return_value=True)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
-        self.store.get_user_by_token = Mock(return_value=None)
+        self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
@@ -129,7 +129,7 @@ class AuthTestCase(unittest.TestCase):
         app_service = Mock(token="foobar", url="a_url", sender=self.test_user)
         app_service.is_interested_in_user = Mock(return_value=False)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
-        self.store.get_user_by_token = Mock(return_value=None)
+        self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]

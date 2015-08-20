@@ -16,27 +16,27 @@
 import pymacaroons
 
 from mock import Mock, NonCallableMock
-from synapse.handlers.register import RegistrationHandler
+from synapse.handlers.auth import AuthHandler
 from tests import unittest
 from tests.utils import setup_test_homeserver
 from twisted.internet import defer
 
 
-class RegisterHandlers(object):
+class AuthHandlers(object):
     def __init__(self, hs):
-        self.registration_handler = RegistrationHandler(hs)
+        self.auth_handler = AuthHandler(hs)
 
 
-class RegisterTestCase(unittest.TestCase):
+class AuthTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield setup_test_homeserver(handlers=None)
-        self.hs.handlers = RegisterHandlers(self.hs)
+        self.hs.handlers = AuthHandlers(self.hs)
 
     def test_token_is_a_macaroon(self):
         self.hs.config.macaroon_secret_key = "this key is a huge secret"
 
-        token = self.hs.handlers.registration_handler.generate_token("some_user")
+        token = self.hs.handlers.auth_handler.generate_access_token("some_user")
         # Check that we can parse the thing with pymacaroons
         macaroon = pymacaroons.Macaroon.deserialize(token)
         # The most basic of sanity checks
@@ -47,7 +47,7 @@ class RegisterTestCase(unittest.TestCase):
         self.hs.config.macaroon_secret_key = "this key is a massive secret"
         self.hs.clock.now = 5000
 
-        token = self.hs.handlers.registration_handler.generate_token("a_user")
+        token = self.hs.handlers.auth_handler.generate_access_token("a_user")
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
         def verify_gen(caveat):

@@ -61,7 +61,7 @@ class RoomTypingTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
@@ -69,7 +69,7 @@ class RoomTypingTestCase(RestTestCase):
                 "token_id": 1,
             }
 
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth().get_user_by_access_token = _get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)

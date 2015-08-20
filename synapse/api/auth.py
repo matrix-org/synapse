@@ -361,7 +361,7 @@ class Auth(object):
             except KeyError:
                 pass  # normal users won't have the user_id query parameter set.
 
-            user_info = yield self.get_user_by_token(access_token)
+            user_info = yield self.get_user_by_access_token(access_token)
             user = user_info["user"]
             device_id = user_info["device_id"]
             token_id = user_info["token_id"]
@@ -390,7 +390,7 @@ class Auth(object):
             )
 
     @defer.inlineCallbacks
-    def get_user_by_token(self, token):
+    def get_user_by_access_token(self, token):
         """ Get a registered user's ID.
 
         Args:
@@ -401,7 +401,7 @@ class Auth(object):
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
-        ret = yield self.store.get_user_by_token(token)
+        ret = yield self.store.get_user_by_access_token(token)
         if not ret:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
