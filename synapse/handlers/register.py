@@ -27,7 +27,6 @@ from synapse.http.client import CaptchaServerHttpClient
 
 import bcrypt
 import logging
-import pymacaroons
 import urllib
 
 logger = logging.getLogger(__name__)
@@ -91,7 +90,7 @@ class RegistrationHandler(BaseHandler):
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
 
-            token = self.generate_token(user_id)
+            token = self.auth_handler().generate_access_token(user_id)
             yield self.store.register(
                 user_id=user_id,
                 token=token,
@@ -111,7 +110,7 @@ class RegistrationHandler(BaseHandler):
                     user_id = user.to_string()
                     yield self.check_user_id_is_valid(user_id)
 
-                    token = self.generate_token(user_id)
+                    token = self.auth_handler().generate_access_token(user_id)
                     yield self.store.register(
                         user_id=user_id,
                         token=token,
@@ -161,7 +160,7 @@ class RegistrationHandler(BaseHandler):
                 400, "Invalid user localpart for this application service.",
                 errcode=Codes.EXCLUSIVE
             )
-        token = self.generate_token(user_id)
+        token = self.auth_handler().generate_access_token(user_id)
         yield self.store.register(
             user_id=user_id,
             token=token,
@@ -208,7 +207,7 @@ class RegistrationHandler(BaseHandler):
         user_id = user.to_string()
 
         yield self.check_user_id_is_valid(user_id)
-        token = self.generate_token(user_id)
+        token = self.auth_handler().generate_access_token(user_id)
         try:
             yield self.store.register(
                 user_id=user_id,
@@ -273,20 +272,6 @@ class RegistrationHandler(BaseHandler):
                     errcode=Codes.EXCLUSIVE
                 )
 
-    def generate_token(self, user_id):
-        macaroon = pymacaroons.Macaroon(
-            location = self.hs.config.server_name,
-            identifier = "key",
-            key = self.hs.config.macaroon_secret_key)
-        macaroon.add_first_party_caveat("gen = 1")
-        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
-        macaroon.add_first_party_caveat("type = access")
-        now = self.hs.get_clock().time_msec()
-        expiry = now + (60 * 60 * 1000)
-        macaroon.add_first_party_caveat("time < %d" % (expiry,))
-
-        return macaroon.serialize()
-
     def _generate_user_id(self):
         return "-" + stringutils.random_string(18)
 
@@ -329,3 +314,6 @@ class RegistrationHandler(BaseHandler):
             }
         )
         defer.returnValue(data)
+
+    def auth_handler(self):
+        return self.hs.get_handlers().auth_handler

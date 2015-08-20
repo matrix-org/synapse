@@ -26,6 +26,7 @@ from twisted.web.client import PartialDownloadError
 
 import logging
 import bcrypt
+import pymacaroons
 import simplejson
 
 import synapse.util.stringutils as stringutils
@@ -284,12 +285,9 @@ class AuthHandler(BaseHandler):
             LoginError if there was an authentication problem.
         """
         yield self._check_password(user_id, password)
-
-        reg_handler = self.hs.get_handlers().registration_handler
-        access_token = reg_handler.generate_token(user_id)
         logger.info("Logging in user %s", user_id)
-        yield self.store.add_access_token_to_user(user_id, access_token)
-        defer.returnValue(access_token)
+        token = yield self.issue_access_token(user_id)
+        defer.returnValue(token)
 
     @defer.inlineCallbacks
     def _check_password(self, user_id, password):
@@ -303,6 +301,27 @@ class AuthHandler(BaseHandler):
         if not bcrypt.checkpw(password, stored_hash):
             logger.warn("Failed password login for user %s", user_id)
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+
+    @defer.inlineCallbacks
+    def issue_access_token(self, user_id):
+        reg_handler = self.hs.get_handlers().registration_handler
+        access_token = reg_handler.generate_access_token(user_id)
+        yield self.store.add_access_token_to_user(user_id, access_token)
+        defer.returnValue(access_token)
+
+    def generate_access_token(self, user_id):
+        macaroon = pymacaroons.Macaroon(
+            location = self.hs.config.server_name,
+            identifier = "key",
+            key = self.hs.config.macaroon_secret_key)
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
+        macaroon.add_first_party_caveat("type = access")
+        now = self.hs.get_clock().time_msec()
+        expiry = now + (60 * 60 * 1000)
+        macaroon.add_first_party_caveat("time < %d" % (expiry,))
+
+        return macaroon.serialize()
 
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword):
