@@ -362,14 +362,11 @@ This should end with a 'PASSED' result::
 Upgrading an existing Synapse
 =============================
 
-IMPORTANT: Before upgrading an existing synapse to a new version, please
-refer to UPGRADE.rst for any additional instructions.
+The instructions for upgrading synapse are in `UPGRADE.rst`_.
+Please check these instructions as upgrading may require extra steps for some
+versions of synapse.
 
-Otherwise, simply re-install the new codebase over the current one - e.g.
-by ``pip install --process-dependency-links
-https://github.com/matrix-org/synapse/tarball/master``
-if using pip, or by ``git pull`` if running off a git working copy.
-
+.. _UPGRADE.rst: UPGRADE.rst
 
 Setting up Federation
 =====================
