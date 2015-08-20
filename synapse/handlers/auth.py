@@ -336,14 +336,16 @@ class AuthHandler(BaseHandler):
         m.add_first_party_caveat("type = refresh")
         # Important to add a nonce, because otherwise every refresh token for a
         # user will be the same.
-        m.add_first_party_caveat("nonce = %s" % stringutils.random_string_with_symbols(16))
+        m.add_first_party_caveat("nonce = %s" % (
+            stringutils.random_string_with_symbols(16),
+        ))
         return m.serialize()
 
     def _generate_base_macaroon(self, user_id):
         macaroon = pymacaroons.Macaroon(
-            location = self.hs.config.server_name,
-            identifier = "key",
-            key = self.hs.config.macaroon_secret_key)
+            location=self.hs.config.server_name,
+            identifier="key",
+            key=self.hs.config.macaroon_secret_key)
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon
