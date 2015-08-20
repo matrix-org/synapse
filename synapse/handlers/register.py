@@ -25,9 +25,9 @@ import synapse.util.stringutils as stringutils
 from synapse.util.async import run_on_reactor
 from synapse.http.client import CaptchaServerHttpClient
 
-import base64
 import bcrypt
 import logging
+import pymacaroons
 import urllib
 
 logger = logging.getLogger(__name__)
@@ -274,11 +274,18 @@ class RegistrationHandler(BaseHandler):
                 )
 
     def generate_token(self, user_id):
-        # urlsafe variant uses _ and - so use . as the separator and replace
-        # all =s with .s so http clients don't quote =s when it is used as
-        # query params.
-        return (base64.urlsafe_b64encode(user_id).replace('=', '.') + '.' +
-                stringutils.random_string(18))
+        macaroon = pymacaroons.Macaroon(
+            location = self.hs.config.server_name,
+            identifier = "key",
+            key = self.hs.config.macaroon_secret_key)
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
+        macaroon.add_first_party_caveat("type = access")
+        now = self.hs.get_clock().time_msec()
+        expiry = now + (60 * 60 * 1000)
+        macaroon.add_first_party_caveat("time < %d" % (expiry,))
+
+        return macaroon.serialize()
 
     def _generate_user_id(self):
         return "-" + stringutils.random_string(18)
