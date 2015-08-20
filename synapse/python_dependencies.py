@@ -33,6 +33,7 @@ REQUIREMENTS = {
     "ujson": ["ujson"],
     "blist": ["blist"],
     "pysaml2": ["saml2"],
+    "pymacaroons-pynacl": ["pymacaroons"],
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {
