@@ -79,7 +79,7 @@ class PasswordRestServlet(RestServlet):
         new_password = params['new_password']
 
         yield self.auth_handler.set_password(
-            user_id, new_password, None
+            user_id, new_password
         )
 
         defer.returnValue((200, {}))

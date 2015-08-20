@@ -74,13 +74,20 @@ class LoginRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def do_password_login(self, login_submission):
-        if not login_submission["user"].startswith('@'):
-            login_submission["user"] = UserID.create(
-                login_submission["user"], self.hs.hostname).to_string()
+        if 'medium' in login_submission and 'address' in login_submission:
+            user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+                login_submission['medium'], login_submission['address']
+            )
+        else:
+            user_id = login_submission['user']
+
+        if not user_id.startswith('@'):
+            user_id = UserID.create(
+                user_id, self.hs.hostname).to_string()
 
         auth_handler = self.handlers.auth_handler
         access_token, refresh_token = yield auth_handler.login_with_password(
-            user_id=login_submission["user"],
+            user_id=user_id,
             password=login_submission["password"])
 
         result = {

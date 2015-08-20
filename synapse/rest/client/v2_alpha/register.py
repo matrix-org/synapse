@@ -54,6 +54,11 @@ class RegisterRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor()
+
+        if '/register/email/requestToken' in request.path:
+            ret = yield self.onEmailTokenRequest(request)
+            defer.returnValue(ret)
+
         body = parse_json_dict_from_request(request)
 
         # we do basic sanity checks here because the auth layer will store these
@@ -207,6 +212,29 @@ class RegisterRestServlet(RestServlet):
             "access_token": token,
             "home_server": self.hs.hostname,
         }
+
+    @defer.inlineCallbacks
+    def onEmailTokenRequest(self, request):
+        body = parse_json_dict_from_request(request)
+
+        required = ['id_server', 'client_secret', 'email', 'send_attempt']
+        absent = []
+        for k in required:
+            if k not in body:
+                absent.append(k)
+
+        if len(absent) > 0:
+            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+
+        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+            'email', body['email']
+        )
+
+        if existingUid is not None:
+            raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
+
+        ret = yield self.identity_handler.requestEmailToken(**body)
+        defer.returnValue((200, ret))
 
 
 def register_servlets(hs, http_server):
