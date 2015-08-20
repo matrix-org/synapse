@@ -174,12 +174,12 @@ traditionally used for convenience and simplicity.
 
 The advantages of Postgres include:
 
- * significant performance improvements due to the superior threading and
-   caching model, smarter query optimiser
- * allowing the DB to be run on separate hardware
- * allowing basic active/backup high-availability with a "hot spare" synapse
-   pointing at the same DB master, as well as enabling DB replication in
-   synapse itself.
+* significant performance improvements due to the superior threading and
+  caching model, smarter query optimiser
+* allowing the DB to be run on separate hardware
+* allowing basic active/backup high-availability with a "hot spare" synapse
+  pointing at the same DB master, as well as enabling DB replication in
+  synapse itself.
 
 The only disadvantage is that the code is relatively new as of April 2015 and
 may have a few regressions relative to SQLite.
@@ -326,7 +326,7 @@ If running `$ synctl start` fails with 'returned non-zero exit status 1',
 you will need to explicitly call Python2.7 - either running as::
 
     python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml
-    
+
 ...or by editing synctl with the correct python executable.
 
 Synapse Development
