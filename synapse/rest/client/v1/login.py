@@ -91,7 +91,7 @@ class LoginRestServlet(ClientV1RestServlet):
             password=login_submission["password"])
 
         result = {
-            "user_id": login_submission["user"],  # may have changed
+            "user_id": user_id,  # may have changed
             "access_token": access_token,
             "refresh_token": refresh_token,
             "home_server": self.hs.hostname,
