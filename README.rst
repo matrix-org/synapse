@@ -7,7 +7,7 @@ Matrix is an ambitious new ecosystem for open federated Instant Messaging and
 VoIP.  The basics you need to know to get up and running are:
 
 - Everything in Matrix happens in a room.  Rooms are distributed and do not
-  exist on any single server.  Rooms can be located using convenience aliases 
+  exist on any single server.  Rooms can be located using convenience aliases
   like ``#matrix:matrix.org`` or ``#test:localhost:8448``.
 
 - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
@@ -23,7 +23,7 @@ The overall architecture is::
 accessed by the web client at http://matrix.org/beta or via an IRC bridge at
 irc://irc.freenode.net/matrix.
 
-Synapse is currently in rapid development, but as of version 0.5 we believe it 
+Synapse is currently in rapid development, but as of version 0.5 we believe it
 is sufficiently stable to be run as an internet-facing service for real usage!
 
 About Matrix
@@ -104,7 +104,7 @@ Installing prerequisites on Ubuntu or Debian::
     sudo apt-get install build-essential python2.7-dev libffi-dev \
                          python-pip python-setuptools sqlite3 \
                          libssl-dev python-virtualenv libjpeg-dev
-                           
+
 Installing prerequisites on ArchLinux::
 
     sudo pacman -S base-devel python2 python-pip \
@@ -115,7 +115,7 @@ Installing prerequisites on Mac OS X::
     xcode-select --install
     sudo easy_install pip
     sudo pip install virtualenv
-    
+
 To install the synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
@@ -180,7 +180,7 @@ The advantages of Postgres include:
  * allowing basic active/backup high-availability with a "hot spare" synapse
    pointing at the same DB master, as well as enabling DB replication in
    synapse itself.
-   
+
 The only disadvantage is that the code is relatively new as of April 2015 and
 may have a few regressions relative to SQLite.
 
@@ -190,8 +190,8 @@ For information on how to install and use PostgreSQL, please see
 Running Synapse
 ===============
 
-To actually run your new homeserver, pick a working directory for Synapse to run 
-(e.g. ``~/.synapse``), and::
+To actually run your new homeserver, pick a working directory for Synapse to
+run (e.g. ``~/.synapse``), and::
 
     cd ~/.synapse
     source ./bin/activate
@@ -214,13 +214,13 @@ defaults to python 3, but synapse currently assumes python 2.7 by default:
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 )::
 
     sudo pip2.7 install --upgrade pip
-    
+
 You also may need to explicitly specify python 2.7 again during the install
 request::
 
     pip2.7 install --process-dependency-links \
         https://github.com/matrix-org/synapse/tarball/master
-    
+
 If you encounter an error with lib bcrypt causing an Wrong ELF Class:
 ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
 compile it under the right architecture. (This should not be needed if
@@ -228,7 +228,7 @@ installing under virtualenv)::
 
     sudo pip2.7 uninstall py-bcrypt
     sudo pip2.7 install py-bcrypt
-    
+
 During setup of Synapse you need to call python2.7 directly again::
 
     cd ~/.synapse
@@ -236,25 +236,27 @@ During setup of Synapse you need to call python2.7 directly again::
       --server-name machine.my.domain.name \
       --config-path homeserver.yaml \
       --generate-config
-        
+
 ...substituting your host and domain name as appropriate.
 
 Windows Install
 ---------------
 Synapse can be installed on Cygwin. It requires the following Cygwin packages:
 
- - gcc
- - git
- - libffi-devel
- - openssl (and openssl-devel, python-openssl)
- - python
- - python-setuptools
+- gcc
+- git
+- libffi-devel
+- openssl (and openssl-devel, python-openssl)
+- python
+- python-setuptools
 
 The content repository requires additional packages and will be unable to process
 uploads without them:
- - libjpeg8
- - libjpeg8-devel
- - zlib
+
+- libjpeg8
+- libjpeg8-devel
+- zlib
+
 If you choose to install Synapse without these packages, you will need to reinstall
 ``pillow`` for changes to be applied, e.g. ``pip uninstall pillow`` ``pip install
 pillow --user``
@@ -276,8 +278,8 @@ Troubleshooting
 Troubleshooting Installation
 ----------------------------
 
-Synapse requires pip 1.7 or later, so if your OS provides too old a version and 
-you get errors about ``error: no such option: --process-dependency-links`` you 
+Synapse requires pip 1.7 or later, so if your OS provides too old a version and
+you get errors about ``error: no such option: --process-dependency-links`` you
 may need to manually upgrade it::
 
     sudo pip install --upgrade pip
@@ -288,9 +290,9 @@ created. To reset the installation::
 
     rm -rf /tmp/pip_install_matrix
 
-pip seems to leak *lots* of memory during installation.  For instance, a Linux 
-host with 512MB of RAM may run out of memory whilst installing Twisted.  If this 
-happens, you will have to individually install the dependencies which are 
+pip seems to leak *lots* of memory during installation.  For instance, a Linux
+host with 512MB of RAM may run out of memory whilst installing Twisted.  If this
+happens, you will have to individually install the dependencies which are
 failing, e.g.::
 
     pip install twisted
@@ -301,8 +303,8 @@ will need to export CFLAGS=-Qunused-arguments.
 Troubleshooting Running
 -----------------------
 
-If synapse fails with ``missing "sodium.h"`` crypto errors, you may need 
-to manually upgrade PyNaCL, as synapse uses NaCl (http://nacl.cr.yp.to/) for 
+If synapse fails with ``missing "sodium.h"`` crypto errors, you may need
+to manually upgrade PyNaCL, as synapse uses NaCl (http://nacl.cr.yp.to/) for
 encryption and digital signatures.
 Unfortunately PyNACL currently has a few issues
 (https://github.com/pyca/pynacl/issues/53) and
@@ -313,7 +315,7 @@ fix try re-installing from PyPI or directly from
 
     # Install from PyPI
     pip install --user --upgrade --force pynacl
-    
+
     # Install from github
     pip install --user https://github.com/pyca/pynacl/tarball/master
 
@@ -431,7 +433,7 @@ private federation (``localhost:8080``, ``localhost:8081`` and
 http://localhost:8080. Simply run::
 
     demo/start.sh
-    
+
 This is mainly useful just for development purposes.
 
 Running The Demo Web Client
@@ -494,7 +496,7 @@ time.
 Where's the spec?!
 ==================
 
-The source of the matrix spec lives at https://github.com/matrix-org/matrix-doc.  
+The source of the matrix spec lives at https://github.com/matrix-org/matrix-doc.
 A recent HTML snapshot of this lives at http://matrix.org/docs/spec
 
 
