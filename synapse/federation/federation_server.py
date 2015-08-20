@@ -27,6 +27,7 @@ from synapse.api.errors import FederationError, SynapseError
 
 from synapse.crypto.event_signing import compute_event_signature
 
+import simplejson as json
 import logging
 
 
@@ -311,6 +312,48 @@ class FederationServer(FederationBase):
         defer.returnValue(
             (200, send_content)
         )
+
+    @defer.inlineCallbacks
+    @log_function
+    def on_query_client_keys(self, origin, content):
+        query = []
+        for user_id, device_ids in content.get("device_keys", {}).items():
+            if not device_ids:
+                query.append((user_id, None))
+            else:
+                for device_id in device_ids:
+                    query.append((user_id, device_id))
+
+        results = yield self.store.get_e2e_device_keys(query)
+
+        json_result = {}
+        for user_id, device_keys in results.items():
+            for device_id, json_bytes in device_keys.items():
+                json_result.setdefault(user_id, {})[device_id] = json.loads(
+                    json_bytes
+                )
+
+        defer.returnValue({"device_keys": json_result})
+
+    @defer.inlineCallbacks
+    @log_function
+    def on_claim_client_keys(self, origin, content):
+        query = []
+        for user_id, device_keys in content.get("one_time_keys", {}).items():
+            for device_id, algorithm in device_keys.items():
+                query.append((user_id, device_id, algorithm))
+
+        results = yield self.store.claim_e2e_one_time_keys(query)
+
+        json_result = {}
+        for user_id, device_keys in results.items():
+            for device_id, keys in device_keys.items():
+                for key_id, json_bytes in keys.items():
+                    json_result.setdefault(user_id, {})[device_id] = {
+                        key_id: json.loads(json_bytes)
+                    }
+
+        defer.returnValue({"one_time_keys": json_result})
 
     @defer.inlineCallbacks
     @log_function

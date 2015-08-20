@@ -44,6 +44,11 @@ class Auth(object):
     def check(self, event, auth_events):
         """ Checks if this event is correctly authed.
 
+        Args:
+            event: the event being checked.
+            auth_events (dict: event-key -> event): the existing room state.
+
+
         Returns:
             True if the auth checks pass.
         """
@@ -319,7 +324,7 @@ class Auth(object):
         Returns:
             tuple : of UserID and device string:
                 User ID object of the user making the request
-                Client ID object of the client instance the user is using
+                ClientInfo object of the client instance the user is using
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -347,12 +352,14 @@ class Auth(object):
                 if not user_id:
                     raise KeyError
 
+                request.authenticated_entity = user_id
+
                 defer.returnValue(
                     (UserID.from_string(user_id), ClientInfo("", ""))
                 )
                 return
             except KeyError:
-                pass  # normal users won't have this query parameter set
+                pass  # normal users won't have the user_id query parameter set.
 
             user_info = yield self.get_user_by_token(access_token)
             user = user_info["user"]
@@ -420,6 +427,7 @@ class Auth(object):
                     "Unrecognised access token.",
                     errcode=Codes.UNKNOWN_TOKEN
                 )
+            request.authenticated_entity = service.sender
             defer.returnValue(service)
         except KeyError:
             raise AuthError(
@@ -521,23 +529,22 @@ class Auth(object):
 
         # Check state_key
         if hasattr(event, "state_key"):
-            if not event.state_key.startswith("_"):
-                if event.state_key.startswith("@"):
-                    if event.state_key != event.user_id:
+            if event.state_key.startswith("@"):
+                if event.state_key != event.user_id:
+                    raise AuthError(
+                        403,
+                        "You are not allowed to set others state"
+                    )
+                else:
+                    sender_domain = UserID.from_string(
+                        event.user_id
+                    ).domain
+
+                    if sender_domain != event.state_key:
                         raise AuthError(
                             403,
                             "You are not allowed to set others state"
                         )
-                    else:
-                        sender_domain = UserID.from_string(
-                            event.user_id
-                        ).domain
-
-                        if sender_domain != event.state_key:
-                            raise AuthError(
-                                403,
-                                "You are not allowed to set others state"
-                            )
 
         return True
 

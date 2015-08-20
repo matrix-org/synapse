@@ -99,7 +99,7 @@ class DataStore(RoomMemberStore, RoomStore,
         key = (user.to_string(), access_token, device_id, ip)
 
         try:
-            last_seen = self.client_ip_last_seen.get(*key)
+            last_seen = self.client_ip_last_seen.get(key)
         except KeyError:
             last_seen = None
 
@@ -107,7 +107,7 @@ class DataStore(RoomMemberStore, RoomStore,
         if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
             defer.returnValue(None)
 
-        self.client_ip_last_seen.prefill(*key + (now,))
+        self.client_ip_last_seen.prefill(key, now)
 
         # It's safe not to lock here: a) no unique constraint,
         # b) LAST_SEEN_GRANULARITY makes concurrent updates incredibly unlikely
@@ -354,6 +354,11 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
                     )
                 logger.debug("Running script %s", relative_path)
                 module.run_upgrade(cur, database_engine)
+            elif ext == ".pyc":
+                # Sometimes .pyc files turn up anyway even though we've
+                # disabled their generation; e.g. from distribution package
+                # installers. Silently skip it
+                pass
             elif ext == ".sql":
                 # A plain old .sql file, just read and execute it
                 logger.debug("Applying schema %s", relative_path)

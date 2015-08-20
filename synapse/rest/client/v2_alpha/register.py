@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 class RegisterRestServlet(RestServlet):
-    PATTERN = client_v2_pattern("/register*")
+    PATTERN = client_v2_pattern("/register")
 
     def __init__(self, hs):
         super(RegisterRestServlet, self).__init__()
@@ -50,7 +50,6 @@ class RegisterRestServlet(RestServlet):
         self.auth_handler = hs.get_handlers().auth_handler
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
-        self.login_handler = hs.get_handlers().login_handler
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -148,7 +147,7 @@ class RegisterRestServlet(RestServlet):
                 if reqd not in threepid:
                     logger.info("Can't add incomplete 3pid")
                 else:
-                    yield self.login_handler.add_threepid(
+                    yield self.auth_handler.add_threepid(
                         user_id,
                         threepid['medium'],
                         threepid['address'],
@@ -224,15 +223,15 @@ class RegisterRestServlet(RestServlet):
             if k not in body:
                 absent.append(k)
 
+        if len(absent) > 0:
+            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
         )
 
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
-
-        if len(absent) > 0:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
         defer.returnValue((200, ret))

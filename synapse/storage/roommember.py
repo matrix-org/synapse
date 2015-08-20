@@ -17,7 +17,8 @@ from twisted.internet import defer
 
 from collections import namedtuple
 
-from ._base import SQLBaseStore, cached
+from ._base import SQLBaseStore
+from synapse.util.caches.descriptors import cached
 
 from synapse.api.constants import Membership
 from synapse.types import UserID
@@ -54,9 +55,9 @@ class RoomMemberStore(SQLBaseStore):
         )
 
         for event in events:
-            txn.call_after(self.get_rooms_for_user.invalidate, event.state_key)
-            txn.call_after(self.get_joined_hosts_for_room.invalidate, event.room_id)
-            txn.call_after(self.get_users_in_room.invalidate, event.room_id)
+            txn.call_after(self.get_rooms_for_user.invalidate, (event.state_key,))
+            txn.call_after(self.get_joined_hosts_for_room.invalidate, (event.room_id,))
+            txn.call_after(self.get_users_in_room.invalidate, (event.room_id,))
 
     def get_room_member(self, user_id, room_id):
         """Retrieve the current state of a room member.
@@ -78,7 +79,7 @@ class RoomMemberStore(SQLBaseStore):
             lambda events: events[0] if events else None
         )
 
-    @cached()
+    @cached(max_entries=5000)
     def get_users_in_room(self, room_id):
         def f(txn):
 
@@ -154,7 +155,7 @@ class RoomMemberStore(SQLBaseStore):
             RoomsForUser(**r) for r in self.cursor_to_dict(txn)
         ]
 
-    @cached()
+    @cached(max_entries=5000)
     def get_joined_hosts_for_room(self, room_id):
         return self.runInteraction(
             "get_joined_hosts_for_room",

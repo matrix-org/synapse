@@ -178,7 +178,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
 
     Live tokens start with an "s" followed by the "stream_ordering" id of the
     event it comes after. Historic tokens start with a "t" followed by the
-    "topological_ordering" id of the event it comes after, follewed by "-",
+    "topological_ordering" id of the event it comes after, followed by "-",
     followed by the "stream_ordering" id of the event it comes after.
     """
     __slots__ = []
@@ -211,4 +211,5 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             return "s%d" % (self.stream,)
 
 
+# token_id is the primary key ID of the access token, not the access token itself.
 ClientInfo = namedtuple("ClientInfo", ("device_id", "token_id"))

@@ -96,9 +96,18 @@ class SyncHandler(BaseHandler):
                 return self.current_sync_for_user(sync_config, since_token)
 
             rm_handler = self.hs.get_handlers().room_member_handler
-            room_ids = yield rm_handler.get_joined_rooms_for_user(
-                sync_config.user
+
+            app_service = yield self.store.get_app_service_by_user_id(
+                sync_config.user.to_string()
             )
+            if app_service:
+                rooms = yield self.store.get_app_service_rooms(app_service)
+                room_ids = set(r.room_id for r in rooms)
+            else:
+                room_ids = yield rm_handler.get_joined_rooms_for_user(
+                    sync_config.user
+                )
+
             result = yield self.notifier.wait_for_events(
                 sync_config.user, room_ids,
                 sync_config.filter, timeout, current_sync_callback
@@ -229,7 +238,16 @@ class SyncHandler(BaseHandler):
         logger.debug("Typing %r", typing_by_room)
 
         rm_handler = self.hs.get_handlers().room_member_handler
-        room_ids = yield rm_handler.get_joined_rooms_for_user(sync_config.user)
+        app_service = yield self.store.get_app_service_by_user_id(
+            sync_config.user.to_string()
+        )
+        if app_service:
+            rooms = yield self.store.get_app_service_rooms(app_service)
+            room_ids = set(r.room_id for r in rooms)
+        else:
+            room_ids = yield rm_handler.get_joined_rooms_for_user(
+                sync_config.user
+            )
 
         # TODO (mjark): Does public mean "published"?
         published_rooms = yield self.store.get_rooms(is_public=True)
@@ -294,15 +312,15 @@ class SyncHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _filter_events_for_client(self, user_id, room_id, events):
-        states = yield self.store.get_state_for_events(
-            room_id, [e.event_id for e in events],
+        event_id_to_state = yield self.store.get_state_for_events(
+            room_id, frozenset(e.event_id for e in events),
+            types=(
+                (EventTypes.RoomHistoryVisibility, ""),
+                (EventTypes.Member, user_id),
+            )
         )
 
-        events_and_states = zip(events, states)
-
-        def allowed(event_and_state):
-            event, state = event_and_state
-
+        def allowed(event, state):
             if event.type == EventTypes.RoomHistoryVisibility:
                 return True
 
@@ -331,10 +349,11 @@ class SyncHandler(BaseHandler):
                 return membership == Membership.INVITE
 
             return True
-        events_and_states = filter(allowed, events_and_states)
+
         defer.returnValue([
-            ev
-            for ev, _ in events_and_states
+            event
+            for event in events
+            if allowed(event, event_id_to_state[event.event_id])
         ])
 
     @defer.inlineCallbacks

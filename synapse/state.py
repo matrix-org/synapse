@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
-from synapse.util.expiringcache import ExpiringCache
+from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.auth import AuthEventTypes
@@ -96,7 +96,7 @@ class StateHandler(object):
             cache.ts = self.clock.time_msec()
             state = cache.state
         else:
-            res = yield self.resolve_state_groups(event_ids)
+            res = yield self.resolve_state_groups(room_id, event_ids)
             state = res[1]
 
         if event_type:
@@ -155,13 +155,13 @@ class StateHandler(object):
 
         if event.is_state():
             ret = yield self.resolve_state_groups(
-                [e for e, _ in event.prev_events],
+                event.room_id, [e for e, _ in event.prev_events],
                 event_type=event.type,
                 state_key=event.state_key,
             )
         else:
             ret = yield self.resolve_state_groups(
-                [e for e, _ in event.prev_events],
+                event.room_id, [e for e, _ in event.prev_events],
             )
 
         group, curr_state, prev_state = ret
@@ -180,7 +180,7 @@ class StateHandler(object):
 
     @defer.inlineCallbacks
     @log_function
-    def resolve_state_groups(self, event_ids, event_type=None, state_key=""):
+    def resolve_state_groups(self, room_id, event_ids, event_type=None, state_key=""):
         """ Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
 
@@ -205,7 +205,7 @@ class StateHandler(object):
                 )
 
         state_groups = yield self.store.get_state_groups(
-            event_ids
+            room_id, event_ids
         )
 
         logger.debug(

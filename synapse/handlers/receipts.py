@@ -171,7 +171,6 @@ class ReceiptEventSource(object):
 
     @defer.inlineCallbacks
     def get_new_events_for_user(self, user, from_key, limit):
-        defer.returnValue(([], from_key))
         from_key = int(from_key)
         to_key = yield self.get_current_key()
 
@@ -194,7 +193,6 @@ class ReceiptEventSource(object):
     @defer.inlineCallbacks
     def get_pagination_rows(self, user, config, key):
         to_key = int(config.from_key)
-        defer.returnValue(([], to_key))
 
         if config.to_key:
             from_key = int(config.to_key)

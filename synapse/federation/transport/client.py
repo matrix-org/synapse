@@ -224,6 +224,76 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
+    def query_client_keys(self, destination, query_content):
+        """Query the device keys for a list of user ids hosted on a remote
+        server.
+
+        Request:
+            {
+              "device_keys": {
+                "<user_id>": ["<device_id>"]
+            } }
+
+        Response:
+            {
+              "device_keys": {
+                "<user_id>": {
+                  "<device_id>": {...}
+            } } }
+
+        Args:
+            destination(str): The server to query.
+            query_content(dict): The user ids to query.
+        Returns:
+            A dict containg the device keys.
+        """
+        path = PREFIX + "/user/keys/query"
+
+        content = yield self.client.post_json(
+            destination=destination,
+            path=path,
+            data=query_content,
+        )
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    @log_function
+    def claim_client_keys(self, destination, query_content):
+        """Claim one-time keys for a list of devices hosted on a remote server.
+
+        Request:
+            {
+              "one_time_keys": {
+                "<user_id>": {
+                    "<device_id>": "<algorithm>"
+            } } }
+
+        Response:
+            {
+              "device_keys": {
+                "<user_id>": {
+                  "<device_id>": {
+                    "<algorithm>:<key_id>": "<key_base64>"
+            } } } }
+
+        Args:
+            destination(str): The server to query.
+            query_content(dict): The user ids to query.
+        Returns:
+            A dict containg the one-time keys.
+        """
+
+        path = PREFIX + "/user/keys/claim"
+
+        content = yield self.client.post_json(
+            destination=destination,
+            path=path,
+            data=query_content,
+        )
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    @log_function
     def get_missing_events(self, destination, room_id, earliest_events,
                            latest_events, limit, min_depth):
         path = PREFIX + "/get_missing_events/%s" % (room_id,)

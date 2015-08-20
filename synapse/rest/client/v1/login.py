@@ -85,9 +85,8 @@ class LoginRestServlet(ClientV1RestServlet):
             user_id = UserID.create(
                 user_id, self.hs.hostname).to_string()
 
-        handler = self.handlers.login_handler
-        token = yield handler.login(
-            user=user_id,
+        token = yield self.handlers.auth_handler.login_with_password(
+            user_id=user_id
             password=login_submission["password"])
 
         result = {
