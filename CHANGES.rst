@@ -17,6 +17,7 @@ General:
   if the request came in via an application service (PR #230)
 * Fix bug where we needlessly regenerated the full list of rooms an AS is
   interested in. (PR #232)
+* Add support for AS's to use v2_alpha registration API (PR #210)
 
 
 Configuration:
