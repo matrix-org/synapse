@@ -247,10 +247,11 @@ class RoomCreationHandler(BaseHandler):
                 },
                 "users_default": 0,
                 "events": {
-                    EventTypes.Name: 100,
+                    EventTypes.Name: 50,
                     EventTypes.PowerLevels: 100,
                     EventTypes.RoomHistoryVisibility: 100,
-                    EventTypes.CanonicalAlias: 100,
+                    EventTypes.CanonicalAlias: 50,
+                    EventTypes.RoomAvatar: 50,
                 },
                 "events_default": 0,
                 "state_default": 50,
