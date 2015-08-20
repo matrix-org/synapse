@@ -24,7 +24,7 @@ REQUIREMENTS = {
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
     "pyyaml": ["yaml"],
     "pyasn1": ["pyasn1"],
-    "pynacl>=0.0.3": ["nacl>=0.0.3"],
+    "pynacl>=0.3.0": ["nacl>=0.3.0"],
     "daemonize": ["daemonize"],
     "py-bcrypt": ["bcrypt"],
     "frozendict>=0.4": ["frozendict"],
