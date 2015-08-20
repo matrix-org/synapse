@@ -247,9 +247,11 @@ class RoomCreationHandler(BaseHandler):
                 },
                 "users_default": 0,
                 "events": {
-                    EventTypes.Name: 100,
+                    EventTypes.Name: 50,
                     EventTypes.PowerLevels: 100,
                     EventTypes.RoomHistoryVisibility: 100,
+                    EventTypes.CanonicalAlias: 50,
+                    EventTypes.RoomAvatar: 50,
                 },
                 "events_default": 0,
                 "state_default": 50,
@@ -557,15 +559,9 @@ class RoomMemberHandler(BaseHandler):
         """Returns a list of roomids that the user has any of the given
         membership states in."""
 
-        app_service = yield self.store.get_app_service_by_user_id(
-            user.to_string()
+        rooms = yield self.store.get_rooms_for_user(
+            user.to_string(),
         )
-        if app_service:
-            rooms = yield self.store.get_app_service_rooms(app_service)
-        else:
-            rooms = yield self.store.get_rooms_for_user(
-                user.to_string(),
-            )
 
         # For some reason the list of events contains duplicates
         # TODO(paul): work out why because I really don't think it should

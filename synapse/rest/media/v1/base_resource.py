@@ -69,6 +69,8 @@ class BaseMediaResource(Resource):
         self.filepaths = filepaths
         self.version_string = hs.version_string
         self.downloads = {}
+        self.dynamic_thumbnails = hs.config.dynamic_thumbnails
+        self.thumbnail_requirements = hs.config.thumbnail_requirements
 
     def _respond_404(self, request):
         respond_with_json(
@@ -208,22 +210,74 @@ class BaseMediaResource(Resource):
             self._respond_404(request)
 
     def _get_thumbnail_requirements(self, media_type):
-        if media_type == "image/jpeg":
-            return (
-                (32, 32, "crop", "image/jpeg"),
-                (96, 96, "crop", "image/jpeg"),
-                (320, 240, "scale", "image/jpeg"),
-                (640, 480, "scale", "image/jpeg"),
+        return self.thumbnail_requirements.get(media_type, ())
+
+    def _generate_thumbnail(self, input_path, t_path, t_width, t_height,
+                            t_method, t_type):
+        thumbnailer = Thumbnailer(input_path)
+        m_width = thumbnailer.width
+        m_height = thumbnailer.height
+
+        if m_width * m_height >= self.max_image_pixels:
+            logger.info(
+                "Image too large to thumbnail %r x %r > %r",
+                m_width, m_height, self.max_image_pixels
             )
-        elif (media_type == "image/png") or (media_type == "image/gif"):
-            return (
-                (32, 32, "crop", "image/png"),
-                (96, 96, "crop", "image/png"),
-                (320, 240, "scale", "image/png"),
-                (640, 480, "scale", "image/png"),
-            )
+            return
+
+        if t_method == "crop":
+            t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
+        elif t_method == "scale":
+            t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
         else:
-            return ()
+            t_len = None
+
+        return t_len
+
+    @defer.inlineCallbacks
+    def _generate_local_exact_thumbnail(self, media_id, t_width, t_height,
+                                        t_method, t_type):
+        input_path = self.filepaths.local_media_filepath(media_id)
+
+        t_path = self.filepaths.local_media_thumbnail(
+            media_id, t_width, t_height, t_type, t_method
+        )
+        self._makedirs(t_path)
+
+        t_len = yield threads.deferToThread(
+            self._generate_thumbnail,
+            input_path, t_path, t_width, t_height, t_method, t_type
+        )
+
+        if t_len:
+            yield self.store.store_local_thumbnail(
+                media_id, t_width, t_height, t_type, t_method, t_len
+            )
+
+            defer.returnValue(t_path)
+
+    @defer.inlineCallbacks
+    def _generate_remote_exact_thumbnail(self, server_name, file_id, media_id,
+                                         t_width, t_height, t_method, t_type):
+        input_path = self.filepaths.remote_media_filepath(server_name, file_id)
+
+        t_path = self.filepaths.remote_media_thumbnail(
+            server_name, file_id, t_width, t_height, t_type, t_method
+        )
+        self._makedirs(t_path)
+
+        t_len = yield threads.deferToThread(
+            self._generate_thumbnail,
+            input_path, t_path, t_width, t_height, t_method, t_type
+        )
+
+        if t_len:
+            yield self.store.store_remote_media_thumbnail(
+                server_name, media_id, file_id,
+                t_width, t_height, t_type, t_method, t_len
+            )
+
+            defer.returnValue(t_path)
 
     @defer.inlineCallbacks
     def _generate_local_thumbnails(self, media_id, media_info):

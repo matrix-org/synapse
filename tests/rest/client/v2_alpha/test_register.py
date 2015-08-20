@@ -13,6 +13,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.request_data = ""
         self.request = Mock(
             content=Mock(read=Mock(side_effect=lambda: self.request_data)),
+            path='/_matrix/api/v2_alpha/register'
         )
         self.request.args = {}
 

@@ -294,6 +294,12 @@ class Pusher(object):
         if not single_event:
             self.last_token = chunk['end']
             logger.debug("Event stream timeout for pushkey %s", self.pushkey)
+            yield self.store.update_pusher_last_token(
+                self.app_id,
+                self.pushkey,
+                self.user_name,
+                self.last_token
+            )
             return
 
         if not self.alive:
@@ -345,7 +351,7 @@ class Pusher(object):
         if processed:
             self.backoff_delay = Pusher.INITIAL_BACKOFF
             self.last_token = chunk['end']
-            self.store.update_pusher_last_token_and_success(
+            yield self.store.update_pusher_last_token_and_success(
                 self.app_id,
                 self.pushkey,
                 self.user_name,
@@ -354,7 +360,7 @@ class Pusher(object):
             )
             if self.failing_since:
                 self.failing_since = None
-                self.store.update_pusher_failing_since(
+                yield self.store.update_pusher_failing_since(
                     self.app_id,
                     self.pushkey,
                     self.user_name,
@@ -362,7 +368,7 @@ class Pusher(object):
         else:
             if not self.failing_since:
                 self.failing_since = self.clock.time_msec()
-                self.store.update_pusher_failing_since(
+                yield self.store.update_pusher_failing_since(
                     self.app_id,
                     self.pushkey,
                     self.user_name,
@@ -380,7 +386,7 @@ class Pusher(object):
                             self.user_name, self.pushkey)
                 self.backoff_delay = Pusher.INITIAL_BACKOFF
                 self.last_token = chunk['end']
-                self.store.update_pusher_last_token(
+                yield self.store.update_pusher_last_token(
                     self.app_id,
                     self.pushkey,
                     self.user_name,
@@ -388,7 +394,7 @@ class Pusher(object):
                 )
 
                 self.failing_since = None
-                self.store.update_pusher_failing_since(
+                yield self.store.update_pusher_failing_since(
                     self.app_id,
                     self.pushkey,
                     self.user_name,
