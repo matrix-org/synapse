@@ -1,3 +1,77 @@
+Changes in synapse v0.10.0-rc1 (2015-08-20)
+===========================================
+
+Also see v0.9.4-rc1 changelog, which has been amalgamated into this release.
+
+General:
+
+* Upgrade to Twisted 15 (PR #173)
+* Add support for serving and fetching encryption keys over federation.
+  (PR #208)
+* Add support for logging in with email address (PR #234)
+* Add support for new ``m.room.canonical_alias`` event. (PR #233)
+* Error if a user tries to register with an email already in use. (PR #211)
+* Add extra and improve existing caches  (PR #212, #219, #226, #228)
+* Batch various storage request (PR #226, #228)
+* Fix bug where we didn't correctly log the entity that triggered the request
+  if the request came in via an application service (PR #230)
+* Fix bug where we needlessly regenerated the full list of rooms an AS is
+  interested in. (PR #232)
+* Add support for AS's to use v2_alpha registration API (PR #210)
+
+
+Configuration:
+
+* Add ``--generate-keys`` that will generate any missing cert and key files in
+  the configuration files. This is equivalent to running ``--generate-config``
+  on an existing configuration file. (PR #220)
+* ``--generate-config`` now no longer requires a ``--server-name`` parameter
+  when used on existing configuration files. (PR #220)
+* Add ``--print-pidfile`` flag that controls the printing of the pid to stdout
+  of the demonised process. (PR #213)
+
+Media Repository:
+
+* Fix bug where we picked a lower resolution image than requested. (PR #205)
+* Add support for specifying if a the media repository should dynamically
+  thumbnail images or not. (PR #206)
+
+Metrics:
+
+* Add statistics from the reactor to the metrics API. (PR #224, #225)
+
+Demo Homeservers:
+
+* Fix starting the demo homeservers without rate-limiting enabled. (PR #182)
+* Fix enabling registration on demo homeservers (PR #223)
+
+
+Changes in synapse v0.9.4-rc1 (2015-07-21)
+==========================================
+
+General:
+
+* Add basic implementation of receipts. (SPEC-99)
+* Add support for configuration presets in room creation API. (PR  #203)
+* Add auth event that limits the visibility of history for new users.
+  (SPEC-134)
+* Add SAML2 login/registration support. (PR  #201. Thanks Muthu Subramanian!)
+* Add client side key management APIs for end to end encryption. (PR #198)
+* Change power level semantics so that you cannot kick, ban or change power
+  levels of users that have equal or greater power level than you. (SYN-192)
+* Improve performance by bulk inserting events where possible. (PR #193)
+* Improve performance by bulk verifying signatures where possible. (PR #194)
+
+
+Configuration:
+
+* Add support for including TLS certificate chains.
+
+Media Repository:
+
+* Add Content-Disposition headers to content repository responses. (SYN-150)
+
+
 Changes in synapse v0.9.3 (2015-07-01)
 ======================================
 
