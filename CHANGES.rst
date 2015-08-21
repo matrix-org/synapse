@@ -10,6 +10,9 @@ General:
   (PR #208)
 * Add support for logging in with email address (PR #234)
 * Add support for new ``m.room.canonical_alias`` event. (PR #233)
+* Change synapse to treat user IDs case insensitively during registration and
+  login. (If two users already exist with case insensitive matching user ids,
+  synapse will continue to require them to specify their user ids exactly.)
 * Error if a user tries to register with an email already in use. (PR #211)
 * Add extra and improve existing caches  (PR #212, #219, #226, #228)
 * Batch various storage request (PR #226, #228)
