@@ -1,4 +1,4 @@
-Changes in synapse v0.10.0-rc1 (2015-08-20)
+Changes in synapse v0.10.0-rc1 (2015-08-21)
 ===========================================
 
 Also see v0.9.4-rc1 changelog, which has been amalgamated into this release.
