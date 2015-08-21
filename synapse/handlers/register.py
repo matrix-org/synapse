@@ -57,8 +57,8 @@ class RegistrationHandler(BaseHandler):
 
         yield self.check_user_id_is_valid(user_id)
 
-        u = yield self.store.get_user_by_id(user_id)
-        if u:
+        users = yield self.store.get_users_by_id_case_insensitive(user_id)
+        if users:
             raise SynapseError(
                 400,
                 "User ID already taken.",
