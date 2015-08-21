@@ -874,7 +874,7 @@ class FederationHandler(BaseHandler):
                 raise AuthError(403, "Host not in room.")
 
         state_groups = yield self.store.get_state_groups(
-            [event_id]
+            room_id, [event_id]
         )
 
         if state_groups:

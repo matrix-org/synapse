@@ -811,6 +811,8 @@ class EventsStore(SQLBaseStore):
             )
 
             if because:
+                # It's fine to do add the event directly, since get_pdu_json
+                # will serialise this field correctly
                 ev.unsigned["redacted_because"] = because
 
         if get_prev_content and "replaces_state" in ev.unsigned:
