@@ -295,6 +295,12 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _find_user_id_and_pwd_hash(self, user_id):
+        """Checks to see if a user with the given id exists. Will check case
+        insensitively, but will throw if there are multiple inexact matches.
+
+        Returns:
+            tuple: A 2-tuple of `(canonical_user_id, password_hash)`
+        """
         user_infos = yield self.store.get_users_by_id_case_insensitive(user_id)
         if not user_infos:
             logger.warn("Attempted to login as %s but they do not exist", user_id)
