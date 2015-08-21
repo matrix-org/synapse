@@ -98,6 +98,17 @@ class RegistrationStore(SQLBaseStore):
             allow_none=True,
         )
 
+    def get_users_by_id_case_insensitive(self, user_id):
+        def f(txn):
+            sql = (
+                "SELECT name, password_hash FROM users"
+                " WHERE name = lower(?)"
+            )
+            txn.execute(sql, (user_id,))
+            return self.cursor_to_dict(txn)
+
+        return self.runInteraction("get_users_by_id_case_insensitive", f)
+
     @defer.inlineCallbacks
     def user_set_password_hash(self, user_id, password_hash):
         """
