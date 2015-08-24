@@ -12,4 +12,9 @@ recursive-include demo *.py
 recursive-include demo *.sh
 recursive-include docs *
 recursive-include scripts *
+recursive-include scripts-dev *
 recursive-include tests *.py
+
+recursive-include static *.css
+recursive-include static *.html
+recursive-include static *.js
