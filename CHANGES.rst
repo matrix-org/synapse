@@ -1,3 +1,13 @@
+Changes in synapse v0.10.0-rc2 (2015-08-24)
+===========================================
+
+* Fix bug where we incorrectly populated the ``event_forward_extremities``
+  table, resulting in problems joining large remote rooms (e.g.
+  ``#matrix:matrix.org``)
+* Reduce the number of times we wake up pushers by not listening for presence
+  or typing events, reducing the CPU cost of each pusher.
+
+
 Changes in synapse v0.10.0-rc1 (2015-08-21)
 ===========================================
 
