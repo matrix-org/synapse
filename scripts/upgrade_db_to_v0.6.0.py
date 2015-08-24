@@ -4,7 +4,7 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.signatures import SignatureStore
 from synapse.storage.event_federation import EventFederationStore
 
-from syutil.base64util import encode_base64, decode_base64
+from unpaddedbase64 import encode_base64, decode_base64
 
 from synapse.crypto.event_signing import compute_event_signature
 
@@ -13,12 +13,10 @@ from synapse.events.utils import prune_event
 
 from synapse.crypto.event_signing import check_event_content_hash
 
-from syutil.crypto.jsonsign import (
-    verify_signed_json, SignatureVerifyException,
-)
-from syutil.crypto.signing_key import decode_verify_key_bytes
+from signedjson.sign import verify_signed_json, SignatureVerifyException
+from signedjson.key import decode_verify_key_bytes
 
-from syutil.jsonutil import encode_canonical_json
+from canonicaljson import encode_canonical_json
 
 import argparse
 # import dns.resolver
@@ -26,7 +24,6 @@ import hashlib
 import httplib
 import json
 import sqlite3
-import syutil
 import urllib2
 
 
@@ -324,8 +321,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    signing_key = syutil.crypto.signing_key.read_signing_keys(
-        args.signing_key
-    )
+    signing_key = signedjson.key.read_signing_keys(args.signing_key)
 
     main(args.database, args.server_name, signing_key[0])
