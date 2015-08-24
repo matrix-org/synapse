@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 def encode_json(json_object):
     if USE_FROZEN_DICTS:
-         # ujson doesn't like frozen_dicts
+        # ujson doesn't like frozen_dicts
         return encode_canonical_json(json_object)
     else:
         return json.dumps(json_object, ensure_ascii=False)
