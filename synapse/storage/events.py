@@ -86,6 +86,10 @@ class EventsStore(SQLBaseStore):
                     is_new_state=is_new_state,
                 )
 
+                yield self._update_extremeties([
+                    ev for ev, _ in chunk
+                ])
+
     @defer.inlineCallbacks
     @log_function
     def persist_event(self, event, context, backfilled=False,
@@ -119,6 +123,8 @@ class EventsStore(SQLBaseStore):
                 )
         except _RollbackButIsFineException:
             pass
+
+        yield self._update_extremeties([event])
 
         max_persisted_id = yield self._stream_id_gen.get_max_token(self)
         defer.returnValue((stream_ordering, max_persisted_id))
