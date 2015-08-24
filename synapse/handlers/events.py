@@ -49,7 +49,12 @@ class EventStreamHandler(BaseHandler):
     @defer.inlineCallbacks
     @log_function
     def get_stream(self, auth_user_id, pagin_config, timeout=0,
-                   as_client_event=True, affect_presence=True):
+                   as_client_event=True, affect_presence=True,
+                   only_room_events=False):
+        """Fetches the events stream for a given user.
+
+        If `only_room_events` is `True` only room events will be returned.
+        """
         auth_user = UserID.from_string(auth_user_id)
 
         try:
@@ -89,7 +94,8 @@ class EventStreamHandler(BaseHandler):
                 timeout = random.randint(int(timeout*0.9), int(timeout*1.1))
 
             events, tokens = yield self.notifier.get_events_for(
-                auth_user, room_ids, pagin_config, timeout
+                auth_user, room_ids, pagin_config, timeout,
+                only_room_events=only_room_events
             )
 
             time_now = self.clock.time_msec()

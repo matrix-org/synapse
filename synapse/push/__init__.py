@@ -249,7 +249,9 @@ class Pusher(object):
             # we fail to dispatch the push)
             config = PaginationConfig(from_token=None, limit='1')
             chunk = yield self.evStreamHandler.get_stream(
-                self.user_name, config, timeout=0)
+                self.user_name, config, timeout=0, affect_presence=False,
+                only_room_events=True
+            )
             self.last_token = chunk['end']
             self.store.update_pusher_last_token(
                 self.app_id, self.pushkey, self.user_name, self.last_token
@@ -280,8 +282,8 @@ class Pusher(object):
         config = PaginationConfig(from_token=from_tok, limit='1')
         timeout = (300 + random.randint(-60, 60)) * 1000
         chunk = yield self.evStreamHandler.get_stream(
-            self.user_name, config,
-            timeout=timeout, affect_presence=False
+            self.user_name, config, timeout=timeout, affect_presence=False,
+            only_room_events=True
         )
 
         # limiting to 1 may get 1 event plus 1 presence event, so
