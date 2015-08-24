@@ -15,8 +15,9 @@
 
 from synapse.api.errors import CodeMessageException
 from synapse.util.logcontext import preserve_context_over_fn
-from syutil.jsonutil import encode_canonical_json
 import synapse.metrics
+
+from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer, reactor
 from twisted.web.client import (

@@ -18,7 +18,9 @@ from distutils.version import LooseVersion
 logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
-    "syutil>=0.0.7": ["syutil>=0.0.7"],
+    "unpaddedbase64>=1.0.1": ["unpaddedbase64>=1.0.1"],
+    "canonicaljson>=1.0.0": ["canconicaljson>=1.0.0"],
+    "signedjson>=1.0.0": ["signedjson>=1.0.0"],
     "Twisted>=15.1.0": ["twisted>=15.1.0"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
@@ -54,11 +56,6 @@ def github_link(project, version, egg):
     return "https://github.com/%s/tarball/%s/#egg=%s" % (project, version, egg)
 
 DEPENDENCY_LINKS = [
-    github_link(
-        project="matrix-org/syutil",
-        version="v0.0.7",
-        egg="syutil-0.0.7",
-    ),
     github_link(
         project="matrix-org/matrix-angular-sdk",
         version="v0.6.6",

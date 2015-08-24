@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached
-from syutil.base64util import encode_base64
+from unpaddedbase64 import encode_base64
 
 import logging
 from Queue import PriorityQueue, Empty

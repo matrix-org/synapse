@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 
-from syutil.jsonutil import encode_canonical_json
+from canonicaljson import encode_canonical_json
 
 import logging
 import simplejson as json

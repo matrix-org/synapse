@@ -19,7 +19,7 @@ from synapse.util.caches.descriptors import cachedInlineCallbacks
 from twisted.internet import defer
 
 import OpenSSL
-from syutil.crypto.signing_key import decode_verify_key_bytes
+from signedjson.key import decode_verify_key_bytes
 import hashlib
 
 

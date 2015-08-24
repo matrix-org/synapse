@@ -40,7 +40,7 @@ class VoipRestServlet(ClientV1RestServlet):
         username = "%d:%s" % (expiry, auth_user.to_string())
 
         mac = hmac.new(turnSecret, msg=username, digestmod=hashlib.sha1)
-        # We need to use standard base64 encoding here, *not* syutil's
+        # We need to use standard padded base64 encoding here
         # encode_base64 because we need to add the standard padding to get the
         # same result as the TURN server.
         password = base64.b64encode(mac.digest())

@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from _base import SQLBaseStore
 
-from syutil.base64util import encode_base64
+from unpaddedbase64 import encode_base64
 from synapse.crypto.event_signing import compute_event_reference_hash
 
 
