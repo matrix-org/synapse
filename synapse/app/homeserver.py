@@ -103,9 +103,15 @@ class SynapseHomeServer(HomeServer):
                 import syweb
             except ImportError:
                 quit_with_error(
-                    "Could not find a webclient. Please either install syweb\n"
-                    "or configure the location of the source to server via\n"
-                    "the config option `web_client_location`"
+                    "Could not find a webclient.\n\n"
+                    "Please either install the matrix-angular-sdk or configure\n"
+                    "the location of the source to serve via the configuration\n"
+                    "option `web_client_location`\n\n"
+                    "To install the `matrix-angular-sdk` via pip, run:\n\n"
+                    "    pip install 'matrix-angular-sdk'\n"
+                    "\n"
+                    "You can also disable hosting of the webclient via the\n"
+                    "configuration option `web_client`\n"
                 )
             syweb_path = os.path.dirname(syweb.__file__)
             webclient_path = os.path.join(syweb_path, "webclient")
@@ -271,8 +277,7 @@ def quit_with_error(error_string):
     line_length = max([len(l) for l in message_lines]) + 2
     sys.stderr.write("*" * line_length + '\n')
     for line in message_lines:
-        if line.strip():
-            sys.stderr.write(" %s\n" % (line.strip(),))
+        sys.stderr.write(" %s\n" % (line.rstrip(),))
     sys.stderr.write("*" * line_length + '\n')
     sys.exit(1)
 
