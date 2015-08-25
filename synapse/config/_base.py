@@ -148,7 +148,8 @@ class Config(object):
             "--keys-directory",
             metavar="DIRECTORY",
             help="Used with 'generate-*' options to specify where files such as"
-                 " certs and signing keys should be stored in."
+                 " certs and signing keys should be stored in, unless explicitly"
+                 " specified in the config."
         )
         config_parser.add_argument(
             "-H", "--server-name",
