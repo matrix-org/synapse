@@ -159,13 +159,23 @@ class Config(object):
                     # We accept specifying directories as config paths, we search
                     # inside that directory for all files matching *.yaml, and then
                     # we apply them in *sorted* order.
-                    config_files.extend(sorted(
-                        os.path.join(config_path, entry)
-                        for entry in os.listdir(config_path)
-                        if entry.endswith(".yaml") and os.path.isfile(
-                            os.path.join(config_path, entry)
-                        )
-                    ))
+                    files = []
+                    for entry in os.listdir(config_path):
+                        entry_path = os.path.join(config_path, entry)
+                        if not os.path.isfile(entry_path):
+                            print (
+                                "Found subdirectory in config directory: %r. IGNORING."
+                            ) % (entry_path, )
+                            continue
+
+                        if not entry.endswith(".yaml"):
+                            print (
+                                "Found file in config directory that does not"
+                                " end in '.yaml': %r. IGNORING."
+                            ) % (entry_path, )
+                            continue
+
+                    config_files.extend(sorted(files))
                 else:
                     config_files.append(config_path)
 
