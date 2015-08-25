@@ -34,13 +34,17 @@ REQUIREMENTS = {
     "blist": ["blist"],
     "pysaml2": ["saml2"],
 }
-CONDITIONAL_REQUIREMENTS = {}
+CONDITIONAL_REQUIREMENTS = {
+    "web_client": {
+        "matrix_angular_sdk>=0.6.6": ["syweb>=0.6.6"],
+    }
+}
 
 
 def requirements(config=None, include_conditional=False):
     reqs = REQUIREMENTS.copy()
-    for key, req in CONDITIONAL_REQUIREMENTS.items():
-        if (config and getattr(config, key)) or include_conditional:
+    if include_conditional:
+        for _, req in CONDITIONAL_REQUIREMENTS.items():
             reqs.update(req)
     return reqs
 
