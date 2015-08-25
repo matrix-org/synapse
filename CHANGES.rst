@@ -1,3 +1,20 @@
+Changes in synapse v0.10.0-rc3 (2015-08-25)
+===========================================
+
+* Add ``--keys-directory`` config option to specify where files such as
+  certs and signing keys should be stored in, when using ``--generate-config``
+  or ``--generate-keys``.
+* Allow ``--config-path`` to specify a directory, causing synapse to use all
+  \*.yaml files in the directory as config files.
+* Add ``web_client_location`` config option to specify static files to be
+  hosted by synapse under ``/_matrix/client``.
+* Add helper utility to synapse to read and parse the config files and extract
+  the value of a given key. For example::
+
+    $ python -m synapse.config read server_name -c homeserver.yaml
+    localhost
+
+
 Changes in synapse v0.10.0-rc2 (2015-08-24)
 ===========================================
 
