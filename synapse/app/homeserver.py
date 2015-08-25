@@ -97,9 +97,11 @@ class SynapseHomeServer(HomeServer):
         return JsonResource(self)
 
     def build_resource_for_web_client(self):
-        import syweb
-        syweb_path = os.path.dirname(syweb.__file__)
-        webclient_path = os.path.join(syweb_path, "webclient")
+        webclient_path = self.get_config().web_client_location
+        if not webclient_path:
+            import syweb
+            syweb_path = os.path.dirname(syweb.__file__)
+            webclient_path = os.path.join(syweb_path, "webclient")
         # GZip is disabled here due to
         # https://twistedmatrix.com/trac/ticket/7678
         # (It can stay enabled for the API resources: they call
