@@ -131,7 +131,8 @@ class Config(object):
             "-c", "--config-path",
             action="append",
             metavar="CONFIG_FILE",
-            help="Specify config file"
+            help="Specify config file. Can be given multiple times and"
+                 " may specify directories containing *.yaml files."
         )
         config_parser.add_argument(
             "--generate-config",
@@ -151,14 +152,31 @@ class Config(object):
 
         generate_keys = config_args.generate_keys
 
+        config_files = []
+        if config_args.config_path:
+            for config_path in config_args.config_path:
+                if os.path.isdir(config_path):
+                    # We accept specifying directories as config paths, we search
+                    # inside that directory for all files matching *.yaml, and then
+                    # we apply them in *sorted* order.
+                    config_files.extend(sorted(
+                        os.path.join(config_path, entry)
+                        for entry in os.listdir(config_path)
+                        if entry.endswith(".yaml") and os.path.isfile(
+                            os.path.join(config_path, entry)
+                        )
+                    ))
+                else:
+                    config_files.append(config_path)
+
         if config_args.generate_config:
-            if not config_args.config_path:
+            if not config_files:
                 config_parser.error(
                     "Must supply a config file.\nA config file can be automatically"
                     " generated using \"--generate-config -H SERVER_NAME"
                     " -c CONFIG-FILE\""
                 )
-            (config_path,) = config_args.config_path
+            (config_path,) = config_files
             if not os.path.exists(config_path):
                 config_dir_path = os.path.dirname(config_path)
                 config_dir_path = os.path.abspath(config_dir_path)
@@ -202,7 +220,7 @@ class Config(object):
         obj.invoke_all("add_arguments", parser)
         args = parser.parse_args(remaining_args)
 
-        if not config_args.config_path:
+        if not config_files:
             config_parser.error(
                 "Must supply a config file.\nA config file can be automatically"
                 " generated using \"--generate-config -H SERVER_NAME"
@@ -213,8 +231,8 @@ class Config(object):
         config_dir_path = os.path.abspath(config_dir_path)
 
         specified_config = {}
-        for config_path in config_args.config_path:
-            yaml_config = cls.read_config_file(config_path)
+        for config_file in config_files:
+            yaml_config = cls.read_config_file(config_file)
             specified_config.update(yaml_config)
 
         server_name = specified_config["server_name"]
