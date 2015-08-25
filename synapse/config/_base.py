@@ -145,6 +145,13 @@ class Config(object):
             help="Generate any missing key files then exit"
         )
         config_parser.add_argument(
+            "--keys-directory",
+            metavar="DIRECTORY",
+            help="Used with 'generate-*' options to specify where files such as"
+                 " certs and signing keys should be stored in, unless explicitly"
+                 " specified in the config."
+        )
+        config_parser.add_argument(
             "-H", "--server-name",
             help="The server name to generate a config file for"
         )
@@ -188,7 +195,10 @@ class Config(object):
                 )
             (config_path,) = config_files
             if not os.path.exists(config_path):
-                config_dir_path = os.path.dirname(config_path)
+                if config_args.keys_directory:
+                    config_dir_path = config_args.keys_directory
+                else:
+                    config_dir_path = os.path.dirname(config_path)
                 config_dir_path = os.path.abspath(config_dir_path)
 
                 server_name = config_args.server_name
@@ -237,7 +247,10 @@ class Config(object):
                 " -c CONFIG-FILE\""
             )
 
-        config_dir_path = os.path.dirname(config_args.config_path[-1])
+        if config_args.keys_directory:
+            config_dir_path = config_args.keys_directory
+        else:
+            config_dir_path = os.path.dirname(config_args.config_path[-1])
         config_dir_path = os.path.abspath(config_dir_path)
 
         specified_config = {}
