@@ -26,5 +26,5 @@ if __name__ == "__main__":
         print getattr(config, key)
         sys.exit(0)
     else:
-        sys.stderr.write("Unknown command %r", action)
+        sys.stderr.write("Unknown command %r\n" % (action,))
         sys.exit(1)
