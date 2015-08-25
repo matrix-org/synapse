@@ -14,7 +14,7 @@
  */
 
 CREATE TABLE IF NOT EXISTS refresh_tokens(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     token TEXT NOT NULL,
     user_id TEXT NOT NULL,
     UNIQUE (token)
