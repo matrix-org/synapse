@@ -34,11 +34,7 @@ REQUIREMENTS = {
     "blist": ["blist"],
     "pysaml2": ["saml2"],
 }
-CONDITIONAL_REQUIREMENTS = {
-    "web_client": {
-        "matrix_angular_sdk>=0.6.6": ["syweb>=0.6.6"],
-    }
-}
+CONDITIONAL_REQUIREMENTS = {}
 
 
 def requirements(config=None, include_conditional=False):

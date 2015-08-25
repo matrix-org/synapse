@@ -99,7 +99,14 @@ class SynapseHomeServer(HomeServer):
     def build_resource_for_web_client(self):
         webclient_path = self.get_config().web_client_location
         if not webclient_path:
-            import syweb
+            try:
+                import syweb
+            except ImportError:
+                quit_with_error(
+                    "Could not find a webclient. Please either install syweb\n"
+                    "or configure the location of the source to server via\n"
+                    "the config option `web_client_location`"
+                )
             syweb_path = os.path.dirname(syweb.__file__)
             webclient_path = os.path.join(syweb_path, "webclient")
         # GZip is disabled here due to
