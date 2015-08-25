@@ -21,7 +21,7 @@ from signedjson.key import (
     decode_signing_key_base64, decode_verify_key_bytes,
     read_signing_keys, write_signing_keys, NACL_ED25519
 )
-from unpadded_base64 import decode_base64
+from unpaddedbase64 import decode_base64
 
 import os
 

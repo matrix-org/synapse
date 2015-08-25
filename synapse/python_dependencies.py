@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
     "unpaddedbase64>=1.0.1": ["unpaddedbase64>=1.0.1"],
-    "canonicaljson>=1.0.0": ["canconicaljson>=1.0.0"],
+    "canonicaljson>=1.0.0": ["canonicaljson>=1.0.0"],
     "signedjson>=1.0.0": ["signedjson>=1.0.0"],
     "Twisted>=15.1.0": ["twisted>=15.1.0"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
