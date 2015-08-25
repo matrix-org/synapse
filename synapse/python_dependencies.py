@@ -52,18 +52,18 @@ def requirements(config=None, include_conditional=False):
 def github_link(project, version, egg):
     return "https://github.com/%s/tarball/%s/#egg=%s" % (project, version, egg)
 
-DEPENDENCY_LINKS = [
-    github_link(
+DEPENDENCY_LINKS = {
+    "syutil": github_link(
         project="matrix-org/syutil",
         version="v0.0.7",
         egg="syutil-0.0.7",
     ),
-    github_link(
+    "matrix-angular-sdk": github_link(
         project="matrix-org/matrix-angular-sdk",
         version="v0.6.6",
         egg="matrix_angular_sdk-0.6.6",
     ),
-]
+}
 
 
 class MissingRequirementError(Exception):
@@ -131,7 +131,7 @@ def check_requirements(config=None):
 def list_requirements():
     result = []
     linked = []
-    for link in DEPENDENCY_LINKS:
+    for link in DEPENDENCY_LINKS.values():
         egg = link.split("#egg=")[1]
         linked.append(egg.split('-')[0])
         result.append(link)

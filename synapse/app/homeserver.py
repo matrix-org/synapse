@@ -16,7 +16,7 @@
 
 import sys
 sys.dont_write_bytecode = True
-from synapse.python_dependencies import check_requirements
+from synapse.python_dependencies import check_requirements, DEPENDENCY_LINKS
 
 if __name__ == '__main__':
     check_requirements()
@@ -108,10 +108,11 @@ class SynapseHomeServer(HomeServer):
                     "the location of the source to serve via the configuration\n"
                     "option `web_client_location`\n\n"
                     "To install the `matrix-angular-sdk` via pip, run:\n\n"
-                    "    pip install 'matrix-angular-sdk'\n"
+                    "    pip install '%(dep)s'\n"
                     "\n"
                     "You can also disable hosting of the webclient via the\n"
                     "configuration option `web_client`\n"
+                    % {"dep": DEPENDENCY_LINKS["matrix-angular-sdk"]}
                 )
             syweb_path = os.path.dirname(syweb.__file__)
             webclient_path = os.path.join(syweb_path, "webclient")
@@ -274,7 +275,7 @@ class SynapseHomeServer(HomeServer):
 
 def quit_with_error(error_string):
     message_lines = error_string.split("\n")
-    line_length = max([len(l) for l in message_lines]) + 2
+    line_length = max([len(l) for l in message_lines if len(l) < 80]) + 2
     sys.stderr.write("*" * line_length + '\n')
     for line in message_lines:
         sys.stderr.write(" %s\n" % (line.rstrip(),))
