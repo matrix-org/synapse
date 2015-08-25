@@ -47,11 +47,6 @@ setup(
     packages=find_packages(exclude=["tests", "tests.*"]),
     description="Reference Synapse Home Server",
     install_requires=dependencies['requirements'](include_conditional=True).keys(),
-    setup_requires=[
-        "Twisted>=15.1.0", # Here to override setuptools_trial's dependency on Twisted>=2.4.0
-        "setuptools_trial",
-        "mock"
-    ],
     dependency_links=dependencies["DEPENDENCY_LINKS"],
     include_package_data=True,
     zip_safe=False,
