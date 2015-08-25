@@ -282,7 +282,6 @@ class MemoryDataStore(object):
             return {
                 "name": self.tokens_to_users[token],
                 "admin": 0,
-                "device_id": None,
             }
         except:
             raise StoreError(400, "User does not exist.")
@@ -380,7 +379,7 @@ class MemoryDataStore(object):
     def get_ops_levels(self, room_id):
         return defer.succeed((5, 5, 5))
 
-    def insert_client_ip(self, user, device_id, access_token, ip, user_agent):
+    def insert_client_ip(self, user, access_token, ip, user_agent):
         return defer.succeed(None)
 
 

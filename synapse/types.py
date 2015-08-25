@@ -209,7 +209,3 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             return "t%d-%d" % (self.topological, self.stream)
         else:
             return "s%d" % (self.stream,)
-
-
-# token_id is the primary key ID of the access token, not the access token itself.
-ClientInfo = namedtuple("ClientInfo", ("device_id", "token_id"))

@@ -65,7 +65,6 @@ class RoomTypingTestCase(RestTestCase):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
 

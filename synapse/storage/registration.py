@@ -163,7 +163,7 @@ class RegistrationStore(SQLBaseStore):
         Args:
             token (str): The access token of a user.
         Returns:
-            dict: Including the name (user_id), device_id and whether they are
+            dict: Including the name (user_id) and whether they are
                 an admin.
         Raises:
             StoreError if no user was found.
@@ -228,8 +228,7 @@ class RegistrationStore(SQLBaseStore):
 
     def _query_for_auth(self, txn, token):
         sql = (
-            "SELECT users.name, users.admin,"
-            " access_tokens.device_id, access_tokens.id as token_id"
+            "SELECT users.name, users.admin, access_tokens.id as token_id"
             " FROM users"
             " INNER JOIN access_tokens on users.name = access_tokens.user_id"
             " WHERE token = ?"

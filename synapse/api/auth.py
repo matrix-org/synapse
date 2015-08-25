@@ -20,7 +20,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.util.logutils import log_function
-from synapse.types import UserID, ClientInfo
+from synapse.types import UserID
 
 import logging
 
@@ -322,9 +322,9 @@ class Auth(object):
         Args:
             request - An HTTP request with an access_token query parameter.
         Returns:
-            tuple : of UserID and device string:
-                User ID object of the user making the request
-                ClientInfo object of the client instance the user is using
+            tuple of:
+                UserID (str)
+                Access token ID (str)
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -354,16 +354,13 @@ class Auth(object):
 
                 request.authenticated_entity = user_id
 
-                defer.returnValue(
-                    (UserID.from_string(user_id), ClientInfo("", ""))
-                )
+                defer.returnValue((UserID.from_string(user_id), ""))
                 return
             except KeyError:
                 pass  # normal users won't have the user_id query parameter set.
 
             user_info = yield self.get_user_by_access_token(access_token)
             user = user_info["user"]
-            device_id = user_info["device_id"]
             token_id = user_info["token_id"]
 
             ip_addr = self.hs.get_ip_from_request(request)
@@ -375,14 +372,13 @@ class Auth(object):
                 self.store.insert_client_ip(
                     user=user,
                     access_token=access_token,
-                    device_id=user_info["device_id"],
                     ip=ip_addr,
                     user_agent=user_agent
                 )
 
             request.authenticated_entity = user.to_string()
 
-            defer.returnValue((user, ClientInfo(device_id, token_id)))
+            defer.returnValue((user, token_id,))
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
@@ -396,7 +392,7 @@ class Auth(object):
         Args:
             token (str): The access token to get the user by.
         Returns:
-            dict : dict that includes the user, device_id, and whether the
+            dict : dict that includes the user and whether the
                 user is a server admin.
         Raises:
             AuthError if no user by that token exists or the token is invalid.
@@ -409,7 +405,6 @@ class Auth(object):
             )
         user_info = {
             "admin": bool(ret.get("admin", False)),
-            "device_id": ret.get("device_id"),
             "user": UserID.from_string(ret.get("name")),
             "token_id": ret.get("token_id", None),
         }

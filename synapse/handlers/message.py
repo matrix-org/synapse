@@ -183,7 +183,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def create_and_send_event(self, event_dict, ratelimit=True,
-                              client=None, txn_id=None):
+                              token_id=None, txn_id=None):
         """ Given a dict from a client, create and handle a new event.
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
@@ -217,11 +217,8 @@ class MessageHandler(BaseHandler):
                     builder.content
                 )
 
-        if client is not None:
-            if client.token_id is not None:
-                builder.internal_metadata.token_id = client.token_id
-            if client.device_id is not None:
-                builder.internal_metadata.device_id = client.device_id
+        if token_id is not None:
+            builder.internal_metadata.token_id = token_id
 
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id

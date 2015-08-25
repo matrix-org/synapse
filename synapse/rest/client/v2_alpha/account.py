@@ -55,7 +55,7 @@ class PasswordRestServlet(RestServlet):
 
         if LoginType.PASSWORD in result:
             # if using password, they should also be logged in
-            auth_user, client = yield self.auth.get_user_by_req(request)
+            auth_user, _ = yield self.auth.get_user_by_req(request)
             if auth_user.to_string() != result[LoginType.PASSWORD]:
                 raise LoginError(400, "", Codes.UNKNOWN)
             user_id = auth_user.to_string()
@@ -119,7 +119,7 @@ class ThreepidRestServlet(RestServlet):
             raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
         threePidCreds = body['threePidCreds']
 
-        auth_user, client = yield self.auth.get_user_by_req(request)
+        auth_user, _ = yield self.auth.get_user_by_req(request)
 
         threepid = yield self.identity_handler.threepid_from_creds(threePidCreds)
 

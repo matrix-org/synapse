@@ -87,7 +87,7 @@ class SyncRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        user, client = yield self.auth.get_user_by_req(request)
+        user, token_id = yield self.auth.get_user_by_req(request)
 
         timeout = parse_integer(request, "timeout", default=0)
         limit = parse_integer(request, "limit", required=True)
@@ -125,7 +125,6 @@ class SyncRestServlet(RestServlet):
 
         sync_config = SyncConfig(
             user=user,
-            client_info=client,
             gap=gap,
             limit=limit,
             sort=sort,
@@ -152,7 +151,7 @@ class SyncRestServlet(RestServlet):
                 sync_result.private_user_data, filter, time_now
             ),
             "rooms": self.encode_rooms(
-                sync_result.rooms, filter, time_now, client.token_id
+                sync_result.rooms, filter, time_now, token_id
             ),
             "next_batch": sync_result.next_batch.to_string(),
         }

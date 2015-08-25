@@ -94,9 +94,9 @@ class DataStore(RoomMemberStore, RoomStore,
         )
 
     @defer.inlineCallbacks
-    def insert_client_ip(self, user, access_token, device_id, ip, user_agent):
+    def insert_client_ip(self, user, access_token, ip, user_agent):
         now = int(self._clock.time_msec())
-        key = (user.to_string(), access_token, device_id, ip)
+        key = (user.to_string(), access_token, ip)
 
         try:
             last_seen = self.client_ip_last_seen.get(key)
@@ -120,7 +120,6 @@ class DataStore(RoomMemberStore, RoomStore,
                 "user_agent": user_agent,
             },
             values={
-                "device_id": device_id,
                 "last_seen": now,
             },
             desc="insert_client_ip",
@@ -132,7 +131,7 @@ class DataStore(RoomMemberStore, RoomStore,
             table="user_ips",
             keyvalues={"user_id": user.to_string()},
             retcols=[
-                "device_id", "access_token", "ip", "user_agent", "last_seen"
+                "access_token", "ip", "user_agent", "last_seen"
             ],
             desc="get_user_ip_and_agents",
         )
