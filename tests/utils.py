@@ -281,7 +281,6 @@ class MemoryDataStore(object):
         try:
             return {
                 "name": self.tokens_to_users[token],
-                "admin": 0,
             }
         except:
             raise StoreError(400, "User does not exist.")

@@ -53,8 +53,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
 
         self.assertDictContainsSubset(
             {
-                "admin": 0,
-                 "name": self.user_id,
+                "name": self.user_id,
             },
             result
         )
@@ -70,8 +69,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
 
         self.assertDictContainsSubset(
             {
-                "admin": 0,
-                 "name": self.user_id,
+                "name": self.user_id,
             },
             result
         )

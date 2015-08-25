@@ -392,8 +392,7 @@ class Auth(object):
         Args:
             token (str): The access token to get the user by.
         Returns:
-            dict : dict that includes the user and whether the
-                user is a server admin.
+            dict : dict that includes the user and the ID of their access token.
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -404,7 +403,6 @@ class Auth(object):
                 errcode=Codes.UNKNOWN_TOKEN
             )
         user_info = {
-            "admin": bool(ret.get("admin", False)),
             "user": UserID.from_string(ret.get("name")),
             "token_id": ret.get("token_id", None),
         }
