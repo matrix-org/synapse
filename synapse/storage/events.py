@@ -24,7 +24,7 @@ from synapse.util.logcontext import preserve_context_over_deferred
 from synapse.util.logutils import log_function
 from synapse.api.constants import EventTypes
 
-from syutil.jsonutil import encode_json
+from canonicaljson import encode_canonical_json
 from contextlib import contextmanager
 
 import logging
@@ -32,6 +32,13 @@ import ujson as json
 
 logger = logging.getLogger(__name__)
 
+
+def encode_json(json_object):
+    if USE_FROZEN_DICTS:
+        # ujson doesn't like frozen_dicts
+        return encode_canonical_json(json_object)
+    else:
+        return json.dumps(json_object, ensure_ascii=False)
 
 # These values are used in the `enqueus_event` and `_do_fetch` methods to
 # control how we batch/bulk fetch events from the database.
@@ -253,8 +260,7 @@ class EventsStore(SQLBaseStore):
                 )
 
                 metadata_json = encode_json(
-                    event.internal_metadata.get_dict(),
-                    using_frozen_dicts=USE_FROZEN_DICTS
+                    event.internal_metadata.get_dict()
                 ).decode("UTF-8")
 
                 sql = (
@@ -329,12 +335,9 @@ class EventsStore(SQLBaseStore):
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "internal_metadata": encode_json(
-                        event.internal_metadata.get_dict(),
-                        using_frozen_dicts=USE_FROZEN_DICTS
+                        event.internal_metadata.get_dict()
                     ).decode("UTF-8"),
-                    "json": encode_json(
-                        event_dict(event), using_frozen_dicts=USE_FROZEN_DICTS
-                    ).decode("UTF-8"),
+                    "json": encode_json(event_dict(event)).decode("UTF-8"),
                 }
                 for event, _ in events_and_contexts
             ],
@@ -353,9 +356,7 @@ class EventsStore(SQLBaseStore):
                     "type": event.type,
                     "processed": True,
                     "outlier": event.internal_metadata.is_outlier(),
-                    "content": encode_json(
-                        event.content, using_frozen_dicts=USE_FROZEN_DICTS
-                    ).decode("UTF-8"),
+                    "content": encode_json(event.content).decode("UTF-8"),
                 }
                 for event, _ in events_and_contexts
             ],

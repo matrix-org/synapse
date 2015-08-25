@@ -16,9 +16,9 @@
 
 from twisted.web.resource import Resource
 from synapse.http.server import respond_with_json_bytes
-from syutil.crypto.jsonsign import sign_json
-from syutil.base64util import encode_base64
-from syutil.jsonutil import encode_canonical_json
+from signedjson.sign import sign_json
+from unpaddedbase64 import encode_base64
+from canonicaljson import encode_canonical_json
 from hashlib import sha256
 from OpenSSL import crypto
 import logging

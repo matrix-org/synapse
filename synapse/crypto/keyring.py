@@ -14,20 +14,20 @@
 # limitations under the License.
 
 from synapse.crypto.keyclient import fetch_server_key
-from twisted.internet import defer
-from syutil.crypto.jsonsign import (
-    verify_signed_json, signature_ids, sign_json, encode_canonical_json
-)
-from syutil.crypto.signing_key import (
-    is_signing_algorithm_supported, decode_verify_key_bytes
-)
-from syutil.base64util import decode_base64, encode_base64
 from synapse.api.errors import SynapseError, Codes
-
 from synapse.util.retryutils import get_retry_limiter
 from synapse.util import unwrapFirstError
-
 from synapse.util.async import ObservableDeferred
+
+from twisted.internet import defer
+
+from signedjson.sign import (
+    verify_signed_json, signature_ids, sign_json, encode_canonical_json
+)
+from signedjson.key import (
+    is_signing_algorithm_supported, decode_verify_key_bytes
+)
+from unpaddedbase64 import decode_base64, encode_base64
 
 from OpenSSL import crypto
 

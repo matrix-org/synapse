@@ -18,7 +18,8 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet
 from synapse.types import UserID
-from syutil.jsonutil import encode_canonical_json
+
+from canonicaljson import encode_canonical_json
 
 from ._base import client_v2_pattern
 

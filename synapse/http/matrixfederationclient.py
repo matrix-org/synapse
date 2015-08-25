@@ -25,13 +25,13 @@ from synapse.util.async import sleep
 from synapse.util.logcontext import preserve_context_over_fn
 import synapse.metrics
 
-from syutil.jsonutil import encode_canonical_json
+from canonicaljson import encode_canonical_json
 
 from synapse.api.errors import (
     SynapseError, Codes, HttpResponseException,
 )
 
-from syutil.crypto.jsonsign import sign_json
+from signedjson.sign import sign_json
 
 import simplejson as json
 import logging
