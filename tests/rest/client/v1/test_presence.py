@@ -73,7 +73,6 @@ class PresenceStateTestCase(unittest.TestCase):
         def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(myid),
-                "admin": False,
                 "token_id": 1,
             }
 
@@ -161,7 +160,6 @@ class PresenceListTestCase(unittest.TestCase):
         def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(myid),
-                "admin": False,
                 "token_id": 1,
             }
 

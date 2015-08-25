@@ -64,7 +64,6 @@ class RoomTypingTestCase(RestTestCase):
         def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(self.auth_user_id),
-                "admin": False,
                 "token_id": 1,
             }
 

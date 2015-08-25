@@ -41,7 +41,6 @@ class AuthTestCase(unittest.TestCase):
         user_info = {
             "name": self.test_user,
             "token_id": "ditto",
-            "admin": False
         }
         self.store.get_user_by_access_token = Mock(return_value=user_info)
 
@@ -66,7 +65,6 @@ class AuthTestCase(unittest.TestCase):
         user_info = {
             "name": self.test_user,
             "token_id": "ditto",
-            "admin": False
         }
         self.store.get_user_by_access_token = Mock(return_value=user_info)
 
