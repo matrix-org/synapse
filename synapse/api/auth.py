@@ -354,9 +354,7 @@ class Auth(object):
 
                 request.authenticated_entity = user_id
 
-                defer.returnValue(
-                    (UserID.from_string(user_id), "")
-                )
+                defer.returnValue((UserID.from_string(user_id), ""))
                 return
             except KeyError:
                 pass  # normal users won't have the user_id query parameter set.
