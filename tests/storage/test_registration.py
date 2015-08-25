@@ -54,7 +54,6 @@ class RegistrationStoreTestCase(unittest.TestCase):
         self.assertDictContainsSubset(
             {
                 "admin": 0,
-                 "device_id": None,
                  "name": self.user_id,
             },
             result
@@ -72,7 +71,6 @@ class RegistrationStoreTestCase(unittest.TestCase):
         self.assertDictContainsSubset(
             {
                 "admin": 0,
-                 "device_id": None,
                  "name": self.user_id,
             },
             result

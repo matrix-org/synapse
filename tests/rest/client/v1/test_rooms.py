@@ -58,7 +58,6 @@ class RoomPermissionsTestCase(RestTestCase):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
         hs.get_v1auth().get_user_by_access_token = _get_user_by_access_token
@@ -445,7 +444,6 @@ class RoomsMemberListTestCase(RestTestCase):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
         hs.get_v1auth().get_user_by_access_token = _get_user_by_access_token
@@ -525,7 +523,6 @@ class RoomsCreateTestCase(RestTestCase):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
         hs.get_v1auth().get_user_by_access_token = _get_user_by_access_token
@@ -618,7 +615,6 @@ class RoomTopicTestCase(RestTestCase):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
 
@@ -725,7 +721,6 @@ class RoomMemberStateTestCase(RestTestCase):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
         hs.get_v1auth().get_user_by_access_token = _get_user_by_access_token
@@ -852,7 +847,6 @@ class RoomMessagesTestCase(RestTestCase):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
         hs.get_v1auth().get_user_by_access_token = _get_user_by_access_token
@@ -949,7 +943,6 @@ class RoomInitialSyncTestCase(RestTestCase):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
         hs.get_v1auth().get_user_by_access_token = _get_user_by_access_token

@@ -74,7 +74,6 @@ class PresenceStateTestCase(unittest.TestCase):
             return {
                 "user": UserID.from_string(myid),
                 "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
 
@@ -163,7 +162,6 @@ class PresenceListTestCase(unittest.TestCase):
             return {
                 "user": UserID.from_string(myid),
                 "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
 

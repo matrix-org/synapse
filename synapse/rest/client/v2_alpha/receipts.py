@@ -39,7 +39,7 @@ class ReceiptRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, receipt_type, event_id):
-        user, client = yield self.auth.get_user_by_req(request)
+        user, _ = yield self.auth.get_user_by_req(request)
 
         yield self.receipts_handler.received_client_receipt(
             room_id,
