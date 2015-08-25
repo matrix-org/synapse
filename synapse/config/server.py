@@ -22,6 +22,7 @@ class ServerConfig(Config):
         self.server_name = config["server_name"]
         self.pid_file = self.abspath(config.get("pid_file"))
         self.web_client = config["web_client"]
+        self.web_client_location = config.get("web_client_location", None)
         self.soft_file_limit = config["soft_file_limit"]
         self.daemonize = config.get("daemonize")
         self.print_pidfile = config.get("print_pidfile")
