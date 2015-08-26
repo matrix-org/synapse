@@ -25,7 +25,6 @@ import synapse.util.stringutils as stringutils
 from synapse.util.async import run_on_reactor
 from synapse.http.client import CaptchaServerHttpClient
 
-import bcrypt
 import logging
 import urllib
 
