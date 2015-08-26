@@ -33,6 +33,7 @@ import os
 
 import cgi
 import logging
+import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -181,10 +182,18 @@ class BaseMediaResource(Resource):
         if os.path.isfile(file_path):
             request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
             if upload_name:
-                request.setHeader(
-                    b"Content-Disposition",
-                    b"inline; filename=%s" % (upload_name.encode("utf-8"),),
-                )
+                if is_ascii(upload_name):
+                    request.setHeader(
+                        b"Content-Disposition",
+                        b"inline; filename=%s" % (upload_name.encode("utf-8"),),
+                    )
+                else:
+                    request.setHeader(
+                        b"Content-Disposition",
+                        b"inline; filename*=utf-8''%s" % (
+                            urllib.quote(upload_name.encode("utf-8")),
+                        ),
+                    )
 
             # cache for at least a day.
             # XXX: we might want to turn this off for data we don't want to
