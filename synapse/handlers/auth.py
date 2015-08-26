@@ -370,7 +370,24 @@ class AuthHandler(BaseHandler):
         del self.sessions[session["id"]]
 
     def hash(self, password):
+        """Computes a secure hash of password.
+
+        Args:
+            password (str): Password to hash.
+
+        Returns:
+            Hashed password (str).
+        """
         return bcrypt.hashpw(password, bcrypt.gensalt())
 
     def validate_hash(self, password, stored_hash):
+        """Validates that self.hash(password) == stored_hash.
+
+        Args:
+            password (str): Password to hash.
+            stored_hash (str): Expected hash value.
+
+        Returns:
+            Whether self.hash(password) == stored_hash (bool).
+        """
         return bcrypt.checkpw(password, stored_hash)
