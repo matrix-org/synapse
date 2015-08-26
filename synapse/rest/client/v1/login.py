@@ -83,10 +83,11 @@ class LoginRestServlet(ClientV1RestServlet):
 
         if not user_id.startswith('@'):
             user_id = UserID.create(
-                user_id, self.hs.hostname).to_string()
+                user_id, self.hs.hostname
+            ).to_string()
 
         auth_handler = self.handlers.auth_handler
-        access_token, refresh_token = yield auth_handler.login_with_password(
+        user_id, access_token, refresh_token = yield auth_handler.login_with_password(
             user_id=user_id,
             password=login_submission["password"])
 
