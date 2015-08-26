@@ -51,7 +51,16 @@ class Tox(Command):
 
     def run(self):
         #import here, cause outside the eggs aren't loaded
-        import tox
+        try:
+            import tox
+        except ImportError:
+            try:
+                self.distribution.fetch_build_eggs("tox")
+                import tox
+            except:
+                raise RuntimeError(
+                    "The tests need 'tox' to run. Please install 'tox'."
+                )
         import shlex
         args = self.tox_args
         if args:
@@ -75,6 +84,5 @@ setup(
     zip_safe=False,
     long_description=long_description,
     scripts=["synctl"] + glob.glob("scripts/*"),
-    tests_require=['tox'],
     cmdclass={'test': Tox},
 )
