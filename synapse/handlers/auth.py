@@ -163,7 +163,8 @@ class AuthHandler(BaseHandler):
         if not user_id.startswith('@'):
             user_id = UserID.create(user_id, self.hs.hostname).to_string()
 
-        yield self._check_password(user_id, password)
+        user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
+        self._check_password(user_id, password, password_hash)
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
@@ -280,27 +281,49 @@ class AuthHandler(BaseHandler):
             password (str): Password
         Returns:
             A tuple of:
+              The user's ID.
               The access token for the user's session.
               The refresh token for the user's session.
         Raises:
             StoreError if there was a problem storing the token.
             LoginError if there was an authentication problem.
         """
-        yield self._check_password(user_id, password)
+        user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
+        self._check_password(user_id, password, password_hash)
+
         logger.info("Logging in user %s", user_id)
         access_token = yield self.issue_access_token(user_id)
         refresh_token = yield self.issue_refresh_token(user_id)
-        defer.returnValue((access_token, refresh_token))
+        defer.returnValue((user_id, access_token, refresh_token))
 
     @defer.inlineCallbacks
-    def _check_password(self, user_id, password):
-        """Checks that user_id has passed password, raises LoginError if not."""
-        user_info = yield self.store.get_user_by_id(user_id=user_id)
-        if not user_info:
+    def _find_user_id_and_pwd_hash(self, user_id):
+        """Checks to see if a user with the given id exists. Will check case
+        insensitively, but will throw if there are multiple inexact matches.
+
+        Returns:
+            tuple: A 2-tuple of `(canonical_user_id, password_hash)`
+        """
+        user_infos = yield self.store.get_users_by_id_case_insensitive(user_id)
+        if not user_infos:
             logger.warn("Attempted to login as %s but they do not exist", user_id)
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
-        stored_hash = user_info["password_hash"]
+        if len(user_infos) > 1:
+            if user_id not in user_infos:
+                logger.warn(
+                    "Attempted to login as %s but it matches more than one user "
+                    "inexactly: %r",
+                    user_id, user_infos.keys()
+                )
+                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+
+            defer.returnValue((user_id, user_infos[user_id]))
+        else:
+            defer.returnValue(user_infos.popitem())
+
+    def _check_password(self, user_id, password, stored_hash):
+        """Checks that user_id has passed password, raises LoginError if not."""
         if not bcrypt.checkpw(password, stored_hash):
             logger.warn("Failed password login for user %s", user_id)
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
