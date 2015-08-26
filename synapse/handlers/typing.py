@@ -260,8 +260,8 @@ class TypingNotificationEventSource(object):
         )
 
         events = []
-        for room_id in handler._room_serials:
-            if room_id not in joined_room_ids:
+        for room_id in joined_room_ids:
+            if room_id not in handler._room_serials:
                 continue
             if handler._room_serials[room_id] <= from_key:
                 continue
