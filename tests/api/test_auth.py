@@ -14,7 +14,6 @@
 # limitations under the License.
 from tests import unittest
 from twisted.internet import defer
-from twisted.trial.unittest import FailTest
 
 from mock import Mock
 
@@ -251,7 +250,6 @@ class AuthTestCase(unittest.TestCase):
             return_value={"name": "@baldrick:matrix.org"}
         )
 
-        self.todo = (FailTest, "Token expiry isn't currently enabled",)
         self.store.get_user_by_access_token = Mock(
             return_value={"name": "@baldrick:matrix.org"}
         )
@@ -267,7 +265,12 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("time < 1") # ms
 
         self.hs.clock.now = 5000 # seconds
-        with self.assertRaises(AuthError) as cm:
-            yield self.auth._get_user_from_macaroon(macaroon.serialize())
-        self.assertEqual(401, cm.exception.code)
-        self.assertIn("Invalid macaroon", cm.exception.msg)
+
+        yield self.auth._get_user_from_macaroon(macaroon.serialize())
+        # TODO(daniel): Turn on the check that we validate expiration, when we
+        # validate expiration (and remove the above line, which will start
+        # throwing).
+        # with self.assertRaises(AuthError) as cm:
+        #     yield self.auth._get_user_from_macaroon(macaroon.serialize())
+        # self.assertEqual(401, cm.exception.code)
+        # self.assertIn("Invalid macaroon", cm.exception.msg)
