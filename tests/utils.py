@@ -27,6 +27,7 @@ from twisted.enterprise.adbapi import ConnectionPool
 
 from collections import namedtuple
 from mock import patch, Mock
+import hashlib
 import urllib
 import urlparse
 
@@ -66,6 +67,18 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
             database_engine=create_engine("sqlite3"),
             **kargs
         )
+
+    # bcrypt is far too slow to be doing in unit tests
+    def swap_out_hash_for_testing(old_build_handlers):
+        def build_handlers():
+            handlers = old_build_handlers()
+            auth_handler = handlers.auth_handler
+            auth_handler.hash = lambda p: hashlib.md5(p).hexdigest()
+            auth_handler.validate_hash = lambda p, h: hashlib.md5(p).hexdigest() == h
+            return handlers
+        return build_handlers
+
+    hs.build_handlers = swap_out_hash_for_testing(hs.build_handlers)
 
     defer.returnValue(hs)
 
