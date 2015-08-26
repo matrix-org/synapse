@@ -155,7 +155,7 @@ class BaseMediaResource(Resource):
                 if upload_name:
                     upload_name = urlparse.unquote(upload_name)
                     try:
-                        upload_name = upload_name.decode("utf-8");
+                        upload_name = upload_name.decode("utf-8")
                     except UnicodeDecodeError:
                         upload_name = None
             else:

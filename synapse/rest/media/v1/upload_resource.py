@@ -86,7 +86,13 @@ class UploadResource(BaseMediaResource):
 
         upload_name = request.args.get("filename", None)
         if upload_name:
-            upload_name = upload_name[0].decode('UTF-8')
+            try:
+                upload_name = upload_name[0].decode('UTF-8')
+            except UnicodeDecodeError:
+                raise SynapseError(
+                    msg="Invalid UTF-8 filename parameter: %r" % (upload_name),
+                    code=400,
+                )
 
         headers = request.requestHeaders
 
