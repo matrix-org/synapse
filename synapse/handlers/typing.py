@@ -204,15 +204,11 @@ class TypingNotificationHandler(BaseHandler):
             )
 
     def _push_update_local(self, room_id, user, typing):
-        if room_id not in self._room_serials:
-            self._room_serials[room_id] = 0
-            self._room_typing[room_id] = set()
-
-        room_set = self._room_typing[room_id]
+        room_set = self._room_typing.setdefault(room_id, set())
         if typing:
             room_set.add(user)
-        elif user in room_set:
-            room_set.remove(user)
+        else:
+            room_set.discard(user)
 
         self._latest_room_serial += 1
         self._room_serials[room_id] = self._latest_room_serial
@@ -260,8 +256,8 @@ class TypingNotificationEventSource(object):
         )
 
         events = []
-        for room_id in handler._room_serials:
-            if room_id not in joined_room_ids:
+        for room_id in joined_room_ids:
+            if room_id not in handler._room_serials:
                 continue
             if handler._room_serials[room_id] <= from_key:
                 continue
