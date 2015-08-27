@@ -1,3 +1,8 @@
+Changes in synapse v0.10.0-rc5 (2015-08-27)
+===========================================
+
+* Fix bug that broke downloading files with ascii filenames across federation.
+
 Changes in synapse v0.10.0-rc4 (2015-08-27)
 ===========================================
 
