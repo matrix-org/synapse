@@ -150,8 +150,9 @@ class BaseMediaResource(Resource):
                     upload_name = None
                 else:
                     upload_name_utf8 = params.get("filename*", None)
-                    if upload_name and upload_name_utf8.lower().startswith("utf-8''"):
-                        upload_name = upload_name_utf8[7:]
+                    if upload_name_utf8:
+                        if upload_name_utf8.lower().startswith("utf-8''"):
+                            upload_name = upload_name_utf8[7:]
                 if upload_name:
                     upload_name = urlparse.unquote(upload_name)
                     try:
