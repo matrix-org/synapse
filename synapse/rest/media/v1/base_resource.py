@@ -145,14 +145,20 @@ class BaseMediaResource(Resource):
             content_disposition = headers.get("Content-Disposition", None)
             if content_disposition:
                 _, params = cgi.parse_header(content_disposition[0],)
-                upload_name = params.get("filename", None)
-                if upload_name and not is_ascii(upload_name):
-                    upload_name = None
-                else:
-                    upload_name_utf8 = params.get("filename*", None)
-                    if upload_name_utf8:
-                        if upload_name_utf8.lower().startswith("utf-8''"):
-                            upload_name = upload_name_utf8[7:]
+                upload_name = None
+
+                # First check if there is a valid UTF-8 filename
+                upload_name_utf8 = params.get("filename*", None)
+                if upload_name_utf8:
+                    if upload_name_utf8.lower().startswith("utf-8''"):
+                        upload_name = upload_name_utf8[7:]
+
+                # If there isn't check for an ascii name.
+                if not upload_name:
+                    upload_name_ascii = params.get("filename", None)
+                    if upload_name_ascii and is_ascii(upload_name_ascii):
+                        upload_name = upload_name_ascii
+
                 if upload_name:
                     upload_name = urlparse.unquote(upload_name)
                     try:
