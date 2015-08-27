@@ -1,18 +1,25 @@
+Changes in synapse v0.10.0-rc4 (2015-08-27)
+===========================================
+
+* Allow UTF-8 filenames for upload. (PR #259)
+
 Changes in synapse v0.10.0-rc3 (2015-08-25)
 ===========================================
 
 * Add ``--keys-directory`` config option to specify where files such as
   certs and signing keys should be stored in, when using ``--generate-config``
-  or ``--generate-keys``.
+  or ``--generate-keys``. (PR #250)
 * Allow ``--config-path`` to specify a directory, causing synapse to use all
-  \*.yaml files in the directory as config files.
+  \*.yaml files in the directory as config files. (PR #249)
 * Add ``web_client_location`` config option to specify static files to be
-  hosted by synapse under ``/_matrix/client``.
+  hosted by synapse under ``/_matrix/client``. (PR #245)
 * Add helper utility to synapse to read and parse the config files and extract
   the value of a given key. For example::
 
     $ python -m synapse.config read server_name -c homeserver.yaml
     localhost
+
+  (PR #246)
 
 
 Changes in synapse v0.10.0-rc2 (2015-08-24)
