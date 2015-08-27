@@ -15,7 +15,7 @@
 
 from synapse.http.server import respond_with_json, request_handler
 
-from synapse.util.stringutils import random_string, is_ascii
+from synapse.util.stringutils import random_string
 from synapse.api.errors import SynapseError
 
 from twisted.web.server import NOT_DONE_YET
@@ -86,9 +86,13 @@ class UploadResource(BaseMediaResource):
 
         upload_name = request.args.get("filename", None)
         if upload_name:
-            upload_name = upload_name[0]
-            if upload_name and not is_ascii(upload_name):
-                raise SynapseError(400, "filename must be ascii")
+            try:
+                upload_name = upload_name[0].decode('UTF-8')
+            except UnicodeDecodeError:
+                raise SynapseError(
+                    msg="Invalid UTF-8 filename parameter: %r" % (upload_name),
+                    code=400,
+                )
 
         headers = request.requestHeaders
 
