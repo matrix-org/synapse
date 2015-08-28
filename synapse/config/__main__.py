@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This is a reference implementation of a Matrix home server.
-"""
+if __name__ == "__main__":
+    import sys
+    from homeserver import HomeServerConfig
 
-__version__ = "0.10.0-rc5"
+    action = sys.argv[1]
+
+    if action == "read":
+        key = sys.argv[2]
+        config = HomeServerConfig.load_config("", sys.argv[3:])
+
+        print getattr(config, key)
+        sys.exit(0)
+    else:
+        sys.stderr.write("Unknown command %r\n" % (action,))
+        sys.exit(1)

@@ -331,7 +331,10 @@ class EventFederationStore(SQLBaseStore):
 
         txn.executemany(
             query,
-            [(ev.event_id, ev.room_id, ev.event_id) for ev in events]
+            [
+                (ev.event_id, ev.room_id, ev.event_id) for ev in events
+                if not ev.internal_metadata.is_outlier()
+            ]
         )
 
         query = (
@@ -358,7 +361,10 @@ class EventFederationStore(SQLBaseStore):
         )
         txn.executemany(
             query,
-            [(ev.event_id, ev.room_id) for ev in events]
+            [
+                (ev.event_id, ev.room_id) for ev in events
+                if not ev.internal_metadata.is_outlier()
+            ]
         )
 
         for room_id in events_by_room:

@@ -328,10 +328,13 @@ class Notifier(object):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def get_events_for(self, user, rooms, pagination_config, timeout):
+    def get_events_for(self, user, rooms, pagination_config, timeout,
+                       only_room_events=False):
         """ For the given user and rooms, return any new events for them. If
         there are no new events wait for up to `timeout` milliseconds for any
         new events to happen before returning.
+
+        If `only_room_events` is `True` only room events will be returned.
         """
         from_token = pagination_config.from_token
         if not from_token:
@@ -351,6 +354,8 @@ class Notifier(object):
                 before_id = getattr(before_token, keyname)
                 after_id = getattr(after_token, keyname)
                 if before_id == after_id:
+                    continue
+                if only_room_events and name != "room":
                     continue
                 new_events, new_key = yield source.get_new_events_for_user(
                     user, getattr(from_token, keyname), limit,
