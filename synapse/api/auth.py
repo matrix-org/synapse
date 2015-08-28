@@ -20,7 +20,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.util.logutils import log_function
-from synapse.types import UserID
+from synapse.types import UserID, EventID
 
 import logging
 
@@ -91,7 +91,7 @@ class Auth(object):
                 self._check_power_levels(event, auth_events)
 
             if event.type == EventTypes.Redaction:
-                self._check_redaction(event, auth_events)
+                self.check_redaction(event, auth_events)
 
             logger.debug("Allowing! %s", event)
         except AuthError as e:
@@ -541,16 +541,33 @@ class Auth(object):
 
         return True
 
-    def _check_redaction(self, event, auth_events):
+    def check_redaction(self, event, auth_events):
+        """Check whether the event sender is allowed to redact the target event.
+
+        Returns:
+            True if the the sender is allowed to redact the target event if the
+            target event was created by them.
+            False if the sender is allowed to redact the target event with no
+            further checks.
+
+        Raises:
+            AuthError if the event sender is definitely not allowed to redact
+            the target event.
+        """
         user_level = self._get_user_power_level(event.user_id, auth_events)
 
         redact_level = self._get_named_level(auth_events, "redact", 50)
 
-        if user_level < redact_level:
-            raise AuthError(
-                403,
-                "You don't have permission to redact events"
-            )
+        if user_level > redact_level:
+            return False
+
+        if EventID.from_string(event.redacts).domain == self.hs.get_config().server_name:
+            return True
+
+        raise AuthError(
+            403,
+            "You don't have permission to redact events"
+        )
 
     def _check_power_levels(self, event, auth_events):
         user_list = event.content.get("users", {})

@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import LimitExceededError, SynapseError
+from synapse.api.errors import LimitExceededError, SynapseError, AuthError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID, RoomAlias
@@ -131,7 +131,7 @@ class BaseHandler(object):
                     )
 
         if event.type == EventTypes.CanonicalAlias:
-            # Check the alias is acually valid (at this time at least)
+            # Check the alias is actually valid (at this time at least)
             room_alias_str = event.content.get("alias", None)
             if room_alias_str:
                 room_alias = RoomAlias.from_string(room_alias_str)
@@ -144,6 +144,21 @@ class BaseHandler(object):
                         "Room alias %s does not point to the room" % (
                             room_alias_str,
                         )
+                    )
+
+        if event.type == EventTypes.Redaction:
+            if self.auth.check_redaction(event, auth_events=context.current_state):
+                original_event = yield self.store.get_event(
+                    event.redacts,
+                    check_redacted=False,
+                    get_prev_content=False,
+                    allow_rejected=False,
+                    allow_none=False
+                )
+                if event.user_id != original_event.user_id:
+                    raise AuthError(
+                        403,
+                        "You don't have permission to redact events"
                     )
 
         destinations = set(extra_destinations)
