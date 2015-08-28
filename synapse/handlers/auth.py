@@ -324,7 +324,7 @@ class AuthHandler(BaseHandler):
 
     def _check_password(self, user_id, password, stored_hash):
         """Checks that user_id has passed password, raises LoginError if not."""
-        if not bcrypt.checkpw(password, stored_hash):
+        if not self.validate_hash(password, stored_hash):
             logger.warn("Failed password login for user %s", user_id)
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
@@ -369,7 +369,7 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword):
-        password_hash = bcrypt.hashpw(newpassword, bcrypt.gensalt())
+        password_hash = self.hash(newpassword)
 
         yield self.store.user_set_password_hash(user_id, password_hash)
         yield self.store.user_delete_access_tokens(user_id)
@@ -391,3 +391,26 @@ class AuthHandler(BaseHandler):
     def _remove_session(self, session):
         logger.debug("Removing session %s", session)
         del self.sessions[session["id"]]
+
+    def hash(self, password):
+        """Computes a secure hash of password.
+
+        Args:
+            password (str): Password to hash.
+
+        Returns:
+            Hashed password (str).
+        """
+        return bcrypt.hashpw(password, bcrypt.gensalt())
+
+    def validate_hash(self, password, stored_hash):
+        """Validates that self.hash(password) == stored_hash.
+
+        Args:
+            password (str): Password to hash.
+            stored_hash (str): Expected hash value.
+
+        Returns:
+            Whether self.hash(password) == stored_hash (bool).
+        """
+        return bcrypt.checkpw(password, stored_hash)

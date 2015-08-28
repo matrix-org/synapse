@@ -25,7 +25,6 @@ import synapse.util.stringutils as stringutils
 from synapse.util.async import run_on_reactor
 from synapse.http.client import CaptchaServerHttpClient
 
-import bcrypt
 import logging
 import urllib
 
@@ -82,7 +81,7 @@ class RegistrationHandler(BaseHandler):
         yield run_on_reactor()
         password_hash = None
         if password:
-            password_hash = bcrypt.hashpw(password, bcrypt.gensalt())
+            password_hash = self.auth_handler().hash(password)
 
         if localpart:
             yield self.check_username(localpart)
