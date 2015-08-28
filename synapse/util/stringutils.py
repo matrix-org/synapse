@@ -38,6 +38,8 @@ def random_string_with_symbols(length):
 def is_ascii(s):
     try:
         s.encode("ascii")
+    except UnicodeEncodeError:
+        return False
     except UnicodeDecodeError:
         return False
     else:

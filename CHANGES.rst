@@ -1,4 +1,43 @@
-Changes in synapse v0.10.0-rc1 (2015-08-20)
+Changes in synapse v0.10.0-rc5 (2015-08-27)
+===========================================
+
+* Fix bug that broke downloading files with ascii filenames across federation.
+
+Changes in synapse v0.10.0-rc4 (2015-08-27)
+===========================================
+
+* Allow UTF-8 filenames for upload. (PR #259)
+
+Changes in synapse v0.10.0-rc3 (2015-08-25)
+===========================================
+
+* Add ``--keys-directory`` config option to specify where files such as
+  certs and signing keys should be stored in, when using ``--generate-config``
+  or ``--generate-keys``. (PR #250)
+* Allow ``--config-path`` to specify a directory, causing synapse to use all
+  \*.yaml files in the directory as config files. (PR #249)
+* Add ``web_client_location`` config option to specify static files to be
+  hosted by synapse under ``/_matrix/client``. (PR #245)
+* Add helper utility to synapse to read and parse the config files and extract
+  the value of a given key. For example::
+
+    $ python -m synapse.config read server_name -c homeserver.yaml
+    localhost
+
+  (PR #246)
+
+
+Changes in synapse v0.10.0-rc2 (2015-08-24)
+===========================================
+
+* Fix bug where we incorrectly populated the ``event_forward_extremities``
+  table, resulting in problems joining large remote rooms (e.g.
+  ``#matrix:matrix.org``)
+* Reduce the number of times we wake up pushers by not listening for presence
+  or typing events, reducing the CPU cost of each pusher.
+
+
+Changes in synapse v0.10.0-rc1 (2015-08-21)
 ===========================================
 
 Also see v0.9.4-rc1 changelog, which has been amalgamated into this release.
@@ -10,6 +49,9 @@ General:
   (PR #208)
 * Add support for logging in with email address (PR #234)
 * Add support for new ``m.room.canonical_alias`` event. (PR #233)
+* Change synapse to treat user IDs case insensitively during registration and
+  login. (If two users already exist with case insensitive matching user ids,
+  synapse will continue to require them to specify their user ids exactly.)
 * Error if a user tries to register with an email already in use. (PR #211)
 * Add extra and improve existing caches  (PR #212, #219, #226, #228)
 * Batch various storage request (PR #226, #228)

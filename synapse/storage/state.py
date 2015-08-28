@@ -403,8 +403,15 @@ class StateStore(SQLBaseStore):
                 state_dict = results[group]
 
             for event_id in state_ids:
-                state_event = state_events[event_id]
-                state_dict[(state_event.type, state_event.state_key)] = state_event
+                try:
+                    state_event = state_events[event_id]
+                    state_dict[(state_event.type, state_event.state_key)] = state_event
+                except KeyError:
+                    # Hmm. So we do don't have that state event? Interesting.
+                    logger.warn(
+                        "Can't find state event %r for state group %r",
+                        event_id, group,
+                    )
 
             self._state_group_cache.update(
                 cache_seq_num,

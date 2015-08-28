@@ -33,6 +33,8 @@ import os
 
 import cgi
 import logging
+import urllib
+import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +44,13 @@ def parse_media_id(request):
         # This allows users to append e.g. /test.png to the URL. Useful for
         # clients that parse the URL to see content type.
         server_name, media_id = request.postpath[:2]
-        if len(request.postpath) > 2 and is_ascii(request.postpath[-1]):
-            return server_name, media_id, request.postpath[-1]
-        else:
-            return server_name, media_id, None
+        file_name = None
+        if len(request.postpath) > 2:
+            try:
+                file_name = urlparse.unquote(request.postpath[-1]).decode("utf-8")
+            except UnicodeDecodeError:
+                pass
+        return server_name, media_id, file_name
     except:
         raise SynapseError(
             404,
@@ -140,9 +145,26 @@ class BaseMediaResource(Resource):
             content_disposition = headers.get("Content-Disposition", None)
             if content_disposition:
                 _, params = cgi.parse_header(content_disposition[0],)
-                upload_name = params.get("filename", None)
-                if upload_name and not is_ascii(upload_name):
-                    upload_name = None
+                upload_name = None
+
+                # First check if there is a valid UTF-8 filename
+                upload_name_utf8 = params.get("filename*", None)
+                if upload_name_utf8:
+                    if upload_name_utf8.lower().startswith("utf-8''"):
+                        upload_name = upload_name_utf8[7:]
+
+                # If there isn't check for an ascii name.
+                if not upload_name:
+                    upload_name_ascii = params.get("filename", None)
+                    if upload_name_ascii and is_ascii(upload_name_ascii):
+                        upload_name = upload_name_ascii
+
+                if upload_name:
+                    upload_name = urlparse.unquote(upload_name)
+                    try:
+                        upload_name = upload_name.decode("utf-8")
+                    except UnicodeDecodeError:
+                        upload_name = None
             else:
                 upload_name = None
 
@@ -181,10 +203,20 @@ class BaseMediaResource(Resource):
         if os.path.isfile(file_path):
             request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
             if upload_name:
-                request.setHeader(
-                    b"Content-Disposition",
-                    b"inline; filename=%s" % (upload_name.encode("utf-8"),),
-                )
+                if is_ascii(upload_name):
+                    request.setHeader(
+                        b"Content-Disposition",
+                        b"inline; filename=%s" % (
+                            urllib.quote(upload_name.encode("utf-8")),
+                        ),
+                    )
+                else:
+                    request.setHeader(
+                        b"Content-Disposition",
+                        b"inline; filename*=utf-8''%s" % (
+                            urllib.quote(upload_name.encode("utf-8")),
+                        ),
+                    )
 
             # cache for at least a day.
             # XXX: we might want to turn this off for data we don't want to

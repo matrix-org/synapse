@@ -107,6 +107,22 @@ class BaseHandler(object):
         if not suppress_auth:
             self.auth.check(event, auth_events=context.current_state)
 
+        if event.type == EventTypes.CanonicalAlias:
+            # Check the alias is acually valid (at this time at least)
+            room_alias_str = event.content.get("alias", None)
+            if room_alias_str:
+                room_alias = RoomAlias.from_string(room_alias_str)
+                directory_handler = self.hs.get_handlers().directory_handler
+                mapping = yield directory_handler.get_association(room_alias)
+
+                if mapping["room_id"] != event.room_id:
+                    raise SynapseError(
+                        400,
+                        "Room alias %s does not point to the room" % (
+                            room_alias_str,
+                        )
+                    )
+
         (event_stream_id, max_stream_id) = yield self.store.persist_event(
             event, context=context
         )
@@ -128,22 +144,6 @@ class BaseHandler(object):
                     # TODO: Make sure the signatures actually are correct.
                     event.signatures.update(
                         returned_invite.signatures
-                    )
-
-        if event.type == EventTypes.CanonicalAlias:
-            # Check the alias is actually valid (at this time at least)
-            room_alias_str = event.content.get("alias", None)
-            if room_alias_str:
-                room_alias = RoomAlias.from_string(room_alias_str)
-                directory_handler = self.hs.get_handlers().directory_handler
-                mapping = yield directory_handler.get_association(room_alias)
-
-                if mapping["room_id"] != event.room_id:
-                    raise SynapseError(
-                        400,
-                        "Room alias %s does not point to the room" % (
-                            room_alias_str,
-                        )
                     )
 
         if event.type == EventTypes.Redaction:
