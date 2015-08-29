@@ -403,7 +403,7 @@ class Porter(object):
 
             ts_ind = headers.index('ts')
 
-            return headers, [r for r in rows if r[ts_ind] < yesterday]
+            return headers, [r for r in rows if r[ts_ind] >= yesterday]
 
         headers, rows = yield self.sqlite_store.runInteraction(
             "select", r,
@@ -412,14 +412,17 @@ class Porter(object):
         self._convert_rows("sent_transactions", headers, rows)
 
         inserted_rows = len(rows)
-        max_inserted_rowid = max(r[0] for r in rows)
+        max_inserted_rowid = 0
 
-        def insert(txn):
-            self.postgres_store.insert_many_txn(
-                txn, "sent_transactions", headers[1:], rows
-            )
+        if inserted_rows > 0:
+            max_inserted_rowid = max(r[0] for r in rows)
 
-        yield self.postgres_store.execute(insert)
+            def insert(txn):
+                self.postgres_store.insert_many_txn(
+                    txn, "sent_transactions", headers[1:], rows
+                )
+
+            yield self.postgres_store.execute(insert)
 
         def get_start_id(txn):
             txn.execute(
