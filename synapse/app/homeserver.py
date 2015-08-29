@@ -403,7 +403,7 @@ def setup(config_options):
         database_engine=database_engine,
     )
 
-    logger.info("Preparing database: %r...", config.database_config)
+    logger.info("Preparing database: %s...", config.database_config['name'])
 
     try:
         db_conn = database_engine.module.connect(
@@ -425,7 +425,7 @@ def setup(config_options):
         )
         sys.exit(1)
 
-    logger.info("Database prepared in %r.", config.database_config)
+    logger.info("Database prepared in %s.", config.database_config['name'])
 
     hs.start_listening()
 
