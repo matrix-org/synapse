@@ -403,7 +403,7 @@ class Porter(object):
 
             ts_ind = headers.index('ts')
 
-            return headers, [r for r in rows if r[ts_ind] < yesterday]
+            return headers, [r for r in rows if r[ts_ind] >= yesterday]
 
         headers, rows = yield self.sqlite_store.runInteraction(
             "select", r,
