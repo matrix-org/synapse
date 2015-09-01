@@ -367,7 +367,7 @@ class Auth(object):
                 pass  # normal users won't have the user_id query parameter set.
 
             user_info = yield self._get_user_by_access_token(access_token)
-            user_id = user_info["user_id"]
+            user = user_info["user"]
             token_id = user_info["token_id"]
 
             ip_addr = self.hs.get_ip_from_request(request)
@@ -375,17 +375,17 @@ class Auth(object):
                 "User-Agent",
                 default=[""]
             )[0]
-            if user_id and access_token and ip_addr:
+            if user and access_token and ip_addr:
                 self.store.insert_client_ip(
-                    user=user_id,
+                    user=user,
                     access_token=access_token,
                     ip=ip_addr,
                     user_agent=user_agent
                 )
 
-            request.authenticated_entity = user_id.to_string()
+            request.authenticated_entity = user.to_string()
 
-            defer.returnValue((user_id, token_id,))
+            defer.returnValue((user, token_id,))
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
@@ -420,18 +420,18 @@ class Auth(object):
             user_prefix = "user_id = "
             for caveat in macaroon.caveats:
                 if caveat.caveat_id.startswith(user_prefix):
-                    user_id = UserID.from_string(caveat.caveat_id[len(user_prefix):])
+                    user = UserID.from_string(caveat.caveat_id[len(user_prefix):])
                     # This codepath exists so that we can actually return a
                     # token ID, because we use token IDs in place of device
                     # identifiers throughout the codebase.
                     # TODO(daniel): Remove this fallback when device IDs are
                     # properly implemented.
                     ret = yield self._look_up_user_by_access_token(macaroon_str)
-                    if ret["user_id"] != user_id:
+                    if ret["user"] != user:
                         logger.error(
                             "Macaroon user (%s) != DB user (%s)",
-                            user_id,
-                            ret["user_id"]
+                            user,
+                            ret["user"]
                         )
                         raise AuthError(
                             self.TOKEN_NOT_FOUND_HTTP_STATUS,
@@ -490,7 +490,7 @@ class Auth(object):
                 errcode=Codes.UNKNOWN_TOKEN
             )
         user_info = {
-            "user_id": UserID.from_string(ret.get("name")),
+            "user": UserID.from_string(ret.get("name")),
             "token_id": ret.get("token_id", None),
         }
         defer.returnValue(user_info)

@@ -146,17 +146,17 @@ class AuthTestCase(unittest.TestCase):
             return_value={"name": "@baldrick:matrix.org"}
         )
 
-        user = "@baldrick:matrix.org"
+        user_id = "@baldrick:matrix.org"
         macaroon = pymacaroons.Macaroon(
             location=self.hs.config.server_name,
             identifier="key",
             key=self.hs.config.macaroon_secret_key)
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = access")
-        macaroon.add_first_party_caveat("user_id = %s" % (user,))
+        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         user_info = yield self.auth._get_user_from_macaroon(macaroon.serialize())
-        user_id = user_info["user_id"]
-        self.assertEqual(UserID.from_string(user), user_id)
+        user = user_info["user"]
+        self.assertEqual(UserID.from_string(user_id), user)
 
     @defer.inlineCallbacks
     def test_get_user_from_macaroon_user_db_mismatch(self):

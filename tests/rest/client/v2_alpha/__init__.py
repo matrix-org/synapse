@@ -45,7 +45,7 @@ class V2AlphaRestTestCase(unittest.TestCase):
 
         def _get_user_by_access_token(token=None):
             return {
-                "user_id": UserID.from_string(self.USER_ID),
+                "user": UserID.from_string(self.USER_ID),
                 "token_id": 1,
             }
         hs.get_auth()._get_user_by_access_token = _get_user_by_access_token
