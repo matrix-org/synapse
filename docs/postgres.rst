@@ -55,9 +55,8 @@ Porting from SQLite
 Overview
 ~~~~~~~~
 
-The script ``port_from_sqlite_to_postgres.py`` allows porting an existing
-synapse server backed by SQLite to using PostgreSQL. This is done in as a two
-phase process:
+The script ``synapse_port_db`` allows porting an existing synapse server
+backed by SQLite to using PostgreSQL. This is done in as a two phase process:
 
 1. Copy the existing SQLite database to a separate location (while the server
    is down) and running the port script against that offline database.
@@ -86,8 +85,7 @@ Assuming your new config file (as described in the section *Synapse config*)
 is named ``homeserver-postgres.yaml`` and the SQLite snapshot is at
 ``homeserver.db.snapshot`` then simply run::
 
-    python scripts/port_from_sqlite_to_postgres.py \
-        --sqlite-database homeserver.db.snapshot \
+    synapse_port_db --sqlite-database homeserver.db.snapshot \
         --postgres-config homeserver-postgres.yaml
 
 The flag ``--curses`` displays a coloured curses progress UI.
@@ -100,8 +98,7 @@ To complete the conversion shut down the synapse server and run the port
 script one last time, e.g. if the SQLite database is at  ``homeserver.db``
 run::
 
-    python scripts/port_from_sqlite_to_postgres.py \
-        --sqlite-database homeserver.db \
+    synapse_port_db --sqlite-database homeserver.db \
         --postgres-config database_config.yaml
 
 Once that has completed, change the synapse config to point at the PostgreSQL
