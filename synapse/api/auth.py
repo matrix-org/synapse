@@ -561,7 +561,9 @@ class Auth(object):
         if user_level > redact_level:
             return False
 
-        if EventID.from_string(event.redacts).domain == self.hs.get_config().server_name:
+        redacter_domain = EventID.from_string(event.event_id).domain
+        redactee_domain = EventID.from_string(event.redacts).domain
+        if redacter_domain == redactee_domain:
             return True
 
         raise AuthError(
