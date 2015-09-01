@@ -20,7 +20,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.util.logutils import log_function
-from synapse.types import EventID, RoomID, UserID
+from synapse.types import RoomID, UserID
 
 import logging
 
@@ -66,10 +66,10 @@ class Auth(object):
                 return True
 
             creating_domain = RoomID.from_string(event.room_id).domain
-            originating_domain = EventID.from_string(event.event_id).domain
+            originating_domain = UserID.from_string(event.sender).domain
             if creating_domain != originating_domain:
                 if not self.can_federate(event, auth_events):
-                    raise SynapseError(
+                    raise AuthError(
                         403,
                         "This room has been marked as unfederatable."
                     )
