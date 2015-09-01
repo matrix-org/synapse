@@ -69,7 +69,7 @@ class Auth(object):
 
             if not creation_event:
                 raise SynapseError(
-                    400,
+                    403,
                     "Room %r does not exist" % (event.room_id,)
                 )
 
