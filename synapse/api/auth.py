@@ -20,7 +20,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.util.logutils import log_function
-from synapse.types import UserID
+from synapse.types import EventID, RoomID, UserID
 
 import logging
 
@@ -66,12 +66,20 @@ class Auth(object):
                 return True
 
             creation_event = auth_events.get((EventTypes.Create, ""), None)
-
             if not creation_event:
                 raise SynapseError(
                     403,
                     "Room %r does not exist" % (event.room_id,)
                 )
+
+            creating_domain = RoomID.from_string(event.room_id).domain
+            originating_domain = EventID.from_string(event.event_id).domain
+            if creating_domain != originating_domain:
+                if not self.can_federate(event, auth_events):
+                    raise SynapseError(
+                        403,
+                        "This room has been marked as unfederatable."
+                    )
 
             # FIXME: Temp hack
             if event.type == EventTypes.Aliases:
@@ -160,6 +168,11 @@ class Auth(object):
             raise AuthError(403, "User %s not in room %s (%s)" % (
                 user_id, room_id, repr(member)
             ))
+
+    def can_federate(self, event, auth_events):
+        creation_event = auth_events.get((EventTypes.Create, ""))
+
+        return creation_event.content.get("m.federate", True) is True
 
     @log_function
     def is_membership_change_allowed(self, event, auth_events):
