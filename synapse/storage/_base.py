@@ -167,7 +167,7 @@ class SQLBaseStore(object):
         self._get_event_cache = Cache("*getEvent*", keylen=3, lru=True,
                                       max_entries=hs.config.event_cache_size)
 
-        self._state_group_cache = DictionaryCache("*stateGroupCache*", 100000)
+        self._state_group_cache = DictionaryCache("*stateGroupCache*", 2000)
 
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list = []
