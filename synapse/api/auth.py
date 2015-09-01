@@ -65,6 +65,14 @@ class Auth(object):
                 # FIXME
                 return True
 
+            creation_event = auth_events.get((EventTypes.Create, ""), None)
+
+            if not creation_event:
+                raise SynapseError(
+                    403,
+                    "Room %r does not exist" % (event.room_id,)
+                )
+
             creating_domain = RoomID.from_string(event.room_id).domain
             originating_domain = UserID.from_string(event.sender).domain
             if creating_domain != originating_domain:
