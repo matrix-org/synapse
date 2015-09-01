@@ -150,12 +150,15 @@ class RoomCreationHandler(BaseHandler):
         for val in raw_initial_state:
             initial_state[(val["type"], val.get("state_key", ""))] = val["content"]
 
+        creation_content = config.get("creation_content", {})
+
         user = UserID.from_string(user_id)
         creation_events = self._create_events_for_new_room(
             user, room_id,
             preset_config=preset_config,
             invite_list=invite_list,
             initial_state=initial_state,
+            creation_content=creation_content,
         )
 
         msg_handler = self.hs.get_handlers().message_handler
@@ -203,7 +206,7 @@ class RoomCreationHandler(BaseHandler):
         defer.returnValue(result)
 
     def _create_events_for_new_room(self, creator, room_id, preset_config,
-                                    invite_list, initial_state):
+                                    invite_list, initial_state, creation_content):
         config = RoomCreationHandler.PRESETS_DICT[preset_config]
 
         creator_id = creator.to_string()
@@ -225,9 +228,10 @@ class RoomCreationHandler(BaseHandler):
 
             return e
 
+        creation_content.update({"creator": creator.to_string()})
         creation_event = create(
             etype=EventTypes.Create,
-            content={"creator": creator.to_string()},
+            content=creation_content,
         )
 
         join_event = create(
