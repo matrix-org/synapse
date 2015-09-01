@@ -56,11 +56,6 @@ def github_link(project, version, egg):
     return "https://github.com/%s/tarball/%s/#egg=%s" % (project, version, egg)
 
 DEPENDENCY_LINKS = {
-    "matrix-angular-sdk": github_link(
-        project="matrix-org/matrix-angular-sdk",
-        version="v0.6.6",
-        egg="matrix_angular_sdk-0.6.6",
-    ),
 }
 
 
