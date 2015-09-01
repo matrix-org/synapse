@@ -190,6 +190,15 @@ class Auth(object):
 
         target_user_id = event.state_key
 
+        creating_domain = RoomID.from_string(event.room_id).domain
+        target_domain = UserID.from_string(target_user_id).domain
+        if creating_domain != target_domain:
+            if not self.can_federate(event, auth_events):
+                raise AuthError(
+                    403,
+                    "This room has been marked as unfederatable."
+                )
+
         # get info about the caller
         key = (EventTypes.Member, event.user_id, )
         caller = auth_events.get(key)
