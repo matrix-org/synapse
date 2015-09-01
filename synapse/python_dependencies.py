@@ -18,18 +18,18 @@ from distutils.version import LooseVersion
 logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
+    "frozendict>=0.4": ["frozendict"],
     "unpaddedbase64>=1.0.1": ["unpaddedbase64>=1.0.1"],
     "canonicaljson>=1.0.0": ["canonicaljson>=1.0.0"],
     "signedjson>=1.0.0": ["signedjson>=1.0.0"],
-    "Twisted>=15.1.0": ["twisted>=15.1.0"],
+    "pynacl>=0.3.0": ["nacl>=0.3.0", "nacl.bindings"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
+    "Twisted>=15.1.0": ["twisted>=15.1.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
     "pyyaml": ["yaml"],
     "pyasn1": ["pyasn1"],
-    "pynacl>=0.3.0": ["nacl>=0.3.0"],
     "daemonize": ["daemonize"],
     "py-bcrypt": ["bcrypt"],
-    "frozendict>=0.4": ["frozendict"],
     "pillow": ["PIL"],
     "pydenticon": ["pydenticon"],
     "ujson": ["ujson"],
