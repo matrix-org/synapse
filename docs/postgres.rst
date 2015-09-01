@@ -98,7 +98,7 @@ To complete the conversion shut down the synapse server and run the port
 script one last time, e.g. if the SQLite database is at  ``homeserver.db``
 run::
 
-    synapse_port_db.py --sqlite-database homeserver.db \
+    synapse_port_db --sqlite-database homeserver.db \
         --postgres-config database_config.yaml
 
 Once that has completed, change the synapse config to point at the PostgreSQL
