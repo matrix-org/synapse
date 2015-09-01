@@ -65,6 +65,14 @@ class Auth(object):
                 # FIXME
                 return True
 
+            creation_event = auth_events.get((EventTypes.Create, ""), None)
+
+            if not creation_event:
+                raise SynapseError(
+                    400,
+                    "Room %r does not exist" % (event.room_id,)
+                )
+
             # FIXME: Temp hack
             if event.type == EventTypes.Aliases:
                 return True
