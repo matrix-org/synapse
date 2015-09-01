@@ -83,7 +83,12 @@ class Auth(object):
 
             # FIXME: Temp hack
             if event.type == EventTypes.Aliases:
-                return True
+                alias_domain = UserID.from_string(event.state_key).domain
+                if alias_domain != originating_domain:
+                    raise AuthError(
+                        403,
+                        "Can only set aliases for own domain"
+                    )
 
             logger.debug(
                 "Auth events: %s",
