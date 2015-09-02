@@ -182,7 +182,7 @@ class Config(object):
                             ) % (entry_path, )
                             continue
 
-                        files.add(config_path)
+                        files.append(entry_path)
 
                     config_files.extend(sorted(files))
                 else:
