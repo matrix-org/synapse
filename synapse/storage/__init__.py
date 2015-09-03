@@ -26,6 +26,7 @@ from .registration import RegistrationStore
 from .room import RoomStore
 from .roommember import RoomMemberStore
 from .stream import StreamStore
+from synapse.storage.invites import PendingInvitesStore
 from .transactions import TransactionStore
 from .keys import KeyStore
 from .event_federation import EventFederationStore
@@ -54,7 +55,7 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 23
+SCHEMA_VERSION = 24
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -79,6 +80,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 EventsStore,
                 ReceiptsStore,
                 EndToEndKeyStore,
+                PendingInvitesStore
                 ):
 
     def __init__(self, hs):
