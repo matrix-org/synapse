@@ -341,7 +341,7 @@ def get_version_string():
                 )
             ).encode("ascii")
     except Exception as e:
-        logger.warn("Failed to check for git repository: %s", e)
+        logger.info("Failed to check for git repository: %s", e)
 
     return ("Synapse/%s" % (synapse.__version__,)).encode("ascii")
 
