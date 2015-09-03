@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore, cached
+from ._base import SQLBaseStore
+from synapse.util.caches.descriptors import cached
 
 from synapse.api.errors import SynapseError
 
@@ -104,7 +105,7 @@ class DirectoryStore(SQLBaseStore):
                 },
                 desc="create_room_alias_association",
             )
-        self.get_aliases_for_room.invalidate(room_id)
+        self.get_aliases_for_room.invalidate((room_id,))
 
     @defer.inlineCallbacks
     def delete_room_alias(self, room_alias):
@@ -114,7 +115,7 @@ class DirectoryStore(SQLBaseStore):
             room_alias,
         )
 
-        self.get_aliases_for_room.invalidate(room_id)
+        self.get_aliases_for_room.invalidate((room_id,))
         defer.returnValue(room_id)
 
     def _delete_room_alias_txn(self, txn, room_alias):

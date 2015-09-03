@@ -19,7 +19,7 @@ from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError, Codes
 from synapse.http.servlet import RestServlet
 
-from ._base import client_v2_pattern, parse_request_allow_empty
+from ._base import client_v2_pattern, parse_json_dict_from_request
 
 import logging
 import hmac
@@ -50,26 +50,64 @@ class RegisterRestServlet(RestServlet):
         self.auth_handler = hs.get_handlers().auth_handler
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
-        self.login_handler = hs.get_handlers().login_handler
 
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor()
 
-        body = parse_request_allow_empty(request)
-        if 'password' not in body:
-            raise SynapseError(400, "", Codes.MISSING_PARAM)
+        if '/register/email/requestToken' in request.path:
+            ret = yield self.onEmailTokenRequest(request)
+            defer.returnValue(ret)
 
+        body = parse_json_dict_from_request(request)
+
+        # we do basic sanity checks here because the auth layer will store these
+        # in sessions. Pull out the username/password provided to us.
+        desired_password = None
+        if 'password' in body:
+            if (not isinstance(body['password'], basestring) or
+                    len(body['password']) > 512):
+                raise SynapseError(400, "Invalid password")
+            desired_password = body["password"]
+
+        desired_username = None
         if 'username' in body:
+            if (not isinstance(body['username'], basestring) or
+                    len(body['username']) > 512):
+                raise SynapseError(400, "Invalid username")
             desired_username = body['username']
-            yield self.registration_handler.check_username(desired_username)
 
-        is_using_shared_secret = False
-        is_application_server = False
-
-        service = None
+        appservice = None
         if 'access_token' in request.args:
-            service = yield self.auth.get_appservice_by_req(request)
+            appservice = yield self.auth.get_appservice_by_req(request)
+
+        # fork off as soon as possible for ASes and shared secret auth which
+        # have completely different registration flows to normal users
+
+        # == Application Service Registration ==
+        if appservice:
+            result = yield self._do_appservice_registration(
+                desired_username, request.args["access_token"][0]
+            )
+            defer.returnValue((200, result))  # we throw for non 200 responses
+            return
+
+        # == Shared Secret Registration == (e.g. create new user scripts)
+        if 'mac' in body:
+            # FIXME: Should we really be determining if this is shared secret
+            # auth based purely on the 'mac' key?
+            result = yield self._do_shared_secret_registration(
+                desired_username, desired_password, body["mac"]
+            )
+            defer.returnValue((200, result))  # we throw for non 200 responses
+            return
+
+        # == Normal User Registration == (everyone else)
+        if self.hs.config.disable_registration:
+            raise SynapseError(403, "Registration has been disabled")
+
+        if desired_username is not None:
+            yield self.registration_handler.check_username(desired_username)
 
         if self.hs.config.enable_registration_captcha:
             flows = [
@@ -82,39 +120,20 @@ class RegisterRestServlet(RestServlet):
                 [LoginType.EMAIL_IDENTITY]
             ]
 
-        result = None
-        if service:
-            is_application_server = True
-            params = body
-        elif 'mac' in body:
-            # Check registration-specific shared secret auth
-            if 'username' not in body:
-                raise SynapseError(400, "", Codes.MISSING_PARAM)
-            self._check_shared_secret_auth(
-                body['username'], body['mac']
-            )
-            is_using_shared_secret = True
-            params = body
-        else:
-            authed, result, params = yield self.auth_handler.check_auth(
-                flows, body, self.hs.get_ip_from_request(request)
-            )
-
-            if not authed:
-                defer.returnValue((401, result))
-
-        can_register = (
-            not self.hs.config.disable_registration
-            or is_application_server
-            or is_using_shared_secret
+        authed, result, params = yield self.auth_handler.check_auth(
+            flows, body, self.hs.get_ip_from_request(request)
         )
-        if not can_register:
-            raise SynapseError(403, "Registration has been disabled")
 
+        if not authed:
+            defer.returnValue((401, result))
+            return
+
+        # NB: This may be from the auth handler and NOT from the POST
         if 'password' not in params:
-            raise SynapseError(400, "", Codes.MISSING_PARAM)
-        desired_username = params['username'] if 'username' in params else None
-        new_password = params['password']
+            raise SynapseError(400, "Missing password.", Codes.MISSING_PARAM)
+
+        desired_username = params.get("username", None)
+        new_password = params.get("password", None)
 
         (user_id, token) = yield self.registration_handler.register(
             localpart=desired_username,
@@ -128,7 +147,7 @@ class RegisterRestServlet(RestServlet):
                 if reqd not in threepid:
                     logger.info("Can't add incomplete 3pid")
                 else:
-                    yield self.login_handler.add_threepid(
+                    yield self.auth_handler.add_threepid(
                         user_id,
                         threepid['medium'],
                         threepid['address'],
@@ -147,18 +166,21 @@ class RegisterRestServlet(RestServlet):
             else:
                 logger.info("bind_email not specified: not binding email")
 
-        result = {
-            "user_id": user_id,
-            "access_token": token,
-            "home_server": self.hs.hostname,
-        }
-
+        result = self._create_registration_details(user_id, token)
         defer.returnValue((200, result))
 
     def on_OPTIONS(self, _):
         return 200, {}
 
-    def _check_shared_secret_auth(self, username, mac):
+    @defer.inlineCallbacks
+    def _do_appservice_registration(self, username, as_token):
+        (user_id, token) = yield self.registration_handler.appservice_register(
+            username, as_token
+        )
+        defer.returnValue(self._create_registration_details(user_id, token))
+
+    @defer.inlineCallbacks
+    def _do_shared_secret_registration(self, username, password, mac):
         if not self.hs.config.registration_shared_secret:
             raise SynapseError(400, "Shared secret registration is not enabled")
 
@@ -174,12 +196,45 @@ class RegisterRestServlet(RestServlet):
             digestmod=sha1,
         ).hexdigest()
 
-        if compare_digest(want_mac, got_mac):
-            return True
-        else:
+        if not compare_digest(want_mac, got_mac):
             raise SynapseError(
                 403, "HMAC incorrect",
             )
+
+        (user_id, token) = yield self.registration_handler.register(
+            localpart=username, password=password
+        )
+        defer.returnValue(self._create_registration_details(user_id, token))
+
+    def _create_registration_details(self, user_id, token):
+        return {
+            "user_id": user_id,
+            "access_token": token,
+            "home_server": self.hs.hostname,
+        }
+
+    @defer.inlineCallbacks
+    def onEmailTokenRequest(self, request):
+        body = parse_json_dict_from_request(request)
+
+        required = ['id_server', 'client_secret', 'email', 'send_attempt']
+        absent = []
+        for k in required:
+            if k not in body:
+                absent.append(k)
+
+        if len(absent) > 0:
+            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+
+        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+            'email', body['email']
+        )
+
+        if existingUid is not None:
+            raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
+
+        ret = yield self.identity_handler.requestEmailToken(**body)
+        defer.returnValue((200, ret))
 
 
 def register_servlets(hs, http_server):

@@ -17,7 +17,8 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError, Codes
 
-from ._base import SQLBaseStore, cached
+from ._base import SQLBaseStore
+from synapse.util.caches.descriptors import cached
 
 
 class RegistrationStore(SQLBaseStore):
@@ -97,6 +98,20 @@ class RegistrationStore(SQLBaseStore):
             allow_none=True,
         )
 
+    def get_users_by_id_case_insensitive(self, user_id):
+        """Gets users that match user_id case insensitively.
+        Returns a mapping of user_id -> password_hash.
+        """
+        def f(txn):
+            sql = (
+                "SELECT name, password_hash FROM users"
+                " WHERE lower(name) = lower(?)"
+            )
+            txn.execute(sql, (user_id,))
+            return dict(txn.fetchall())
+
+        return self.runInteraction("get_users_by_id_case_insensitive", f)
+
     @defer.inlineCallbacks
     def user_set_password_hash(self, user_id, password_hash):
         """
@@ -111,16 +126,16 @@ class RegistrationStore(SQLBaseStore):
         })
 
     @defer.inlineCallbacks
-    def user_delete_access_tokens_apart_from(self, user_id, token_id):
+    def user_delete_access_tokens(self, user_id):
         yield self.runInteraction(
-            "user_delete_access_tokens_apart_from",
-            self._user_delete_access_tokens_apart_from, user_id, token_id
+            "user_delete_access_tokens",
+            self._user_delete_access_tokens, user_id
         )
 
-    def _user_delete_access_tokens_apart_from(self, txn, user_id, token_id):
+    def _user_delete_access_tokens(self, txn, user_id):
         txn.execute(
-            "DELETE FROM access_tokens WHERE user_id = ? AND id != ?",
-            (user_id, token_id)
+            "DELETE FROM access_tokens WHERE user_id = ?",
+            (user_id, )
         )
 
     @defer.inlineCallbacks
@@ -131,7 +146,7 @@ class RegistrationStore(SQLBaseStore):
             user_id
         )
         for r in rows:
-            self.get_user_by_token.invalidate(r)
+            self.get_user_by_token.invalidate((r,))
 
     @cached()
     def get_user_by_token(self, token):

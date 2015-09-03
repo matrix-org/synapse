@@ -57,8 +57,8 @@ class RegistrationHandler(BaseHandler):
 
         yield self.check_user_id_is_valid(user_id)
 
-        u = yield self.store.get_user_by_id(user_id)
-        if u:
+        users = yield self.store.get_users_by_id_case_insensitive(user_id)
+        if users:
             raise SynapseError(
                 400,
                 "User ID already taken.",
@@ -73,7 +73,8 @@ class RegistrationHandler(BaseHandler):
             localpart : The local part of the user ID to register. If None,
               one will be randomly generated.
             password (str) : The password to assign to this user so they can
-            login again.
+            login again. This can be None which means they cannot login again
+            via a password (e.g. the user is an application service user).
         Returns:
             A tuple of (user_id, access_token).
         Raises:
@@ -90,7 +91,7 @@ class RegistrationHandler(BaseHandler):
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
 
-            token = self._generate_token(user_id)
+            token = self.generate_token(user_id)
             yield self.store.register(
                 user_id=user_id,
                 token=token,
@@ -110,7 +111,7 @@ class RegistrationHandler(BaseHandler):
                     user_id = user.to_string()
                     yield self.check_user_id_is_valid(user_id)
 
-                    token = self._generate_token(user_id)
+                    token = self.generate_token(user_id)
                     yield self.store.register(
                         user_id=user_id,
                         token=token,
@@ -160,7 +161,7 @@ class RegistrationHandler(BaseHandler):
                 400, "Invalid user localpart for this application service.",
                 errcode=Codes.EXCLUSIVE
             )
-        token = self._generate_token(user_id)
+        token = self.generate_token(user_id)
         yield self.store.register(
             user_id=user_id,
             token=token,
@@ -191,6 +192,35 @@ class RegistrationHandler(BaseHandler):
             )
         else:
             logger.info("Valid captcha entered from %s", ip)
+
+    @defer.inlineCallbacks
+    def register_saml2(self, localpart):
+        """
+        Registers email_id as SAML2 Based Auth.
+        """
+        if urllib.quote(localpart) != localpart:
+            raise SynapseError(
+                400,
+                "User ID must only contain characters which do not"
+                " require URL encoding."
+                )
+        user = UserID(localpart, self.hs.hostname)
+        user_id = user.to_string()
+
+        yield self.check_user_id_is_valid(user_id)
+        token = self.generate_token(user_id)
+        try:
+            yield self.store.register(
+                user_id=user_id,
+                token=token,
+                password_hash=None
+            )
+            yield self.distributor.fire("registered_user", user)
+        except Exception, e:
+            yield self.store.add_access_token_to_user(user_id, token)
+            # Ignore Registration errors
+            logger.exception(e)
+        defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
     def register_email(self, threepidCreds):
@@ -243,7 +273,7 @@ class RegistrationHandler(BaseHandler):
                     errcode=Codes.EXCLUSIVE
                 )
 
-    def _generate_token(self, user_id):
+    def generate_token(self, user_id):
         # urlsafe variant uses _ and - so use . as the separator and replace
         # all =s with .s so http clients don't quote =s when it is used as
         # query params.

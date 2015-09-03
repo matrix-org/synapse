@@ -40,6 +40,7 @@ class Codes(object):
     TOO_LARGE = "M_TOO_LARGE"
     EXCLUSIVE = "M_EXCLUSIVE"
     THREEPID_AUTH_FAILED = "M_THREEPID_AUTH_FAILED"
+    THREEPID_IN_USE = "THREEPID_IN_USE"
 
 
 class CodeMessageException(RuntimeError):

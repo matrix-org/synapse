@@ -82,7 +82,7 @@ class Thumbnailer(object):
 
     def save_image(self, output_image, output_type, output_path):
         output_bytes_io = BytesIO()
-        output_image.save(output_bytes_io, self.FORMATS[output_type], quality=70)
+        output_image.save(output_bytes_io, self.FORMATS[output_type], quality=80)
         output_bytes = output_bytes_io.getvalue()
         with open(output_path, "wb") as output_file:
             output_file.write(output_bytes)

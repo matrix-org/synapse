@@ -27,18 +27,30 @@ from twisted.web.resource import Resource
 from twisted.protocols.basic import FileSender
 
 from synapse.util.async import ObservableDeferred
+from synapse.util.stringutils import is_ascii
 
 import os
 
+import cgi
 import logging
+import urllib
+import urlparse
 
 logger = logging.getLogger(__name__)
 
 
 def parse_media_id(request):
     try:
-        server_name, media_id = request.postpath
-        return (server_name, media_id)
+        # This allows users to append e.g. /test.png to the URL. Useful for
+        # clients that parse the URL to see content type.
+        server_name, media_id = request.postpath[:2]
+        file_name = None
+        if len(request.postpath) > 2:
+            try:
+                file_name = urlparse.unquote(request.postpath[-1]).decode("utf-8")
+            except UnicodeDecodeError:
+                pass
+        return server_name, media_id, file_name
     except:
         raise SynapseError(
             404,
@@ -62,6 +74,8 @@ class BaseMediaResource(Resource):
         self.filepaths = filepaths
         self.version_string = hs.version_string
         self.downloads = {}
+        self.dynamic_thumbnails = hs.config.dynamic_thumbnails
+        self.thumbnail_requirements = hs.config.thumbnail_requirements
 
     def _respond_404(self, request):
         respond_with_json(
@@ -128,12 +142,38 @@ class BaseMediaResource(Resource):
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
 
+            content_disposition = headers.get("Content-Disposition", None)
+            if content_disposition:
+                _, params = cgi.parse_header(content_disposition[0],)
+                upload_name = None
+
+                # First check if there is a valid UTF-8 filename
+                upload_name_utf8 = params.get("filename*", None)
+                if upload_name_utf8:
+                    if upload_name_utf8.lower().startswith("utf-8''"):
+                        upload_name = upload_name_utf8[7:]
+
+                # If there isn't check for an ascii name.
+                if not upload_name:
+                    upload_name_ascii = params.get("filename", None)
+                    if upload_name_ascii and is_ascii(upload_name_ascii):
+                        upload_name = upload_name_ascii
+
+                if upload_name:
+                    upload_name = urlparse.unquote(upload_name)
+                    try:
+                        upload_name = upload_name.decode("utf-8")
+                    except UnicodeDecodeError:
+                        upload_name = None
+            else:
+                upload_name = None
+
             yield self.store.store_cached_remote_media(
                 origin=server_name,
                 media_id=media_id,
                 media_type=media_type,
                 time_now_ms=self.clock.time_msec(),
-                upload_name=None,
+                upload_name=upload_name,
                 media_length=length,
                 filesystem_id=file_id,
             )
@@ -144,7 +184,7 @@ class BaseMediaResource(Resource):
         media_info = {
             "media_type": media_type,
             "media_length": length,
-            "upload_name": None,
+            "upload_name": upload_name,
             "created_ts": time_now_ms,
             "filesystem_id": file_id,
         }
@@ -157,11 +197,26 @@ class BaseMediaResource(Resource):
 
     @defer.inlineCallbacks
     def _respond_with_file(self, request, media_type, file_path,
-                           file_size=None):
+                           file_size=None, upload_name=None):
         logger.debug("Responding with %r", file_path)
 
         if os.path.isfile(file_path):
             request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
+            if upload_name:
+                if is_ascii(upload_name):
+                    request.setHeader(
+                        b"Content-Disposition",
+                        b"inline; filename=%s" % (
+                            urllib.quote(upload_name.encode("utf-8")),
+                        ),
+                    )
+                else:
+                    request.setHeader(
+                        b"Content-Disposition",
+                        b"inline; filename*=utf-8''%s" % (
+                            urllib.quote(upload_name.encode("utf-8")),
+                        ),
+                    )
 
             # cache for at least a day.
             # XXX: we might want to turn this off for data we don't want to
@@ -187,22 +242,74 @@ class BaseMediaResource(Resource):
             self._respond_404(request)
 
     def _get_thumbnail_requirements(self, media_type):
-        if media_type == "image/jpeg":
-            return (
-                (32, 32, "crop", "image/jpeg"),
-                (96, 96, "crop", "image/jpeg"),
-                (320, 240, "scale", "image/jpeg"),
-                (640, 480, "scale", "image/jpeg"),
+        return self.thumbnail_requirements.get(media_type, ())
+
+    def _generate_thumbnail(self, input_path, t_path, t_width, t_height,
+                            t_method, t_type):
+        thumbnailer = Thumbnailer(input_path)
+        m_width = thumbnailer.width
+        m_height = thumbnailer.height
+
+        if m_width * m_height >= self.max_image_pixels:
+            logger.info(
+                "Image too large to thumbnail %r x %r > %r",
+                m_width, m_height, self.max_image_pixels
             )
-        elif (media_type == "image/png") or (media_type == "image/gif"):
-            return (
-                (32, 32, "crop", "image/png"),
-                (96, 96, "crop", "image/png"),
-                (320, 240, "scale", "image/png"),
-                (640, 480, "scale", "image/png"),
-            )
+            return
+
+        if t_method == "crop":
+            t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
+        elif t_method == "scale":
+            t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
         else:
-            return ()
+            t_len = None
+
+        return t_len
+
+    @defer.inlineCallbacks
+    def _generate_local_exact_thumbnail(self, media_id, t_width, t_height,
+                                        t_method, t_type):
+        input_path = self.filepaths.local_media_filepath(media_id)
+
+        t_path = self.filepaths.local_media_thumbnail(
+            media_id, t_width, t_height, t_type, t_method
+        )
+        self._makedirs(t_path)
+
+        t_len = yield threads.deferToThread(
+            self._generate_thumbnail,
+            input_path, t_path, t_width, t_height, t_method, t_type
+        )
+
+        if t_len:
+            yield self.store.store_local_thumbnail(
+                media_id, t_width, t_height, t_type, t_method, t_len
+            )
+
+            defer.returnValue(t_path)
+
+    @defer.inlineCallbacks
+    def _generate_remote_exact_thumbnail(self, server_name, file_id, media_id,
+                                         t_width, t_height, t_method, t_type):
+        input_path = self.filepaths.remote_media_filepath(server_name, file_id)
+
+        t_path = self.filepaths.remote_media_thumbnail(
+            server_name, file_id, t_width, t_height, t_type, t_method
+        )
+        self._makedirs(t_path)
+
+        t_len = yield threads.deferToThread(
+            self._generate_thumbnail,
+            input_path, t_path, t_width, t_height, t_method, t_type
+        )
+
+        if t_len:
+            yield self.store.store_remote_media_thumbnail(
+                server_name, media_id, file_id,
+                t_width, t_height, t_type, t_method, t_len
+            )
+
+            defer.returnValue(t_path)
 
     @defer.inlineCallbacks
     def _generate_local_thumbnails(self, media_id, media_info):
@@ -223,43 +330,52 @@ class BaseMediaResource(Resource):
             )
             return
 
-        scales = set()
-        crops = set()
-        for r_width, r_height, r_method, r_type in requirements:
-            if r_method == "scale":
-                t_width, t_height = thumbnailer.aspect(r_width, r_height)
-                scales.add((
-                    min(m_width, t_width), min(m_height, t_height), r_type,
+        local_thumbnails = []
+
+        def generate_thumbnails():
+            scales = set()
+            crops = set()
+            for r_width, r_height, r_method, r_type in requirements:
+                if r_method == "scale":
+                    t_width, t_height = thumbnailer.aspect(r_width, r_height)
+                    scales.add((
+                        min(m_width, t_width), min(m_height, t_height), r_type,
+                    ))
+                elif r_method == "crop":
+                    crops.add((r_width, r_height, r_type))
+
+            for t_width, t_height, t_type in scales:
+                t_method = "scale"
+                t_path = self.filepaths.local_media_thumbnail(
+                    media_id, t_width, t_height, t_type, t_method
+                )
+                self._makedirs(t_path)
+                t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
+
+                local_thumbnails.append((
+                    media_id, t_width, t_height, t_type, t_method, t_len
                 ))
-            elif r_method == "crop":
-                crops.add((r_width, r_height, r_type))
 
-        for t_width, t_height, t_type in scales:
-            t_method = "scale"
-            t_path = self.filepaths.local_media_thumbnail(
-                media_id, t_width, t_height, t_type, t_method
-            )
-            self._makedirs(t_path)
-            t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
-            yield self.store.store_local_thumbnail(
-                media_id, t_width, t_height, t_type, t_method, t_len
-            )
+            for t_width, t_height, t_type in crops:
+                if (t_width, t_height, t_type) in scales:
+                    # If the aspect ratio of the cropped thumbnail matches a purely
+                    # scaled one then there is no point in calculating a separate
+                    # thumbnail.
+                    continue
+                t_method = "crop"
+                t_path = self.filepaths.local_media_thumbnail(
+                    media_id, t_width, t_height, t_type, t_method
+                )
+                self._makedirs(t_path)
+                t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
+                local_thumbnails.append((
+                    media_id, t_width, t_height, t_type, t_method, t_len
+                ))
 
-        for t_width, t_height, t_type in crops:
-            if (t_width, t_height, t_type) in scales:
-                # If the aspect ratio of the cropped thumbnail matches a purely
-                # scaled one then there is no point in calculating a separate
-                # thumbnail.
-                continue
-            t_method = "crop"
-            t_path = self.filepaths.local_media_thumbnail(
-                media_id, t_width, t_height, t_type, t_method
-            )
-            self._makedirs(t_path)
-            t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
-            yield self.store.store_local_thumbnail(
-                media_id, t_width, t_height, t_type, t_method, t_len
-            )
+        yield threads.deferToThread(generate_thumbnails)
+
+        for l in local_thumbnails:
+            yield self.store.store_local_thumbnail(*l)
 
         defer.returnValue({
             "width": m_width,

@@ -249,7 +249,9 @@ class Pusher(object):
             # we fail to dispatch the push)
             config = PaginationConfig(from_token=None, limit='1')
             chunk = yield self.evStreamHandler.get_stream(
-                self.user_name, config, timeout=0)
+                self.user_name, config, timeout=0, affect_presence=False,
+                only_room_events=True
+            )
             self.last_token = chunk['end']
             self.store.update_pusher_last_token(
                 self.app_id, self.pushkey, self.user_name, self.last_token
@@ -280,8 +282,8 @@ class Pusher(object):
         config = PaginationConfig(from_token=from_tok, limit='1')
         timeout = (300 + random.randint(-60, 60)) * 1000
         chunk = yield self.evStreamHandler.get_stream(
-            self.user_name, config,
-            timeout=timeout, affect_presence=False
+            self.user_name, config, timeout=timeout, affect_presence=False,
+            only_room_events=True
         )
 
         # limiting to 1 may get 1 event plus 1 presence event, so
@@ -294,6 +296,12 @@ class Pusher(object):
         if not single_event:
             self.last_token = chunk['end']
             logger.debug("Event stream timeout for pushkey %s", self.pushkey)
+            yield self.store.update_pusher_last_token(
+                self.app_id,
+                self.pushkey,
+                self.user_name,
+                self.last_token
+            )
             return
 
         if not self.alive:
@@ -345,7 +353,7 @@ class Pusher(object):
         if processed:
             self.backoff_delay = Pusher.INITIAL_BACKOFF
             self.last_token = chunk['end']
-            self.store.update_pusher_last_token_and_success(
+            yield self.store.update_pusher_last_token_and_success(
                 self.app_id,
                 self.pushkey,
                 self.user_name,
@@ -354,7 +362,7 @@ class Pusher(object):
             )
             if self.failing_since:
                 self.failing_since = None
-                self.store.update_pusher_failing_since(
+                yield self.store.update_pusher_failing_since(
                     self.app_id,
                     self.pushkey,
                     self.user_name,
@@ -362,7 +370,7 @@ class Pusher(object):
         else:
             if not self.failing_since:
                 self.failing_since = self.clock.time_msec()
-                self.store.update_pusher_failing_since(
+                yield self.store.update_pusher_failing_since(
                     self.app_id,
                     self.pushkey,
                     self.user_name,
@@ -380,7 +388,7 @@ class Pusher(object):
                             self.user_name, self.pushkey)
                 self.backoff_delay = Pusher.INITIAL_BACKOFF
                 self.last_token = chunk['end']
-                self.store.update_pusher_last_token(
+                yield self.store.update_pusher_last_token(
                     self.app_id,
                     self.pushkey,
                     self.user_name,
@@ -388,7 +396,7 @@ class Pusher(object):
                 )
 
                 self.failing_since = None
-                self.store.update_pusher_failing_since(
+                yield self.store.update_pusher_failing_since(
                     self.app_id,
                     self.pushkey,
                     self.user_name,

@@ -16,7 +16,7 @@
 
 import sys
 sys.dont_write_bytecode = True
-from synapse.python_dependencies import check_requirements
+from synapse.python_dependencies import check_requirements, DEPENDENCY_LINKS
 
 if __name__ == '__main__':
     check_requirements()
@@ -97,9 +97,25 @@ class SynapseHomeServer(HomeServer):
         return JsonResource(self)
 
     def build_resource_for_web_client(self):
-        import syweb
-        syweb_path = os.path.dirname(syweb.__file__)
-        webclient_path = os.path.join(syweb_path, "webclient")
+        webclient_path = self.get_config().web_client_location
+        if not webclient_path:
+            try:
+                import syweb
+            except ImportError:
+                quit_with_error(
+                    "Could not find a webclient.\n\n"
+                    "Please either install the matrix-angular-sdk or configure\n"
+                    "the location of the source to serve via the configuration\n"
+                    "option `web_client_location`\n\n"
+                    "To install the `matrix-angular-sdk` via pip, run:\n\n"
+                    "    pip install '%(dep)s'\n"
+                    "\n"
+                    "You can also disable hosting of the webclient via the\n"
+                    "configuration option `web_client`\n"
+                    % {"dep": DEPENDENCY_LINKS["matrix-angular-sdk"]}
+                )
+            syweb_path = os.path.dirname(syweb.__file__)
+            webclient_path = os.path.join(syweb_path, "webclient")
         # GZip is disabled here due to
         # https://twistedmatrix.com/trac/ticket/7678
         # (It can stay enabled for the API resources: they call
@@ -259,11 +275,10 @@ class SynapseHomeServer(HomeServer):
 
 def quit_with_error(error_string):
     message_lines = error_string.split("\n")
-    line_length = max([len(l) for l in message_lines]) + 2
+    line_length = max([len(l) for l in message_lines if len(l) < 80]) + 2
     sys.stderr.write("*" * line_length + '\n')
     for line in message_lines:
-        if line.strip():
-            sys.stderr.write(" %s\n" % (line.strip(),))
+        sys.stderr.write(" %s\n" % (line.rstrip(),))
     sys.stderr.write("*" * line_length + '\n')
     sys.exit(1)
 
@@ -326,7 +341,7 @@ def get_version_string():
                 )
             ).encode("ascii")
     except Exception as e:
-        logger.warn("Failed to check for git repository: %s", e)
+        logger.info("Failed to check for git repository: %s", e)
 
     return ("Synapse/%s" % (synapse.__version__,)).encode("ascii")
 
@@ -657,7 +672,8 @@ def run(hs):
 
     if hs.config.daemonize:
 
-        print hs.config.pid_file
+        if hs.config.print_pidfile:
+            print hs.config.pid_file
 
         daemon = Daemonize(
             app="synapse-homeserver",

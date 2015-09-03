@@ -84,6 +84,16 @@ class UploadResource(BaseMediaResource):
                 code=413,
             )
 
+        upload_name = request.args.get("filename", None)
+        if upload_name:
+            try:
+                upload_name = upload_name[0].decode('UTF-8')
+            except UnicodeDecodeError:
+                raise SynapseError(
+                    msg="Invalid UTF-8 filename parameter: %r" % (upload_name),
+                    code=400,
+                )
+
         headers = request.requestHeaders
 
         if headers.hasHeader("Content-Type"):
@@ -99,7 +109,7 @@ class UploadResource(BaseMediaResource):
         # TODO(markjh): parse content-dispostion
 
         content_uri = yield self.create_content(
-            media_type, None, request.content.read(),
+            media_type, upload_name, request.content.read(),
             content_length, auth_user
         )
 

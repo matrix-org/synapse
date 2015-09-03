@@ -44,7 +44,7 @@ class IdentityHandler(BaseHandler):
         http_client = SimpleHttpClient(self.hs)
         # XXX: make this configurable!
         # trustedIdServers = ['matrix.org', 'localhost:8090']
-        trustedIdServers = ['matrix.org']
+        trustedIdServers = ['matrix.org', 'vector.im']
 
         if 'id_server' in creds:
             id_server = creds['id_server']
@@ -117,3 +117,28 @@ class IdentityHandler(BaseHandler):
         except CodeMessageException as e:
             data = json.loads(e.msg)
         defer.returnValue(data)
+
+    @defer.inlineCallbacks
+    def requestEmailToken(self, id_server, email, client_secret, send_attempt, **kwargs):
+        yield run_on_reactor()
+        http_client = SimpleHttpClient(self.hs)
+
+        params = {
+            'email': email,
+            'client_secret': client_secret,
+            'send_attempt': send_attempt,
+        }
+        params.update(kwargs)
+
+        try:
+            data = yield http_client.post_urlencoded_get_json(
+                "https://%s%s" % (
+                    id_server,
+                    "/_matrix/identity/api/v1/validate/email/requestToken"
+                ),
+                params
+            )
+            defer.returnValue(data)
+        except CodeMessageException as e:
+            logger.info("Proxied requestToken failed: %r", e)
+            raise e

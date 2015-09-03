@@ -69,7 +69,7 @@ class StateGroupStore(object):
 
         self._next_group = 1
 
-    def get_state_groups(self, event_ids):
+    def get_state_groups(self, room_id, event_ids):
         groups = {}
         for event_id in event_ids:
             group = self._event_to_state_group.get(event_id)

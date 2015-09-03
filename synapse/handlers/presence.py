@@ -192,6 +192,20 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_state(self, target_user, auth_user, as_event=False, check_auth=True):
+        """Get the current presence state of the given user.
+
+        Args:
+            target_user (UserID): The user whose presence we want
+            auth_user (UserID): The user requesting the presence, used for
+                checking if said user is allowed to see the persence of the
+                `target_user`
+            as_event (bool): Format the return as an event or not?
+            check_auth (bool): Perform the auth checks or not?
+
+        Returns:
+            dict: The presence state of the `target_user`, whose format depends
+            on the `as_event` argument.
+        """
         if self.hs.is_mine(target_user):
             if check_auth:
                 visible = yield self.is_presence_visible(
@@ -231,6 +245,81 @@ class PresenceHandler(BaseHandler):
             defer.returnValue({"type": "m.presence", "content": content})
         else:
             defer.returnValue(state)
+
+    @defer.inlineCallbacks
+    def get_states(self, target_users, auth_user, as_event=False, check_auth=True):
+        """A batched version of the `get_state` method that accepts a list of
+        `target_users`
+
+        Args:
+            target_users (list): The list of UserID's whose presence we want
+            auth_user (UserID): The user requesting the presence, used for
+                checking if said user is allowed to see the persence of the
+                `target_users`
+            as_event (bool): Format the return as an event or not?
+            check_auth (bool): Perform the auth checks or not?
+
+        Returns:
+            dict: A mapping from user -> presence_state
+        """
+        local_users, remote_users = partitionbool(
+            target_users,
+            lambda u: self.hs.is_mine(u)
+        )
+
+        if check_auth:
+            for user in local_users:
+                visible = yield self.is_presence_visible(
+                    observer_user=auth_user,
+                    observed_user=user
+                )
+
+                if not visible:
+                    raise SynapseError(404, "Presence information not visible")
+
+        results = {}
+        if local_users:
+            for user in local_users:
+                if user in self._user_cachemap:
+                    results[user] = self._user_cachemap[user].get_state()
+
+            local_to_user = {u.localpart: u for u in local_users}
+
+            states = yield self.store.get_presence_states(
+                [u.localpart for u in local_users if u not in results]
+            )
+
+            for local_part, state in states.items():
+                if state is None:
+                    continue
+                res = {"presence": state["state"]}
+                if "status_msg" in state and state["status_msg"]:
+                    res["status_msg"] = state["status_msg"]
+                results[local_to_user[local_part]] = res
+
+        for user in remote_users:
+            # TODO(paul): Have remote server send us permissions set
+            results[user] = self._get_or_offline_usercache(user).get_state()
+
+        for state in results.values():
+            if "last_active" in state:
+                state["last_active_ago"] = int(
+                    self.clock.time_msec() - state.pop("last_active")
+                )
+
+        if as_event:
+            for user, state in results.items():
+                content = state
+                content["user_id"] = user.to_string()
+
+                if "last_active" in content:
+                    content["last_active_ago"] = int(
+                        self._clock.time_msec() - content.pop("last_active")
+                    )
+
+                results[user] = {"type": "m.presence", "content": content}
+
+        defer.returnValue(results)
 
     @defer.inlineCallbacks
     @log_function
@@ -992,7 +1081,7 @@ class PresenceHandler(BaseHandler):
             room_ids([str]): List of room_ids to notify.
         """
         with PreserveLoggingContext():
-            self.notifier.on_new_user_event(
+            self.notifier.on_new_event(
                 "presence_key",
                 self._user_cachemap_latest_serial,
                 users_to_push,

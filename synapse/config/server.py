@@ -22,8 +22,10 @@ class ServerConfig(Config):
         self.server_name = config["server_name"]
         self.pid_file = self.abspath(config.get("pid_file"))
         self.web_client = config["web_client"]
+        self.web_client_location = config.get("web_client_location", None)
         self.soft_file_limit = config["soft_file_limit"]
         self.daemonize = config.get("daemonize")
+        self.print_pidfile = config.get("print_pidfile")
         self.use_frozen_dicts = config.get("use_frozen_dicts", True)
 
         self.listeners = config.get("listeners", [])
@@ -208,12 +210,18 @@ class ServerConfig(Config):
             self.manhole = args.manhole
         if args.daemonize is not None:
             self.daemonize = args.daemonize
+        if args.print_pidfile is not None:
+            self.print_pidfile = args.print_pidfile
 
     def add_arguments(self, parser):
         server_group = parser.add_argument_group("server")
         server_group.add_argument("-D", "--daemonize", action='store_true',
                                   default=None,
                                   help="Daemonize the home server")
+        server_group.add_argument("--print-pidfile", action='store_true',
+                                  default=None,
+                                  help="Print the path to the pidfile just"
+                                  " before daemonizing")
         server_group.add_argument("--manhole", metavar="PORT", dest="manhole",
                                   type=int,
                                   help="Turn on the twisted telnet manhole"

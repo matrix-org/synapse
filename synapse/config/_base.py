@@ -131,7 +131,8 @@ class Config(object):
             "-c", "--config-path",
             action="append",
             metavar="CONFIG_FILE",
-            help="Specify config file"
+            help="Specify config file. Can be given multiple times and"
+                 " may specify directories containing *.yaml files."
         )
         config_parser.add_argument(
             "--generate-config",
@@ -139,63 +140,98 @@ class Config(object):
             help="Generate a config file for the server name"
         )
         config_parser.add_argument(
+            "--generate-keys",
+            action="store_true",
+            help="Generate any missing key files then exit"
+        )
+        config_parser.add_argument(
+            "--keys-directory",
+            metavar="DIRECTORY",
+            help="Used with 'generate-*' options to specify where files such as"
+                 " certs and signing keys should be stored in, unless explicitly"
+                 " specified in the config."
+        )
+        config_parser.add_argument(
             "-H", "--server-name",
             help="The server name to generate a config file for"
         )
         config_args, remaining_args = config_parser.parse_known_args(argv)
 
+        generate_keys = config_args.generate_keys
+
+        config_files = []
+        if config_args.config_path:
+            for config_path in config_args.config_path:
+                if os.path.isdir(config_path):
+                    # We accept specifying directories as config paths, we search
+                    # inside that directory for all files matching *.yaml, and then
+                    # we apply them in *sorted* order.
+                    files = []
+                    for entry in os.listdir(config_path):
+                        entry_path = os.path.join(config_path, entry)
+                        if not os.path.isfile(entry_path):
+                            print (
+                                "Found subdirectory in config directory: %r. IGNORING."
+                            ) % (entry_path, )
+                            continue
+
+                        if not entry.endswith(".yaml"):
+                            print (
+                                "Found file in config directory that does not"
+                                " end in '.yaml': %r. IGNORING."
+                            ) % (entry_path, )
+                            continue
+
+                        files.append(entry_path)
+
+                    config_files.extend(sorted(files))
+                else:
+                    config_files.append(config_path)
+
         if config_args.generate_config:
-            if not config_args.config_path:
+            if not config_files:
                 config_parser.error(
                     "Must supply a config file.\nA config file can be automatically"
                     " generated using \"--generate-config -H SERVER_NAME"
                     " -c CONFIG-FILE\""
                 )
+            (config_path,) = config_files
+            if not os.path.exists(config_path):
+                if config_args.keys_directory:
+                    config_dir_path = config_args.keys_directory
+                else:
+                    config_dir_path = os.path.dirname(config_path)
+                config_dir_path = os.path.abspath(config_dir_path)
 
-            config_dir_path = os.path.dirname(config_args.config_path[0])
-            config_dir_path = os.path.abspath(config_dir_path)
-
-            server_name = config_args.server_name
-            if not server_name:
-                print "Must specify a server_name to a generate config for."
-                sys.exit(1)
-            (config_path,) = config_args.config_path
-            if not os.path.exists(config_dir_path):
-                os.makedirs(config_dir_path)
-            if os.path.exists(config_path):
-                print "Config file %r already exists" % (config_path,)
-                yaml_config = cls.read_config_file(config_path)
-                yaml_name = yaml_config["server_name"]
-                if server_name != yaml_name:
-                    print (
-                        "Config file %r has a different server_name: "
-                        " %r != %r" % (config_path, server_name, yaml_name)
-                    )
+                server_name = config_args.server_name
+                if not server_name:
+                    print "Must specify a server_name to a generate config for."
                     sys.exit(1)
-                config_bytes, config = obj.generate_config(
-                    config_dir_path, server_name
-                )
-                config.update(yaml_config)
-                print "Generating any missing keys for %r" % (server_name,)
-                obj.invoke_all("generate_files", config)
-                sys.exit(0)
-            with open(config_path, "wb") as config_file:
-                config_bytes, config = obj.generate_config(
-                    config_dir_path, server_name
-                )
-                obj.invoke_all("generate_files", config)
-                config_file.write(config_bytes)
+                if not os.path.exists(config_dir_path):
+                    os.makedirs(config_dir_path)
+                with open(config_path, "wb") as config_file:
+                    config_bytes, config = obj.generate_config(
+                        config_dir_path, server_name
+                    )
+                    obj.invoke_all("generate_files", config)
+                    config_file.write(config_bytes)
                 print (
-                    "A config file has been generated in %s for server name"
-                    " '%s' with corresponding SSL keys and self-signed"
-                    " certificates. Please review this file and customise it to"
-                    " your needs."
+                    "A config file has been generated in %r for server name"
+                    " %r with corresponding SSL keys and self-signed"
+                    " certificates. Please review this file and customise it"
+                    " to your needs."
                 ) % (config_path, server_name)
-            print (
-                "If this server name is incorrect, you will need to regenerate"
-                " the SSL certificates"
-            )
-            sys.exit(0)
+                print (
+                    "If this server name is incorrect, you will need to"
+                    " regenerate the SSL certificates"
+                )
+                sys.exit(0)
+            else:
+                print (
+                    "Config file %r already exists. Generating any missing key"
+                    " files."
+                ) % (config_path,)
+                generate_keys = True
 
         parser = argparse.ArgumentParser(
             parents=[config_parser],
@@ -206,25 +242,32 @@ class Config(object):
         obj.invoke_all("add_arguments", parser)
         args = parser.parse_args(remaining_args)
 
-        if not config_args.config_path:
+        if not config_files:
             config_parser.error(
                 "Must supply a config file.\nA config file can be automatically"
                 " generated using \"--generate-config -H SERVER_NAME"
                 " -c CONFIG-FILE\""
             )
 
-        config_dir_path = os.path.dirname(config_args.config_path[0])
+        if config_args.keys_directory:
+            config_dir_path = config_args.keys_directory
+        else:
+            config_dir_path = os.path.dirname(config_args.config_path[-1])
         config_dir_path = os.path.abspath(config_dir_path)
 
         specified_config = {}
-        for config_path in config_args.config_path:
-            yaml_config = cls.read_config_file(config_path)
+        for config_file in config_files:
+            yaml_config = cls.read_config_file(config_file)
             specified_config.update(yaml_config)
 
         server_name = specified_config["server_name"]
         _, config = obj.generate_config(config_dir_path, server_name)
         config.pop("log_config")
         config.update(specified_config)
+
+        if generate_keys:
+            obj.invoke_all("generate_files", config)
+            sys.exit(0)
 
         obj.invoke_all("read_config", config)
 

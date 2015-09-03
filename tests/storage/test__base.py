@@ -17,7 +17,9 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.storage._base import Cache, cached
+from synapse.util.async import ObservableDeferred
+
+from synapse.util.caches.descriptors import Cache, cached
 
 
 class CacheTestCase(unittest.TestCase):
@@ -40,12 +42,12 @@ class CacheTestCase(unittest.TestCase):
         self.assertEquals(self.cache.get("foo"), 123)
 
     def test_invalidate(self):
-        self.cache.prefill("foo", 123)
-        self.cache.invalidate("foo")
+        self.cache.prefill(("foo",), 123)
+        self.cache.invalidate(("foo",))
 
         failed = False
         try:
-            self.cache.get("foo")
+            self.cache.get(("foo",))
         except KeyError:
             failed = True
 
@@ -139,7 +141,7 @@ class CacheDecoratorTestCase(unittest.TestCase):
 
         self.assertEquals(callcount[0], 1)
 
-        a.func.invalidate("foo")
+        a.func.invalidate(("foo",))
 
         yield a.func("foo")
 
@@ -151,7 +153,7 @@ class CacheDecoratorTestCase(unittest.TestCase):
             def func(self, key):
                 return key
 
-        A().func.invalidate("what")
+        A().func.invalidate(("what",))
 
     @defer.inlineCallbacks
     def test_max_entries(self):
@@ -178,19 +180,20 @@ class CacheDecoratorTestCase(unittest.TestCase):
         self.assertTrue(callcount[0] >= 14,
             msg="Expected callcount >= 14, got %d" % (callcount[0]))
 
-    @defer.inlineCallbacks
     def test_prefill(self):
         callcount = [0]
+
+        d = defer.succeed(123)
 
         class A(object):
             @cached()
             def func(self, key):
                 callcount[0] += 1
-                return key
+                return d
 
         a = A()
 
-        a.func.prefill("foo", 123)
+        a.func.prefill(("foo",), ObservableDeferred(d))
 
-        self.assertEquals((yield a.func("foo")), 123)
+        self.assertEquals(a.func("foo").result, d.result)
         self.assertEquals(callcount[0], 0)

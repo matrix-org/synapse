@@ -90,7 +90,7 @@ class EventBase(object):
         d = dict(self._event_dict)
         d.update({
             "signatures": self.signatures,
-            "unsigned": self.unsigned,
+            "unsigned": dict(self.unsigned),
         })
 
         return d
@@ -108,6 +108,9 @@ class EventBase(object):
             age = time_now - pdu_json["unsigned"]["age_ts"]
             pdu_json.setdefault("unsigned", {})["age"] = int(age)
             del pdu_json["unsigned"]["age_ts"]
+
+        # This may be a frozen event
+        pdu_json["unsigned"].pop("redacted_because", None)
 
         return pdu_json
 

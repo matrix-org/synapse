@@ -164,7 +164,7 @@ def make_base_append_underride_rules(user):
             ]
         },
         {
-            'rule_id': 'global/override/.m.rule.contains_display_name',
+            'rule_id': 'global/underride/.m.rule.contains_display_name',
             'conditions': [
                 {
                     'kind': 'contains_display_name'

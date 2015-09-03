@@ -49,7 +49,12 @@ class EventStreamHandler(BaseHandler):
     @defer.inlineCallbacks
     @log_function
     def get_stream(self, auth_user_id, pagin_config, timeout=0,
-                   as_client_event=True, affect_presence=True):
+                   as_client_event=True, affect_presence=True,
+                   only_room_events=False):
+        """Fetches the events stream for a given user.
+
+        If `only_room_events` is `True` only room events will be returned.
+        """
         auth_user = UserID.from_string(auth_user_id)
 
         try:
@@ -70,7 +75,15 @@ class EventStreamHandler(BaseHandler):
                 self._streams_per_user[auth_user] += 1
 
             rm_handler = self.hs.get_handlers().room_member_handler
-            room_ids = yield rm_handler.get_joined_rooms_for_user(auth_user)
+
+            app_service = yield self.store.get_app_service_by_user_id(
+                auth_user.to_string()
+            )
+            if app_service:
+                rooms = yield self.store.get_app_service_rooms(app_service)
+                room_ids = set(r.room_id for r in rooms)
+            else:
+                room_ids = yield rm_handler.get_joined_rooms_for_user(auth_user)
 
             if timeout:
                 # If they've set a timeout set a minimum limit.
@@ -81,7 +94,8 @@ class EventStreamHandler(BaseHandler):
                 timeout = random.randint(int(timeout*0.9), int(timeout*1.1))
 
             events, tokens = yield self.notifier.get_events_for(
-                auth_user, room_ids, pagin_config, timeout
+                auth_user, room_ids, pagin_config, timeout,
+                only_room_events=only_room_events
             )
 
             time_now = self.clock.time_msec()
