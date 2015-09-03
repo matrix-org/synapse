@@ -1,3 +1,8 @@
+Changes in synapse v0.10.0 (2015-09-03)
+=======================================
+
+No change from release candidate.
+
 Changes in synapse v0.10.0-rc6 (2015-09-02)
 ===========================================
 
