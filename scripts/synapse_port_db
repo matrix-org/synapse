@@ -29,7 +29,7 @@ import traceback
 import yaml
 
 
-logger = logging.getLogger("port_from_sqlite_to_postgres")
+logger = logging.getLogger("synapse_port_db")
 
 
 BOOLEAN_COLUMNS = {
