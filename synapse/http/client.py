@@ -59,7 +59,7 @@ class SimpleHttpClient(object):
         # 'like a browser'
         pool = HTTPConnectionPool(reactor)
         pool.maxPersistentPerHost = 10
-        self.agent = Agent(reactor, pool=pool)
+        self.agent = Agent(reactor, pool=pool, connectTimeout=15)
         self.version_string = hs.version_string
 
     def request(self, method, uri, *args, **kwargs):

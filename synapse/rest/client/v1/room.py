@@ -409,9 +409,13 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         # target user is you unless it is an invite
         state_key = user.to_string()
         if membership_action in ["invite", "ban", "kick"]:
-            if "user_id" not in content:
-                raise SynapseError(400, "Missing user_id key.")
-            state_key = content["user_id"]
+            try:
+                state_key = content["user_id"]
+            except KeyError:
+                if membership_action == "invite" and "id_server" in content:
+                    state_key = yield self.lookup_3pid_user(content)
+                else:
+                    raise SynapseError(400, "Missing user_id key.")
             # make sure it looks like a user ID; it'll throw if it's invalid.
             UserID.from_string(state_key)
 
@@ -432,6 +436,28 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         )
 
         defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def lookup_3pid_user(self, content):
+        missing_keys = {"address", "medium", "id_server"} - set(content.keys())
+        if missing_keys:
+            raise SynapseError(404, "Missing 3pid keys: %s" % (",".join(missing_keys),))
+
+        address = content["address"]
+        data = yield self.hs.get_simple_http_client().get_json(
+                "http://%s/_matrix/identity/api/v1/lookup" % (content["id_server"],),
+                {
+                    "medium": content["medium"],
+                    "address": address,
+                }
+            )
+        if "mxid" in data:
+            # TODO: Validate the response signature and such
+            defer.returnValue(data["mxid"])
+            return
+
+        raise SynapseError(404, "Unknown 3pid '%s'." % (address,))
+
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):
