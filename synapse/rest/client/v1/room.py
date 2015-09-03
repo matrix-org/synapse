@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 from base import ClientV1RestServlet, client_path_pattern
-from synapse.api.errors import SynapseError, Codes, CodeMessageException
+from synapse.api.errors import SynapseError, Codes
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.types import UserID, RoomID, RoomAlias
@@ -463,12 +463,12 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             (str) the matrix ID of the 3pid, or None if it is not recognized.
         """
         data = yield self.hs.get_simple_http_client().get_json(
-                "http://%s/_matrix/identity/api/v1/lookup" % (id_server,),
-                {
-                    "medium": medium,
-                    "address": address,
-                }
-            )
+            "http://%s/_matrix/identity/api/v1/lookup" % (id_server,),
+            {
+                "medium": medium,
+                "address": address,
+            }
+        )
         if "mxid" in data:
             # TODO: Validate the response signature and such
             defer.returnValue(data["mxid"])
@@ -647,6 +647,7 @@ def _assert_has_keys(content, expected_keys):
         raise SynapseError(404, "Missing expected keys: %s" % (
             ",".join(missing_keys),
         ))
+
 
 def register_txn_path(servlet, regex_string, http_server, with_get=False):
     """Registers a transaction-based path.
