@@ -52,7 +52,7 @@ setup(
         "setuptools_trial",
         "mock"
     ],
-    dependency_links=dependencies["DEPENDENCY_LINKS"],
+    dependency_links=dependencies["DEPENDENCY_LINKS"].values(),
     include_package_data=True,
     zip_safe=False,
     long_description=long_description,
