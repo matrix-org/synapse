@@ -19,7 +19,6 @@ from ._base import BaseHandler
 from synapse.api.constants import LoginType
 from synapse.types import UserID
 from synapse.api.errors import LoginError, Codes
-from synapse.http.client import SimpleHttpClient
 from synapse.util.async import run_on_reactor
 
 from twisted.web.client import PartialDownloadError
@@ -187,7 +186,7 @@ class AuthHandler(BaseHandler):
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
         try:
-            client = SimpleHttpClient(self.hs)
+            client = self.hs.get_simple_http_client()
             resp_body = yield client.post_urlencoded_get_json(
                 self.hs.config.recaptcha_siteverify_api,
                 args={

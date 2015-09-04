@@ -20,6 +20,7 @@
 
 # Imports required for the default HomeServer() implementation
 from synapse.federation import initialize_http_replication
+from synapse.http.client import SimpleHttpClient
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
@@ -87,6 +88,7 @@ class BaseHomeServer(object):
         'pusherpool',
         'event_builder_factory',
         'filtering',
+        'simple_http_client',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -182,6 +184,9 @@ class HomeServer(BaseHomeServer):
         # with backwards compat behaviour.
         orf.TOKEN_NOT_FOUND_HTTP_STATUS = 403
         return orf
+
+    def build_simple_http_client(self):
+        return SimpleHttpClient(self)
 
     def build_state_handler(self):
         return StateHandler(self)

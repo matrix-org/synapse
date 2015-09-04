@@ -182,6 +182,7 @@ class SQLBaseStore(object):
         self._state_groups_id_gen = IdGenerator("state_groups", "id", self)
         self._access_tokens_id_gen = IdGenerator("access_tokens", "id", self)
         self._refresh_tokens_id_gen = IdGenerator("refresh_tokens", "id", self)
+        self._pending_invites_id_gen = IdGenerator("pending_invites", "id", self)
         self._pushers_id_gen = IdGenerator("pushers", "id", self)
         self._push_rule_id_gen = IdGenerator("push_rules", "id", self)
         self._push_rules_enable_id_gen = IdGenerator("push_rules_enable", "id", self)
