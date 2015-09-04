@@ -497,17 +497,15 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             token_id
         )
 
-        is_url = "https://%s/_matrix/identity/api/v1/register-callback" % (id_server,)
-        callback_url = "https://%s/3pid-registered-callback" % (
-            self.hs.config.server_name,
-        )
-        yield self.hs.get_simple_http_client().post_json_get_json(
+        is_url = "http://%s/_matrix/identity/api/v1/register-callback" % (id_server,)
+        callback_server = self.hs.config.server_name
+        yield self.hs.get_simple_http_client().post_urlencoded_get_json(
             is_url,
             {
                 "medium": medium,
                 "address": address,
                 "nonce": nonce,
-                "url": callback_url,
+                "server": callback_server,
             }
         )
 
