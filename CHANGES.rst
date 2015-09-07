@@ -1,3 +1,14 @@
+Changes in synapse v0.10.0 (2015-09-03)
+=======================================
+
+No change from release candidate.
+
+Changes in synapse v0.10.0-rc6 (2015-09-02)
+===========================================
+
+* Remove some of the old database upgrade scripts.
+* Fix database port script to work with newly created sqlite databases.
+
 Changes in synapse v0.10.0-rc5 (2015-08-27)
 ===========================================
 

@@ -81,7 +81,7 @@ setup(
     packages=find_packages(exclude=["tests", "tests.*"]),
     description="Reference Synapse Home Server",
     install_requires=dependencies['requirements'](include_conditional=True).keys(),
-    dependency_links=dependencies["DEPENDENCY_LINKS"],
+    dependency_links=dependencies["DEPENDENCY_LINKS"].values(),
     include_package_data=True,
     zip_safe=False,
     long_description=long_description,
