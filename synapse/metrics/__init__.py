@@ -130,6 +130,10 @@ def _process_fds():
     counts = {(k,): 0 for k in TYPES.values()}
     counts[("other",)] = 0
 
+    # Not every OS will have a /proc/self/fd directory
+    if not os.path.exists("/proc/self/fd"):
+        return counts
+
     for fd in os.listdir("/proc/self/fd"):
         try:
             s = os.stat("/proc/self/fd/%s" % (fd))
