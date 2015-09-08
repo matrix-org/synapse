@@ -316,7 +316,9 @@ class MessageHandler(BaseHandler):
         """
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
             user_id=user_id,
-            membership_list=[Membership.INVITE, Membership.JOIN]
+            membership_list=[
+                Membership.INVITE, Membership.JOIN, Membership.LEAVE
+            ]
         )
 
         user = UserID.from_string(user_id)
@@ -358,19 +360,32 @@ class MessageHandler(BaseHandler):
 
             rooms_ret.append(d)
 
-            if event.membership != Membership.JOIN:
+            if event.membership not in (Membership.JOIN, Membership.LEAVE):
                 return
             try:
+                if event.membership == Membership.JOIN:
+                    room_end_token = now_token.room_key
+                    deferred_room_state = self.state_handler.get_current_state(
+                        event.room_id
+                    )
+                else:
+                    room_end_token = "s%d" % (event.stream_ordering,)
+                    deferred_room_state = self.store.get_state_for_events(
+                        event.room_id, [event.event_id], None
+                    )
+                    deferred_room_state.addCallback(
+                        lambda states: states[event.event_id]
+                    )
+
+
                 (messages, token), current_state = yield defer.gatherResults(
                     [
                         self.store.get_recent_events_for_room(
                             event.room_id,
                             limit=limit,
-                            end_token=now_token.room_key,
+                            end_token=room_end_token,
                         ),
-                        self.state_handler.get_current_state(
-                            event.room_id
-                        ),
+                        deferred_room_state,
                     ]
                 ).addErrback(unwrapFirstError)
 
