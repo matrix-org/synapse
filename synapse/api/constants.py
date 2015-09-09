@@ -27,16 +27,6 @@ class Membership(object):
     LIST = (INVITE, JOIN, KNOCK, LEAVE, BAN)
 
 
-class Feedback(object):
-
-    """Represents the types of feedback a user can send in response to a
-    message."""
-
-    DELIVERED = u"delivered"
-    READ = u"read"
-    LIST = (DELIVERED, READ)
-
-
 class PresenceState(object):
     """Represents the presence state of a user."""
     OFFLINE = u"offline"
@@ -73,7 +63,6 @@ class EventTypes(object):
     PowerLevels = "m.room.power_levels"
     Aliases = "m.room.aliases"
     Redaction = "m.room.redaction"
-    Feedback = "m.room.message.feedback"
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"

@@ -159,9 +159,7 @@ class StreamStore(SQLBaseStore):
 
     @log_function
     def get_room_events_stream(self, user_id, from_key, to_key, room_id,
-                               limit=0, with_feedback=False):
-        # TODO (erikj): Handle compressed feedback
-
+                               limit=0):
         current_room_membership_sql = (
             "SELECT m.room_id FROM room_memberships as m "
             " INNER JOIN current_state_events as c"
@@ -227,10 +225,7 @@ class StreamStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def paginate_room_events(self, room_id, from_key, to_key=None,
-                             direction='b', limit=-1,
-                             with_feedback=False):
-        # TODO (erikj): Handle compressed feedback
-
+                             direction='b', limit=-1):
         # Tokens really represent positions between elements, but we use
         # the convention of pointing to the event before the gap. Hence
         # we have a bit of asymmetry when it comes to equalities.
@@ -302,7 +297,6 @@ class StreamStore(SQLBaseStore):
 
     @cachedInlineCallbacks(num_args=4)
     def get_recent_events_for_room(self, room_id, limit, end_token, from_token=None):
-        # TODO (erikj): Handle compressed feedback
 
         end_token = RoomStreamToken.parse_stream_token(end_token)
 

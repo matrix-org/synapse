@@ -610,7 +610,6 @@ class RoomEventSource(object):
             to_key=config.to_key,
             direction=config.direction,
             limit=config.limit,
-            with_feedback=True
         )
 
         defer.returnValue((events, next_key))
