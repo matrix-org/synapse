@@ -290,12 +290,18 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
     def on_GET(self, request, room_id):
         # TODO support Pagination stream API (limit/tokens)
         user, _ = yield self.auth.get_user_by_req(request)
-        handler = self.handlers.room_member_handler
-        members = yield handler.get_room_members_as_pagination_chunk(
+        handler = self.handlers.message_handler
+        events = yield handler.get_state_events(
             room_id=room_id,
-            user_id=user.to_string())
+            user_id=user.to_string(),
+        )
 
-        for event in members["chunk"]:
+        chunk = []
+
+        for event in events:
+            if event["type"] != EventTypes.Member:
+                continue
+            chunk.append(event)
             # FIXME: should probably be state_key here, not user_id
             target_user = UserID.from_string(event["user_id"])
             # Presence is an optional cache; don't fail if we can't fetch it
@@ -308,7 +314,9 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
             except:
                 pass
 
-        defer.returnValue((200, members))
+        defer.returnValue((200, {
+            "chunk": chunk
+        }))
 
 
 # TODO: Needs unit testing
