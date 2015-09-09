@@ -386,7 +386,24 @@ class StreamStore(SQLBaseStore):
             table="events",
             keyvalues={"event_id": event_id},
             retcol="stream_ordering",
-        ).addCallback(lambda stream_ordering: "s%d" % (stream_ordering,))
+        ).addCallback(lambda row: "s%d" % (row,))
+
+    def get_topological_token_for_event(self, event_id):
+        """The stream token for an event
+        Args:
+            event_id(str): The id of the event to look up a stream token for.
+        Raises:
+            StoreError if the event wasn't in the database.
+        Returns:
+            A deferred "t%d-%d" topological token.
+        """
+        return self._simple_select_one(
+            table="events",
+            keyvalues={"event_id": event_id},
+            retcols=("stream_ordering", "topological_ordering"),
+        ).addCallback(lambda row: "t%d-%d" % (
+            row["topological_ordering"], row["stream_ordering"],)
+        )
 
     def _get_max_topological_txn(self, txn):
         txn.execute(
