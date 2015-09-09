@@ -119,6 +119,20 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
+        """Check if the user is currently joined in the room
+        Args:
+            room_id(str): The room to check.
+            user_id(str): The user to check.
+            current_state(dict): Optional map of the current state of the room.
+                If provided then that map is used to check whether they are a
+                member of the room. Otherwise the current membership is
+                loaded from the database.
+        Raises:
+            AuthError if the user is not in the room.
+        Returns:
+            A deferred membership event for the user if the user is in
+            the room.
+        """
         if current_state:
             member = current_state.get(
                 (EventTypes.Member, user_id),
@@ -132,6 +146,41 @@ class Auth(object):
             )
 
         self._check_joined_room(member, user_id, room_id)
+        defer.returnValue(member)
+
+    @defer.inlineCallbacks
+    def check_user_was_in_room(self, room_id, user_id, current_state=None):
+        """Check if the user was in the room at some point.
+        Args:
+            room_id(str): The room to check.
+            user_id(str): The user to check.
+            current_state(dict): Optional map of the current state of the room.
+                If provided then that map is used to check whether they are a
+                member of the room. Otherwise the current membership is
+                loaded from the database.
+        Raises:
+            AuthError if the user was never in the room.
+        Returns:
+            A deferred membership event for the user if the user was in
+            the room.
+        """
+        if current_state:
+            member = current_state.get(
+                (EventTypes.Member, user_id),
+                None
+            )
+        else:
+            member = yield self.state.get_current_state(
+                room_id=room_id,
+                event_type=EventTypes.Member,
+                state_key=user_id
+            )
+
+        if not member:
+            raise AuthError(403, "User %s not in room %s" % (
+                user_id, room_id
+            ))
+
         defer.returnValue(member)
 
     @defer.inlineCallbacks
