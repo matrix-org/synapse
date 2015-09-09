@@ -71,7 +71,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
-                     feedback=False, as_client_event=True):
+                     as_client_event=True):
         """Get messages in a room.
 
         Args:
@@ -79,7 +79,6 @@ class MessageHandler(BaseHandler):
             room_id (str): The room they want messages from.
             pagin_config (synapse.api.streams.PaginationConfig): The pagination
             config rules to apply, if any.
-            feedback (bool): True to get compressed feedback with the messages
             as_client_event (bool): True to get events in client-server format.
         Returns:
             dict: Pagination API results
@@ -265,17 +264,6 @@ class MessageHandler(BaseHandler):
         defer.returnValue(data)
 
     @defer.inlineCallbacks
-    def get_feedback(self, event_id):
-        # yield self.auth.check_joined_room(room_id, user_id)
-
-        # Pull out the feedback from the db
-        fb = yield self.store.get_feedback(event_id)
-
-        if fb:
-            defer.returnValue(fb)
-        defer.returnValue(None)
-
-    @defer.inlineCallbacks
     def get_state_events(self, user_id, room_id):
         """Retrieve all state events for a given room. If the user is
         joined to the room then return the current state. If the user has
@@ -303,8 +291,7 @@ class MessageHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def snapshot_all_rooms(self, user_id=None, pagin_config=None,
-                           feedback=False, as_client_event=True):
+    def snapshot_all_rooms(self, user_id=None, pagin_config=None, as_client_event=True):
         """Retrieve a snapshot of all rooms the user is invited or has joined.
 
         This snapshot may include messages for all rooms where the user is
@@ -314,7 +301,6 @@ class MessageHandler(BaseHandler):
             user_id (str): The ID of the user making the request.
             pagin_config (synapse.api.streams.PaginationConfig): The pagination
             config used to determine how many messages *PER ROOM* to return.
-            feedback (bool): True to get feedback along with these messages.
             as_client_event (bool): True to get events in client-server format.
         Returns:
             A list of dicts with "room_id" and "membership" keys for all rooms
@@ -439,8 +425,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def room_initial_sync(self, user_id, room_id, pagin_config=None,
-                          feedback=False):
+    def room_initial_sync(self, user_id, room_id, pagin_config=None):
         """Capture the a snapshot of a room. If user is currently a member of
         the room this will be what is currently in the room. If the user left
         the room this will be what was in the room when they left.
