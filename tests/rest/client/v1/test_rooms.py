@@ -492,9 +492,9 @@ class RoomsMemberListTestCase(RestTestCase):
         self.assertEquals(200, code, msg=str(response))
 
         yield self.leave(room=room_id, user=self.user_id)
-        # can no longer see list, you've left.
+        # can see old list once left
         (code, response) = yield self.mock_resource.trigger_get(room_path)
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(200, code, msg=str(response))
 
 
 class RoomsCreateTestCase(RestTestCase):
