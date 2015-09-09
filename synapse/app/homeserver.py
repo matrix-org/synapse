@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import sys
-
 sys.dont_write_bytecode = True
 from synapse.python_dependencies import check_requirements, DEPENDENCY_LINKS
 

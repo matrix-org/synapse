@@ -265,7 +265,8 @@ class WoefullyInsecureContextFactory(ssl.ContextFactory):
     """
     Factory for PyOpenSSL SSL contexts which does absolutely no certificate verification.
 
-    Do not use this unless you really, really hate your users."""
+    Do not use this unless you really, really hate your users.
+    """
 
     def __init__(self):
         self._context = SSL.Context(SSL.SSLv23_METHOD)
