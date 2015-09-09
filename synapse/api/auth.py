@@ -160,8 +160,9 @@ class Auth(object):
                 event_type=EventTypes.Member,
                 state_key=user_id
             )
+        membership = member.membership if member else None
 
-        if not member:
+        if membership not in (Membership.JOIN, Membership.LEAVE):
             raise AuthError(403, "User %s not in room %s" % (
                 user_id, room_id
             ))
