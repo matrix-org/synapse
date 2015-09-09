@@ -57,14 +57,14 @@ incoming_responses_counter = metrics.register_counter(
 
 class MatrixFederationEndpointFactory(object):
     def __init__(self, hs):
-        self.tls_context_factory = hs.tls_context_factory
+        self.tls_server_context_factory = hs.tls_server_context_factory
 
     def endpointForURI(self, uri):
         destination = uri.netloc
 
         return matrix_federation_endpoint(
             reactor, destination, timeout=10,
-            ssl_context_factory=self.tls_context_factory
+            ssl_context_factory=self.tls_server_context_factory
         )
 
 
