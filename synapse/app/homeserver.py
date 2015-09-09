@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import sys
+
 sys.dont_write_bytecode = True
 from synapse.python_dependencies import check_requirements, DEPENDENCY_LINKS
 
@@ -221,7 +222,7 @@ class SynapseHomeServer(HomeServer):
                     listener_config,
                     root_resource,
                 ),
-                self.tls_context_factory,
+                self.tls_server_context_factory,
                 interface=bind_address
             )
         else:
@@ -365,7 +366,6 @@ def setup(config_options):
     Args:
         config_options_options: The options passed to Synapse. Usually
             `sys.argv[1:]`.
-        should_run (bool): Whether to start the reactor.
 
     Returns:
         HomeServer
@@ -388,7 +388,7 @@ def setup(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    tls_context_factory = context_factory.ServerContextFactory(config)
+    tls_server_context_factory = context_factory.ServerContextFactory(config)
 
     database_engine = create_engine(config.database_config["name"])
     config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
@@ -396,7 +396,7 @@ def setup(config_options):
     hs = SynapseHomeServer(
         config.server_name,
         db_config=config.database_config,
-        tls_context_factory=tls_context_factory,
+        tls_server_context_factory=tls_server_context_factory,
         config=config,
         content_addr=config.content_addr,
         version_string=version_string,

@@ -42,6 +42,10 @@ class TlsConfig(Config):
             config.get("tls_dh_params_path"), "tls_dh_params"
         )
 
+        self.use_insecure_ssl_client = config.get(
+            "i_really_want_to_ignore_ssl_certs_when_i_am_an_http_client_even_"
+            "though_it_is_woefully_insecure_because_i_hate_my_users", False)
+
     def default_config(self, config_dir_path, server_name):
         base_key_name = os.path.join(config_dir_path, server_name)
 

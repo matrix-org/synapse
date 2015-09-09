@@ -19,7 +19,9 @@
 # partial one for unit test mocking.
 
 # Imports required for the default HomeServer() implementation
+from twisted.web.client import BrowserLikePolicyForHTTPS
 from synapse.federation import initialize_http_replication
+from synapse.http.client import SimpleHttpClient, WoefullyInsecureContextFactory
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
@@ -87,6 +89,8 @@ class BaseHomeServer(object):
         'pusherpool',
         'event_builder_factory',
         'filtering',
+        'http_client_context_factory',
+        'simple_http_client',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -173,6 +177,16 @@ class HomeServer(BaseHomeServer):
 
     def build_auth(self):
         return Auth(self)
+
+    def build_http_client_context_factory(self):
+        config = self.get_config()
+        return (
+            WoefullyInsecureContextFactory() if config.use_insecure_ssl_client
+            else BrowserLikePolicyForHTTPS()
+        )
+
+    def build_simple_http_client(self):
+        return SimpleHttpClient(self)
 
     def build_v1auth(self):
         orf = Auth(self)
