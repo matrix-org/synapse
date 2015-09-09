@@ -277,7 +277,9 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_state_events(self, user_id, room_id):
-        """Retrieve all state events for a given room.
+        """Retrieve all state events for a given room. If the user is
+        joined to the room then return the current state. If the user has
+        left the room return the state events from when they left.
 
         Args:
             user_id(str): The user requesting state events.
@@ -285,13 +287,19 @@ class MessageHandler(BaseHandler):
         Returns:
             A list of dicts representing state events. [{}, {}, {}]
         """
-        yield self.auth.check_joined_room(room_id, user_id)
+        member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
 
-        # TODO: This is duplicating logic from snapshot_all_rooms
-        current_state = yield self.state_handler.get_current_state(room_id)
+        if member_event.membership == Membership.JOIN:
+            room_state = yield self.state_handler.get_current_state(room_id)
+        elif member_event.membership == Membership.LEAVE:
+            room_state = yield self.store.get_state_for_events(
+                room_id, [member_event.event_id], None
+            )
+            room_state = room_state[member_event.event_id]
+
         now = self.clock.time_msec()
         defer.returnValue(
-            [serialize_event(c, now) for c in current_state.values()]
+            [serialize_event(c, now) for c in room_state.values()]
         )
 
     @defer.inlineCallbacks
