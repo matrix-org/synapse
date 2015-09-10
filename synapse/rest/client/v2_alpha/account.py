@@ -96,6 +96,7 @@ class ThreepidRestServlet(RestServlet):
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
+        self.auth_handler = hs.get_handlers().auth_handler
 
     @defer.inlineCallbacks
     def on_GET(self, request):
