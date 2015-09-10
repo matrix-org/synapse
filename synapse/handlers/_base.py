@@ -123,23 +123,37 @@ class BaseHandler(object):
                         )
                     )
 
-        (event_stream_id, max_stream_id) = yield self.store.persist_event(
-            event, context=context
-        )
-
         federation_handler = self.hs.get_handlers().federation_handler
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.INVITE:
+                event.unsigned["invite_room_state"] = [
+                    {
+                        "type": e.type,
+                        "state_key": e.state_key,
+                        "content": e.content,
+                    }
+                    for k, e in context.current_state.items()
+                    if e.type in (
+                        EventTypes.JoinRules,
+                        EventTypes.CanonicalAlias,
+                        EventTypes.RoomAvatar,
+                        EventTypes.Name,
+                    )
+                ]
+
                 invitee = UserID.from_string(event.state_key)
                 if not self.hs.is_mine(invitee):
                     # TODO: Can we add signature from remote server in a nicer
                     # way? If we have been invited by a remote server, we need
                     # to get them to sign the event.
+
                     returned_invite = yield federation_handler.send_invite(
                         invitee.domain,
                         event,
                     )
+
+                    event.unsigned.pop("room_state", None)
 
                     # TODO: Make sure the signatures actually are correct.
                     event.signatures.update(
@@ -160,6 +174,10 @@ class BaseHandler(object):
                         403,
                         "You don't have permission to redact events"
                     )
+
+        (event_stream_id, max_stream_id) = yield self.store.persist_event(
+            event, context=context
+        )
 
         destinations = set(extra_destinations)
         for k, s in context.current_state.items():
@@ -188,6 +206,9 @@ class BaseHandler(object):
             )
 
         notify_d.addErrback(log_failure)
+
+        # If invite, remove room_state from unsigned before sending.
+        event.unsigned.pop("invite_room_state", None)
 
         federation_handler.handle_new_event(
             event, destinations=destinations,
