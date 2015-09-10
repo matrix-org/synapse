@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import RoomError, SynapseError
+from synapse.api.errors import SynapseError
 from synapse.streams.config import PaginationConfig
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
@@ -277,13 +277,19 @@ class MessageHandler(BaseHandler):
         Raises:
             SynapseError if something went wrong.
         """
-        have_joined = yield self.auth.check_joined_room(room_id, user_id)
-        if not have_joined:
-            raise RoomError(403, "User not in room.")
+        member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
 
-        data = yield self.state_handler.get_current_state(
-            room_id, event_type, state_key
-        )
+        if member_event.membership == Membership.JOIN:
+            data = yield self.state_handler.get_current_state(
+                room_id, event_type, state_key
+            )
+        elif member_event.membership == Membership.LEAVE:
+            key = (event_type, state_key)
+            room_state = yield self.store.get_state_for_events(
+                room_id, [member_event.event_id], [key]
+            )
+            data = room_state[member_event.event_id].get(key)
+
         defer.returnValue(data)
 
     @defer.inlineCallbacks
