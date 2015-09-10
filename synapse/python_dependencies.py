@@ -25,6 +25,7 @@ REQUIREMENTS = {
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
     "pyyaml": ["yaml"],
+    "ruamel.yaml": ["ruamel.yaml"],
     "pyasn1": ["pyasn1"],
     "pynacl>=0.3.0": ["nacl>=0.3.0"],
     "daemonize": ["daemonize"],

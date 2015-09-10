@@ -18,7 +18,7 @@ import sys
 import os
 import subprocess
 import signal
-import yaml
+import ruamel.yaml
 
 SYNAPSE = ["python", "-B", "-m", "synapse.app.homeserver"]
 
@@ -37,7 +37,7 @@ if not os.path.exists(CONFIGFILE):
     )
     sys.exit(1)
 
-CONFIG = yaml.load(open(CONFIGFILE))
+CONFIG = ruamel.yaml.load(open(CONFIGFILE), ruamel.yaml.RoundTripLoader)
 PIDFILE = CONFIG["pid_file"]
 
 
@@ -55,6 +55,37 @@ def stop():
         os.kill(pid, signal.SIGTERM)
         print GREEN + "stopped" + NORMAL
 
+"""
+Very basic tool for editing the synapse config from the cli
+Supports setting the value of root level keys and appending to arrays
+Does not support nested keys, removing items from arrays or removing keys.
+Uses ruamel.yaml feature that preserves comments and formatting (although
+does quoting slightly differently)
+"""
+def cfgedit(args):
+    if len(args) < 3:
+        raise Exception(
+            "Usage: synctl cfgedit config_option = value"
+            "       synctl cfgedit config_listoption += value"
+        )
+    key = args[0]
+    op = args[1]
+    val = args[2]
+    if op == '+=':
+        if CONFIG[key] and not isinstance(CONFIG[key], list):
+            raise Exception("%s is not a list" % key)
+        if not key in CONFIG:
+            CONFIG[key] = []
+        CONFIG[key].append(val)
+    elif op == '=':
+        CONFIG[key] = val
+    else:
+        raise Exception("Unsupported operator: %s" % op)
+
+    fp = open(CONFIGFILE, 'w')
+    fp.write(ruamel.yaml.dump(CONFIG, Dumper=ruamel.yaml.RoundTripDumper))
+    fp.close()
+
 
 def main():
     action = sys.argv[1] if sys.argv[1:] else "usage"
@@ -65,6 +96,8 @@ def main():
     elif action == "restart":
         stop()
         start()
+    elif action == 'cfgedit':
+        cfgedit(sys.argv[2:])
     else:
         sys.stderr.write("Usage: %s [start|stop|restart]\n" % (sys.argv[0],))
         sys.exit(1)
