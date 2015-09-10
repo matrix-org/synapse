@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """This module contains classes for authenticating the user."""
+import hashlib
 
 from twisted.internet import defer
 
@@ -30,6 +31,7 @@ logger = logging.getLogger(__name__)
 AuthEventTypes = (
     EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,
     EventTypes.JoinRules, EventTypes.RoomHistoryVisibility,
+    EventTypes.TokenBasedInvite,
 )
 
 
@@ -252,7 +254,8 @@ class Auth(object):
                 pass
             elif join_rule == JoinRules.INVITE:
                 if not caller_in_room and not caller_invited:
-                    raise AuthError(403, "You are not invited to this room.")
+                    if not self._caller_has_invite_token(event, auth_events):
+                        raise AuthError(403, "You are not invited to this room.")
             else:
                 # TODO (erikj): may_join list
                 # TODO (erikj): private rooms
@@ -277,6 +280,20 @@ class Auth(object):
             raise AuthError(500, "Unknown membership %s" % membership)
 
         return True
+
+    def _caller_has_invite_token(self, event, auth_events):
+        if "digest" not in event.content:
+            return False
+        invite_event = auth_events.get(
+            (EventTypes.TokenBasedInvite, event.content["digest"]),
+            None
+        )
+        if not invite_event:
+            return False
+        to_digest = invite_event.content["nonce"] + event.content["secret"]
+        computed_digest = hashlib.sha256(to_digest).hexdigest()
+        # TODO: Should probably verify that something has signed the event
+        return computed_digest == event.content["digest"]
 
     def _get_power_level_event(self, auth_events):
         key = (EventTypes.PowerLevels, "", )

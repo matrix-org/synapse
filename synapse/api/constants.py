@@ -74,6 +74,7 @@ class EventTypes(object):
     Aliases = "m.room.aliases"
     Redaction = "m.room.redaction"
     Feedback = "m.room.message.feedback"
+    TokenBasedInvite = "m.room.token_based_invite"
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
