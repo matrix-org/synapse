@@ -55,6 +55,7 @@ def stop():
         os.kill(pid, signal.SIGTERM)
         print GREEN + "stopped" + NORMAL
 
+
 """
 Very basic tool for editing the synapse config from the cli
 Supports setting the value of root level keys and appending to arrays
@@ -62,6 +63,8 @@ Does not support nested keys, removing items from arrays or removing keys.
 Uses ruamel.yaml feature that preserves comments and formatting (although
 does quoting slightly differently)
 """
+
+
 def cfgedit(args):
     if len(args) < 3:
         raise Exception(
@@ -74,7 +77,7 @@ def cfgedit(args):
     if op == '+=':
         if CONFIG[key] and not isinstance(CONFIG[key], list):
             raise Exception("%s is not a list" % key)
-        if not key in CONFIG:
+        if key not in CONFIG:
             CONFIG[key] = []
         CONFIG[key].append(val)
     elif op == '=':
