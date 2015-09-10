@@ -1,3 +1,9 @@
+Changes in synapse v0.10.0-r2 (2015-09-10)
+==========================================
+
+* Fix bug where we always fetched remote server signing keys instead of using
+  ones in our cache.
+
 Changes in synapse v0.10.0-r1 (2015-09-08)
 ==========================================
 
