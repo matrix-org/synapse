@@ -228,10 +228,9 @@ class Keyring(object):
         def do_iterations():
             merged_results = {}
 
-            missing_keys = {
-                group.server_name: set(group.key_ids)
-                for group in group_id_to_group.values()
-            }
+            missing_keys = {}
+            for group in group_id_to_group.values():
+                missing_keys.setdefault(group.server_name, set()).union(group.key_ids)
 
             for fn in key_fetch_fns:
                 results = yield fn(missing_keys.items())
