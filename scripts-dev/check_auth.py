@@ -38,7 +38,7 @@ def check_auth(auth, auth_chain, events):
             print "Failed:", e.event_id, e.type, e.state_key
             print "Auth_events:", auth_events
             print ex
-            print json.dumps(e.get_dict(), sort_keys=True, indent=4)
+            # print json.dumps(e.get_dict(), sort_keys=True, indent=4)
             # raise
         print "Success:", e.event_id, e.type, e.state_key
 

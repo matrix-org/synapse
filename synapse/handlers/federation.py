@@ -649,8 +649,6 @@ class FederationHandler(BaseHandler):
                 # FIXME
                 pass
 
-            self._check_auth_tree(auth_chain, event)
-
             event_stream_id, max_stream_id = yield self._persist_auth_tree(
                 auth_chain, state, event
             )
@@ -1001,7 +999,16 @@ class FederationHandler(BaseHandler):
             is_new_state=(not outliers and not backfilled),
         )
 
-    def _check_auth_tree(self, auth_events, event):
+    @defer.inlineCallbacks
+    def _persist_auth_tree(self, auth_events, state, event):
+        events_to_context = {}
+        for e in auth_events:
+            ctx = yield self.state_handler.compute_event_context(
+                e, outlier=True,
+            )
+            events_to_context[e.event_id] = ctx
+            e.internal_metadata.outlier = True
+
         event_map = {
             e.event_id: e
             for e in auth_events
@@ -1021,17 +1028,17 @@ class FederationHandler(BaseHandler):
             if create_event:
                 a[(EventTypes.Create, "")] = create_event
 
-            self.auth.check(e, auth_events=a)
+            try:
+                self.auth.check(e, auth_events=a)
+            except AuthError:
+                logger.warn(
+                    "Rejecting %s because %s",
+                    event.event_id, e.msg
+                )
 
-    @defer.inlineCallbacks
-    def _persist_auth_tree(self, auth_events, state, event):
-        events_to_context = {}
-        for e in auth_events:
-            ctx = yield self.state_handler.compute_event_context(
-                e, outlier=True,
-            )
-            events_to_context[e.event_id] = ctx
-            e.internal_metadata.outlier = True
+                if e == event:
+                    raise
+                events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
 
         yield self.store.persist_events(
             [
