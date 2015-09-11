@@ -1002,7 +1002,7 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _persist_auth_tree(self, auth_events, state, event):
         events_to_context = {}
-        for e in auth_events:
+        for e in itertools.chain(auth_events, state):
             ctx = yield self.state_handler.compute_event_context(
                 e, outlier=True,
             )
@@ -1020,7 +1020,7 @@ class FederationHandler(BaseHandler):
                 create_event = e
                 break
 
-        for e in auth_events + [event]:
+        for e in itertools.chain(auth_events, state, [event]):
             a = {
                 (event_map[e_id].type, event_map[e_id].state_key): event_map[e_id]
                 for e_id, _ in e.auth_events
@@ -1033,7 +1033,7 @@ class FederationHandler(BaseHandler):
             except AuthError:
                 logger.warn(
                     "Rejecting %s because %s",
-                    event.event_id, e.msg
+                    e.event_id, e.msg
                 )
 
                 if e == event:
