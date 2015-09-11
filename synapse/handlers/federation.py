@@ -1030,10 +1030,10 @@ class FederationHandler(BaseHandler):
 
             try:
                 self.auth.check(e, auth_events=a)
-            except AuthError:
+            except AuthError as err:
                 logger.warn(
                     "Rejecting %s because %s",
-                    e.event_id, e.msg
+                    e.event_id, err.msg
                 )
 
                 if e == event:
