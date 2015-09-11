@@ -1043,7 +1043,7 @@ class FederationHandler(BaseHandler):
         yield self.store.persist_events(
             [
                 (e, events_to_context[e.event_id])
-                for e in auth_events
+                for e in itertools.chain(auth_events, state)
             ],
             is_new_state=False,
         )
