@@ -29,7 +29,7 @@ import traceback
 import yaml
 
 
-logger = logging.getLogger("port_from_sqlite_to_postgres")
+logger = logging.getLogger("synapse_port_db")
 
 
 BOOLEAN_COLUMNS = {
@@ -412,14 +412,17 @@ class Porter(object):
         self._convert_rows("sent_transactions", headers, rows)
 
         inserted_rows = len(rows)
-        max_inserted_rowid = max(r[0] for r in rows)
+        if inserted_rows:
+            max_inserted_rowid = max(r[0] for r in rows)
 
-        def insert(txn):
-            self.postgres_store.insert_many_txn(
-                txn, "sent_transactions", headers[1:], rows
-            )
+            def insert(txn):
+                self.postgres_store.insert_many_txn(
+                    txn, "sent_transactions", headers[1:], rows
+                )
 
-        yield self.postgres_store.execute(insert)
+            yield self.postgres_store.execute(insert)
+        else:
+            max_inserted_rowid = 0
 
         def get_start_id(txn):
             txn.execute(
