@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from OpenSSL import SSL
+from OpenSSL.SSL import VERIFY_NONE
 
 from synapse.api.errors import CodeMessageException
 from synapse.util.logcontext import preserve_context_over_fn
@@ -19,7 +21,7 @@ import synapse.metrics
 
 from canonicaljson import encode_canonical_json
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer, reactor, ssl
 from twisted.web.client import (
     Agent, readBody, FileBodyProducer, PartialDownloadError,
     HTTPConnectionPool,
@@ -59,7 +61,12 @@ class SimpleHttpClient(object):
         # 'like a browser'
         pool = HTTPConnectionPool(reactor)
         pool.maxPersistentPerHost = 10
-        self.agent = Agent(reactor, pool=pool)
+        self.agent = Agent(
+            reactor,
+            pool=pool,
+            connectTimeout=15,
+            contextFactory=hs.get_http_client_context_factory()
+        )
         self.version_string = hs.version_string
 
     def request(self, method, uri, *args, **kwargs):
@@ -252,3 +259,18 @@ def _print_ex(e):
             _print_ex(ex)
     else:
         logger.exception(e)
+
+
+class WoefullyInsecureContextFactory(ssl.ContextFactory):
+    """
+    Factory for PyOpenSSL SSL contexts which does absolutely no certificate verification.
+
+    Do not use this unless you really, really hate your users.
+    """
+
+    def __init__(self):
+        self._context = SSL.Context(SSL.SSLv23_METHOD)
+        self._context.set_verify(VERIFY_NONE, lambda *_: None)
+
+    def getContext(self, hostname, port):
+        return self._context
