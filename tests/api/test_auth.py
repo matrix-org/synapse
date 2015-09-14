@@ -19,17 +19,21 @@ from mock import Mock
 
 from synapse.api.auth import Auth
 from synapse.api.errors import AuthError
+from synapse.types import UserID
+from tests.utils import setup_test_homeserver
+
+import pymacaroons
 
 
 class AuthTestCase(unittest.TestCase):
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.state_handler = Mock()
         self.store = Mock()
 
-        self.hs = Mock()
+        self.hs = yield setup_test_homeserver(handlers=None)
         self.hs.get_datastore = Mock(return_value=self.store)
-        self.hs.get_state_handler = Mock(return_value=self.state_handler)
         self.auth = Auth(self.hs)
 
         self.test_user = "@foo:bar"
@@ -133,3 +137,140 @@ class AuthTestCase(unittest.TestCase):
         request.requestHeaders.getRawHeaders = Mock(return_value=[""])
         d = self.auth.get_user_by_req(request)
         self.failureResultOf(d, AuthError)
+
+    @defer.inlineCallbacks
+    def test_get_user_from_macaroon(self):
+        # TODO(danielwh): Remove this mock when we remove the
+        # get_user_by_access_token fallback.
+        self.store.get_user_by_access_token = Mock(
+            return_value={"name": "@baldrick:matrix.org"}
+        )
+
+        user_id = "@baldrick:matrix.org"
+        macaroon = pymacaroons.Macaroon(
+            location=self.hs.config.server_name,
+            identifier="key",
+            key=self.hs.config.macaroon_secret_key)
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("type = access")
+        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
+        user_info = yield self.auth._get_user_from_macaroon(macaroon.serialize())
+        user = user_info["user"]
+        self.assertEqual(UserID.from_string(user_id), user)
+
+    @defer.inlineCallbacks
+    def test_get_user_from_macaroon_user_db_mismatch(self):
+        self.store.get_user_by_access_token = Mock(
+            return_value={"name": "@percy:matrix.org"}
+        )
+
+        user = "@baldrick:matrix.org"
+        macaroon = pymacaroons.Macaroon(
+            location=self.hs.config.server_name,
+            identifier="key",
+            key=self.hs.config.macaroon_secret_key)
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("type = access")
+        macaroon.add_first_party_caveat("user_id = %s" % (user,))
+        with self.assertRaises(AuthError) as cm:
+            yield self.auth._get_user_from_macaroon(macaroon.serialize())
+        self.assertEqual(401, cm.exception.code)
+        self.assertIn("User mismatch", cm.exception.msg)
+
+    @defer.inlineCallbacks
+    def test_get_user_from_macaroon_missing_caveat(self):
+        # TODO(danielwh): Remove this mock when we remove the
+        # get_user_by_access_token fallback.
+        self.store.get_user_by_access_token = Mock(
+            return_value={"name": "@baldrick:matrix.org"}
+        )
+
+        macaroon = pymacaroons.Macaroon(
+            location=self.hs.config.server_name,
+            identifier="key",
+            key=self.hs.config.macaroon_secret_key)
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("type = access")
+
+        with self.assertRaises(AuthError) as cm:
+            yield self.auth._get_user_from_macaroon(macaroon.serialize())
+        self.assertEqual(401, cm.exception.code)
+        self.assertIn("No user caveat", cm.exception.msg)
+
+    @defer.inlineCallbacks
+    def test_get_user_from_macaroon_wrong_key(self):
+        # TODO(danielwh): Remove this mock when we remove the
+        # get_user_by_access_token fallback.
+        self.store.get_user_by_access_token = Mock(
+            return_value={"name": "@baldrick:matrix.org"}
+        )
+
+        user = "@baldrick:matrix.org"
+        macaroon = pymacaroons.Macaroon(
+            location=self.hs.config.server_name,
+            identifier="key",
+            key=self.hs.config.macaroon_secret_key + "wrong")
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("type = access")
+        macaroon.add_first_party_caveat("user_id = %s" % (user,))
+
+        with self.assertRaises(AuthError) as cm:
+            yield self.auth._get_user_from_macaroon(macaroon.serialize())
+        self.assertEqual(401, cm.exception.code)
+        self.assertIn("Invalid macaroon", cm.exception.msg)
+
+    @defer.inlineCallbacks
+    def test_get_user_from_macaroon_unknown_caveat(self):
+        # TODO(danielwh): Remove this mock when we remove the
+        # get_user_by_access_token fallback.
+        self.store.get_user_by_access_token = Mock(
+            return_value={"name": "@baldrick:matrix.org"}
+        )
+
+        user = "@baldrick:matrix.org"
+        macaroon = pymacaroons.Macaroon(
+            location=self.hs.config.server_name,
+            identifier="key",
+            key=self.hs.config.macaroon_secret_key)
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("type = access")
+        macaroon.add_first_party_caveat("user_id = %s" % (user,))
+        macaroon.add_first_party_caveat("cunning > fox")
+
+        with self.assertRaises(AuthError) as cm:
+            yield self.auth._get_user_from_macaroon(macaroon.serialize())
+        self.assertEqual(401, cm.exception.code)
+        self.assertIn("Invalid macaroon", cm.exception.msg)
+
+    @defer.inlineCallbacks
+    def test_get_user_from_macaroon_expired(self):
+        # TODO(danielwh): Remove this mock when we remove the
+        # get_user_by_access_token fallback.
+        self.store.get_user_by_access_token = Mock(
+            return_value={"name": "@baldrick:matrix.org"}
+        )
+
+        self.store.get_user_by_access_token = Mock(
+            return_value={"name": "@baldrick:matrix.org"}
+        )
+
+        user = "@baldrick:matrix.org"
+        macaroon = pymacaroons.Macaroon(
+            location=self.hs.config.server_name,
+            identifier="key",
+            key=self.hs.config.macaroon_secret_key)
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("type = access")
+        macaroon.add_first_party_caveat("user_id = %s" % (user,))
+        macaroon.add_first_party_caveat("time < 1") # ms
+
+        self.hs.clock.now = 5000 # seconds
+
+        yield self.auth._get_user_from_macaroon(macaroon.serialize())
+        # TODO(daniel): Turn on the check that we validate expiration, when we
+        # validate expiration (and remove the above line, which will start
+        # throwing).
+        # with self.assertRaises(AuthError) as cm:
+        #     yield self.auth._get_user_from_macaroon(macaroon.serialize())
+        # self.assertEqual(401, cm.exception.code)
+        # self.assertIn("Invalid macaroon", cm.exception.msg)

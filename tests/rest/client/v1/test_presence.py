@@ -76,7 +76,7 @@ class PresenceStateTestCase(unittest.TestCase):
                 "token_id": 1,
             }
 
-        hs.get_v1auth().get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
         room_member_handler = hs.handlers.room_member_handler = Mock(
             spec=[
@@ -169,7 +169,7 @@ class PresenceListTestCase(unittest.TestCase):
             ]
         )
 
-        hs.get_v1auth().get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
         presence.register_servlets(hs, self.mock_resource)
 
