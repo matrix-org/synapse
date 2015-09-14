@@ -94,6 +94,7 @@ Synapse is the reference python/twisted Matrix homeserver implementation.
 System requirements:
 - POSIX-compliant system (tested on Linux & OS X)
 - Python 2.7
+- At least 512 MB RAM.
 
 Synapse is written in python but some of the libraries is uses are written in
 C. So before we can install synapse itself we need a working C compiler and the
@@ -120,6 +121,7 @@ To install the synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
     source ~/.synapse/bin/activate
+    pip install --upgrade setuptools
     pip install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
 
 This installs synapse, along with the libraries it uses, into a virtual
@@ -283,6 +285,11 @@ you get errors about ``error: no such option: --process-dependency-links`` you
 may need to manually upgrade it::
 
     sudo pip install --upgrade pip
+
+Installing may fail with ``mock requires setuptools>=17.1. Aborting installation``.
+You can fix this by upgrading setuptools::
+
+    pip install --upgrade setuptools
 
 If pip crashes mid-installation for reason (e.g. lost terminal), pip may
 refuse to run until you remove the temporary installation directory it

@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import LimitExceededError, SynapseError
+from synapse.api.errors import LimitExceededError, SynapseError, AuthError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID, RoomAlias
@@ -144,6 +144,21 @@ class BaseHandler(object):
                     # TODO: Make sure the signatures actually are correct.
                     event.signatures.update(
                         returned_invite.signatures
+                    )
+
+        if event.type == EventTypes.Redaction:
+            if self.auth.check_redaction(event, auth_events=context.current_state):
+                original_event = yield self.store.get_event(
+                    event.redacts,
+                    check_redacted=False,
+                    get_prev_content=False,
+                    allow_rejected=False,
+                    allow_none=False
+                )
+                if event.user_id != original_event.user_id:
+                    raise AuthError(
+                        403,
+                        "You don't have permission to redact events"
                     )
 
         destinations = set(extra_destinations)
