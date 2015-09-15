@@ -303,6 +303,9 @@ class EventFederationStore(SQLBaseStore):
             ],
         )
 
+        self._update_extremeties(txn, events)
+
+    def _update_extremeties(self, txn, events):
         events_by_room = {}
         for ev in events:
             events_by_room.setdefault(ev.room_id, []).append(ev)
