@@ -1,3 +1,8 @@
+Changes in synapse v0.10.0-r1 (2015-09-08)
+==========================================
+
+* Fix bug with python packaging
+
 Changes in synapse v0.10.0 (2015-09-03)
 =======================================
 
