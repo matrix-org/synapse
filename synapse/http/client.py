@@ -261,11 +261,11 @@ def _print_ex(e):
         logger.exception(e)
 
 
-class WoefullyInsecureContextFactory(ssl.ContextFactory):
+class InsecureInterceptableContextFactory(ssl.ContextFactory):
     """
-    Factory for PyOpenSSL SSL contexts which does absolutely no certificate verification.
+    Factory for PyOpenSSL SSL contexts which accepts any certificate for any domain.
 
-    Do not use this unless you really, really hate your users.
+    Do not use this since it allows an attacker to intercept your communications.
     """
 
     def __init__(self):

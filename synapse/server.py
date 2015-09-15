@@ -21,7 +21,7 @@
 # Imports required for the default HomeServer() implementation
 from twisted.web.client import BrowserLikePolicyForHTTPS
 from synapse.federation import initialize_http_replication
-from synapse.http.client import SimpleHttpClient, WoefullyInsecureContextFactory
+from synapse.http.client import SimpleHttpClient,  InsecureInterceptableContextFactory
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
@@ -181,7 +181,7 @@ class HomeServer(BaseHomeServer):
     def build_http_client_context_factory(self):
         config = self.get_config()
         return (
-            WoefullyInsecureContextFactory() if config.use_insecure_ssl_client
+            InsecureInterceptableContextFactory() if config.use_insecure_ssl_client
             else BrowserLikePolicyForHTTPS()
         )
 
