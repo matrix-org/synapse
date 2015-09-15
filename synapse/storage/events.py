@@ -281,6 +281,8 @@ class EventsStore(SQLBaseStore):
                     (False, event.event_id,)
                 )
 
+                self._update_extremeties(txn, [event])
+
         events_and_contexts = filter(
             lambda ec: ec[0] not in to_remove,
             events_and_contexts
