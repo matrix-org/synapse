@@ -46,9 +46,9 @@ class TlsConfig(Config):
         # (e.g. for talking to recaptcha, identity servers, and such)
         # It should never be used in production, and is intended for
         # use only when running tests.
-        self.use_insecure_ssl_client = config.get(
-            "i_really_want_to_ignore_ssl_certs_when_i_am_an_https_client_even_"
-            "though_it_is_woefully_insecure_because_i_am_testing_i_promise", False)
+        self.use_insecure_ssl_client_just_for_testing_do_not_use = config.get(
+            "use_insecure_ssl_client_just_for_testing_do_not_use"
+        )
 
     def default_config(self, config_dir_path, server_name):
         base_key_name = os.path.join(config_dir_path, server_name)

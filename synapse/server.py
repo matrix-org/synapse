@@ -181,7 +181,8 @@ class HomeServer(BaseHomeServer):
     def build_http_client_context_factory(self):
         config = self.get_config()
         return (
-            InsecureInterceptableContextFactory() if config.use_insecure_ssl_client
+            InsecureInterceptableContextFactory()
+            if config.use_insecure_ssl_client_just_for_testing_do_not_use
             else BrowserLikePolicyForHTTPS()
         )
 
