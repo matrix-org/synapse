@@ -19,6 +19,7 @@ from ._base import Config
 class MetricsConfig(Config):
     def read_config(self, config):
         self.enable_metrics = config["enable_metrics"]
+        self.report_stats = config.get("report_stats", False)
         self.metrics_port = config.get("metrics_port")
         self.metrics_bind_host = config.get("metrics_bind_host", "127.0.0.1")
 
@@ -28,4 +29,5 @@ class MetricsConfig(Config):
 
         # Enable collection and rendering of performance metrics
         enable_metrics: False
+        report_stats: False
         """
