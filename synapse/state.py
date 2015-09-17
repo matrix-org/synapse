@@ -17,7 +17,6 @@
 from twisted.internet import defer
 
 from synapse.util.logutils import log_function
-from synapse.util.async import run_on_reactor
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
@@ -119,8 +118,6 @@ class StateHandler(object):
         Returns:
             an EventContext
         """
-        yield run_on_reactor()
-
         context = EventContext()
 
         if outlier:
