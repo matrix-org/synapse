@@ -16,10 +16,23 @@
 
 import sys
 sys.dont_write_bytecode = True
-from synapse.python_dependencies import check_requirements, DEPENDENCY_LINKS
+from synapse.python_dependencies import (
+    check_requirements, DEPENDENCY_LINKS, MissingRequirementError
+)
 
 if __name__ == '__main__':
-    check_requirements()
+    try:
+        check_requirements()
+    except MissingRequirementError as e:
+        message = "\n".join([
+            "Missing Requirement: %s" % (e.message,),
+            "To install run:",
+            "    pip install --upgrade --force \"%s\"" % (e.dependency,),
+            "",
+        ])
+        sys.stderr.writelines(message)
+        sys.exit(1)
+
 
 from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
 from synapse.storage import (
