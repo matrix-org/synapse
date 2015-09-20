@@ -409,9 +409,35 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         # target user is you unless it is an invite
         state_key = user.to_string()
         if membership_action in ["invite", "ban", "kick"]:
-            if "user_id" not in content:
-                raise SynapseError(400, "Missing user_id key.")
-            state_key = content["user_id"]
+            try:
+                state_key = content["user_id"]
+            except KeyError:
+                if membership_action != "invite" or "id_server" not in content:
+                    raise SynapseError(400, "Missing user_id key.")
+
+                _assert_has_keys(
+                    content,
+                    {"id_server", "medium", "address", "display_name"}
+                )
+                id_server = content["id_server"]
+                medium = content["medium"]
+                address = content["address"]
+                display_name = content["display_name"]
+                state_key = yield self._lookup_3pid_user(id_server, medium, address)
+                if not state_key:
+                    yield self._make_and_store_3pid_invite(
+                        id_server,
+                        display_name,
+                        medium,
+                        address,
+                        room_id,
+                        user,
+                        token_id,
+                        txn_id=txn_id
+                    )
+                    defer.returnValue((200, {}))
+                    return
+
             # make sure it looks like a user ID; it'll throw if it's invalid.
             UserID.from_string(state_key)
 
@@ -419,10 +445,21 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 membership_action = "leave"
 
         msg_handler = self.handlers.message_handler
+
+        event_content = {
+            "membership": unicode(membership_action),
+        }
+
+        if membership_action == "join" and "digest" in content:
+            keys = ["nonce", "secret", "digest"]
+            _assert_has_keys(content, keys)
+            for key in keys:
+                event_content[key] = content[key]
+
         yield msg_handler.create_and_send_event(
             {
                 "type": EventTypes.Member,
-                "content": {"membership": unicode(membership_action)},
+                "content": event_content,
                 "room_id": room_id,
                 "sender": user.to_string(),
                 "state_key": state_key,
@@ -432,6 +469,81 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         )
 
         defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def _lookup_3pid_user(self, id_server, medium, address):
+        """Looks up a 3pid in the passed identity server.
+
+        Args:
+            id_server (str): The server name (including port, if required)
+                of the identity server to use.
+            medium (str): The type of the third party identifier (e.g. "email").
+            address (str): The third party identifier (e.g. "foo@example.com").
+
+        Returns:
+            (str) the matrix ID of the 3pid, or None if it is not recognized.
+        """
+        try:
+            data = yield self.hs.get_simple_http_client().get_json(
+                "https://%s/_matrix/identity/api/v1/lookup" % (id_server,),
+                {
+                    "medium": medium,
+                    "address": address,
+                }
+            )
+
+            if "mxid" in data:
+                # TODO: Validate the response signature and such
+                defer.returnValue(data["mxid"])
+        except IOError:
+            # TODO: Log something maybe?
+            defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def _make_and_store_3pid_invite(
+            self,
+            id_server,
+            display_name,
+            medium,
+            address,
+            room_id,
+            user,
+            token_id,
+            txn_id
+    ):
+        nonce, digest = yield self._ask_id_server_for_third_party_invite(
+            id_server, medium, address)
+        msg_handler = self.handlers.message_handler
+        yield msg_handler.create_and_send_event(
+            {
+                "type": EventTypes.TokenBasedInvite,
+                "content": {
+                    "nonce": nonce,
+                    "display_name": display_name,
+                    "id_server": id_server,
+                },
+                "room_id": room_id,
+                "sender": user.to_string(),
+                "state_key": digest,
+            },
+            token_id=token_id,
+            txn_id=txn_id,
+        )
+
+    @defer.inlineCallbacks
+    def _ask_id_server_for_third_party_invite(self, id_server, medium, address):
+        is_url = "https://%s/_matrix/identity/api/v1/nonce-it-up" % (id_server,)
+        data = yield self.hs.get_simple_http_client().post_urlencoded_get_json(
+            is_url,
+            {
+                "medium": medium,
+                "address": address,
+            }
+        )
+        # TODO: Check for success
+        nonce = data["nonce"]
+        digest = data["digest"]
+        defer.returnValue((nonce, digest))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):
@@ -523,15 +635,25 @@ class RoomTypingRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-def _parse_json(request):
+def _parse_json(request, expected_keys=None):
     try:
         content = json.loads(request.content.read())
         if type(content) != dict:
             raise SynapseError(400, "Content must be a JSON object.",
                                errcode=Codes.NOT_JSON)
+        if expected_keys:
+            _assert_has_keys(content, expected_keys)
         return content
     except ValueError:
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
+
+
+def _assert_has_keys(content, expected_keys):
+    missing_keys = set(expected_keys) - set(content.keys())
+    if missing_keys:
+        raise SynapseError(404, "Missing expected keys: %s" % (
+            ",".join(missing_keys),
+        ))
 
 
 def register_txn_path(servlet, regex_string, http_server, with_get=False):
