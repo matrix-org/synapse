@@ -389,13 +389,14 @@ class MessageHandler(BaseHandler):
 
             if event.membership not in (Membership.JOIN, Membership.LEAVE):
                 return
+
             try:
                 if event.membership == Membership.JOIN:
                     room_end_token = now_token.room_key
                     deferred_room_state = self.state_handler.get_current_state(
                         event.room_id
                     )
-                else:
+                elif event.membership == Membership.LEAVE:
                     room_end_token = "s%d" % (event.stream_ordering,)
                     deferred_room_state = self.store.get_state_for_events(
                         event.room_id, [event.event_id], None
