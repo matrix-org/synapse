@@ -467,8 +467,9 @@ class MessageHandler(BaseHandler):
         Args:
             user_id(str): The user to get a snapshot for.
             room_id(str): The room to get a snapshot of.
-            pagin_config(synapse.api.streams.PaginationConfig): The pagination
-            config used to determine how many messages to return.
+            pagin_config(synapse.streams.config.PaginationConfig):
+                The pagination config used to determine how many messages to
+                return.
         Raises:
             AuthError if the user wasn't in the room.
         Returns:
