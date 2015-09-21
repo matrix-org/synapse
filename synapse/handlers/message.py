@@ -120,6 +120,10 @@ class MessageHandler(BaseHandler):
             if source_config.direction == "f":
                 if source_config.to_key is None:
                     source_config.to_key = str(leave_token)
+                else:
+                    to_token = RoomStreamToken.parse(source_config.to_key)
+                    if leave_token.topological < to_token.topological:
+                        source_config.to_key = str(leave_token)
 
         yield self.hs.get_handlers().federation_handler.maybe_backfill(
             room_id, room_token.topological
