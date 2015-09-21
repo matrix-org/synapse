@@ -146,8 +146,9 @@ class Auth(object):
         Raises:
             AuthError if the user was never in the room.
         Returns:
-            A deferred membership event for the user if the user was in
-            the room.
+            A deferred membership event for the user if the user was in the
+            room. This will be the join event if they are currently joined to
+            the room. This will be the leave event if they have left the room.
         """
         if current_state:
             member = current_state.get(
