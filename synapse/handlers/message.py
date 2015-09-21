@@ -473,7 +473,7 @@ class MessageHandler(BaseHandler):
         Raises:
             AuthError if the user wasn't in the room.
         Returns:
-            A JSON object with the snapshot of the room.
+            A JSON serialisable dict with the snapshot of the room.
         """
 
         member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
