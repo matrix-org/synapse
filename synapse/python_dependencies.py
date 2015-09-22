@@ -27,6 +27,7 @@ REQUIREMENTS = {
     "Twisted>=15.1.0": ["twisted>=15.1.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
     "pyyaml": ["yaml"],
+    "ruamel.yaml": ["ruamel.yaml"],
     "pyasn1": ["pyasn1"],
     "daemonize": ["daemonize"],
     "py-bcrypt": ["bcrypt"],
