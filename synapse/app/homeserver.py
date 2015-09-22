@@ -128,6 +128,7 @@ class SynapseHomeServer(HomeServer):
         # (It can stay enabled for the API resources: they call
         # write() with the whole body and then finish() straight
         # after and so do not trigger the bug.
+        # GzipFile was removed in commit 184ba09
         # return GzipFile(webclient_path)  # TODO configurable?
         return File(webclient_path)  # TODO configurable?
 
