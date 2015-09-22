@@ -27,13 +27,13 @@ class ConfigError(Exception):
 class Config(object):
 
     stats_reporting_begging_spiel = (
-        "We would really appreciate it if you could help our project out by "
-        "reporting anonymized usage statistics from your homeserver. Only very "
-        "basic aggregate data (e.g. number of users) will be reported, but it "
-        "helps us to track the growth of the Matrix community, and helps us to "
-        "make Matrix a success, as well as to convince other networks that they "
-        "should peer with us.\n"
-        "Thank you."
+        "We would really appreciate it if you could help our project out by"
+        " reporting anonymized usage statistics from your homeserver. Only very"
+        " basic aggregate data (e.g. number of users) will be reported, but it"
+        " helps us to track the growth of the Matrix community, and helps us to"
+        " make Matrix a success, as well as to convince other networks that they"
+        " should peer with us."
+        "\nThank you."
     )
 
     @staticmethod
