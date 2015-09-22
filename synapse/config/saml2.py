@@ -41,7 +41,7 @@ class SAML2Config(Config):
             self.saml2_config_path = None
             self.saml2_idp_redirect_url = None
 
-    def default_config(self, config_dir_path, server_name):
+    def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable SAML2 for registration and login. Uses pysaml2
         # config_path:      Path to the sp_conf.py configuration file
