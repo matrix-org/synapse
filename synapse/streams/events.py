@@ -70,15 +70,3 @@ class EventSources(object):
             ),
         )
         defer.returnValue(token)
-
-
-class StreamSource(object):
-    def get_new_events_for_user(self, user, from_key, limit):
-        """from_key is the key within this event source."""
-        raise NotImplementedError("get_new_events_for_user")
-
-    def get_current_key(self):
-        raise NotImplementedError("get_current_key")
-
-    def get_pagination_rows(self, user, pagination_config, key):
-        raise NotImplementedError("get_rows")
