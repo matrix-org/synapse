@@ -908,6 +908,12 @@ class EventsStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def count_daily_messages(self):
+        """
+        Returns an estimate of the number of messages sent in the last day.
+
+        If it has been significantly less or more than one day since the last
+        call to this function, it will return None.
+        """
         def _count_messages(txn):
             now = self.hs.get_clock().time()
 
