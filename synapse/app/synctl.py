@@ -25,6 +25,7 @@ SYNAPSE = ["python", "-B", "-m", "synapse.app.homeserver"]
 CONFIGFILE = "homeserver.yaml"
 
 GREEN = "\x1b[1;32m"
+RED = "\x1b[1;31m"
 NORMAL = "\x1b[m"
 
 if not os.path.exists(CONFIGFILE):
@@ -45,8 +46,15 @@ def start():
     print "Starting ...",
     args = SYNAPSE
     args.extend(["--daemonize", "-c", CONFIGFILE])
-    subprocess.check_call(args)
-    print GREEN + "started" + NORMAL
+    try:
+        subprocess.check_call(args)
+        print GREEN + "started" + NORMAL
+    except subprocess.CalledProcessError as e:
+        print (
+            RED +
+            "error starting (exit code: %d); see above for logs" % e.returncode +
+            NORMAL
+        )
 
 
 def stop():
