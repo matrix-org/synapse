@@ -77,11 +77,6 @@ class SynapseError(CodeMessageException):
         )
 
 
-class RoomError(SynapseError):
-    """An error raised when a room event fails."""
-    pass
-
-
 class RegistrationError(SynapseError):
     """An error raised when a registration event fails."""
     pass
