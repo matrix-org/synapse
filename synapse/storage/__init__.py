@@ -128,6 +128,9 @@ class DataStore(RoomMemberStore, RoomStore,
 
     @defer.inlineCallbacks
     def count_daily_users(self):
+        """
+        Counts the number of users who used this homeserver in the last 24 hours.
+        """
         def _count_users(txn):
             txn.execute(
                 "SELECT COUNT(DISTINCT user_id) AS users"

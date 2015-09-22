@@ -292,6 +292,7 @@ class RegistrationStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def count_all_users(self):
+        """Counts all users registered on the homeserver."""
         def _count_users(txn):
             txn.execute("SELECT COUNT(*) AS users FROM users")
             rows = self.cursor_to_dict(txn)
