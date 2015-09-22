@@ -42,7 +42,7 @@ from synapse.storage import (
 from synapse.server import HomeServer
 
 
-from twisted.internet import reactor
+from twisted.internet import reactor, task, defer
 from twisted.application import service
 from twisted.enterprise import adbapi
 from twisted.web.resource import Resource, EncodingResourceWrapper
@@ -676,6 +676,42 @@ def run(hs):
         from twisted.python.threadpool import ThreadPool
         ThreadPool._worker = profile(ThreadPool._worker)
         reactor.run = profile(reactor.run)
+
+    start_time = hs.get_clock().time()
+
+    @defer.inlineCallbacks
+    def phone_stats_home():
+        now = int(hs.get_clock().time())
+        uptime = int(now - start_time)
+        if uptime < 0:
+            uptime = 0
+
+        stats = {}
+        stats["homeserver"] = hs.config.server_name
+        stats["timestamp"] = now
+        stats["uptime_seconds"] = uptime
+        stats["total_users"] = yield hs.get_datastore().count_all_users()
+
+        all_rooms = yield hs.get_datastore().get_rooms(False)
+        stats["total_room_count"] = len(all_rooms)
+
+        stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
+        daily_messages = yield hs.get_datastore().count_daily_messages()
+        if daily_messages is not None:
+            stats["daily_messages"] = daily_messages
+
+        logger.info("Reporting stats to matrix.org: %s" % (stats,))
+        try:
+            yield hs.get_simple_http_client().put_json(
+                "https://matrix.org/report-usage-stats/push",
+                stats
+            )
+        except Exception as e:
+            logger.warn("Error reporting stats: %s", e)
+
+    if hs.config.report_stats:
+        phone_home_task = task.LoopingCall(phone_stats_home)
+        phone_home_task.start(60 * 60 * 24, now=False)
 
     def in_thread():
         with LoggingContext("run"):

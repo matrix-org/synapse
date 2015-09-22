@@ -40,7 +40,7 @@ class KeyConfig(Config):
             config["perspectives"]
         )
 
-    def default_config(self, config_dir_path, server_name):
+    def default_config(self, config_dir_path, server_name, **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
         return """\
         ## Signing Keys ##
