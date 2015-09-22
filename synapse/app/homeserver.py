@@ -701,10 +701,13 @@ def run(hs):
             stats["daily_messages"] = daily_messages
 
         logger.info("Reporting stats to matrix.org: %s" % (stats,))
-        hs.get_simple_http_client().put_json(
-            "https://matrix.org/report-usage-stats/push",
-            stats
-        )
+        try:
+            yield hs.get_simple_http_client().put_json(
+                "https://matrix.org/report-usage-stats/push",
+                stats
+            )
+        except Exception as e:
+            logger.warn("Error reporting stats: %s", e)
 
     if hs.config.report_stats:
         phone_home_task = task.LoopingCall(phone_stats_home)
