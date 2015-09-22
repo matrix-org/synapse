@@ -85,12 +85,6 @@ import time
 logger = logging.getLogger("synapse.app.homeserver")
 
 
-class GzipFile(File):
-    def getChild(self, path, request):
-        child = File.getChild(self, path, request)
-        return EncodingResourceWrapper(child, [GzipEncoderFactory()])
-
-
 def gz_wrap(r):
     return EncodingResourceWrapper(r, [GzipEncoderFactory()])
 
