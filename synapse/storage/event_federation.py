@@ -225,27 +225,6 @@ class EventFederationStore(SQLBaseStore):
 
         return results
 
-    def _get_auth_events(self, txn, event_id):
-        auth_ids = self._simple_select_onecol_txn(
-            txn,
-            table="event_auth",
-            keyvalues={
-                "event_id": event_id,
-            },
-            retcol="auth_id",
-        )
-
-        results = []
-        for auth_id in auth_ids:
-            hashes = self._get_event_reference_hashes_txn(txn, auth_id)
-            prev_hashes = {
-                k: encode_base64(v) for k, v in hashes.items()
-                if k == "sha256"
-            }
-            results.append((auth_id, prev_hashes))
-
-        return results
-
     def get_min_depth(self, room_id):
         """ For hte given room, get the minimum depth we have seen for it.
         """
