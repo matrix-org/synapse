@@ -25,6 +25,7 @@ for port in 8080 8081 8082; do
         --generate-config \
         -H "localhost:$https_port" \
         --config-path "$DIR/etc/$port.config" \
+        --report-stats no
 
     # Check script parameters
     if [ $# -eq 1 ]; then
