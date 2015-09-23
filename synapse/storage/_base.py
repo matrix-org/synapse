@@ -707,16 +707,6 @@ class SQLBaseStore(object):
                 raise StoreError(500, "more than one row matched")
         return self.runInteraction(desc, func)
 
-    def _simple_delete(self, table, keyvalues, desc="_simple_delete"):
-        """Executes a DELETE query on the named table.
-
-        Args:
-            table : string giving the table name
-            keyvalues : dict of column names and values to select the row with
-        """
-
-        return self.runInteraction(desc, self._simple_delete_txn)
-
     def _simple_delete_txn(self, txn, table, keyvalues):
         sql = "DELETE FROM %s WHERE %s" % (
             table,
