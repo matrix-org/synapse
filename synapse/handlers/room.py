@@ -38,7 +38,7 @@ class RoomCreationHandler(BaseHandler):
     PRESETS_DICT = {
         RoomCreationPreset.PRIVATE_CHAT: {
             "join_rules": JoinRules.INVITE,
-            "history_visibility": "invited",
+            "history_visibility": "shared",
             "original_invitees_have_ops": False,
         },
         RoomCreationPreset.PUBLIC_CHAT: {
