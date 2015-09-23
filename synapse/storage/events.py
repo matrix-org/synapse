@@ -890,21 +890,10 @@ class EventsStore(SQLBaseStore):
 
         return ev
 
-    def _parse_events(self, rows):
-        return self.runInteraction(
-            "_parse_events", self._parse_events_txn, rows
-        )
-
     def _parse_events_txn(self, txn, rows):
         event_ids = [r["event_id"] for r in rows]
 
         return self._get_events_txn(txn, event_ids)
-
-    def _has_been_redacted_txn(self, txn, event):
-        sql = "SELECT event_id FROM redactions WHERE redacts = ?"
-        txn.execute(sql, (event.event_id,))
-        result = txn.fetchone()
-        return result[0] if result else None
 
     @defer.inlineCallbacks
     def count_daily_messages(self):
