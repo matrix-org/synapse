@@ -92,21 +92,32 @@ def used_names(prefix, defs, names):
 
 
 if __name__ == '__main__':
-    import sys, os
-    if not sys.argv[1:]:
-        sys.stderr.write(
-            "Usage: definitions.py <directory> <regexp>\n"
-            "       definitions.py <directory>\n"
-            "Either list the definitions matching the regexp or list\n"
-            " 'unused' definitions\n"
-        )
+    import sys, os, argparse, re
+
+    parser = argparse.ArgumentParser(description='Find definitions.')
+    parser.add_argument(
+        "--unused", action="store_true", help="Only list unused definitions"
+    )
+    parser.add_argument(
+        "--ignore", action="append", metavar="REGEXP", help="Ignore a pattern"
+    )
+    parser.add_argument(
+        "--pattern", nargs='+', action="append", metavar="REGEXP",
+        help="Search for a pattern"
+    )
+    parser.add_argument(
+        "directories", nargs='+', metavar="DIR",
+        help="Directories to search for definitions"
+    )
+    args = parser.parse_args()
 
     definitions = {}
-    for root, dirs, files in os.walk(sys.argv[1]):
-        for filename in files:
-            if filename.endswith(".py"):
-                filepath = os.path.join(root, filename)
-                definitions[filepath] = definitions_in_file(filepath)
+    for directory in args.directories:
+        for root, dirs, files in os.walk(directory):
+            for filename in files:
+                if filename.endswith(".py"):
+                    filepath = os.path.join(root, filename)
+                    definitions[filepath] = definitions_in_file(filepath)
 
     names = {}
     for filepath, defs in definitions.items():
@@ -115,16 +126,17 @@ if __name__ == '__main__':
     for filepath, defs in definitions.items():
         used_names(filepath + ":", defs, names)
 
-    if sys.argv[2:]:
-        import re
-        pattern = re.compile(sys.argv[2])
-        for name in list(names):
-            if not pattern.match(name):
-                del names[name]
-    else:
-        for name in list(names):
-            if 'used' in names[name]:
-                del names[name]
+    patterns = [re.compile(pattern) for pattern in args.pattern or ()]
+    ignore = [re.compile(pattern) for pattern in args.ignore or ()]
 
-    yaml.dump(names, sys.stdout, default_flow_style=False)
-    #yaml.dump(definitions, sys.stdout, default_flow_style=False)
+    result = {}
+    for name, definition in names.items():
+        if patterns and not any(pattern.match(name) for pattern in patterns):
+            continue
+        if ignore and any(pattern.match(name) for pattern in ignore):
+            continue
+        if args.unused and definition.get('used'):
+            continue
+        result[name] = definition
+
+    yaml.dump(result, sys.stdout, default_flow_style=False)
