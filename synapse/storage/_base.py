@@ -715,24 +715,6 @@ class SQLBaseStore(object):
 
         return txn.execute(sql, keyvalues.values())
 
-    def _simple_max_id(self, table):
-        """Executes a SELECT query on the named table, expecting to return the
-        max value for the column "id".
-
-        Args:
-            table : string giving the table name
-        """
-        sql = "SELECT MAX(id) AS id FROM %s" % table
-
-        def func(txn):
-            txn.execute(sql)
-            max_id = self.cursor_to_dict(txn)[0]["id"]
-            if max_id is None:
-                return 0
-            return max_id
-
-        return self.runInteraction("_simple_max_id", func)
-
     def get_next_stream_id(self):
         with self._next_stream_id_lock:
             i = self._next_stream_id
