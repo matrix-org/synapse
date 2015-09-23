@@ -493,32 +493,6 @@ class RoomMemberHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def _should_invite_join(self, room_id, prev_state, do_auth):
-        logger.debug("_should_invite_join: room_id: %s", room_id)
-
-        # XXX: We don't do an auth check if we are doing an invite
-        # join dance for now, since we're kinda implicitly checking
-        # that we are allowed to join when we decide whether or not we
-        # need to do the invite/join dance.
-
-        # Only do an invite join dance if a) we were invited,
-        # b) the person inviting was from a differnt HS and c) we are
-        # not currently in the room
-        room_host = None
-        if prev_state and prev_state.membership == Membership.INVITE:
-            room = yield self.store.get_room(room_id)
-            inviter = UserID.from_string(
-                prev_state.sender
-            )
-
-            is_remote_invite_join = not self.hs.is_mine(inviter) and not room
-            room_host = inviter.domain
-        else:
-            is_remote_invite_join = False
-
-        defer.returnValue((is_remote_invite_join, room_host))
-
-    @defer.inlineCallbacks
     def get_joined_rooms_for_user(self, user):
         """Returns a list of roomids that the user has any of the given
         membership states in."""
