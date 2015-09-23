@@ -686,37 +686,6 @@ class SQLBaseStore(object):
 
         return dict(zip(retcols, row))
 
-    def _simple_selectupdate_one(self, table, keyvalues, updatevalues=None,
-                                 retcols=None, allow_none=False,
-                                 desc="_simple_selectupdate_one"):
-        """ Combined SELECT then UPDATE."""
-        def func(txn):
-            ret = None
-            if retcols:
-                ret = self._simple_select_one_txn(
-                    txn,
-                    table=table,
-                    keyvalues=keyvalues,
-                    retcols=retcols,
-                    allow_none=allow_none,
-                )
-
-            if updatevalues:
-                self._simple_update_one_txn(
-                    txn,
-                    table=table,
-                    keyvalues=keyvalues,
-                    updatevalues=updatevalues,
-                )
-
-                # if txn.rowcount == 0:
-                #     raise StoreError(404, "No row found")
-                if txn.rowcount > 1:
-                    raise StoreError(500, "More than one row matched")
-
-            return ret
-        return self.runInteraction(desc, func)
-
     def _simple_delete_one(self, table, keyvalues, desc="_simple_delete_one"):
         """Executes a DELETE query on the named table, expecting to delete a
         single row.
