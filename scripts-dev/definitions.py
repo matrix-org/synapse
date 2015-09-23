@@ -102,7 +102,7 @@ if __name__ == '__main__':
         "--ignore", action="append", metavar="REGEXP", help="Ignore a pattern"
     )
     parser.add_argument(
-        "--pattern", nargs='+', action="append", metavar="REGEXP",
+        "--pattern", action="append", metavar="REGEXP",
         help="Search for a pattern"
     )
     parser.add_argument(
