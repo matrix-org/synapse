@@ -73,8 +73,8 @@ def main():
     elif action == "stop":
         stop(pidfile)
     elif action == "restart":
-        stop()
-        start()
+        stop(pidfile)
+        start(configfile)
     else:
         sys.stderr.write("Usage: %s [start|stop|restart] [configfile]\n" % (sys.argv[0],))
         sys.exit(1)
