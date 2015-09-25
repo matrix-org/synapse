@@ -117,6 +117,11 @@ class ServerConfig(Config):
 
         self.content_addr = content_addr
 
+        client_addr = config.get("client_addr")
+        if not client_addr:
+            client_addr = content_addr
+        self.client_addr = client_addr
+
     def default_config(self, server_name, **kwargs):
         if ":" in server_name:
             bind_port = int(server_name.split(":")[1])
@@ -139,6 +144,9 @@ class ServerConfig(Config):
 
         # Whether to serve a web client from the HTTP/HTTPS root resource.
         web_client: True
+
+        # URL clients can use to talk to the server.
+        client_addr: "https://%(server_name)s:%(bind_port)s"
 
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the

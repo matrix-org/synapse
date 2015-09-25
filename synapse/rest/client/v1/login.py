@@ -27,6 +27,8 @@ from saml2 import BINDING_HTTP_POST
 from saml2 import config
 from saml2.client import Saml2Client
 
+import pymacaroons
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,7 @@ class LoginRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/login$")
     PASS_TYPE = "m.login.password"
     SAML2_TYPE = "m.login.saml2"
+    TOKEN_TYPE = "m.login.token"
 
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__(hs)
@@ -42,7 +45,10 @@ class LoginRestServlet(ClientV1RestServlet):
         self.saml2_enabled = hs.config.saml2_enabled
 
     def on_GET(self, request):
-        flows = [{"type": LoginRestServlet.PASS_TYPE}]
+        flows = [
+            {"type": LoginRestServlet.PASS_TYPE},
+            {"type": LoginRestServlet.TOKEN_TYPE}
+        ]
         if self.saml2_enabled:
             flows.append({"type": LoginRestServlet.SAML2_TYPE})
         return (200, {"flows": flows})
@@ -67,6 +73,12 @@ class LoginRestServlet(ClientV1RestServlet):
                     "uri": "%s%s" % (self.idp_redirect_url, relay_state)
                 }
                 defer.returnValue((200, result))
+            elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
+                auth_handler = self.handlers.auth_handler
+                token = login_submission["token"]
+                user_id = login_submission["user"]
+                result = yield auth_handler.do_short_term_token_login(token, user_id)
+                defer.returnValue(result)
             else:
                 raise SynapseError(400, "Bad login type.")
         except KeyError:
@@ -99,6 +111,60 @@ class LoginRestServlet(ClientV1RestServlet):
         }
 
         defer.returnValue((200, result))
+
+    @defer.inlineCallbacks
+    def do_short_term_token_login(self, login_submission):
+        token = login_submission["token"]
+        user_id = login_submission["user"]
+
+        macaroon_exact_caveats = [
+            "gen = 1",
+            "type = st_login",
+            "user_id = %s" % (user_id,)
+        ]
+
+        macaroon_general_caveats = [
+            self._verify_macaroon_expiry
+        ]
+
+        try:
+            macaroon = pymacaroons.Macaroon.deserialize(token)
+
+            v = pymacaroons.Verifier()
+            for exact_caveat in macaroon_exact_caveats:
+                v.satisfy_exact(exact_caveat)
+
+            for general_caveat in macaroon_general_caveats:
+                v.satisfy_general(general_caveat)
+
+            verified = v.verify(macaroon, self.hs.config.macaroon_secret_key)
+            if not verified:
+                raise SynapseError(400, "Invalid token.")
+
+            auth_handler = self.handlers.auth_handler
+            user_id, access_token, refresh_token = yield auth_handler.issue_tokens(
+                user_id=user_id,
+            )
+
+            result = {
+                "user_id": user_id,  # may have changed
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "home_server": self.hs.hostname,
+            }
+
+            defer.returnValue(result)
+        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+            raise SynapseError(400, "Invalid token.")
+
+    def _verify_macaroon_expiry(self, caveat):
+        prefix = "time < "
+        if not caveat.startswith(prefix):
+            return False
+
+        expiry = int(caveat[len(prefix):])
+        now = self.hs.get_clock().time_msec()
+        return now < expiry
 
 
 class LoginFallbackRestServlet(ClientV1RestServlet):

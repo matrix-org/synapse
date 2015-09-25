@@ -290,10 +290,73 @@ class AuthHandler(BaseHandler):
         user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
         self._check_password(user_id, password, password_hash)
 
+        res = yield self._issue_tokens(user_id)
+        defer.returnValue(res)
+
+    @defer.inlineCallbacks
+    def _issue_tokens(self, user_id):
         logger.info("Logging in user %s", user_id)
         access_token = yield self.issue_access_token(user_id)
         refresh_token = yield self.issue_refresh_token(user_id)
         defer.returnValue((user_id, access_token, refresh_token))
+
+    @defer.inlineCallbacks
+    def do_short_term_token_login(self, token, user_id):
+        macaroon_exact_caveats = [
+            "gen = 1",
+            "type = st_login",
+            "user_id = %s" % (user_id,)
+        ]
+
+        macaroon_general_caveats = [
+            self._verify_macaroon_expiry
+        ]
+
+        try:
+            macaroon = pymacaroons.Macaroon.deserialize(token)
+
+            v = pymacaroons.Verifier()
+            for exact_caveat in macaroon_exact_caveats:
+                v.satisfy_exact(exact_caveat)
+
+            for general_caveat in macaroon_general_caveats:
+                v.satisfy_general(general_caveat)
+
+            verified = v.verify(macaroon, self.hs.config.macaroon_secret_key)
+            if not verified:
+                raise LoginError(403, "Invalid token", errcode=Codes.FORBIDDEN)
+
+            user_id, access_token, refresh_token = yield self._issue_tokens(
+                user_id=user_id,
+            )
+
+            result = {
+                "user_id": user_id,  # may have changed
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "home_server": self.hs.hostname,
+            }
+
+            defer.returnValue(result)
+        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+            raise LoginError(403, "Invalid token", errcode=Codes.FORBIDDEN)
+
+    def _verify_macaroon_expiry(self, caveat):
+        prefix = "time < "
+        if not caveat.startswith(prefix):
+            return False
+
+        expiry = int(caveat[len(prefix):])
+        now = self.hs.get_clock().time_msec()
+        return now < expiry
+
+    def make_short_term_token(self, user_id):
+        macaroon = self._generate_base_macaroon(user_id)
+        macaroon.add_first_party_caveat("type = st_login")
+        now = self.hs.get_clock().time_msec()
+        expiry = now + (60 * 1000)
+        macaroon.add_first_party_caveat("time < %d" % (expiry,))
+        return macaroon.serialize()
 
     @defer.inlineCallbacks
     def _find_user_id_and_pwd_hash(self, user_id):
