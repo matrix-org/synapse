@@ -23,6 +23,7 @@ from synapse.util.logutils import log_function
 from synapse.types import UserID, EventID
 
 import logging
+import pymacaroons
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,12 @@ class Auth(object):
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
+        self._KNOWN_CAVEAT_PREFIXES = set([
+            "gen = ",
+            "type = ",
+            "time < ",
+            "user_id = ",
+        ])
 
     def check(self, event, auth_events):
         """ Checks if this event is correctly authed.
@@ -64,6 +71,14 @@ class Auth(object):
             if event.type == EventTypes.Create:
                 # FIXME
                 return True
+
+            creation_event = auth_events.get((EventTypes.Create, ""), None)
+
+            if not creation_event:
+                raise SynapseError(
+                    403,
+                    "Room %r does not exist" % (event.room_id,)
+                )
 
             # FIXME: Temp hack
             if event.type == EventTypes.Aliases:
@@ -104,6 +119,20 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
+        """Check if the user is currently joined in the room
+        Args:
+            room_id(str): The room to check.
+            user_id(str): The user to check.
+            current_state(dict): Optional map of the current state of the room.
+                If provided then that map is used to check whether they are a
+                member of the room. Otherwise the current membership is
+                loaded from the database.
+        Raises:
+            AuthError if the user is not in the room.
+        Returns:
+            A deferred membership event for the user if the user is in
+            the room.
+        """
         if current_state:
             member = current_state.get(
                 (EventTypes.Member, user_id),
@@ -117,6 +146,43 @@ class Auth(object):
             )
 
         self._check_joined_room(member, user_id, room_id)
+        defer.returnValue(member)
+
+    @defer.inlineCallbacks
+    def check_user_was_in_room(self, room_id, user_id, current_state=None):
+        """Check if the user was in the room at some point.
+        Args:
+            room_id(str): The room to check.
+            user_id(str): The user to check.
+            current_state(dict): Optional map of the current state of the room.
+                If provided then that map is used to check whether they are a
+                member of the room. Otherwise the current membership is
+                loaded from the database.
+        Raises:
+            AuthError if the user was never in the room.
+        Returns:
+            A deferred membership event for the user if the user was in the
+            room. This will be the join event if they are currently joined to
+            the room. This will be the leave event if they have left the room.
+        """
+        if current_state:
+            member = current_state.get(
+                (EventTypes.Member, user_id),
+                None
+            )
+        else:
+            member = yield self.state.get_current_state(
+                room_id=room_id,
+                event_type=EventTypes.Member,
+                state_key=user_id
+            )
+        membership = member.membership if member else None
+
+        if membership not in (Membership.JOIN, Membership.LEAVE):
+            raise AuthError(403, "User %s not in room %s" % (
+                user_id, room_id
+            ))
+
         defer.returnValue(member)
 
     @defer.inlineCallbacks
@@ -359,7 +425,7 @@ class Auth(object):
             except KeyError:
                 pass  # normal users won't have the user_id query parameter set.
 
-            user_info = yield self.get_user_by_access_token(access_token)
+            user_info = yield self._get_user_by_access_token(access_token)
             user = user_info["user"]
             token_id = user_info["token_id"]
 
@@ -386,7 +452,7 @@ class Auth(object):
             )
 
     @defer.inlineCallbacks
-    def get_user_by_access_token(self, token):
+    def _get_user_by_access_token(self, token):
         """ Get a registered user's ID.
 
         Args:
@@ -396,6 +462,86 @@ class Auth(object):
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
+        try:
+            ret = yield self._get_user_from_macaroon(token)
+        except AuthError:
+            # TODO(daniel): Remove this fallback when all existing access tokens
+            # have been re-issued as macaroons.
+            ret = yield self._look_up_user_by_access_token(token)
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def _get_user_from_macaroon(self, macaroon_str):
+        try:
+            macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
+            self._validate_macaroon(macaroon)
+
+            user_prefix = "user_id = "
+            for caveat in macaroon.caveats:
+                if caveat.caveat_id.startswith(user_prefix):
+                    user = UserID.from_string(caveat.caveat_id[len(user_prefix):])
+                    # This codepath exists so that we can actually return a
+                    # token ID, because we use token IDs in place of device
+                    # identifiers throughout the codebase.
+                    # TODO(daniel): Remove this fallback when device IDs are
+                    # properly implemented.
+                    ret = yield self._look_up_user_by_access_token(macaroon_str)
+                    if ret["user"] != user:
+                        logger.error(
+                            "Macaroon user (%s) != DB user (%s)",
+                            user,
+                            ret["user"]
+                        )
+                        raise AuthError(
+                            self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                            "User mismatch in macaroon",
+                            errcode=Codes.UNKNOWN_TOKEN
+                        )
+                    defer.returnValue(ret)
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "No user caveat in macaroon",
+                errcode=Codes.UNKNOWN_TOKEN
+            )
+        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Invalid macaroon passed.",
+                errcode=Codes.UNKNOWN_TOKEN
+            )
+
+    def _validate_macaroon(self, macaroon):
+        v = pymacaroons.Verifier()
+        v.satisfy_exact("gen = 1")
+        v.satisfy_exact("type = access")
+        v.satisfy_general(lambda c: c.startswith("user_id = "))
+        v.satisfy_general(self._verify_expiry)
+        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+
+        v = pymacaroons.Verifier()
+        v.satisfy_general(self._verify_recognizes_caveats)
+        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+
+    def _verify_expiry(self, caveat):
+        prefix = "time < "
+        if not caveat.startswith(prefix):
+            return False
+        # TODO(daniel): Enable expiry check when clients actually know how to
+        # refresh tokens. (And remember to enable the tests)
+        return True
+        expiry = int(caveat[len(prefix):])
+        now = self.hs.get_clock().time_msec()
+        return now < expiry
+
+    def _verify_recognizes_caveats(self, caveat):
+        first_space = caveat.find(" ")
+        if first_space < 0:
+            return False
+        second_space = caveat.find(" ", first_space + 1)
+        if second_space < 0:
+            return False
+        return caveat[:second_space + 1] in self._KNOWN_CAVEAT_PREFIXES
+
+    @defer.inlineCallbacks
+    def _look_up_user_by_access_token(self, token):
         ret = yield self.store.get_user_by_access_token(token)
         if not ret:
             raise AuthError(
@@ -406,7 +552,6 @@ class Auth(object):
             "user": UserID.from_string(ret.get("name")),
             "token_id": ret.get("token_id", None),
         }
-
         defer.returnValue(user_info)
 
     @defer.inlineCallbacks

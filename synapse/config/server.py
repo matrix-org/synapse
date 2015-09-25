@@ -117,7 +117,7 @@ class ServerConfig(Config):
 
         self.content_addr = content_addr
 
-    def default_config(self, config_dir_path, server_name):
+    def default_config(self, server_name, **kwargs):
         if ":" in server_name:
             bind_port = int(server_name.split(":")[1])
             unsecure_port = bind_port - 400

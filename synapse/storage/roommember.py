@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 RoomsForUser = namedtuple(
     "RoomsForUser",
-    ("room_id", "sender", "membership", "event_id")
+    ("room_id", "sender", "membership", "event_id", "stream_ordering")
 )
 
 
@@ -141,11 +141,13 @@ class RoomMemberStore(SQLBaseStore):
         args.extend(membership_list)
 
         sql = (
-            "SELECT m.event_id, m.room_id, m.sender, m.membership"
-            " FROM room_memberships as m"
-            " INNER JOIN current_state_events as c"
-            " ON m.event_id = c.event_id "
-            " AND m.room_id = c.room_id "
+            "SELECT m.room_id, m.sender, m.membership, m.event_id, e.stream_ordering"
+            " FROM current_state_events as c"
+            " INNER JOIN room_memberships as m"
+            " ON m.event_id = c.event_id"
+            " INNER JOIN events as e"
+            " ON e.event_id = c.event_id"
+            " AND m.room_id = c.room_id"
             " AND m.user_id = c.state_key"
             " WHERE %s"
         ) % (where_clause,)

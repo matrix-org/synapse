@@ -19,13 +19,15 @@ from ._base import Config
 class MetricsConfig(Config):
     def read_config(self, config):
         self.enable_metrics = config["enable_metrics"]
+        self.report_stats = config.get("report_stats", None)
         self.metrics_port = config.get("metrics_port")
         self.metrics_bind_host = config.get("metrics_bind_host", "127.0.0.1")
 
-    def default_config(self, config_dir_path, server_name):
-        return """\
+    def default_config(self, report_stats=None, **kwargs):
+        suffix = "" if report_stats is None else "report_stats: %(report_stats)s\n"
+        return ("""\
         ## Metrics ###
 
         # Enable collection and rendering of performance metrics
         enable_metrics: False
-        """
+        """ + suffix) % locals()

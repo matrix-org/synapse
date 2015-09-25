@@ -18,18 +18,18 @@ from distutils.version import LooseVersion
 logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
+    "frozendict>=0.4": ["frozendict"],
     "unpaddedbase64>=1.0.1": ["unpaddedbase64>=1.0.1"],
     "canonicaljson>=1.0.0": ["canonicaljson>=1.0.0"],
     "signedjson>=1.0.0": ["signedjson>=1.0.0"],
-    "Twisted>=15.1.0": ["twisted>=15.1.0"],
+    "pynacl>=0.3.0": ["nacl>=0.3.0", "nacl.bindings"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
+    "Twisted>=15.1.0": ["twisted>=15.1.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
     "pyyaml": ["yaml"],
     "pyasn1": ["pyasn1"],
-    "pynacl>=0.3.0": ["nacl>=0.3.0"],
     "daemonize": ["daemonize"],
     "py-bcrypt": ["bcrypt"],
-    "frozendict>=0.4": ["frozendict"],
     "pillow": ["PIL"],
     "pydenticon": ["pydenticon"],
     "ujson": ["ujson"],
@@ -60,7 +60,10 @@ DEPENDENCY_LINKS = {
 
 
 class MissingRequirementError(Exception):
-    pass
+    def __init__(self, message, module_name, dependency):
+        super(MissingRequirementError, self).__init__(message)
+        self.module_name = module_name
+        self.dependency = dependency
 
 
 def check_requirements(config=None):
@@ -88,7 +91,7 @@ def check_requirements(config=None):
                 )
                 raise MissingRequirementError(
                     "Can't import %r which is part of %r"
-                    % (module_name, dependency)
+                    % (module_name, dependency), module_name, dependency
                 )
             version = getattr(module, "__version__", None)
             file_path = getattr(module, "__file__", None)
@@ -101,23 +104,25 @@ def check_requirements(config=None):
                 if version is None:
                     raise MissingRequirementError(
                         "Version of %r isn't set as __version__ of module %r"
-                        % (dependency, module_name)
+                        % (dependency, module_name), module_name, dependency
                     )
                 if LooseVersion(version) < LooseVersion(required_version):
                     raise MissingRequirementError(
                         "Version of %r in %r is too old. %r < %r"
-                        % (dependency, file_path, version, required_version)
+                        % (dependency, file_path, version, required_version),
+                        module_name, dependency
                     )
             elif version_test == "==":
                 if version is None:
                     raise MissingRequirementError(
                         "Version of %r isn't set as __version__ of module %r"
-                        % (dependency, module_name)
+                        % (dependency, module_name), module_name, dependency
                     )
                 if LooseVersion(version) != LooseVersion(required_version):
                     raise MissingRequirementError(
                         "Unexpected version of %r in %r. %r != %r"
-                        % (dependency, file_path, version, required_version)
+                        % (dependency, file_path, version, required_version),
+                        module_name, dependency
                     )
 
 

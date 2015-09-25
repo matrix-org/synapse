@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 23
+SCHEMA_VERSION = 24
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -125,6 +125,27 @@ class DataStore(RoomMemberStore, RoomStore,
             desc="insert_client_ip",
             lock=False,
         )
+
+    @defer.inlineCallbacks
+    def count_daily_users(self):
+        """
+        Counts the number of users who used this homeserver in the last 24 hours.
+        """
+        def _count_users(txn):
+            txn.execute(
+                "SELECT COUNT(DISTINCT user_id) AS users"
+                " FROM user_ips"
+                " WHERE last_seen > ?",
+                # This is close enough to a day for our purposes.
+                (int(self._clock.time_msec()) - (1000 * 60 * 60 * 24),)
+            )
+            rows = self.cursor_to_dict(txn)
+            if rows:
+                return rows[0]["users"]
+            return 0
+
+        ret = yield self.runInteraction("count_users", _count_users)
+        defer.returnValue(ret)
 
     def get_user_ip_and_agents(self, user):
         return self._simple_select_list(

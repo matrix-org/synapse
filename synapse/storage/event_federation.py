@@ -303,6 +303,15 @@ class EventFederationStore(SQLBaseStore):
             ],
         )
 
+        self._update_extremeties(txn, events)
+
+    def _update_extremeties(self, txn, events):
+        """Updates the event_*_extremities tables based on the new/updated
+        events being persisted.
+
+        This is called for new events *and* for events that were outliers, but
+        are are now being persisted as non-outliers.
+        """
         events_by_room = {}
         for ev in events:
             events_by_room.setdefault(ev.room_id, []).append(ev)
