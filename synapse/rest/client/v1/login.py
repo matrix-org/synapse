@@ -78,7 +78,7 @@ class LoginRestServlet(ClientV1RestServlet):
                 token = login_submission["token"]
                 user_id = login_submission["user"]
                 result = yield auth_handler.do_short_term_token_login(token, user_id)
-                defer.returnValue(result)
+                defer.returnValue((200, result))
             else:
                 raise SynapseError(400, "Bad login type.")
         except KeyError:
