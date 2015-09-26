@@ -384,7 +384,7 @@ class AuthHandler(BaseHandler):
         )
 
         if does_match:
-            user_dict[nonce] = client_nonce
+            user_dict.setdefault(nonce, {})["client_nonce"] = client_nonce
 
         return does_match
 
