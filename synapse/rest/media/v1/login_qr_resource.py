@@ -17,6 +17,7 @@ from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer, threads
 
 from synapse.api.errors import CodeMessageException
+from synapse.util.stringutils import random_string
 
 import simplejson
 import logging
@@ -46,7 +47,16 @@ class LoginQRResource(Resource):
     def _async_render_GET(self, request):
         try:
             auth_user, _ = yield self.auth.get_user_by_req(request)
-            image = yield self.make_short_term_qr_code(auth_user.to_string())
+
+            nonce = request.path.split("/")[-1]
+
+            if not nonce:
+                nonce = random_string(10)
+
+            image = yield self.make_short_term_qr_code(
+                auth_user.to_string(), nonce
+            )
+
             request.setHeader(b"Content-Type", b"image/png")
 
             image.save(request)
@@ -54,16 +64,18 @@ class LoginQRResource(Resource):
         except CodeMessageException as e:
             logger.info("Returning: %s", e)
             request.setResponseCode(e.code)
+            request.write("%s: %s" % (e.code, e.message))
             request.finish()
         except Exception:
             logger.exception("Exception while generating token")
             request.setResponseCode(500)
+            request.write("Internal server error")
             request.finish()
 
     @defer.inlineCallbacks
-    def make_short_term_qr_code(self, user_id):
+    def make_short_term_qr_code(self, user_id, nonce):
         h = self.handlers.auth_handler
-        token = h.make_short_term_token(user_id)
+        token = h.make_short_term_token(user_id, nonce)
 
         x509_certificate_bytes = crypto.dump_certificate(
             crypto.FILETYPE_ASN1,

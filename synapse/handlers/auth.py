@@ -18,7 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 from synapse.api.constants import LoginType
 from synapse.types import UserID
-from synapse.api.errors import LoginError, Codes
+from synapse.api.errors import SynapseError, LoginError, Codes
 from synapse.util.async import run_on_reactor
 
 from twisted.web.client import PartialDownloadError
@@ -33,6 +33,8 @@ import synapse.util.stringutils as stringutils
 
 logger = logging.getLogger(__name__)
 
+MACAROON_TYPE_LOGIN_TOKEN = "st_login"
+
 
 class AuthHandler(BaseHandler):
 
@@ -45,6 +47,22 @@ class AuthHandler(BaseHandler):
             LoginType.DUMMY: self._check_dummy_auth,
         }
         self.sessions = {}
+
+        self._nonces = {}
+
+        self.clock.looping_call(self._prune_nonce, 60 * 1000)
+
+    def _prune_nonce(self):
+        now = self.clock.time_msec()
+        self._nonces = {
+            user_id: {
+                nonce: nonce_dict
+                for nonce, nonce_dict in user_dict.items()
+                if nonce_dict.get("expiry", 0) < now - 60 * 1000
+            }
+            for user_id, user_dict in self._nonces.items()
+            if user_dict
+        }
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):
@@ -301,15 +319,16 @@ class AuthHandler(BaseHandler):
         defer.returnValue((user_id, access_token, refresh_token))
 
     @defer.inlineCallbacks
-    def do_short_term_token_login(self, token, user_id):
+    def do_short_term_token_login(self, token, user_id, client_nonce):
         macaroon_exact_caveats = [
             "gen = 1",
-            "type = st_login",
+            "type = %s" % (MACAROON_TYPE_LOGIN_TOKEN,),
             "user_id = %s" % (user_id,)
         ]
 
         macaroon_general_caveats = [
-            self._verify_macaroon_expiry
+            self._verify_macaroon_expiry,
+            lambda c: self._verify_nonce(c, user_id, client_nonce)
         ]
 
         try:
@@ -338,7 +357,8 @@ class AuthHandler(BaseHandler):
             }
 
             defer.returnValue(result)
-        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError) as e:
+            logger.info("Invalid token: %s", e.message)
             raise LoginError(403, "Invalid token", errcode=Codes.FORBIDDEN)
 
     def _verify_macaroon_expiry(self, caveat):
@@ -350,12 +370,41 @@ class AuthHandler(BaseHandler):
         now = self.hs.get_clock().time_msec()
         return now < expiry
 
-    def make_short_term_token(self, user_id):
+    def _verify_nonce(self, caveat, user_id, client_nonce):
+        prefix = "nonce = "
+        if not caveat.startswith(prefix):
+            return False
+
+        user_dict = self._nonces.get(user_id, {})
+
+        nonce = caveat[len(prefix):]
+        does_match = (
+            nonce in user_dict
+            and user_dict[nonce].get("client_nonce", None) in (None, client_nonce)
+        )
+
+        if does_match:
+            user_dict[nonce] = client_nonce
+
+        return does_match
+
+    def make_short_term_token(self, user_id, nonce):
+        user_nonces = self._nonces.setdefault(user_id, {})
+        if user_nonces.get(nonce, {}).get("client_nonce", None) is not None:
+            raise SynapseError(400, "nonce already used")
+
         macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = st_login")
+        macaroon.add_first_party_caveat("type = %s" % (MACAROON_TYPE_LOGIN_TOKEN,))
         now = self.hs.get_clock().time_msec()
         expiry = now + (60 * 1000)
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
+        macaroon.add_first_party_caveat("nonce = %s" % (nonce,))
+
+        user_nonces[nonce] = {
+            "client_nonce": None,
+            "expiry": expiry,
+        }
+
         return macaroon.serialize()
 
     @defer.inlineCallbacks

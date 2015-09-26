@@ -77,7 +77,10 @@ class LoginRestServlet(ClientV1RestServlet):
                 auth_handler = self.handlers.auth_handler
                 token = login_submission["token"]
                 user_id = login_submission["user"]
-                result = yield auth_handler.do_short_term_token_login(token, user_id)
+                client_nonce = login_submission["nonce"]
+                result = yield auth_handler.do_short_term_token_login(
+                    token, user_id, client_nonce
+                )
                 defer.returnValue((200, result))
             else:
                 raise SynapseError(400, "Bad login type.")
@@ -111,51 +114,6 @@ class LoginRestServlet(ClientV1RestServlet):
         }
 
         defer.returnValue((200, result))
-
-    @defer.inlineCallbacks
-    def do_short_term_token_login(self, login_submission):
-        token = login_submission["token"]
-        user_id = login_submission["user"]
-
-        macaroon_exact_caveats = [
-            "gen = 1",
-            "type = st_login",
-            "user_id = %s" % (user_id,)
-        ]
-
-        macaroon_general_caveats = [
-            self._verify_macaroon_expiry
-        ]
-
-        try:
-            macaroon = pymacaroons.Macaroon.deserialize(token)
-
-            v = pymacaroons.Verifier()
-            for exact_caveat in macaroon_exact_caveats:
-                v.satisfy_exact(exact_caveat)
-
-            for general_caveat in macaroon_general_caveats:
-                v.satisfy_general(general_caveat)
-
-            verified = v.verify(macaroon, self.hs.config.macaroon_secret_key)
-            if not verified:
-                raise SynapseError(400, "Invalid token.")
-
-            auth_handler = self.handlers.auth_handler
-            user_id, access_token, refresh_token = yield auth_handler.issue_tokens(
-                user_id=user_id,
-            )
-
-            result = {
-                "user_id": user_id,  # may have changed
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "home_server": self.hs.hostname,
-            }
-
-            defer.returnValue(result)
-        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
-            raise SynapseError(400, "Invalid token.")
 
     def _verify_macaroon_expiry(self, caveat):
         prefix = "time < "
