@@ -178,12 +178,6 @@ class RoomMemberStore(SQLBaseStore):
 
         return joined_domains
 
-    def _get_members_query(self, where_clause, where_values):
-        return self.runInteraction(
-            "get_members_query", self._get_members_events_txn,
-            where_clause, where_values
-        ).addCallbacks(self._get_events)
-
     def _get_members_events_txn(self, txn, room_id, membership=None, user_id=None):
         rows = self._get_members_rows_txn(
             txn,

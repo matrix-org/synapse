@@ -41,6 +41,22 @@ myid = "@apple:test"
 PATH_PREFIX = "/_matrix/client/api/v1"
 
 
+class NullSource(object):
+    """This event source never yields any events and its token remains at
+    zero. It may be useful for unit-testing."""
+    def __init__(self, hs):
+        pass
+
+    def get_new_events_for_user(self, user, from_key, limit):
+        return defer.succeed(([], from_key))
+
+    def get_current_key(self, direction='f'):
+        return defer.succeed(0)
+
+    def get_pagination_rows(self, user, pagination_config, key):
+        return defer.succeed(([], pagination_config.from_key))
+
+
 class JustPresenceHandlers(object):
     def __init__(self, hs):
         self.presence_handler = PresenceHandler(hs)
@@ -243,7 +259,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         # HIDEOUS HACKERY
         # TODO(paul): This should be injected in via the HomeServer DI system
         from synapse.streams.events import (
-            PresenceEventSource, NullSource, EventSources
+            PresenceEventSource, EventSources
         )
 
         old_SOURCE_TYPES = EventSources.SOURCE_TYPES
