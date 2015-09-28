@@ -319,7 +319,7 @@ class AuthHandler(BaseHandler):
         defer.returnValue((user_id, access_token, refresh_token))
 
     @defer.inlineCallbacks
-    def do_short_term_token_login(self, token, user_id, client_nonce):
+    def do_short_term_token_login(self, token, user_id, txn_id):
         macaroon_exact_caveats = [
             "gen = 1",
             "type = %s" % (MACAROON_TYPE_LOGIN_TOKEN,),
@@ -328,7 +328,7 @@ class AuthHandler(BaseHandler):
 
         macaroon_general_caveats = [
             self._verify_macaroon_expiry,
-            lambda c: self._verify_nonce(c, user_id, client_nonce)
+            lambda c: self._verify_nonce(c, user_id, txn_id)
         ]
 
         try:

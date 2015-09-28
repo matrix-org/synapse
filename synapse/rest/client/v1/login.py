@@ -77,9 +77,9 @@ class LoginRestServlet(ClientV1RestServlet):
                 auth_handler = self.handlers.auth_handler
                 token = login_submission["token"]
                 user_id = login_submission["user"]
-                client_nonce = login_submission["nonce"]
+                txn_id = login_submission["txn_id"]
                 result = yield auth_handler.do_short_term_token_login(
-                    token, user_id, client_nonce
+                    token, user_id, txn_id
                 )
                 defer.returnValue((200, result))
             else:
