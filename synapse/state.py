@@ -31,10 +31,6 @@ import hashlib
 logger = logging.getLogger(__name__)
 
 
-def _get_state_key_from_event(event):
-    return event.state_key
-
-
 KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 
 
