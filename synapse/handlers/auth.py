@@ -370,7 +370,7 @@ class AuthHandler(BaseHandler):
         now = self.hs.get_clock().time_msec()
         return now < expiry
 
-    def _verify_nonce(self, caveat, user_id, client_nonce):
+    def _verify_nonce(self, caveat, user_id, txn_id):
         prefix = "nonce = "
         if not caveat.startswith(prefix):
             return False
@@ -380,17 +380,17 @@ class AuthHandler(BaseHandler):
         nonce = caveat[len(prefix):]
         does_match = (
             nonce in user_dict
-            and user_dict[nonce].get("client_nonce", None) in (None, client_nonce)
+            and user_dict[nonce].get("txn_id", None) in (None, txn_id)
         )
 
         if does_match:
-            user_dict.setdefault(nonce, {})["client_nonce"] = client_nonce
+            user_dict.setdefault(nonce, {})["txn_id"] = txn_id
 
         return does_match
 
     def make_short_term_token(self, user_id, nonce):
         user_nonces = self._nonces.setdefault(user_id, {})
-        if user_nonces.get(nonce, {}).get("client_nonce", None) is not None:
+        if user_nonces.get(nonce, {}).get("txn_id", None) is not None:
             raise SynapseError(400, "nonce already used")
 
         macaroon = self._generate_base_macaroon(user_id)
@@ -401,7 +401,7 @@ class AuthHandler(BaseHandler):
         macaroon.add_first_party_caveat("nonce = %s" % (nonce,))
 
         user_nonces[nonce] = {
-            "client_nonce": None,
+            "txn_id": None,
             "expiry": expiry,
         }
 
