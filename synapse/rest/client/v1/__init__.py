@@ -15,7 +15,7 @@
 
 from . import (
     room, events, register, login, profile, presence, initial_sync, directory,
-    voip, admin, pusher, push_rule
+    voip, admin, pusher, push_rule, login_qr
 )
 
 from synapse.http.server import JsonResource
@@ -42,3 +42,4 @@ class ClientV1RestResource(JsonResource):
         admin.register_servlets(hs, client_resource)
         pusher.register_servlets(hs, client_resource)
         push_rule.register_servlets(hs, client_resource)
+        login_qr.register_servlets(hs, client_resource)
