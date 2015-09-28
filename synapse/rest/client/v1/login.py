@@ -27,8 +27,6 @@ from saml2 import BINDING_HTTP_POST
 from saml2 import config
 from saml2.client import Saml2Client
 
-import pymacaroons
-
 
 logger = logging.getLogger(__name__)
 
