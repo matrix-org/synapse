@@ -71,6 +71,8 @@ from synapse import events
 from daemonize import Daemonize
 import twisted.manhole.telnet
 
+from multiprocessing import Process
+
 import synapse
 
 import contextlib
@@ -78,6 +80,7 @@ import logging
 import os
 import re
 import resource
+import signal
 import subprocess
 import time
 
@@ -368,15 +371,16 @@ def change_resource_limit(soft_file_no):
         logger.warn("Failed to set file limit: %s", e)
 
 
-def setup(config_options):
+def load_config(config_options):
     """
     Args:
         config_options_options: The options passed to Synapse. Usually
             `sys.argv[1:]`.
 
     Returns:
-        HomeServer
+        HomeServerConfig
     """
+
     config = HomeServerConfig.load_config(
         "Synapse Homeserver",
         config_options,
@@ -385,9 +389,17 @@ def setup(config_options):
 
     config.setup_logging()
 
-    # check any extra requirements we have now we have a config
-    check_requirements(config)
+    return config
 
+
+def setup(config):
+    """
+    Args:
+        config (Homeserver)
+
+    Returns:
+        HomeServer
+    """
     version_string = get_version_string()
 
     logger.info("Server hostname: %s", config.server_name)
@@ -440,6 +452,42 @@ def setup(config_options):
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
     hs.get_replication_layer().start_get_pdu_cache()
+
+    start_time = time.time()
+
+    @defer.inlineCallbacks
+    def phone_stats_home():
+        now = int(time.time())
+        uptime = int(now - start_time)
+        if uptime < 0:
+            uptime = 0
+
+        stats = {}
+        stats["homeserver"] = config.server_name
+        stats["timestamp"] = now
+        stats["uptime_seconds"] = uptime
+        stats["total_users"] = yield hs.get_datastore().count_all_users()
+
+        all_rooms = yield hs.get_datastore().get_rooms(False)
+        stats["total_room_count"] = len(all_rooms)
+
+        stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
+        daily_messages = yield hs.get_datastore().count_daily_messages()
+        if daily_messages is not None:
+            stats["daily_messages"] = daily_messages
+
+        logger.info("Reporting stats to matrix.org: %s" % (stats,))
+        try:
+            yield hs.get_simple_http_client().put_json(
+                "https://matrix.org/report-usage-stats/push",
+                stats
+            )
+        except Exception as e:
+            logger.warn("Error reporting stats: %s", e)
+
+    if hs.config.report_stats:
+        phone_home_task = task.LoopingCall(phone_stats_home)
+        phone_home_task.start(60 * 60 * 24, now=False)
 
     return hs
 
@@ -649,7 +697,7 @@ def _resource_id(resource, path_seg):
     return "%s-%s" % (resource, path_seg)
 
 
-def run(hs):
+def run(config):
     PROFILE_SYNAPSE = False
     if PROFILE_SYNAPSE:
         def profile(func):
@@ -663,7 +711,7 @@ def run(hs):
                 profile.disable()
                 ident = current_thread().ident
                 profile.dump_stats("/tmp/%s.%s.%i.pstat" % (
-                    hs.hostname, func.__name__, ident
+                    config.server_name, func.__name__, ident
                 ))
 
             return profiled
@@ -672,56 +720,52 @@ def run(hs):
         ThreadPool._worker = profile(ThreadPool._worker)
         reactor.run = profile(reactor.run)
 
-    start_time = hs.get_clock().time()
-
-    @defer.inlineCallbacks
-    def phone_stats_home():
-        now = int(hs.get_clock().time())
-        uptime = int(now - start_time)
-        if uptime < 0:
-            uptime = 0
-
-        stats = {}
-        stats["homeserver"] = hs.config.server_name
-        stats["timestamp"] = now
-        stats["uptime_seconds"] = uptime
-        stats["total_users"] = yield hs.get_datastore().count_all_users()
-
-        all_rooms = yield hs.get_datastore().get_rooms(False)
-        stats["total_room_count"] = len(all_rooms)
-
-        stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
-        daily_messages = yield hs.get_datastore().count_daily_messages()
-        if daily_messages is not None:
-            stats["daily_messages"] = daily_messages
-
-        logger.info("Reporting stats to matrix.org: %s" % (stats,))
-        try:
-            yield hs.get_simple_http_client().put_json(
-                "https://matrix.org/report-usage-stats/push",
-                stats
-            )
-        except Exception as e:
-            logger.warn("Error reporting stats: %s", e)
-
-    if hs.config.report_stats:
-        phone_home_task = task.LoopingCall(phone_stats_home)
-        phone_home_task.start(60 * 60 * 24, now=False)
-
     def in_thread():
+        hs = setup(config)
         with LoggingContext("run"):
             change_resource_limit(hs.config.soft_file_limit)
             reactor.run()
 
-    if hs.config.daemonize:
+    def start_in_process_checker():
+        p = None
+        should_restart = [True]
 
-        if hs.config.print_pidfile:
-            print hs.config.pid_file
+        def proxy_signal(signum, stack):
+            logger.info("Got signal: %r", signum)
+            if p is not None:
+                os.kill(p.pid, signum)
+
+            if signum == signal.SIGTERM:
+                should_restart[0] = False
+
+        if getattr(signal, "SIGHUP"):
+            signal.signal(signal.SIGHUP, proxy_signal)
+        signal.signal(signal.SIGTERM, proxy_signal)
+
+        last_start = 0
+        next_delay = 1
+
+        while should_restart[0]:
+            last_start = time.time()
+            p = Process(target=in_thread, args=())
+            p.start()
+            p.join()
+
+            if time.time() - last_start < 120:
+                next_delay = min(next_delay * 5, 5 * 60)
+            else:
+                next_delay = 1
+
+            time.sleep(next_delay)
+
+    if config.daemonize:
+        if config.print_pidfile:
+            print config.pid_file
 
         daemon = Daemonize(
             app="synapse-homeserver",
-            pid=hs.config.pid_file,
-            action=lambda: in_thread(),
+            pid=config.pid_file,
+            action=lambda: start_in_process_checker(),
             auto_close_fds=False,
             verbose=True,
             logger=logger,
@@ -736,8 +780,8 @@ def main():
     with LoggingContext("main"):
         # check base requirements
         check_requirements()
-        hs = setup(sys.argv[1:])
-        run(hs)
+        config = load_config(sys.argv[1:])
+        run(config)
 
 
 if __name__ == '__main__':
