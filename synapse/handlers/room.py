@@ -272,14 +272,13 @@ class RoomCreationHandler(BaseHandler):
 
             returned_events.append(power_levels_event)
 
-        if room_alias:
-            if (EventTypes.CanonicalAlias, '') not in initial_state:
-                room_alias_event = create(
-                    etype=EventTypes.CanonicalAlias,
-                    content={"alias": room_alias.to_string()},
-                )
+        if room_alias and (EventTypes.CanonicalAlias, '') not in initial_state:
+            room_alias_event = create(
+                etype=EventTypes.CanonicalAlias,
+                content={"alias": room_alias.to_string()},
+            )
 
-                returned_events.append(room_alias_event)
+            returned_events.append(room_alias_event)
 
         if (EventTypes.JoinRules, '') not in initial_state:
             join_rules_event = create(
