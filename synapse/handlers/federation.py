@@ -1013,6 +1013,14 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _persist_auth_tree(self, auth_events, state, event):
+        """Checks the auth chain is valid (and passes auth checks) for the
+        state and event. Then persists the auth chain and state atomically.
+        Persists the event seperately.
+
+        Returns:
+            2-tuple of (event_stream_id, max_stream_id) from the persist_event
+            call for `event`
+        """
         events_to_context = {}
         for e in itertools.chain(auth_events, state):
             ctx = yield self.state_handler.compute_event_context(
