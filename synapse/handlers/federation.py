@@ -1033,15 +1033,15 @@ class FederationHandler(BaseHandler):
                 break
 
         for e in itertools.chain(auth_events, state, [event]):
-            a = {
+            auth_for_e = {
                 (event_map[e_id].type, event_map[e_id].state_key): event_map[e_id]
                 for e_id, _ in e.auth_events
             }
             if create_event:
-                a[(EventTypes.Create, "")] = create_event
+                auth_for_e[(EventTypes.Create, "")] = create_event
 
             try:
-                self.auth.check(e, auth_events=a)
+                self.auth.check(e, auth_events=auth_for_e)
             except AuthError as err:
                 logger.warn(
                     "Rejecting %s because %s",
