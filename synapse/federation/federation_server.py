@@ -23,9 +23,11 @@ from synapse.util.logutils import log_function
 from synapse.events import FrozenEvent
 import synapse.metrics
 
-from synapse.api.errors import FederationError, SynapseError
+from synapse.api.errors import FederationError, SynapseError, Codes
 
 from synapse.crypto.event_signing import compute_event_signature
+
+from synapse.util.thirdpartyinvites import ThirdPartyInvites
 
 import simplejson as json
 import logging
@@ -228,8 +230,19 @@ class FederationServer(FederationBase):
             )
 
     @defer.inlineCallbacks
-    def on_make_join_request(self, room_id, user_id):
-        pdu = yield self.handler.on_make_join_request(room_id, user_id)
+    def on_make_join_request(self, room_id, user_id, query):
+        threepid_details = {}
+        if ThirdPartyInvites.has_join_keys(query):
+            for k in ThirdPartyInvites.JOIN_KEYS:
+                if not isinstance(query[k], list) or len(query[k]) != 1:
+                    raise FederationError(
+                        "FATAL",
+                        Codes.MISSING_PARAM,
+                        "key %s value %s" % (k, query[k],),
+                        None
+                    )
+                threepid_details[k] = query[k][0]
+        pdu = yield self.handler.on_make_join_request(room_id, user_id, threepid_details)
         time_now = self._clock.time_msec()
         defer.returnValue({"event": pdu.get_pdu_json(time_now)})
 

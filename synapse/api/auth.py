@@ -14,15 +14,19 @@
 # limitations under the License.
 
 """This module contains classes for authenticating the user."""
+from nacl.exceptions import BadSignatureError
 
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.util.logutils import log_function
+from synapse.util.thirdpartyinvites import ThirdPartyInvites
 from synapse.types import UserID, EventID
+from unpaddedbase64 import decode_base64
 
 import logging
+import nacl.signing
 import pymacaroons
 
 logger = logging.getLogger(__name__)
@@ -31,6 +35,7 @@ logger = logging.getLogger(__name__)
 AuthEventTypes = (
     EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,
     EventTypes.JoinRules, EventTypes.RoomHistoryVisibility,
+    EventTypes.ThirdPartyInvite,
 )
 
 
@@ -318,7 +323,8 @@ class Auth(object):
                 pass
             elif join_rule == JoinRules.INVITE:
                 if not caller_in_room and not caller_invited:
-                    raise AuthError(403, "You are not invited to this room.")
+                    if not self._verify_third_party_invite(event, auth_events):
+                        raise AuthError(403, "You are not invited to this room.")
             else:
                 # TODO (erikj): may_join list
                 # TODO (erikj): private rooms
@@ -343,6 +349,31 @@ class Auth(object):
             raise AuthError(500, "Unknown membership %s" % membership)
 
         return True
+
+    def _verify_third_party_invite(self, event, auth_events):
+        for key in ThirdPartyInvites.JOIN_KEYS:
+            if key not in event.content:
+                return False
+        token = event.content["token"]
+        invite_event = auth_events.get(
+            (EventTypes.ThirdPartyInvite, token,)
+        )
+        if not invite_event:
+            return False
+        try:
+            public_key = event.content["public_key"]
+            key_validity_url = event.content["key_validity_url"]
+            if invite_event.content["public_key"] != public_key:
+                return False
+            if invite_event.content["key_validity_url"] != key_validity_url:
+                return False
+            verify_key = nacl.signing.VerifyKey(decode_base64(public_key))
+            encoded_signature = event.content["signature"]
+            signature = decode_base64(encoded_signature)
+            verify_key.verify(token, signature)
+            return True
+        except (KeyError, BadSignatureError,):
+            return False
 
     def _get_power_level_event(self, auth_events):
         key = (EventTypes.PowerLevels, "", )

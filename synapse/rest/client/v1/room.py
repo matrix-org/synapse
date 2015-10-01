@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 from base import ClientV1RestServlet, client_path_pattern
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import SynapseError, Codes, AuthError
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.types import UserID, RoomID, RoomAlias
@@ -26,7 +26,7 @@ from synapse.events.utils import serialize_event
 import simplejson as json
 import logging
 import urllib
-
+from synapse.util.thirdpartyinvites import ThirdPartyInvites
 
 logger = logging.getLogger(__name__)
 
@@ -415,9 +415,35 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         # target user is you unless it is an invite
         state_key = user.to_string()
         if membership_action in ["invite", "ban", "kick"]:
-            if "user_id" not in content:
-                raise SynapseError(400, "Missing user_id key.")
-            state_key = content["user_id"]
+            try:
+                state_key = content["user_id"]
+            except KeyError:
+                if (
+                    membership_action != "invite" or
+                    not ThirdPartyInvites.has_invite_keys(content)
+                ):
+                    raise SynapseError(400, "Missing user_id key.")
+
+
+                id_server = content["id_server"]
+                medium = content["medium"]
+                address = content["address"]
+                display_name = content["display_name"]
+                state_key = yield self._lookup_3pid_user(id_server, medium, address)
+                if not state_key:
+                    yield self._make_and_store_3pid_invite(
+                        id_server,
+                        display_name,
+                        medium,
+                        address,
+                        room_id,
+                        user,
+                        token_id,
+                        txn_id=txn_id
+                    )
+                    defer.returnValue((200, {}))
+                    return
+
             # make sure it looks like a user ID; it'll throw if it's invalid.
             UserID.from_string(state_key)
 
@@ -425,10 +451,18 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 membership_action = "leave"
 
         msg_handler = self.handlers.message_handler
+
+        event_content = {
+            "membership": unicode(membership_action),
+        }
+
+        if membership_action == "join" and ThirdPartyInvites.has_join_keys(content):
+            ThirdPartyInvites.copy_join_keys(content, event_content)
+
         yield msg_handler.create_and_send_event(
             {
                 "type": EventTypes.Member,
-                "content": {"membership": unicode(membership_action)},
+                "content": event_content,
                 "room_id": room_id,
                 "sender": user.to_string(),
                 "state_key": state_key,
@@ -438,6 +472,92 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         )
 
         defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def _lookup_3pid_user(self, id_server, medium, address):
+        """Looks up a 3pid in the passed identity server.
+
+        Args:
+            id_server (str): The server name (including port, if required)
+                of the identity server to use.
+            medium (str): The type of the third party identifier (e.g. "email").
+            address (str): The third party identifier (e.g. "foo@example.com").
+
+        Returns:
+            (str) the matrix ID of the 3pid, or None if it is not recognized.
+        """
+        try:
+            data = yield self.hs.get_simple_http_client().get_json(
+                "https://%s/_matrix/identity/api/v1/lookup" % (id_server,),
+                {
+                    "medium": medium,
+                    "address": address,
+                }
+            )
+
+            if "mxid" in data:
+                # TODO: Validate the response signature and such
+                defer.returnValue(data["mxid"])
+        except IOError:
+            # TODO: Log something maybe?
+            defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def _make_and_store_3pid_invite(
+            self,
+            id_server,
+            display_name,
+            medium,
+            address,
+            room_id,
+            user,
+            token_id,
+            txn_id
+    ):
+        token, public_key, key_validity_url = (
+            yield self._ask_id_server_for_third_party_invite(
+                id_server,
+                medium,
+                address,
+                room_id,
+                user.to_string()
+            )
+        )
+        msg_handler = self.handlers.message_handler
+        yield msg_handler.create_and_send_event(
+            {
+                "type": EventTypes.ThirdPartyInvite,
+                "content": {
+                    "display_name": display_name,
+                    "key_validity_url": key_validity_url,
+                    "public_key": public_key,
+                },
+                "room_id": room_id,
+                "sender": user.to_string(),
+                "state_key": token,
+            },
+            token_id=token_id,
+            txn_id=txn_id,
+        )
+
+    @defer.inlineCallbacks
+    def _ask_id_server_for_third_party_invite(
+            self, id_server, medium, address, room_id, sender):
+        is_url = "https://%s/_matrix/identity/api/v1/nonce-it-up" % (id_server,)
+        data = yield self.hs.get_simple_http_client().post_urlencoded_get_json(
+            is_url,
+            {
+                "medium": medium,
+                "address": address,
+                "room_id": room_id,
+                "sender": sender,
+            }
+        )
+        # TODO: Check for success
+        token = data["token"]
+        public_key = data["public_key"]
+        key_validity_url = "https://%s/_matrix/identity/api/v1/pubkey/isvalid" % (id_server,)
+        defer.returnValue((token, public_key, key_validity_url))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):

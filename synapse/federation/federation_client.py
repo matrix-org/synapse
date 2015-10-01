@@ -25,6 +25,7 @@ from synapse.api.errors import (
 from synapse.util import unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
+from synapse.util.thirdpartyinvites import ThirdPartyInvites
 from synapse.events import FrozenEvent
 import synapse.metrics
 
@@ -356,17 +357,21 @@ class FederationClient(FederationBase):
         defer.returnValue(signed_auth)
 
     @defer.inlineCallbacks
-    def make_join(self, destinations, room_id, user_id):
+    def make_join(self, destinations, room_id, user_id, content):
         for destination in destinations:
             if destination == self.server_name:
                 continue
 
+            args = {}
+            if ThirdPartyInvites.has_join_keys(content):
+                ThirdPartyInvites.copy_join_keys(content, args)
             try:
                 ret = yield self.transport_layer.make_join(
-                    destination, room_id, user_id
+                    destination, room_id, user_id, args
                 )
 
                 pdu_dict = ret["event"]
+
 
                 logger.debug("Got response to make_join: %s", pdu_dict)
 

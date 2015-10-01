@@ -160,13 +160,14 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def make_join(self, destination, room_id, user_id, retry_on_dns_fail=True):
+    def make_join(self, destination, room_id, user_id, args={}):
         path = PREFIX + "/make_join/%s/%s" % (room_id, user_id)
 
         content = yield self.client.get_json(
             destination=destination,
             path=path,
-            retry_on_dns_fail=retry_on_dns_fail,
+            args=args,
+            retry_on_dns_fail=True,
         )
 
         defer.returnValue(content)

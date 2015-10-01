@@ -464,6 +464,10 @@ class RoomMemberHandler(BaseHandler):
 
                 should_do_dance = not self.hs.is_mine(inviter)
                 room_hosts = [inviter.domain]
+            elif "sender" in event.content:
+                inviter = UserID.from_string(event.content["sender"])
+                should_do_dance = not self.hs.is_mine(inviter)
+                room_hosts = [inviter.domain]
             else:
                 # return the same error as join_room_alias does
                 raise SynapseError(404, "No known servers")

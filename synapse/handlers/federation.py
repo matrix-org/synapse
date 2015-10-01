@@ -39,7 +39,7 @@ from twisted.internet import defer
 
 import itertools
 import logging
-
+from synapse.util.thirdpartyinvites import ThirdPartyInvites
 
 logger = logging.getLogger(__name__)
 
@@ -572,7 +572,8 @@ class FederationHandler(BaseHandler):
         origin, pdu = yield self.replication_layer.make_join(
             target_hosts,
             room_id,
-            joinee
+            joinee,
+            content
         )
 
         logger.debug("Got response to make_join: %s", pdu)
@@ -712,14 +713,18 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_make_join_request(self, room_id, user_id):
+    def on_make_join_request(self, room_id, user_id, query):
         """ We've received a /make_join/ request, so we create a partial
         join event for the room and return that. We don *not* persist or
         process it until the other server has signed it and sent it back.
         """
+        event_content = {"membership": Membership.JOIN}
+        if ThirdPartyInvites.has_join_keys(query):
+            ThirdPartyInvites.copy_join_keys(query, event_content)
+
         builder = self.event_builder_factory.new({
             "type": EventTypes.Member,
-            "content": {"membership": Membership.JOIN},
+            "content": event_content,
             "room_id": room_id,
             "sender": user_id,
             "state_key": user_id,
@@ -730,6 +735,9 @@ class FederationHandler(BaseHandler):
         )
 
         self.auth.check(event, auth_events=context.current_state)
+
+        if ThirdPartyInvites.has_join_keys(event.content):
+            ThirdPartyInvites.check_key_valid(self.hs.get_simple_http_client(), event)
 
         defer.returnValue(event)
 

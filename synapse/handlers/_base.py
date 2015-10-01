@@ -21,6 +21,7 @@ from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID, RoomAlias
 
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.thirdpartyinvites import ThirdPartyInvites
 
 import logging
 
@@ -122,6 +123,16 @@ class BaseHandler(object):
                             room_alias_str,
                         )
                     )
+
+        if (
+            event.type == EventTypes.Member and
+            event.content["membership"] == Membership.JOIN and
+            ThirdPartyInvites.has_join_keys(event.content)
+        ):
+            yield ThirdPartyInvites.check_key_valid(
+                self.hs.get_simple_http_client(),
+                event
+            )
 
         (event_stream_id, max_stream_id) = yield self.store.persist_event(
             event, context=context
