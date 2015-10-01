@@ -155,6 +155,7 @@ class RoomCreationHandler(BaseHandler):
             preset_config=preset_config,
             invite_list=invite_list,
             initial_state=initial_state,
+            room_alias=room_alias,
         )
 
         msg_handler = self.hs.get_handlers().message_handler
@@ -202,7 +203,7 @@ class RoomCreationHandler(BaseHandler):
         defer.returnValue(result)
 
     def _create_events_for_new_room(self, creator, room_id, preset_config,
-                                    invite_list, initial_state):
+                                    invite_list, initial_state, room_alias):
         config = RoomCreationHandler.PRESETS_DICT[preset_config]
 
         creator_id = creator.to_string()
@@ -270,6 +271,14 @@ class RoomCreationHandler(BaseHandler):
             )
 
             returned_events.append(power_levels_event)
+
+        if room_alias and (EventTypes.CanonicalAlias, '') not in initial_state:
+            room_alias_event = create(
+                etype=EventTypes.CanonicalAlias,
+                content={"alias": room_alias.to_string()},
+            )
+
+            returned_events.append(room_alias_event)
 
         if (EventTypes.JoinRules, '') not in initial_state:
             join_rules_event = create(
