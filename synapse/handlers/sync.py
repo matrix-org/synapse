@@ -28,21 +28,26 @@ logger = logging.getLogger(__name__)
 
 SyncConfig = collections.namedtuple("SyncConfig", [
     "user",
-    "limit",
-    "gap",
-    "sort",
-    "backfill",
     "filter",
 ])
 
+class TimelineBatch(collections.namedtuple("TimelineBatch", [
+    "prev_batch",
+    "events",
+    "limited",
+])):
+    __slots__ = []
+
+    def __nonzero__(self):
+        """Make the result appear empty if there are no updates. This is used
+        to tell if room needs to be part of the sync result.
+        """
+        return bool(self.events)
 
 class RoomSyncResult(collections.namedtuple("RoomSyncResult", [
     "room_id",
-    "limited",
-    "published",
-    "events",
+    "timeline",
     "state",
-    "prev_batch",
     "ephemeral",
 ])):
     __slots__ = []
@@ -51,13 +56,12 @@ class RoomSyncResult(collections.namedtuple("RoomSyncResult", [
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
-        return bool(self.events or self.state or self.ephemeral)
+        return bool(self.timeline or self.state or self.ephemeral)
 
 
 class SyncResult(collections.namedtuple("SyncResult", [
     "next_batch",  # Token for the next sync
-    "private_user_data",  # List of private events for the user.
-    "public_user_data",  # List of public events for all users.
+    "presence",  # List of presence events for the user.
     "rooms",  # RoomSyncResult for each room.
 ])):
     __slots__ = []
@@ -133,12 +137,6 @@ class SyncHandler(BaseHandler):
         Returns:
             A Deferred SyncResult.
         """
-        if sync_config.sort == "timeline,desc":
-            # TODO(mjark): Handle going through events in reverse order?.
-            # What does "most recent events" mean when applying the limits mean
-            # in this case?
-            raise NotImplementedError()
-
         now_token = yield self.event_sources.get_current_token()
 
         presence_stream = self.event_sources.sources["presence"]
@@ -155,20 +153,15 @@ class SyncHandler(BaseHandler):
             membership_list=[Membership.INVITE, Membership.JOIN]
         )
 
-        # TODO (mjark): Does public mean "published"?
-        published_rooms = yield self.store.get_rooms(is_public=True)
-        published_room_ids = set(r["room_id"] for r in published_rooms)
-
         rooms = []
         for event in room_list:
             room_sync = yield self.initial_sync_for_room(
-                event.room_id, sync_config, now_token, published_room_ids
+                event.room_id, sync_config, now_token,
             )
             rooms.append(room_sync)
 
         defer.returnValue(SyncResult(
-            public_user_data=presence,
-            private_user_data=[],
+            presence=presence,
             rooms=rooms,
             next_batch=now_token,
         ))
@@ -192,7 +185,6 @@ class SyncHandler(BaseHandler):
 
         defer.returnValue(RoomSyncResult(
             room_id=room_id,
-            published=room_id in published_room_ids,
             events=recents,
             prev_batch=prev_batch_token,
             state=current_state_events,
@@ -219,7 +211,6 @@ class SyncHandler(BaseHandler):
         presence, presence_key = yield presence_source.get_new_events_for_user(
             user=sync_config.user,
             from_key=since_token.presence_key,
-            limit=sync_config.limit,
         )
         now_token = now_token.copy_and_replace("presence_key", presence_key)
 
@@ -227,7 +218,6 @@ class SyncHandler(BaseHandler):
         typing, typing_key = yield typing_source.get_new_events_for_user(
             user=sync_config.user,
             from_key=since_token.typing_key,
-            limit=sync_config.limit,
         )
         now_token = now_token.copy_and_replace("typing_key", typing_key)
 
@@ -252,16 +242,18 @@ class SyncHandler(BaseHandler):
         published_rooms = yield self.store.get_rooms(is_public=True)
         published_room_ids = set(r["room_id"] for r in published_rooms)
 
+        timeline_limit = sync_config.filter.timeline_limit()
+
         room_events, _ = yield self.store.get_room_events_stream(
             sync_config.user.to_string(),
             from_key=since_token.room_key,
             to_key=now_token.room_key,
             room_id=None,
-            limit=sync_config.limit + 1,
+            limit=timeline_limit + 1,
         )
 
         rooms = []
-        if len(room_events) <= sync_config.limit:
+        if len(room_events) <= timeline_limit:
             # There is no gap in any of the rooms. Therefore we can just
             # partition the new events by room and return them.
             events_by_room_id = {}
@@ -365,8 +357,9 @@ class SyncHandler(BaseHandler):
         max_repeat = 3  # Only try a few times per room, otherwise
         room_key = now_token.room_key
         end_key = room_key
+        timeline_limit = sync_config.filter.timeline_limit()
 
-        while limited and len(recents) < sync_config.limit and max_repeat:
+        while limited and len(recents) < timeline_limit and max_repeat:
             events, keys = yield self.store.get_recent_events_for_room(
                 room_id,
                 limit=load_limit + 1,
@@ -393,7 +386,9 @@ class SyncHandler(BaseHandler):
             "room_key", room_key
         )
 
-        defer.returnValue((recents, prev_batch_token, limited))
+        defer.returnValue(TimelineBatch(
+            events=recents, prev_batch=prev_batch_token, limited=limited
+        ))
 
     @defer.inlineCallbacks
     def incremental_sync_with_gap_for_room(self, room_id, sync_config,
@@ -408,7 +403,7 @@ class SyncHandler(BaseHandler):
 
         # TODO(mjark): Check for redactions we might have missed.
 
-        recents, prev_batch_token, limited = yield self.load_filtered_recents(
+        batch = yield self.load_filtered_recents(
             room_id, sync_config, now_token, since_token,
         )
 
@@ -437,11 +432,8 @@ class SyncHandler(BaseHandler):
 
         room_sync = RoomSyncResult(
             room_id=room_id,
-            published=room_id in published_room_ids,
-            events=recents,
-            prev_batch=prev_batch_token,
+            timeline=batch,
             state=state_events_delta,
-            limited=limited,
             ephemeral=typing_by_room.get(room_id, [])
         )
 

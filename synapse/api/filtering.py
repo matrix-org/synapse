@@ -54,7 +54,7 @@ class Filtering(object):
         ]
 
         room_level_definitions = [
-            "state", "events", "ephemeral"
+            "state", "timeline", "ephemeral"
         ]
 
         for key in top_level_definitions:
@@ -134,6 +134,9 @@ class Filtering(object):
 class Filter(object):
     def __init__(self, filter_json):
         self.filter_json = filter_json
+
+    def timeline_limit(self):
+        return self.filter_json.get("room", {}).get("timeline", {}).get(limit, 10)
 
     def filter_public_user_data(self, events):
         return self._filter_on_key(events, ["public_user_data"])
