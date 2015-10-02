@@ -35,7 +35,7 @@ def create_event(name=None, type=None, state_key=None, depth=2, event_id=None,
 
     if not event_id:
         _next_event_id += 1
-        event_id = str(_next_event_id)
+        event_id = "$%s:test" % (_next_event_id,)
 
     if not name:
         if state_key is not None:
