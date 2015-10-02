@@ -25,7 +25,6 @@ from synapse.api.constants import (
 from synapse.api.errors import StoreError, SynapseError
 from synapse.util import stringutils, unwrapFirstError
 from synapse.util.async import run_on_reactor
-from synapse.events.utils import serialize_event
 
 from collections import OrderedDict
 import logging
@@ -39,7 +38,7 @@ class RoomCreationHandler(BaseHandler):
     PRESETS_DICT = {
         RoomCreationPreset.PRIVATE_CHAT: {
             "join_rules": JoinRules.INVITE,
-            "history_visibility": "invited",
+            "history_visibility": "shared",
             "original_invitees_have_ops": False,
         },
         RoomCreationPreset.PUBLIC_CHAT: {
@@ -159,6 +158,7 @@ class RoomCreationHandler(BaseHandler):
             invite_list=invite_list,
             initial_state=initial_state,
             creation_content=creation_content,
+            room_alias=room_alias,
         )
 
         msg_handler = self.hs.get_handlers().message_handler
@@ -206,7 +206,8 @@ class RoomCreationHandler(BaseHandler):
         defer.returnValue(result)
 
     def _create_events_for_new_room(self, creator, room_id, preset_config,
-                                    invite_list, initial_state, creation_content):
+                                    invite_list, initial_state, creation_content,
+                                    room_alias):
         config = RoomCreationHandler.PRESETS_DICT[preset_config]
 
         creator_id = creator.to_string()
@@ -275,6 +276,14 @@ class RoomCreationHandler(BaseHandler):
             )
 
             returned_events.append(power_levels_event)
+
+        if room_alias and (EventTypes.CanonicalAlias, '') not in initial_state:
+            room_alias_event = create(
+                etype=EventTypes.CanonicalAlias,
+                content={"alias": room_alias.to_string()},
+            )
+
+            returned_events.append(room_alias_event)
 
         if (EventTypes.JoinRules, '') not in initial_state:
             join_rules_event = create(
@@ -345,41 +354,6 @@ class RoomMemberHandler(BaseHandler):
             else:
                 if remotedomains is not None:
                     remotedomains.add(member.domain)
-
-    @defer.inlineCallbacks
-    def get_room_members_as_pagination_chunk(self, room_id=None, user_id=None,
-                                             limit=0, start_tok=None,
-                                             end_tok=None):
-        """Retrieve a list of room members in the room.
-
-        Args:
-            room_id (str): The room to get the member list for.
-            user_id (str): The ID of the user making the request.
-            limit (int): The max number of members to return.
-            start_tok (str): Optional. The start token if known.
-            end_tok (str): Optional. The end token if known.
-        Returns:
-            dict: A Pagination streamable dict.
-        Raises:
-            SynapseError if something goes wrong.
-        """
-        yield self.auth.check_joined_room(room_id, user_id)
-
-        member_list = yield self.store.get_room_members(room_id=room_id)
-        time_now = self.clock.time_msec()
-        event_list = [
-            serialize_event(entry, time_now)
-            for entry in member_list
-        ]
-        chunk_data = {
-            "start": "START",  # FIXME (erikj): START is no longer valid
-            "end": "END",
-            "chunk": event_list
-        }
-        # TODO honor Pagination stream params
-        # TODO snapshot this list to return on subsequent requests when
-        # paginating
-        defer.returnValue(chunk_data)
 
     @defer.inlineCallbacks
     def change_membership(self, event, context, do_auth=True):
@@ -533,32 +507,6 @@ class RoomMemberHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def _should_invite_join(self, room_id, prev_state, do_auth):
-        logger.debug("_should_invite_join: room_id: %s", room_id)
-
-        # XXX: We don't do an auth check if we are doing an invite
-        # join dance for now, since we're kinda implicitly checking
-        # that we are allowed to join when we decide whether or not we
-        # need to do the invite/join dance.
-
-        # Only do an invite join dance if a) we were invited,
-        # b) the person inviting was from a differnt HS and c) we are
-        # not currently in the room
-        room_host = None
-        if prev_state and prev_state.membership == Membership.INVITE:
-            room = yield self.store.get_room(room_id)
-            inviter = UserID.from_string(
-                prev_state.sender
-            )
-
-            is_remote_invite_join = not self.hs.is_mine(inviter) and not room
-            room_host = inviter.domain
-        else:
-            is_remote_invite_join = False
-
-        defer.returnValue((is_remote_invite_join, room_host))
-
-    @defer.inlineCallbacks
     def get_joined_rooms_for_user(self, user):
         """Returns a list of roomids that the user has any of the given
         membership states in."""
@@ -650,7 +598,6 @@ class RoomEventSource(object):
             to_key=config.to_key,
             direction=config.direction,
             limit=config.limit,
-            with_feedback=True
         )
 
         defer.returnValue((events, next_key))

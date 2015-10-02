@@ -228,10 +228,9 @@ class Keyring(object):
         def do_iterations():
             merged_results = {}
 
-            missing_keys = {
-                group.server_name: set(group.key_ids)
-                for group in group_id_to_group.values()
-            }
+            missing_keys = {}
+            for group in group_id_to_group.values():
+                missing_keys.setdefault(group.server_name, set()).union(group.key_ids)
 
             for fn in key_fetch_fns:
                 results = yield fn(missing_keys.items())
@@ -470,7 +469,7 @@ class Keyring(object):
                 continue
 
             (response, tls_certificate) = yield fetch_server_key(
-                server_name, self.hs.tls_context_factory,
+                server_name, self.hs.tls_server_context_factory,
                 path=(b"/_matrix/key/v2/server/%s" % (
                     urllib.quote(requested_key_id),
                 )).encode("ascii"),
@@ -604,7 +603,7 @@ class Keyring(object):
         # Try to fetch the key from the remote server.
 
         (response, tls_certificate) = yield fetch_server_key(
-            server_name, self.hs.tls_context_factory
+            server_name, self.hs.tls_server_context_factory
         )
 
         # Check the response.

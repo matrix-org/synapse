@@ -48,7 +48,7 @@ class V2AlphaRestTestCase(unittest.TestCase):
                 "user": UserID.from_string(self.USER_ID),
                 "token_id": 1,
             }
-        hs.get_auth().get_user_by_access_token = _get_user_by_access_token
+        hs.get_auth()._get_user_by_access_token = _get_user_by_access_token
 
         for r in self.TO_REGISTER:
             r.register_servlets(hs, self.mock_resource)

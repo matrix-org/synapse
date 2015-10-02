@@ -1,3 +1,17 @@
+Changes in synapse v0.10.0-r2 (2015-09-16)
+==========================================
+
+* Fix bug where we always fetched remote server signing keys instead of using
+  ones in our cache.
+* Fix adding threepids to an existing account.
+* Fix bug with invinting over federation where remote server was already in
+  the room. (PR #281, SYN-392)
+
+Changes in synapse v0.10.0-r1 (2015-09-08)
+==========================================
+
+* Fix bug with python packaging
+
 Changes in synapse v0.10.0 (2015-09-03)
 =======================================
 

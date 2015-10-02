@@ -154,98 +154,6 @@ class EventFederationStore(SQLBaseStore):
 
         return results
 
-    def _get_latest_state_in_room(self, txn, room_id, type, state_key):
-        event_ids = self._simple_select_onecol_txn(
-            txn,
-            table="state_forward_extremities",
-            keyvalues={
-                "room_id": room_id,
-                "type": type,
-                "state_key": state_key,
-            },
-            retcol="event_id",
-        )
-
-        results = []
-        for event_id in event_ids:
-            hashes = self._get_event_reference_hashes_txn(txn, event_id)
-            prev_hashes = {
-                k: encode_base64(v) for k, v in hashes.items()
-                if k == "sha256"
-            }
-            results.append((event_id, prev_hashes))
-
-        return results
-
-    def _get_prev_events(self, txn, event_id):
-        results = self._get_prev_events_and_state(
-            txn,
-            event_id,
-            is_state=0,
-        )
-
-        return [(e_id, h, ) for e_id, h, _ in results]
-
-    def _get_prev_state(self, txn, event_id):
-        results = self._get_prev_events_and_state(
-            txn,
-            event_id,
-            is_state=True,
-        )
-
-        return [(e_id, h, ) for e_id, h, _ in results]
-
-    def _get_prev_events_and_state(self, txn, event_id, is_state=None):
-        keyvalues = {
-            "event_id": event_id,
-        }
-
-        if is_state is not None:
-            keyvalues["is_state"] = bool(is_state)
-
-        res = self._simple_select_list_txn(
-            txn,
-            table="event_edges",
-            keyvalues=keyvalues,
-            retcols=["prev_event_id", "is_state"],
-        )
-
-        hashes = self._get_prev_event_hashes_txn(txn, event_id)
-
-        results = []
-        for d in res:
-            edge_hash = self._get_event_reference_hashes_txn(txn, d["prev_event_id"])
-            edge_hash.update(hashes.get(d["prev_event_id"], {}))
-            prev_hashes = {
-                k: encode_base64(v)
-                for k, v in edge_hash.items()
-                if k == "sha256"
-            }
-            results.append((d["prev_event_id"], prev_hashes, d["is_state"]))
-
-        return results
-
-    def _get_auth_events(self, txn, event_id):
-        auth_ids = self._simple_select_onecol_txn(
-            txn,
-            table="event_auth",
-            keyvalues={
-                "event_id": event_id,
-            },
-            retcol="auth_id",
-        )
-
-        results = []
-        for auth_id in auth_ids:
-            hashes = self._get_event_reference_hashes_txn(txn, auth_id)
-            prev_hashes = {
-                k: encode_base64(v) for k, v in hashes.items()
-                if k == "sha256"
-            }
-            results.append((auth_id, prev_hashes))
-
-        return results
-
     def get_min_depth(self, room_id):
         """ For hte given room, get the minimum depth we have seen for it.
         """
@@ -303,6 +211,15 @@ class EventFederationStore(SQLBaseStore):
             ],
         )
 
+        self._update_extremeties(txn, events)
+
+    def _update_extremeties(self, txn, events):
+        """Updates the event_*_extremities tables based on the new/updated
+        events being persisted.
+
+        This is called for new events *and* for events that were outliers, but
+        are are now being persisted as non-outliers.
+        """
         events_by_room = {}
         for ev in events:
             events_by_room.setdefault(ev.room_id, []).append(ev)

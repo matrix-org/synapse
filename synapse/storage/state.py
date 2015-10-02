@@ -20,8 +20,6 @@ from synapse.util.caches.descriptors import (
 
 from twisted.internet import defer
 
-from synapse.util.stringutils import random_string
-
 import logging
 
 logger = logging.getLogger(__name__)
@@ -428,7 +426,3 @@ class StateStore(SQLBaseStore):
             }
 
         defer.returnValue(results)
-
-
-def _make_group_id(clock):
-    return str(int(clock.time_msec())) + random_string(5)
