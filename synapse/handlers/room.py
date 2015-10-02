@@ -41,6 +41,11 @@ class RoomCreationHandler(BaseHandler):
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
         },
+        RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
+            "join_rules": JoinRules.INVITE,
+            "history_visibility": "shared",
+            "original_invitees_have_ops": True,
+        },
         RoomCreationPreset.PUBLIC_CHAT: {
             "join_rules": JoinRules.PUBLIC,
             "history_visibility": "shared",
