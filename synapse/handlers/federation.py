@@ -660,7 +660,7 @@ class FederationHandler(BaseHandler):
                     "event": e,
                     "auth_events": {
                         (e.type, e.state_key): e for e in auth_chain
-                        if e.event_id in auth_ids
+                        if e.event_id in auth_ids or e.type == EventTypes.Create
                     }
                 })
 
@@ -669,7 +669,7 @@ class FederationHandler(BaseHandler):
             auth_ids = [e_id for e_id, _ in event.auth_events]
             auth_events = {
                 (e.type, e.state_key): e for e in auth_chain
-                if e.event_id in auth_ids
+                if e.event_id in auth_ids or e.type == EventTypes.Create
             }
 
             _, event_stream_id, max_stream_id = yield self._handle_new_event(
