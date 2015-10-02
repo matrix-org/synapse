@@ -26,6 +26,7 @@ class ServerConfig(Config):
         self.soft_file_limit = config["soft_file_limit"]
         self.daemonize = config.get("daemonize")
         self.print_pidfile = config.get("print_pidfile")
+        self.user_agent_override = config.get("user_agent_override")
         self.use_frozen_dicts = config.get("use_frozen_dicts", True)
 
         self.listeners = config.get("listeners", [])
