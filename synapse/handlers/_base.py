@@ -132,6 +132,7 @@ class BaseHandler(object):
                         "type": e.type,
                         "state_key": e.state_key,
                         "content": e.content,
+                        "sender": e.sender,
                     }
                     for k, e in context.current_state.items()
                     if e.type in (
