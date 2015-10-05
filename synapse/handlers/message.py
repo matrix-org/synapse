@@ -383,7 +383,11 @@ class MessageHandler(BaseHandler):
             }
 
             if event.membership == Membership.INVITE:
+                time_now = self.clock.time_msec()
                 d["inviter"] = event.sender
+
+                invite_event = yield self.store.get_event(event.event_id)
+                d["invite"] = serialize_event(invite_event, time_now, as_client_event)
 
             rooms_ret.append(d)
 

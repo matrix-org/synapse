@@ -32,9 +32,9 @@ def start(configfile):
     print "Starting ...",
     args = SYNAPSE
     args.extend(["--daemonize", "-c", configfile])
-    cwd = os.path.dirname(os.path.abspath(__file__))
+
     try:
-        subprocess.check_call(args, cwd=cwd)
+        subprocess.check_call(args)
         print GREEN + "started" + NORMAL
     except subprocess.CalledProcessError as e:
         print (

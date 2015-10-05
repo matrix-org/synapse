@@ -20,9 +20,9 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.types import RoomID, UserID, EventID
 from synapse.util.logutils import log_function
 from synapse.util.thirdpartyinvites import ThirdPartyInvites
-from synapse.types import UserID, EventID
 from unpaddedbase64 import decode_base64
 
 import logging
@@ -84,6 +84,15 @@ class Auth(object):
                     403,
                     "Room %r does not exist" % (event.room_id,)
                 )
+
+            creating_domain = RoomID.from_string(event.room_id).domain
+            originating_domain = UserID.from_string(event.sender).domain
+            if creating_domain != originating_domain:
+                if not self.can_federate(event, auth_events):
+                    raise AuthError(
+                        403,
+                        "This room has been marked as unfederatable."
+                    )
 
             # FIXME: Temp hack
             if event.type == EventTypes.Aliases:
@@ -224,6 +233,11 @@ class Auth(object):
                 user_id, room_id, repr(member)
             ))
 
+    def can_federate(self, event, auth_events):
+        creation_event = auth_events.get((EventTypes.Create, ""))
+
+        return creation_event.content.get("m.federate", True) is True
+
     @log_function
     def is_membership_change_allowed(self, event, auth_events):
         membership = event.content["membership"]
@@ -238,6 +252,15 @@ class Auth(object):
                     return True
 
         target_user_id = event.state_key
+
+        creating_domain = RoomID.from_string(event.room_id).domain
+        target_domain = UserID.from_string(target_user_id).domain
+        if creating_domain != target_domain:
+            if not self.can_federate(event, auth_events):
+                raise AuthError(
+                    403,
+                    "This room has been marked as unfederatable."
+                )
 
         # get info about the caller
         key = (EventTypes.Member, event.user_id, )
