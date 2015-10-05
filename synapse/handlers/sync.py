@@ -31,6 +31,7 @@ SyncConfig = collections.namedtuple("SyncConfig", [
     "filter",
 ])
 
+
 class TimelineBatch(collections.namedtuple("TimelineBatch", [
     "prev_batch",
     "events",
@@ -43,6 +44,7 @@ class TimelineBatch(collections.namedtuple("TimelineBatch", [
         to tell if room needs to be part of the sync result.
         """
         return bool(self.events)
+
 
 class RoomSyncResult(collections.namedtuple("RoomSyncResult", [
     "room_id",
@@ -125,11 +127,7 @@ class SyncHandler(BaseHandler):
         if since_token is None:
             return self.initial_sync(sync_config)
         else:
-            if sync_config.gap:
-                return self.incremental_sync_with_gap(sync_config, since_token)
-            else:
-                # TODO(mjark): Handle gapless sync
-                raise NotImplementedError()
+            return self.incremental_sync_with_gap(sync_config, since_token)
 
     @defer.inlineCallbacks
     def initial_sync(self, sync_config):
@@ -174,7 +172,7 @@ class SyncHandler(BaseHandler):
             A Deferred RoomSyncResult.
         """
 
-        recents, prev_batch_token, limited = yield self.load_filtered_recents(
+        batch = yield self.load_filtered_recents(
             room_id, sync_config, now_token,
         )
 
@@ -185,10 +183,8 @@ class SyncHandler(BaseHandler):
 
         defer.returnValue(RoomSyncResult(
             room_id=room_id,
-            events=recents,
-            prev_batch=prev_batch_token,
+            timeline=batch,
             state=current_state_events,
-            limited=limited,
             ephemeral=[],
         ))
 
@@ -199,18 +195,13 @@ class SyncHandler(BaseHandler):
         Returns:
             A Deferred SyncResult.
         """
-        if sync_config.sort == "timeline,desc":
-            # TODO(mjark): Handle going through events in reverse order?.
-            # What does "most recent events" mean when applying the limits mean
-            # in this case?
-            raise NotImplementedError()
-
         now_token = yield self.event_sources.get_current_token()
 
         presence_source = self.event_sources.sources["presence"]
         presence, presence_key = yield presence_source.get_new_events_for_user(
             user=sync_config.user,
             from_key=since_token.presence_key,
+            limit=sync_config.filter.presence_limit(),
         )
         now_token = now_token.copy_and_replace("presence_key", presence_key)
 
@@ -218,6 +209,7 @@ class SyncHandler(BaseHandler):
         typing, typing_key = yield typing_source.get_new_events_for_user(
             user=sync_config.user,
             from_key=since_token.typing_key,
+            limit=sync_config.filter.ephemeral_limit(),
         )
         now_token = now_token.copy_and_replace("typing_key", typing_key)
 
@@ -295,8 +287,7 @@ class SyncHandler(BaseHandler):
                     rooms.append(room_sync)
 
         defer.returnValue(SyncResult(
-            public_user_data=presence,
-            private_user_data=[],
+            presence=presence,
             rooms=rooms,
             next_batch=now_token,
         ))
@@ -407,7 +398,7 @@ class SyncHandler(BaseHandler):
             room_id, sync_config, now_token, since_token,
         )
 
-        logging.debug("Recents %r", recents)
+        logging.debug("Recents %r", batch)
 
         # TODO(mjark): This seems racy since this isn't being passed a
         # token to indicate what point in the stream this is

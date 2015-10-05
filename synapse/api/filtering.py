@@ -136,7 +136,13 @@ class Filter(object):
         self.filter_json = filter_json
 
     def timeline_limit(self):
-        return self.filter_json.get("room", {}).get("timeline", {}).get(limit, 10)
+        return self.filter_json.get("room", {}).get("timeline", {}).get("limit", 10)
+
+    def presence_limit(self):
+        return self.filter_json.get("presence", {}).get("limit", 10)
+
+    def ephemeral_limit(self):
+        return self.filter_json.get("room", {}).get("ephemeral", {}).get("limit", 10)
 
     def filter_public_user_data(self, events):
         return self._filter_on_key(events, ["public_user_data"])

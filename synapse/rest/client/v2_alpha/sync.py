@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.http.servlet import (
-    RestServlet, parse_string, parse_integer, parse_boolean
+    RestServlet, parse_string, parse_integer
 )
 from synapse.handlers.sync import SyncConfig
 from synapse.types import StreamToken
@@ -46,8 +46,14 @@ class SyncRestServlet(RestServlet):
           "next_batch": // batch token for the next /sync
           "presence": // presence data for the user.
           "rooms": {
-            "roomlist": [{ // List of rooms with updates.
-              "room_id": // Id of the room being updated
+            "default": {
+               "invited": [], // Ids of invited rooms being updated.
+               "joined": [], // Ids of joined rooms being updated.
+               "archived": [] // Ids of archived rooms being updated.
+            }
+          }
+          "room_map": {
+            "${room_id}": { // Id of the room being updated
               "event_map": // Map of EventID -> event JSON.
               "timeline": { // The recent events in the room if gap is "true"
                   "limited": // Was the per-room event limit exceeded?
@@ -58,7 +64,7 @@ class SyncRestServlet(RestServlet):
               "state": [] // list of EventIDs updating the current state to
                           // be what it should be at the end of the batch.
               "ephemeral": []
-            }]
+            }
           }
         }
     """
@@ -115,13 +121,16 @@ class SyncRestServlet(RestServlet):
 
         time_now = self.clock.time_msec()
 
+        room_map, rooms = self.encode_rooms(
+            sync_result.rooms, filter, time_now, token_id
+        )
+
         response_content = {
             "presence": self.encode_user_data(
                 sync_result.presence, filter, time_now
             ),
-            "rooms": self.encode_rooms(
-                sync_result.rooms, filter, time_now, token_id
-            ),
+            "room_map": room_map,
+            "rooms": rooms,
             "next_batch": sync_result.next_batch.to_string(),
         }
 
@@ -131,10 +140,21 @@ class SyncRestServlet(RestServlet):
         return events
 
     def encode_rooms(self, rooms, filter, time_now, token_id):
-        return [
-            self.encode_room(room, filter, time_now, token_id)
-            for room in rooms
-        ]
+        room_map = {}
+        joined = []
+        for room in rooms:
+            room_map[room.room_id] = self.encode_room(
+                room, filter, time_now, token_id
+            )
+            joined.append(room.room_id)
+
+        return room_map, {
+            "default": {
+                "joined": joined,
+                "invited": [],
+                "archived": [],
+            }
+        }
 
     @staticmethod
     def encode_room(room, filter, time_now, token_id):
@@ -159,7 +179,6 @@ class SyncRestServlet(RestServlet):
             )
             recent_event_ids.append(event.event_id)
         result = {
-            "room_id": room.room_id,
             "event_map": event_map,
             "events": {
                 "batch": recent_event_ids,
@@ -167,7 +186,6 @@ class SyncRestServlet(RestServlet):
             },
             "state": state_event_ids,
             "limited": room.limited,
-            "published": room.published,
             "ephemeral": room.ephemeral,
         }
         return result
