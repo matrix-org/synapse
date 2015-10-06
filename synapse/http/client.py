@@ -69,7 +69,7 @@ class SimpleHttpClient(object):
         )
         self.user_agent = hs.version_string
         if hs.config.user_agent_suffix:
-            self.user_agent += " - " + hs.config.user_agent_suffix
+            self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix,)
 
     def request(self, method, uri, *args, **kwargs):
         # A small wrapper around self.agent.request() so we can easily attach
