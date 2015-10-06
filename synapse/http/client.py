@@ -67,9 +67,9 @@ class SimpleHttpClient(object):
             connectTimeout=15,
             contextFactory=hs.get_http_client_context_factory()
         )
-        self.user_agent = hs.config.user_agent_override
-        if self.user_agent is None:
-            self.user_agent = hs.version_string
+        self.user_agent = hs.version_string
+        if hs.config.user_agent_suffix:
+            self.user_agent += " - " + hs.config.user_agent_suffix
 
     def request(self, method, uri, *args, **kwargs):
         # A small wrapper around self.agent.request() so we can easily attach
