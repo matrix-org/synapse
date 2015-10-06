@@ -1174,7 +1174,7 @@ class FederationHandler(BaseHandler):
                         auth_ids = [e_id for e_id, _ in e.auth_events]
                         auth = {
                             (e.type, e.state_key): e for e in remote_auth_chain
-                            if e.event_id in auth_ids
+                            if e.event_id in auth_ids or e.type == EventTypes.Create
                         }
                         e.internal_metadata.outlier = True
 
@@ -1292,6 +1292,7 @@ class FederationHandler(BaseHandler):
                                 (e.type, e.state_key): e
                                 for e in result["auth_chain"]
                                 if e.event_id in auth_ids
+                                or event.type == EventTypes.Create
                             }
                             ev.internal_metadata.outlier = True
 
