@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 from base import ClientV1RestServlet, client_path_pattern
-from synapse.api.errors import SynapseError, Codes, AuthError
+from synapse.api.errors import SynapseError, Codes
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.types import UserID, RoomID, RoomAlias
@@ -424,7 +424,6 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 ):
                     raise SynapseError(400, "Missing user_id key.")
 
-
                 id_server = content["id_server"]
                 medium = content["medium"]
                 address = content["address"]
@@ -556,7 +555,9 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         # TODO: Check for success
         token = data["token"]
         public_key = data["public_key"]
-        key_validity_url = "https://%s/_matrix/identity/api/v1/pubkey/isvalid" % (id_server,)
+        key_validity_url = "https://%s/_matrix/identity/api/v1/pubkey/isvalid" % (
+            id_server,
+        )
         defer.returnValue((token, public_key, key_validity_url))
 
     @defer.inlineCallbacks

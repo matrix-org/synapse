@@ -372,7 +372,6 @@ class FederationClient(FederationBase):
 
                 pdu_dict = ret["event"]
 
-
                 logger.debug("Got response to make_join: %s", pdu_dict)
 
                 defer.returnValue(
