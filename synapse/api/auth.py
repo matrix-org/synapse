@@ -677,6 +677,11 @@ class Auth(object):
             if e_type == Membership.JOIN:
                 if member_event and not is_public:
                     auth_ids.append(member_event.event_id)
+                if ThirdPartyInvites.has_join_keys(event.content):
+                    key = (EventTypes.ThirdPartyInvite, event.content["token"])
+                    invite = current_state.get(key)
+                    if invite:
+                        auth_ids.append(invite.event_id)
             else:
                 if member_event:
                     auth_ids.append(member_event.event_id)
