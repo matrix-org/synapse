@@ -134,10 +134,6 @@ class BaseHandler(object):
                 event
             )
 
-        (event_stream_id, max_stream_id) = yield self.store.persist_event(
-            event, context=context
-        )
-
         federation_handler = self.hs.get_handlers().federation_handler
 
         if event.type == EventTypes.Member:
