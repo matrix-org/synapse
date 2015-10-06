@@ -67,7 +67,9 @@ class SimpleHttpClient(object):
             connectTimeout=15,
             contextFactory=hs.get_http_client_context_factory()
         )
-        self.version_string = hs.version_string
+        self.user_agent = hs.version_string
+        if hs.config.user_agent_suffix:
+            self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix,)
 
     def request(self, method, uri, *args, **kwargs):
         # A small wrapper around self.agent.request() so we can easily attach
@@ -112,7 +114,7 @@ class SimpleHttpClient(object):
             uri.encode("ascii"),
             headers=Headers({
                 b"Content-Type": [b"application/x-www-form-urlencoded"],
-                b"User-Agent": [self.version_string],
+                b"User-Agent": [self.user_agent],
             }),
             bodyProducer=FileBodyProducer(StringIO(query_bytes))
         )
@@ -131,7 +133,8 @@ class SimpleHttpClient(object):
             "POST",
             uri.encode("ascii"),
             headers=Headers({
-                "Content-Type": ["application/json"]
+                b"Content-Type": [b"application/json"],
+                b"User-Agent": [self.user_agent],
             }),
             bodyProducer=FileBodyProducer(StringIO(json_str))
         )
@@ -165,7 +168,7 @@ class SimpleHttpClient(object):
             "GET",
             uri.encode("ascii"),
             headers=Headers({
-                b"User-Agent": [self.version_string],
+                b"User-Agent": [self.user_agent],
             })
         )
 
@@ -206,7 +209,7 @@ class SimpleHttpClient(object):
             "PUT",
             uri.encode("ascii"),
             headers=Headers({
-                b"User-Agent": [self.version_string],
+                b"User-Agent": [self.user_agent],
                 "Content-Type": ["application/json"]
             }),
             bodyProducer=FileBodyProducer(StringIO(json_str))
@@ -241,7 +244,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
             bodyProducer=FileBodyProducer(StringIO(query_bytes)),
             headers=Headers({
                 b"Content-Type": [b"application/x-www-form-urlencoded"],
-                b"User-Agent": [self.version_string],
+                b"User-Agent": [self.user_agent],
             })
         )
 
