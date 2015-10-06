@@ -41,6 +41,11 @@ class RoomCreationHandler(BaseHandler):
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
         },
+        RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
+            "join_rules": JoinRules.INVITE,
+            "history_visibility": "shared",
+            "original_invitees_have_ops": True,
+        },
         RoomCreationPreset.PUBLIC_CHAT: {
             "join_rules": JoinRules.PUBLIC,
             "history_visibility": "shared",
@@ -149,12 +154,16 @@ class RoomCreationHandler(BaseHandler):
         for val in raw_initial_state:
             initial_state[(val["type"], val.get("state_key", ""))] = val["content"]
 
+        creation_content = config.get("creation_content", {})
+
         user = UserID.from_string(user_id)
         creation_events = self._create_events_for_new_room(
             user, room_id,
             preset_config=preset_config,
             invite_list=invite_list,
             initial_state=initial_state,
+            creation_content=creation_content,
+            room_alias=room_alias,
         )
 
         msg_handler = self.hs.get_handlers().message_handler
@@ -202,7 +211,8 @@ class RoomCreationHandler(BaseHandler):
         defer.returnValue(result)
 
     def _create_events_for_new_room(self, creator, room_id, preset_config,
-                                    invite_list, initial_state):
+                                    invite_list, initial_state, creation_content,
+                                    room_alias):
         config = RoomCreationHandler.PRESETS_DICT[preset_config]
 
         creator_id = creator.to_string()
@@ -224,9 +234,10 @@ class RoomCreationHandler(BaseHandler):
 
             return e
 
+        creation_content.update({"creator": creator.to_string()})
         creation_event = create(
             etype=EventTypes.Create,
-            content={"creator": creator.to_string()},
+            content=creation_content,
         )
 
         join_event = create(
@@ -270,6 +281,14 @@ class RoomCreationHandler(BaseHandler):
             )
 
             returned_events.append(power_levels_event)
+
+        if room_alias and (EventTypes.CanonicalAlias, '') not in initial_state:
+            room_alias_event = create(
+                etype=EventTypes.CanonicalAlias,
+                content={"alias": room_alias.to_string()},
+            )
+
+            returned_events.append(room_alias_event)
 
         if (EventTypes.JoinRules, '') not in initial_state:
             join_rules_event = create(
