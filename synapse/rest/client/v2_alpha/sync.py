@@ -45,26 +45,29 @@ class SyncRestServlet(RestServlet):
         {
           "next_batch": // batch token for the next /sync
           "presence": // presence data for the user.
-          "rooms": {
-            "default": {
                "invited": [], // Ids of invited rooms being updated.
                "joined": [], // Ids of joined rooms being updated.
                "archived": [] // Ids of archived rooms being updated.
             }
           }
-          "room_map": {
-            "${room_id}": { // Id of the room being updated
-              "event_map": // Map of EventID -> event JSON.
-              "timeline": { // The recent events in the room if gap is "true"
+          "rooms": {
+            "joined": { // Joined rooms being updated.
+              "${room_id}": { // Id of the room being updated
+                "event_map": // Map of EventID -> event JSON.
+                "timeline": { // The recent events in the room if gap is "true"
                   "limited": // Was the per-room event limit exceeded?
-                          // otherwise the next events in the room.
-                  "batch": [] // list of EventIDs in the "event_map".
+                             // otherwise the next events in the room.
+                  "events": [] // list of EventIDs in the "event_map".
                   "prev_batch": // back token for getting previous events.
+                }
+                "state": {"events": []} // list of EventIDs updating the
+                                        // current state to be what it should
+                                        // be at the end of the batch.
+                "ephemeral": {"events": []} // list of event objects
               }
-              "state": [] // list of EventIDs updating the current state to
-                          // be what it should be at the end of the batch.
-              "ephemeral": []
-            }
+            },
+            "invited": {}, // Ids of invited rooms being updated.
+            "archived": {} // Ids of archived rooms being updated.
           }
         }
     """
@@ -121,7 +124,7 @@ class SyncRestServlet(RestServlet):
 
         time_now = self.clock.time_msec()
 
-        room_map, rooms = self.encode_rooms(
+        rooms = self.encode_rooms(
             sync_result.rooms, filter, time_now, token_id
         )
 
@@ -129,7 +132,6 @@ class SyncRestServlet(RestServlet):
             "presence": self.encode_user_data(
                 sync_result.presence, filter, time_now
             ),
-            "room_map": room_map,
             "rooms": rooms,
             "next_batch": sync_result.next_batch.to_string(),
         }
@@ -140,20 +142,16 @@ class SyncRestServlet(RestServlet):
         return events
 
     def encode_rooms(self, rooms, filter, time_now, token_id):
-        room_map = {}
-        joined = []
+        joined = {}
         for room in rooms:
-            room_map[room.room_id] = self.encode_room(
+            joined[room.room_id] = self.encode_room(
                 room, filter, time_now, token_id
             )
-            joined.append(room.room_id)
 
-        return room_map, {
-            "default": {
-                "joined": joined,
-                "invited": [],
-                "archived": [],
-            }
+        return {
+            "joined": joined,
+            "invited": {},
+            "archived": {},
         }
 
     @staticmethod
