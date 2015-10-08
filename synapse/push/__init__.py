@@ -186,7 +186,7 @@ class Pusher(object):
             if not display_name:
                 return False
             return re.search(
-                "\b%s\b" % re.escape(display_name), ev['content']['body'],
+                r"\b%s\b" % re.escape(display_name), ev['content']['body'],
                 flags=re.IGNORECASE
             ) is not None
 
