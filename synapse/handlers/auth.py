@@ -298,7 +298,8 @@ class AuthHandler(BaseHandler):
     @defer.inlineCallbacks
     def login_with_cas_user_id(self, user_id):
         """
-        Authenticates the user with the given user ID, intended to have been captured from a CAS response
+        Authenticates the user with the given user ID,
+        intended to have been captured from a CAS response
 
         Args:
             user_id (str): User ID

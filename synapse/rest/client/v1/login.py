@@ -77,9 +77,13 @@ class LoginRestServlet(ClientV1RestServlet):
                     "uri": "%s%s" % (self.idp_redirect_url, relay_state)
                 }
                 defer.returnValue((200, result))
-            elif self.cas_enabled and (login_submission["type"] == LoginRestServlet.CAS_TYPE):
+            elif self.cas_enabled and (login_submission["type"] ==
+                                       LoginRestServlet.CAS_TYPE):
                 url = "%s/proxyValidate" % (self.cas_server_url)
-                parameters = {"ticket": login_submission["ticket"], "service": login_submission["service"]}
+                parameters = {
+                    "ticket": login_submission["ticket"],
+                    "service": login_submission["service"]
+                }
                 response = requests.get(url, verify=False, params=parameters)
                 result = yield self.do_cas_login(response.text)
                 defer.returnValue(result)
@@ -130,7 +134,8 @@ class LoginRestServlet(ClientV1RestServlet):
                 auth_handler = self.handlers.auth_handler
                 user_exists = yield auth_handler.does_user_exist(user_id)
                 if user_exists:
-                    user_id, access_token, refresh_token = yield auth_handler.login_with_cas_user_id(user_id)
+                    user_id, access_token, refresh_token = yield
+                    auth_handler.login_with_cas_user_id(user_id)
                     result = {
                         "user_id": user_id,  # may have changed
                         "access_token": access_token,
@@ -139,7 +144,8 @@ class LoginRestServlet(ClientV1RestServlet):
                     }
 
                 else:
-                    user_id, access_token = yield self.handlers.registration_handler.register(localpart=user)
+                    user_id, access_token = yield
+                    self.handlers.registration_handler.register(localpart=user)
                     result = {
                         "user_id": user_id,  # may have changed
                         "access_token": access_token,
@@ -147,7 +153,6 @@ class LoginRestServlet(ClientV1RestServlet):
                     }
 
             defer.returnValue((200, result))
-
 
         raise LoginError(401, "Invalid CAS response", errcode=Codes.UNAUTHORIZED)
 
@@ -224,6 +229,7 @@ class SAML2RestServlet(ClientV1RestServlet):
             defer.returnValue(None)
         defer.returnValue((200, {"status": "not_authenticated"}))
 
+
 class CasRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/login/cas")
 
@@ -233,6 +239,7 @@ class CasRestServlet(ClientV1RestServlet):
 
     def on_GET(self, request):
         return (200, {"serverUrl": self.cas_server_url})
+
 
 def _parse_json(request):
     try:
