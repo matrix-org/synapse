@@ -165,8 +165,7 @@ class SyncHandler(BaseHandler):
         ))
 
     @defer.inlineCallbacks
-    def initial_sync_for_room(self, room_id, sync_config, now_token,
-                              published_room_ids):
+    def initial_sync_for_room(self, room_id, sync_config, now_token):
         """Sync a room for a client which is starting without any state
         Returns:
             A Deferred RoomSyncResult.
@@ -230,10 +229,6 @@ class SyncHandler(BaseHandler):
                 sync_config.user
             )
 
-        # TODO (mjark): Does public mean "published"?
-        published_rooms = yield self.store.get_rooms(is_public=True)
-        published_room_ids = set(r["room_id"] for r in published_rooms)
-
         timeline_limit = sync_config.filter.timeline_limit()
 
         room_events, _ = yield self.store.get_room_events_stream(
@@ -268,11 +263,12 @@ class SyncHandler(BaseHandler):
 
                 room_sync = RoomSyncResult(
                     room_id=room_id,
-                    published=room_id in published_room_ids,
-                    events=recents,
-                    prev_batch=prev_batch,
+                    timeline=TimelineBatch(
+                        events=recents,
+                        prev_batch=prev_batch,
+                        limited=False,
+                    ),
                     state=state,
-                    limited=False,
                     ephemeral=typing_by_room.get(room_id, [])
                 )
                 if room_sync:
@@ -344,11 +340,11 @@ class SyncHandler(BaseHandler):
         limited = True
         recents = []
         filtering_factor = 2
-        load_limit = max(sync_config.limit * filtering_factor, 100)
+        timeline_limit = sync_config.filter.timeline_limit()
+        load_limit = max(timeline_limit * filtering_factor, 100)
         max_repeat = 3  # Only try a few times per room, otherwise
         room_key = now_token.room_key
         end_key = room_key
-        timeline_limit = sync_config.filter.timeline_limit()
 
         while limited and len(recents) < timeline_limit and max_repeat:
             events, keys = yield self.store.get_recent_events_for_room(
@@ -369,8 +365,9 @@ class SyncHandler(BaseHandler):
                 limited = False
             max_repeat -= 1
 
-        if len(recents) > sync_config.limit:
-            recents = recents[-sync_config.limit:]
+        if len(recents) > timeline_limit:
+            limited = True
+            recents = recents[-timeline_limit:]
             room_key = recents[0].internal_metadata.before
 
         prev_batch_token = now_token.copy_and_replace(

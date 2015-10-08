@@ -158,7 +158,7 @@ class SyncRestServlet(RestServlet):
     def encode_room(room, filter, time_now, token_id):
         event_map = {}
         state_events = filter.filter_room_state(room.state)
-        recent_events = filter.filter_room_events(room.events)
+        recent_events = filter.filter_room_events(room.timeline.events)
         state_event_ids = []
         recent_event_ids = []
         for event in state_events:
@@ -178,13 +178,13 @@ class SyncRestServlet(RestServlet):
             recent_event_ids.append(event.event_id)
         result = {
             "event_map": event_map,
-            "events": {
-                "batch": recent_event_ids,
-                "prev_batch": room.prev_batch.to_string(),
+            "timeline": {
+                "events": recent_event_ids,
+                "prev_batch": room.timeline.prev_batch.to_string(),
+                "limited": room.timeline.limited,
             },
-            "state": state_event_ids,
-            "limited": room.limited,
-            "ephemeral": room.ephemeral,
+            "state": {"events": state_event_ids},
+            "ephemeral": {"events": room.ephemeral},
         }
         return result
 
