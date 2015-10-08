@@ -29,10 +29,12 @@ class InitialSyncRestServlet(ClientV1RestServlet):
         as_client_event = "raw" not in request.args
         pagination_config = PaginationConfig.from_request(request)
         handler = self.handlers.message_handler
+        include_archived = request.args.get("archived", None) == "1"
         content = yield handler.snapshot_all_rooms(
             user_id=user.to_string(),
             pagin_config=pagination_config,
-            as_client_event=as_client_event
+            as_client_event=as_client_event,
+            include_archived=include_archived,
         )
 
         defer.returnValue((200, content))
