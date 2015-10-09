@@ -137,8 +137,9 @@ class LoginRestServlet(ClientV1RestServlet):
                 auth_handler = self.handlers.auth_handler
                 user_exists = yield auth_handler.does_user_exist(user_id)
                 if user_exists:
-                    user_id, access_token, refresh_token = yield
-                    auth_handler.login_with_cas_user_id(user_id)
+                    user_id, access_token, refresh_token = (
+                        yield auth_handler.login_with_cas_user_id(user_id)
+                    )
                     result = {
                         "user_id": user_id,  # may have changed
                         "access_token": access_token,
@@ -147,8 +148,9 @@ class LoginRestServlet(ClientV1RestServlet):
                     }
 
                 else:
-                    user_id, access_token = yield
-                    self.handlers.registration_handler.register(localpart=user)
+                    user_id, access_token = (
+                        yield self.handlers.registration_handler.register(localpart=user)
+                    )
                     result = {
                         "user_id": user_id,  # may have changed
                         "access_token": access_token,
