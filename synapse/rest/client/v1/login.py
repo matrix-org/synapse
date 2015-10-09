@@ -133,7 +133,7 @@ class LoginRestServlet(ClientV1RestServlet):
         for child in root[0]:
             if child.tag.endswith("user"):
                 user = child.text
-                user_id = "@%s:%s" % (user, self.servername)
+                user_id = UserID.create(user, self.hs.hostname).to_string()
                 auth_handler = self.handlers.auth_handler
                 user_exists = yield auth_handler.does_user_exist(user_id)
                 if user_exists:
