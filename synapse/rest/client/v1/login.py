@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, LoginError, Codes
+from synapse.http.client import SimpleHttpClient
 from synapse.types import UserID
 from base import ClientV1RestServlet, client_path_pattern
 
@@ -28,7 +29,6 @@ from saml2 import config
 from saml2.client import Saml2Client
 
 import xml.etree.ElementTree as ET
-import requests
 
 
 logger = logging.getLogger(__name__)
@@ -79,13 +79,16 @@ class LoginRestServlet(ClientV1RestServlet):
                 defer.returnValue((200, result))
             elif self.cas_enabled and (login_submission["type"] ==
                                        LoginRestServlet.CAS_TYPE):
-                url = "%s/proxyValidate" % (self.cas_server_url)
-                parameters = {
+                # TODO: get this from the homeserver rather than creating a new one for
+                # each request
+                http_client = SimpleHttpClient(self.hs)
+                uri = "%s/proxyValidate" % (self.cas_server_url,)
+                args = {
                     "ticket": login_submission["ticket"],
                     "service": login_submission["service"]
                 }
-                response = requests.get(url, verify=False, params=parameters)
-                result = yield self.do_cas_login(response.text)
+                body = yield http_client.get_raw(uri, args)
+                result = yield self.do_cas_login(body)
                 defer.returnValue(result)
             else:
                 raise SynapseError(400, "Bad login type.")
