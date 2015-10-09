@@ -40,6 +40,7 @@ from .filtering import FilteringStore
 from .end_to_end_keys import EndToEndKeyStore
 
 from .receipts import ReceiptsStore
+from .search import SearchStore
 
 
 import fnmatch
@@ -79,6 +80,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 EventsStore,
                 ReceiptsStore,
                 EndToEndKeyStore,
+                SearchStore,
                 ):
 
     def __init__(self, hs):

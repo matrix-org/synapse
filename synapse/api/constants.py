@@ -84,3 +84,22 @@ class RoomCreationPreset(object):
     PRIVATE_CHAT = "private_chat"
     PUBLIC_CHAT = "public_chat"
     TRUSTED_PRIVATE_CHAT = "trusted_private_chat"
+
+
+class SearchConstraintTypes(object):
+    FTS = "fts"
+    EXACT = "exact"
+    PREFIX = "prefix"
+    SUBSTRING = "substring"
+    RANGE = "range"
+
+
+class KnownRoomEventKeys(object):
+    CONTENT_BODY = "content.body"
+    CONTENT_MSGTYPE = "content.msgtype"
+    CONTENT_NAME = "content.name"
+    CONTENT_TOPIC = "content.topic"
+
+    SENDER = "sender"
+    ORIGIN_SERVER_TS = "origin_server_ts"
+    ROOM_ID = "room_id"
