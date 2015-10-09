@@ -26,6 +26,7 @@ from synapse.events.utils import (
 from synapse.api.filtering import Filter
 from ._base import client_v2_pattern
 
+import copy
 import logging
 
 logger = logging.getLogger(__name__)
@@ -129,7 +130,7 @@ class SyncRestServlet(RestServlet):
         )
 
         response_content = {
-            "presence": self.encode_user_data(
+            "presence": self.encode_presence(
                 sync_result.presence, filter, time_now
             ),
             "rooms": rooms,
@@ -138,8 +139,13 @@ class SyncRestServlet(RestServlet):
 
         defer.returnValue((200, response_content))
 
-    def encode_user_data(self, events, filter, time_now):
-        return events
+    def encode_presence(self, events, filter, time_now):
+        formatted = []
+        for event in events:
+            event = copy.deepcopy(event)
+            event['sender'] = event['content'].pop('user_id');
+            formatted.append(event)
+        return {"events": formatted}
 
     def encode_rooms(self, rooms, filter, time_now, token_id):
         joined = {}
