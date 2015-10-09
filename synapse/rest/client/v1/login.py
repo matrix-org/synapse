@@ -157,7 +157,7 @@ class LoginRestServlet(ClientV1RestServlet):
                         "home_server": self.hs.hostname,
                     }
 
-            defer.returnValue((200, result))
+                defer.returnValue((200, result))
 
         raise LoginError(401, "Invalid CAS response", errcode=Codes.UNAUTHORIZED)
 
