@@ -79,6 +79,7 @@ class SyncRestServlet(RestServlet):
     def __init__(self, hs):
         super(SyncRestServlet, self).__init__()
         self.auth = hs.get_auth()
+        self.event_stream_handler = hs.get_handlers().event_stream_handler
         self.sync_handler = hs.get_handlers().sync_handler
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
@@ -119,9 +120,16 @@ class SyncRestServlet(RestServlet):
         else:
             since_token = None
 
-        sync_result = yield self.sync_handler.wait_for_sync_for_user(
-            sync_config, since_token=since_token, timeout=timeout
-        )
+        if set_presence == "online":
+            yield self.event_stream_handler.started_stream(user)
+
+        try:
+            sync_result = yield self.sync_handler.wait_for_sync_for_user(
+                sync_config, since_token=since_token, timeout=timeout
+            )
+        finally:
+            if set_presence == "online":
+                self.event_stream_handler.stopped_stream(user)
 
         time_now = self.clock.time_msec()
 
