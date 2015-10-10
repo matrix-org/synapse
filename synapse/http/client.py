@@ -190,7 +190,7 @@ class SimpleHttpClient(object):
             "PUT",
             uri.encode("ascii"),
             headers=Headers({
-                b"User-Agent": [self.version_string],
+                b"User-Agent": [self.user_agent],
                 "Content-Type": ["application/json"]
             }),
             bodyProducer=FileBodyProducer(StringIO(json_str))
@@ -231,7 +231,7 @@ class SimpleHttpClient(object):
             "GET",
             uri.encode("ascii"),
             headers=Headers({
-                b"User-Agent": [self.version_string],
+                b"User-Agent": [self.user_agent],
             })
         )
 
