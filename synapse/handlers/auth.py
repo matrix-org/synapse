@@ -296,6 +296,38 @@ class AuthHandler(BaseHandler):
         defer.returnValue((user_id, access_token, refresh_token))
 
     @defer.inlineCallbacks
+    def login_with_cas_user_id(self, user_id):
+        """
+        Authenticates the user with the given user ID,
+        intended to have been captured from a CAS response
+
+        Args:
+            user_id (str): User ID
+        Returns:
+            A tuple of:
+              The user's ID.
+              The access token for the user's session.
+              The refresh token for the user's session.
+        Raises:
+            StoreError if there was a problem storing the token.
+            LoginError if there was an authentication problem.
+        """
+        user_id, ignored = yield self._find_user_id_and_pwd_hash(user_id)
+
+        logger.info("Logging in user %s", user_id)
+        access_token = yield self.issue_access_token(user_id)
+        refresh_token = yield self.issue_refresh_token(user_id)
+        defer.returnValue((user_id, access_token, refresh_token))
+
+    @defer.inlineCallbacks
+    def does_user_exist(self, user_id):
+        try:
+            yield self._find_user_id_and_pwd_hash(user_id)
+            defer.returnValue(True)
+        except LoginError:
+            defer.returnValue(False)
+
+    @defer.inlineCallbacks
     def _find_user_id_and_pwd_hash(self, user_id):
         """Checks to see if a user with the given id exists. Will check case
         insensitively, but will throw if there are multiple inexact matches.

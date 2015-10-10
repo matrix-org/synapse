@@ -160,27 +160,8 @@ class SimpleHttpClient(object):
             On a non-2xx HTTP response. The response body will be used as the
             error message.
         """
-        if len(args):
-            query_bytes = urllib.urlencode(args, True)
-            uri = "%s?%s" % (uri, query_bytes)
-
-        response = yield self.request(
-            "GET",
-            uri.encode("ascii"),
-            headers=Headers({
-                b"User-Agent": [self.user_agent],
-            })
-        )
-
-        body = yield preserve_context_over_fn(readBody, response)
-
-        if 200 <= response.code < 300:
-            defer.returnValue(json.loads(body))
-        else:
-            # NB: This is explicitly not json.loads(body)'d because the contract
-            # of CodeMessageException is a *string* message. Callers can always
-            # load it into JSON if they want.
-            raise CodeMessageException(response.code, body)
+        body = yield self.get_raw(uri, args)
+        defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}):
@@ -209,7 +190,7 @@ class SimpleHttpClient(object):
             "PUT",
             uri.encode("ascii"),
             headers=Headers({
-                b"User-Agent": [self.user_agent],
+                b"User-Agent": [self.version_string],
                 "Content-Type": ["application/json"]
             }),
             bodyProducer=FileBodyProducer(StringIO(json_str))
@@ -223,6 +204,42 @@ class SimpleHttpClient(object):
             # NB: This is explicitly not json.loads(body)'d because the contract
             # of CodeMessageException is a *string* message. Callers can always
             # load it into JSON if they want.
+            raise CodeMessageException(response.code, body)
+
+    @defer.inlineCallbacks
+    def get_raw(self, uri, args={}):
+        """ Gets raw text from the given URI.
+
+        Args:
+            uri (str): The URI to request, not including query parameters
+            args (dict): A dictionary used to create query strings, defaults to
+                None.
+                **Note**: The value of each key is assumed to be an iterable
+                and *not* a string.
+        Returns:
+            Deferred: Succeeds when we get *any* 2xx HTTP response, with the
+            HTTP body at text.
+        Raises:
+            On a non-2xx HTTP response. The response body will be used as the
+            error message.
+        """
+        if len(args):
+            query_bytes = urllib.urlencode(args, True)
+            uri = "%s?%s" % (uri, query_bytes)
+
+        response = yield self.request(
+            "GET",
+            uri.encode("ascii"),
+            headers=Headers({
+                b"User-Agent": [self.version_string],
+            })
+        )
+
+        body = yield preserve_context_over_fn(readBody, response)
+
+        if 200 <= response.code < 300:
+            defer.returnValue(body)
+        else:
             raise CodeMessageException(response.code, body)
 
 
