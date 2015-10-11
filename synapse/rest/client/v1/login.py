@@ -45,7 +45,7 @@ class LoginRestServlet(ClientV1RestServlet):
         self.idp_redirect_url = hs.config.saml2_idp_redirect_url
         self.saml2_enabled = hs.config.saml2_enabled
         self.cas_enabled = hs.config.cas_enabled
-
+        self.cas_user_id_prefix = hs.config.cas_user_id_prefix
         self.cas_server_url = hs.config.cas_server_url
         self.servername = hs.config.server_name
 
@@ -132,7 +132,7 @@ class LoginRestServlet(ClientV1RestServlet):
             raise LoginError(401, "Unsuccessful CAS response", errcode=Codes.UNAUTHORIZED)
         for child in root[0]:
             if child.tag.endswith("user"):
-                user = child.text
+                user = self.cas_user_id_prefix + child.text
                 user_id = UserID.create(user, self.hs.hostname).to_string()
                 auth_handler = self.handlers.auth_handler
                 user_exists = yield auth_handler.does_user_exist(user_id)

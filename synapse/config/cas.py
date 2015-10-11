@@ -27,13 +27,16 @@ class CasConfig(Config):
         if cas_config:
             self.cas_enabled = True
             self.cas_server_url = cas_config["server_url"]
+            self.cas_user_id_prefix = cas_config["user_id_prefix"]
         else:
             self.cas_enabled = False
             self.cas_server_url = None
+            self.cas_user_id_prefix = None
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable CAS for registration and login.
         #cas_config:
         #   server_url: "https://cas-server.com"
+        #   user_id_prefix: "cas_"
         """
