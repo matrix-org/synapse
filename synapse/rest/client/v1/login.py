@@ -125,7 +125,7 @@ class LoginRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def do_cas_login(self, cas_response_body):
-        (user, attributes) = self.parse_cas_response(cas_response_body)
+        user, attributes = self.parse_cas_response(cas_response_body)
 
         for required_attribute in self.cas_required_attributes:
             # If required attribute was not in CAS Response - Forbidden
