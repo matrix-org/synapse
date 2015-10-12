@@ -127,16 +127,16 @@ class LoginRestServlet(ClientV1RestServlet):
     def do_cas_login(self, cas_response_body):
         user, attributes = self.parse_cas_response(cas_response_body)
 
-        for required_attribute in self.cas_required_attributes:
+        for required_attribute, required_value in self.cas_required_attributes.items():
             # If required attribute was not in CAS Response - Forbidden
             if required_attribute not in attributes:
                 raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
             # Also need to check value
-            if self.cas_required_attributes[required_attribute] is not None:
-                actualValue = attributes[required_attribute]
+            if required_value is not None:
+                actual_value = attributes[required_attribute]
                 # If required attribute value does not match expected - Forbidden
-                if self.cas_required_attributes[required_attribute] != actualValue:
+                if required_value != actual_value:
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID.create(user, self.hs.hostname).to_string()
