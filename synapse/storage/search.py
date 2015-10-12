@@ -21,10 +21,15 @@ from synapse.api.constants import KnownRoomEventKeys, SearchConstraintTypes
 
 class SearchStore(SQLBaseStore):
     @defer.inlineCallbacks
-    def search_msgs(self, constraints):
+    def search_msgs(self, room_ids, constraints):
         clauses = []
         args = []
         fts = None
+
+        clauses.append(
+            "room_id IN (%s)" % (",".join(["?"] * len(room_ids)),)
+        )
+        args.extend(room_ids)
 
         for c in constraints:
             local_clauses = []

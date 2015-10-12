@@ -307,6 +307,8 @@ class EventsStore(SQLBaseStore):
                 self._store_room_name_txn(txn, event)
             elif event.type == EventTypes.Topic:
                 self._store_room_topic_txn(txn, event)
+            elif event.type == EventTypes.Message:
+                self._store_room_message_txn(txn, event)
             elif event.type == EventTypes.Redaction:
                 self._store_redaction(txn, event)
 

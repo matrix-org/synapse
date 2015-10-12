@@ -44,7 +44,8 @@ INSERT INTO event_search SELECT
     FROM events NATURAL JOIN event_json WHERE type = 'm.room.topic';
 
 
-CREATE INDEX event_search_idx ON event_search USING gin(vector);
+CREATE INDEX event_search_fts_idx ON event_search USING gin(vector);
+CREATE INDEX event_search_ev_idx ON event_search(event_id);
 """
 
 

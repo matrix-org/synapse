@@ -65,7 +65,7 @@ class SearchHandler(BaseHandler):
         super(SearchHandler, self).__init__(hs)
 
     @defer.inlineCallbacks
-    def search(self, content):
+    def search(self, user, content):
         constraint_dicts = content["search_categories"]["room_events"]["constraints"]
         constraints = [RoomConstraint.from_dict(c)for c in constraint_dicts]
 
@@ -76,20 +76,33 @@ class SearchHandler(BaseHandler):
                     raise SynapseError(400, "Only one constraint can be FTS")
                 fts = True
 
-        res = yield self.hs.get_datastore().search_msgs(constraints)
+        rooms = yield self.store.get_rooms_for_user(
+            user.to_string(),
+        )
 
-        time_now = self.hs.get_clock().time_msec()
+        # For some reason the list of events contains duplicates
+        # TODO(paul): work out why because I really don't think it should
+        room_ids = set(r.room_id for r in rooms)
 
-        results = [
-            {
+        res = yield self.store.search_msgs(room_ids, constraints)
+
+        time_now = self.clock.time_msec()
+
+        results = {
+            r["result"].event_id: {
                 "rank": r["rank"],
                 "result": serialize_event(r["result"], time_now)
             }
             for r in res
-        ]
+        }
 
         logger.info("returning: %r", results)
 
-        results.sort(key=lambda r: -r["rank"])
-
-        defer.returnValue(results)
+        defer.returnValue({
+            "search_categories": {
+                "room_events": {
+                    "results": results,
+                    "count": len(results)
+                }
+            }
+        })

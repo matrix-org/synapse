@@ -175,6 +175,10 @@ class RoomStore(SQLBaseStore):
                 },
             )
 
+            self._store_event_search_txn(
+                txn, event, "content.topic", event.content["topic"]
+            )
+
     def _store_room_name_txn(self, txn, event):
         if hasattr(event, "content") and "name" in event.content:
             self._simple_insert_txn(
@@ -186,6 +190,24 @@ class RoomStore(SQLBaseStore):
                     "name": event.content["name"],
                 }
             )
+
+            self._store_event_search_txn(
+                txn, event, "content.name", event.content["name"]
+            )
+
+    def _store_room_message_txn(self, txn, event):
+        if hasattr(event, "content") and "body" in event.content:
+            self._store_event_search_txn(
+                txn, event, "content.body", event.content["body"]
+            )
+
+    def _store_event_search_txn(self, txn, event, key, value):
+        sql = (
+            "INSERT INTO event_search (event_id, room_id, key, vector)"
+            " VALUES (?,?,?,to_tsvector('english', ?))"
+        )
+
+        txn.execute(sql, (event.event_id, event.room_id, key, value,))
 
     @cachedInlineCallbacks()
     def get_room_name_and_aliases(self, room_id):

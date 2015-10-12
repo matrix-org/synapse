@@ -540,7 +540,7 @@ class SearchRestServlet(ClientV1RestServlet):
 
         content = _parse_json(request)
 
-        results = yield self.handlers.search_handler.search(content)
+        results = yield self.handlers.search_handler.search(auth_user, content)
 
         defer.returnValue((200, results))
 
