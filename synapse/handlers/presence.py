@@ -378,7 +378,7 @@ class PresenceHandler(BaseHandler):
 
         # TODO(paul): perform a presence push as part of start/stop poll so
         #   we don't have to do this all the time
-        self.changed_presencelike_data(target_user, state)
+        yield self.changed_presencelike_data(target_user, state)
 
     def bump_presence_active_time(self, user, now=None):
         if now is None:
@@ -422,12 +422,12 @@ class PresenceHandler(BaseHandler):
     @log_function
     def started_user_eventstream(self, user):
         # TODO(paul): Use "last online" state
-        self.set_state(user, user, {"presence": PresenceState.ONLINE})
+        return self.set_state(user, user, {"presence": PresenceState.ONLINE})
 
     @log_function
     def stopped_user_eventstream(self, user):
         # TODO(paul): Save current state as "last online" state
-        self.set_state(user, user, {"presence": PresenceState.OFFLINE})
+        return self.set_state(user, user, {"presence": PresenceState.OFFLINE})
 
     @defer.inlineCallbacks
     def user_joined_room(self, user, room_id):
@@ -1262,6 +1262,11 @@ class UserPresenceCache(object):
     def __init__(self):
         self.state = {"presence": PresenceState.OFFLINE}
         self.serial = None
+
+    def __repr__(self):
+        return "UserPresenceCache(state=%r, serial=%r)" % (
+            self.state, self.serial
+        )
 
     def update(self, state, serial):
         assert("mtime_age" not in state)
