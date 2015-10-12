@@ -30,7 +30,11 @@ logger = logging.getLogger(__name__)
 KEYS_TO_ALLOWED_CONSTRAINT_TYPES = {
     KnownRoomEventKeys.CONTENT_BODY: [SearchConstraintTypes.FTS],
     KnownRoomEventKeys.CONTENT_MSGTYPE: [SearchConstraintTypes.EXACT],
-    KnownRoomEventKeys.CONTENT_NAME: [SearchConstraintTypes.FTS, SearchConstraintTypes.EXACT, SearchConstraintTypes.SUBSTRING],
+    KnownRoomEventKeys.CONTENT_NAME: [
+        SearchConstraintTypes.FTS,
+        SearchConstraintTypes.EXACT,
+        SearchConstraintTypes.SUBSTRING,
+    ],
     KnownRoomEventKeys.CONTENT_TOPIC: [SearchConstraintTypes.FTS],
     KnownRoomEventKeys.SENDER: [SearchConstraintTypes.EXACT],
     KnownRoomEventKeys.ORIGIN_SERVER_TS: [SearchConstraintTypes.RANGE],
@@ -54,7 +58,10 @@ class RoomConstraint(object):
                 raise SynapseError(400, "Unrecognized key %r", key)
 
             if search_type not in KEYS_TO_ALLOWED_CONSTRAINT_TYPES[key]:
-                raise SynapseError(400, "Disallowed constraint type %r for key %r", search_type, key)
+                raise SynapseError(
+                    400,
+                    "Disallowed constraint type %r for key %r", search_type, key
+                )
 
         return cls(search_type, keys, d["value"])
 
