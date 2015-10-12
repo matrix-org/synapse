@@ -277,7 +277,7 @@ class SyncHandler(BaseHandler):
             for room_id in room_ids:
                 room_sync = yield self.incremental_sync_with_gap_for_room(
                     room_id, sync_config, since_token, now_token,
-                    published_room_ids, typing_by_room
+                    typing_by_room
                 )
                 if room_sync:
                     rooms.append(room_sync)
@@ -355,7 +355,7 @@ class SyncHandler(BaseHandler):
             )
             (room_key, _) = keys
             end_key = "s" + room_key.split('-')[-1]
-            loaded_recents = sync_config.filter.filter_room_events(events)
+            loaded_recents = sync_config.filter.filter_room_timeline(events)
             loaded_recents = yield self._filter_events_for_client(
                 sync_config.user.to_string(), room_id, loaded_recents,
             )
@@ -381,7 +381,7 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def incremental_sync_with_gap_for_room(self, room_id, sync_config,
                                            since_token, now_token,
-                                           published_room_ids, typing_by_room):
+                                           typing_by_room):
         """ Get the incremental delta needed to bring the client up to date for
         the room. Gives the client the most recent events and the changes to
         state.
