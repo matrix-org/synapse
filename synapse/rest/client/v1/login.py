@@ -177,6 +177,11 @@ class LoginRestServlet(ClientV1RestServlet):
             if child.tag.endswith("attributes"):
                 attributes = {}
                 for attribute in child:
+                    # ElementTree library expands the namespace in attribute tags
+                    # to the full URL of the namespace.
+                    # See (https://docs.python.org/2/library/xml.etree.elementtree.html)
+                    # We don't care about namespace here and it will always be encased in
+                    # curly braces, so we remove them.
                     if "}" in attribute.tag:
                         attributes[attribute.tag.split("}")[1]] = attribute.text
                     else:
