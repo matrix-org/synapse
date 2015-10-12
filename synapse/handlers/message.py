@@ -164,7 +164,7 @@ class MessageHandler(BaseHandler):
     @defer.inlineCallbacks
     def _filter_events_for_client(self, user_id, room_id, events):
         event_id_to_state = yield self.store.get_state_for_events(
-            room_id, frozenset(e.event_id for e in events),
+            frozenset(e.event_id for e in events),
             types=(
                 (EventTypes.RoomHistoryVisibility, ""),
                 (EventTypes.Member, user_id),
@@ -290,7 +290,7 @@ class MessageHandler(BaseHandler):
         elif member_event.membership == Membership.LEAVE:
             key = (event_type, state_key)
             room_state = yield self.store.get_state_for_events(
-                room_id, [member_event.event_id], [key]
+                [member_event.event_id], [key]
             )
             data = room_state[member_event.event_id].get(key)
 
@@ -314,7 +314,7 @@ class MessageHandler(BaseHandler):
             room_state = yield self.state_handler.get_current_state(room_id)
         elif member_event.membership == Membership.LEAVE:
             room_state = yield self.store.get_state_for_events(
-                room_id, [member_event.event_id], None
+                [member_event.event_id], None
             )
             room_state = room_state[member_event.event_id]
 
@@ -403,7 +403,7 @@ class MessageHandler(BaseHandler):
                 elif event.membership == Membership.LEAVE:
                     room_end_token = "s%d" % (event.stream_ordering,)
                     deferred_room_state = self.store.get_state_for_events(
-                        event.room_id, [event.event_id], None
+                        [event.event_id], None
                     )
                     deferred_room_state.addCallback(
                         lambda states: states[event.event_id]
@@ -496,7 +496,7 @@ class MessageHandler(BaseHandler):
     def _room_initial_sync_parted(self, user_id, room_id, pagin_config,
                                   member_event):
         room_state = yield self.store.get_state_for_events(
-            member_event.room_id, [member_event.event_id], None
+            [member_event.event_id], None
         )
 
         room_state = room_state[member_event.event_id]
