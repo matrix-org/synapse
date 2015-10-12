@@ -74,7 +74,7 @@ class SearchHandler(BaseHandler):
         super(SearchHandler, self).__init__(hs)
 
     @defer.inlineCallbacks
-    def _filter_events_for_client(self, user_id, room_id, events):
+    def _filter_events_for_client(self, user_id, events):
         event_id_to_state = yield self.store.get_state_for_events(
             frozenset(e.event_id for e in events),
             types=(
@@ -139,16 +139,20 @@ class SearchHandler(BaseHandler):
         # TODO(paul): work out why because I really don't think it should
         room_ids = set(r.room_id for r in rooms)
 
-        res = yield self.store.search_msgs(room_ids, constraints)
+        rank_map, event_map = yield self.store.search_msgs(room_ids, constraints)
+
+        allowed_events = yield self._filter_events_for_client(
+            user.to_string(), event_map.values()
+        )
 
         time_now = self.clock.time_msec()
 
         results = {
-            r["result"].event_id: {
-                "rank": r["rank"],
-                "result": serialize_event(r["result"], time_now)
+            e.event_id: {
+                "rank": rank_map[e.event_id],
+                "result": serialize_event(e, time_now)
             }
-            for r in res
+            for e in allowed_events
         }
 
         logger.info("returning: %r", results)

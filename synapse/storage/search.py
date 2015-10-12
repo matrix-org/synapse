@@ -70,11 +70,11 @@ class SearchStore(SQLBaseStore):
             for ev in events
         }
 
-        defer.returnValue([
+        defer.returnValue((
             {
-                "rank": r["rank"],
-                "result": event_map[r["event_id"]]
-            }
-            for r in results
-            if r["event_id"] in event_map
-        ])
+                r["event_id"]: r["rank"]
+                for r in results
+                if r["event_id"] in event_map
+            },
+            event_map
+        ))
