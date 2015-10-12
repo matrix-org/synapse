@@ -27,7 +27,7 @@ class CasConfig(Config):
         if cas_config:
             self.cas_enabled = True
             self.cas_server_url = cas_config["server_url"]
-            self.cas_required_attributes = cas_config.get("required_attributes", None)
+            self.cas_required_attributes = cas_config.get("required_attributes", {})
         else:
             self.cas_enabled = False
             self.cas_server_url = None
