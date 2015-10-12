@@ -27,13 +27,28 @@ class CasConfig(Config):
         if cas_config:
             self.cas_enabled = True
             self.cas_server_url = cas_config["server_url"]
+
+            if "required_attribute" in cas_config:
+                self.cas_required_attribute = cas_config["required_attribute"]
+            else:
+                self.cas_required_attribute = None
+
+            if "required_attribute_value" in cas_config:
+                self.cas_required_attribute_value = cas_config["required_attribute_value"]
+            else:
+                self.cas_required_attribute_value = None
+
         else:
             self.cas_enabled = False
             self.cas_server_url = None
+            self.cas_required_attribute = None
+            self.cas_required_attribute_value = None
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable CAS for registration and login.
         #cas_config:
         #   server_url: "https://cas-server.com"
+        #   #required_attribute: something
+        #   #required_attribute_value: true
         """
