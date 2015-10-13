@@ -15,7 +15,8 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, LoginError, Codes
+from synapse.http.client import SimpleHttpClient
 from synapse.types import UserID
 from base import ClientV1RestServlet, client_path_pattern
 
@@ -27,6 +28,8 @@ from saml2 import BINDING_HTTP_POST
 from saml2 import config
 from saml2.client import Saml2Client
 
+import xml.etree.ElementTree as ET
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +38,23 @@ class LoginRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/login$")
     PASS_TYPE = "m.login.password"
     SAML2_TYPE = "m.login.saml2"
+    CAS_TYPE = "m.login.cas"
 
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__(hs)
         self.idp_redirect_url = hs.config.saml2_idp_redirect_url
         self.saml2_enabled = hs.config.saml2_enabled
+        self.cas_enabled = hs.config.cas_enabled
+        self.cas_server_url = hs.config.cas_server_url
+        self.cas_required_attributes = hs.config.cas_required_attributes
+        self.servername = hs.config.server_name
 
     def on_GET(self, request):
         flows = [{"type": LoginRestServlet.PASS_TYPE}]
         if self.saml2_enabled:
             flows.append({"type": LoginRestServlet.SAML2_TYPE})
+        if self.cas_enabled:
+            flows.append({"type": LoginRestServlet.CAS_TYPE})
         return (200, {"flows": flows})
 
     def on_OPTIONS(self, request):
@@ -67,6 +77,19 @@ class LoginRestServlet(ClientV1RestServlet):
                     "uri": "%s%s" % (self.idp_redirect_url, relay_state)
                 }
                 defer.returnValue((200, result))
+            elif self.cas_enabled and (login_submission["type"] ==
+                                       LoginRestServlet.CAS_TYPE):
+                # TODO: get this from the homeserver rather than creating a new one for
+                # each request
+                http_client = SimpleHttpClient(self.hs)
+                uri = "%s/proxyValidate" % (self.cas_server_url,)
+                args = {
+                    "ticket": login_submission["ticket"],
+                    "service": login_submission["service"]
+                }
+                body = yield http_client.get_raw(uri, args)
+                result = yield self.do_cas_login(body)
+                defer.returnValue(result)
             else:
                 raise SynapseError(400, "Bad login type.")
         except KeyError:
@@ -99,6 +122,74 @@ class LoginRestServlet(ClientV1RestServlet):
         }
 
         defer.returnValue((200, result))
+
+    @defer.inlineCallbacks
+    def do_cas_login(self, cas_response_body):
+        user, attributes = self.parse_cas_response(cas_response_body)
+
+        for required_attribute, required_value in self.cas_required_attributes.items():
+            # If required attribute was not in CAS Response - Forbidden
+            if required_attribute not in attributes:
+                raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
+
+            # Also need to check value
+            if required_value is not None:
+                actual_value = attributes[required_attribute]
+                # If required attribute value does not match expected - Forbidden
+                if required_value != actual_value:
+                    raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
+
+        user_id = UserID.create(user, self.hs.hostname).to_string()
+        auth_handler = self.handlers.auth_handler
+        user_exists = yield auth_handler.does_user_exist(user_id)
+        if user_exists:
+            user_id, access_token, refresh_token = (
+                yield auth_handler.login_with_cas_user_id(user_id)
+            )
+            result = {
+                "user_id": user_id,  # may have changed
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "home_server": self.hs.hostname,
+            }
+
+        else:
+            user_id, access_token = (
+                yield self.handlers.registration_handler.register(localpart=user)
+            )
+            result = {
+                "user_id": user_id,  # may have changed
+                "access_token": access_token,
+                "home_server": self.hs.hostname,
+            }
+
+        defer.returnValue((200, result))
+
+    def parse_cas_response(self, cas_response_body):
+        root = ET.fromstring(cas_response_body)
+        if not root.tag.endswith("serviceResponse"):
+            raise LoginError(401, "Invalid CAS response", errcode=Codes.UNAUTHORIZED)
+        if not root[0].tag.endswith("authenticationSuccess"):
+            raise LoginError(401, "Unsuccessful CAS response", errcode=Codes.UNAUTHORIZED)
+        for child in root[0]:
+            if child.tag.endswith("user"):
+                user = child.text
+            if child.tag.endswith("attributes"):
+                attributes = {}
+                for attribute in child:
+                    # ElementTree library expands the namespace in attribute tags
+                    # to the full URL of the namespace.
+                    # See (https://docs.python.org/2/library/xml.etree.elementtree.html)
+                    # We don't care about namespace here and it will always be encased in
+                    # curly braces, so we remove them.
+                    if "}" in attribute.tag:
+                        attributes[attribute.tag.split("}")[1]] = attribute.text
+                    else:
+                        attributes[attribute.tag] = attribute.text
+        if user is None or attributes is None:
+            raise LoginError(401, "Invalid CAS response", errcode=Codes.UNAUTHORIZED)
+
+        return (user, attributes)
 
 
 class LoginFallbackRestServlet(ClientV1RestServlet):
@@ -174,6 +265,17 @@ class SAML2RestServlet(ClientV1RestServlet):
         defer.returnValue((200, {"status": "not_authenticated"}))
 
 
+class CasRestServlet(ClientV1RestServlet):
+    PATTERN = client_path_pattern("/login/cas")
+
+    def __init__(self, hs):
+        super(CasRestServlet, self).__init__(hs)
+        self.cas_server_url = hs.config.cas_server_url
+
+    def on_GET(self, request):
+        return (200, {"serverUrl": self.cas_server_url})
+
+
 def _parse_json(request):
     try:
         content = json.loads(request.content.read())
@@ -188,4 +290,6 @@ def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
     if hs.config.saml2_enabled:
         SAML2RestServlet(hs).register(http_server)
+    if hs.config.cas_enabled:
+        CasRestServlet(hs).register(http_server)
     # TODO PasswordResetRestServlet(hs).register(http_server)
