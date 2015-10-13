@@ -498,8 +498,8 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             if "mxid" in data:
                 # TODO: Validate the response signature and such
                 defer.returnValue(data["mxid"])
-        except IOError:
-            # TODO: Log something maybe?
+        except IOError as e:
+            logger.warn("Error from identity server lookup: %s" % (e,))
             defer.returnValue(None)
 
     @defer.inlineCallbacks
