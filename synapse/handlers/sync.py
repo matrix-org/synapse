@@ -297,12 +297,8 @@ class SyncHandler(BaseHandler):
                 if room_sync:
                     joined.append(room_sync)
         else:
-            invites = yield self.store.get_rooms_for_user_where_membership_is(
-                user_id=sync_config.user.to_string(),
-                membership_list=[Membership.INVITE],
-            )
-            invite_events = yield self.store.get_events(
-                [invite.event_id for invite in invites]
+            invite_events = yield self.store.get_invites_for_user(
+                sync_config.user.to_string()
             )
 
             for room_id in joined_room_ids:
