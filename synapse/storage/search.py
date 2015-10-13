@@ -54,7 +54,7 @@ class SearchStore(SQLBaseStore):
         for clause in clauses:
             sql += " AND " + clause
 
-        sql += " ORDER BY rank DESC"
+        sql += " ORDER BY rank DESC LIMIT 500"
 
         results = yield self._execute(
             "search_msgs", self.cursor_to_dict, sql, *([search_term] + args)
