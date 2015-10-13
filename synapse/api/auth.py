@@ -374,6 +374,21 @@ class Auth(object):
         return True
 
     def _verify_third_party_invite(self, event, auth_events):
+        """
+        Validates that the join event is authorized by a previous third-party invite.
+
+        Checks that the public key, and keyserver, match those in the invite,
+        and that the join event has a signature issued using that public key.
+
+        Args:
+            event: The m.room.member join event being validated.
+            auth_events: All relevant previous context events which may be used
+                for authorization decisions.
+
+        Return:
+            True if the event fulfills the expectations of a previous third party
+            invite event.
+        """
         if not ThirdPartyInvites.join_has_third_party_invite(event.content):
             return False
         join_third_party_invite = event.content["third_party_invite"]
