@@ -27,7 +27,7 @@ from synapse.api.errors import FederationError, SynapseError, Codes
 
 from synapse.crypto.event_signing import compute_event_signature
 
-from synapse.util.thirdpartyinvites import ThirdPartyInvites
+from synapse.util import third_party_invites
 
 import simplejson as json
 import logging
@@ -232,8 +232,8 @@ class FederationServer(FederationBase):
     @defer.inlineCallbacks
     def on_make_join_request(self, room_id, user_id, query):
         threepid_details = {}
-        if ThirdPartyInvites.has_join_keys(query):
-            for k in ThirdPartyInvites.JOIN_KEYS:
+        if third_party_invites.has_join_keys(query):
+            for k in third_party_invites.JOIN_KEYS:
                 if not isinstance(query[k], list) or len(query[k]) != 1:
                     raise FederationError(
                         "FATAL",

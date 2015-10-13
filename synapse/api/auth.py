@@ -22,7 +22,7 @@ from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.types import RoomID, UserID, EventID
 from synapse.util.logutils import log_function
-from synapse.util.thirdpartyinvites import ThirdPartyInvites
+from synapse.util import third_party_invites
 from unpaddedbase64 import decode_base64
 
 import logging
@@ -389,7 +389,7 @@ class Auth(object):
             True if the event fulfills the expectations of a previous third party
             invite event.
         """
-        if not ThirdPartyInvites.join_has_third_party_invite(event.content):
+        if not third_party_invites.join_has_third_party_invite(event.content):
             return False
         join_third_party_invite = event.content["third_party_invite"]
         token = join_third_party_invite["token"]
@@ -692,7 +692,7 @@ class Auth(object):
             if e_type == Membership.JOIN:
                 if member_event and not is_public:
                     auth_ids.append(member_event.event_id)
-                if ThirdPartyInvites.join_has_third_party_invite(event.content):
+                if third_party_invites.join_has_third_party_invite(event.content):
                     key = (
                         EventTypes.ThirdPartyInvite,
                         event.content["third_party_invite"]["token"]

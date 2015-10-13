@@ -26,7 +26,7 @@ from synapse.events.utils import serialize_event
 import simplejson as json
 import logging
 import urllib
-from synapse.util.thirdpartyinvites import ThirdPartyInvites
+from synapse.util import third_party_invites
 
 logger = logging.getLogger(__name__)
 
@@ -415,7 +415,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         # target user is you unless it is an invite
         state_key = user.to_string()
 
-        if membership_action == "invite" and ThirdPartyInvites.has_invite_keys(content):
+        if membership_action == "invite" and third_party_invites.has_invite_keys(content):
             yield self.handlers.room_member_handler.do_3pid_invite(
                 room_id,
                 user,
@@ -446,9 +446,10 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             "membership": unicode(membership_action),
         }
 
-        if membership_action == "join" and ThirdPartyInvites.has_join_keys(content):
-            event_content["third_party_invite"] = {}
-            ThirdPartyInvites.copy_join_keys(content, event_content["third_party_invite"])
+        if membership_action == "join" and third_party_invites.has_join_keys(content):
+            event_content["third_party_invite"] = (
+                third_party_invites.extract_join_keys(content)
+            )
 
         yield msg_handler.create_and_send_event(
             {

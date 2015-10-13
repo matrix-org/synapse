@@ -25,7 +25,7 @@ from synapse.api.errors import (
 from synapse.util import unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
-from synapse.util.thirdpartyinvites import ThirdPartyInvites
+from synapse.util import third_party_invites
 from synapse.events import FrozenEvent
 import synapse.metrics
 
@@ -363,8 +363,8 @@ class FederationClient(FederationBase):
                 continue
 
             args = {}
-            if ThirdPartyInvites.join_has_third_party_invite(content):
-                ThirdPartyInvites.copy_join_keys(content["third_party_invite"], args)
+            if third_party_invites.join_has_third_party_invite(content):
+                args = third_party_invites.extract_join_keys(content)
             try:
                 ret = yield self.transport_layer.make_join(
                     destination, room_id, user_id, args

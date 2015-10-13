@@ -39,7 +39,7 @@ from twisted.internet import defer
 
 import itertools
 import logging
-from synapse.util.thirdpartyinvites import ThirdPartyInvites
+from synapse.util import third_party_invites
 
 logger = logging.getLogger(__name__)
 
@@ -704,9 +704,10 @@ class FederationHandler(BaseHandler):
         process it until the other server has signed it and sent it back.
         """
         event_content = {"membership": Membership.JOIN}
-        if ThirdPartyInvites.has_join_keys(query):
-            event_content["third_party_invite"] = {}
-            ThirdPartyInvites.copy_join_keys(query, event_content["third_party_invite"])
+        if third_party_invites.has_join_keys(query):
+            event_content["third_party_invite"] = (
+                third_party_invites.extract_join_keys(query)
+            )
 
         builder = self.event_builder_factory.new({
             "type": EventTypes.Member,
@@ -722,8 +723,8 @@ class FederationHandler(BaseHandler):
 
         self.auth.check(event, auth_events=context.current_state)
 
-        if ThirdPartyInvites.join_has_third_party_invite(event.content):
-            ThirdPartyInvites.check_key_valid(self.hs.get_simple_http_client(), event)
+        if third_party_invites.join_has_third_party_invite(event.content):
+            third_party_invites.check_key_valid(self.hs.get_simple_http_client(), event)
 
         defer.returnValue(event)
 
