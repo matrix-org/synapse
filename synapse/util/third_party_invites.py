@@ -66,4 +66,4 @@ def check_key_valid(http_client, event):
         if not response["valid"]:
             raise AuthError(403, "Third party certificate was invalid")
     except IOError:
-        raise AuthError(403, "Third party certificate could not be checked")
+        raise AuthError(502, "Third party certificate could not be checked")
