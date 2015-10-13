@@ -132,13 +132,17 @@ class SyncRestServlet(RestServlet):
             sync_result.joined, filter, time_now, token_id
         )
 
+        invited = self.encode_invited(
+            sync_result.invited, filter, time_now, token_id
+        )
+
         response_content = {
             "presence": self.encode_presence(
                 sync_result.presence, filter, time_now
             ),
             "rooms": {
                 "joined": joined,
-                "invited": {},
+                "invited": invited,
                 "archived": {},
             },
             "next_batch": sync_result.next_batch.to_string(),
@@ -162,6 +166,21 @@ class SyncRestServlet(RestServlet):
             )
 
         return joined
+
+    def encode_invited(self, rooms, filter, time_now, token_id):
+        invited = {}
+        for room in rooms:
+            invite = serialize_event(
+                room.invite, time_now, token_id=token_id,
+                event_format=format_event_for_client_v2_without_event_id,
+            )
+            invited_state = invite.get("unsigned", {}).pop("invite_room_state", [])
+            invited_state.append(invite)
+            invited[room.room_id] = {
+                "invite_state": { "events": invited_state }
+            }
+
+        return invited
 
     @staticmethod
     def encode_room(room, filter, time_now, token_id):

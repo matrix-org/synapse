@@ -63,15 +63,9 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
 
 class InvitedSyncResult(collections.namedtuple("InvitedSyncResult", [
     "room_id",
-    "invite_state",
+    "invite",
 ])):
     __slots__ = []
-
-    def __nonzero__(self):
-        """Make the result appear empty if there are no updates. This is used
-        to tell if room needs to be part of the sync result.
-        """
-        return bool(self.invite_state)
 
 
 class SyncResult(collections.namedtuple("SyncResult", [
@@ -166,6 +160,7 @@ class SyncHandler(BaseHandler):
         )
 
         joined = []
+        invited = []
         for event in room_list:
             if event.membership == Membership.JOIN:
                 room_sync = yield self.initial_sync_for_room(
@@ -173,15 +168,16 @@ class SyncHandler(BaseHandler):
                 )
                 joined.append(room_sync)
             elif event.membership == Membership.INVITE:
+                invite = yield self.store.get_event(event.event_id)
                 invited.append(InvitedSyncResult(
                     room_id=event.room_id,
-                    invited_state=[event],
-                )
+                    invite=invite,
+                ))
 
         defer.returnValue(SyncResult(
             presence=presence,
             joined=joined,
-            invited=[],
+            invited=invited,
             next_batch=now_token,
         ))
 
