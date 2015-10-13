@@ -16,7 +16,7 @@
 from synapse.http.server import HttpServer
 from synapse.api.errors import cs_error, CodeMessageException, StoreError
 from synapse.api.constants import EventTypes
-from synapse.storage import prepare_database
+from synapse.storage.prepare_database import prepare_database
 from synapse.storage.engines import create_engine
 from synapse.server import HomeServer
 
