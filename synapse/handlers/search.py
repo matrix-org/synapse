@@ -131,12 +131,9 @@ class SearchHandler(BaseHandler):
                     raise SynapseError(400, "Only one constraint can be FTS")
                 fts = True
 
-        rooms = yield self.store.get_rooms_for_user(
-            user.to_string(),
+        rooms = yield self.store.get_rooms_for_user_where_membership_is(
+            user.to_string(), membership_list=[Membership.JOIN, Membership.LEAVE],
         )
-
-        # For some reason the list of events contains duplicates
-        # TODO(paul): work out why because I really don't think it should
         room_ids = set(r.room_id for r in rooms)
 
         rank_map, event_map = yield self.store.search_msgs(room_ids, constraints)
