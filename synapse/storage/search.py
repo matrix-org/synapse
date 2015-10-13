@@ -17,6 +17,7 @@ from twisted.internet import defer
 
 from _base import SQLBaseStore
 from synapse.api.constants import KnownRoomEventKeys, SearchConstraintTypes
+from synapse.storage.engines import PostgresEngine
 
 
 class SearchStore(SQLBaseStore):
@@ -48,11 +49,17 @@ class SearchStore(SQLBaseStore):
                 "(%s)" % (" OR ".join(local_clauses),)
             )
 
-        sql = (
-            "SELECT ts_rank_cd(vector, query) AS rank, event_id"
-            " FROM plainto_tsquery('english', ?) as query, event_search"
-            " WHERE vector @@ query"
-        )
+        if isinstance(self.database_engine, PostgresEngine):
+            sql = (
+                "SELECT ts_rank_cd(vector, query) AS rank, event_id"
+                " FROM plainto_tsquery('english', ?) as query, event_search"
+                " WHERE vector @@ query"
+            )
+        else:
+            sql = (
+                "SELECT 0 as rank, event_id FROM event_search"
+                " WHERE value MATCH ?"
+            )
 
         for clause in clauses:
             sql += " AND " + clause
