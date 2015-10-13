@@ -456,7 +456,8 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         }
 
         if membership_action == "join" and ThirdPartyInvites.has_join_keys(content):
-            ThirdPartyInvites.copy_join_keys(content, event_content)
+            event_content["third_party_invite"] = {}
+            ThirdPartyInvites.copy_join_keys(content, event_content["third_party_invite"])
 
         yield msg_handler.create_and_send_event(
             {

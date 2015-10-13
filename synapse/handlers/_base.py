@@ -127,7 +127,7 @@ class BaseHandler(object):
         if (
             event.type == EventTypes.Member and
             event.content["membership"] == Membership.JOIN and
-            ThirdPartyInvites.has_join_keys(event.content)
+            ThirdPartyInvites.join_has_third_party_invite(event.content)
         ):
             yield ThirdPartyInvites.check_key_valid(
                 self.hs.get_simple_http_client(),

@@ -43,6 +43,12 @@ class ThirdPartyInvites(object):
         return True
 
     @classmethod
+    def join_has_third_party_invite(cls, content):
+        if "third_party_invite" not in content:
+            return False
+        return cls.has_join_keys(content["third_party_invite"])
+
+    @classmethod
     def copy_join_keys(cls, src, dst):
         for key in cls.JOIN_KEYS:
             if key in src:
@@ -53,8 +59,8 @@ class ThirdPartyInvites(object):
     def check_key_valid(cls, http_client, event):
         try:
             response = yield http_client.get_json(
-                event.content["key_validity_url"],
-                {"public_key": event.content["public_key"]}
+                event.content["third_party_invite"]["key_validity_url"],
+                {"public_key": event.content["third_party_invite"]["public_key"]}
             )
             if not response["valid"]:
                 raise AuthError(403, "Third party certificate was invalid")

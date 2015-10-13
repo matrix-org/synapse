@@ -705,7 +705,8 @@ class FederationHandler(BaseHandler):
         """
         event_content = {"membership": Membership.JOIN}
         if ThirdPartyInvites.has_join_keys(query):
-            ThirdPartyInvites.copy_join_keys(query, event_content)
+            event_content["third_party_invite"] = {}
+            ThirdPartyInvites.copy_join_keys(query, event_content["third_party_invite"])
 
         builder = self.event_builder_factory.new({
             "type": EventTypes.Member,
@@ -721,7 +722,7 @@ class FederationHandler(BaseHandler):
 
         self.auth.check(event, auth_events=context.current_state)
 
-        if ThirdPartyInvites.has_join_keys(event.content):
+        if ThirdPartyInvites.join_has_third_party_invite(event.content):
             ThirdPartyInvites.check_key_valid(self.hs.get_simple_http_client(), event)
 
         defer.returnValue(event)

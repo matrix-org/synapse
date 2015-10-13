@@ -374,24 +374,24 @@ class Auth(object):
         return True
 
     def _verify_third_party_invite(self, event, auth_events):
-        for key in ThirdPartyInvites.JOIN_KEYS:
-            if key not in event.content:
-                return False
-        token = event.content["token"]
+        if not ThirdPartyInvites.join_has_third_party_invite(event.content):
+            return False
+        join_third_party_invite = event.content["third_party_invite"]
+        token = join_third_party_invite["token"]
         invite_event = auth_events.get(
             (EventTypes.ThirdPartyInvite, token,)
         )
         if not invite_event:
             return False
         try:
-            public_key = event.content["public_key"]
-            key_validity_url = event.content["key_validity_url"]
+            public_key = join_third_party_invite["public_key"]
+            key_validity_url = join_third_party_invite["key_validity_url"]
             if invite_event.content["public_key"] != public_key:
                 return False
             if invite_event.content["key_validity_url"] != key_validity_url:
                 return False
             verify_key = nacl.signing.VerifyKey(decode_base64(public_key))
-            encoded_signature = event.content["signature"]
+            encoded_signature = join_third_party_invite["signature"]
             signature = decode_base64(encoded_signature)
             verify_key.verify(token, signature)
             return True
@@ -677,8 +677,11 @@ class Auth(object):
             if e_type == Membership.JOIN:
                 if member_event and not is_public:
                     auth_ids.append(member_event.event_id)
-                if ThirdPartyInvites.has_join_keys(event.content):
-                    key = (EventTypes.ThirdPartyInvite, event.content["token"])
+                if ThirdPartyInvites.join_has_third_party_invite(event.content):
+                    key = (
+                        EventTypes.ThirdPartyInvite,
+                        event.content["third_party_invite"]["token"]
+                    )
                     invite = current_state.get(key)
                     if invite:
                         auth_ids.append(invite.event_id)
