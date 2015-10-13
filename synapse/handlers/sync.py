@@ -46,7 +46,7 @@ class TimelineBatch(collections.namedtuple("TimelineBatch", [
         return bool(self.events)
 
 
-class RoomSyncResult(collections.namedtuple("RoomSyncResult", [
+class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "room_id",
     "timeline",
     "state",
@@ -61,10 +61,24 @@ class RoomSyncResult(collections.namedtuple("RoomSyncResult", [
         return bool(self.timeline or self.state or self.ephemeral)
 
 
+class InvitedSyncResult(collections.namedtuple("InvitedSyncResult", [
+    "room_id",
+    "invite_state",
+])):
+    __slots__ = []
+
+    def __nonzero__(self):
+        """Make the result appear empty if there are no updates. This is used
+        to tell if room needs to be part of the sync result.
+        """
+        return bool(self.invite_state)
+
+
 class SyncResult(collections.namedtuple("SyncResult", [
     "next_batch",  # Token for the next sync
     "presence",  # List of presence events for the user.
-    "rooms",  # RoomSyncResult for each room.
+    "joined",  # JoinedSyncResult for each joined room.
+    "invited",  # InvitedSyncResult for each invited room.
 ])):
     __slots__ = []
 
@@ -151,24 +165,31 @@ class SyncHandler(BaseHandler):
             membership_list=[Membership.INVITE, Membership.JOIN]
         )
 
-        rooms = []
+        joined = []
         for event in room_list:
-            room_sync = yield self.initial_sync_for_room(
-                event.room_id, sync_config, now_token,
-            )
-            rooms.append(room_sync)
+            if event.membership == Membership.JOIN:
+                room_sync = yield self.initial_sync_for_room(
+                    event.room_id, sync_config, now_token,
+                )
+                joined.append(room_sync)
+            elif event.membership == Membership.INVITE:
+                invited.append(InvitedSyncResult(
+                    room_id=event.room_id,
+                    invited_state=[event],
+                )
 
         defer.returnValue(SyncResult(
             presence=presence,
-            rooms=rooms,
+            joined=joined,
+            invited=[],
             next_batch=now_token,
         ))
 
     @defer.inlineCallbacks
-    def initial_sync_for_room(self, room_id, sync_config, now_token):
+    def initial_sync_for_joined_room(self, room_id, sync_config, now_token):
         """Sync a room for a client which is starting without any state
         Returns:
-            A Deferred RoomSyncResult.
+            A Deferred JoinedSyncResult.
         """
 
         batch = yield self.load_filtered_recents(
@@ -180,7 +201,7 @@ class SyncHandler(BaseHandler):
         )
         current_state_events = current_state.values()
 
-        defer.returnValue(RoomSyncResult(
+        defer.returnValue(JoinedSyncResult(
             room_id=room_id,
             timeline=batch,
             state=current_state_events,
@@ -239,7 +260,7 @@ class SyncHandler(BaseHandler):
             limit=timeline_limit + 1,
         )
 
-        rooms = []
+        joined = []
         if len(room_events) <= timeline_limit:
             # There is no gap in any of the rooms. Therefore we can just
             # partition the new events by room and return them.
@@ -261,7 +282,7 @@ class SyncHandler(BaseHandler):
                     sync_config, room_id, state
                 )
 
-                room_sync = RoomSyncResult(
+                room_sync = JoinedSyncResult(
                     room_id=room_id,
                     timeline=TimelineBatch(
                         events=recents,
@@ -272,7 +293,7 @@ class SyncHandler(BaseHandler):
                     ephemeral=typing_by_room.get(room_id, [])
                 )
                 if room_sync:
-                    rooms.append(room_sync)
+                    joined.append(room_sync)
         else:
             for room_id in room_ids:
                 room_sync = yield self.incremental_sync_with_gap_for_room(
@@ -280,11 +301,12 @@ class SyncHandler(BaseHandler):
                     typing_by_room
                 )
                 if room_sync:
-                    rooms.append(room_sync)
+                    joined.append(room_sync)
 
         defer.returnValue(SyncResult(
             presence=presence,
-            rooms=rooms,
+            joined=joined,
+            invited=[],
             next_batch=now_token,
         ))
 
@@ -386,7 +408,7 @@ class SyncHandler(BaseHandler):
         the room. Gives the client the most recent events and the changes to
         state.
         Returns:
-            A Deferred RoomSyncResult
+            A Deferred JoinedSyncResult
         """
 
         # TODO(mjark): Check for redactions we might have missed.
@@ -418,7 +440,7 @@ class SyncHandler(BaseHandler):
             sync_config, room_id, state_events_delta
         )
 
-        room_sync = RoomSyncResult(
+        room_sync = JoinedSyncResult(
             room_id=room_id,
             timeline=batch,
             state=state_events_delta,

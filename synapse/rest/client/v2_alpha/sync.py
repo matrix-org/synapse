@@ -128,15 +128,19 @@ class SyncRestServlet(RestServlet):
 
         time_now = self.clock.time_msec()
 
-        rooms = self.encode_rooms(
-            sync_result.rooms, filter, time_now, token_id
+        joined = self.encode_joined(
+            sync_result.joined, filter, time_now, token_id
         )
 
         response_content = {
             "presence": self.encode_presence(
                 sync_result.presence, filter, time_now
             ),
-            "rooms": rooms,
+            "rooms": {
+                "joined": joined,
+                "invited": {},
+                "archived": {},
+            },
             "next_batch": sync_result.next_batch.to_string(),
         }
 
@@ -150,18 +154,14 @@ class SyncRestServlet(RestServlet):
             formatted.append(event)
         return {"events": filter.filter_presence(formatted)}
 
-    def encode_rooms(self, rooms, filter, time_now, token_id):
+    def encode_joined(self, rooms, filter, time_now, token_id):
         joined = {}
         for room in rooms:
             joined[room.room_id] = self.encode_room(
                 room, filter, time_now, token_id
             )
 
-        return {
-            "joined": joined,
-            "invited": {},
-            "archived": {},
-        }
+        return joined
 
     @staticmethod
     def encode_room(room, filter, time_now, token_id):
