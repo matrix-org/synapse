@@ -17,19 +17,24 @@ from twisted.internet import defer, reactor
 from functools import wraps
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 
-def with_logging_context(fn):
-    context = LoggingContext.current_context()
-    def restore_context_callback(x):
-        with PreserveLoggingContext():
-            LoggingContext.thread_local.current_context = context
-            return fn(x)
-    return restore_context_callback
 
 def debug_deferreds():
     """Cause all deferreds to wait for a reactor tick before running their
     callbacks. This increases the chance of getting a stack trace out of
     a defer.inlineCallback since the code waiting on the deferred will get
     a chance to add an errback before the deferred runs."""
+
+    # Helper method for retrieving and restoring the current logging context
+    # around a callback.
+    def with_logging_context(fn):
+        context = LoggingContext.current_context()
+
+        def restore_context_callback(x):
+            with PreserveLoggingContext():
+                LoggingContext.thread_local.current_context = context
+                return fn(x)
+
+        return restore_context_callback
 
     # We are going to modify the __init__ method of defer.Deferred so we
     # need to get a copy of the old method so we can still call it.
@@ -65,4 +70,3 @@ def debug_deferreds():
         self.addCallbacks(bounce_callback, bounce_errback)
 
     defer.Deferred.__init__ = new__init__
-
