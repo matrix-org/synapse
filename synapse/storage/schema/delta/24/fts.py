@@ -14,7 +14,7 @@
 
 import logging
 
-from synapse.storage.schema_prepare import get_statements
+from synapse.storage.prepare_database import get_statements
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 import ujson

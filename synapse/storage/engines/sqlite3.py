@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.schema_prepare import (
+from synapse.storage.prepare_database import (
     prepare_database, prepare_sqlite3_database
 )
 
