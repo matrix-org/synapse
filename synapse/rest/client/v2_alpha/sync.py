@@ -177,7 +177,7 @@ class SyncRestServlet(RestServlet):
             invited_state = invite.get("unsigned", {}).pop("invite_room_state", [])
             invited_state.append(invite)
             invited[room.room_id] = {
-                "invite_state": { "events": invited_state }
+                "invite_state": {"events": invited_state}
             }
 
         return invited

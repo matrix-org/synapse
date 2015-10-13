@@ -163,7 +163,7 @@ class SyncHandler(BaseHandler):
         invited = []
         for event in room_list:
             if event.membership == Membership.JOIN:
-                room_sync = yield self.initial_sync_for_room(
+                room_sync = yield self.initial_sync_for_joined_room(
                     event.room_id, sync_config, now_token,
                 )
                 joined.append(room_sync)
@@ -240,9 +240,9 @@ class SyncHandler(BaseHandler):
         )
         if app_service:
             rooms = yield self.store.get_app_service_rooms(app_service)
-            room_ids = set(r.room_id for r in rooms)
+            joined_room_ids = set(r.room_id for r in rooms)
         else:
-            room_ids = yield rm_handler.get_joined_rooms_for_user(
+            joined_room_ids = yield rm_handler.get_joined_rooms_for_user(
                 sync_config.user
             )
 
@@ -260,11 +260,17 @@ class SyncHandler(BaseHandler):
         if len(room_events) <= timeline_limit:
             # There is no gap in any of the rooms. Therefore we can just
             # partition the new events by room and return them.
+            invite_events = []
             events_by_room_id = {}
             for event in room_events:
                 events_by_room_id.setdefault(event.room_id, []).append(event)
+                if event.room_id not in joined_room_ids:
+                    if (event.type == EventTypes.Member
+                            and event.membership == Membership.INVITE
+                            and event.state_key == sync_config.user.to_string()):
+                        invite_events.append(event)
 
-            for room_id in room_ids:
+            for room_id in joined_room_ids:
                 recents = events_by_room_id.get(room_id, [])
                 state = [event for event in recents if event.is_state()]
                 if recents:
@@ -291,7 +297,15 @@ class SyncHandler(BaseHandler):
                 if room_sync:
                     joined.append(room_sync)
         else:
-            for room_id in room_ids:
+            invites = yield self.store.get_rooms_for_user_where_membership_is(
+                user_id=sync_config.user.to_string(),
+                membership_list=[Membership.INVITE],
+            )
+            invite_events = yield self.store.get_events(
+                [invite.event_id for invite in invites]
+            )
+
+            for room_id in joined_room_ids:
                 room_sync = yield self.incremental_sync_with_gap_for_room(
                     room_id, sync_config, since_token, now_token,
                     typing_by_room
@@ -299,10 +313,15 @@ class SyncHandler(BaseHandler):
                 if room_sync:
                     joined.append(room_sync)
 
+        invited = [
+            InvitedSyncResult(room_id=event.room_id, invite=event)
+            for event in invite_events
+        ]
+
         defer.returnValue(SyncResult(
             presence=presence,
             joined=joined,
-            invited=[],
+            invited=invited,
             next_batch=now_token,
         ))
 
