@@ -345,9 +345,9 @@ class FilteringTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_filter_public_user_data_match(self):
+    def test_filter_presence_match(self):
         user_filter_json = {
-            "public_user_data": {
+            "presence": {
                 "types": ["m.*"]
             }
         }
@@ -368,13 +368,13 @@ class FilteringTestCase(unittest.TestCase):
             filter_id=filter_id,
         )
 
-        results = user_filter.filter_public_user_data(events=events)
+        results = user_filter.filter_presence(events=events)
         self.assertEquals(events, results)
 
     @defer.inlineCallbacks
-    def test_filter_public_user_data_no_match(self):
+    def test_filter_presence_no_match(self):
         user_filter_json = {
-            "public_user_data": {
+            "presence": {
                 "types": ["m.*"]
             }
         }
@@ -395,7 +395,7 @@ class FilteringTestCase(unittest.TestCase):
             filter_id=filter_id,
         )
 
-        results = user_filter.filter_public_user_data(events=events)
+        results = user_filter.filter_presence(events=events)
         self.assertEquals([], results)
 
     @defer.inlineCallbacks
