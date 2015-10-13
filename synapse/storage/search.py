@@ -16,38 +16,28 @@
 from twisted.internet import defer
 
 from _base import SQLBaseStore
-from synapse.api.constants import KnownRoomEventKeys, SearchConstraintTypes
 from synapse.storage.engines import PostgresEngine
 
 
 class SearchStore(SQLBaseStore):
     @defer.inlineCallbacks
-    def search_msgs(self, room_ids, constraints):
+    def search_msgs(self, room_ids, search_term, keys):
         clauses = []
         args = []
-        fts = None
 
         clauses.append(
             "room_id IN (%s)" % (",".join(["?"] * len(room_ids)),)
         )
         args.extend(room_ids)
 
-        for c in constraints:
-            local_clauses = []
-            if c.search_type == SearchConstraintTypes.FTS:
-                fts = c.value
-                for key in c.keys:
-                    local_clauses.append("key = ?")
-                    args.append(key)
-            elif c.search_type == SearchConstraintTypes.EXACT:
-                for key in c.keys:
-                    if key == KnownRoomEventKeys.ROOM_ID:
-                        for value in c.value:
-                            local_clauses.append("room_id = ?")
-                            args.append(value)
-            clauses.append(
-                "(%s)" % (" OR ".join(local_clauses),)
-            )
+        local_clauses = []
+        for key in keys:
+            local_clauses.append("key = ?")
+            args.append(key)
+
+        clauses.append(
+            "(%s)" % (" OR ".join(local_clauses),)
+        )
 
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
@@ -67,7 +57,7 @@ class SearchStore(SQLBaseStore):
         sql += " ORDER BY rank DESC"
 
         results = yield self._execute(
-            "search_msgs", self.cursor_to_dict, sql, *([fts] + args)
+            "search_msgs", self.cursor_to_dict, sql, *([search_term] + args)
         )
 
         events = yield self._get_events([r["event_id"] for r in results])
