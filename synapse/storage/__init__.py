@@ -41,9 +41,6 @@ from .end_to_end_keys import EndToEndKeyStore
 
 from .receipts import ReceiptsStore
 
-from ._schema_prepare import UpgradeDatabaseException
-
-__all__ = [UpgradeDatabaseException]
 
 import logging
 

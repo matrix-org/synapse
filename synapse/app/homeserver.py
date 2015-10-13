@@ -35,9 +35,8 @@ if __name__ == '__main__':
 
 
 from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
-from synapse.storage import (
-    are_all_users_on_domain, UpgradeDatabaseException,
-)
+from synapse.storage import are_all_users_on_domain
+from synapse.storage.schema_prepare import UpgradeDatabaseException
 
 from synapse.server import HomeServer
 
