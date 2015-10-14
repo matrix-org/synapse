@@ -19,6 +19,7 @@ from synapse.api.errors import StoreError
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
+from .engines import PostgresEngine
 
 import collections
 import logging
@@ -202,10 +203,16 @@ class RoomStore(SQLBaseStore):
             )
 
     def _store_event_search_txn(self, txn, event, key, value):
-        sql = (
-            "INSERT INTO event_search (event_id, room_id, key, vector)"
-            " VALUES (?,?,?,to_tsvector('english', ?))"
-        )
+        if isinstance(self.database_engine, PostgresEngine):
+            sql = (
+                "INSERT INTO event_search (event_id, room_id, key, vector)"
+                " VALUES (?,?,?,to_tsvector('english', ?))"
+            )
+        else:
+            sql = (
+                "INSERT INTO event_search (event_id, room_id, key, value)"
+                " VALUES (?,?,?,?)"
+            )
 
         txn.execute(sql, (event.event_id, event.room_id, key, value,))
 
