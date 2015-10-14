@@ -110,6 +110,20 @@ class RoomMemberStore(SQLBaseStore):
             membership=membership,
         ).addCallback(self._get_events)
 
+    def get_invites_for_user(self, user_id):
+        """ Get all the invite events for a user
+        Args:
+            user_id (str): The user ID.
+        Returns:
+            A deferred list of event objects.
+        """
+
+        return self.get_rooms_for_user_where_membership_is(
+            user_id, [Membership.INVITE]
+        ).addCallback(lambda invites: self._get_events([
+            invites.event_id for invite in invites
+        ]))
+
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         """ Get all the rooms for this user where the membership for this user
         matches one in the membership list.
