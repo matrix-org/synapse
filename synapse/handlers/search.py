@@ -84,7 +84,9 @@ class SearchHandler(BaseHandler):
     def search(self, user, content):
         try:
             search_term = content["search_categories"]["room_events"]["search_term"]
-            keys = content["search_categories"]["room_events"]["keys"]
+            keys = content["search_categories"]["room_events"].get("keys", [
+                "content.body", "content.name", "content.topic",
+            ])
         except KeyError:
             raise SynapseError(400, "Invalid search query")
 
