@@ -82,7 +82,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
         events.
         """
         return bool(
-            self.private_user_data or self.public_user_data or self.rooms
+            self.presence or self.joined or self.invited
         )
 
 
@@ -122,8 +122,8 @@ class SyncHandler(BaseHandler):
                 )
 
             result = yield self.notifier.wait_for_events(
-                sync_config.user, room_ids,
-                sync_config.filter, timeout, current_sync_callback
+                sync_config.user, room_ids, timeout, current_sync_callback,
+                from_token=since_token
             )
             defer.returnValue(result)
 
