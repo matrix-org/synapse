@@ -104,6 +104,9 @@ class SearchHandler(BaseHandler):
             user.to_string(), event_map.values()
         )
 
+        # TODO: Filter allowed_events
+        # TODO: Add a limit
+
         time_now = self.clock.time_msec()
 
         results = {
