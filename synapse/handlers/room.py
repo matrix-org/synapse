@@ -661,7 +661,7 @@ class RoomMemberHandler(BaseHandler):
     @defer.inlineCallbacks
     def _ask_id_server_for_third_party_invite(
             self, id_server, medium, address, room_id, sender):
-        is_url = "https://%s/_matrix/identity/api/v1/nonce-it-up" % (id_server,)
+        is_url = "https://%s/_matrix/identity/api/v1/store-invite" % (id_server,)
         data = yield self.hs.get_simple_http_client().post_urlencoded_get_json(
             is_url,
             {
