@@ -364,7 +364,9 @@ class FederationClient(FederationBase):
 
             args = {}
             if third_party_invites.join_has_third_party_invite(content):
-                args = third_party_invites.extract_join_keys(content)
+                args = third_party_invites.extract_join_keys(
+                    content["third_party_invite"]
+                )
             try:
                 ret = yield self.transport_layer.make_join(
                     destination, room_id, user_id, args

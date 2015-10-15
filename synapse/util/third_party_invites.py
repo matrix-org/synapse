@@ -51,7 +51,7 @@ def join_has_third_party_invite(content):
 def extract_join_keys(src):
     return {
         key: value
-        for key, value in src["third_party_invite"].items()
+        for key, value in src.items()
         if key in JOIN_KEYS
     }
 

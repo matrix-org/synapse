@@ -566,7 +566,7 @@ class RoomMemberHandler(BaseHandler):
         if invitee:
             # make sure it looks like a user ID; it'll throw if it's invalid.
             UserID.from_string(invitee)
-            yield self.handlers.message_handler.create_and_send_event(
+            yield self.hs.get_handlers().message_handler.create_and_send_event(
                 {
                     "type": EventTypes.Member,
                     "content": {
@@ -641,7 +641,7 @@ class RoomMemberHandler(BaseHandler):
                 user.to_string()
             )
         )
-        msg_handler = self.handlers.message_handler
+        msg_handler = self.hs.get_handlers().message_handler
         yield msg_handler.create_and_send_event(
             {
                 "type": EventTypes.ThirdPartyInvite,
