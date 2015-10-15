@@ -54,7 +54,7 @@ class Filtering(object):
         ]
 
         room_level_definitions = [
-            "state", "events", "ephemeral"
+            "state", "timeline", "ephemeral"
         ]
 
         for key in top_level_definitions:
@@ -135,17 +135,23 @@ class Filter(object):
     def __init__(self, filter_json):
         self.filter_json = filter_json
 
-    def filter_public_user_data(self, events):
-        return self._filter_on_key(events, ["public_user_data"])
+    def timeline_limit(self):
+        return self.filter_json.get("room", {}).get("timeline", {}).get("limit", 10)
 
-    def filter_private_user_data(self, events):
-        return self._filter_on_key(events, ["private_user_data"])
+    def presence_limit(self):
+        return self.filter_json.get("presence", {}).get("limit", 10)
+
+    def ephemeral_limit(self):
+        return self.filter_json.get("room", {}).get("ephemeral", {}).get("limit", 10)
+
+    def filter_presence(self, events):
+        return self._filter_on_key(events, ["presence"])
 
     def filter_room_state(self, events):
         return self._filter_on_key(events, ["room", "state"])
 
-    def filter_room_events(self, events):
-        return self._filter_on_key(events, ["room", "events"])
+    def filter_room_timeline(self, events):
+        return self._filter_on_key(events, ["room", "timeline"])
 
     def filter_room_ephemeral(self, events):
         return self._filter_on_key(events, ["room", "ephemeral"])
@@ -169,11 +175,34 @@ class Filter(object):
         return [e for e in events if self._passes_definition(definition, e)]
 
     def _passes_definition(self, definition, event):
+        """Check if the event passes the filter definition
+        Args:
+            definition(dict): The filter definition to check against
+            event(dict or Event): The event to check
+        Returns:
+            True if the event passes the filter in the definition
+        """
+        if type(event) is dict:
+            room_id = event.get("room_id")
+            sender = event.get("sender")
+            event_type = event["type"]
+        else:
+            room_id = getattr(event, "room_id", None)
+            sender = getattr(event, "sender", None)
+            event_type = event.type
+        return self._event_passes_definition(
+            definition, room_id, sender, event_type
+        )
+
+    def _event_passes_definition(self, definition, room_id, sender,
+                                 event_type):
         """Check if the event passes through the given definition.
 
         Args:
             definition(dict): The definition to check against.
-            event(Event): The event to check.
+            room_id(str): The id of the room this event is in or None.
+            sender(str): The sender of the event
+            event_type(str): The type of the event.
         Returns:
             True if the event passes through the filter.
         """
@@ -185,8 +214,7 @@ class Filter(object):
         #     and 'not_types' then it is treated as only being in 'not_types')
 
         # room checks
-        if hasattr(event, "room_id"):
-            room_id = event.room_id
+        if room_id is not None:
             allow_rooms = definition.get("rooms", None)
             reject_rooms = definition.get("not_rooms", None)
             if reject_rooms and room_id in reject_rooms:
@@ -195,9 +223,7 @@ class Filter(object):
                 return False
 
         # sender checks
-        if hasattr(event, "sender"):
-            # Should we be including event.state_key for some event types?
-            sender = event.sender
+        if sender is not None:
             allow_senders = definition.get("senders", None)
             reject_senders = definition.get("not_senders", None)
             if reject_senders and sender in reject_senders:
@@ -208,12 +234,12 @@ class Filter(object):
         # type checks
         if "not_types" in definition:
             for def_type in definition["not_types"]:
-                if self._event_matches_type(event, def_type):
+                if self._event_matches_type(event_type, def_type):
                     return False
         if "types" in definition:
             included = False
             for def_type in definition["types"]:
-                if self._event_matches_type(event, def_type):
+                if self._event_matches_type(event_type, def_type):
                     included = True
                     break
             if not included:
@@ -221,9 +247,9 @@ class Filter(object):
 
         return True
 
-    def _event_matches_type(self, event, def_type):
+    def _event_matches_type(self, event_type, def_type):
         if def_type.endswith("*"):
             type_prefix = def_type[:-1]
-            return event.type.startswith(type_prefix)
+            return event_type.startswith(type_prefix)
         else:
-            return event.type == def_type
+            return event_type == def_type

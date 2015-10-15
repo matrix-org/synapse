@@ -54,7 +54,7 @@ class StateStore(SQLBaseStore):
             defer.returnValue({})
 
         event_to_groups = yield self._get_state_group_for_events(
-            room_id, event_ids,
+            event_ids,
         )
 
         groups = set(event_to_groups.values())
@@ -208,7 +208,7 @@ class StateStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_state_for_events(self, room_id, event_ids, types):
+    def get_state_for_events(self, event_ids, types):
         """Given a list of event_ids and type tuples, return a list of state
         dicts for each event. The state dicts will only have the type/state_keys
         that are in the `types` list.
@@ -225,7 +225,7 @@ class StateStore(SQLBaseStore):
             The dicts are mappings from (type, state_key) -> state_events
         """
         event_to_groups = yield self._get_state_group_for_events(
-            room_id, event_ids,
+            event_ids,
         )
 
         groups = set(event_to_groups.values())
@@ -251,8 +251,8 @@ class StateStore(SQLBaseStore):
         )
 
     @cachedList(cache=_get_state_group_for_event.cache, list_name="event_ids",
-                num_args=2)
-    def _get_state_group_for_events(self, room_id, event_ids):
+                num_args=1)
+    def _get_state_group_for_events(self, event_ids):
         """Returns mapping event_id -> state_group
         """
         def f(txn):
