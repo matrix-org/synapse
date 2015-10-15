@@ -1,3 +1,19 @@
+Changes in synapse v0.10.1-rc1 (2015-10-15)
+===========================================
+
+* Add CAS support, thanks to Steven Hammerton (PR #295, #296)
+* Allow users to view the history of rooms that they have left. (PR #276, #294)
+* Bundle in some room state in invites. (PR #275)
+* Add flag on creation which disables federation of the room (PR #279)
+* Atomically persist events when joining a room over federation (PR #283)
+* Add support for ``m.room.canonical_alias`` (PR #287)
+* Change default history visibility for private rooms (PR #271)
+* Use Macaroons for ``access_token`` (PR #256, #229)
+* Allow users to redact their own sent events (PR #262)
+* Use tox for tests (PR #247)
+* Split up syutil into separate libraries (PR #243)
+* Add support for refresh tokens (PR #240)
+
 Changes in synapse v0.10.0-r2 (2015-09-16)
 ==========================================
 
