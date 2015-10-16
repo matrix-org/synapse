@@ -24,7 +24,6 @@ from canonicaljson import encode_canonical_json
 from twisted.internet import defer, reactor, ssl
 from twisted.web.client import (
     Agent, readBody, FileBodyProducer, PartialDownloadError,
-    HTTPConnectionPool,
 )
 from twisted.web.http_headers import Headers
 
@@ -59,11 +58,8 @@ class SimpleHttpClient(object):
         # The default context factory in Twisted 14.0.0 (which we require) is
         # BrowserLikePolicyForHTTPS which will do regular cert validation
         # 'like a browser'
-        pool = HTTPConnectionPool(reactor)
-        pool.maxPersistentPerHost = 10
         self.agent = Agent(
             reactor,
-            pool=pool,
             connectTimeout=15,
             contextFactory=hs.get_http_client_context_factory()
         )

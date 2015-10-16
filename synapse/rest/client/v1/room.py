@@ -26,7 +26,7 @@ from synapse.events.utils import serialize_event
 import simplejson as json
 import logging
 import urllib
-
+from synapse.util import third_party_invites
 
 logger = logging.getLogger(__name__)
 
@@ -414,10 +414,26 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
         # target user is you unless it is an invite
         state_key = user.to_string()
-        if membership_action in ["invite", "ban", "kick"]:
-            if "user_id" not in content:
+
+        if membership_action == "invite" and third_party_invites.has_invite_keys(content):
+            yield self.handlers.room_member_handler.do_3pid_invite(
+                room_id,
+                user,
+                content["medium"],
+                content["address"],
+                content["id_server"],
+                content["display_name"],
+                token_id,
+                txn_id
+            )
+            defer.returnValue((200, {}))
+            return
+        elif membership_action in ["invite", "ban", "kick"]:
+            if "user_id" in content:
+                state_key = content["user_id"]
+            else:
                 raise SynapseError(400, "Missing user_id key.")
-            state_key = content["user_id"]
+
             # make sure it looks like a user ID; it'll throw if it's invalid.
             UserID.from_string(state_key)
 
@@ -425,10 +441,20 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 membership_action = "leave"
 
         msg_handler = self.handlers.message_handler
+
+        event_content = {
+            "membership": unicode(membership_action),
+        }
+
+        if membership_action == "join" and third_party_invites.has_join_keys(content):
+            event_content["third_party_invite"] = (
+                third_party_invites.extract_join_keys(content)
+            )
+
         yield msg_handler.create_and_send_event(
             {
                 "type": EventTypes.Member,
-                "content": {"membership": unicode(membership_action)},
+                "content": event_content,
                 "room_id": room_id,
                 "sender": user.to_string(),
                 "state_key": state_key,

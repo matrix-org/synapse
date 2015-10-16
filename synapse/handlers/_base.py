@@ -21,6 +21,7 @@ from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID, RoomAlias
 
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util import third_party_invites
 
 import logging
 
@@ -168,6 +169,16 @@ class BaseHandler(object):
                             room_alias_str,
                         )
                     )
+
+        if (
+            event.type == EventTypes.Member and
+            event.content["membership"] == Membership.JOIN and
+            third_party_invites.join_has_third_party_invite(event.content)
+        ):
+            yield third_party_invites.check_key_valid(
+                self.hs.get_simple_http_client(),
+                event
+            )
 
         federation_handler = self.hs.get_handlers().federation_handler
 
