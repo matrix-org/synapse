@@ -22,13 +22,13 @@ from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 class SearchStore(SQLBaseStore):
     @defer.inlineCallbacks
     def search_msgs(self, room_ids, search_term, keys):
-        """Performs a full text search over events with give keys.
+        """Performs a full text search over events with given keys.
 
         Args:
             room_ids (list): List of room ids to search in
             search_term (str): Search term to search for
             keys (list): List of keys to search in, currently supports
-                "content.body", "content.name", "content.body"
+                "content.body", "content.name", "content.topic"
 
         Returns:
             2-tuple of (dict event_id -> rank, dict event_id -> event)
