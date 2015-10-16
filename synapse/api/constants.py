@@ -63,6 +63,7 @@ class EventTypes(object):
     PowerLevels = "m.room.power_levels"
     Aliases = "m.room.aliases"
     Redaction = "m.room.redaction"
+    ThirdPartyInvite = "m.room.third_party_invite"
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
