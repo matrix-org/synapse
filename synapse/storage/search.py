@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from _base import SQLBaseStore
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 
 class SearchStore(SQLBaseStore):
@@ -56,11 +56,14 @@ class SearchStore(SQLBaseStore):
                 " FROM plainto_tsquery('english', ?) as query, event_search"
                 " WHERE vector @@ query"
             )
-        else:
+        elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
                 "SELECT 0 as rank, event_id FROM event_search"
                 " WHERE value MATCH ?"
             )
+        else:
+            # This should be unreachable.
+            raise Exception("Unrecognized database engine")
 
         for clause in clauses:
             sql += " AND " + clause
