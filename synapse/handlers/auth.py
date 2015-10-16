@@ -44,6 +44,7 @@ class AuthHandler(BaseHandler):
             LoginType.EMAIL_IDENTITY: self._check_email_identity,
             LoginType.DUMMY: self._check_dummy_auth,
         }
+        self.bcrypt_rounds = hs.config.bcrypt_rounds
         self.sessions = {}
 
     @defer.inlineCallbacks
@@ -432,7 +433,7 @@ class AuthHandler(BaseHandler):
         Returns:
             Hashed password (str).
         """
-        return bcrypt.hashpw(password, bcrypt.gensalt())
+        return bcrypt.hashpw(password, bcrypt.gensalt(self.bcrypt_rounds))
 
     def validate_hash(self, password, stored_hash):
         """Validates that self.hash(password) == stored_hash.
