@@ -17,9 +17,7 @@ from twisted.internet import defer
 
 from ._base import BaseHandler
 
-from synapse.api.constants import (
-    EventTypes, Membership,
-)
+from synapse.api.constants import Membership
 from synapse.api.errors import SynapseError
 from synapse.events.utils import serialize_event
 
