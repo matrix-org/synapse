@@ -55,16 +55,24 @@ CREATE INDEX event_search_ev_ridx ON event_search(room_id);
 SQLITE_TABLE = (
     "CREATE VIRTUAL TABLE event_search USING fts3 ( event_id, room_id, key, value)"
 )
-SQLITE_INDEX = "CREATE INDEX event_search_ev_idx ON event_search(event_id)"
 
 
 def run_upgrade(cur, database_engine, *args, **kwargs):
     if isinstance(database_engine, PostgresEngine):
-        for statement in get_statements(POSTGRES_SQL.splitlines()):
-            cur.execute(statement)
+        run_postgres_upgrade(cur)
         return
 
     if isinstance(database_engine, Sqlite3Engine):
+        run_sqlite_upgrade(cur)
+        return
+
+
+def run_postgres_upgrade(cur):
+    for statement in get_statements(POSTGRES_SQL.splitlines()):
+        cur.execute(statement)
+
+
+def run_sqlite_upgrade(cur):
         cur.execute(SQLITE_TABLE)
 
         rowid = -1
@@ -113,5 +121,3 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
                     " VALUES (?,?,?,?)",
                     rows
                 )
-
-        # cur.execute(SQLITE_INDEX)
