@@ -23,7 +23,7 @@ JOIN_KEYS = {
     "token",
     "public_key",
     "key_validity_url",
-    "signature",
+    "signatures",
     "sender",
 }
 

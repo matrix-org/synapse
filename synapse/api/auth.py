@@ -416,11 +416,15 @@ class Auth(object):
                     key_validity_url
                 )
                 return False
-            verify_key = nacl.signing.VerifyKey(decode_base64(public_key))
-            encoded_signature = join_third_party_invite["signature"]
-            signature = decode_base64(encoded_signature)
-            verify_key.verify(token, signature)
-            return True
+            for _, signature_block in join_third_party_invite["signatures"].items():
+                for key_name, encoded_signature in signature_block.items():
+                    if not key_name.startswith("ed25519:"):
+                        return False
+                    verify_key = nacl.signing.VerifyKey(decode_base64(public_key))
+                    signature = decode_base64(encoded_signature)
+                    verify_key.verify(token, signature)
+                    return True
+            return False
         except (KeyError, BadSignatureError,):
             return False
 
