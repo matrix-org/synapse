@@ -54,6 +54,8 @@ class SearchStore(SQLBaseStore):
         for clause in clauses:
             sql += " AND " + clause
 
+        # We add an arbitrary limit here to ensure we don't try to pull the
+        # entire table from the database.
         sql += " ORDER BY rank DESC LIMIT 500"
 
         results = yield self._execute(
