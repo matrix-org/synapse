@@ -82,6 +82,16 @@ class SearchHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def search(self, user, content):
+        """Performs a full text search for a user.
+
+        Args:
+            user (UserID)
+            content (dict): Search parameters
+
+        Returns:
+            dict to be returned to the client with results of search
+        """
+
         try:
             search_term = content["search_categories"]["room_events"]["search_term"]
             keys = content["search_categories"]["room_events"].get("keys", [
