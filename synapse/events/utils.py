@@ -66,7 +66,6 @@ def prune_event(event):
             "users_default",
             "events",
             "events_default",
-            "events_default",
             "state_default",
             "ban",
             "kick",
