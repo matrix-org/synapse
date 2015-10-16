@@ -63,7 +63,7 @@ def check_key_valid(http_client, event):
             event.content["third_party_invite"]["key_validity_url"],
             {"public_key": event.content["third_party_invite"]["public_key"]}
         )
-        if not response["valid"]:
-            raise AuthError(403, "Third party certificate was invalid")
-    except IOError:
+    except Exception:
         raise AuthError(502, "Third party certificate could not be checked")
+    if "valid" not in response or not response["valid"]:
+        raise AuthError(403, "Third party certificate was invalid")

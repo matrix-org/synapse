@@ -22,11 +22,16 @@ from synapse.types import UserID, RoomAlias, RoomID
 from synapse.api.constants import (
     EventTypes, Membership, JoinRules, RoomCreationPreset,
 )
-from synapse.api.errors import StoreError, SynapseError
+from synapse.api.errors import AuthError, StoreError, SynapseError
 from synapse.util import stringutils, unwrapFirstError
 from synapse.util.async import run_on_reactor
 
+from signedjson.sign import verify_signed_json
+from signedjson.key import decode_verify_key_bytes
+
 from collections import OrderedDict
+from unpaddedbase64 import decode_base64
+
 import logging
 import string
 
@@ -614,11 +619,33 @@ class RoomMemberHandler(BaseHandler):
             )
 
             if "mxid" in data:
-                # TODO: Validate the response signature and such
+                if "signatures" not in data:
+                    raise AuthError(401, "No signatures on 3pid binding")
+                self.verify_any_signature(data, id_server)
                 defer.returnValue(data["mxid"])
+
         except IOError as e:
             logger.warn("Error from identity server lookup: %s" % (e,))
             defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def verify_any_signature(self, data, server_hostname):
+        if server_hostname not in data["signatures"]:
+            raise AuthError(401, "No signature from server %s" % (server_hostname,))
+        for key_name, signature in data["signatures"][server_hostname].items():
+            key_data = yield self.hs.get_simple_http_client().get_json(
+                "https://%s/_matrix/identity/api/v1/pubkey/%s" %
+                (server_hostname, key_name,),
+            )
+            if "public_key" not in key_data:
+                raise AuthError(401, "No public key named %s from %s" %
+                                (key_name, server_hostname,))
+            verify_signed_json(
+                data,
+                server_hostname,
+                decode_verify_key_bytes(key_name, decode_base64(key_data["public_key"]))
+            )
+            return
 
     @defer.inlineCallbacks
     def _make_and_store_3pid_invite(

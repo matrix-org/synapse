@@ -397,13 +397,24 @@ class Auth(object):
             (EventTypes.ThirdPartyInvite, token,)
         )
         if not invite_event:
+            logger.info("Failing 3pid invite because no invite found for token %s", token)
             return False
         try:
             public_key = join_third_party_invite["public_key"]
             key_validity_url = join_third_party_invite["key_validity_url"]
             if invite_event.content["public_key"] != public_key:
+                logger.info(
+                    "Failing 3pid invite because public key invite: %s != join: %s",
+                    invite_event.content["public_key"],
+                    public_key
+                )
                 return False
             if invite_event.content["key_validity_url"] != key_validity_url:
+                logger.info(
+                    "Failing 3pid invite because key_validity_url invite: %s != join: %s",
+                    invite_event.content["key_validity_url"],
+                    key_validity_url
+                )
                 return False
             verify_key = nacl.signing.VerifyKey(decode_base64(public_key))
             encoded_signature = join_third_party_invite["signature"]
