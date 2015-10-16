@@ -35,52 +35,6 @@ class SearchHandler(BaseHandler):
         super(SearchHandler, self).__init__(hs)
 
     @defer.inlineCallbacks
-    def _filter_events_for_client(self, user_id, events):
-        event_id_to_state = yield self.store.get_state_for_events(
-            frozenset(e.event_id for e in events),
-            types=(
-                (EventTypes.RoomHistoryVisibility, ""),
-                (EventTypes.Member, user_id),
-            )
-        )
-
-        def allowed(event, state):
-            if event.type == EventTypes.RoomHistoryVisibility:
-                return True
-
-            membership_ev = state.get((EventTypes.Member, user_id), None)
-            if membership_ev:
-                membership = membership_ev.membership
-            else:
-                membership = Membership.LEAVE
-
-            if membership == Membership.JOIN:
-                return True
-
-            history = state.get((EventTypes.RoomHistoryVisibility, ''), None)
-            if history:
-                visibility = history.content.get("history_visibility", "shared")
-            else:
-                visibility = "shared"
-
-            if visibility == "public":
-                return True
-            elif visibility == "shared":
-                return True
-            elif visibility == "joined":
-                return membership == Membership.JOIN
-            elif visibility == "invited":
-                return membership == Membership.INVITE
-
-            return True
-
-        defer.returnValue([
-            event
-            for event in events
-            if allowed(event, event_id_to_state[event.event_id])
-        ])
-
-    @defer.inlineCallbacks
     def search(self, user, content):
         """Performs a full text search for a user.
 
