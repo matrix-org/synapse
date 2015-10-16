@@ -19,7 +19,7 @@ from synapse.api.errors import StoreError
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
-from .engines import PostgresEngine
+from .engines import PostgresEngine, Sqlite3Engine
 
 import collections
 import logging
@@ -208,11 +208,14 @@ class RoomStore(SQLBaseStore):
                 "INSERT INTO event_search (event_id, room_id, key, vector)"
                 " VALUES (?,?,?,to_tsvector('english', ?))"
             )
-        else:
+        elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
                 "INSERT INTO event_search (event_id, room_id, key, value)"
                 " VALUES (?,?,?,?)"
             )
+        else:
+            # This should be unreachable.
+            raise Exception("Unrecognized database engine")
 
         txn.execute(sql, (event.event_id, event.room_id, key, value,))
 
