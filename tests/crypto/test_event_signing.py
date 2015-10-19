@@ -61,7 +61,7 @@ class EventSigningTestCase(unittest.TestCase):
         self.signing_key.alg = KEY_ALG
         self.signing_key.version = KEY_VER
 
-    def test_sign(self):
+    def test_sign_minimal(self):
         builder = self.event_builder_factory.new(
             {'type': "X"}
         )
@@ -95,4 +95,52 @@ class EventSigningTestCase(unittest.TestCase):
             event.signatures[HOSTNAME][KEY_NAME],
             "2Wptgo4CwmLo/Y8B8qinxApKaCkBG2fjTWB7AbP5Uy+"
             "aIbygsSdLOFzvdDjww8zUVKCmI02eP9xtyJxc/cLiBA",
+        )
+
+    def test_sign_message(self):
+        builder = self.event_builder_factory.new(
+            {
+                'type': "m.room.message",
+                'sender': "@u:domain",
+                'room_id': "!r:domain",
+                'content': {
+                    'body': "Here is the message content",
+                },
+            }
+        )
+        self.assertEquals(
+            builder.build().get_dict(),
+            {
+                'content': {
+                    'body': "Here is the message content",
+                },
+                'event_id': "$0:domain",
+                'origin': "domain",
+                'origin_server_ts': 1000000,
+                'type': "m.room.message",
+                'room_id': "!r:domain",
+                'sender': "@u:domain",
+                'signatures': {},
+                'unsigned': {'age_ts': 1000000},
+            }
+        )
+
+        add_hashes_and_signatures(builder, HOSTNAME, self.signing_key)
+
+        event = builder.build()
+
+        self.assertTrue(hasattr(event, 'hashes'))
+        self.assertTrue('sha256' in event.hashes)
+        self.assertEquals(
+            event.hashes['sha256'],
+            "onLKD1bGljeBWQhWZ1kaP9SorVmRQNdN5aM2JYU2n/g",
+        )
+
+        self.assertTrue(hasattr(event, 'signatures'))
+        self.assertTrue(HOSTNAME in event.signatures)
+        self.assertTrue(KEY_NAME in event.signatures["domain"])
+        self.assertEquals(
+            event.signatures[HOSTNAME][KEY_NAME],
+            "Wm+VzmOUOz08Ds+0NTWb1d4CZrVsJSikkeRxh6aCcUw"
+            "u6pNC78FunoD7KNWzqFn241eYHYMGCA5McEiVPdhzBA"
         )
