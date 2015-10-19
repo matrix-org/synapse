@@ -537,7 +537,6 @@ class SyncHandler(BaseHandler):
 
         defer.returnValue(room_sync)
 
-
     @defer.inlineCallbacks
     def get_state_at_previous_sync(self, room_id, since_token):
         """ Get the room state at the previous sync the client made.
