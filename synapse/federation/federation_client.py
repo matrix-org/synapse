@@ -357,7 +357,7 @@ class FederationClient(FederationBase):
         defer.returnValue(signed_auth)
 
     @defer.inlineCallbacks
-    def make_join(self, destinations, room_id, user_id, content):
+    def make_membership_event(self, destinations, room_id, user_id, membership, content):
         for destination in destinations:
             if destination == self.server_name:
                 continue
@@ -368,13 +368,13 @@ class FederationClient(FederationBase):
                     content["third_party_invite"]
                 )
             try:
-                ret = yield self.transport_layer.make_join(
-                    destination, room_id, user_id, args
+                ret = yield self.transport_layer.make_membership_event(
+                    destination, room_id, user_id, membership, args
                 )
 
                 pdu_dict = ret["event"]
 
-                logger.debug("Got response to make_join: %s", pdu_dict)
+                logger.debug("Got response to make_%s: %s", membership, pdu_dict)
 
                 defer.returnValue(
                     (destination, self.event_from_pdu_json(pdu_dict))
@@ -384,8 +384,8 @@ class FederationClient(FederationBase):
                 raise
             except Exception as e:
                 logger.warn(
-                    "Failed to make_join via %s: %s",
-                    destination, e.message
+                    "Failed to make_%s via %s: %s",
+                    membership, destination, e.message
                 )
 
         raise RuntimeError("Failed to send to any server.")
@@ -490,6 +490,33 @@ class FederationClient(FederationBase):
         # FIXME: We should handle signature failures more gracefully.
 
         defer.returnValue(pdu)
+
+    @defer.inlineCallbacks
+    def send_leave(self, destinations, pdu):
+        for destination in destinations:
+            if destination == self.server_name:
+                continue
+
+            try:
+                time_now = self._clock.time_msec()
+                _, content = yield self.transport_layer.send_leave(
+                    destination=destination,
+                    room_id=pdu.room_id,
+                    event_id=pdu.event_id,
+                    content=pdu.get_pdu_json(time_now),
+                )
+
+                logger.debug("Got content: %s", content)
+                defer.returnValue(None)
+            except CodeMessageException:
+                raise
+            except Exception as e:
+                logger.exception(
+                    "Failed to send_leave via %s: %s",
+                    destination, e.message
+                )
+
+        raise RuntimeError("Failed to send to any server.")
 
     @defer.inlineCallbacks
     def query_auth(self, destination, room_id, event_id, local_auth):
