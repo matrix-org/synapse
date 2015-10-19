@@ -519,7 +519,7 @@ class SQLBaseStore(object):
                                   allow_none=False,
                                   desc="_simple_select_one_onecol"):
         """Executes a SELECT query on the named table, which is expected to
-        return a single row, returning a single column from it."
+        return a single row, returning a single column from it.
 
         Args:
             table : string giving the table name
