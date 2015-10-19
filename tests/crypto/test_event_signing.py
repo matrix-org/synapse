@@ -82,15 +82,15 @@ class EventSigningTestCase(unittest.TestCase):
         event = builder.build()
 
         self.assertTrue(hasattr(event, 'hashes'))
-        self.assertTrue('sha256' in event.hashes)
+        self.assertIn('sha256', event.hashes)
         self.assertEquals(
             event.hashes['sha256'],
             "6tJjLpXtggfke8UxFhAKg82QVkJzvKOVOOSjUDK4ZSI",
         )
 
         self.assertTrue(hasattr(event, 'signatures'))
-        self.assertTrue(HOSTNAME in event.signatures)
-        self.assertTrue(KEY_NAME in event.signatures["domain"])
+        self.assertIn(HOSTNAME, event.signatures)
+        self.assertIn(KEY_NAME, event.signatures["domain"])
         self.assertEquals(
             event.signatures[HOSTNAME][KEY_NAME],
             "2Wptgo4CwmLo/Y8B8qinxApKaCkBG2fjTWB7AbP5Uy+"
@@ -130,15 +130,15 @@ class EventSigningTestCase(unittest.TestCase):
         event = builder.build()
 
         self.assertTrue(hasattr(event, 'hashes'))
-        self.assertTrue('sha256' in event.hashes)
+        self.assertIn('sha256', event.hashes)
         self.assertEquals(
             event.hashes['sha256'],
             "onLKD1bGljeBWQhWZ1kaP9SorVmRQNdN5aM2JYU2n/g",
         )
 
         self.assertTrue(hasattr(event, 'signatures'))
-        self.assertTrue(HOSTNAME in event.signatures)
-        self.assertTrue(KEY_NAME in event.signatures["domain"])
+        self.assertIn(HOSTNAME, event.signatures)
+        self.assertIn(KEY_NAME, event.signatures["domain"])
         self.assertEquals(
             event.signatures[HOSTNAME][KEY_NAME],
             "Wm+VzmOUOz08Ds+0NTWb1d4CZrVsJSikkeRxh6aCcUw"
