@@ -136,6 +136,10 @@ class SyncRestServlet(RestServlet):
             sync_result.invited, filter, time_now, token_id
         )
 
+        archived = self.encode_archived(
+            sync_result.archived, filter, time_now, token_id
+        )
+
         response_content = {
             "presence": self.encode_presence(
                 sync_result.presence, filter, time_now
@@ -143,7 +147,7 @@ class SyncRestServlet(RestServlet):
             "rooms": {
                 "joined": joined,
                 "invited": invited,
-                "archived": {},
+                "archived": archived,
             },
             "next_batch": sync_result.next_batch.to_string(),
         }
@@ -182,14 +186,20 @@ class SyncRestServlet(RestServlet):
 
         return invited
 
+    def encode_archived(self, rooms, filter, time_now, token_id):
+        joined = {}
+        for room in rooms:
+            joined[room.room_id] = self.encode_room(
+                room, filter, time_now, token_id, joined=False
+            )
+
+        return joined
+
     @staticmethod
-    def encode_room(room, filter, time_now, token_id):
+    def encode_room(room, filter, time_now, token_id, joined=True):
         event_map = {}
         state_events = filter.filter_room_state(room.state)
-        timeline_events = filter.filter_room_timeline(room.timeline.events)
-        ephemeral_events = filter.filter_room_ephemeral(room.ephemeral)
         state_event_ids = []
-        timeline_event_ids = []
         for event in state_events:
             # TODO(mjark): Respect formatting requirements in the filter.
             event_map[event.event_id] = serialize_event(
@@ -198,6 +208,8 @@ class SyncRestServlet(RestServlet):
             )
             state_event_ids.append(event.event_id)
 
+        timeline_events = filter.filter_room_timeline(room.timeline.events)
+        timeline_event_ids = []
         for event in timeline_events:
             # TODO(mjark): Respect formatting requirements in the filter.
             event_map[event.event_id] = serialize_event(
@@ -205,6 +217,7 @@ class SyncRestServlet(RestServlet):
                 event_format=format_event_for_client_v2_without_event_id,
             )
             timeline_event_ids.append(event.event_id)
+
         result = {
             "event_map": event_map,
             "timeline": {
@@ -213,8 +226,12 @@ class SyncRestServlet(RestServlet):
                 "limited": room.timeline.limited,
             },
             "state": {"events": state_event_ids},
-            "ephemeral": {"events": ephemeral_events},
         }
+
+        if joined:
+            ephemeral_events = filter.filter_room_ephemeral(room.ephemeral)
+            result["ephemeral"] = {"events": ephemeral_events}
+
         return result
 
 

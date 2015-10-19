@@ -61,11 +61,29 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
         return bool(self.timeline or self.state or self.ephemeral)
 
 
+class ArchivedSyncResult(collections.namedtuple("JoinedSyncResult", [
+    "room_id",
+    "timeline",
+    "state",
+])):
+    __slots__ = []
+
+    def __nonzero__(self):
+        """Make the result appear empty if there are no updates. This is used
+        to tell if room needs to be part of the sync result.
+        """
+        return bool(self.timeline or self.state)
+
+
 class InvitedSyncResult(collections.namedtuple("InvitedSyncResult", [
     "room_id",
     "invite",
 ])):
     __slots__ = []
+
+    def __nonzero__(self):
+        """Invited rooms should always be reported to the client"""
+        return True
 
 
 class SyncResult(collections.namedtuple("SyncResult", [
@@ -73,6 +91,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "presence",  # List of presence events for the user.
     "joined",  # JoinedSyncResult for each joined room.
     "invited",  # InvitedSyncResult for each invited room.
+    "archived",  # ArchivedSyncResult for each archived room.
 ])):
     __slots__ = []
 
@@ -156,11 +175,14 @@ class SyncHandler(BaseHandler):
         )
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
             user_id=sync_config.user.to_string(),
-            membership_list=[Membership.INVITE, Membership.JOIN]
+            membership_list=[
+                Membership.INVITE, Membership.JOIN, Membership.LEAVE
+            ]
         )
 
         joined = []
         invited = []
+        archived = []
         for event in room_list:
             if event.membership == Membership.JOIN:
                 room_sync = yield self.initial_sync_for_joined_room(
@@ -173,11 +195,23 @@ class SyncHandler(BaseHandler):
                     room_id=event.room_id,
                     invite=invite,
                 ))
+            elif event.membership == Membership.LEAVE:
+                leave_token = now_token.copy_and_replace(
+                    "room_key", "s%d" % (event.stream_ordering,)
+                )
+                room_sync = yield self.initial_sync_for_archived_room(
+                    sync_config=sync_config,
+                    room_id=event.room_id,
+                    leave_event_id=event.event_id,
+                    leave_token=leave_token,
+                )
+                archived.append(room_sync)
 
         defer.returnValue(SyncResult(
             presence=presence,
             joined=joined,
             invited=invited,
+            archived=archived,
             next_batch=now_token,
         ))
 
@@ -202,6 +236,28 @@ class SyncHandler(BaseHandler):
             timeline=batch,
             state=current_state_events,
             ephemeral=[],
+        ))
+
+    @defer.inlineCallbacks
+    def initial_sync_for_archived_room(self, room_id, sync_config,
+                                       leave_event_id, leave_token):
+        """Sync a room for a client which is starting without any state
+        Returns:
+            A Deferred JoinedSyncResult.
+        """
+
+        batch = yield self.load_filtered_recents(
+            room_id, sync_config, leave_token,
+        )
+
+        leave_state = yield self.store.get_state_for_events(
+            [leave_event_id], None
+        )
+
+        defer.returnValue(ArchivedSyncResult(
+            room_id=room_id,
+            timeline=batch,
+            state=leave_state[leave_event_id].values(),
         ))
 
     @defer.inlineCallbacks
@@ -257,18 +313,22 @@ class SyncHandler(BaseHandler):
         )
 
         joined = []
+        archived = []
         if len(room_events) <= timeline_limit:
             # There is no gap in any of the rooms. Therefore we can just
             # partition the new events by room and return them.
             invite_events = []
+            leave_events = []
             events_by_room_id = {}
             for event in room_events:
                 events_by_room_id.setdefault(event.room_id, []).append(event)
                 if event.room_id not in joined_room_ids:
                     if (event.type == EventTypes.Member
-                            and event.membership == Membership.INVITE
                             and event.state_key == sync_config.user.to_string()):
-                        invite_events.append(event)
+                        if event.membership == Membership.INVITE:
+                            invite_events.append(event)
+                        elif event.membership == Membership.LEAVE:
+                            leave_events.append(event)
 
             for room_id in joined_room_ids:
                 recents = events_by_room_id.get(room_id, [])
@@ -296,8 +356,13 @@ class SyncHandler(BaseHandler):
                 )
                 if room_sync:
                     joined.append(room_sync)
+
         else:
             invite_events = yield self.store.get_invites_for_user(
+                sync_config.user.to_string()
+            )
+
+            leave_events = yield self.store.get_leave_events_for_user(
                 sync_config.user.to_string()
             )
 
@@ -309,6 +374,12 @@ class SyncHandler(BaseHandler):
                 if room_sync:
                     joined.append(room_sync)
 
+        for leave_event in leave_events:
+            room_sync = yield self.incremental_sync_for_archived_room(
+                sync_config, leave_event, since_token
+            )
+            archived.append(room_sync)
+
         invited = [
             InvitedSyncResult(room_id=event.room_id, invite=event)
             for event in invite_events
@@ -318,6 +389,7 @@ class SyncHandler(BaseHandler):
             presence=presence,
             joined=joined,
             invited=invited,
+            archived=archived,
             next_batch=now_token,
         ))
 
@@ -415,6 +487,56 @@ class SyncHandler(BaseHandler):
         logging.debug("Room sync: %r", room_sync)
 
         defer.returnValue(room_sync)
+
+    @defer.inlineCallbacks
+    def incremental_sync_for_archived_room(self, sync_config, leave_event,
+                                           since_token):
+        """ Get the incremental delta needed to bring the client up to date for
+        the archived room.
+        Returns:
+            A Deferred ArchivedSyncResult
+        """
+
+        stream_token = yield self.store.get_stream_token_for_event(
+            leave_event.event_id
+        )
+
+        leave_token = since_token.copy_and_replace("room_key", stream_token)
+
+        batch = yield self.load_filtered_recents(
+            leave_event.room_id, sync_config, leave_token, since_token,
+        )
+
+        logging.debug("Recents %r", batch)
+
+        # TODO(mjark): This seems racy since this isn't being passed a
+        # token to indicate what point in the stream this is
+        leave_state = yield self.store.get_state_for_events(
+            [leave_event.event_id], None
+        )
+
+        state_events_at_leave = leave_state[leave_event.event_id].values()
+
+        state_at_previous_sync = yield self.get_state_at_previous_sync(
+            leave_event.room_id, since_token=since_token
+        )
+
+        state_events_delta = yield self.compute_state_delta(
+            since_token=since_token,
+            previous_state=state_at_previous_sync,
+            current_state=state_events_at_leave,
+        )
+
+        room_sync = ArchivedSyncResult(
+            room_id=leave_event.room_id,
+            timeline=batch,
+            state=state_events_delta,
+        )
+
+        logging.debug("Room sync: %r", room_sync)
+
+        defer.returnValue(room_sync)
+
 
     @defer.inlineCallbacks
     def get_state_at_previous_sync(self, room_id, since_token):
