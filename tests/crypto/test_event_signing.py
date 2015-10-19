@@ -15,11 +15,9 @@
 
 
 from tests import unittest
-from tests.utils import MockClock
 
-from synapse.events.builder import EventBuilderFactory
+from synapse.events.builder import EventBuilder
 from synapse.crypto.event_signing import add_hashes_and_signatures
-from synapse.types import EventID
 
 from unpaddedbase64 import decode_base64
 
@@ -39,34 +37,15 @@ KEY_NAME = "%s:%d" % (KEY_ALG, KEY_VER)
 HOSTNAME = "domain"
 
 
-class EventBuilderFactoryWithPredicableIDs(EventBuilderFactory):
-    """ A subclass of EventBuilderFactory that generates entirely predicatable
-    event IDs, so we can assert on them. """
-    def create_event_id(self):
-        i = str(self.event_id_count)
-        self.event_id_count += 1
-
-        return EventID.create(i, self.hostname).to_string()
-
-
 class EventSigningTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.event_builder_factory = EventBuilderFactoryWithPredicableIDs(
-            clock=MockClock(),
-            hostname=HOSTNAME,
-        )
-
         self.signing_key = nacl.signing.SigningKey(SIGNING_KEY_SEED)
         self.signing_key.alg = KEY_ALG
         self.signing_key.version = KEY_VER
 
     def test_sign_minimal(self):
-        builder = self.event_builder_factory.new(
-            {'type': "X"}
-        )
-        self.assertEquals(
-            builder.build().get_dict(),
+        builder = EventBuilder(
             {
                 'event_id': "$0:domain",
                 'origin': "domain",
@@ -98,18 +77,7 @@ class EventSigningTestCase(unittest.TestCase):
         )
 
     def test_sign_message(self):
-        builder = self.event_builder_factory.new(
-            {
-                'type': "m.room.message",
-                'sender': "@u:domain",
-                'room_id': "!r:domain",
-                'content': {
-                    'body': "Here is the message content",
-                },
-            }
-        )
-        self.assertEquals(
-            builder.build().get_dict(),
+        builder = EventBuilder(
             {
                 'content': {
                     'body': "Here is the message content",
