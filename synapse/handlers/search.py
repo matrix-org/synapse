@@ -18,6 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 from synapse.api.constants import Membership
+from synapse.api.filtering import Filter
 from synapse.api.errors import SynapseError
 from synapse.events.utils import serialize_event
 
@@ -49,8 +50,11 @@ class SearchHandler(BaseHandler):
             keys = content["search_categories"]["room_events"].get("keys", [
                 "content.body", "content.name", "content.topic",
             ])
+            filter_dict = content["search_categories"]["room_events"].get("filter", {})
         except KeyError:
             raise SynapseError(400, "Invalid search query")
+
+        filtr = Filter(filter_dict)
 
         # TODO: Search through left rooms too
         rooms = yield self.store.get_rooms_for_user_where_membership_is(
@@ -64,11 +68,12 @@ class SearchHandler(BaseHandler):
 
         rank_map, event_map = yield self.store.search_msgs(room_ids, search_term, keys)
 
+        filtered_events = filtr.filter(event_map.values())
+
         allowed_events = yield self._filter_events_for_client(
-            user.to_string(), event_map.values()
+            user.to_string(), filtered_events
         )
 
-        # TODO: Filter allowed_events
         # TODO: Add a limit
 
         time_now = self.clock.time_msec()
