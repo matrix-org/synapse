@@ -17,6 +17,7 @@
 from twisted.internet import defer
 
 from .federation_base import FederationBase
+from synapse.api.constants import Membership
 from .units import Edu
 
 from synapse.api.errors import (
@@ -358,6 +359,33 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     def make_membership_event(self, destinations, room_id, user_id, membership, content):
+        """
+        Creates an m.room.member event, with context, without participating in the room.
+
+        Does so by asking one of the already participating servers to create an
+        event with proper context.
+
+        Note that this does not append any events to any graphs.
+
+        Args:
+            destinations (str): Candidate homeservers which are probably
+                participating in the room.
+            room_id (str): The room in which the event will happen.
+            user_id (str): The user whose membership is being evented.
+            membership (str): The "membership" property of the event. Must be
+                one of "join" or "leave".
+            content (object): Any additional data to put into the content field
+                of the event.
+        Return:
+            A tuple of (origin (str), event (object)) where origin is the remote
+            homeserver which generated the event.
+        """
+        valid_memberships = {Membership.JOIN, Membership.LEAVE}
+        if membership not in valid_memberships:
+            raise RuntimeError(
+                "make_membership_event called with membership='%s', must be one of %s" %
+                (membership, ",".join(valid_memberships))
+            )
         for destination in destinations:
             if destination == self.server_name:
                 continue
