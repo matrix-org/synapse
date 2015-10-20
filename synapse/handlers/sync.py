@@ -145,6 +145,10 @@ class SyncHandler(BaseHandler):
         """
         now_token = yield self.event_sources.get_current_token()
 
+        now_token, typing_by_room = yield self.typing_by_room(
+            sync_config, now_token
+        )
+
         presence_stream = self.event_sources.sources["presence"]
         # TODO (mjark): This looks wrong, shouldn't we be getting the presence
         # UP to the present rather than after the present?
@@ -164,7 +168,7 @@ class SyncHandler(BaseHandler):
         for event in room_list:
             if event.membership == Membership.JOIN:
                 room_sync = yield self.initial_sync_for_joined_room(
-                    event.room_id, sync_config, now_token,
+                    event.room_id, sync_config, now_token, typing_by_room
                 )
                 joined.append(room_sync)
             elif event.membership == Membership.INVITE:
@@ -182,7 +186,8 @@ class SyncHandler(BaseHandler):
         ))
 
     @defer.inlineCallbacks
-    def initial_sync_for_joined_room(self, room_id, sync_config, now_token):
+    def initial_sync_for_joined_room(self, room_id, sync_config, now_token,
+                                     typing_by_room):
         """Sync a room for a client which is starting without any state
         Returns:
             A Deferred JoinedSyncResult.
@@ -201,8 +206,27 @@ class SyncHandler(BaseHandler):
             room_id=room_id,
             timeline=batch,
             state=current_state_events,
-            ephemeral=[],
+            ephemeral=typing_by_room.get(room_id, []),
         ))
+
+    @defer.inlineCallbacks
+    def typing_by_room(self, sync_config, now_token, since_token=None):
+        typing_key = since_token.typing_key if since_token else "0"
+
+        typing_source = self.event_sources.sources["typing"]
+        typing, typing_key = yield typing_source.get_new_events_for_user(
+            user=sync_config.user,
+            from_key=typing_key,
+            limit=sync_config.filter.ephemeral_limit(),
+        )
+        now_token = now_token.copy_and_replace("typing_key", typing_key)
+
+        typing_by_room = {event["room_id"]: [event] for event in typing}
+        for event in typing:
+            event.pop("room_id")
+        logger.debug("Typing %r", typing_by_room)
+
+        defer.returnValue((now_token, typing_by_room))
 
     @defer.inlineCallbacks
     def incremental_sync_with_gap(self, sync_config, since_token):
@@ -221,18 +245,9 @@ class SyncHandler(BaseHandler):
         )
         now_token = now_token.copy_and_replace("presence_key", presence_key)
 
-        typing_source = self.event_sources.sources["typing"]
-        typing, typing_key = yield typing_source.get_new_events_for_user(
-            user=sync_config.user,
-            from_key=since_token.typing_key,
-            limit=sync_config.filter.ephemeral_limit(),
+        now_token, typing_by_room = yield self.typing_by_room(
+            sync_config, now_token, since_token
         )
-        now_token = now_token.copy_and_replace("typing_key", typing_key)
-
-        typing_by_room = {event["room_id"]: [event] for event in typing}
-        for event in typing:
-            event.pop("room_id")
-        logger.debug("Typing %r", typing_by_room)
 
         rm_handler = self.hs.get_handlers().room_member_handler
         app_service = yield self.store.get_app_service_by_user_id(
