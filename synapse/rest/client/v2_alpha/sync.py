@@ -23,7 +23,7 @@ from synapse.types import StreamToken
 from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_event_id,
 )
-from synapse.api.filtering import Filter
+from synapse.api.filtering import FilterCollection
 from ._base import client_v2_pattern
 
 import copy
@@ -103,7 +103,7 @@ class SyncRestServlet(RestServlet):
                 user.localpart, filter_id
             )
         except:
-            filter = Filter({})
+            filter = FilterCollection({})
 
         sync_config = SyncConfig(
             user=user,

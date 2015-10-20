@@ -296,6 +296,24 @@ class FederationMakeJoinServlet(BaseFederationServlet):
         defer.returnValue((200, content))
 
 
+class FederationMakeLeaveServlet(BaseFederationServlet):
+    PATH = "/make_leave/([^/]*)/([^/]*)"
+
+    @defer.inlineCallbacks
+    def on_GET(self, origin, content, query, context, user_id):
+        content = yield self.handler.on_make_leave_request(context, user_id)
+        defer.returnValue((200, content))
+
+
+class FederationSendLeaveServlet(BaseFederationServlet):
+    PATH = "/send_leave/([^/]*)/([^/]*)"
+
+    @defer.inlineCallbacks
+    def on_PUT(self, origin, content, query, room_id, txid):
+        content = yield self.handler.on_send_leave_request(origin, content)
+        defer.returnValue((200, content))
+
+
 class FederationEventAuthServlet(BaseFederationServlet):
     PATH = "/event_auth/([^/]*)/([^/]*)"
 
@@ -385,8 +403,10 @@ SERVLET_CLASSES = (
     FederationBackfillServlet,
     FederationQueryServlet,
     FederationMakeJoinServlet,
+    FederationMakeLeaveServlet,
     FederationEventServlet,
     FederationSendJoinServlet,
+    FederationSendLeaveServlet,
     FederationInviteServlet,
     FederationQueryAuthServlet,
     FederationGetMissingEventsServlet,
