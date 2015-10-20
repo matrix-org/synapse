@@ -308,7 +308,11 @@ class Auth(object):
         )
 
         if Membership.JOIN != membership:
-            # JOIN is the only action you can perform if you're not in the room
+            if (caller_invited
+                    and Membership.LEAVE == membership
+                    and target_user_id == event.user_id):
+                return True
+
             if not caller_in_room:  # caller isn't joined
                 raise AuthError(
                     403,
