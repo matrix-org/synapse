@@ -101,6 +101,10 @@ class LoginRestServlet(ClientV1RestServlet):
             user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
                 login_submission['medium'], login_submission['address']
             )
+            if not user_id:
+                raise LoginError(
+                    401, "Unrecognised address", errcode=Codes.UNAUTHORIZED
+                )
         else:
             user_id = login_submission['user']
 
