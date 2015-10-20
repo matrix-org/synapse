@@ -178,6 +178,11 @@ class Filter(object):
         self.filter_json = filter_json
 
     def check(self, event):
+        """Checks whether the filter matches the given event.
+
+        Returns:
+            bool: True if the event matches
+        """
         literal_keys = {
             "rooms": lambda v: event.room_id == v,
             "senders": lambda v: event.sender == v,
