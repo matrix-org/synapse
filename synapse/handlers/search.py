@@ -64,7 +64,7 @@ class SearchHandler(BaseHandler):
         )
         room_ids = set(r.room_id for r in rooms)
 
-        # TODO: Apply room filter to rooms list
+        room_ids = filtr.filter_rooms(room_ids)
 
         rank_map, event_map = yield self.store.search_msgs(room_ids, search_term, keys)
 
