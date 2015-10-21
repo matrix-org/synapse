@@ -101,6 +101,8 @@ class LoginRestServlet(ClientV1RestServlet):
             user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
                 login_submission['medium'], login_submission['address']
             )
+            if not user_id:
+                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
         else:
             user_id = login_submission['user']
 
@@ -190,36 +192,6 @@ class LoginRestServlet(ClientV1RestServlet):
             raise LoginError(401, "Invalid CAS response", errcode=Codes.UNAUTHORIZED)
 
         return (user, attributes)
-
-
-class LoginFallbackRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/login/fallback$")
-
-    def on_GET(self, request):
-        # TODO(kegan): This should be returning some HTML which is capable of
-        # hitting LoginRestServlet
-        return (200, {})
-
-
-class PasswordResetRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/login/reset")
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        reset_info = _parse_json(request)
-        try:
-            email = reset_info["email"]
-            user_id = reset_info["user_id"]
-            handler = self.handlers.login_handler
-            yield handler.reset_password(user_id, email)
-            # purposefully give no feedback to avoid people hammering different
-            # combinations.
-            defer.returnValue((200, {}))
-        except KeyError:
-            raise SynapseError(
-                400,
-                "Missing keys. Requires 'email' and 'user_id'."
-            )
 
 
 class SAML2RestServlet(ClientV1RestServlet):

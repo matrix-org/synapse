@@ -555,6 +555,22 @@ class RoomTypingRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
+class SearchRestServlet(ClientV1RestServlet):
+    PATTERN = client_path_pattern(
+        "/search$"
+    )
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        auth_user, _ = yield self.auth.get_user_by_req(request)
+
+        content = _parse_json(request)
+
+        results = yield self.handlers.search_handler.search(auth_user, content)
+
+        defer.returnValue((200, results))
+
+
 def _parse_json(request):
     try:
         content = json.loads(request.content.read())
@@ -611,3 +627,4 @@ def register_servlets(hs, http_server):
     RoomInitialSyncRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
+    SearchRestServlet(hs).register(http_server)

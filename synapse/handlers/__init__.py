@@ -32,6 +32,7 @@ from .sync import SyncHandler
 from .auth import AuthHandler
 from .identity import IdentityHandler
 from .receipts import ReceiptsHandler
+from .search import SearchHandler
 
 
 class Handlers(object):
@@ -68,3 +69,4 @@ class Handlers(object):
         self.sync_handler = SyncHandler(hs)
         self.auth_handler = AuthHandler(hs)
         self.identity_handler = IdentityHandler(hs)
+        self.search_handler = SearchHandler(hs)
