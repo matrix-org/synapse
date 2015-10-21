@@ -211,6 +211,18 @@ class SyncHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def typing_by_room(self, sync_config, now_token, since_token=None):
+        """Get the typing events for each room the user is in
+        Args:
+            sync_config (SyncConfig): The flags, filters and user for the sync.
+            now_token (StreamToken): Where the server is currently up to.
+            since_token (StreamToken): Where the server was when the client
+                last synced.
+        Returns:
+            A tuple of the now StreamToken, updated to reflect the which typing
+            events are included, and a dict mapping from room_id to a list of
+            typing events for that room.
+        """
+
         typing_key = since_token.typing_key if since_token else "0"
 
         typing_source = self.event_sources.sources["typing"]
