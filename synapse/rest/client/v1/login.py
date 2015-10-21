@@ -102,9 +102,7 @@ class LoginRestServlet(ClientV1RestServlet):
                 login_submission['medium'], login_submission['address']
             )
             if not user_id:
-                raise LoginError(
-                    401, "Unrecognised address", errcode=Codes.UNAUTHORIZED
-                )
+                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
         else:
             user_id = login_submission['user']
 
