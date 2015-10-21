@@ -175,9 +175,12 @@ class SyncHandler(BaseHandler):
         )
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
             user_id=sync_config.user.to_string(),
-            membership_list=[
-                Membership.INVITE, Membership.JOIN, Membership.LEAVE
-            ]
+            membership_list=(
+                Membership.INVITE,
+                Membership.JOIN,
+                Membership.LEAVE,
+                Membership.BAN
+            )
         )
 
         joined = []
@@ -195,7 +198,7 @@ class SyncHandler(BaseHandler):
                     room_id=event.room_id,
                     invite=invite,
                 ))
-            elif event.membership == Membership.LEAVE:
+            elif event.membership in (Membership.LEAVE, Membership.BAN):
                 leave_token = now_token.copy_and_replace(
                     "room_key", "s%d" % (event.stream_ordering,)
                 )
@@ -327,7 +330,7 @@ class SyncHandler(BaseHandler):
                             and event.state_key == sync_config.user.to_string()):
                         if event.membership == Membership.INVITE:
                             invite_events.append(event)
-                        elif event.membership == Membership.LEAVE:
+                        elif event.membership in (Membership.LEAVE, Membership.BAN):
                             leave_events.append(event)
 
             for room_id in joined_room_ids:
@@ -362,7 +365,7 @@ class SyncHandler(BaseHandler):
                 sync_config.user.to_string()
             )
 
-            leave_events = yield self.store.get_leave_events_for_user(
+            leave_events = yield self.store.get_leave_and_ban_events_for_user(
                 sync_config.user.to_string()
             )
 

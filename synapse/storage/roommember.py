@@ -124,7 +124,7 @@ class RoomMemberStore(SQLBaseStore):
             invites.event_id for invite in invites
         ]))
 
-    def get_leave_events_for_user(self, user_id):
+    def get_leave_and_ban_events_for_user(self, user_id):
         """ Get all the leave events for a user
         Args:
             user_id (str): The user ID.
@@ -132,7 +132,7 @@ class RoomMemberStore(SQLBaseStore):
             A deferred list of event objects.
         """
         return self.get_rooms_for_user_where_membership_is(
-            user_id, [Membership.LEAVE]
+            user_id, (Membership.LEAVE, Membership.BAN)
         ).addCallback(lambda leaves: self._get_events([
             leave.event_id for leave in leaves
         ]))
