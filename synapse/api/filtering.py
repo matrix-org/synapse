@@ -202,6 +202,26 @@ class Filter(object):
 
         return True
 
+    def filter_rooms(self, room_ids):
+        """Apply the 'rooms' filter to a given list of rooms.
+
+        Args:
+            room_ids (list): A list of room_ids.
+
+        Returns:
+            list: A list of room_ids that match the filter
+        """
+        room_ids = set(room_ids)
+
+        disallowed_rooms = set(self.filter_json.get("not_rooms", []))
+        room_ids -= disallowed_rooms
+
+        allowed_rooms = self.filter_json.get("rooms", None)
+        if allowed_rooms is not None:
+            room_ids &= set(allowed_rooms)
+
+        return room_ids
+
     def filter(self, events):
         return filter(self.check, events)
 

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 POSTGRES_SQL = """
-CREATE TABLE event_search (
+CREATE TABLE IF NOT EXISTS event_search (
     event_id TEXT,
     room_id TEXT,
     key TEXT,
@@ -53,7 +53,8 @@ CREATE INDEX event_search_ev_ridx ON event_search(room_id);
 
 
 SQLITE_TABLE = (
-    "CREATE VIRTUAL TABLE event_search USING fts3 ( event_id, room_id, key, value)"
+    "CREATE VIRTUAL TABLE IF NOT EXISTS event_search"
+    " USING fts3 ( event_id, room_id, key, value)"
 )
 
 
