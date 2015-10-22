@@ -14,13 +14,14 @@
 # limitations under the License.
 
 """This module contains classes for authenticating the user."""
+from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json, SignatureVerifyException
 
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
 from synapse.types import RoomID, UserID, EventID
 from synapse.util.logutils import log_function
 from synapse.util import third_party_invites
@@ -64,6 +65,8 @@ class Auth(object):
         Returns:
             True if the auth checks pass.
         """
+        self.check_size_limits(event)
+
         try:
             if not hasattr(event, "room_id"):
                 raise AuthError(500, "Event has no room_id: %s" % event)
@@ -130,6 +133,23 @@ class Auth(object):
             )
             logger.info("Denying! %s", event)
             raise
+
+    def check_size_limits(self, event):
+        def too_big(field):
+            raise EventSizeError("%s too large" % (field,))
+
+        if len(event.user_id) > 255:
+            too_big("user_id")
+        if len(event.room_id) > 255:
+            too_big("room_id")
+        if event.is_state() and len(event.state_key) > 255:
+            too_big("state_key")
+        if len(event.type) > 255:
+            too_big("type")
+        if len(event.event_id) > 255:
+            too_big("event_id")
+        if len(encode_canonical_json(event.get_pdu_json())) > 65536:
+            too_big("event")
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
