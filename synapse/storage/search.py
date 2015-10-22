@@ -18,6 +18,17 @@ from twisted.internet import defer
 from _base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
+from collections import namedtuple
+
+"""The result of a search.
+
+Fields:
+    rank_map (dict): Mapping event_id -> rank
+    event_map (dict): Mapping event_id -> event
+    pagination_token (str): Pagination token
+"""
+SearchResult = namedtuple("SearchResult", ("rank_map", "event_map", "pagination_token"))
+
 
 class SearchStore(SQLBaseStore):
     @defer.inlineCallbacks
@@ -31,7 +42,7 @@ class SearchStore(SQLBaseStore):
                 "content.body", "content.name", "content.topic"
 
         Returns:
-            2-tuple of (dict event_id -> rank, dict event_id -> event)
+            SearchResult
         """
         clauses = []
         args = []
@@ -85,11 +96,12 @@ class SearchStore(SQLBaseStore):
             for ev in events
         }
 
-        defer.returnValue((
+        defer.returnValue(SearchResult(
             {
                 r["event_id"]: r["rank"]
                 for r in results
                 if r["event_id"] in event_map
             },
-            event_map
+            event_map,
+            None
         ))

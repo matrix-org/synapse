@@ -66,7 +66,9 @@ class SearchHandler(BaseHandler):
 
         room_ids = filtr.filter_rooms(room_ids)
 
-        rank_map, event_map = yield self.store.search_msgs(room_ids, search_term, keys)
+        rank_map, event_map, _ = yield self.store.search_msgs(
+            room_ids, search_term, keys
+        )
 
         filtered_events = filtr.filter(event_map.values())
 
