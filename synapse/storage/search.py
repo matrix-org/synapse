@@ -48,7 +48,7 @@ class SearchStore(SQLBaseStore):
         args = []
 
         # Make sure we don't explode because the person is in too many rooms.
-        # We filter the results regardless.
+        # We filter the results below regardless.
         if len(room_ids) < 500:
             clauses.append(
                 "room_id IN (%s)" % (",".join(["?"] * len(room_ids)),)
@@ -66,13 +66,13 @@ class SearchStore(SQLBaseStore):
 
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
-                "SELECT ts_rank_cd(vector, query) AS rank, event_id"
+                "SELECT ts_rank_cd(vector, query) AS rank, room_id, event_id"
                 " FROM plainto_tsquery('english', ?) as query, event_search"
                 " WHERE vector @@ query"
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
-                "SELECT 0 as rank, event_id FROM event_search"
+                "SELECT 0 as rank, room_id, event_id FROM event_search"
                 " WHERE value MATCH ?"
             )
         else:
@@ -89,6 +89,8 @@ class SearchStore(SQLBaseStore):
         results = yield self._execute(
             "search_msgs", self.cursor_to_dict, sql, *([search_term] + args)
         )
+
+        results = filter(lambda row: row["room_id"] in room_ids, results)
 
         events = yield self._get_events([r["event_id"] for r in results])
 
