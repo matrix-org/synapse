@@ -183,10 +183,29 @@ class Filter(object):
         Returns:
             bool: True if the event matches
         """
+        if isinstance(event, dict):
+            return self.check_fields(
+                event.get("room_id", None),
+                event.get("sender", None),
+                event.get("type", None),
+            )
+        else:
+            return self.check_fields(
+                event.room_id,
+                event.sender,
+                event.type,
+            )
+
+    def check_fields(self, room_id, sender, event_type):
+        """Checks whether the filter matches the given event fields.
+
+        Returns:
+            bool: True if the event fields match
+        """
         literal_keys = {
-            "rooms": lambda v: event.room_id == v,
-            "senders": lambda v: event.sender == v,
-            "types": lambda v: _matches_wildcard(event.type, v)
+            "rooms": lambda v: room_id == v,
+            "senders": lambda v: sender == v,
+            "types": lambda v: _matches_wildcard(event_type, v)
         }
 
         for name, match_func in literal_keys.items():
