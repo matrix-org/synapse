@@ -54,7 +54,7 @@ class SearchHandler(BaseHandler):
         except KeyError:
             raise SynapseError(400, "Invalid search query")
 
-        filtr = Filter(filter_dict)
+        search_filter = Filter(filter_dict)
 
         # TODO: Search through left rooms too
         rooms = yield self.store.get_rooms_for_user_where_membership_is(
@@ -64,13 +64,13 @@ class SearchHandler(BaseHandler):
         )
         room_ids = set(r.room_id for r in rooms)
 
-        room_ids = filtr.filter_rooms(room_ids)
+        room_ids = search_filter.filter_rooms(room_ids)
 
         rank_map, event_map, _ = yield self.store.search_msgs(
             room_ids, search_term, keys
         )
 
-        filtered_events = filtr.filter(event_map.values())
+        filtered_events = search_filter.filter(event_map.values())
 
         allowed_events = yield self._filter_events_for_client(
             user.to_string(), filtered_events
