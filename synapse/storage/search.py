@@ -48,7 +48,8 @@ class SearchStore(SQLBaseStore):
         args = []
 
         # Make sure we don't explode because the person is in too many rooms.
-        if len(room_ids) > 500:
+        # We filter the results regardless.
+        if len(room_ids) < 500:
             clauses.append(
                 "room_id IN (%s)" % (",".join(["?"] * len(room_ids)),)
             )
