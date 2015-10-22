@@ -53,7 +53,8 @@ CREATE INDEX event_search_ev_ridx ON event_search(room_id);
 
 
 SQLITE_TABLE = (
-    "CREATE VIRTUAL TABLE IF NOT EXISTS event_search USING fts3 ( event_id, room_id, key, value)"
+    "CREATE VIRTUAL TABLE IF NOT EXISTS event_search"
+    " USING fts3 ( event_id, room_id, key, value)"
 )
 
 
