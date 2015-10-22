@@ -191,8 +191,8 @@ class Filter(object):
             )
         else:
             return self.check_fields(
-                event.room_id,
-                event.sender,
+                getattr(event, "room_id", None),
+                getattr(event, "sender", None),
                 event.type,
             )
 
