@@ -16,29 +16,17 @@
 from ._base import Config
 
 
-class CasConfig(Config):
-    """Cas Configuration
-
-    cas_server_url: URL of CAS server
+class PasswordConfig(Config):
+    """Password login configuration
     """
 
     def read_config(self, config):
-        cas_config = config.get("cas_config", None)
-        if cas_config:
-            self.cas_enabled = cas_config.get("enabled", True)
-            self.cas_server_url = cas_config["server_url"]
-            self.cas_required_attributes = cas_config.get("required_attributes", {})
-        else:
-            self.cas_enabled = False
-            self.cas_server_url = None
-            self.cas_required_attributes = {}
+        password_config = config.get("password_config", {})
+        self.password_enabled = password_config.get("enabled", True)
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
-        # Enable CAS for registration and login.
-        #cas_config:
-        #   enabled: true
-        #   server_url: "https://cas-server.com"
-        #   #required_attributes:
-        #   #    name: value
+        # Enable password for login.
+        password_config:
+           enabled: true
         """
