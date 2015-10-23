@@ -72,7 +72,8 @@ class SearchStore(SQLBaseStore):
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
-                "SELECT 0 as rank, room_id, event_id FROM event_search"
+                "SELECT rank(matchinfo(event_search)) as rank, room_id, event_id"
+                " FROM event_search"
                 " WHERE value MATCH ?"
             )
         else:
