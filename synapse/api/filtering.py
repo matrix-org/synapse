@@ -24,7 +24,7 @@ class Filtering(object):
 
     def get_user_filter(self, user_localpart, filter_id):
         result = self.store.get_user_filter(user_localpart, filter_id)
-        result.addCallback(Filter)
+        result.addCallback(FilterCollection)
         return result
 
     def add_user_filter(self, user_localpart, user_filter):
@@ -54,7 +54,7 @@ class Filtering(object):
         ]
 
         room_level_definitions = [
-            "state", "events", "ephemeral"
+            "state", "timeline", "ephemeral"
         ]
 
         for key in top_level_definitions:
@@ -131,99 +131,107 @@ class Filtering(object):
             raise SynapseError(400, "Bad bundle_updates: expected bool.")
 
 
+class FilterCollection(object):
+    def __init__(self, filter_json):
+        self.filter_json = filter_json
+
+        self.room_timeline_filter = Filter(
+            self.filter_json.get("room", {}).get("timeline", {})
+        )
+
+        self.room_state_filter = Filter(
+            self.filter_json.get("room", {}).get("state", {})
+        )
+
+        self.room_ephemeral_filter = Filter(
+            self.filter_json.get("room", {}).get("ephemeral", {})
+        )
+
+        self.presence_filter = Filter(
+            self.filter_json.get("presence", {})
+        )
+
+    def timeline_limit(self):
+        return self.room_timeline_filter.limit()
+
+    def presence_limit(self):
+        return self.presence_filter.limit()
+
+    def ephemeral_limit(self):
+        return self.room_ephemeral_filter.limit()
+
+    def filter_presence(self, events):
+        return self.presence_filter.filter(events)
+
+    def filter_room_state(self, events):
+        return self.room_state_filter.filter(events)
+
+    def filter_room_timeline(self, events):
+        return self.room_timeline_filter.filter(events)
+
+    def filter_room_ephemeral(self, events):
+        return self.room_ephemeral_filter.filter(events)
+
+
 class Filter(object):
     def __init__(self, filter_json):
         self.filter_json = filter_json
 
-    def filter_public_user_data(self, events):
-        return self._filter_on_key(events, ["public_user_data"])
+    def check(self, event):
+        """Checks whether the filter matches the given event.
 
-    def filter_private_user_data(self, events):
-        return self._filter_on_key(events, ["private_user_data"])
-
-    def filter_room_state(self, events):
-        return self._filter_on_key(events, ["room", "state"])
-
-    def filter_room_events(self, events):
-        return self._filter_on_key(events, ["room", "events"])
-
-    def filter_room_ephemeral(self, events):
-        return self._filter_on_key(events, ["room", "ephemeral"])
-
-    def _filter_on_key(self, events, keys):
-        filter_json = self.filter_json
-        if not filter_json:
-            return events
-
-        try:
-            # extract the right definition from the filter
-            definition = filter_json
-            for key in keys:
-                definition = definition[key]
-            return self._filter_with_definition(events, definition)
-        except KeyError:
-            # return all events if definition isn't specified.
-            return events
-
-    def _filter_with_definition(self, events, definition):
-        return [e for e in events if self._passes_definition(definition, e)]
-
-    def _passes_definition(self, definition, event):
-        """Check if the event passes through the given definition.
-
-        Args:
-            definition(dict): The definition to check against.
-            event(Event): The event to check.
         Returns:
-            True if the event passes through the filter.
+            bool: True if the event matches
         """
-        # Algorithm notes:
-        # For each key in the definition, check the event meets the criteria:
-        #   * For types: Literal match or prefix match (if ends with wildcard)
-        #   * For senders/rooms: Literal match only
-        #   * "not_" checks take presedence (e.g. if "m.*" is in both 'types'
-        #     and 'not_types' then it is treated as only being in 'not_types')
+        literal_keys = {
+            "rooms": lambda v: event.room_id == v,
+            "senders": lambda v: event.sender == v,
+            "types": lambda v: _matches_wildcard(event.type, v)
+        }
 
-        # room checks
-        if hasattr(event, "room_id"):
-            room_id = event.room_id
-            allow_rooms = definition.get("rooms", None)
-            reject_rooms = definition.get("not_rooms", None)
-            if reject_rooms and room_id in reject_rooms:
-                return False
-            if allow_rooms and room_id not in allow_rooms:
+        for name, match_func in literal_keys.items():
+            not_name = "not_%s" % (name,)
+            disallowed_values = self.filter_json.get(not_name, [])
+            if any(map(match_func, disallowed_values)):
                 return False
 
-        # sender checks
-        if hasattr(event, "sender"):
-            # Should we be including event.state_key for some event types?
-            sender = event.sender
-            allow_senders = definition.get("senders", None)
-            reject_senders = definition.get("not_senders", None)
-            if reject_senders and sender in reject_senders:
-                return False
-            if allow_senders and sender not in allow_senders:
-                return False
-
-        # type checks
-        if "not_types" in definition:
-            for def_type in definition["not_types"]:
-                if self._event_matches_type(event, def_type):
+            allowed_values = self.filter_json.get(name, None)
+            if allowed_values is not None:
+                if not any(map(match_func, allowed_values)):
                     return False
-        if "types" in definition:
-            included = False
-            for def_type in definition["types"]:
-                if self._event_matches_type(event, def_type):
-                    included = True
-                    break
-            if not included:
-                return False
 
         return True
 
-    def _event_matches_type(self, event, def_type):
-        if def_type.endswith("*"):
-            type_prefix = def_type[:-1]
-            return event.type.startswith(type_prefix)
-        else:
-            return event.type == def_type
+    def filter_rooms(self, room_ids):
+        """Apply the 'rooms' filter to a given list of rooms.
+
+        Args:
+            room_ids (list): A list of room_ids.
+
+        Returns:
+            list: A list of room_ids that match the filter
+        """
+        room_ids = set(room_ids)
+
+        disallowed_rooms = set(self.filter_json.get("not_rooms", []))
+        room_ids -= disallowed_rooms
+
+        allowed_rooms = self.filter_json.get("rooms", None)
+        if allowed_rooms is not None:
+            room_ids &= set(allowed_rooms)
+
+        return room_ids
+
+    def filter(self, events):
+        return filter(self.check, events)
+
+    def limit(self):
+        return self.filter_json.get("limit", 10)
+
+
+def _matches_wildcard(actual_value, filter_value):
+    if filter_value.endswith("*"):
+        type_prefix = filter_value[:-1]
+        return actual_value.startswith(type_prefix)
+    else:
+        return actual_value == filter_value

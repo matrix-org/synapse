@@ -37,9 +37,6 @@ class RestTestCase(unittest.TestCase):
         self.mock_resource = None
         self.auth_user_id = None
 
-    def mock_get_user_by_token(self, token=None):
-        return self.auth_user_id
-
     @defer.inlineCallbacks
     def create_room_as(self, room_creator, is_public=True, tok=None):
         temp_id = self.auth_user_id

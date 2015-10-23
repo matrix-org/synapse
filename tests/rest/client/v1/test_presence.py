@@ -41,6 +41,22 @@ myid = "@apple:test"
 PATH_PREFIX = "/_matrix/client/api/v1"
 
 
+class NullSource(object):
+    """This event source never yields any events and its token remains at
+    zero. It may be useful for unit-testing."""
+    def __init__(self, hs):
+        pass
+
+    def get_new_events_for_user(self, user, from_key, limit):
+        return defer.succeed(([], from_key))
+
+    def get_current_key(self, direction='f'):
+        return defer.succeed(0)
+
+    def get_pagination_rows(self, user, pagination_config, key):
+        return defer.succeed(([], pagination_config.from_key))
+
+
 class JustPresenceHandlers(object):
     def __init__(self, hs):
         self.presence_handler = PresenceHandler(hs)
@@ -70,15 +86,13 @@ class PresenceStateTestCase(unittest.TestCase):
             return defer.succeed([])
         self.datastore.get_presence_list = get_presence_list
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(myid),
-                "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
 
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
         room_member_handler = hs.handlers.room_member_handler = Mock(
             spec=[
@@ -159,11 +173,9 @@ class PresenceListTestCase(unittest.TestCase):
             )
         self.datastore.has_presence_state = has_presence_state
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(myid),
-                "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
 
@@ -173,7 +185,7 @@ class PresenceListTestCase(unittest.TestCase):
             ]
         )
 
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
         presence.register_servlets(hs, self.mock_resource)
 
@@ -247,7 +259,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         # HIDEOUS HACKERY
         # TODO(paul): This should be injected in via the HomeServer DI system
         from synapse.streams.events import (
-            PresenceEventSource, NullSource, EventSources
+            PresenceEventSource, EventSources
         )
 
         old_SOURCE_TYPES = EventSources.SOURCE_TYPES

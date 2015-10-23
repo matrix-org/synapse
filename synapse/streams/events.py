@@ -23,22 +23,6 @@ from synapse.handlers.typing import TypingNotificationEventSource
 from synapse.handlers.receipts import ReceiptEventSource
 
 
-class NullSource(object):
-    """This event source never yields any events and its token remains at
-    zero. It may be useful for unit-testing."""
-    def __init__(self, hs):
-        pass
-
-    def get_new_events_for_user(self, user, from_key, limit):
-        return defer.succeed(([], from_key))
-
-    def get_current_key(self, direction='f'):
-        return defer.succeed(0)
-
-    def get_pagination_rows(self, user, pagination_config, key):
-        return defer.succeed(([], pagination_config.from_key))
-
-
 class EventSources(object):
     SOURCE_TYPES = {
         "room": RoomEventSource,
@@ -70,15 +54,3 @@ class EventSources(object):
             ),
         )
         defer.returnValue(token)
-
-
-class StreamSource(object):
-    def get_new_events_for_user(self, user, from_key, limit):
-        """from_key is the key within this event source."""
-        raise NotImplementedError("get_new_events_for_user")
-
-    def get_current_key(self):
-        raise NotImplementedError("get_current_key")
-
-    def get_pagination_rows(self, user, pagination_config, key):
-        raise NotImplementedError("get_rows")

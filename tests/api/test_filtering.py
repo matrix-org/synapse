@@ -23,10 +23,17 @@ from tests.utils import (
 )
 
 from synapse.types import UserID
-from synapse.api.filtering import Filter
+from synapse.api.filtering import FilterCollection, Filter
 
 user_localpart = "test_user"
-MockEvent = namedtuple("MockEvent", "sender type room_id")
+# MockEvent = namedtuple("MockEvent", "sender type room_id")
+
+
+def MockEvent(**kwargs):
+    ev = NonCallableMock(spec_set=kwargs.keys())
+    ev.configure_mock(**kwargs)
+    return ev
+
 
 class FilteringTestCase(unittest.TestCase):
 
@@ -44,7 +51,6 @@ class FilteringTestCase(unittest.TestCase):
         )
 
         self.filtering = hs.get_filtering()
-        self.filter = Filter({})
 
         self.datastore = hs.get_datastore()
 
@@ -57,8 +63,9 @@ class FilteringTestCase(unittest.TestCase):
             type="m.room.message",
             room_id="!foo:bar"
         )
+
         self.assertTrue(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_types_works_with_wildcards(self):
@@ -71,7 +78,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.assertTrue(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_types_works_with_unknowns(self):
@@ -84,7 +91,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_not_types_works_with_literals(self):
@@ -97,7 +104,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_not_types_works_with_wildcards(self):
@@ -110,7 +117,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_not_types_works_with_unknowns(self):
@@ -123,7 +130,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.assertTrue(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_not_types_takes_priority_over_types(self):
@@ -137,7 +144,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_senders_works_with_literals(self):
@@ -150,7 +157,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.assertTrue(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_senders_works_with_unknowns(self):
@@ -163,7 +170,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_not_senders_works_with_literals(self):
@@ -176,7 +183,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_not_senders_works_with_unknowns(self):
@@ -189,7 +196,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.assertTrue(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_not_senders_takes_priority_over_senders(self):
@@ -203,7 +210,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!foo:bar"
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_rooms_works_with_literals(self):
@@ -216,7 +223,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!secretbase:unknown"
         )
         self.assertTrue(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_rooms_works_with_unknowns(self):
@@ -229,7 +236,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!anothersecretbase:unknown"
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_not_rooms_works_with_literals(self):
@@ -242,7 +249,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!anothersecretbase:unknown"
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_not_rooms_works_with_unknowns(self):
@@ -255,7 +262,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!anothersecretbase:unknown"
         )
         self.assertTrue(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_not_rooms_takes_priority_over_rooms(self):
@@ -269,7 +276,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!secretbase:unknown"
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_combined_event(self):
@@ -287,7 +294,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!stage:unknown"  # yup
         )
         self.assertTrue(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_combined_event_bad_sender(self):
@@ -305,7 +312,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!stage:unknown"  # yup
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_combined_event_bad_room(self):
@@ -323,7 +330,7 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!piggyshouse:muppets"  # nope
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     def test_definition_combined_event_bad_type(self):
@@ -341,13 +348,13 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!stage:unknown"  # yup
         )
         self.assertFalse(
-            self.filter._passes_definition(definition, event)
+            Filter(definition).check(event)
         )
 
     @defer.inlineCallbacks
-    def test_filter_public_user_data_match(self):
+    def test_filter_presence_match(self):
         user_filter_json = {
-            "public_user_data": {
+            "presence": {
                 "types": ["m.*"]
             }
         }
@@ -359,7 +366,6 @@ class FilteringTestCase(unittest.TestCase):
         event = MockEvent(
             sender="@foo:bar",
             type="m.profile",
-            room_id="!foo:bar"
         )
         events = [event]
 
@@ -368,13 +374,13 @@ class FilteringTestCase(unittest.TestCase):
             filter_id=filter_id,
         )
 
-        results = user_filter.filter_public_user_data(events=events)
+        results = user_filter.filter_presence(events=events)
         self.assertEquals(events, results)
 
     @defer.inlineCallbacks
-    def test_filter_public_user_data_no_match(self):
+    def test_filter_presence_no_match(self):
         user_filter_json = {
-            "public_user_data": {
+            "presence": {
                 "types": ["m.*"]
             }
         }
@@ -386,7 +392,6 @@ class FilteringTestCase(unittest.TestCase):
         event = MockEvent(
             sender="@foo:bar",
             type="custom.avatar.3d.crazy",
-            room_id="!foo:bar"
         )
         events = [event]
 
@@ -395,7 +400,7 @@ class FilteringTestCase(unittest.TestCase):
             filter_id=filter_id,
         )
 
-        results = user_filter.filter_public_user_data(events=events)
+        results = user_filter.filter_presence(events=events)
         self.assertEquals([], results)
 
     @defer.inlineCallbacks

@@ -15,12 +15,13 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import LimitExceededError, SynapseError
+from synapse.api.errors import LimitExceededError, SynapseError, AuthError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID, RoomAlias
 
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util import third_party_invites
 
 import logging
 
@@ -44,6 +45,52 @@ class BaseHandler(object):
         self.server_name = hs.hostname
 
         self.event_builder_factory = hs.get_event_builder_factory()
+
+    @defer.inlineCallbacks
+    def _filter_events_for_client(self, user_id, events):
+        event_id_to_state = yield self.store.get_state_for_events(
+            frozenset(e.event_id for e in events),
+            types=(
+                (EventTypes.RoomHistoryVisibility, ""),
+                (EventTypes.Member, user_id),
+            )
+        )
+
+        def allowed(event, state):
+            if event.type == EventTypes.RoomHistoryVisibility:
+                return True
+
+            membership_ev = state.get((EventTypes.Member, user_id), None)
+            if membership_ev:
+                membership = membership_ev.membership
+            else:
+                membership = Membership.LEAVE
+
+            if membership == Membership.JOIN:
+                return True
+
+            history = state.get((EventTypes.RoomHistoryVisibility, ''), None)
+            if history:
+                visibility = history.content.get("history_visibility", "shared")
+            else:
+                visibility = "shared"
+
+            if visibility == "public":
+                return True
+            elif visibility == "shared":
+                return True
+            elif visibility == "joined":
+                return membership == Membership.JOIN
+            elif visibility == "invited":
+                return membership == Membership.INVITE
+
+            return True
+
+        defer.returnValue([
+            event
+            for event in events
+            if allowed(event, event_id_to_state[event.event_id])
+        ])
 
     def ratelimit(self, user_id):
         time_now = self.clock.time()
@@ -123,28 +170,72 @@ class BaseHandler(object):
                         )
                     )
 
-        (event_stream_id, max_stream_id) = yield self.store.persist_event(
-            event, context=context
-        )
+        if (
+            event.type == EventTypes.Member and
+            event.content["membership"] == Membership.JOIN and
+            third_party_invites.join_has_third_party_invite(event.content)
+        ):
+            yield third_party_invites.check_key_valid(
+                self.hs.get_simple_http_client(),
+                event
+            )
 
         federation_handler = self.hs.get_handlers().federation_handler
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.INVITE:
+                event.unsigned["invite_room_state"] = [
+                    {
+                        "type": e.type,
+                        "state_key": e.state_key,
+                        "content": e.content,
+                        "sender": e.sender,
+                    }
+                    for k, e in context.current_state.items()
+                    if e.type in (
+                        EventTypes.JoinRules,
+                        EventTypes.CanonicalAlias,
+                        EventTypes.RoomAvatar,
+                        EventTypes.Name,
+                    )
+                ]
+
                 invitee = UserID.from_string(event.state_key)
                 if not self.hs.is_mine(invitee):
                     # TODO: Can we add signature from remote server in a nicer
                     # way? If we have been invited by a remote server, we need
                     # to get them to sign the event.
+
                     returned_invite = yield federation_handler.send_invite(
                         invitee.domain,
                         event,
                     )
 
+                    event.unsigned.pop("room_state", None)
+
                     # TODO: Make sure the signatures actually are correct.
                     event.signatures.update(
                         returned_invite.signatures
                     )
+
+        if event.type == EventTypes.Redaction:
+            if self.auth.check_redaction(event, auth_events=context.current_state):
+                original_event = yield self.store.get_event(
+                    event.redacts,
+                    check_redacted=False,
+                    get_prev_content=False,
+                    allow_rejected=False,
+                    allow_none=False
+                )
+                if event.user_id != original_event.user_id:
+                    raise AuthError(
+                        403,
+                        "You don't have permission to redact events"
+                    )
+
+        (event_stream_id, max_stream_id) = yield self.store.persist_event(
+            event, context=context
+        )
 
         destinations = set(extra_destinations)
         for k, s in context.current_state.items():
@@ -173,6 +264,9 @@ class BaseHandler(object):
             )
 
         notify_d.addErrback(log_failure)
+
+        # If invite, remove room_state from unsigned before sending.
+        event.unsigned.pop("invite_room_state", None)
 
         federation_handler.handle_new_event(
             event, destinations=destinations,

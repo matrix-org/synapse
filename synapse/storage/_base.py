@@ -25,8 +25,6 @@ from util.id_generators import IdGenerator, StreamIdGenerator
 
 from twisted.internet import defer
 
-from collections import namedtuple
-
 import sys
 import time
 import threading
@@ -181,6 +179,7 @@ class SQLBaseStore(object):
         self._transaction_id_gen = IdGenerator("sent_transactions", "id", self)
         self._state_groups_id_gen = IdGenerator("state_groups", "id", self)
         self._access_tokens_id_gen = IdGenerator("access_tokens", "id", self)
+        self._refresh_tokens_id_gen = IdGenerator("refresh_tokens", "id", self)
         self._pushers_id_gen = IdGenerator("pushers", "id", self)
         self._push_rule_id_gen = IdGenerator("push_rules", "id", self)
         self._push_rules_enable_id_gen = IdGenerator("push_rules_enable", "id", self)
@@ -375,9 +374,6 @@ class SQLBaseStore(object):
 
         return self.runInteraction(desc, interaction)
 
-    def _execute_and_decode(self, desc, query, *args):
-        return self._execute(desc, self.cursor_to_dict, query, *args)
-
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
 
@@ -523,7 +519,7 @@ class SQLBaseStore(object):
                                   allow_none=False,
                                   desc="_simple_select_one_onecol"):
         """Executes a SELECT query on the named table, which is expected to
-        return a single row, returning a single column from it."
+        return a single row, returning a single column from it.
 
         Args:
             table : string giving the table name
@@ -690,37 +686,6 @@ class SQLBaseStore(object):
 
         return dict(zip(retcols, row))
 
-    def _simple_selectupdate_one(self, table, keyvalues, updatevalues=None,
-                                 retcols=None, allow_none=False,
-                                 desc="_simple_selectupdate_one"):
-        """ Combined SELECT then UPDATE."""
-        def func(txn):
-            ret = None
-            if retcols:
-                ret = self._simple_select_one_txn(
-                    txn,
-                    table=table,
-                    keyvalues=keyvalues,
-                    retcols=retcols,
-                    allow_none=allow_none,
-                )
-
-            if updatevalues:
-                self._simple_update_one_txn(
-                    txn,
-                    table=table,
-                    keyvalues=keyvalues,
-                    updatevalues=updatevalues,
-                )
-
-                # if txn.rowcount == 0:
-                #     raise StoreError(404, "No row found")
-                if txn.rowcount > 1:
-                    raise StoreError(500, "More than one row matched")
-
-            return ret
-        return self.runInteraction(desc, func)
-
     def _simple_delete_one(self, table, keyvalues, desc="_simple_delete_one"):
         """Executes a DELETE query on the named table, expecting to delete a
         single row.
@@ -742,16 +707,6 @@ class SQLBaseStore(object):
                 raise StoreError(500, "more than one row matched")
         return self.runInteraction(desc, func)
 
-    def _simple_delete(self, table, keyvalues, desc="_simple_delete"):
-        """Executes a DELETE query on the named table.
-
-        Args:
-            table : string giving the table name
-            keyvalues : dict of column names and values to select the row with
-        """
-
-        return self.runInteraction(desc, self._simple_delete_txn)
-
     def _simple_delete_txn(self, txn, table, keyvalues):
         sql = "DELETE FROM %s WHERE %s" % (
             table,
@@ -759,24 +714,6 @@ class SQLBaseStore(object):
         )
 
         return txn.execute(sql, keyvalues.values())
-
-    def _simple_max_id(self, table):
-        """Executes a SELECT query on the named table, expecting to return the
-        max value for the column "id".
-
-        Args:
-            table : string giving the table name
-        """
-        sql = "SELECT MAX(id) AS id FROM %s" % table
-
-        def func(txn):
-            txn.execute(sql)
-            max_id = self.cursor_to_dict(txn)[0]["id"]
-            if max_id is None:
-                return 0
-            return max_id
-
-        return self.runInteraction("_simple_max_id", func)
 
     def get_next_stream_id(self):
         with self._next_stream_id_lock:
@@ -790,129 +727,3 @@ class _RollbackButIsFineException(Exception):
     something went wrong.
     """
     pass
-
-
-class Table(object):
-    """ A base class used to store information about a particular table.
-    """
-
-    table_name = None
-    """ str: The name of the table """
-
-    fields = None
-    """ list: The field names """
-
-    EntryType = None
-    """ Type: A tuple type used to decode the results """
-
-    _select_where_clause = "SELECT %s FROM %s WHERE %s"
-    _select_clause = "SELECT %s FROM %s"
-    _insert_clause = "REPLACE INTO %s (%s) VALUES (%s)"
-
-    @classmethod
-    def select_statement(cls, where_clause=None):
-        """
-        Args:
-            where_clause (str): The WHERE clause to use.
-
-        Returns:
-            str: An SQL statement to select rows from the table with the given
-            WHERE clause.
-        """
-        if where_clause:
-            return cls._select_where_clause % (
-                ", ".join(cls.fields),
-                cls.table_name,
-                where_clause
-            )
-        else:
-            return cls._select_clause % (
-                ", ".join(cls.fields),
-                cls.table_name,
-            )
-
-    @classmethod
-    def insert_statement(cls):
-        return cls._insert_clause % (
-            cls.table_name,
-            ", ".join(cls.fields),
-            ", ".join(["?"] * len(cls.fields)),
-        )
-
-    @classmethod
-    def decode_single_result(cls, results):
-        """ Given an iterable of tuples, return a single instance of
-            `EntryType` or None if the iterable is empty
-        Args:
-            results (list): The results list to convert to `EntryType`
-        Returns:
-            EntryType: An instance of `EntryType`
-        """
-        results = list(results)
-        if results:
-            return cls.EntryType(*results[0])
-        else:
-            return None
-
-    @classmethod
-    def decode_results(cls, results):
-        """ Given an iterable of tuples, return a list of `EntryType`
-        Args:
-            results (list): The results list to convert to `EntryType`
-
-        Returns:
-            list: A list of `EntryType`
-        """
-        return [cls.EntryType(*row) for row in results]
-
-    @classmethod
-    def get_fields_string(cls, prefix=None):
-        if prefix:
-            to_join = ("%s.%s" % (prefix, f) for f in cls.fields)
-        else:
-            to_join = cls.fields
-
-        return ", ".join(to_join)
-
-
-class JoinHelper(object):
-    """ Used to help do joins on tables by looking at the tables' fields and
-    creating a list of unique fields to use with SELECTs and a namedtuple
-    to dump the results into.
-
-    Attributes:
-        tables (list): List of `Table` classes
-        EntryType (type)
-    """
-
-    def __init__(self, *tables):
-        self.tables = tables
-
-        res = []
-        for table in self.tables:
-            res += [f for f in table.fields if f not in res]
-
-        self.EntryType = namedtuple("JoinHelperEntry", res)
-
-    def get_fields(self, **prefixes):
-        """Get a string representing a list of fields for use in SELECT
-        statements with the given prefixes applied to each.
-
-        For example::
-
-            JoinHelper(PdusTable, StateTable).get_fields(
-                PdusTable="pdus",
-                StateTable="state"
-            )
-        """
-        res = []
-        for field in self.EntryType._fields:
-            for table in self.tables:
-                if field in table.fields:
-                    res.append("%s.%s" % (prefixes[table.__name__], field))
-                    break
-
-        return ", ".join(res)
-
-    def decode_results(self, rows):
-        return [self.EntryType(*row) for row in rows]

@@ -26,6 +26,7 @@ class ServerConfig(Config):
         self.soft_file_limit = config["soft_file_limit"]
         self.daemonize = config.get("daemonize")
         self.print_pidfile = config.get("print_pidfile")
+        self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", True)
 
         self.listeners = config.get("listeners", [])
@@ -117,7 +118,7 @@ class ServerConfig(Config):
 
         self.content_addr = content_addr
 
-    def default_config(self, config_dir_path, server_name):
+    def default_config(self, server_name, **kwargs):
         if ":" in server_name:
             bind_port = int(server_name.split(":")[1])
             unsecure_port = bind_port - 400

@@ -16,7 +16,8 @@
 
 import glob
 import os
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Command
+import sys
 
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -37,6 +38,39 @@ def exec_file(path_segments):
     exec(code, result)
     return result
 
+
+class Tox(Command):
+    user_options = [('tox-args=', 'a', "Arguments to pass to tox")]
+
+    def initialize_options(self):
+        self.tox_args = None
+
+    def finalize_options(self):
+        self.test_args = []
+        self.test_suite = True
+
+    def run(self):
+        #import here, cause outside the eggs aren't loaded
+        try:
+            import tox
+        except ImportError:
+            try:
+                self.distribution.fetch_build_eggs("tox")
+                import tox
+            except:
+                raise RuntimeError(
+                    "The tests need 'tox' to run. Please install 'tox'."
+                )
+        import shlex
+        args = self.tox_args
+        if args:
+            args = shlex.split(self.tox_args)
+        else:
+            args = []
+        errno = tox.cmdline(args=args)
+        sys.exit(errno)
+
+
 version = exec_file(("synapse", "__init__.py"))["__version__"]
 dependencies = exec_file(("synapse", "python_dependencies.py"))
 long_description = read_file(("README.rst",))
@@ -47,14 +81,10 @@ setup(
     packages=find_packages(exclude=["tests", "tests.*"]),
     description="Reference Synapse Home Server",
     install_requires=dependencies['requirements'](include_conditional=True).keys(),
-    setup_requires=[
-        "Twisted>=15.1.0", # Here to override setuptools_trial's dependency on Twisted>=2.4.0
-        "setuptools_trial",
-        "mock"
-    ],
     dependency_links=dependencies["DEPENDENCY_LINKS"].values(),
     include_package_data=True,
     zip_safe=False,
     long_description=long_description,
     scripts=["synctl"] + glob.glob("scripts/*"),
+    cmdclass={'test': Tox},
 )

@@ -54,14 +54,12 @@ class RoomPermissionsTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(self.auth_user_id),
-                "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -241,7 +239,7 @@ class RoomPermissionsTestCase(RestTestCase):
                            "PUT", topic_path, topic_content)
         self.assertEquals(403, code, msg=str(response))
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(200, code, msg=str(response))
 
         # get topic in PUBLIC room, not joined, expect 403
         (code, response) = yield self.mock_resource.trigger_get(
@@ -279,10 +277,10 @@ class RoomPermissionsTestCase(RestTestCase):
                           expect_code=403)
 
         # set [invite/join/left] of self, set [invite/join/left] of other,
-        # expect all 403s
+        # expect all 404s because room doesn't exist on any server
         for usr in [self.user_id, self.rmcreator_id]:
             yield self.join(room=room, user=usr, expect_code=404)
-            yield self.leave(room=room, user=usr, expect_code=403)
+            yield self.leave(room=room, user=usr, expect_code=404)
 
     @defer.inlineCallbacks
     def test_membership_private_room_perms(self):
@@ -303,11 +301,11 @@ class RoomPermissionsTestCase(RestTestCase):
             room=room, expect_code=200)
 
         # get membership of self, get membership of other, private room + left
-        # expect all 403s
+        # expect all 200s
         yield self.leave(room=room, user=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
-            room=room, expect_code=403)
+            room=room, expect_code=200)
 
     @defer.inlineCallbacks
     def test_membership_public_room_perms(self):
@@ -328,11 +326,11 @@ class RoomPermissionsTestCase(RestTestCase):
             room=room, expect_code=200)
 
         # get membership of self, get membership of other, public room + left
-        # expect 403.
+        # expect 200.
         yield self.leave(room=room, user=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
-            room=room, expect_code=403)
+            room=room, expect_code=200)
 
     @defer.inlineCallbacks
     def test_invited_permissions(self):
@@ -441,14 +439,12 @@ class RoomsMemberListTestCase(RestTestCase):
 
         self.auth_user_id = self.user_id
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(self.auth_user_id),
-                "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -496,9 +492,9 @@ class RoomsMemberListTestCase(RestTestCase):
         self.assertEquals(200, code, msg=str(response))
 
         yield self.leave(room=room_id, user=self.user_id)
-        # can no longer see list, you've left.
+        # can see old list once left
         (code, response) = yield self.mock_resource.trigger_get(room_path)
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(200, code, msg=str(response))
 
 
 class RoomsCreateTestCase(RestTestCase):
@@ -521,14 +517,12 @@ class RoomsCreateTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(self.auth_user_id),
-                "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -614,15 +608,13 @@ class RoomTopicTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(self.auth_user_id),
-                "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
 
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -721,14 +713,12 @@ class RoomMemberStateTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(self.auth_user_id),
-                "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -848,14 +838,12 @@ class RoomMessagesTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(self.auth_user_id),
-                "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -945,14 +933,12 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None):
             return {
                 "user": UserID.from_string(self.auth_user_id),
-                "admin": False,
-                "device_id": None,
                 "token_id": 1,
             }
-        hs.get_v1auth().get_user_by_token = _get_user_by_token
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)

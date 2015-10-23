@@ -34,10 +34,10 @@ class FilteringStore(SQLBaseStore):
             desc="get_user_filter",
         )
 
-        defer.returnValue(json.loads(def_json))
+        defer.returnValue(json.loads(str(def_json).decode("utf-8")))
 
     def add_user_filter(self, user_localpart, user_filter):
-        def_json = json.dumps(user_filter)
+        def_json = json.dumps(user_filter).encode("utf-8")
 
         # Need an atomic transaction to SELECT the maximal ID so far then
         # INSERT a new one

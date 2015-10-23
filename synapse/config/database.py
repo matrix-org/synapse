@@ -45,7 +45,7 @@ class DatabaseConfig(Config):
 
         self.set_databasepath(config.get("database_path"))
 
-    def default_config(self, config, config_dir_path):
+    def default_config(self, **kwargs):
         database_path = self.abspath("homeserver.db")
         return """\
         # Database configuration

@@ -13,7 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage import prepare_database, prepare_sqlite3_database
+from synapse.storage.prepare_database import (
+    prepare_database, prepare_sqlite3_database
+)
+
+import struct
 
 
 class Sqlite3Engine(object):
@@ -30,6 +34,7 @@ class Sqlite3Engine(object):
 
     def on_new_connection(self, db_conn):
         self.prepare_database(db_conn)
+        db_conn.create_function("rank", 1, _rank)
 
     def prepare_database(self, db_conn):
         prepare_sqlite3_database(db_conn)
@@ -43,3 +48,27 @@ class Sqlite3Engine(object):
 
     def lock_table(self, txn, table):
         return
+
+
+# Following functions taken from: https://github.com/coleifer/peewee
+
+def _parse_match_info(buf):
+    bufsize = len(buf)
+    return [struct.unpack('@I', buf[i:i+4])[0] for i in range(0, bufsize, 4)]
+
+
+def _rank(raw_match_info):
+    """Handle match_info called w/default args 'pcx' - based on the example rank
+    function http://sqlite.org/fts3.html#appendix_a
+    """
+    match_info = _parse_match_info(raw_match_info)
+    score = 0.0
+    p, c = match_info[:2]
+    for phrase_num in range(p):
+        phrase_info_idx = 2 + (phrase_num * c * 3)
+        for col_num in range(c):
+            col_idx = phrase_info_idx + (col_num * 3)
+            x1, x2 = match_info[col_idx:col_idx + 2]
+            if x1 > 0:
+                score += float(x1) / x2
+    return score

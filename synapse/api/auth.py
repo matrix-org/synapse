@@ -14,15 +14,20 @@
 # limitations under the License.
 
 """This module contains classes for authenticating the user."""
+from signedjson.key import decode_verify_key_bytes
+from signedjson.sign import verify_signed_json, SignatureVerifyException
 
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.types import RoomID, UserID, EventID
 from synapse.util.logutils import log_function
-from synapse.types import UserID, ClientInfo
+from synapse.util import third_party_invites
+from unpaddedbase64 import decode_base64
 
 import logging
+import pymacaroons
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +35,7 @@ logger = logging.getLogger(__name__)
 AuthEventTypes = (
     EventTypes.Create, EventTypes.Member, EventTypes.PowerLevels,
     EventTypes.JoinRules, EventTypes.RoomHistoryVisibility,
+    EventTypes.ThirdPartyInvite,
 )
 
 
@@ -40,6 +46,12 @@ class Auth(object):
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
+        self._KNOWN_CAVEAT_PREFIXES = set([
+            "gen = ",
+            "type = ",
+            "time < ",
+            "user_id = ",
+        ])
 
     def check(self, event, auth_events):
         """ Checks if this event is correctly authed.
@@ -64,6 +76,23 @@ class Auth(object):
             if event.type == EventTypes.Create:
                 # FIXME
                 return True
+
+            creation_event = auth_events.get((EventTypes.Create, ""), None)
+
+            if not creation_event:
+                raise SynapseError(
+                    403,
+                    "Room %r does not exist" % (event.room_id,)
+                )
+
+            creating_domain = RoomID.from_string(event.room_id).domain
+            originating_domain = UserID.from_string(event.sender).domain
+            if creating_domain != originating_domain:
+                if not self.can_federate(event, auth_events):
+                    raise AuthError(
+                        403,
+                        "This room has been marked as unfederatable."
+                    )
 
             # FIXME: Temp hack
             if event.type == EventTypes.Aliases:
@@ -91,7 +120,7 @@ class Auth(object):
                 self._check_power_levels(event, auth_events)
 
             if event.type == EventTypes.Redaction:
-                self._check_redaction(event, auth_events)
+                self.check_redaction(event, auth_events)
 
             logger.debug("Allowing! %s", event)
         except AuthError as e:
@@ -104,6 +133,20 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
+        """Check if the user is currently joined in the room
+        Args:
+            room_id(str): The room to check.
+            user_id(str): The user to check.
+            current_state(dict): Optional map of the current state of the room.
+                If provided then that map is used to check whether they are a
+                member of the room. Otherwise the current membership is
+                loaded from the database.
+        Raises:
+            AuthError if the user is not in the room.
+        Returns:
+            A deferred membership event for the user if the user is in
+            the room.
+        """
         if current_state:
             member = current_state.get(
                 (EventTypes.Member, user_id),
@@ -117,6 +160,43 @@ class Auth(object):
             )
 
         self._check_joined_room(member, user_id, room_id)
+        defer.returnValue(member)
+
+    @defer.inlineCallbacks
+    def check_user_was_in_room(self, room_id, user_id, current_state=None):
+        """Check if the user was in the room at some point.
+        Args:
+            room_id(str): The room to check.
+            user_id(str): The user to check.
+            current_state(dict): Optional map of the current state of the room.
+                If provided then that map is used to check whether they are a
+                member of the room. Otherwise the current membership is
+                loaded from the database.
+        Raises:
+            AuthError if the user was never in the room.
+        Returns:
+            A deferred membership event for the user if the user was in the
+            room. This will be the join event if they are currently joined to
+            the room. This will be the leave event if they have left the room.
+        """
+        if current_state:
+            member = current_state.get(
+                (EventTypes.Member, user_id),
+                None
+            )
+        else:
+            member = yield self.state.get_current_state(
+                room_id=room_id,
+                event_type=EventTypes.Member,
+                state_key=user_id
+            )
+        membership = member.membership if member else None
+
+        if membership not in (Membership.JOIN, Membership.LEAVE):
+            raise AuthError(403, "User %s not in room %s" % (
+                user_id, room_id
+            ))
+
         defer.returnValue(member)
 
     @defer.inlineCallbacks
@@ -153,6 +233,11 @@ class Auth(object):
                 user_id, room_id, repr(member)
             ))
 
+    def can_federate(self, event, auth_events):
+        creation_event = auth_events.get((EventTypes.Create, ""))
+
+        return creation_event.content.get("m.federate", True) is True
+
     @log_function
     def is_membership_change_allowed(self, event, auth_events):
         membership = event.content["membership"]
@@ -167,6 +252,15 @@ class Auth(object):
                     return True
 
         target_user_id = event.state_key
+
+        creating_domain = RoomID.from_string(event.room_id).domain
+        target_domain = UserID.from_string(target_user_id).domain
+        if creating_domain != target_domain:
+            if not self.can_federate(event, auth_events):
+                raise AuthError(
+                    403,
+                    "This room has been marked as unfederatable."
+                )
 
         # get info about the caller
         key = (EventTypes.Member, event.user_id, )
@@ -214,7 +308,11 @@ class Auth(object):
         )
 
         if Membership.JOIN != membership:
-            # JOIN is the only action you can perform if you're not in the room
+            if (caller_invited
+                    and Membership.LEAVE == membership
+                    and target_user_id == event.user_id):
+                return True
+
             if not caller_in_room:  # caller isn't joined
                 raise AuthError(
                     403,
@@ -252,7 +350,8 @@ class Auth(object):
                 pass
             elif join_rule == JoinRules.INVITE:
                 if not caller_in_room and not caller_invited:
-                    raise AuthError(403, "You are not invited to this room.")
+                    if not self._verify_third_party_invite(event, auth_events):
+                        raise AuthError(403, "You are not invited to this room.")
             else:
                 # TODO (erikj): may_join list
                 # TODO (erikj): private rooms
@@ -277,6 +376,68 @@ class Auth(object):
             raise AuthError(500, "Unknown membership %s" % membership)
 
         return True
+
+    def _verify_third_party_invite(self, event, auth_events):
+        """
+        Validates that the join event is authorized by a previous third-party invite.
+
+        Checks that the public key, and keyserver, match those in the invite,
+        and that the join event has a signature issued using that public key.
+
+        Args:
+            event: The m.room.member join event being validated.
+            auth_events: All relevant previous context events which may be used
+                for authorization decisions.
+
+        Return:
+            True if the event fulfills the expectations of a previous third party
+            invite event.
+        """
+        if not third_party_invites.join_has_third_party_invite(event.content):
+            return False
+        join_third_party_invite = event.content["third_party_invite"]
+        token = join_third_party_invite["token"]
+        invite_event = auth_events.get(
+            (EventTypes.ThirdPartyInvite, token,)
+        )
+        if not invite_event:
+            logger.info("Failing 3pid invite because no invite found for token %s", token)
+            return False
+        try:
+            public_key = join_third_party_invite["public_key"]
+            key_validity_url = join_third_party_invite["key_validity_url"]
+            if invite_event.content["public_key"] != public_key:
+                logger.info(
+                    "Failing 3pid invite because public key invite: %s != join: %s",
+                    invite_event.content["public_key"],
+                    public_key
+                )
+                return False
+            if invite_event.content["key_validity_url"] != key_validity_url:
+                logger.info(
+                    "Failing 3pid invite because key_validity_url invite: %s != join: %s",
+                    invite_event.content["key_validity_url"],
+                    key_validity_url
+                )
+                return False
+            signed = join_third_party_invite["signed"]
+            if signed["mxid"] != event.user_id:
+                return False
+            if signed["token"] != token:
+                return False
+            for server, signature_block in signed["signatures"].items():
+                for key_name, encoded_signature in signature_block.items():
+                    if not key_name.startswith("ed25519:"):
+                        return False
+                    verify_key = decode_verify_key_bytes(
+                        key_name,
+                        decode_base64(public_key)
+                    )
+                    verify_signed_json(signed, server, verify_key)
+                    return True
+            return False
+        except (KeyError, SignatureVerifyException,):
+            return False
 
     def _get_power_level_event(self, auth_events):
         key = (EventTypes.PowerLevels, "", )
@@ -322,9 +483,9 @@ class Auth(object):
         Args:
             request - An HTTP request with an access_token query parameter.
         Returns:
-            tuple : of UserID and device string:
-                User ID object of the user making the request
-                ClientInfo object of the client instance the user is using
+            tuple of:
+                UserID (str)
+                Access token ID (str)
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -354,16 +515,13 @@ class Auth(object):
 
                 request.authenticated_entity = user_id
 
-                defer.returnValue(
-                    (UserID.from_string(user_id), ClientInfo("", ""))
-                )
+                defer.returnValue((UserID.from_string(user_id), ""))
                 return
             except KeyError:
                 pass  # normal users won't have the user_id query parameter set.
 
-            user_info = yield self.get_user_by_token(access_token)
+            user_info = yield self._get_user_by_access_token(access_token)
             user = user_info["user"]
-            device_id = user_info["device_id"]
             token_id = user_info["token_id"]
 
             ip_addr = self.hs.get_ip_from_request(request)
@@ -375,14 +533,13 @@ class Auth(object):
                 self.store.insert_client_ip(
                     user=user,
                     access_token=access_token,
-                    device_id=user_info["device_id"],
                     ip=ip_addr,
                     user_agent=user_agent
                 )
 
             request.authenticated_entity = user.to_string()
 
-            defer.returnValue((user, ClientInfo(device_id, token_id)))
+            defer.returnValue((user, token_id,))
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
@@ -390,30 +547,106 @@ class Auth(object):
             )
 
     @defer.inlineCallbacks
-    def get_user_by_token(self, token):
+    def _get_user_by_access_token(self, token):
         """ Get a registered user's ID.
 
         Args:
             token (str): The access token to get the user by.
         Returns:
-            dict : dict that includes the user, device_id, and whether the
-                user is a server admin.
+            dict : dict that includes the user and the ID of their access token.
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
-        ret = yield self.store.get_user_by_token(token)
+        try:
+            ret = yield self._get_user_from_macaroon(token)
+        except AuthError:
+            # TODO(daniel): Remove this fallback when all existing access tokens
+            # have been re-issued as macaroons.
+            ret = yield self._look_up_user_by_access_token(token)
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def _get_user_from_macaroon(self, macaroon_str):
+        try:
+            macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
+            self._validate_macaroon(macaroon)
+
+            user_prefix = "user_id = "
+            for caveat in macaroon.caveats:
+                if caveat.caveat_id.startswith(user_prefix):
+                    user = UserID.from_string(caveat.caveat_id[len(user_prefix):])
+                    # This codepath exists so that we can actually return a
+                    # token ID, because we use token IDs in place of device
+                    # identifiers throughout the codebase.
+                    # TODO(daniel): Remove this fallback when device IDs are
+                    # properly implemented.
+                    ret = yield self._look_up_user_by_access_token(macaroon_str)
+                    if ret["user"] != user:
+                        logger.error(
+                            "Macaroon user (%s) != DB user (%s)",
+                            user,
+                            ret["user"]
+                        )
+                        raise AuthError(
+                            self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                            "User mismatch in macaroon",
+                            errcode=Codes.UNKNOWN_TOKEN
+                        )
+                    defer.returnValue(ret)
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "No user caveat in macaroon",
+                errcode=Codes.UNKNOWN_TOKEN
+            )
+        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Invalid macaroon passed.",
+                errcode=Codes.UNKNOWN_TOKEN
+            )
+
+    def _validate_macaroon(self, macaroon):
+        v = pymacaroons.Verifier()
+        v.satisfy_exact("gen = 1")
+        v.satisfy_exact("type = access")
+        v.satisfy_general(lambda c: c.startswith("user_id = "))
+        v.satisfy_general(self._verify_expiry)
+        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+
+        v = pymacaroons.Verifier()
+        v.satisfy_general(self._verify_recognizes_caveats)
+        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+
+    def _verify_expiry(self, caveat):
+        prefix = "time < "
+        if not caveat.startswith(prefix):
+            return False
+        # TODO(daniel): Enable expiry check when clients actually know how to
+        # refresh tokens. (And remember to enable the tests)
+        return True
+        expiry = int(caveat[len(prefix):])
+        now = self.hs.get_clock().time_msec()
+        return now < expiry
+
+    def _verify_recognizes_caveats(self, caveat):
+        first_space = caveat.find(" ")
+        if first_space < 0:
+            return False
+        second_space = caveat.find(" ", first_space + 1)
+        if second_space < 0:
+            return False
+        return caveat[:second_space + 1] in self._KNOWN_CAVEAT_PREFIXES
+
+    @defer.inlineCallbacks
+    def _look_up_user_by_access_token(self, token):
+        ret = yield self.store.get_user_by_access_token(token)
         if not ret:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
                 errcode=Codes.UNKNOWN_TOKEN
             )
         user_info = {
-            "admin": bool(ret.get("admin", False)),
-            "device_id": ret.get("device_id"),
             "user": UserID.from_string(ret.get("name")),
             "token_id": ret.get("token_id", None),
         }
-
         defer.returnValue(user_info)
 
     @defer.inlineCallbacks
@@ -485,6 +718,14 @@ class Auth(object):
             if e_type == Membership.JOIN:
                 if member_event and not is_public:
                     auth_ids.append(member_event.event_id)
+                if third_party_invites.join_has_third_party_invite(event.content):
+                    key = (
+                        EventTypes.ThirdPartyInvite,
+                        event.content["third_party_invite"]["token"]
+                    )
+                    invite = current_state.get(key)
+                    if invite:
+                        auth_ids.append(invite.event_id)
             else:
                 if member_event:
                     auth_ids.append(member_event.event_id)
@@ -548,16 +789,35 @@ class Auth(object):
 
         return True
 
-    def _check_redaction(self, event, auth_events):
+    def check_redaction(self, event, auth_events):
+        """Check whether the event sender is allowed to redact the target event.
+
+        Returns:
+            True if the the sender is allowed to redact the target event if the
+            target event was created by them.
+            False if the sender is allowed to redact the target event with no
+            further checks.
+
+        Raises:
+            AuthError if the event sender is definitely not allowed to redact
+            the target event.
+        """
         user_level = self._get_user_power_level(event.user_id, auth_events)
 
         redact_level = self._get_named_level(auth_events, "redact", 50)
 
-        if user_level < redact_level:
-            raise AuthError(
-                403,
-                "You don't have permission to redact events"
-            )
+        if user_level > redact_level:
+            return False
+
+        redacter_domain = EventID.from_string(event.event_id).domain
+        redactee_domain = EventID.from_string(event.redacts).domain
+        if redacter_domain == redactee_domain:
+            return True
+
+        raise AuthError(
+            403,
+            "You don't have permission to redact events"
+        )
 
     def _check_power_levels(self, event, auth_events):
         user_list = event.content.get("users", {})

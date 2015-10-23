@@ -21,6 +21,8 @@ import logging.config
 import yaml
 from string import Template
 import os
+import signal
+from synapse.util.debug import debug_deferreds
 
 
 DEFAULT_LOG_CONFIG = Template("""
@@ -68,8 +70,10 @@ class LoggingConfig(Config):
         self.verbosity = config.get("verbose", 0)
         self.log_config = self.abspath(config.get("log_config"))
         self.log_file = self.abspath(config.get("log_file"))
+        if config.get("full_twisted_stacktraces"):
+            debug_deferreds()
 
-    def default_config(self, config_dir_path, server_name):
+    def default_config(self, config_dir_path, server_name, **kwargs):
         log_file = self.abspath("homeserver.log")
         log_config = self.abspath(
             os.path.join(config_dir_path, server_name + ".log.config")
@@ -83,6 +87,11 @@ class LoggingConfig(Config):
 
         # A yaml python logging config file
         log_config: "%(log_config)s"
+
+        # Stop twisted from discarding the stack traces of exceptions in
+        # deferreds by waiting a reactor tick before running a deferred's
+        # callbacks.
+        # full_twisted_stacktraces: true
         """ % locals()
 
     def read_arguments(self, args):
@@ -142,6 +151,19 @@ class LoggingConfig(Config):
                 handler = logging.handlers.RotatingFileHandler(
                     self.log_file, maxBytes=(1000 * 1000 * 100), backupCount=3
                 )
+
+                def sighup(signum, stack):
+                    logger.info("Closing log file due to SIGHUP")
+                    handler.doRollover()
+                    logger.info("Opened new log file due to SIGHUP")
+
+                # TODO(paul): obviously this is a terrible mechanism for
+                #   stealing SIGHUP, because it means no other part of synapse
+                #   can use it instead. If we want to catch SIGHUP anywhere
+                #   else as well, I'd suggest we find a nicer way to broadcast
+                #   it around.
+                if getattr(signal, "SIGHUP"):
+                    signal.signal(signal.SIGHUP, sighup)
             else:
                 handler = logging.StreamHandler()
             handler.setFormatter(formatter)

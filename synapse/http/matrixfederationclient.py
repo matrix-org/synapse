@@ -25,13 +25,13 @@ from synapse.util.async import sleep
 from synapse.util.logcontext import preserve_context_over_fn
 import synapse.metrics
 
-from syutil.jsonutil import encode_canonical_json
+from canonicaljson import encode_canonical_json
 
 from synapse.api.errors import (
     SynapseError, Codes, HttpResponseException,
 )
 
-from syutil.crypto.jsonsign import sign_json
+from signedjson.sign import sign_json
 
 import simplejson as json
 import logging
@@ -57,14 +57,14 @@ incoming_responses_counter = metrics.register_counter(
 
 class MatrixFederationEndpointFactory(object):
     def __init__(self, hs):
-        self.tls_context_factory = hs.tls_context_factory
+        self.tls_server_context_factory = hs.tls_server_context_factory
 
     def endpointForURI(self, uri):
         destination = uri.netloc
 
         return matrix_federation_endpoint(
             reactor, destination, timeout=10,
-            ssl_context_factory=self.tls_context_factory
+            ssl_context_factory=self.tls_server_context_factory
         )
 
 

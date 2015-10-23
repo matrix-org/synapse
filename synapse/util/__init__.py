@@ -29,34 +29,6 @@ def unwrapFirstError(failure):
     return failure.value.subFailure
 
 
-def unwrap_deferred(d):
-    """Given a deferred that we know has completed, return its value or raise
-    the failure as an exception
-    """
-    if not d.called:
-        raise RuntimeError("deferred has not finished")
-
-    res = []
-
-    def f(r):
-        res.append(r)
-        return r
-    d.addCallback(f)
-
-    if res:
-        return res[0]
-
-    def f(r):
-        res.append(r)
-        return r
-    d.addErrback(f)
-
-    if res:
-        res[0].raiseException()
-    else:
-        raise RuntimeError("deferred did not call callbacks")
-
-
 class Clock(object):
     """A small utility that obtains current time-of-day so that time may be
     mocked during unit-tests.

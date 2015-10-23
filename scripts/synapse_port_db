@@ -29,7 +29,7 @@ import traceback
 import yaml
 
 
-logger = logging.getLogger("port_from_sqlite_to_postgres")
+logger = logging.getLogger("synapse_port_db")
 
 
 BOOLEAN_COLUMNS = {
@@ -94,8 +94,6 @@ class Store(object):
 
     _simple_update_one = SQLBaseStore.__dict__["_simple_update_one"]
     _simple_update_one_txn = SQLBaseStore.__dict__["_simple_update_one_txn"]
-
-    _execute_and_decode = SQLBaseStore.__dict__["_execute_and_decode"]
 
     def runInteraction(self, desc, func, *args, **kwargs):
         def r(conn):

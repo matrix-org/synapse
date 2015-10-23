@@ -47,7 +47,6 @@ class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes."""
 
     def __init__(self, code, msg):
-        logger.info("%s: %s, %s", type(self).__name__, code, msg)
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
         self.code = code
         self.msg = msg
@@ -75,11 +74,6 @@ class SynapseError(CodeMessageException):
             self.msg,
             self.errcode,
         )
-
-
-class RoomError(SynapseError):
-    """An error raised when a room event fails."""
-    pass
 
 
 class RegistrationError(SynapseError):

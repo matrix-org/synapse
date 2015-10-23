@@ -18,7 +18,7 @@ from synapse.util.caches.descriptors import cached
 
 from collections import namedtuple
 
-from syutil.jsonutil import encode_canonical_json
+from canonicaljson import encode_canonical_json
 import logging
 
 logger = logging.getLogger(__name__)

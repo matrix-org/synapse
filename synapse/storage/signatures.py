@@ -17,47 +17,12 @@ from twisted.internet import defer
 
 from _base import SQLBaseStore
 
-from syutil.base64util import encode_base64
+from unpaddedbase64 import encode_base64
 from synapse.crypto.event_signing import compute_event_reference_hash
 
 
 class SignatureStore(SQLBaseStore):
     """Persistence for event signatures and hashes"""
-
-    def _get_event_content_hashes_txn(self, txn, event_id):
-        """Get all the hashes for a given Event.
-        Args:
-            txn (cursor):
-            event_id (str): Id for the Event.
-        Returns:
-            A dict of algorithm -> hash.
-        """
-        query = (
-            "SELECT algorithm, hash"
-            " FROM event_content_hashes"
-            " WHERE event_id = ?"
-        )
-        txn.execute(query, (event_id, ))
-        return dict(txn.fetchall())
-
-    def _store_event_content_hash_txn(self, txn, event_id, algorithm,
-                                      hash_bytes):
-        """Store a hash for a Event
-        Args:
-            txn (cursor):
-            event_id (str): Id for the Event.
-            algorithm (str): Hashing algorithm.
-            hash_bytes (bytes): Hash function output bytes.
-        """
-        self._simple_insert_txn(
-            txn,
-            "event_content_hashes",
-            {
-                "event_id": event_id,
-                "algorithm": algorithm,
-                "hash": buffer(hash_bytes),
-            },
-        )
 
     def get_event_reference_hashes(self, event_ids):
         def f(txn):
@@ -122,81 +87,4 @@ class SignatureStore(SQLBaseStore):
             txn,
             table="event_reference_hashes",
             values=vals,
-        )
-
-    def _get_event_signatures_txn(self, txn, event_id):
-        """Get all the signatures for a given PDU.
-        Args:
-            txn (cursor):
-            event_id (str): Id for the Event.
-        Returns:
-            A dict of sig name -> dict(key_id -> signature_bytes)
-        """
-        query = (
-            "SELECT signature_name, key_id, signature"
-            " FROM event_signatures"
-            " WHERE event_id = ? "
-        )
-        txn.execute(query, (event_id, ))
-        rows = txn.fetchall()
-
-        res = {}
-
-        for name, key, sig in rows:
-            res.setdefault(name, {})[key] = sig
-
-        return res
-
-    def _store_event_signature_txn(self, txn, event_id, signature_name, key_id,
-                                   signature_bytes):
-        """Store a signature from the origin server for a PDU.
-        Args:
-            txn (cursor):
-            event_id (str): Id for the Event.
-            origin (str): origin of the Event.
-            key_id (str): Id for the signing key.
-            signature (bytes): The signature.
-        """
-        self._simple_insert_txn(
-            txn,
-            "event_signatures",
-            {
-                "event_id": event_id,
-                "signature_name": signature_name,
-                "key_id": key_id,
-                "signature": buffer(signature_bytes),
-            },
-        )
-
-    def _get_prev_event_hashes_txn(self, txn, event_id):
-        """Get all the hashes for previous PDUs of a PDU
-        Args:
-            txn (cursor):
-            event_id (str): Id for the Event.
-        Returns:
-            dict of (pdu_id, origin) -> dict of algorithm -> hash_bytes.
-        """
-        query = (
-            "SELECT prev_event_id, algorithm, hash"
-            " FROM event_edge_hashes"
-            " WHERE event_id = ?"
-        )
-        txn.execute(query, (event_id, ))
-        results = {}
-        for prev_event_id, algorithm, hash_bytes in txn.fetchall():
-            hashes = results.setdefault(prev_event_id, {})
-            hashes[algorithm] = hash_bytes
-        return results
-
-    def _store_prev_event_hash_txn(self, txn, event_id, prev_event_id,
-                                   algorithm, hash_bytes):
-        self._simple_insert_txn(
-            txn,
-            "event_edge_hashes",
-            {
-                "event_id": event_id,
-                "prev_event_id": prev_event_id,
-                "algorithm": algorithm,
-                "hash": buffer(hash_bytes),
-            },
         )
