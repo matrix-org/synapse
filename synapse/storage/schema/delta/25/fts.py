@@ -26,22 +26,23 @@ POSTGRES_SQL = """
 CREATE TABLE IF NOT EXISTS event_search (
     event_id TEXT,
     room_id TEXT,
+    sender TEXT,
     key TEXT,
     vector tsvector
 );
 
 INSERT INTO event_search SELECT
-    event_id, room_id, 'content.body',
+    event_id, room_id, json::json->>'sender', 'content.body',
     to_tsvector('english', json::json->'content'->>'body')
     FROM events NATURAL JOIN event_json WHERE type = 'm.room.message';
 
 INSERT INTO event_search SELECT
-    event_id, room_id, 'content.name',
+    event_id, room_id, json::json->>'sender', 'content.name',
     to_tsvector('english', json::json->'content'->>'name')
     FROM events NATURAL JOIN event_json WHERE type = 'm.room.name';
 
 INSERT INTO event_search SELECT
-    event_id, room_id, 'content.topic',
+    event_id, room_id, json::json->>'sender', 'content.topic',
     to_tsvector('english', json::json->'content'->>'topic')
     FROM events NATURAL JOIN event_json WHERE type = 'm.room.topic';
 
@@ -99,26 +100,28 @@ def run_sqlite_upgrade(cur):
 
             rows = []
             for ev in events:
-                if ev["type"] == "m.room.message":
+                content = ev.get("content", {})
+                body = content.get("body", None)
+                name = content.get("name", None)
+                topic = content.get("topic", None)
+                sender = ev.get("sender", None)
+                if ev["type"] == "m.room.message" and body:
                     rows.append((
-                        ev["event_id"], ev["room_id"], "content.body",
-                        ev["content"]["body"]
+                        ev["event_id"], ev["room_id"], sender, "content.body", body
                     ))
-                if ev["type"] == "m.room.name":
+                if ev["type"] == "m.room.name" and name:
                     rows.append((
-                        ev["event_id"], ev["room_id"], "content.name",
-                        ev["content"]["name"]
+                        ev["event_id"], ev["room_id"], sender, "content.name", name
                     ))
-                if ev["type"] == "m.room.topic":
+                if ev["type"] == "m.room.topic" and topic:
                     rows.append((
-                        ev["event_id"], ev["room_id"], "content.topic",
-                        ev["content"]["topic"]
+                        ev["event_id"], ev["room_id"], sender, "content.topic", topic
                     ))
 
             if rows:
                 logger.info(rows)
                 cur.executemany(
-                    "INSERT INTO event_search (event_id, room_id, key, value)"
-                    " VALUES (?,?,?,?)",
+                    "INSERT INTO event_search (event_id, room_id, sender, key, value)"
+                    " VALUES (?,?,?,?,?)",
                     rows
                 )
