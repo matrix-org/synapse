@@ -161,9 +161,7 @@ var try_cas = function() {
         return false;
     }
 
-    getCasURL(function(url) {
-        submitCas(ticket, url);
-    });
+    submitCas(ticket, location.origin);
 
     return true;
 };
