@@ -132,7 +132,9 @@ class SynapseHomeServer(HomeServer):
 
     def build_resource_for_static_content(self):
         # This is old and should go away: not going to bother adding gzip
-        return File("static")
+        return File(
+            os.path.join(os.path.dirname(synapse.__file__), "static")
+        )
 
     def build_resource_for_content_repo(self):
         return ContentRepoResource(
