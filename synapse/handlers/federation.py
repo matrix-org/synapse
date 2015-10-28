@@ -1652,7 +1652,6 @@ class FederationHandler(BaseHandler):
             "content": {
                 "membership": Membership.INVITE,
                 "third_party_invite": invite,
-                "token": invite["token"],
             },
             "room_id": room_id,
             "sender": sender,
