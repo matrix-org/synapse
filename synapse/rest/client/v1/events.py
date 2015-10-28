@@ -34,7 +34,7 @@ class EventStreamRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
         try:
             handler = self.handlers.event_stream_handler
             pagin_config = PaginationConfig.from_request(request)
@@ -71,7 +71,7 @@ class EventRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, event_id):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
         handler = self.handlers.event_handler
         event = yield handler.get_event(auth_user, event_id)
 

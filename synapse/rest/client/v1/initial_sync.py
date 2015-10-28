@@ -25,7 +25,7 @@ class InitialSyncRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        user, _ = yield self.auth.get_user_by_req(request)
+        user, _, _ = yield self.auth.get_user_by_req(request)
         as_client_event = "raw" not in request.args
         pagination_config = PaginationConfig.from_request(request)
         handler = self.handlers.message_handler

@@ -66,7 +66,7 @@ class ContentRepoResource(resource.Resource):
     @defer.inlineCallbacks
     def map_request_to_name(self, request):
         # auth the user
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
 
         # namespace all file uploads on the user
         prefix = base64.urlsafe_b64encode(

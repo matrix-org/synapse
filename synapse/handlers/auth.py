@@ -372,12 +372,15 @@ class AuthHandler(BaseHandler):
         yield self.store.add_refresh_token_to_user(user_id, refresh_token)
         defer.returnValue(refresh_token)
 
-    def generate_access_token(self, user_id):
+    def generate_access_token(self, user_id, extra_caveats=None):
+        extra_caveats = extra_caveats or []
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = access")
         now = self.hs.get_clock().time_msec()
         expiry = now + (60 * 60 * 1000)
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
+        for caveat in extra_caveats:
+            macaroon.add_first_party_caveat(caveat)
         return macaroon.serialize()
 
     def generate_refresh_token(self, user_id):

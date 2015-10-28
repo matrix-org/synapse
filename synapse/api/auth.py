@@ -49,6 +49,7 @@ class Auth(object):
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
         self._KNOWN_CAVEAT_PREFIXES = set([
             "gen = ",
+            "guest = ",
             "type = ",
             "time < ",
             "user_id = ",
@@ -497,7 +498,7 @@ class Auth(object):
             return default
 
     @defer.inlineCallbacks
-    def get_user_by_req(self, request):
+    def get_user_by_req(self, request, allow_guest=False):
         """ Get a registered user's ID.
 
         Args:
@@ -535,14 +536,15 @@ class Auth(object):
 
                 request.authenticated_entity = user_id
 
-                defer.returnValue((UserID.from_string(user_id), ""))
+                defer.returnValue((UserID.from_string(user_id), "", False))
                 return
             except KeyError:
                 pass  # normal users won't have the user_id query parameter set.
 
-            user_info = yield self._get_user_by_access_token(access_token)
+            user_info = yield self._get_user_by_access_token(access_token, allow_guest)
             user = user_info["user"]
             token_id = user_info["token_id"]
+            is_guest = user_info["is_guest"]
 
             ip_addr = self.hs.get_ip_from_request(request)
             user_agent = request.requestHeaders.getRawHeaders(
@@ -557,9 +559,14 @@ class Auth(object):
                     user_agent=user_agent
                 )
 
+            if is_guest and not allow_guest:
+                raise AuthError(
+                    403, "Guest access not allowed", Codes.GUEST_ACCESS_FORBIDDEN
+                )
+
             request.authenticated_entity = user.to_string()
 
-            defer.returnValue((user, token_id,))
+            defer.returnValue((user, token_id, is_guest,))
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
@@ -567,7 +574,7 @@ class Auth(object):
             )
 
     @defer.inlineCallbacks
-    def _get_user_by_access_token(self, token):
+    def _get_user_by_access_token(self, token, allow_guest):
         """ Get a registered user's ID.
 
         Args:
@@ -578,7 +585,7 @@ class Auth(object):
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            ret = yield self._get_user_from_macaroon(token)
+            ret = yield self._get_user_from_macaroon(token, allow_guest)
         except AuthError:
             # TODO(daniel): Remove this fallback when all existing access tokens
             # have been re-issued as macaroons.
@@ -586,49 +593,65 @@ class Auth(object):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def _get_user_from_macaroon(self, macaroon_str):
+    def _get_user_from_macaroon(self, macaroon_str, allow_guest=False):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
-            self._validate_macaroon(macaroon)
+            self._validate_macaroon(macaroon, allow_guest=allow_guest)
 
             user_prefix = "user_id = "
+            user = None
+            guest = False
             for caveat in macaroon.caveats:
                 if caveat.caveat_id.startswith(user_prefix):
                     user = UserID.from_string(caveat.caveat_id[len(user_prefix):])
-                    # This codepath exists so that we can actually return a
-                    # token ID, because we use token IDs in place of device
-                    # identifiers throughout the codebase.
-                    # TODO(daniel): Remove this fallback when device IDs are
-                    # properly implemented.
-                    ret = yield self._look_up_user_by_access_token(macaroon_str)
-                    if ret["user"] != user:
-                        logger.error(
-                            "Macaroon user (%s) != DB user (%s)",
-                            user,
-                            ret["user"]
-                        )
-                        raise AuthError(
-                            self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                            "User mismatch in macaroon",
-                            errcode=Codes.UNKNOWN_TOKEN
-                        )
-                    defer.returnValue(ret)
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS, "No user caveat in macaroon",
-                errcode=Codes.UNKNOWN_TOKEN
-            )
+                elif caveat.caveat_id == "guest = true":
+                    guest = True
+
+            if user is None:
+                raise AuthError(
+                    self.TOKEN_NOT_FOUND_HTTP_STATUS, "No user caveat in macaroon",
+                    errcode=Codes.UNKNOWN_TOKEN
+                )
+
+            if guest:
+                ret = {
+                    "user": user,
+                    "is_guest": True,
+                    "token_id": None,
+                }
+            else:
+                # This codepath exists so that we can actually return a
+                # token ID, because we use token IDs in place of device
+                # identifiers throughout the codebase.
+                # TODO(daniel): Remove this fallback when device IDs are
+                # properly implemented.
+                ret = yield self._look_up_user_by_access_token(macaroon_str)
+                if ret["user"] != user:
+                    logger.error(
+                        "Macaroon user (%s) != DB user (%s)",
+                        user,
+                        ret["user"]
+                    )
+                    raise AuthError(
+                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                        "User mismatch in macaroon",
+                        errcode=Codes.UNKNOWN_TOKEN
+                    )
+            defer.returnValue(ret)
         except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Invalid macaroon passed.",
                 errcode=Codes.UNKNOWN_TOKEN
             )
 
-    def _validate_macaroon(self, macaroon):
+    def _validate_macaroon(self, macaroon, allow_guest=False):
         v = pymacaroons.Verifier()
         v.satisfy_exact("gen = 1")
         v.satisfy_exact("type = access")
         v.satisfy_general(lambda c: c.startswith("user_id = "))
         v.satisfy_general(self._verify_expiry)
+        if allow_guest:
+            v.satisfy_exact("guest = true")
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
         v = pymacaroons.Verifier()
@@ -666,6 +689,7 @@ class Auth(object):
         user_info = {
             "user": UserID.from_string(ret.get("name")),
             "token_id": ret.get("token_id", None),
+            "is_guest": False,
         }
         defer.returnValue(user_info)
 

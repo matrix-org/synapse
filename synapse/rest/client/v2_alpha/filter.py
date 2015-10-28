@@ -40,7 +40,7 @@ class GetFilterRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, filter_id):
         target_user = UserID.from_string(user_id)
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
 
         if target_user != auth_user:
             raise AuthError(403, "Cannot get filters for other users")
@@ -76,7 +76,7 @@ class CreateFilterRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, user_id):
         target_user = UserID.from_string(user_id)
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
 
         if target_user != auth_user:
             raise AuthError(403, "Cannot create filters for other users")

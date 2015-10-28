@@ -52,8 +52,8 @@ class ProfileTestCase(unittest.TestCase):
             replication_layer=Mock(),
         )
 
-        def _get_user_by_req(request=None):
-            return (UserID.from_string(myid), "")
+        def _get_user_by_req(request=None, allow_guest=False):
+            return (UserID.from_string(myid), "", False)
 
         hs.get_v1auth().get_user_by_req = _get_user_by_req
 
