@@ -1664,9 +1664,7 @@ class FederationHandler(BaseHandler):
             EventValidator().validate_new(builder)
             event, context = yield self._create_new_client_event(builder=builder)
             check = self.auth.check(event, context.current_state)
-            logger.info("Passed check, about to do second check (no-fed)")
             yield check()
-            logger.info("Passed check, did second check (no-fed)")
             member_handler = self.hs.get_handlers().room_member_handler
             yield member_handler.change_membership(event, context)
         else:
@@ -1687,9 +1685,7 @@ class FederationHandler(BaseHandler):
         )
 
         check = self.auth.check(event, auth_events=context.current_state)
-        logger.info("Passed check, about to do second check (fed)")
         yield check()
-        logger.info("Passed check, did second check (fed)")
 
         returned_invite = yield self.send_invite(origin, event)
         # TODO: Make sure the signatures actually are correct.
