@@ -419,6 +419,8 @@ class On3pidBindServlet(BaseFederationServlet):
                 yield self.handler.exchange_third_party_invite(invite)
         defer.returnValue((200, {}))
 
+    # Avoid doing remote HS authorization checks which are done by default by
+    # BaseFederationServlet.
     def _wrap(self, code):
         return code
 
