@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.http.servlet import (
-    RestServlet, parse_string, parse_integer
+    RestServlet, parse_string, parse_integer, parse_boolean
 )
 from synapse.handlers.sync import SyncConfig
 from synapse.types import StreamToken
@@ -90,6 +90,7 @@ class SyncRestServlet(RestServlet):
             allowed_values=self.ALLOWED_PRESENCE
         )
         filter_id = parse_string(request, "filter", default=None)
+        full_state = parse_boolean(request, "full_state", default=False)
 
         logger.info(
             "/sync: user=%r, timeout=%r, since=%r,"
@@ -120,7 +121,8 @@ class SyncRestServlet(RestServlet):
 
         try:
             sync_result = yield self.sync_handler.wait_for_sync_for_user(
-                sync_config, since_token=since_token, timeout=timeout
+                sync_config, since_token=since_token, timeout=timeout,
+                full_state=full_state
             )
         finally:
             if set_presence == "online":
