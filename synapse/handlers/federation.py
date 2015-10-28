@@ -1706,7 +1706,7 @@ class FederationHandler(BaseHandler):
                 {"public_key": invite_event.content["public_key"]}
             )
         except Exception:
-            raise AuthError(
+            raise SynapseError(
                 502,
                 "Third party certificate could not be checked"
             )
