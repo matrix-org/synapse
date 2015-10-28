@@ -426,13 +426,15 @@ class Auth(object):
             if key not in signed:
                 return False
 
-        join_third_party_invite = event.content["third_party_invite"]
-        token = join_third_party_invite["token"]
+        token = signed["token"]
 
         invite_event = auth_events.get(
             (EventTypes.ThirdPartyInvite, token,)
         )
         if not invite_event:
+            return False
+
+        if event.user_id != invite_event.user_id:
             return False
         try:
             public_key = invite_event.content["public_key"]
