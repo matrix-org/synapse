@@ -327,10 +327,9 @@ class Auth(object):
         )
 
         if Membership.INVITE == membership and "third_party_invite" in event.content:
-            verified_or_func = self._verify_third_party_invite(event, auth_events)
-            if not verified_or_func:
+            if not self._verify_third_party_invite(event, auth_events):
                 raise AuthError(403, "You are not invited to this room.")
-            return verified_or_func
+            return True
 
         if Membership.JOIN != membership:
             if (caller_invited
@@ -452,22 +451,7 @@ class Auth(object):
                     )
                     verify_signed_json(signed, server, verify_key)
 
-                    @defer.inlineCallbacks
-                    def check_key_valid():
-                        try:
-                            response = yield self.hs.get_simple_http_client().get_json(
-                                invite_event.content["key_validity_url"],
-                                {"public_key": public_key}
-                            )
-                        except Exception:
-                            raise AuthError(
-                                502,
-                                "Third party certificate could not be checked"
-                            )
-                        if "valid" not in response or not response["valid"]:
-                            raise AuthError(403, "Third party certificate was invalid")
-
-                    return check_key_valid
+                    return True
             return False
         except (KeyError, SignatureVerifyException,):
             return False

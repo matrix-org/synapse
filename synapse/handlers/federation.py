@@ -1662,8 +1662,8 @@ class FederationHandler(BaseHandler):
             builder = self.event_builder_factory.new(event_dict)
             EventValidator().validate_new(builder)
             event, context = yield self._create_new_client_event(builder=builder)
-            check = self.auth.check(event, context.current_state)
-            yield check()
+            self.auth.check(event, context.current_state)
+            yield self._validate_keyserver(event, auth_events=context.current_state)
             member_handler = self.hs.get_handlers().room_member_handler
             yield member_handler.change_membership(event, context)
         else:
@@ -1683,11 +1683,32 @@ class FederationHandler(BaseHandler):
             builder=builder,
         )
 
-        check = self.auth.check(event, auth_events=context.current_state)
-        yield check()
+        self.auth.check(event, auth_events=context.current_state)
+        yield self._validate_keyserver(event, auth_events=context.current_state)
 
         returned_invite = yield self.send_invite(origin, event)
         # TODO: Make sure the signatures actually are correct.
         event.signatures.update(returned_invite.signatures)
         member_handler = self.hs.get_handlers().room_member_handler
         yield member_handler.change_membership(event, context)
+
+    @defer.inlineCallbacks
+    def _validate_keyserver(self, event, auth_events):
+        token = event.content["third_party_invite"]["signed"]["token"]
+
+        invite_event = auth_events.get(
+            (EventTypes.ThirdPartyInvite, token,)
+        )
+
+        try:
+            response = yield self.hs.get_simple_http_client().get_json(
+                invite_event.content["key_validity_url"],
+                {"public_key": invite_event.content["public_key"]}
+            )
+        except Exception:
+            raise AuthError(
+                502,
+                "Third party certificate could not be checked"
+            )
+        if "valid" not in response or not response["valid"]:
+            raise AuthError(403, "Third party certificate was invalid")
