@@ -16,6 +16,7 @@
 from ._base import client_v2_pattern
 
 from synapse.http.servlet import RestServlet
+from synapse.api.errors import AuthError
 
 from twisted.internet import defer
 
@@ -56,6 +57,7 @@ class TagServlet(RestServlet):
     PATTERN = client_v2_pattern(
         "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags/(?P<tag>[^/]*)"
     )
+
     def __init__(self, hs):
         super(TagServlet, self).__init__()
         self.auth = hs.get_auth()

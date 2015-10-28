@@ -84,7 +84,7 @@ class TagsStore(SQLBaseStore):
         results = {}
         if room_ids:
             tags_by_room = yield self.get_tags_for_user(self, user_id)
-            for room_id in rooms_ids:
+            for room_id in room_ids:
                 results[room_id] = tags_by_room[room_id]
 
         defer.returnValue(results)
@@ -117,7 +117,7 @@ class TagsStore(SQLBaseStore):
             )
             try:
                 txn.execute(sql, (user_id, room_id, tag))
-            except database_engine.module.IntegrityError as e:
+            except self.database_engine.module.IntegrityError:
                 # Return early if the row is already in the table
                 # and we don't need to bump the revision number of the
                 # private_user_data.
@@ -180,7 +180,7 @@ class TagsStore(SQLBaseStore):
             )
             try:
                 txn.execute(insert_sql, (user_id, room_id, next_id))
-            except database_engine.module.IntegrityError as e:
+            except self.database_engine.module.IntegrityError:
                 # Ignore insertion errors. It doesn't matter if the row wasn't
                 # inserted because if two updates happend concurrently the one
                 # with the higher stream_id will not be reported to a client
