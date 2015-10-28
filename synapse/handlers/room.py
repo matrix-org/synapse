@@ -751,6 +751,19 @@ class RoomListHandler(BaseHandler):
 class RoomContextHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_event_context(self, user, room_id, event_id, limit):
+        """Retrieves events, pagination tokens and state around a given event
+        in a room.
+
+        Args:
+            user (UserID)
+            room_id (str)
+            event_id (str)
+            limit (int): The maximum number of events to return in total
+                (excluding state).
+
+        Returns:
+            dict
+        """
         before_limit = math.floor(limit/2.)
         after_limit = limit - before_limit
 

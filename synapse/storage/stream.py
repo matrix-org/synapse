@@ -439,6 +439,19 @@ class StreamStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_events_around(self, room_id, event_id, before_limit, after_limit):
+        """Retrieve events and pagination tokens around a given event in a
+        room.
+
+        Args:
+            room_id (str)
+            event_id (str)
+            before_limit (int)
+            after_limit (int)
+
+        Returns:
+            dict
+        """
+
         results = yield self.runInteraction(
             "get_events_around", self._get_events_around_txn,
             room_id, event_id, before_limit, after_limit
@@ -462,6 +475,19 @@ class StreamStore(SQLBaseStore):
         })
 
     def _get_events_around_txn(self, txn, room_id, event_id, before_limit, after_limit):
+        """Retrieves event_ids and pagination tokens around a given event in a
+        room.
+
+        Args:
+            room_id (str)
+            event_id (str)
+            before_limit (int)
+            after_limit (int)
+
+        Returns:
+            dict
+        """
+
         results = self._simple_select_one_txn(
             txn,
             "events",
