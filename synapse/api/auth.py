@@ -184,15 +184,11 @@ class Auth(object):
         defer.returnValue(member)
 
     @defer.inlineCallbacks
-    def check_user_was_in_room(self, room_id, user_id, current_state=None):
+    def check_user_was_in_room(self, room_id, user_id):
         """Check if the user was in the room at some point.
         Args:
             room_id(str): The room to check.
             user_id(str): The user to check.
-            current_state(dict): Optional map of the current state of the room.
-                If provided then that map is used to check whether they are a
-                member of the room. Otherwise the current membership is
-                loaded from the database.
         Raises:
             AuthError if the user was never in the room.
         Returns:
@@ -200,17 +196,11 @@ class Auth(object):
             room. This will be the join event if they are currently joined to
             the room. This will be the leave event if they have left the room.
         """
-        if current_state:
-            member = current_state.get(
-                (EventTypes.Member, user_id),
-                None
-            )
-        else:
-            member = yield self.state.get_current_state(
-                room_id=room_id,
-                event_type=EventTypes.Member,
-                state_key=user_id
-            )
+        member = yield self.state.get_current_state(
+            room_id=room_id,
+            event_type=EventTypes.Member,
+            state_key=user_id
+        )
         membership = member.membership if member else None
 
         if membership not in (Membership.JOIN, Membership.LEAVE):

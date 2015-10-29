@@ -47,7 +47,36 @@ class BaseHandler(object):
         self.event_builder_factory = hs.get_event_builder_factory()
 
     @defer.inlineCallbacks
-    def _filter_events_for_client(self, user_id, events):
+    def _filter_events_for_client(self, user_id, events, is_guest=False):
+        exclude = 0
+        include = 1
+        include_if_later_joined = 2
+
+        def allowed(event, membership, visibility):
+            if visibility == "world_readable":
+                return include
+
+            if membership == Membership.JOIN:
+                return include
+
+            if event.type == EventTypes.RoomHistoryVisibility:
+                return include_if_later_joined
+
+            if visibility == "public":
+                return include_if_later_joined
+            elif visibility == "shared":
+                return include_if_later_joined
+            elif visibility == "joined":
+                if membership == Membership.JOIN:
+                    return include
+                return exclude
+            elif visibility == "invited":
+                if membership == Membership.INVITE:
+                    return include_if_later_joined
+                return exclude
+
+            return include_if_later_joined
+
         event_id_to_state = yield self.store.get_state_for_events(
             frozenset(e.event_id for e in events),
             types=(
@@ -56,41 +85,39 @@ class BaseHandler(object):
             )
         )
 
-        def allowed(event, state):
-            if event.type == EventTypes.RoomHistoryVisibility:
-                return True
+        events_to_return = []
+        events_to_return_if_later_joined = []
+        for event in events:
+            state = event_id_to_state[event.event_id]
 
-            membership_ev = state.get((EventTypes.Member, user_id), None)
-            if membership_ev:
-                membership = membership_ev.membership
+            membership_event = state.get((EventTypes.Member, user_id), None)
+            if membership_event:
+                membership = membership_event.membership
             else:
-                membership = Membership.LEAVE
+                membership = None
 
             if membership == Membership.JOIN:
-                return True
+                events_to_return.extend(events_to_return_if_later_joined)
+                events_to_return_if_later_joined = []
 
-            history = state.get((EventTypes.RoomHistoryVisibility, ''), None)
-            if history:
-                visibility = history.content.get("history_visibility", "shared")
+            visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
+            if visibility_event:
+                visibility = visibility_event.content.get("history_visibility", "shared")
             else:
                 visibility = "shared"
 
-            if visibility == "public":
-                return True
-            elif visibility == "shared":
-                return True
-            elif visibility == "joined":
-                return membership == Membership.JOIN
-            elif visibility == "invited":
-                return membership == Membership.INVITE
+            should_include = allowed(event, membership, visibility)
+            if should_include == include:
+                events_to_return.append(event)
+            elif should_include == include_if_later_joined:
+                events_to_return_if_later_joined.append(event)
 
-            return True
+        if is_guest and len(events_to_return) < len(events):
+            raise AuthError(403, "User %s does not have permission" % (
+                user_id
+            ))
 
-        defer.returnValue([
-            event
-            for event in events
-            if allowed(event, event_id_to_state[event.event_id])
-        ])
+        defer.returnValue(events_to_return)
 
     def ratelimit(self, user_id):
         time_now = self.clock.time()
