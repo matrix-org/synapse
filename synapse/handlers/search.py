@@ -87,6 +87,9 @@ class SearchHandler(BaseHandler):
             user.to_string(), filtered_events
         )
 
+        allowed_events.sort(key=lambda e: -rank_map[e.event_id])
+        allowed_events = allowed_events[:search_filter.limit()]
+
         if event_context is not None:
             now_token = yield self.hs.get_event_sources().get_current_token()
 
