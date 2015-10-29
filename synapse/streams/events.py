@@ -21,6 +21,7 @@ from synapse.handlers.presence import PresenceEventSource
 from synapse.handlers.room import RoomEventSource
 from synapse.handlers.typing import TypingNotificationEventSource
 from synapse.handlers.receipts import ReceiptEventSource
+from synapse.handlers.private_user_data import PrivateUserDataEventSource
 
 
 class EventSources(object):
@@ -29,6 +30,7 @@ class EventSources(object):
         "presence": PresenceEventSource,
         "typing": TypingNotificationEventSource,
         "receipt": ReceiptEventSource,
+        "private_user_data": PrivateUserDataEventSource,
     }
 
     def __init__(self, hs):
@@ -51,6 +53,9 @@ class EventSources(object):
             ),
             receipt_key=(
                 yield self.sources["receipt"].get_current_key()
+            ),
+            private_user_data_key=(
+                yield self.sources["private_user_data"].get_current_key()
             ),
         )
         defer.returnValue(token)

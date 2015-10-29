@@ -31,6 +31,14 @@ class TagsStore(SQLBaseStore):
             "private_user_data_max_stream_id", "stream_id"
         )
 
+    def get_max_private_user_data_stream_id(self):
+        """Get the current max stream id for the private user data stream
+
+        Returns:
+            A deferred int.
+        """
+        return self._private_user_data_id_gen.get_max_token(self)
+
     @cached()
     def get_tags_for_user(self, user_id):
         """Get all the tags for a user.
@@ -83,7 +91,7 @@ class TagsStore(SQLBaseStore):
 
         results = {}
         if room_ids:
-            tags_by_room = yield self.get_tags_for_user(self, user_id)
+            tags_by_room = yield self.get_tags_for_user(user_id)
             for room_id in room_ids:
                 results[room_id] = tags_by_room[room_id]
 
@@ -129,6 +137,9 @@ class TagsStore(SQLBaseStore):
 
         self.get_tags_for_user.invalidate((user_id,))
 
+        result = yield self._private_user_data_id_gen.get_max_token(self)
+        defer.returnValue(result)
+
     @defer.inlineCallbacks
     def remove_tag_from_room(self, user_id, room_id, tag):
         """Remove a tag from a room for a user.
@@ -147,6 +158,9 @@ class TagsStore(SQLBaseStore):
             yield self.runInteraction("remove_tag", remove_tag_txn, next_id)
 
         self.get_tags_for_user.invalidate((user_id,))
+
+        result = yield self._private_user_data_id_gen.get_max_token(self)
+        defer.returnValue(result)
 
     def _update_revision_txn(self, txn, user_id, room_id, next_id):
         """Update the latest revision of the tags for the given user and room.

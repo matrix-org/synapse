@@ -62,6 +62,7 @@ class TagServlet(RestServlet):
         super(TagServlet, self).__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.notifier = hs.get_notifier()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id, room_id, tag):
@@ -69,9 +70,12 @@ class TagServlet(RestServlet):
         if user_id != auth_user.to_string():
             raise AuthError(403, "Cannot add tags for other users.")
 
-        yield self.store.add_tag_to_room(user_id, room_id, tag)
+        max_id = yield self.store.add_tag_to_room(user_id, room_id, tag)
 
-        # TODO: poke the notifier.
+        yield self.notifier.on_new_event(
+            "private_user_data_key", max_id, users=[user_id]
+        )
+
         defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
@@ -80,7 +84,11 @@ class TagServlet(RestServlet):
         if user_id != auth_user.to_string():
             raise AuthError(403, "Cannot add tags for other users.")
 
-        yield self.store.remove_tag_from_room(user_id, room_id, tag)
+        max_id = yield self.store.remove_tag_from_room(user_id, room_id, tag)
+
+        yield self.notifier.on_new_event(
+            "private_user_data_key", max_id, users=[user_id]
+        )
 
         # TODO: poke the notifier.
         defer.returnValue((200, {}))

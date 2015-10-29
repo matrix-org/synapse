@@ -98,10 +98,13 @@ class EventID(DomainSpecificString):
 
 
 class StreamToken(
-    namedtuple(
-        "Token",
-        ("room_key", "presence_key", "typing_key", "receipt_key")
-    )
+    namedtuple("Token", (
+        "room_key",
+        "presence_key",
+        "typing_key",
+        "receipt_key",
+        "private_user_data_key",
+    ))
 ):
     _SEPARATOR = "_"
 
@@ -128,13 +131,14 @@ class StreamToken(
         else:
             return int(self.room_key[1:].split("-")[-1])
 
-    def is_after(self, other_token):
+    def is_after(self, other):
         """Does this token contain events that the other doesn't?"""
         return (
-            (other_token.room_stream_id < self.room_stream_id)
-            or (int(other_token.presence_key) < int(self.presence_key))
-            or (int(other_token.typing_key) < int(self.typing_key))
-            or (int(other_token.receipt_key) < int(self.receipt_key))
+            (other.room_stream_id < self.room_stream_id)
+            or (int(other.presence_key) < int(self.presence_key))
+            or (int(other.typing_key) < int(self.typing_key))
+            or (int(other.receipt_key) < int(self.receipt_key))
+            or (int(other.private_user_data_key) < int(self.private_user_data_key))
         )
 
     def copy_and_advance(self, key, new_value):
