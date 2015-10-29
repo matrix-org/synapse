@@ -541,7 +541,7 @@ class Auth(object):
             except KeyError:
                 pass  # normal users won't have the user_id query parameter set.
 
-            user_info = yield self._get_user_by_access_token(access_token, allow_guest)
+            user_info = yield self._get_user_by_access_token(access_token)
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
@@ -561,7 +561,7 @@ class Auth(object):
 
             if is_guest and not allow_guest:
                 raise AuthError(
-                    403, "Guest access not allowed", Codes.GUEST_ACCESS_FORBIDDEN
+                    403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
                 )
 
             request.authenticated_entity = user.to_string()
@@ -574,7 +574,7 @@ class Auth(object):
             )
 
     @defer.inlineCallbacks
-    def _get_user_by_access_token(self, token, allow_guest):
+    def _get_user_by_access_token(self, token):
         """ Get a registered user's ID.
 
         Args:
@@ -585,7 +585,7 @@ class Auth(object):
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            ret = yield self._get_user_from_macaroon(token, allow_guest)
+            ret = yield self._get_user_from_macaroon(token)
         except AuthError:
             # TODO(daniel): Remove this fallback when all existing access tokens
             # have been re-issued as macaroons.
@@ -593,10 +593,10 @@ class Auth(object):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def _get_user_from_macaroon(self, macaroon_str, allow_guest=False):
+    def _get_user_from_macaroon(self, macaroon_str):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
-            self._validate_macaroon(macaroon, allow_guest=allow_guest)
+            self._validate_macaroon(macaroon)
 
             user_prefix = "user_id = "
             user = None
@@ -644,14 +644,13 @@ class Auth(object):
                 errcode=Codes.UNKNOWN_TOKEN
             )
 
-    def _validate_macaroon(self, macaroon, allow_guest=False):
+    def _validate_macaroon(self, macaroon):
         v = pymacaroons.Verifier()
         v.satisfy_exact("gen = 1")
         v.satisfy_exact("type = access")
         v.satisfy_general(lambda c: c.startswith("user_id = "))
         v.satisfy_general(self._verify_expiry)
-        if allow_guest:
-            v.satisfy_exact("guest = true")
+        v.satisfy_exact("guest = true")
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
         v = pymacaroons.Verifier()

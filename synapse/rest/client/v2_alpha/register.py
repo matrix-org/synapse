@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 class RegisterRestServlet(RestServlet):
-    PATTERN = client_v2_pattern("/register")
+    PATTERN = client_v2_pattern("/register(/.*)?$")
 
     def __init__(self, hs):
         super(RegisterRestServlet, self).__init__()
@@ -52,7 +52,7 @@ class RegisterRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
 
     @defer.inlineCallbacks
-    def on_POST(self, request):
+    def on_POST(self, request, trailing_path=""):
         yield run_on_reactor()
 
         if '/register/email/requestToken' in request.path:
@@ -237,5 +237,28 @@ class RegisterRestServlet(RestServlet):
         defer.returnValue((200, ret))
 
 
+class RegisterGuestRestServlet(RestServlet):
+    PATTERN = client_v2_pattern("/register-guest?$")
+
+    def __init__(self, hs):
+        super(RegisterGuestRestServlet, self).__init__()
+        self.hs = hs
+        self.auth_handler = hs.get_handlers().auth_handler
+        self.registration_handler = hs.get_handlers().registration_handler
+
+    def on_POST(self, request):
+        if not self.hs.config.allow_guest_access:
+            return (403, "Guest access is disabled")
+        user_id, _ = self.registration_handler.register(generate_token=False)
+        access_token = self.auth_handler.generate_access_token(user_id, ["guest = true"])
+        return (200, {
+            "user_id": user_id,
+            "access_token": access_token,
+            "home_server": self.hs.hostname,
+
+        })
+
+
 def register_servlets(hs, http_server):
     RegisterRestServlet(hs).register(http_server)
+    RegisterGuestRestServlet(hs).register(http_server)

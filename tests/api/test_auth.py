@@ -171,19 +171,7 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("guest = true")
         serialized = macaroon.serialize()
 
-        try:
-            ret = yield self.auth._get_user_from_macaroon(
-                serialized,
-                allow_guest=False
-            )
-            self.fail("want AuthError got return value: %s" % (ret,))
-        except AuthError:
-            pass
-
-        user_info = yield self.auth._get_user_from_macaroon(
-            serialized,
-            allow_guest=True
-        )
+        user_info = yield self.auth._get_user_from_macaroon(serialized)
         user = user_info["user"]
         is_guest = user_info["is_guest"]
         self.assertEqual(UserID.from_string(user_id), user)

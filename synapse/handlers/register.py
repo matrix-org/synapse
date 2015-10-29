@@ -64,7 +64,7 @@ class RegistrationHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def register(self, localpart=None, password=None):
+    def register(self, localpart=None, password=None, generate_token=True):
         """Registers a new client on the server.
 
         Args:
@@ -89,7 +89,9 @@ class RegistrationHandler(BaseHandler):
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
 
-            token = self.auth_handler().generate_access_token(user_id)
+            token = None
+            if generate_token:
+                token = self.auth_handler().generate_access_token(user_id)
             yield self.store.register(
                 user_id=user_id,
                 token=token,
@@ -102,14 +104,14 @@ class RegistrationHandler(BaseHandler):
             attempts = 0
             user_id = None
             token = None
-            while not user_id and not token:
+            while not user_id:
                 try:
                     localpart = self._generate_user_id()
                     user = UserID(localpart, self.hs.hostname)
                     user_id = user.to_string()
                     yield self.check_user_id_is_valid(user_id)
-
-                    token = self.auth_handler().generate_access_token(user_id)
+                    if generate_token:
+                        token = self.auth_handler().generate_access_token(user_id)
                     yield self.store.register(
                         user_id=user_id,
                         token=token,
