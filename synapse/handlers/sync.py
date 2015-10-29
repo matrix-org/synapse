@@ -387,7 +387,7 @@ class SyncHandler(BaseHandler):
                 else:
                     prev_batch = now_token
 
-                state = yield self.check_joined_room(
+                state, limited = yield self.check_joined_room(
                     sync_config, room_id, state
                 )
 
@@ -396,7 +396,7 @@ class SyncHandler(BaseHandler):
                     timeline=TimelineBatch(
                         events=recents,
                         prev_batch=prev_batch,
-                        limited=False,
+                        limited=limited,
                     ),
                     state=state,
                     ephemeral=typing_by_room.get(room_id, [])
@@ -627,6 +627,7 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def check_joined_room(self, sync_config, room_id, state_delta):
         joined = False
+        limited = False
         for event in state_delta:
             if (
                 event.type == EventTypes.Member
@@ -638,5 +639,6 @@ class SyncHandler(BaseHandler):
         if joined:
             res = yield self.state_handler.get_current_state(room_id)
             state_delta = res.values()
+            limited = True
 
-        defer.returnValue(state_delta)
+        defer.returnValue((state_delta, limited))
