@@ -246,17 +246,18 @@ class RegisterGuestRestServlet(RestServlet):
         self.auth_handler = hs.get_handlers().auth_handler
         self.registration_handler = hs.get_handlers().registration_handler
 
+    @defer.inlineCallbacks
     def on_POST(self, request):
         if not self.hs.config.allow_guest_access:
-            return (403, "Guest access is disabled")
-        user_id, _ = self.registration_handler.register(generate_token=False)
+            defer.returnValue((403, "Guest access is disabled"))
+        user_id, _ = yield self.registration_handler.register(generate_token=False)
         access_token = self.auth_handler.generate_access_token(user_id, ["guest = true"])
-        return (200, {
+        defer.returnValue((200, {
             "user_id": user_id,
             "access_token": access_token,
             "home_server": self.hs.hostname,
 
-        })
+        }))
 
 
 def register_servlets(hs, http_server):
