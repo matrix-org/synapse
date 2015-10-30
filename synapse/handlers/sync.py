@@ -520,7 +520,7 @@ class SyncHandler(BaseHandler):
             current_state=current_state_events,
         )
 
-        state_events_delta = yield self.check_joined_room(
+        state_events_delta, _ = yield self.check_joined_room(
             sync_config, room_id, state_events_delta
         )
 
