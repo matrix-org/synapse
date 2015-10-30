@@ -112,7 +112,7 @@ class StreamToken(
     def from_string(cls, string):
         try:
             keys = string.split(cls._SEPARATOR)
-            if len(keys) == len(cls._fields) - 1:
+            while len(keys) < len(cls._fields):
                 # i.e. old token from before receipt_key
                 keys.append("0")
             return cls(*keys)
