@@ -415,8 +415,14 @@ class On3pidBindServlet(BaseFederationServlet):
         content_bytes = request.content.read()
         content = json.loads(content_bytes)
         if "invites" in content:
+            last_exception = None
             for invite in content["invites"]:
-                yield self.handler.exchange_third_party_invite(invite)
+                try:
+                    yield self.handler.exchange_third_party_invite(invite)
+                except Exception as e:
+                    last_exception = e
+            if last_exception:
+                raise last_exception
         defer.returnValue((200, {}))
 
     # Avoid doing remote HS authorization checks which are done by default by

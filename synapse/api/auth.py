@@ -451,6 +451,10 @@ class Auth(object):
                     )
                     verify_signed_json(signed, server, verify_key)
 
+                    # We got the public key from the invite, so we know that the
+                    # correct server signed the signed bundle.
+                    # The caller is responsible for checking that the signing
+                    # server has not revoked that public key.
                     return True
             return False
         except (KeyError, SignatureVerifyException,):
@@ -738,6 +742,16 @@ class Auth(object):
             else:
                 if member_event:
                     auth_ids.append(member_event.event_id)
+
+            if e_type == Membership.INVITE:
+                if "third_party_invite" in event.content:
+                    key = (
+                        EventTypes.ThirdPartyInvite,
+                        event.content["third_party_invite"]["token"]
+                    )
+                    third_party_invite = current_state.get(key)
+                    if third_party_invite:
+                        auth_ids.append(third_party_invite.event_id)
         elif member_event:
             if member_event.content["membership"] == Membership.JOIN:
                 auth_ids.append(member_event.event_id)
