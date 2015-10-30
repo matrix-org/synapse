@@ -459,6 +459,17 @@ class MessageHandler(BaseHandler):
             result = yield self._room_initial_sync_parted(
                 user_id, room_id, pagin_config, member_event
             )
+
+        private_user_data = []
+        tags = yield self.store.get_tags_for_room(user_id, room_id)
+        if tags:
+            private_user_data.append({
+                "type": "m.tag",
+                "content": {"tags": tags},
+                "room_id": room_id,
+            })
+        result["private_user_data"] = private_user_data
+
         defer.returnValue(result)
 
     @defer.inlineCallbacks
