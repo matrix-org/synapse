@@ -15,19 +15,25 @@
 
 from tests import unittest
 
+from synapse.api.errors import SynapseError
 from synapse.server import BaseHomeServer
 from synapse.types import UserID, RoomAlias
 
 mock_homeserver = BaseHomeServer(hostname="my.domain")
 
-class UserIDTestCase(unittest.TestCase):
 
+class UserIDTestCase(unittest.TestCase):
     def test_parse(self):
         user = UserID.from_string("@1234abcd:my.domain")
 
         self.assertEquals("1234abcd", user.localpart)
         self.assertEquals("my.domain", user.domain)
         self.assertEquals(True, mock_homeserver.is_mine(user))
+
+    def test_pase_empty(self):
+        with self.assertRaises(SynapseError):
+            UserID.from_string("")
+
 
     def test_build(self):
         user = UserID("5678efgh", "my.domain")
@@ -44,7 +50,6 @@ class UserIDTestCase(unittest.TestCase):
 
 
 class RoomAliasTestCase(unittest.TestCase):
-
     def test_parse(self):
         room = RoomAlias.from_string("#channel:my.domain")
 

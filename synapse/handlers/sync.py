@@ -113,15 +113,20 @@ class SyncHandler(BaseHandler):
         self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
-    def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0):
+    def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0,
+                               full_state=False):
         """Get the sync for a client if we have new data for it now. Otherwise
         wait for new data to arrive on the server. If the timeout expires, then
         return an empty sync result.
         Returns:
             A Deferred SyncResult.
         """
-        if timeout == 0 or since_token is None:
-            result = yield self.current_sync_for_user(sync_config, since_token)
+
+        if timeout == 0 or since_token is None or full_state:
+            # we are going to return immediately, so don't bother calling
+            # notifier.wait_for_events.
+            result = yield self.current_sync_for_user(sync_config, since_token,
+                                                      full_state=full_state)
             defer.returnValue(result)
         else:
             def current_sync_callback(before_token, after_token):
@@ -146,19 +151,24 @@ class SyncHandler(BaseHandler):
             )
             defer.returnValue(result)
 
-    def current_sync_for_user(self, sync_config, since_token=None):
+    def current_sync_for_user(self, sync_config, since_token=None,
+                              full_state=False):
         """Get the sync for client needed to match what the server has now.
         Returns:
             A Deferred SyncResult.
         """
-        if since_token is None:
-            return self.initial_sync(sync_config)
+        if since_token is None or full_state:
+            return self.full_state_sync(sync_config, since_token)
         else:
             return self.incremental_sync_with_gap(sync_config, since_token)
 
     @defer.inlineCallbacks
-    def initial_sync(self, sync_config):
-        """Get a sync for a client which is starting without any state
+    def full_state_sync(self, sync_config, timeline_since_token):
+        """Get a sync for a client which is starting without any state.
+
+        If a 'message_since_token' is given, only timeline events which have
+        happened since that token will be returned.
+
         Returns:
             A Deferred SyncResult.
         """
@@ -192,8 +202,12 @@ class SyncHandler(BaseHandler):
         archived = []
         for event in room_list:
             if event.membership == Membership.JOIN:
-                room_sync = yield self.initial_sync_for_joined_room(
-                    event.room_id, sync_config, now_token, typing_by_room
+                room_sync = yield self.full_state_sync_for_joined_room(
+                    room_id=event.room_id,
+                    sync_config=sync_config,
+                    now_token=now_token,
+                    timeline_since_token=timeline_since_token,
+                    typing_by_room=typing_by_room
                 )
                 joined.append(room_sync)
             elif event.membership == Membership.INVITE:
@@ -206,11 +220,12 @@ class SyncHandler(BaseHandler):
                 leave_token = now_token.copy_and_replace(
                     "room_key", "s%d" % (event.stream_ordering,)
                 )
-                room_sync = yield self.initial_sync_for_archived_room(
+                room_sync = yield self.full_state_sync_for_archived_room(
                     sync_config=sync_config,
                     room_id=event.room_id,
                     leave_event_id=event.event_id,
                     leave_token=leave_token,
+                    timeline_since_token=timeline_since_token,
                 )
                 archived.append(room_sync)
 
@@ -223,15 +238,16 @@ class SyncHandler(BaseHandler):
         ))
 
     @defer.inlineCallbacks
-    def initial_sync_for_joined_room(self, room_id, sync_config, now_token,
-                                     typing_by_room):
+    def full_state_sync_for_joined_room(self, room_id, sync_config,
+                                        now_token, timeline_since_token,
+                                        typing_by_room):
         """Sync a room for a client which is starting without any state
         Returns:
             A Deferred JoinedSyncResult.
         """
 
         batch = yield self.load_filtered_recents(
-            room_id, sync_config, now_token,
+            room_id, sync_config, now_token, since_token=timeline_since_token
         )
 
         current_state = yield self.state_handler.get_current_state(
@@ -278,15 +294,16 @@ class SyncHandler(BaseHandler):
         defer.returnValue((now_token, typing_by_room))
 
     @defer.inlineCallbacks
-    def initial_sync_for_archived_room(self, room_id, sync_config,
-                                       leave_event_id, leave_token):
+    def full_state_sync_for_archived_room(self, room_id, sync_config,
+                                          leave_event_id, leave_token,
+                                          timeline_since_token):
         """Sync a room for a client which is starting without any state
         Returns:
             A Deferred JoinedSyncResult.
         """
 
         batch = yield self.load_filtered_recents(
-            room_id, sync_config, leave_token,
+            room_id, sync_config, leave_token, since_token=timeline_since_token
         )
 
         leave_state = yield self.store.get_state_for_events(
@@ -370,7 +387,7 @@ class SyncHandler(BaseHandler):
                 else:
                     prev_batch = now_token
 
-                state = yield self.check_joined_room(
+                state, limited = yield self.check_joined_room(
                     sync_config, room_id, state
                 )
 
@@ -379,7 +396,7 @@ class SyncHandler(BaseHandler):
                     timeline=TimelineBatch(
                         events=recents,
                         prev_batch=prev_batch,
-                        limited=False,
+                        limited=limited,
                     ),
                     state=state,
                     ephemeral=typing_by_room.get(room_id, [])
@@ -503,7 +520,7 @@ class SyncHandler(BaseHandler):
             current_state=current_state_events,
         )
 
-        state_events_delta = yield self.check_joined_room(
+        state_events_delta, _ = yield self.check_joined_room(
             sync_config, room_id, state_events_delta
         )
 
@@ -610,6 +627,7 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def check_joined_room(self, sync_config, room_id, state_delta):
         joined = False
+        limited = False
         for event in state_delta:
             if (
                 event.type == EventTypes.Member
@@ -621,5 +639,6 @@ class SyncHandler(BaseHandler):
         if joined:
             res = yield self.state_handler.get_current_state(room_id)
             state_delta = res.values()
+            limited = True
 
-        defer.returnValue(state_delta)
+        defer.returnValue((state_delta, limited))

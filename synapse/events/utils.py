@@ -154,7 +154,8 @@ def serialize_event(e, time_now_ms, as_client_event=True,
 
     if "redacted_because" in e.unsigned:
         d["unsigned"]["redacted_because"] = serialize_event(
-            e.unsigned["redacted_because"], time_now_ms
+            e.unsigned["redacted_because"], time_now_ms,
+            event_format=event_format
         )
 
     if token_id is not None:

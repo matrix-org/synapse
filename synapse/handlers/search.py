@@ -51,6 +51,17 @@ class SearchHandler(BaseHandler):
                 "content.body", "content.name", "content.topic",
             ])
             filter_dict = content["search_categories"]["room_events"].get("filter", {})
+            event_context = content["search_categories"]["room_events"].get(
+                "event_context", None
+            )
+
+            if event_context is not None:
+                before_limit = int(event_context.get(
+                    "before_limit", 5
+                ))
+                after_limit = int(event_context.get(
+                    "after_limit", 5
+                ))
         except KeyError:
             raise SynapseError(400, "Invalid search query")
 
@@ -76,14 +87,57 @@ class SearchHandler(BaseHandler):
             user.to_string(), filtered_events
         )
 
+        allowed_events.sort(key=lambda e: -rank_map[e.event_id])
+        allowed_events = allowed_events[:search_filter.limit()]
+
+        if event_context is not None:
+            now_token = yield self.hs.get_event_sources().get_current_token()
+
+            contexts = {}
+            for event in allowed_events:
+                res = yield self.store.get_events_around(
+                    event.room_id, event.event_id, before_limit, after_limit
+                )
+
+                res["events_before"] = yield self._filter_events_for_client(
+                    user.to_string(), res["events_before"]
+                )
+
+                res["events_after"] = yield self._filter_events_for_client(
+                    user.to_string(), res["events_after"]
+                )
+
+                res["start"] = now_token.copy_and_replace(
+                    "room_key", res["start"]
+                ).to_string()
+
+                res["end"] = now_token.copy_and_replace(
+                    "room_key", res["end"]
+                ).to_string()
+
+                contexts[event.event_id] = res
+        else:
+            contexts = {}
+
         # TODO: Add a limit
 
         time_now = self.clock.time_msec()
 
+        for context in contexts.values():
+            context["events_before"] = [
+                serialize_event(e, time_now)
+                for e in context["events_before"]
+            ]
+            context["events_after"] = [
+                serialize_event(e, time_now)
+                for e in context["events_after"]
+            ]
+
         results = {
             e.event_id: {
                 "rank": rank_map[e.event_id],
-                "result": serialize_event(e, time_now)
+                "result": serialize_event(e, time_now),
+                "context": contexts.get(e.event_id, {}),
             }
             for e in allowed_events
         }
