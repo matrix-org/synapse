@@ -18,6 +18,7 @@ from synapse.util.caches.descriptors import cached
 from twisted.internet import defer
 from .util.id_generators import StreamIdGenerator
 
+import ujson as json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,14 +53,15 @@ class TagsStore(SQLBaseStore):
         """
 
         deferred = self._simple_select_list(
-            "room_tags", {"user_id": user_id}, ["room_id", "tag"]
+            "room_tags", {"user_id": user_id}, ["room_id", "tag", "content"]
         )
 
         @deferred.addCallback
         def tags_by_room(rows):
             tags_by_room = {}
             for row in rows:
-                tags_by_room.setdefault(row["room_id"], []).append(row["tag"])
+                room_tags = tags_by_room.setdefault(row["room_id"], {})
+                room_tags[row["tag"]] = json.loads(row["content"])
             return tags_by_room
 
         return deferred
@@ -105,31 +107,41 @@ class TagsStore(SQLBaseStore):
         Returns:
             A deferred list of string tags.
         """
-        return self._simple_select_onecol(
+        return self._simple_select_list(
             table="room_tags",
             keyvalues={"user_id": user_id, "room_id": room_id},
-            retcol="tag",
+            retcols=("tag", "content"),
             desc="get_tags_for_room",
-        )
+        ).addCallback(lambda rows: {
+            row["tag"]: json.loads(row["content"]) for row in rows
+        })
 
     @defer.inlineCallbacks
-    def add_tag_to_room(self, user_id, room_id, tag):
+    def add_tag_to_room(self, user_id, room_id, tag, content):
         """Add a tag to a room for a user.
+        Args:
+            user_id(str): The user to add a tag for.
+            room_id(str): The room to add a tag for.
+            tag(str): The tag name to add.
+            content(dict): A json object to associate with the tag.
         Returns:
             A deferred that completes once the tag has been added.
         """
+        content_json = json.dumps(content)
+
         def add_tag_txn(txn, next_id):
-            sql = (
-                "INSERT INTO room_tags (user_id, room_id, tag)"
-                " VALUES (?, ?, ?)"
+            self._simple_upsert_txn(
+                txn,
+                table="room_tags",
+                keyvalues={
+                    "user_id": user_id,
+                    "room_id": room_id,
+                    "tag": tag,
+                },
+                values={
+                    "content": content_json,
+                }
             )
-            try:
-                txn.execute(sql, (user_id, room_id, tag))
-            except self.database_engine.module.IntegrityError:
-                # Return early if the row is already in the table
-                # and we don't need to bump the revision number of the
-                # private_user_data.
-                return
             self._update_revision_txn(txn, user_id, room_id, next_id)
 
         with (yield self._private_user_data_id_gen.get_next(self)) as next_id:

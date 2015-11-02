@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS room_tags(
     user_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     tag     TEXT NOT NULL,  -- The name of the tag.
+    content TEXT NOT NULL,  -- The JSON content of the tag.
     CONSTRAINT room_tag_uniqueness UNIQUE (user_id, room_id, tag)
 );
 

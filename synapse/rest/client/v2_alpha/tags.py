@@ -16,11 +16,13 @@
 from ._base import client_v2_pattern
 
 from synapse.http.servlet import RestServlet
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, SynapseError
 
 from twisted.internet import defer
 
 import logging
+
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +72,13 @@ class TagServlet(RestServlet):
         if user_id != auth_user.to_string():
             raise AuthError(403, "Cannot add tags for other users.")
 
-        max_id = yield self.store.add_tag_to_room(user_id, room_id, tag)
+        try:
+            content_bytes = request.content.read()
+            body = json.loads(content_bytes)
+        except:
+            raise SynapseError(400, "Invalid tag JSON")
+
+        max_id = yield self.store.add_tag_to_room(user_id, room_id, tag, body)
 
         yield self.notifier.on_new_event(
             "private_user_data_key", max_id, users=[user_id]

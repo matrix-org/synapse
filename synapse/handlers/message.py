@@ -405,7 +405,6 @@ class MessageHandler(BaseHandler):
                 tags = tags_by_room.get(event.room_id)
                 if tags:
                     private_user_data.append({
-                        "room_id": event.room_id,
                         "type": "m.tag",
                         "content": {"tags": tags},
                     })
@@ -466,7 +465,6 @@ class MessageHandler(BaseHandler):
             private_user_data.append({
                 "type": "m.tag",
                 "content": {"tags": tags},
-                "room_id": room_id,
             })
         result["private_user_data"] = private_user_data
 
@@ -499,8 +497,8 @@ class MessageHandler(BaseHandler):
             user_id, messages
         )
 
-        start_token = StreamToken(token[0], 0, 0, 0)
-        end_token = StreamToken(token[1], 0, 0, 0)
+        start_token = StreamToken(token[0], 0, 0, 0, 0)
+        end_token = StreamToken(token[1], 0, 0, 0, 0)
 
         time_now = self.clock.time_msec()
 
