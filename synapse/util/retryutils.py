@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import CodeMessageException
 
 import logging
+import random
 
 
 logger = logging.getLogger(__name__)
@@ -85,8 +86,9 @@ def get_retry_limiter(destination, clock, store, **kwargs):
 
 class RetryDestinationLimiter(object):
     def __init__(self, destination, clock, store, retry_interval,
-                 min_retry_interval=5000, max_retry_interval=60 * 60 * 1000,
-                 multiplier_retry_interval=2,):
+                 min_retry_interval=10 * 60 * 1000,
+                 max_retry_interval=24 * 60 * 60 * 1000,
+                 multiplier_retry_interval=5,):
         """Marks the destination as "down" if an exception is thrown in the
         context, except for CodeMessageException with code < 500.
 
@@ -140,6 +142,7 @@ class RetryDestinationLimiter(object):
             # We couldn't connect.
             if self.retry_interval:
                 self.retry_interval *= self.multiplier_retry_interval
+                self.retry_interval *= int(random.uniform(0.8, 1.4))
 
                 if self.retry_interval >= self.max_retry_interval:
                     self.retry_interval = self.max_retry_interval
