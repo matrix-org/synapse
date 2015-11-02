@@ -342,7 +342,6 @@ class SyncHandler(BaseHandler):
             sync_config.user.to_string(),
             from_key=since_token.room_key,
             to_key=now_token.room_key,
-            room_id=None,
             limit=timeline_limit + 1,
         )
 
