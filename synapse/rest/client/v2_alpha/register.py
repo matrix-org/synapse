@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_pattern, parse_json_dict_from_request
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 class RegisterRestServlet(RestServlet):
-    PATTERN = client_v2_pattern("/register(/.*)?$")
+    PATTERN = client_v2_pattern("/register")
 
     def __init__(self, hs):
         super(RegisterRestServlet, self).__init__()
@@ -52,8 +52,21 @@ class RegisterRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
 
     @defer.inlineCallbacks
-    def on_POST(self, request, trailing_path=""):
+    def on_POST(self, request):
         yield run_on_reactor()
+
+        kind = "user"
+        if "kind" in request.args:
+            kind = request.args["kind"][0]
+
+        if kind == "guest":
+            ret = yield self._do_guest_registration()
+            defer.returnValue(ret)
+            return
+        elif kind != "user":
+            raise UnrecognizedRequestError(
+                "Do not understand membership kind: %s" % (kind,)
+            )
 
         if '/register/email/requestToken' in request.path:
             ret = yield self.onEmailTokenRequest(request)
@@ -236,18 +249,8 @@ class RegisterRestServlet(RestServlet):
         ret = yield self.identity_handler.requestEmailToken(**body)
         defer.returnValue((200, ret))
 
-
-class RegisterGuestRestServlet(RestServlet):
-    PATTERN = client_v2_pattern("/register-guest?$")
-
-    def __init__(self, hs):
-        super(RegisterGuestRestServlet, self).__init__()
-        self.hs = hs
-        self.auth_handler = hs.get_handlers().auth_handler
-        self.registration_handler = hs.get_handlers().registration_handler
-
     @defer.inlineCallbacks
-    def on_POST(self, request):
+    def _do_guest_registration(self):
         if not self.hs.config.allow_guest_access:
             defer.returnValue((403, "Guest access is disabled"))
         user_id, _ = yield self.registration_handler.register(generate_token=False)
@@ -262,4 +265,3 @@ class RegisterGuestRestServlet(RestServlet):
 
 def register_servlets(hs, http_server):
     RegisterRestServlet(hs).register(http_server)
-    RegisterGuestRestServlet(hs).register(http_server)
