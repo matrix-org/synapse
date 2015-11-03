@@ -156,7 +156,7 @@ class TagsStore(SQLBaseStore):
     def remove_tag_from_room(self, user_id, room_id, tag):
         """Remove a tag from a room for a user.
         Returns:
-            A deffered that completes once the tag has been removed
+            A deferred that completes once the tag has been removed
         """
         def remove_tag_txn(txn, next_id):
             sql = (
