@@ -51,6 +51,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "timeline",
     "state",
     "ephemeral",
+    "private_user_data",
 ])):
     __slots__ = []
 
@@ -58,13 +59,19 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
-        return bool(self.timeline or self.state or self.ephemeral)
+        return bool(
+            self.timeline
+            or self.state
+            or self.ephemeral
+            or self.private_user_data
+        )
 
 
 class ArchivedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "room_id",
     "timeline",
     "state",
+    "private_user_data",
 ])):
     __slots__ = []
 
@@ -72,7 +79,11 @@ class ArchivedSyncResult(collections.namedtuple("JoinedSyncResult", [
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
-        return bool(self.timeline or self.state)
+        return bool(
+            self.timeline
+            or self.state
+            or self.private_user_data
+        )
 
 
 class InvitedSyncResult(collections.namedtuple("InvitedSyncResult", [
@@ -197,6 +208,10 @@ class SyncHandler(BaseHandler):
             )
         )
 
+        tags_by_room = yield self.store.get_tags_for_user(
+            sync_config.user.to_string()
+        )
+
         joined = []
         invited = []
         archived = []
@@ -207,7 +222,8 @@ class SyncHandler(BaseHandler):
                     sync_config=sync_config,
                     now_token=now_token,
                     timeline_since_token=timeline_since_token,
-                    typing_by_room=typing_by_room
+                    typing_by_room=typing_by_room,
+                    tags_by_room=tags_by_room,
                 )
                 joined.append(room_sync)
             elif event.membership == Membership.INVITE:
@@ -226,6 +242,7 @@ class SyncHandler(BaseHandler):
                     leave_event_id=event.event_id,
                     leave_token=leave_token,
                     timeline_since_token=timeline_since_token,
+                    tags_by_room=tags_by_room,
                 )
                 archived.append(room_sync)
 
@@ -240,7 +257,7 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def full_state_sync_for_joined_room(self, room_id, sync_config,
                                         now_token, timeline_since_token,
-                                        typing_by_room):
+                                        typing_by_room, tags_by_room):
         """Sync a room for a client which is starting without any state
         Returns:
             A Deferred JoinedSyncResult.
@@ -260,7 +277,20 @@ class SyncHandler(BaseHandler):
             timeline=batch,
             state=current_state_events,
             ephemeral=typing_by_room.get(room_id, []),
+            private_user_data=self.private_user_data_for_room(
+                room_id, tags_by_room
+            ),
         ))
+
+    def private_user_data_for_room(self, room_id, tags_by_room):
+        private_user_data = []
+        tags = tags_by_room.get(room_id)
+        if tags:
+            private_user_data.append({
+                "type": "m.tag",
+                "content": {"tags": tags},
+            })
+        return private_user_data
 
     @defer.inlineCallbacks
     def typing_by_room(self, sync_config, now_token, since_token=None):
@@ -296,7 +326,7 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def full_state_sync_for_archived_room(self, room_id, sync_config,
                                           leave_event_id, leave_token,
-                                          timeline_since_token):
+                                          timeline_since_token, tags_by_room):
         """Sync a room for a client which is starting without any state
         Returns:
             A Deferred JoinedSyncResult.
@@ -314,6 +344,9 @@ class SyncHandler(BaseHandler):
             room_id=room_id,
             timeline=batch,
             state=leave_state[leave_event_id].values(),
+            private_user_data=self.private_user_data_for_room(
+                room_id, tags_by_room
+            ),
         ))
 
     @defer.inlineCallbacks
@@ -359,6 +392,11 @@ class SyncHandler(BaseHandler):
             limit=timeline_limit + 1,
         )
 
+        tags_by_room = yield self.store.get_updated_tags(
+            sync_config.user.to_string(),
+            since_token.private_user_data_key,
+        )
+
         joined = []
         archived = []
         if len(room_events) <= timeline_limit:
@@ -399,7 +437,10 @@ class SyncHandler(BaseHandler):
                         limited=limited,
                     ),
                     state=state,
-                    ephemeral=typing_by_room.get(room_id, [])
+                    ephemeral=typing_by_room.get(room_id, []),
+                    private_user_data=self.private_user_data_for_room(
+                        room_id, tags_by_room
+                    ),
                 )
                 if room_sync:
                     joined.append(room_sync)
@@ -416,14 +457,14 @@ class SyncHandler(BaseHandler):
             for room_id in joined_room_ids:
                 room_sync = yield self.incremental_sync_with_gap_for_room(
                     room_id, sync_config, since_token, now_token,
-                    typing_by_room
+                    typing_by_room, tags_by_room
                 )
                 if room_sync:
                     joined.append(room_sync)
 
         for leave_event in leave_events:
             room_sync = yield self.incremental_sync_for_archived_room(
-                sync_config, leave_event, since_token
+                sync_config, leave_event, since_token, tags_by_room
             )
             archived.append(room_sync)
 
@@ -487,7 +528,7 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def incremental_sync_with_gap_for_room(self, room_id, sync_config,
                                            since_token, now_token,
-                                           typing_by_room):
+                                           typing_by_room, tags_by_room):
         """ Get the incremental delta needed to bring the client up to date for
         the room. Gives the client the most recent events and the changes to
         state.
@@ -528,7 +569,10 @@ class SyncHandler(BaseHandler):
             room_id=room_id,
             timeline=batch,
             state=state_events_delta,
-            ephemeral=typing_by_room.get(room_id, [])
+            ephemeral=typing_by_room.get(room_id, []),
+            private_user_data=self.private_user_data_for_room(
+                room_id, tags_by_room
+            ),
         )
 
         logging.debug("Room sync: %r", room_sync)
@@ -537,7 +581,7 @@ class SyncHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def incremental_sync_for_archived_room(self, sync_config, leave_event,
-                                           since_token):
+                                           since_token, tags_by_room):
         """ Get the incremental delta needed to bring the client up to date for
         the archived room.
         Returns:
@@ -578,6 +622,9 @@ class SyncHandler(BaseHandler):
             room_id=leave_event.room_id,
             timeline=batch,
             state=state_events_delta,
+            private_user_data=self.private_user_data_for_room(
+                leave_event.room_id, tags_by_room
+            ),
         )
 
         logging.debug("Room sync: %r", room_sync)
