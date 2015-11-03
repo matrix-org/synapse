@@ -14,19 +14,20 @@
 # limitations under the License.
 
 """This module contains classes for authenticating the user."""
-from nacl.exceptions import BadSignatureError
+from canonicaljson import encode_canonical_json
+from signedjson.key import decode_verify_key_bytes
+from signedjson.sign import verify_signed_json, SignatureVerifyException
 
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
 from synapse.types import RoomID, UserID, EventID
 from synapse.util.logutils import log_function
 from synapse.util import third_party_invites
 from unpaddedbase64 import decode_base64
 
 import logging
-import nacl.signing
 import pymacaroons
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,8 @@ class Auth(object):
         Returns:
             True if the auth checks pass.
         """
+        self.check_size_limits(event)
+
         try:
             if not hasattr(event, "room_id"):
                 raise AuthError(500, "Event has no room_id: %s" % event)
@@ -130,6 +133,23 @@ class Auth(object):
             )
             logger.info("Denying! %s", event)
             raise
+
+    def check_size_limits(self, event):
+        def too_big(field):
+            raise EventSizeError("%s too large" % (field,))
+
+        if len(event.user_id) > 255:
+            too_big("user_id")
+        if len(event.room_id) > 255:
+            too_big("room_id")
+        if event.is_state() and len(event.state_key) > 255:
+            too_big("state_key")
+        if len(event.type) > 255:
+            too_big("type")
+        if len(event.event_id) > 255:
+            too_big("event_id")
+        if len(encode_canonical_json(event.get_pdu_json())) > 65536:
+            too_big("event")
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
@@ -308,7 +328,11 @@ class Auth(object):
         )
 
         if Membership.JOIN != membership:
-            # JOIN is the only action you can perform if you're not in the room
+            if (caller_invited
+                    and Membership.LEAVE == membership
+                    and target_user_id == event.user_id):
+                return True
+
             if not caller_in_room:  # caller isn't joined
                 raise AuthError(
                     403,
@@ -416,16 +440,23 @@ class Auth(object):
                     key_validity_url
                 )
                 return False
-            for _, signature_block in join_third_party_invite["signatures"].items():
+            signed = join_third_party_invite["signed"]
+            if signed["mxid"] != event.user_id:
+                return False
+            if signed["token"] != token:
+                return False
+            for server, signature_block in signed["signatures"].items():
                 for key_name, encoded_signature in signature_block.items():
                     if not key_name.startswith("ed25519:"):
                         return False
-                    verify_key = nacl.signing.VerifyKey(decode_base64(public_key))
-                    signature = decode_base64(encoded_signature)
-                    verify_key.verify(token, signature)
+                    verify_key = decode_verify_key_bytes(
+                        key_name,
+                        decode_base64(public_key)
+                    )
+                    verify_signed_json(signed, server, verify_key)
                     return True
             return False
-        except (KeyError, BadSignatureError,):
+        except (KeyError, SignatureVerifyException,):
             return False
 
     def _get_power_level_event(self, auth_events):

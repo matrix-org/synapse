@@ -19,6 +19,7 @@ from synapse.api.errors import StoreError
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
+from .engines import PostgresEngine, Sqlite3Engine
 
 import collections
 import logging
@@ -175,6 +176,10 @@ class RoomStore(SQLBaseStore):
                 },
             )
 
+            self._store_event_search_txn(
+                txn, event, "content.topic", event.content["topic"]
+            )
+
     def _store_room_name_txn(self, txn, event):
         if hasattr(event, "content") and "name" in event.content:
             self._simple_insert_txn(
@@ -186,6 +191,33 @@ class RoomStore(SQLBaseStore):
                     "name": event.content["name"],
                 }
             )
+
+            self._store_event_search_txn(
+                txn, event, "content.name", event.content["name"]
+            )
+
+    def _store_room_message_txn(self, txn, event):
+        if hasattr(event, "content") and "body" in event.content:
+            self._store_event_search_txn(
+                txn, event, "content.body", event.content["body"]
+            )
+
+    def _store_event_search_txn(self, txn, event, key, value):
+        if isinstance(self.database_engine, PostgresEngine):
+            sql = (
+                "INSERT INTO event_search (event_id, room_id, key, vector)"
+                " VALUES (?,?,?,to_tsvector('english', ?))"
+            )
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            sql = (
+                "INSERT INTO event_search (event_id, room_id, key, value)"
+                " VALUES (?,?,?,?)"
+            )
+        else:
+            # This should be unreachable.
+            raise Exception("Unrecognized database engine")
+
+        txn.execute(sql, (event.event_id, event.room_id, key, value,))
 
     @cachedInlineCallbacks()
     def get_room_name_and_aliases(self, room_id):

@@ -43,6 +43,7 @@ class LoginRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__(hs)
         self.idp_redirect_url = hs.config.saml2_idp_redirect_url
+        self.password_enabled = hs.config.password_enabled
         self.saml2_enabled = hs.config.saml2_enabled
         self.cas_enabled = hs.config.cas_enabled
         self.cas_server_url = hs.config.cas_server_url
@@ -50,11 +51,13 @@ class LoginRestServlet(ClientV1RestServlet):
         self.servername = hs.config.server_name
 
     def on_GET(self, request):
-        flows = [{"type": LoginRestServlet.PASS_TYPE}]
+        flows = []
         if self.saml2_enabled:
             flows.append({"type": LoginRestServlet.SAML2_TYPE})
         if self.cas_enabled:
             flows.append({"type": LoginRestServlet.CAS_TYPE})
+        if self.password_enabled:
+            flows.append({"type": LoginRestServlet.PASS_TYPE})
         return (200, {"flows": flows})
 
     def on_OPTIONS(self, request):
@@ -65,6 +68,9 @@ class LoginRestServlet(ClientV1RestServlet):
         login_submission = _parse_json(request)
         try:
             if login_submission["type"] == LoginRestServlet.PASS_TYPE:
+                if not self.password_enabled:
+                    raise SynapseError(400, "Password login has been disabled.")
+
                 result = yield self.do_password_login(login_submission)
                 defer.returnValue(result)
             elif self.saml2_enabled and (login_submission["type"] ==
@@ -101,6 +107,8 @@ class LoginRestServlet(ClientV1RestServlet):
             user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
                 login_submission['medium'], login_submission['address']
             )
+            if not user_id:
+                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
         else:
             user_id = login_submission['user']
 

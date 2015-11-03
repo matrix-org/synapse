@@ -224,8 +224,8 @@ class _Recoverer(object):
         self.clock.call_later((2 ** self.backoff_counter), self.retry)
 
     def _backoff(self):
-        # cap the backoff to be around 18h => (2^16) = 65536 secs
-        if self.backoff_counter < 16:
+        # cap the backoff to be around 8.5min => (2^9) = 512 secs
+        if self.backoff_counter < 9:
             self.backoff_counter += 1
         self.recover()
 

@@ -16,14 +16,14 @@
 from twisted.internet import defer
 
 from synapse.http.servlet import (
-    RestServlet, parse_string, parse_integer
+    RestServlet, parse_string, parse_integer, parse_boolean
 )
 from synapse.handlers.sync import SyncConfig
 from synapse.types import StreamToken
 from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_event_id,
 )
-from synapse.api.filtering import Filter
+from synapse.api.filtering import FilterCollection
 from ._base import client_v2_pattern
 
 import copy
@@ -90,6 +90,7 @@ class SyncRestServlet(RestServlet):
             allowed_values=self.ALLOWED_PRESENCE
         )
         filter_id = parse_string(request, "filter", default=None)
+        full_state = parse_boolean(request, "full_state", default=False)
 
         logger.info(
             "/sync: user=%r, timeout=%r, since=%r,"
@@ -103,7 +104,7 @@ class SyncRestServlet(RestServlet):
                 user.localpart, filter_id
             )
         except:
-            filter = Filter({})
+            filter = FilterCollection({})
 
         sync_config = SyncConfig(
             user=user,
@@ -120,7 +121,8 @@ class SyncRestServlet(RestServlet):
 
         try:
             sync_result = yield self.sync_handler.wait_for_sync_for_user(
-                sync_config, since_token=since_token, timeout=timeout
+                sync_config, since_token=since_token, timeout=timeout,
+                full_state=full_state
             )
         finally:
             if set_presence == "online":
@@ -136,6 +138,10 @@ class SyncRestServlet(RestServlet):
             sync_result.invited, filter, time_now, token_id
         )
 
+        archived = self.encode_archived(
+            sync_result.archived, filter, time_now, token_id
+        )
+
         response_content = {
             "presence": self.encode_presence(
                 sync_result.presence, filter, time_now
@@ -143,7 +149,7 @@ class SyncRestServlet(RestServlet):
             "rooms": {
                 "joined": joined,
                 "invited": invited,
-                "archived": {},
+                "archived": archived,
             },
             "next_batch": sync_result.next_batch.to_string(),
         }
@@ -182,14 +188,20 @@ class SyncRestServlet(RestServlet):
 
         return invited
 
+    def encode_archived(self, rooms, filter, time_now, token_id):
+        joined = {}
+        for room in rooms:
+            joined[room.room_id] = self.encode_room(
+                room, filter, time_now, token_id, joined=False
+            )
+
+        return joined
+
     @staticmethod
-    def encode_room(room, filter, time_now, token_id):
+    def encode_room(room, filter, time_now, token_id, joined=True):
         event_map = {}
         state_events = filter.filter_room_state(room.state)
-        timeline_events = filter.filter_room_timeline(room.timeline.events)
-        ephemeral_events = filter.filter_room_ephemeral(room.ephemeral)
         state_event_ids = []
-        timeline_event_ids = []
         for event in state_events:
             # TODO(mjark): Respect formatting requirements in the filter.
             event_map[event.event_id] = serialize_event(
@@ -198,6 +210,8 @@ class SyncRestServlet(RestServlet):
             )
             state_event_ids.append(event.event_id)
 
+        timeline_events = filter.filter_room_timeline(room.timeline.events)
+        timeline_event_ids = []
         for event in timeline_events:
             # TODO(mjark): Respect formatting requirements in the filter.
             event_map[event.event_id] = serialize_event(
@@ -205,6 +219,7 @@ class SyncRestServlet(RestServlet):
                 event_format=format_event_for_client_v2_without_event_id,
             )
             timeline_event_ids.append(event.event_id)
+
         result = {
             "event_map": event_map,
             "timeline": {
@@ -213,8 +228,12 @@ class SyncRestServlet(RestServlet):
                 "limited": room.timeline.limited,
             },
             "state": {"events": state_event_ids},
-            "ephemeral": {"events": ephemeral_events},
         }
+
+        if joined:
+            ephemeral_events = filter.filter_room_ephemeral(room.ephemeral)
+            result["ephemeral"] = {"events": ephemeral_events}
+
         return result
 
 

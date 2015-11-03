@@ -268,6 +268,20 @@ class FederationServer(FederationBase):
         }))
 
     @defer.inlineCallbacks
+    def on_make_leave_request(self, room_id, user_id):
+        pdu = yield self.handler.on_make_leave_request(room_id, user_id)
+        time_now = self._clock.time_msec()
+        defer.returnValue({"event": pdu.get_pdu_json(time_now)})
+
+    @defer.inlineCallbacks
+    def on_send_leave_request(self, origin, content):
+        logger.debug("on_send_leave_request: content: %s", content)
+        pdu = self.event_from_pdu_json(content)
+        logger.debug("on_send_leave_request: pdu sigs: %s", pdu.signatures)
+        yield self.handler.on_send_leave_request(origin, pdu)
+        defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
     def on_event_auth(self, origin, room_id, event_id):
         time_now = self._clock.time_msec()
         auth_pdus = yield self.handler.on_event_auth(event_id)

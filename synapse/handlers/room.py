@@ -33,6 +33,7 @@ from collections import OrderedDict
 from unpaddedbase64 import decode_base64
 
 import logging
+import math
 import string
 
 logger = logging.getLogger(__name__)
@@ -389,7 +390,22 @@ class RoomMemberHandler(BaseHandler):
         if event.membership == Membership.JOIN:
             yield self._do_join(event, context, do_auth=do_auth)
         else:
-            # This is not a JOIN, so we can handle it normally.
+            if event.membership == Membership.LEAVE:
+                is_host_in_room = yield self.is_host_in_room(room_id, context)
+                if not is_host_in_room:
+                    # Rejecting an invite, rather than leaving a joined room
+                    handler = self.hs.get_handlers().federation_handler
+                    inviter = yield self.get_inviter(event)
+                    if not inviter:
+                        # return the same error as join_room_alias does
+                        raise SynapseError(404, "No known servers")
+                    yield handler.do_remotely_reject_invite(
+                        [inviter.domain],
+                        room_id,
+                        event.user_id
+                    )
+                    defer.returnValue({"room_id": room_id})
+                    return
 
             # FIXME: This isn't idempotency.
             if prev_state and prev_state.membership == event.membership:
@@ -413,7 +429,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def join_room_alias(self, joinee, room_alias, do_auth=True, content={}):
+    def join_room_alias(self, joinee, room_alias, content={}):
         directory_handler = self.hs.get_handlers().directory_handler
         mapping = yield directory_handler.get_association(room_alias)
 
@@ -447,8 +463,6 @@ class RoomMemberHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _do_join(self, event, context, room_hosts=None, do_auth=True):
-        joinee = UserID.from_string(event.state_key)
-        # room_id = RoomID.from_string(event.room_id, self.hs)
         room_id = event.room_id
 
         # XXX: We don't do an auth check if we are doing an invite
@@ -456,48 +470,18 @@ class RoomMemberHandler(BaseHandler):
         # that we are allowed to join when we decide whether or not we
         # need to do the invite/join dance.
 
-        is_host_in_room = yield self.auth.check_host_in_room(
-            event.room_id,
-            self.hs.hostname
-        )
-        if not is_host_in_room:
-            # is *anyone* in the room?
-            room_member_keys = [
-                v for (k, v) in context.current_state.keys() if (
-                    k == "m.room.member"
-                )
-            ]
-            if len(room_member_keys) == 0:
-                # has the room been created so we can join it?
-                create_event = context.current_state.get(("m.room.create", ""))
-                if create_event:
-                    is_host_in_room = True
-
+        is_host_in_room = yield self.is_host_in_room(room_id, context)
         if is_host_in_room:
             should_do_dance = False
         elif room_hosts:  # TODO: Shouldn't this be remote_room_host?
             should_do_dance = True
         else:
-            # TODO(markjh): get prev_state from snapshot
-            prev_state = yield self.store.get_room_member(
-                joinee.to_string(), room_id
-            )
-
-            if prev_state and prev_state.membership == Membership.INVITE:
-                inviter = UserID.from_string(prev_state.user_id)
-
-                should_do_dance = not self.hs.is_mine(inviter)
-                room_hosts = [inviter.domain]
-            elif "third_party_invite" in event.content:
-                if "sender" in event.content["third_party_invite"]:
-                    inviter = UserID.from_string(
-                        event.content["third_party_invite"]["sender"]
-                    )
-                    should_do_dance = not self.hs.is_mine(inviter)
-                    room_hosts = [inviter.domain]
-            else:
+            inviter = yield self.get_inviter(event)
+            if not inviter:
                 # return the same error as join_room_alias does
                 raise SynapseError(404, "No known servers")
+            should_do_dance = not self.hs.is_mine(inviter)
+            room_hosts = [inviter.domain]
 
         if should_do_dance:
             handler = self.hs.get_handlers().federation_handler
@@ -505,8 +489,7 @@ class RoomMemberHandler(BaseHandler):
                 room_hosts,
                 room_id,
                 event.user_id,
-                event.content,  # FIXME To get a non-frozen dict
-                context
+                event.content  # FIXME To get a non-frozen dict
             )
         else:
             logger.debug("Doing normal join")
@@ -522,6 +505,44 @@ class RoomMemberHandler(BaseHandler):
         yield self.distributor.fire(
             "user_joined_room", user=user, room_id=room_id
         )
+
+    @defer.inlineCallbacks
+    def get_inviter(self, event):
+        # TODO(markjh): get prev_state from snapshot
+        prev_state = yield self.store.get_room_member(
+            event.user_id, event.room_id
+        )
+
+        if prev_state and prev_state.membership == Membership.INVITE:
+            defer.returnValue(UserID.from_string(prev_state.user_id))
+            return
+        elif "third_party_invite" in event.content:
+            if "sender" in event.content["third_party_invite"]:
+                inviter = UserID.from_string(
+                    event.content["third_party_invite"]["sender"]
+                )
+                defer.returnValue(inviter)
+        defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def is_host_in_room(self, room_id, context):
+        is_host_in_room = yield self.auth.check_host_in_room(
+            room_id,
+            self.hs.hostname
+        )
+        if not is_host_in_room:
+            # is *anyone* in the room?
+            room_member_keys = [
+                v for (k, v) in context.current_state.keys() if (
+                    k == "m.room.member"
+                )
+            ]
+            if len(room_member_keys) == 0:
+                # has the room been created so we can join it?
+                create_event = context.current_state.get(("m.room.create", ""))
+                if create_event:
+                    is_host_in_room = True
+        defer.returnValue(is_host_in_room)
 
     @defer.inlineCallbacks
     def get_joined_rooms_for_user(self, user):
@@ -725,6 +746,60 @@ class RoomListHandler(BaseHandler):
 
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
+
+
+class RoomContextHandler(BaseHandler):
+    @defer.inlineCallbacks
+    def get_event_context(self, user, room_id, event_id, limit):
+        """Retrieves events, pagination tokens and state around a given event
+        in a room.
+
+        Args:
+            user (UserID)
+            room_id (str)
+            event_id (str)
+            limit (int): The maximum number of events to return in total
+                (excluding state).
+
+        Returns:
+            dict
+        """
+        before_limit = math.floor(limit/2.)
+        after_limit = limit - before_limit
+
+        now_token = yield self.hs.get_event_sources().get_current_token()
+
+        results = yield self.store.get_events_around(
+            room_id, event_id, before_limit, after_limit
+        )
+
+        results["events_before"] = yield self._filter_events_for_client(
+            user.to_string(), results["events_before"]
+        )
+
+        results["events_after"] = yield self._filter_events_for_client(
+            user.to_string(), results["events_after"]
+        )
+
+        if results["events_after"]:
+            last_event_id = results["events_after"][-1].event_id
+        else:
+            last_event_id = event_id
+
+        state = yield self.store.get_state_for_events(
+            [last_event_id], None
+        )
+        results["state"] = state[last_event_id].values()
+
+        results["start"] = now_token.copy_and_replace(
+            "room_key", results["start"]
+        ).to_string()
+
+        results["end"] = now_token.copy_and_replace(
+            "room_key", results["end"]
+        ).to_string()
+
+        defer.returnValue(results)
 
 
 class RoomEventSource(object):

@@ -119,6 +119,15 @@ class AuthError(SynapseError):
         super(AuthError, self).__init__(*args, **kwargs)
 
 
+class EventSizeError(SynapseError):
+    """An error raised when an event is too big."""
+
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.TOO_LARGE
+        super(EventSizeError, self).__init__(413, *args, **kwargs)
+
+
 class EventStreamError(SynapseError):
     """An error raised when there a problem with the event stream."""
     def __init__(self, *args, **kwargs):

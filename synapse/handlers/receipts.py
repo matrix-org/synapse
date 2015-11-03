@@ -156,13 +156,7 @@ class ReceiptsHandler(BaseHandler):
         if not result:
             defer.returnValue([])
 
-        event = {
-            "type": "m.receipt",
-            "room_id": room_id,
-            "content": result,
-        }
-
-        defer.returnValue([event])
+        defer.returnValue(result)
 
 
 class ReceiptEventSource(object):

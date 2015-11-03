@@ -38,8 +38,12 @@ for port in 8080 8081 8082; do
 
     perl -p -i -e 's/^enable_registration:.*/enable_registration: true/g' $DIR/etc/$port.config
 
-    echo "full_twisted_stacktraces: true" >> $DIR/etc/$port.config
-    echo "report_stats: false" >> $DIR/etc/$port.config
+    if ! grep -F "full_twisted_stacktraces" -q  $DIR/etc/$port.config; then
+        echo "full_twisted_stacktraces: true" >> $DIR/etc/$port.config
+    fi
+    if ! grep -F "report_stats" -q  $DIR/etc/$port.config ; then
+        echo "report_stats: false" >> $DIR/etc/$port.config
+    fi
 
     python -m synapse.app.homeserver \
         --config-path "$DIR/etc/$port.config" \

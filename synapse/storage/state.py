@@ -214,7 +214,6 @@ class StateStore(SQLBaseStore):
         that are in the `types` list.
 
         Args:
-            room_id (str)
             event_ids (list)
             types (list): List of (type, state_key) tuples which are used to
                 filter the state fetched. `state_key` may be None, which matches
