@@ -98,7 +98,6 @@ class TagServlet(RestServlet):
             "private_user_data_key", max_id, users=[user_id]
         )
 
-        # TODO: poke the notifier.
         defer.returnValue((200, {}))
 
 
