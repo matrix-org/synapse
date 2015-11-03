@@ -202,19 +202,6 @@ class TransactionQueue(object):
     @defer.inlineCallbacks
     @log_function
     def _attempt_new_transaction(self, destination):
-        if destination in self.pending_transactions:
-            # XXX: pending_transactions can get stuck on by a never-ending
-            # request at which point pending_pdus_by_dest just keeps growing.
-            # we need application-layer timeouts of some flavour of these
-            # requests
-            logger.debug(
-                "TX [%s] Transaction already in progress",
-                destination
-            )
-            return
-
-        logger.debug("TX [%s] _attempt_new_transaction", destination)
-
         # list of (pending_pdu, deferred, order)
         pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
         pending_edus = self.pending_edus_by_dest.pop(destination, [])
@@ -228,19 +215,33 @@ class TransactionQueue(object):
             logger.debug("TX [%s] Nothing to send", destination)
             return
 
-        # Sort based on the order field
-        pending_pdus.sort(key=lambda t: t[2])
+        if destination in self.pending_transactions:
+            # XXX: pending_transactions can get stuck on by a never-ending
+            # request at which point pending_pdus_by_dest just keeps growing.
+            # we need application-layer timeouts of some flavour of these
+            # requests
+            logger.debug(
+                "TX [%s] Transaction already in progress",
+                destination
+            )
+            return
 
-        pdus = [x[0] for x in pending_pdus]
-        edus = [x[0] for x in pending_edus]
-        failures = [x[0].get_dict() for x in pending_failures]
-        deferreds = [
-            x[1]
-            for x in pending_pdus + pending_edus + pending_failures
-        ]
-
+        # NOTE: Nothing should be between the above check and the insertion below
         try:
             self.pending_transactions[destination] = 1
+
+            logger.debug("TX [%s] _attempt_new_transaction", destination)
+
+            # Sort based on the order field
+            pending_pdus.sort(key=lambda t: t[2])
+
+            pdus = [x[0] for x in pending_pdus]
+            edus = [x[0] for x in pending_edus]
+            failures = [x[0].get_dict() for x in pending_failures]
+            deferreds = [
+                x[1]
+                for x in pending_pdus + pending_edus + pending_failures
+            ]
 
             txn_id = str(self._next_txn_id)
 
