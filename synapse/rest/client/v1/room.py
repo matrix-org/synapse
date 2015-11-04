@@ -125,7 +125,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_type, state_key):
-        user, _, _ = yield self.auth.get_user_by_req(request)
+        user, _, is_guest = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         msg_handler = self.handlers.message_handler
         data = yield msg_handler.get_room_data(
@@ -133,6 +133,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
             room_id=room_id,
             event_type=event_type,
             state_key=state_key,
+            is_guest=is_guest,
         )
 
         if not data:
@@ -348,12 +349,13 @@ class RoomStateRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
-        user, _, _ = yield self.auth.get_user_by_req(request)
+        user, _, is_guest = yield self.auth.get_user_by_req(request, allow_guest=True)
         handler = self.handlers.message_handler
         # Get all the current state for this room
         events = yield handler.get_state_events(
             room_id=room_id,
             user_id=user.to_string(),
+            is_guest=is_guest,
         )
         defer.returnValue((200, events))
 
