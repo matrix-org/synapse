@@ -46,14 +46,19 @@ class SearchHandler(BaseHandler):
         """
 
         try:
-            search_term = content["search_categories"]["room_events"]["search_term"]
-            keys = content["search_categories"]["room_events"].get("keys", [
+            room_cat = content["search_categories"]["room_events"]
+            search_term = room_cat["search_term"]
+            keys = room_cat.get("keys", [
                 "content.body", "content.name", "content.topic",
             ])
-            filter_dict = content["search_categories"]["room_events"].get("filter", {})
-            event_context = content["search_categories"]["room_events"].get(
+            filter_dict = room_cat.get("filter", {})
+            order_by = room_cat.get("order_by", "rank")
+            event_context = room_cat.get(
                 "event_context", None
             )
+
+            group_by = room_cat.get("groupings", {}).get("group_by", {})
+            group_keys = [g["key"] for g in group_by]
 
             if event_context is not None:
                 before_limit = int(event_context.get(
@@ -64,6 +69,15 @@ class SearchHandler(BaseHandler):
                 ))
         except KeyError:
             raise SynapseError(400, "Invalid search query")
+
+        if order_by not in ("rank", "recent"):
+            raise SynapseError(400, "Invalid order by: %r" % (order_by,))
+
+        if set(group_keys) - {"room_id", "sender"}:
+            raise SynapseError(
+                400,
+                "Invalid group by keys: %r" % (set(group_keys) - {"room_id", "sender"},)
+            )
 
         search_filter = Filter(filter_dict)
 
@@ -77,18 +91,88 @@ class SearchHandler(BaseHandler):
 
         room_ids = search_filter.filter_rooms(room_ids)
 
-        rank_map, event_map, _ = yield self.store.search_msgs(
-            room_ids, search_term, keys
-        )
+        rank_map = {}
+        allowed_events = []
+        room_groups = {}
+        sender_group = {}
 
-        filtered_events = search_filter.filter(event_map.values())
+        if order_by == "rank":
+            rank_map, event_map, _ = yield self.store.search_msgs(
+                room_ids, search_term, keys
+            )
 
-        allowed_events = yield self._filter_events_for_client(
-            user.to_string(), filtered_events
-        )
+            filtered_events = search_filter.filter(event_map.values())
 
-        allowed_events.sort(key=lambda e: -rank_map[e.event_id])
-        allowed_events = allowed_events[:search_filter.limit()]
+            events = yield self._filter_events_for_client(
+                user.to_string(), filtered_events
+            )
+
+            events.sort(key=lambda e: -rank_map[e.event_id])
+            allowed_events = events[:search_filter.limit()]
+
+            for e in allowed_events:
+                rm = room_groups.setdefault(e.room_id, {
+                    "results": [],
+                    "order": rank_map[e.event_id],
+                })
+                rm["results"].append(e.event_id)
+
+                s = sender_group.setdefault(e.sender, {
+                    "results": [],
+                    "order": rank_map[e.event_id],
+                })
+                s["results"].append(e.event_id)
+
+        elif order_by == "recent":
+            for room_id in room_ids:
+                room_events = []
+                pagination_token = None
+                i = 0
+
+                while len(room_events) < search_filter.limit() and i < 5:
+                    i += 5
+                    r_map, event_map, pagination_token = yield self.store.search_room(
+                        room_id, search_term, keys, search_filter.limit() * 2,
+                        pagination_token=pagination_token,
+                    )
+                    rank_map.update(r_map)
+
+                    filtered_events = search_filter.filter(event_map.values())
+
+                    events = yield self._filter_events_for_client(
+                        user.to_string(), filtered_events
+                    )
+
+                    room_events.extend(events)
+                    room_events = room_events[:search_filter.limit()]
+
+                    if len(event_map) < search_filter.limit() * 2:
+                        break
+
+                if room_events:
+                    group = room_groups.setdefault(room_id, {})
+                    if pagination_token:
+                        group["next_batch"] = pagination_token
+
+                    group["results"] = [e.event_id for e in room_events]
+                    group["order"] = max(
+                        e.origin_server_ts/1000 for e in room_events
+                        if hasattr(e, "origin_server_ts")
+                    )
+
+                allowed_events.extend(room_events)
+
+            # Normalize the group ranks
+            if room_groups:
+                mx = max(g["order"] for g in room_groups.values())
+                mn = min(g["order"] for g in room_groups.values())
+
+                for g in room_groups.values():
+                    g["order"] = (g["order"] - mn) * 1.0 / (mx - mn)
+
+        else:
+            # We should never get here due to the guard earlier.
+            raise NotImplementedError()
 
         if event_context is not None:
             now_token = yield self.hs.get_event_sources().get_current_token()
@@ -144,11 +228,19 @@ class SearchHandler(BaseHandler):
 
         logger.info("Found %d results", len(results))
 
+        rooms_cat_res = {
+            "results": results,
+            "count": len(results)
+        }
+
+        if room_groups and "room_id" in group_keys:
+            rooms_cat_res.setdefault("groups", {})["room_id"] = room_groups
+
+        if sender_group and "sender" in group_keys:
+            rooms_cat_res.setdefault("groups", {})["sender"] = sender_group
+
         defer.returnValue({
             "search_categories": {
-                "room_events": {
-                    "results": results,
-                    "count": len(results)
-                }
+                "room_events": rooms_cat_res
             }
         })
