@@ -48,34 +48,29 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def _filter_events_for_client(self, user_id, events, is_guest=False):
-        exclude = 0
-        include = 1
-        include_if_later_joined = 2
+        # Assumes that user has at some point joined the room if not is_guest.
 
         def allowed(event, membership, visibility):
             if visibility == "world_readable":
-                return include
+                return True
+
+            if is_guest:
+                return False
 
             if membership == Membership.JOIN:
-                return include
+                return True
 
             if event.type == EventTypes.RoomHistoryVisibility:
-                return include_if_later_joined
+                return not is_guest
 
-            if visibility == "public":
-                return include_if_later_joined
-            elif visibility == "shared":
-                return include_if_later_joined
+            if visibility == "shared":
+                return True
             elif visibility == "joined":
-                if membership == Membership.JOIN:
-                    return include
-                return exclude
+                return membership == Membership.JOIN
             elif visibility == "invited":
-                if membership == Membership.INVITE:
-                    return include_if_later_joined
-                return exclude
+                return membership == Membership.INVITE
 
-            return include_if_later_joined
+            return True
 
         event_id_to_state = yield self.store.get_state_for_events(
             frozenset(e.event_id for e in events),
@@ -86,7 +81,6 @@ class BaseHandler(object):
         )
 
         events_to_return = []
-        events_to_return_if_later_joined = []
         for event in events:
             state = event_id_to_state[event.event_id]
 
@@ -96,10 +90,6 @@ class BaseHandler(object):
             else:
                 membership = None
 
-            if membership == Membership.JOIN:
-                events_to_return.extend(events_to_return_if_later_joined)
-                events_to_return_if_later_joined = []
-
             visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
             if visibility_event:
                 visibility = visibility_event.content.get("history_visibility", "shared")
@@ -107,10 +97,8 @@ class BaseHandler(object):
                 visibility = "shared"
 
             should_include = allowed(event, membership, visibility)
-            if should_include == include:
+            if should_include:
                 events_to_return.append(event)
-            elif should_include == include_if_later_joined:
-                events_to_return_if_later_joined.append(event)
 
         if is_guest and len(events_to_return) < len(events):
             # This indicates that some events in the requested range were not
