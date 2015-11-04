@@ -120,7 +120,6 @@ class RedactionTestCase(unittest.TestCase):
             self.u_alice.to_string(),
             start,
             end,
-            None,  # Is currently ignored
         )
 
         self.assertEqual(1, len(results))
@@ -149,7 +148,6 @@ class RedactionTestCase(unittest.TestCase):
             self.u_alice.to_string(),
             start,
             end,
-            None,  # Is currently ignored
         )
 
         self.assertEqual(1, len(results))
@@ -199,7 +197,6 @@ class RedactionTestCase(unittest.TestCase):
             self.u_alice.to_string(),
             start,
             end,
-            None,  # Is currently ignored
         )
 
         self.assertEqual(1, len(results))
@@ -228,7 +225,6 @@ class RedactionTestCase(unittest.TestCase):
             self.u_alice.to_string(),
             start,
             end,
-            None,  # Is currently ignored
         )
 
         self.assertEqual(1, len(results))

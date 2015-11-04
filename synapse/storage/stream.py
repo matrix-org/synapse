@@ -158,14 +158,40 @@ class StreamStore(SQLBaseStore):
         defer.returnValue(results)
 
     @log_function
-    def get_room_events_stream(self, user_id, from_key, to_key, room_id,
-                               limit=0):
-        current_room_membership_sql = (
-            "SELECT m.room_id FROM room_memberships as m "
-            " INNER JOIN current_state_events as c"
-            " ON m.event_id = c.event_id AND c.state_key = m.user_id"
-            " WHERE m.user_id = ? AND m.membership = 'join'"
-        )
+    def get_room_events_stream(
+        self,
+        user_id,
+        from_key,
+        to_key,
+        limit=0,
+        is_guest=False,
+        room_ids=None
+    ):
+        room_ids = room_ids or []
+        room_ids = [r for r in room_ids]
+        if is_guest:
+            current_room_membership_sql = (
+                "SELECT c.room_id FROM history_visibility AS h"
+                " INNER JOIN current_state_events AS c"
+                " ON h.event_id = c.event_id"
+                " WHERE c.room_id IN (%s) AND h.history_visibility = 'world_readable'" % (
+                    ",".join(map(lambda _: "?", room_ids))
+                )
+            )
+            current_room_membership_args = room_ids
+        else:
+            current_room_membership_sql = (
+                "SELECT m.room_id FROM room_memberships as m "
+                " INNER JOIN current_state_events as c"
+                " ON m.event_id = c.event_id AND c.state_key = m.user_id"
+                " WHERE m.user_id = ? AND m.membership = 'join'"
+            )
+            current_room_membership_args = [user_id]
+            if room_ids:
+                current_room_membership_sql += " AND m.room_id in (%s)" % (
+                    ",".join(map(lambda _: "?", room_ids))
+                )
+                current_room_membership_args = [user_id] + room_ids
 
         # We also want to get any membership events about that user, e.g.
         # invites or leave notifications.
@@ -174,6 +200,7 @@ class StreamStore(SQLBaseStore):
             "INNER JOIN current_state_events as c ON m.event_id = c.event_id "
             "WHERE m.user_id = ? "
         )
+        membership_args = [user_id]
 
         if limit:
             limit = max(limit, MAX_STREAM_SIZE)
@@ -200,7 +227,9 @@ class StreamStore(SQLBaseStore):
         }
 
         def f(txn):
-            txn.execute(sql, (False, user_id, user_id, from_id.stream, to_id.stream,))
+            args = ([False] + current_room_membership_args + membership_args +
+                    [from_id.stream, to_id.stream])
+            txn.execute(sql, args)
 
             rows = self.cursor_to_dict(txn)
 

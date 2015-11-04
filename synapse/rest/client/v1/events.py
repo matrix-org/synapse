@@ -34,7 +34,15 @@ class EventStreamRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, is_guest = yield self.auth.get_user_by_req(
+            request,
+            allow_guest=True
+        )
+        room_id = None
+        if is_guest:
+            if "room_id" not in request.args:
+                raise SynapseError(400, "Guest users must specify room_id param")
+            room_id = request.args["room_id"][0]
         try:
             handler = self.handlers.event_stream_handler
             pagin_config = PaginationConfig.from_request(request)
@@ -49,7 +57,8 @@ class EventStreamRestServlet(ClientV1RestServlet):
 
             chunk = yield handler.get_stream(
                 auth_user.to_string(), pagin_config, timeout=timeout,
-                as_client_event=as_client_event
+                as_client_event=as_client_event, affect_presence=(not is_guest),
+                room_id=room_id, is_guest=is_guest
             )
         except:
             logger.exception("Event stream failed")

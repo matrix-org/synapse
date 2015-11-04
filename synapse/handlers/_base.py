@@ -47,7 +47,8 @@ class BaseHandler(object):
         self.event_builder_factory = hs.get_event_builder_factory()
 
     @defer.inlineCallbacks
-    def _filter_events_for_client(self, user_id, events, is_guest=False):
+    def _filter_events_for_client(self, user_id, events, is_guest=False,
+                                  require_all_visible_for_guests=True):
         exclude = 0
         include = 1
         include_if_later_joined = 2
@@ -112,7 +113,9 @@ class BaseHandler(object):
             elif should_include == include_if_later_joined:
                 events_to_return_if_later_joined.append(event)
 
-        if is_guest and len(events_to_return) < len(events):
+        if (require_all_visible_for_guests
+                and is_guest
+                and len(events_to_return) < len(events)):
             raise AuthError(403, "User %s does not have permission" % (
                 user_id
             ))
