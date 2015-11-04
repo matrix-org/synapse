@@ -33,6 +33,7 @@ from collections import OrderedDict
 from unpaddedbase64 import decode_base64
 
 import logging
+import math
 import string
 
 logger = logging.getLogger(__name__)
@@ -745,6 +746,60 @@ class RoomListHandler(BaseHandler):
 
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
+
+
+class RoomContextHandler(BaseHandler):
+    @defer.inlineCallbacks
+    def get_event_context(self, user, room_id, event_id, limit):
+        """Retrieves events, pagination tokens and state around a given event
+        in a room.
+
+        Args:
+            user (UserID)
+            room_id (str)
+            event_id (str)
+            limit (int): The maximum number of events to return in total
+                (excluding state).
+
+        Returns:
+            dict
+        """
+        before_limit = math.floor(limit/2.)
+        after_limit = limit - before_limit
+
+        now_token = yield self.hs.get_event_sources().get_current_token()
+
+        results = yield self.store.get_events_around(
+            room_id, event_id, before_limit, after_limit
+        )
+
+        results["events_before"] = yield self._filter_events_for_client(
+            user.to_string(), results["events_before"]
+        )
+
+        results["events_after"] = yield self._filter_events_for_client(
+            user.to_string(), results["events_after"]
+        )
+
+        if results["events_after"]:
+            last_event_id = results["events_after"][-1].event_id
+        else:
+            last_event_id = event_id
+
+        state = yield self.store.get_state_for_events(
+            [last_event_id], None
+        )
+        results["state"] = state[last_event_id].values()
+
+        results["start"] = now_token.copy_and_replace(
+            "room_key", results["start"]
+        ).to_string()
+
+        results["end"] = now_token.copy_and_replace(
+            "room_key", results["end"]
+        ).to_string()
+
+        defer.returnValue(results)
 
 
 class RoomEventSource(object):

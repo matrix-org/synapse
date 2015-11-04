@@ -398,6 +398,41 @@ class RoomTriggerBackfill(ClientV1RestServlet):
         defer.returnValue((200, res))
 
 
+class RoomEventContext(ClientV1RestServlet):
+    PATTERN = client_path_pattern(
+        "/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$"
+    )
+
+    def __init__(self, hs):
+        super(RoomEventContext, self).__init__(hs)
+        self.clock = hs.get_clock()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id, event_id):
+        user, _ = yield self.auth.get_user_by_req(request)
+
+        limit = int(request.args.get("limit", [10])[0])
+
+        results = yield self.handlers.room_context_handler.get_event_context(
+            user, room_id, event_id, limit,
+        )
+
+        time_now = self.clock.time_msec()
+        results["events_before"] = [
+            serialize_event(event, time_now) for event in results["events_before"]
+        ]
+        results["events_after"] = [
+            serialize_event(event, time_now) for event in results["events_after"]
+        ]
+        results["state"] = [
+            serialize_event(event, time_now) for event in results["state"]
+        ]
+
+        logger.info("Responding with %r", results)
+
+        defer.returnValue((200, results))
+
+
 # TODO: Needs unit testing
 class RoomMembershipRestServlet(ClientV1RestServlet):
 
@@ -629,3 +664,4 @@ def register_servlets(hs, http_server):
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     SearchRestServlet(hs).register(http_server)
+    RoomEventContext(hs).register(http_server)

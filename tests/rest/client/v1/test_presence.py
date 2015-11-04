@@ -371,7 +371,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         # all be ours
 
         # I'll already get my own presence state change
-        self.assertEquals({"start": "0_1_0_0", "end": "0_1_0_0", "chunk": []},
+        self.assertEquals({"start": "0_1_0_0_0", "end": "0_1_0_0_0", "chunk": []},
             response
         )
 
@@ -390,7 +390,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 "/events?from=s0_1_0&timeout=0", None)
 
         self.assertEquals(200, code)
-        self.assertEquals({"start": "s0_1_0_0", "end": "s0_2_0_0", "chunk": [
+        self.assertEquals({"start": "s0_1_0_0_0", "end": "s0_2_0_0_0", "chunk": [
             {"type": "m.presence",
              "content": {
                  "user_id": "@banana:test",

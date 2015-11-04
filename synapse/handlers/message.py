@@ -324,6 +324,8 @@ class MessageHandler(BaseHandler):
             user, pagination_config.get_source_config("receipt"), None
         )
 
+        tags_by_room = yield self.store.get_tags_for_user(user_id)
+
         public_room_ids = yield self.store.get_public_room_ids()
 
         limit = pagin_config.limit
@@ -400,6 +402,15 @@ class MessageHandler(BaseHandler):
                     serialize_event(c, time_now, as_client_event)
                     for c in current_state.values()
                 ]
+
+                private_user_data = []
+                tags = tags_by_room.get(event.room_id)
+                if tags:
+                    private_user_data.append({
+                        "type": "m.tag",
+                        "content": {"tags": tags},
+                    })
+                d["private_user_data"] = private_user_data
             except:
                 logger.exception("Failed to get snapshot")
 
@@ -449,6 +460,16 @@ class MessageHandler(BaseHandler):
             result = yield self._room_initial_sync_parted(
                 user_id, room_id, pagin_config, member_event
             )
+
+        private_user_data = []
+        tags = yield self.store.get_tags_for_room(user_id, room_id)
+        if tags:
+            private_user_data.append({
+                "type": "m.tag",
+                "content": {"tags": tags},
+            })
+        result["private_user_data"] = private_user_data
+
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -478,8 +499,8 @@ class MessageHandler(BaseHandler):
             user_id, messages
         )
 
-        start_token = StreamToken(token[0], 0, 0, 0)
-        end_token = StreamToken(token[1], 0, 0, 0)
+        start_token = StreamToken(token[0], 0, 0, 0, 0)
+        end_token = StreamToken(token[1], 0, 0, 0, 0)
 
         time_now = self.clock.time_msec()
 
