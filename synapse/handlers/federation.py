@@ -72,8 +72,6 @@ class FederationHandler(BaseHandler):
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
 
-        self.lock_manager = hs.get_room_lock_manager()
-
         self.replication_layer.set_handler(self)
 
         # When joining a room we need to queue any events for that room up

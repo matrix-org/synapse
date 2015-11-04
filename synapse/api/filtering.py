@@ -147,6 +147,10 @@ class FilterCollection(object):
             self.filter_json.get("room", {}).get("ephemeral", {})
         )
 
+        self.room_private_user_data = Filter(
+            self.filter_json.get("room", {}).get("private_user_data", {})
+        )
+
         self.presence_filter = Filter(
             self.filter_json.get("presence", {})
         )
@@ -171,6 +175,9 @@ class FilterCollection(object):
 
     def filter_room_ephemeral(self, events):
         return self.room_ephemeral_filter.filter(events)
+
+    def filter_room_private_user_data(self, events):
+        return self.room_private_user_data.filter(events)
 
 
 class Filter(object):

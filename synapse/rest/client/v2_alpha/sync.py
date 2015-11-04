@@ -220,6 +220,10 @@ class SyncRestServlet(RestServlet):
             )
             timeline_event_ids.append(event.event_id)
 
+        private_user_data = filter.filter_room_private_user_data(
+            room.private_user_data
+        )
+
         result = {
             "event_map": event_map,
             "timeline": {
@@ -228,6 +232,7 @@ class SyncRestServlet(RestServlet):
                 "limited": room.timeline.limited,
             },
             "state": {"events": state_event_ids},
+            "private_user_data": {"events": private_user_data},
         }
 
         if joined:
