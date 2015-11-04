@@ -78,8 +78,10 @@ class MessageHandler(BaseHandler):
             user_id (str): The user requesting messages.
             room_id (str): The room they want messages from.
             pagin_config (synapse.api.streams.PaginationConfig): The pagination
-            config rules to apply, if any.
+                config rules to apply, if any.
             as_client_event (bool): True to get events in client-server format.
+            is_guest (bool): Whether the requesting user is a guest (as opposed
+                to a fully registered user).
         Returns:
             dict: Pagination API results
         """
