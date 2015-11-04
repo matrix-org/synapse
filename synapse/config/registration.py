@@ -56,6 +56,9 @@ class RegistrationConfig(Config):
         # The default number of rounds is 12.
         bcrypt_rounds: 12
 
+        # Allows users to register as guests without a password/email/etc, and
+        # participate in rooms hosted on this server which have been made
+        # accessible to anonymous users.
         allow_guest_access: False
         """ % locals()
 
