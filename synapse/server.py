@@ -29,7 +29,6 @@ from synapse.state import StateHandler
 from synapse.storage import DataStore
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
-from synapse.util.lockutils import LockManager
 from synapse.streams.events import EventSources
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.crypto.keyring import Keyring
@@ -70,7 +69,6 @@ class BaseHomeServer(object):
         'auth',
         'rest_servlet_factory',
         'state_handler',
-        'room_lock_manager',
         'notifier',
         'distributor',
         'resource_for_client',
@@ -200,9 +198,6 @@ class HomeServer(BaseHomeServer):
 
     def build_state_handler(self):
         return StateHandler(self)
-
-    def build_room_lock_manager(self):
-        return LockManager()
 
     def build_distributor(self):
         return Distributor()
