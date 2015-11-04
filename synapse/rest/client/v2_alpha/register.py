@@ -259,7 +259,6 @@ class RegisterRestServlet(RestServlet):
             "user_id": user_id,
             "access_token": access_token,
             "home_server": self.hs.hostname,
-
         }))
 
 
