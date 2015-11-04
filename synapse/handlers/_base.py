@@ -113,6 +113,10 @@ class BaseHandler(object):
                 events_to_return_if_later_joined.append(event)
 
         if is_guest and len(events_to_return) < len(events):
+            # This indicates that some events in the requested range were not
+            # visible to guest users. To be safe, we reject the entire request,
+            # so that we don't have to worry about interpreting visibility
+            # boundaries.
             raise AuthError(403, "User %s does not have permission" % (
                 user_id
             ))
