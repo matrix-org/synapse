@@ -71,20 +71,20 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
-                     as_client_event=True):
+                     as_client_event=True, is_guest=False):
         """Get messages in a room.
 
         Args:
             user_id (str): The user requesting messages.
             room_id (str): The room they want messages from.
             pagin_config (synapse.api.streams.PaginationConfig): The pagination
-            config rules to apply, if any.
+                config rules to apply, if any.
             as_client_event (bool): True to get events in client-server format.
+            is_guest (bool): Whether the requesting user is a guest (as opposed
+                to a fully registered user).
         Returns:
             dict: Pagination API results
         """
-        member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
-
         data_source = self.hs.get_event_sources().sources["room"]
 
         if pagin_config.from_token:
@@ -107,23 +107,27 @@ class MessageHandler(BaseHandler):
 
         source_config = pagin_config.get_source_config("room")
 
-        if member_event.membership == Membership.LEAVE:
-            # If they have left the room then clamp the token to be before
-            # they left the room
-            leave_token = yield self.store.get_topological_token_for_event(
-                member_event.event_id
-            )
-            leave_token = RoomStreamToken.parse(leave_token)
-            if leave_token.topological < room_token.topological:
-                source_config.from_key = str(leave_token)
+        if not is_guest:
+            member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
+            if member_event.membership == Membership.LEAVE:
+                # If they have left the room then clamp the token to be before
+                # they left the room.
+                # If they're a guest, we'll just 403 them if they're asking for
+                # events they can't see.
+                leave_token = yield self.store.get_topological_token_for_event(
+                    member_event.event_id
+                )
+                leave_token = RoomStreamToken.parse(leave_token)
+                if leave_token.topological < room_token.topological:
+                    source_config.from_key = str(leave_token)
 
-            if source_config.direction == "f":
-                if source_config.to_key is None:
-                    source_config.to_key = str(leave_token)
-                else:
-                    to_token = RoomStreamToken.parse(source_config.to_key)
-                    if leave_token.topological < to_token.topological:
+                if source_config.direction == "f":
+                    if source_config.to_key is None:
                         source_config.to_key = str(leave_token)
+                    else:
+                        to_token = RoomStreamToken.parse(source_config.to_key)
+                        if leave_token.topological < to_token.topological:
+                            source_config.to_key = str(leave_token)
 
         yield self.hs.get_handlers().federation_handler.maybe_backfill(
             room_id, room_token.topological
@@ -146,7 +150,7 @@ class MessageHandler(BaseHandler):
                 "end": next_token.to_string(),
             })
 
-        events = yield self._filter_events_for_client(user_id, events)
+        events = yield self._filter_events_for_client(user_id, events, is_guest=is_guest)
 
         time_now = self.clock.time_msec()
 

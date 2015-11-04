@@ -32,7 +32,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         state = yield self.handlers.presence_handler.get_state(
@@ -42,7 +42,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         state = {}
@@ -77,7 +77,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         if not self.hs.is_mine(user):
@@ -97,7 +97,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, user_id):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         if not self.hs.is_mine(user):
