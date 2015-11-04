@@ -827,7 +827,6 @@ class RoomEventSource(object):
                 user_id=user.to_string(),
                 from_key=from_key,
                 to_key=to_key,
-                room_id=None,
                 limit=limit,
             )
 

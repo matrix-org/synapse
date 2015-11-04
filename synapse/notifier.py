@@ -269,7 +269,7 @@ class Notifier(object):
                 logger.exception("Failed to notify listener")
 
     @defer.inlineCallbacks
-    def wait_for_events(self, user, rooms, timeout, callback,
+    def wait_for_events(self, user, timeout, callback,
                         from_token=StreamToken("s0", "0", "0", "0", "0")):
         """Wait until the callback returns a non empty response or the
         timeout fires.
@@ -328,7 +328,7 @@ class Notifier(object):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def get_events_for(self, user, rooms, pagination_config, timeout,
+    def get_events_for(self, user, pagination_config, timeout,
                        only_room_events=False):
         """ For the given user and rooms, return any new events for them. If
         there are no new events wait for up to `timeout` milliseconds for any
@@ -369,7 +369,7 @@ class Notifier(object):
                 defer.returnValue(None)
 
         result = yield self.wait_for_events(
-            user, rooms, timeout, check_for_updates, from_token=from_token
+            user, timeout, check_for_updates, from_token=from_token
         )
 
         if result is None:

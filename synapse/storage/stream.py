@@ -158,8 +158,7 @@ class StreamStore(SQLBaseStore):
         defer.returnValue(results)
 
     @log_function
-    def get_room_events_stream(self, user_id, from_key, to_key, room_id,
-                               limit=0):
+    def get_room_events_stream(self, user_id, from_key, to_key, limit=0):
         current_room_membership_sql = (
             "SELECT m.room_id FROM room_memberships as m "
             " INNER JOIN current_state_events as c"
