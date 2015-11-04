@@ -143,21 +143,8 @@ class SyncHandler(BaseHandler):
             def current_sync_callback(before_token, after_token):
                 return self.current_sync_for_user(sync_config, since_token)
 
-            rm_handler = self.hs.get_handlers().room_member_handler
-
-            app_service = yield self.store.get_app_service_by_user_id(
-                sync_config.user.to_string()
-            )
-            if app_service:
-                rooms = yield self.store.get_app_service_rooms(app_service)
-                room_ids = set(r.room_id for r in rooms)
-            else:
-                room_ids = yield rm_handler.get_joined_rooms_for_user(
-                    sync_config.user
-                )
-
             result = yield self.notifier.wait_for_events(
-                sync_config.user, room_ids, timeout, current_sync_callback,
+                sync_config.user, timeout, current_sync_callback,
                 from_token=since_token
             )
             defer.returnValue(result)
@@ -403,7 +390,6 @@ class SyncHandler(BaseHandler):
             sync_config.user.to_string(),
             from_key=since_token.room_key,
             to_key=now_token.room_key,
-            room_id=None,
             limit=timeline_limit + 1,
         )
 
