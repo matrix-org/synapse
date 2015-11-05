@@ -1,3 +1,20 @@
+Changes in synapse v0.11.0-rc1 (XXXX-XX-XX)
+===========================================
+
+* Add Search API (PR #307, #324, #327, #336, )
+* Add 'archived' state to v2 /sync API (PR #316)
+* Add ability to reject invites (PR #317)
+* Add config option to disable password login (PR #322)
+* Add the login fallback API (PR #330)
+* Add room context API (PR #334)
+* Add room tagging support (PR #335)
+* Add anonymous access support (PR #344, #345, #348)
+* Update v2 /sync API to match spec (PR #305, #316, #321, #332, #337, #341)
+* Change retry schedule for remote application services (PR #320)
+* Change retry schedule for remote servers (PR #340)
+* Fix bug where we hosted static content in the incorrect place (PR #329)
+* Fix bug where we didn't increment retry interval for remote servers (PR #343)
+
 Changes in synapse v0.10.1-rc1 (2015-10-15)
 ===========================================
 
