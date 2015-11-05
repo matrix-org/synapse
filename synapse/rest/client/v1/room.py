@@ -600,7 +600,8 @@ class SearchRestServlet(ClientV1RestServlet):
 
         content = _parse_json(request)
 
-        results = yield self.handlers.search_handler.search(auth_user, content)
+        batch = request.args.get("next_batch", [None])[0]
+        results = yield self.handlers.search_handler.search(auth_user, content, batch)
 
         defer.returnValue((200, results))
 
