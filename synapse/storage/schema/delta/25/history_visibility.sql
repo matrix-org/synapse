@@ -13,6 +13,10 @@
  * limitations under the License.
  */
 
+/*
+ * This is a manual index of history_visibility content of state events,
+ * so that we can join on them in SELECT statements.
+ */
 CREATE TABLE IF NOT EXISTS history_visibility(
     id INTEGER PRIMARY KEY,
     event_id TEXT NOT NULL,
