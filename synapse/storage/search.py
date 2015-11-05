@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 from _base import SQLBaseStore
+from synapse.api.errors import SynapseError
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 import logging
@@ -130,7 +131,13 @@ class SearchStore(SQLBaseStore):
         )
 
         if pagination_token:
-            topo, stream = pagination_token.split(",")
+            try:
+                topo, stream = pagination_token.split(",")
+                topo = int(topo)
+                stream = int(stream)
+            except:
+                raise SynapseError(400, "Invalid pagination token")
+
             clauses.append(
                 "(topological_ordering < ?"
                 " OR (topological_ordering = ? AND stream_ordering < ?))"
