@@ -26,7 +26,6 @@ from synapse.events.utils import serialize_event
 import simplejson as json
 import logging
 import urllib
-from synapse.util import third_party_invites
 
 logger = logging.getLogger(__name__)
 
@@ -453,7 +452,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         # target user is you unless it is an invite
         state_key = user.to_string()
 
-        if membership_action == "invite" and third_party_invites.has_invite_keys(content):
+        if membership_action == "invite" and self._has_3pid_invite_keys(content):
             yield self.handlers.room_member_handler.do_3pid_invite(
                 room_id,
                 user,
@@ -480,19 +479,10 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
         msg_handler = self.handlers.message_handler
 
-        event_content = {
-            "membership": unicode(membership_action),
-        }
-
-        if membership_action == "join" and third_party_invites.has_join_keys(content):
-            event_content["third_party_invite"] = (
-                third_party_invites.extract_join_keys(content)
-            )
-
         yield msg_handler.create_and_send_event(
             {
                 "type": EventTypes.Member,
-                "content": event_content,
+                "content": {"membership": unicode(membership_action)},
                 "room_id": room_id,
                 "sender": user.to_string(),
                 "state_key": state_key,
@@ -502,6 +492,12 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         )
 
         defer.returnValue((200, {}))
+
+    def _has_3pid_invite_keys(self, content):
+        for key in {"id_server", "medium", "address", "display_name"}:
+            if key not in content:
+                return False
+        return True
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):
