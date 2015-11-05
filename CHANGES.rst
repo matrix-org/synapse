@@ -1,7 +1,7 @@
 Changes in synapse v0.11.0-rc1 (XXXX-XX-XX)
 ===========================================
 
-* Add Search API (PR #307, #324, #327, #336, )
+* Add Search API (PR #307, #324, #327, #336, #350)
 * Add 'archived' state to v2 /sync API (PR #316)
 * Add ability to reject invites (PR #317)
 * Add config option to disable password login (PR #322)
