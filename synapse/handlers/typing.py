@@ -246,17 +246,12 @@ class TypingNotificationEventSource(object):
             },
         }
 
-    @defer.inlineCallbacks
-    def get_new_events_for_user(self, user, from_key, limit):
+    def get_new_events(self, from_key, room_ids, **kwargs):
         from_key = int(from_key)
         handler = self.handler()
 
-        joined_room_ids = (
-            yield self.room_member_handler().get_joined_rooms_for_user(user)
-        )
-
         events = []
-        for room_id in joined_room_ids:
+        for room_id in room_ids:
             if room_id not in handler._room_serials:
                 continue
             if handler._room_serials[room_id] <= from_key:
@@ -264,7 +259,7 @@ class TypingNotificationEventSource(object):
 
             events.append(self._make_event_for(room_id))
 
-        defer.returnValue((events, handler._latest_room_serial))
+        return events, handler._latest_room_serial
 
     def get_current_key(self):
         return self.handler()._latest_room_serial

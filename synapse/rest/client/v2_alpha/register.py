@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_pattern, parse_json_dict_from_request
@@ -54,6 +54,19 @@ class RegisterRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor()
+
+        kind = "user"
+        if "kind" in request.args:
+            kind = request.args["kind"][0]
+
+        if kind == "guest":
+            ret = yield self._do_guest_registration()
+            defer.returnValue(ret)
+            return
+        elif kind != "user":
+            raise UnrecognizedRequestError(
+                "Do not understand membership kind: %s" % (kind,)
+            )
 
         if '/register/email/requestToken' in request.path:
             ret = yield self.onEmailTokenRequest(request)
@@ -235,6 +248,18 @@ class RegisterRestServlet(RestServlet):
 
         ret = yield self.identity_handler.requestEmailToken(**body)
         defer.returnValue((200, ret))
+
+    @defer.inlineCallbacks
+    def _do_guest_registration(self):
+        if not self.hs.config.allow_guest_access:
+            defer.returnValue((403, "Guest access is disabled"))
+        user_id, _ = yield self.registration_handler.register(generate_token=False)
+        access_token = self.auth_handler.generate_access_token(user_id, ["guest = true"])
+        defer.returnValue((200, {
+            "user_id": user_id,
+            "access_token": access_token,
+            "home_server": self.hs.hostname,
+        }))
 
 
 def register_servlets(hs, http_server):

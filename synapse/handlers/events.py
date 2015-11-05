@@ -100,7 +100,7 @@ class EventStreamHandler(BaseHandler):
     @log_function
     def get_stream(self, auth_user_id, pagin_config, timeout=0,
                    as_client_event=True, affect_presence=True,
-                   only_room_events=False):
+                   only_room_events=False, room_id=None, is_guest=False):
         """Fetches the events stream for a given user.
 
         If `only_room_events` is `True` only room events will be returned.
@@ -111,17 +111,6 @@ class EventStreamHandler(BaseHandler):
             if affect_presence:
                 yield self.started_stream(auth_user)
 
-            rm_handler = self.hs.get_handlers().room_member_handler
-
-            app_service = yield self.store.get_app_service_by_user_id(
-                auth_user.to_string()
-            )
-            if app_service:
-                rooms = yield self.store.get_app_service_rooms(app_service)
-                room_ids = set(r.room_id for r in rooms)
-            else:
-                room_ids = yield rm_handler.get_joined_rooms_for_user(auth_user)
-
             if timeout:
                 # If they've set a timeout set a minimum limit.
                 timeout = max(timeout, 500)
@@ -130,9 +119,15 @@ class EventStreamHandler(BaseHandler):
                 # thundering herds on restart.
                 timeout = random.randint(int(timeout*0.9), int(timeout*1.1))
 
+            if is_guest:
+                yield self.distributor.fire(
+                    "user_joined_room", user=auth_user, room_id=room_id
+                )
+
             events, tokens = yield self.notifier.get_events_for(
-                auth_user, room_ids, pagin_config, timeout,
-                only_room_events=only_room_events
+                auth_user, pagin_config, timeout,
+                only_room_events=only_room_events,
+                is_guest=is_guest, guest_room_id=room_id
             )
 
             time_now = self.clock.time_msec()

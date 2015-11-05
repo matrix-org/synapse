@@ -50,11 +50,11 @@ class Filtering(object):
         # many definitions.
 
         top_level_definitions = [
-            "public_user_data", "private_user_data", "server_data"
+            "presence"
         ]
 
         room_level_definitions = [
-            "state", "timeline", "ephemeral"
+            "state", "timeline", "ephemeral", "private_user_data"
         ]
 
         for key in top_level_definitions:
@@ -114,22 +114,6 @@ class Filtering(object):
                     if not isinstance(event_type, basestring):
                         raise SynapseError(400, "Event type should be a string")
 
-        if "format" in definition:
-            event_format = definition["format"]
-            if event_format not in ["federation", "events"]:
-                raise SynapseError(400, "Invalid format: %s" % (event_format,))
-
-        if "select" in definition:
-            event_select_list = definition["select"]
-            for select_key in event_select_list:
-                if select_key not in ["event_id", "origin_server_ts",
-                                      "thread_id", "content", "content.body"]:
-                    raise SynapseError(400, "Bad select: %s" % (select_key,))
-
-        if ("bundle_updates" in definition and
-                type(definition["bundle_updates"]) != bool):
-            raise SynapseError(400, "Bad bundle_updates: expected bool.")
-
 
 class FilterCollection(object):
     def __init__(self, filter_json):
@@ -145,6 +129,10 @@ class FilterCollection(object):
 
         self.room_ephemeral_filter = Filter(
             self.filter_json.get("room", {}).get("ephemeral", {})
+        )
+
+        self.room_private_user_data = Filter(
+            self.filter_json.get("room", {}).get("private_user_data", {})
         )
 
         self.presence_filter = Filter(
@@ -171,6 +159,9 @@ class FilterCollection(object):
 
     def filter_room_ephemeral(self, events):
         return self.room_ephemeral_filter.filter(events)
+
+    def filter_room_private_user_data(self, events):
+        return self.room_private_user_data.filter(events)
 
 
 class Filter(object):

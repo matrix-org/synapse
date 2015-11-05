@@ -54,10 +54,11 @@ class RoomPermissionsTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None):
+        def _get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
+                "is_guest": False,
             }
         hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
@@ -439,10 +440,11 @@ class RoomsMemberListTestCase(RestTestCase):
 
         self.auth_user_id = self.user_id
 
-        def _get_user_by_access_token(token=None):
+        def _get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
+                "is_guest": False,
             }
         hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
@@ -517,10 +519,11 @@ class RoomsCreateTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None):
+        def _get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
+                "is_guest": False,
             }
         hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
@@ -608,10 +611,11 @@ class RoomTopicTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None):
+        def _get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
+                "is_guest": False,
             }
 
         hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
@@ -713,10 +717,11 @@ class RoomMemberStateTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None):
+        def _get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
+                "is_guest": False,
             }
         hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
@@ -838,10 +843,11 @@ class RoomMessagesTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None):
+        def _get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
+                "is_guest": False,
             }
         hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 
@@ -933,10 +939,11 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None):
+        def _get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
+                "is_guest": False,
             }
         hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
 

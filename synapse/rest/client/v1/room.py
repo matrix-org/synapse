@@ -61,7 +61,7 @@ class RoomCreateRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
 
         room_config = self.get_room_config(request)
         info = yield self.make_room(room_config, auth_user, None)
@@ -124,7 +124,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_type, state_key):
-        user, _ = yield self.auth.get_user_by_req(request)
+        user, _, is_guest = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         msg_handler = self.handlers.message_handler
         data = yield msg_handler.get_room_data(
@@ -132,6 +132,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
             room_id=room_id,
             event_type=event_type,
             state_key=state_key,
+            is_guest=is_guest,
         )
 
         if not data:
@@ -142,7 +143,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, state_key, txn_id=None):
-        user, token_id = yield self.auth.get_user_by_req(request)
+        user, token_id, _ = yield self.auth.get_user_by_req(request)
 
         content = _parse_json(request)
 
@@ -174,7 +175,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_type, txn_id=None):
-        user, token_id = yield self.auth.get_user_by_req(request)
+        user, token_id, _ = yield self.auth.get_user_by_req(request)
         content = _parse_json(request)
 
         msg_handler = self.handlers.message_handler
@@ -219,7 +220,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_identifier, txn_id=None):
-        user, token_id = yield self.auth.get_user_by_req(request)
+        user, token_id, _ = yield self.auth.get_user_by_req(request)
 
         # the identifier could be a room alias or a room id. Try one then the
         # other if it fails to parse, without swallowing other valid
@@ -288,7 +289,7 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         # TODO support Pagination stream API (limit/tokens)
-        user, _ = yield self.auth.get_user_by_req(request)
+        user, _, _ = yield self.auth.get_user_by_req(request)
         handler = self.handlers.message_handler
         events = yield handler.get_state_events(
             room_id=room_id,
@@ -324,7 +325,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
-        user, _ = yield self.auth.get_user_by_req(request)
+        user, _, is_guest = yield self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = PaginationConfig.from_request(
             request, default_limit=10,
         )
@@ -333,6 +334,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
         msgs = yield handler.get_messages(
             room_id=room_id,
             user_id=user.to_string(),
+            is_guest=is_guest,
             pagin_config=pagination_config,
             as_client_event=as_client_event
         )
@@ -346,12 +348,13 @@ class RoomStateRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
-        user, _ = yield self.auth.get_user_by_req(request)
+        user, _, is_guest = yield self.auth.get_user_by_req(request, allow_guest=True)
         handler = self.handlers.message_handler
         # Get all the current state for this room
         events = yield handler.get_state_events(
             room_id=room_id,
             user_id=user.to_string(),
+            is_guest=is_guest,
         )
         defer.returnValue((200, events))
 
@@ -362,7 +365,7 @@ class RoomInitialSyncRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
-        user, _ = yield self.auth.get_user_by_req(request)
+        user, _, _ = yield self.auth.get_user_by_req(request)
         pagination_config = PaginationConfig.from_request(request)
         content = yield self.handlers.message_handler.room_initial_sync(
             room_id=room_id,
@@ -396,6 +399,41 @@ class RoomTriggerBackfill(ClientV1RestServlet):
         defer.returnValue((200, res))
 
 
+class RoomEventContext(ClientV1RestServlet):
+    PATTERN = client_path_pattern(
+        "/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$"
+    )
+
+    def __init__(self, hs):
+        super(RoomEventContext, self).__init__(hs)
+        self.clock = hs.get_clock()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id, event_id):
+        user, _ = yield self.auth.get_user_by_req(request)
+
+        limit = int(request.args.get("limit", [10])[0])
+
+        results = yield self.handlers.room_context_handler.get_event_context(
+            user, room_id, event_id, limit,
+        )
+
+        time_now = self.clock.time_msec()
+        results["events_before"] = [
+            serialize_event(event, time_now) for event in results["events_before"]
+        ]
+        results["events_after"] = [
+            serialize_event(event, time_now) for event in results["events_after"]
+        ]
+        results["state"] = [
+            serialize_event(event, time_now) for event in results["state"]
+        ]
+
+        logger.info("Responding with %r", results)
+
+        defer.returnValue((200, results))
+
+
 # TODO: Needs unit testing
 class RoomMembershipRestServlet(ClientV1RestServlet):
 
@@ -407,7 +445,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, membership_action, txn_id=None):
-        user, token_id = yield self.auth.get_user_by_req(request)
+        user, token_id, _ = yield self.auth.get_user_by_req(request)
 
         content = _parse_json(request)
 
@@ -485,7 +523,7 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_id, txn_id=None):
-        user, token_id = yield self.auth.get_user_by_req(request)
+        user, token_id, _ = yield self.auth.get_user_by_req(request)
         content = _parse_json(request)
 
         msg_handler = self.handlers.message_handler
@@ -525,7 +563,7 @@ class RoomTypingRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, user_id):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
 
         room_id = urllib.unquote(room_id)
         target_user = UserID.from_string(urllib.unquote(user_id))
@@ -558,7 +596,7 @@ class SearchRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
 
         content = _parse_json(request)
 
@@ -624,3 +662,4 @@ def register_servlets(hs, http_server):
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     SearchRestServlet(hs).register(http_server)
+    RoomEventContext(hs).register(http_server)

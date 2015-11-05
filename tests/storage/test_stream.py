@@ -68,7 +68,6 @@ class StreamStoreTestCase(unittest.TestCase):
             self.u_bob.to_string(),
             start,
             end,
-            None,  # Is currently ignored
         )
 
         self.assertEqual(1, len(results))
@@ -105,7 +104,6 @@ class StreamStoreTestCase(unittest.TestCase):
             self.u_alice.to_string(),
             start,
             end,
-            None,  # Is currently ignored
         )
 
         self.assertEqual(1, len(results))
@@ -147,7 +145,6 @@ class StreamStoreTestCase(unittest.TestCase):
             self.u_bob.to_string(),
             start,
             end,
-            None,  # Is currently ignored
         )
 
         # We should not get the message, as it happened *after* bob left.
@@ -175,7 +172,6 @@ class StreamStoreTestCase(unittest.TestCase):
             self.u_bob.to_string(),
             start,
             end,
-            None,  # Is currently ignored
         )
 
         # We should not get the message, as it happened *after* bob left.
