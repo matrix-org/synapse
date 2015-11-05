@@ -35,6 +35,7 @@ from signedjson.sign import sign_json
 
 import simplejson as json
 import logging
+import random
 import sys
 import urllib
 import urlparse
@@ -53,6 +54,9 @@ incoming_responses_counter = metrics.register_counter(
     "responses",
     labels=["method", "code"],
 )
+
+
+MAX_RETRIES = 4
 
 
 class MatrixFederationEndpointFactory(object):
@@ -119,7 +123,7 @@ class MatrixFederationHttpClient(object):
 
         # XXX: Would be much nicer to retry only at the transaction-layer
         # (once we have reliable transactions in place)
-        retries_left = 5
+        retries_left = MAX_RETRIES
 
         http_url_bytes = urlparse.urlunparse(
             ("", "", path_bytes, param_bytes, query_bytes, "")
@@ -180,7 +184,9 @@ class MatrixFederationHttpClient(object):
                     )
 
                     if retries_left and not timeout:
-                        yield sleep(2 ** (5 - retries_left))
+                        delay = 5 ** (MAX_RETRIES + 1 - retries_left)
+                        delay *= random.uniform(0.8, 1.4)
+                        yield sleep(delay)
                         retries_left -= 1
                     else:
                         raise
