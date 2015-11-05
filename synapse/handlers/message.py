@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, AuthError, Codes
 from synapse.streams.config import PaginationConfig
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
@@ -229,7 +229,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_room_data(self, user_id=None, room_id=None,
-                      event_type=None, state_key=""):
+                      event_type=None, state_key="", is_guest=False):
         """ Get data from a room.
 
         Args:
@@ -239,23 +239,42 @@ class MessageHandler(BaseHandler):
         Raises:
             SynapseError if something went wrong.
         """
-        member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
+        membership, membership_event_id = yield self._check_in_room_or_world_readable(
+            room_id, user_id, is_guest
+        )
 
-        if member_event.membership == Membership.JOIN:
+        if membership == Membership.JOIN:
             data = yield self.state_handler.get_current_state(
                 room_id, event_type, state_key
             )
-        elif member_event.membership == Membership.LEAVE:
+        elif membership == Membership.LEAVE:
             key = (event_type, state_key)
             room_state = yield self.store.get_state_for_events(
-                [member_event.event_id], [key]
+                [membership_event_id], [key]
             )
-            data = room_state[member_event.event_id].get(key)
+            data = room_state[membership_event_id].get(key)
 
         defer.returnValue(data)
 
     @defer.inlineCallbacks
-    def get_state_events(self, user_id, room_id):
+    def _check_in_room_or_world_readable(self, room_id, user_id, is_guest):
+        if is_guest:
+            visibility = yield self.state_handler.get_current_state(
+                room_id, EventTypes.RoomHistoryVisibility, ""
+            )
+            if visibility.content["history_visibility"] == "world_readable":
+                defer.returnValue((Membership.JOIN, None))
+                return
+            else:
+                raise AuthError(
+                    403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
+                )
+        else:
+            member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
+            defer.returnValue((member_event.membership, member_event.event_id))
+
+    @defer.inlineCallbacks
+    def get_state_events(self, user_id, room_id, is_guest=False):
         """Retrieve all state events for a given room. If the user is
         joined to the room then return the current state. If the user has
         left the room return the state events from when they left.
@@ -266,15 +285,17 @@ class MessageHandler(BaseHandler):
         Returns:
             A list of dicts representing state events. [{}, {}, {}]
         """
-        member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
+        membership, membership_event_id = yield self._check_in_room_or_world_readable(
+            room_id, user_id, is_guest
+        )
 
-        if member_event.membership == Membership.JOIN:
+        if membership == Membership.JOIN:
             room_state = yield self.state_handler.get_current_state(room_id)
-        elif member_event.membership == Membership.LEAVE:
+        elif membership == Membership.LEAVE:
             room_state = yield self.store.get_state_for_events(
-                [member_event.event_id], None
+                [membership_event_id], None
             )
-            room_state = room_state[member_event.event_id]
+            room_state = room_state[membership_event_id]
 
         now = self.clock.time_msec()
         defer.returnValue(

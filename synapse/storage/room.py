@@ -202,6 +202,19 @@ class RoomStore(SQLBaseStore):
                 txn, event, "content.body", event.content["body"]
             )
 
+    def _store_history_visibility_txn(self, txn, event):
+        if hasattr(event, "content") and "history_visibility" in event.content:
+            sql = (
+                "INSERT INTO history_visibility"
+                " (event_id, room_id, history_visibility)"
+                " VALUES (?, ?, ?)"
+            )
+            txn.execute(sql, (
+                event.event_id,
+                event.room_id,
+                event.content["history_visibility"]
+            ))
+
     def _store_event_search_txn(self, txn, event, key, value):
         if isinstance(self.database_engine, PostgresEngine):
             sql = (

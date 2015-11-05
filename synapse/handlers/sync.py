@@ -295,11 +295,16 @@ class SyncHandler(BaseHandler):
 
         typing_key = since_token.typing_key if since_token else "0"
 
+        rooms = yield self.store.get_rooms_for_user(sync_config.user.to_string())
+        room_ids = [room.room_id for room in rooms]
+
         typing_source = self.event_sources.sources["typing"]
-        typing, typing_key = yield typing_source.get_new_events_for_user(
+        typing, typing_key = yield typing_source.get_new_events(
             user=sync_config.user,
             from_key=typing_key,
             limit=sync_config.filter.ephemeral_limit(),
+            room_ids=room_ids,
+            is_guest=False,
         )
         now_token = now_token.copy_and_replace("typing_key", typing_key)
 
@@ -312,10 +317,13 @@ class SyncHandler(BaseHandler):
         receipt_key = since_token.receipt_key if since_token else "0"
 
         receipt_source = self.event_sources.sources["receipt"]
-        receipts, receipt_key = yield receipt_source.get_new_events_for_user(
+        receipts, receipt_key = yield receipt_source.get_new_events(
             user=sync_config.user,
             from_key=receipt_key,
             limit=sync_config.filter.ephemeral_limit(),
+            room_ids=room_ids,
+            # /sync doesn't support guest access, they can't get to this point in code
+            is_guest=False,
         )
         now_token = now_token.copy_and_replace("receipt_key", receipt_key)
 
@@ -360,11 +368,17 @@ class SyncHandler(BaseHandler):
         """
         now_token = yield self.event_sources.get_current_token()
 
+        rooms = yield self.store.get_rooms_for_user(sync_config.user.to_string())
+        room_ids = [room.room_id for room in rooms]
+
         presence_source = self.event_sources.sources["presence"]
-        presence, presence_key = yield presence_source.get_new_events_for_user(
+        presence, presence_key = yield presence_source.get_new_events(
             user=sync_config.user,
             from_key=since_token.presence_key,
             limit=sync_config.filter.presence_limit(),
+            room_ids=room_ids,
+            # /sync doesn't support guest access, they can't get to this point in code
+            is_guest=False,
         )
         now_token = now_token.copy_and_replace("presence_key", presence_key)
 
