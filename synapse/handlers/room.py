@@ -807,7 +807,14 @@ class RoomEventSource(object):
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def get_new_events_for_user(self, user, from_key, limit):
+    def get_new_events(
+            self,
+            user,
+            from_key,
+            limit,
+            room_ids,
+            is_guest,
+    ):
         # We just ignore the key for now.
 
         to_key = yield self.get_current_key()
@@ -827,8 +834,9 @@ class RoomEventSource(object):
                 user_id=user.to_string(),
                 from_key=from_key,
                 to_key=to_key,
-                room_id=None,
                 limit=limit,
+                room_ids=room_ids,
+                is_guest=is_guest,
             )
 
         defer.returnValue((events, end_key))

@@ -650,9 +650,30 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
             {"presence": ONLINE}
         )
 
+        # Apple sees self-reflection even without room_id
+        (events, _) = yield self.event_source.get_new_events(
+            user=self.u_apple,
+            from_key=0,
+        )
+
+        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEquals(events,
+            [
+                {"type": "m.presence",
+                 "content": {
+                    "user_id": "@apple:test",
+                    "presence": ONLINE,
+                    "last_active_ago": 0,
+                }},
+            ],
+            msg="Presence event should be visible to self-reflection"
+        )
+
         # Apple sees self-reflection
-        (events, _) = yield self.event_source.get_new_events_for_user(
-            self.u_apple, 0, None
+        (events, _) = yield self.event_source.get_new_events(
+            user=self.u_apple,
+            from_key=0,
+            room_ids=[self.room_id],
         )
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -684,8 +705,10 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
         )
 
         # Banana sees it because of presence subscription
-        (events, _) = yield self.event_source.get_new_events_for_user(
-            self.u_banana, 0, None
+        (events, _) = yield self.event_source.get_new_events(
+            user=self.u_banana,
+            from_key=0,
+            room_ids=[self.room_id],
         )
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -702,8 +725,10 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
         )
 
         # Elderberry sees it because of same room
-        (events, _) = yield self.event_source.get_new_events_for_user(
-            self.u_elderberry, 0, None
+        (events, _) = yield self.event_source.get_new_events(
+            user=self.u_elderberry,
+            from_key=0,
+            room_ids=[self.room_id],
         )
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -720,8 +745,10 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
         )
 
         # Durian is not in the room, should not see this event
-        (events, _) = yield self.event_source.get_new_events_for_user(
-            self.u_durian, 0, None
+        (events, _) = yield self.event_source.get_new_events(
+            user=self.u_durian,
+            from_key=0,
+            room_ids=[],
         )
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -767,8 +794,9 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
                  "accepted": True},
         ], presence)
 
-        (events, _) = yield self.event_source.get_new_events_for_user(
-            self.u_apple, 1, None
+        (events, _) = yield self.event_source.get_new_events(
+            user=self.u_apple,
+            from_key=1,
         )
 
         self.assertEquals(self.event_source.get_current_key(), 2)
@@ -858,8 +886,10 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
             )
         )
 
-        (events, _) = yield self.event_source.get_new_events_for_user(
-            self.u_apple, 0, None
+        (events, _) = yield self.event_source.get_new_events(
+            user=self.u_apple,
+            from_key=0,
+            room_ids=[self.room_id],
         )
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -905,8 +935,10 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 1)
 
-        (events, _) = yield self.event_source.get_new_events_for_user(
-            self.u_apple, 0, None
+        (events, _) = yield self.event_source.get_new_events(
+            user=self.u_apple,
+            from_key=0,
+            room_ids=[self.room_id,]
         )
         self.assertEquals(events,
             [
@@ -932,8 +964,10 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 2)
 
-        (events, _) = yield self.event_source.get_new_events_for_user(
-            self.u_apple, 0, None
+        (events, _) = yield self.event_source.get_new_events(
+            user=self.u_apple,
+            from_key=0,
+            room_ids=[self.room_id,]
         )
         self.assertEquals(events,
             [
@@ -966,8 +1000,9 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
 
         self.room_members.append(self.u_clementine)
 
-        (events, _) = yield self.event_source.get_new_events_for_user(
-            self.u_apple, 0, None
+        (events, _) = yield self.event_source.get_new_events(
+            user=self.u_apple,
+            from_key=0,
         )
 
         self.assertEquals(self.event_source.get_current_key(), 1)
