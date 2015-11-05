@@ -42,7 +42,7 @@ class TagListServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, room_id):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
         if user_id != auth_user.to_string():
             raise AuthError(403, "Cannot get tags for other users.")
 
@@ -68,7 +68,7 @@ class TagServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id, room_id, tag):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
         if user_id != auth_user.to_string():
             raise AuthError(403, "Cannot add tags for other users.")
 
@@ -88,7 +88,7 @@ class TagServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, user_id, room_id, tag):
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
         if user_id != auth_user.to_string():
             raise AuthError(403, "Cannot add tags for other users.")
 
