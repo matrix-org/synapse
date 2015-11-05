@@ -121,7 +121,7 @@ class SearchHandler(BaseHandler):
         room_ids = search_filter.filter_rooms(room_ids)
 
         if batch_group == "room_id":
-            room_ids = room_ids & {batch_group_key}
+            room_ids.intersection_update({batch_group_key})
 
         rank_map = {}  # event_id -> rank of event
         allowed_events = []
