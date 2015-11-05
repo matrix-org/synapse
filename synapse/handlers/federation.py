@@ -1665,7 +1665,7 @@ class FederationHandler(BaseHandler):
             member_handler = self.hs.get_handlers().room_member_handler
             yield member_handler.change_membership(event, context)
         else:
-            destinations = list(set([x.split(":", 1)[-1] for x in (sender, room_id)]))
+            destinations = set([x.split(":", 1)[-1] for x in (sender, room_id)])
             yield self.replication_layer.forward_third_party_invite(
                 destinations,
                 room_id,
