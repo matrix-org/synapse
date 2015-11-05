@@ -121,7 +121,7 @@ class SearchHandler(BaseHandler):
         room_ids = search_filter.filter_rooms(room_ids)
 
         if batch_group == "room_id":
-            room_ids = room_ids & {batch_group_key}
+            room_ids.intersection_update({batch_group_key})
 
         rank_map = {}  # event_id -> rank of event
         allowed_events = []
@@ -178,7 +178,7 @@ class SearchHandler(BaseHandler):
                 # or we run out of things.
                 # But only go around 5 times since otherwise synapse will be sad.
                 while len(room_events) < search_filter.limit() and i < 5:
-                    i += 5
+                    i += 1
                     results = yield self.store.search_room(
                         room_id, search_term, keys, search_filter.limit() * 2,
                         pagination_token=pagination_token,
@@ -209,7 +209,6 @@ class SearchHandler(BaseHandler):
                     res = results_map[room_events[-1].event_id]
                     pagination_token = res["pagination_token"]
 
-                if room_events:
                     group = room_groups.setdefault(room_id, {})
                     if pagination_token:
                         next_batch = encode_base64("%s\n%s\n%s" % (

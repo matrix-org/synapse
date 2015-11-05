@@ -161,7 +161,7 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def make_membership_event(self, destination, room_id, user_id, membership, args={}):
+    def make_membership_event(self, destination, room_id, user_id, membership):
         valid_memberships = {Membership.JOIN, Membership.LEAVE}
         if membership not in valid_memberships:
             raise RuntimeError(
@@ -173,7 +173,6 @@ class TransportLayerClient(object):
         content = yield self.client.get_json(
             destination=destination,
             path=path,
-            args=args,
             retry_on_dns_fail=True,
         )
 
@@ -214,6 +213,19 @@ class TransportLayerClient(object):
             destination=destination,
             path=path,
             data=content,
+        )
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
+    @log_function
+    def exchange_third_party_invite(self, destination, room_id, event_dict):
+        path = PREFIX + "/exchange_third_party_invite/%s" % (room_id,)
+
+        response = yield self.client.put_json(
+            destination=destination,
+            path=path,
+            data=event_dict,
         )
 
         defer.returnValue(response)

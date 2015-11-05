@@ -292,7 +292,7 @@ class FederationMakeJoinServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, context, user_id):
-        content = yield self.handler.on_make_join_request(context, user_id, query)
+        content = yield self.handler.on_make_join_request(context, user_id)
         defer.returnValue((200, content))
 
 
@@ -340,6 +340,17 @@ class FederationInviteServlet(BaseFederationServlet):
         # TODO(paul): assert that context/event_id parsed from path actually
         #   match those given in content
         content = yield self.handler.on_invite_request(origin, content)
+        defer.returnValue((200, content))
+
+
+class FederationThirdPartyInviteExchangeServlet(BaseFederationServlet):
+    PATH = "/exchange_third_party_invite/([^/]*)"
+
+    @defer.inlineCallbacks
+    def on_PUT(self, origin, content, query, room_id):
+        content = yield self.handler.on_exchange_third_party_invite_request(
+            origin, room_id, content
+        )
         defer.returnValue((200, content))
 
 
@@ -396,6 +407,30 @@ class FederationGetMissingEventsServlet(BaseFederationServlet):
         defer.returnValue((200, content))
 
 
+class On3pidBindServlet(BaseFederationServlet):
+    PATH = "/3pid/onbind"
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        content_bytes = request.content.read()
+        content = json.loads(content_bytes)
+        if "invites" in content:
+            last_exception = None
+            for invite in content["invites"]:
+                try:
+                    yield self.handler.exchange_third_party_invite(invite)
+                except Exception as e:
+                    last_exception = e
+            if last_exception:
+                raise last_exception
+        defer.returnValue((200, {}))
+
+    # Avoid doing remote HS authorization checks which are done by default by
+    # BaseFederationServlet.
+    def _wrap(self, code):
+        return code
+
+
 SERVLET_CLASSES = (
     FederationPullServlet,
     FederationEventServlet,
@@ -413,4 +448,6 @@ SERVLET_CLASSES = (
     FederationEventAuthServlet,
     FederationClientKeysQueryServlet,
     FederationClientKeysClaimServlet,
+    FederationThirdPartyInviteExchangeServlet,
+    On3pidBindServlet,
 )

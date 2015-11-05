@@ -21,6 +21,7 @@ from synapse.api.errors import (
     AuthError, FederationError, StoreError, CodeMessageException, SynapseError,
 )
 from synapse.api.constants import EventTypes, Membership, RejectedReason
+from synapse.events.validator import EventValidator
 from synapse.util import unwrapFirstError
 from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.logutils import log_function
@@ -39,7 +40,6 @@ from twisted.internet import defer
 
 import itertools
 import logging
-from synapse.util import third_party_invites
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,8 @@ class FederationHandler(BaseHandler):
     def __init__(self, hs):
         super(FederationHandler, self).__init__(hs)
 
+        self.hs = hs
+
         self.distributor.observe(
             "user_joined_room",
             self._on_user_joined
@@ -68,7 +70,6 @@ class FederationHandler(BaseHandler):
         self.store = hs.get_datastore()
         self.replication_layer = hs.get_replication_layer()
         self.state_handler = hs.get_state_handler()
-        # self.auth_handler = gs.get_auth_handler()
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
 
@@ -563,7 +564,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def do_invite_join(self, target_hosts, room_id, joinee, content):
+    def do_invite_join(self, target_hosts, room_id, joinee):
         """ Attempts to join the `joinee` to the room `room_id` via the
         server `target_host`.
 
@@ -583,8 +584,7 @@ class FederationHandler(BaseHandler):
             target_hosts,
             room_id,
             joinee,
-            "join",
-            content
+            "join"
         )
 
         self.room_queues[room_id] = []
@@ -661,16 +661,12 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_make_join_request(self, room_id, user_id, query):
+    def on_make_join_request(self, room_id, user_id):
         """ We've received a /make_join/ request, so we create a partial
         join event for the room and return that. We do *not* persist or
         process it until the other server has signed it and sent it back.
         """
         event_content = {"membership": Membership.JOIN}
-        if third_party_invites.has_join_keys(query):
-            event_content["third_party_invite"] = (
-                third_party_invites.extract_join_keys(query)
-            )
 
         builder = self.event_builder_factory.new({
             "type": EventTypes.Member,
@@ -685,9 +681,6 @@ class FederationHandler(BaseHandler):
         )
 
         self.auth.check(event, auth_events=context.current_state)
-
-        if third_party_invites.join_has_third_party_invite(event.content):
-            third_party_invites.check_key_valid(self.hs.get_simple_http_client(), event)
 
         defer.returnValue(event)
 
@@ -828,8 +821,7 @@ class FederationHandler(BaseHandler):
             target_hosts,
             room_id,
             user_id,
-            "leave",
-            {}
+            "leave"
         )
         signed_event = self._sign_event(event)
 
@@ -848,13 +840,12 @@ class FederationHandler(BaseHandler):
         defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def _make_and_verify_event(self, target_hosts, room_id, user_id, membership, content):
+    def _make_and_verify_event(self, target_hosts, room_id, user_id, membership):
         origin, pdu = yield self.replication_layer.make_membership_event(
             target_hosts,
             room_id,
             user_id,
-            membership,
-            content
+            membership
         )
 
         logger.debug("Got response to make_%s: %s", membership, pdu)
@@ -1647,3 +1638,75 @@ class FederationHandler(BaseHandler):
             },
             "missing": [e.event_id for e in missing_locals],
         })
+
+    @defer.inlineCallbacks
+    @log_function
+    def exchange_third_party_invite(self, invite):
+        sender = invite["sender"]
+        room_id = invite["room_id"]
+
+        event_dict = {
+            "type": EventTypes.Member,
+            "content": {
+                "membership": Membership.INVITE,
+                "third_party_invite": invite,
+            },
+            "room_id": room_id,
+            "sender": sender,
+            "state_key": invite["mxid"],
+        }
+
+        if (yield self.auth.check_host_in_room(room_id, self.hs.hostname)):
+            builder = self.event_builder_factory.new(event_dict)
+            EventValidator().validate_new(builder)
+            event, context = yield self._create_new_client_event(builder=builder)
+            self.auth.check(event, context.current_state)
+            yield self._validate_keyserver(event, auth_events=context.current_state)
+            member_handler = self.hs.get_handlers().room_member_handler
+            yield member_handler.change_membership(event, context)
+        else:
+            destinations = set([x.split(":", 1)[-1] for x in (sender, room_id)])
+            yield self.replication_layer.forward_third_party_invite(
+                destinations,
+                room_id,
+                event_dict,
+            )
+
+    @defer.inlineCallbacks
+    @log_function
+    def on_exchange_third_party_invite_request(self, origin, room_id, event_dict):
+        builder = self.event_builder_factory.new(event_dict)
+
+        event, context = yield self._create_new_client_event(
+            builder=builder,
+        )
+
+        self.auth.check(event, auth_events=context.current_state)
+        yield self._validate_keyserver(event, auth_events=context.current_state)
+
+        returned_invite = yield self.send_invite(origin, event)
+        # TODO: Make sure the signatures actually are correct.
+        event.signatures.update(returned_invite.signatures)
+        member_handler = self.hs.get_handlers().room_member_handler
+        yield member_handler.change_membership(event, context)
+
+    @defer.inlineCallbacks
+    def _validate_keyserver(self, event, auth_events):
+        token = event.content["third_party_invite"]["signed"]["token"]
+
+        invite_event = auth_events.get(
+            (EventTypes.ThirdPartyInvite, token,)
+        )
+
+        try:
+            response = yield self.hs.get_simple_http_client().get_json(
+                invite_event.content["key_validity_url"],
+                {"public_key": invite_event.content["public_key"]}
+            )
+        except Exception:
+            raise SynapseError(
+                502,
+                "Third party certificate could not be checked"
+            )
+        if "valid" not in response or not response["valid"]:
+            raise AuthError(403, "Third party certificate was invalid")

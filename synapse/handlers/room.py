@@ -38,6 +38,8 @@ import string
 
 logger = logging.getLogger(__name__)
 
+id_server_scheme = "https://"
+
 
 class RoomCreationHandler(BaseHandler):
 
@@ -488,8 +490,7 @@ class RoomMemberHandler(BaseHandler):
             yield handler.do_invite_join(
                 room_hosts,
                 room_id,
-                event.user_id,
-                event.content  # FIXME To get a non-frozen dict
+                event.user_id
             )
         else:
             logger.debug("Doing normal join")
@@ -632,7 +633,7 @@ class RoomMemberHandler(BaseHandler):
         """
         try:
             data = yield self.hs.get_simple_http_client().get_json(
-                "https://%s/_matrix/identity/api/v1/lookup" % (id_server,),
+                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server,),
                 {
                     "medium": medium,
                     "address": address,
@@ -655,8 +656,8 @@ class RoomMemberHandler(BaseHandler):
             raise AuthError(401, "No signature from server %s" % (server_hostname,))
         for key_name, signature in data["signatures"][server_hostname].items():
             key_data = yield self.hs.get_simple_http_client().get_json(
-                "https://%s/_matrix/identity/api/v1/pubkey/%s" %
-                (server_hostname, key_name,),
+                "%s%s/_matrix/identity/api/v1/pubkey/%s" %
+                (id_server_scheme, server_hostname, key_name,),
             )
             if "public_key" not in key_data:
                 raise AuthError(401, "No public key named %s from %s" %
@@ -709,7 +710,9 @@ class RoomMemberHandler(BaseHandler):
     @defer.inlineCallbacks
     def _ask_id_server_for_third_party_invite(
             self, id_server, medium, address, room_id, sender):
-        is_url = "https://%s/_matrix/identity/api/v1/store-invite" % (id_server,)
+        is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
+            id_server_scheme, id_server,
+        )
         data = yield self.hs.get_simple_http_client().post_urlencoded_get_json(
             is_url,
             {
@@ -722,8 +725,8 @@ class RoomMemberHandler(BaseHandler):
         # TODO: Check for success
         token = data["token"]
         public_key = data["public_key"]
-        key_validity_url = "https://%s/_matrix/identity/api/v1/pubkey/isvalid" % (
-            id_server,
+        key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
+            id_server_scheme, id_server,
         )
         defer.returnValue((token, public_key, key_validity_url))
 
