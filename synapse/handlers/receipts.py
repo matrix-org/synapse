@@ -164,17 +164,15 @@ class ReceiptEventSource(object):
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def get_new_events_for_user(self, user, from_key, limit):
+    def get_new_events(self, from_key, room_ids, **kwargs):
         from_key = int(from_key)
         to_key = yield self.get_current_key()
 
         if from_key == to_key:
             defer.returnValue(([], to_key))
 
-        rooms = yield self.store.get_rooms_for_user(user.to_string())
-        rooms = [room.room_id for room in rooms]
         events = yield self.store.get_linearized_receipts_for_rooms(
-            rooms,
+            room_ids,
             from_key=from_key,
             to_key=to_key,
         )

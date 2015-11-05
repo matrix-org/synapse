@@ -24,7 +24,7 @@ class PrivateUserDataEventSource(object):
         return self.store.get_max_private_user_data_stream_id()
 
     @defer.inlineCallbacks
-    def get_new_events_for_user(self, user, from_key, limit):
+    def get_new_events(self, user, from_key, **kwargs):
         user_id = user.to_string()
         last_stream_id = from_key
 

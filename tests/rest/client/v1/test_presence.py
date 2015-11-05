@@ -47,7 +47,14 @@ class NullSource(object):
     def __init__(self, hs):
         pass
 
-    def get_new_events_for_user(self, user, from_key, limit):
+    def get_new_events(
+            self,
+            user,
+            from_key,
+            room_ids=None,
+            limit=None,
+            is_guest=None
+    ):
         return defer.succeed(([], from_key))
 
     def get_current_key(self, direction='f'):

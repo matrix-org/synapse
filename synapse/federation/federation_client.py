@@ -26,7 +26,6 @@ from synapse.api.errors import (
 from synapse.util import unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
-from synapse.util import third_party_invites
 from synapse.events import FrozenEvent
 import synapse.metrics
 
@@ -358,7 +357,7 @@ class FederationClient(FederationBase):
         defer.returnValue(signed_auth)
 
     @defer.inlineCallbacks
-    def make_membership_event(self, destinations, room_id, user_id, membership, content):
+    def make_membership_event(self, destinations, room_id, user_id, membership):
         """
         Creates an m.room.member event, with context, without participating in the room.
 
@@ -390,14 +389,9 @@ class FederationClient(FederationBase):
             if destination == self.server_name:
                 continue
 
-            args = {}
-            if third_party_invites.join_has_third_party_invite(content):
-                args = third_party_invites.extract_join_keys(
-                    content["third_party_invite"]
-                )
             try:
                 ret = yield self.transport_layer.make_membership_event(
-                    destination, room_id, user_id, membership, args
+                    destination, room_id, user_id, membership
                 )
 
                 pdu_dict = ret["event"]
@@ -704,3 +698,26 @@ class FederationClient(FederationBase):
         event.internal_metadata.outlier = outlier
 
         return event
+
+    @defer.inlineCallbacks
+    def forward_third_party_invite(self, destinations, room_id, event_dict):
+        for destination in destinations:
+            if destination == self.server_name:
+                continue
+
+            try:
+                yield self.transport_layer.exchange_third_party_invite(
+                    destination=destination,
+                    room_id=room_id,
+                    event_dict=event_dict,
+                )
+                defer.returnValue(None)
+            except CodeMessageException:
+                raise
+            except Exception as e:
+                logger.exception(
+                    "Failed to send_third_party_invite via %s: %s",
+                    destination, e.message
+                )
+
+        raise RuntimeError("Failed to send to any server.")

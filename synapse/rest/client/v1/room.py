@@ -26,7 +26,6 @@ from synapse.events.utils import serialize_event
 import simplejson as json
 import logging
 import urllib
-from synapse.util import third_party_invites
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +124,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_type, state_key):
-        user, _, _ = yield self.auth.get_user_by_req(request)
+        user, _, is_guest = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         msg_handler = self.handlers.message_handler
         data = yield msg_handler.get_room_data(
@@ -133,6 +132,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
             room_id=room_id,
             event_type=event_type,
             state_key=state_key,
+            is_guest=is_guest,
         )
 
         if not data:
@@ -348,12 +348,13 @@ class RoomStateRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
-        user, _, _ = yield self.auth.get_user_by_req(request)
+        user, _, is_guest = yield self.auth.get_user_by_req(request, allow_guest=True)
         handler = self.handlers.message_handler
         # Get all the current state for this room
         events = yield handler.get_state_events(
             room_id=room_id,
             user_id=user.to_string(),
+            is_guest=is_guest,
         )
         defer.returnValue((200, events))
 
@@ -451,7 +452,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         # target user is you unless it is an invite
         state_key = user.to_string()
 
-        if membership_action == "invite" and third_party_invites.has_invite_keys(content):
+        if membership_action == "invite" and self._has_3pid_invite_keys(content):
             yield self.handlers.room_member_handler.do_3pid_invite(
                 room_id,
                 user,
@@ -478,19 +479,10 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
         msg_handler = self.handlers.message_handler
 
-        event_content = {
-            "membership": unicode(membership_action),
-        }
-
-        if membership_action == "join" and third_party_invites.has_join_keys(content):
-            event_content["third_party_invite"] = (
-                third_party_invites.extract_join_keys(content)
-            )
-
         yield msg_handler.create_and_send_event(
             {
                 "type": EventTypes.Member,
-                "content": event_content,
+                "content": {"membership": unicode(membership_action)},
                 "room_id": room_id,
                 "sender": user.to_string(),
                 "state_key": state_key,
@@ -500,6 +492,12 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         )
 
         defer.returnValue((200, {}))
+
+    def _has_3pid_invite_keys(self, content):
+        for key in {"id_server", "medium", "address", "display_name"}:
+            if key not in content:
+                return False
+        return True
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):
@@ -602,7 +600,8 @@ class SearchRestServlet(ClientV1RestServlet):
 
         content = _parse_json(request)
 
-        results = yield self.handlers.search_handler.search(auth_user, content)
+        batch = request.args.get("next_batch", [None])[0]
+        results = yield self.handlers.search_handler.search(auth_user, content, batch)
 
         defer.returnValue((200, results))
 
