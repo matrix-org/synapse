@@ -178,7 +178,7 @@ class SearchHandler(BaseHandler):
                 # or we run out of things.
                 # But only go around 5 times since otherwise synapse will be sad.
                 while len(room_events) < search_filter.limit() and i < 5:
-                    i += 5
+                    i += 1
                     results = yield self.store.search_room(
                         room_id, search_term, keys, search_filter.limit() * 2,
                         pagination_token=pagination_token,
