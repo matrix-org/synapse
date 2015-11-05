@@ -64,16 +64,28 @@ class SearchHandler(BaseHandler):
 
         try:
             room_cat = content["search_categories"]["room_events"]
+
+            # The actual thing to query in FTS
             search_term = room_cat["search_term"]
+
+            # Which "keys" to search over in FTS query
             keys = room_cat.get("keys", [
                 "content.body", "content.name", "content.topic",
             ])
+
+            # Filter to apply to results
             filter_dict = room_cat.get("filter", {})
+
+            # What to order results by (impacts whether pagination can be doen)
             order_by = room_cat.get("order_by", "rank")
+
+            # Include context around each event?
             event_context = room_cat.get(
                 "event_context", None
             )
 
+            # Group results together? May allow clients to paginate within a
+            # group
             group_by = room_cat.get("groupings", {}).get("group_by", {})
             group_keys = [g["key"] for g in group_by]
 
@@ -111,10 +123,12 @@ class SearchHandler(BaseHandler):
         if batch_group == "room_id":
             room_ids = room_ids & {batch_group_key}
 
-        rank_map = {}
+        rank_map = {}  # event_id -> rank of event
         allowed_events = []
-        room_groups = {}
-        sender_group = {}
+        room_groups = {}  # Holds result of grouping by room, if applicable
+        sender_group = {}  # Holds result of grouping by sender, if applicable
+
+        # Holds the next_batch for the entire result set if one of those exists
         global_next_batch = None
 
         if order_by == "rank":
@@ -149,6 +163,9 @@ class SearchHandler(BaseHandler):
                 s["results"].append(e.event_id)
 
         elif order_by == "recent":
+            # In this case we specifically loop through each room as the given
+            # limit applies to each room, rather than a global list.
+            # This is not necessarilly a good idea.
             for room_id in room_ids:
                 room_events = []
                 if batch_group == "room_id" and batch_group_key == room_id:
@@ -157,6 +174,9 @@ class SearchHandler(BaseHandler):
                     pagination_token = None
                 i = 0
 
+                # We keep looping and we keep filtering until we reach the limit
+                # or we run out of things.
+                # But only go around 5 times since otherwise synapse will be sad.
                 while len(room_events) < search_filter.limit() and i < 5:
                     i += 5
                     results = yield self.store.search_room(
@@ -208,7 +228,7 @@ class SearchHandler(BaseHandler):
 
                 allowed_events.extend(room_events)
 
-            # Normalize the group ranks
+            # Normalize the group orders
             if room_groups:
                 if len(room_groups) > 1:
                     mx = max(g["order"] for g in room_groups.values())
@@ -223,6 +243,8 @@ class SearchHandler(BaseHandler):
             # We should never get here due to the guard earlier.
             raise NotImplementedError()
 
+        # If client has asked for "context" for each event (i.e. some surrounding
+        # events and state), fetch that
         if event_context is not None:
             now_token = yield self.hs.get_event_sources().get_current_token()
 
