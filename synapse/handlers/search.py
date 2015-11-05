@@ -209,7 +209,6 @@ class SearchHandler(BaseHandler):
                     res = results_map[room_events[-1].event_id]
                     pagination_token = res["pagination_token"]
 
-                if room_events:
                     group = room_groups.setdefault(room_id, {})
                     if pagination_token:
                         next_batch = encode_base64("%s\n%s\n%s" % (
