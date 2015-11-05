@@ -319,7 +319,7 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
         }))
 
 
-# TODO: Needs unit testing
+# TODO: Needs better unit testing
 class RoomMessageListRestServlet(ClientV1RestServlet):
     PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/messages$")
 
