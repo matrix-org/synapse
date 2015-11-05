@@ -18,22 +18,10 @@ from twisted.internet import defer
 from _base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
-from collections import namedtuple
-
 import logging
 
 
 logger = logging.getLogger(__name__)
-
-
-"""The result of a search.
-
-Fields:
-    rank_map (dict): Mapping event_id -> rank
-    event_map (dict): Mapping event_id -> event
-    pagination_token (str): Pagination token
-"""
-SearchResult = namedtuple("SearchResult", ("rank_map", "event_map", "pagination_token"))
 
 
 class SearchStore(SQLBaseStore):
@@ -48,7 +36,7 @@ class SearchStore(SQLBaseStore):
                 "content.body", "content.name", "content.topic"
 
         Returns:
-            SearchResult
+            list of dicts
         """
         clauses = []
         args = []
@@ -106,15 +94,14 @@ class SearchStore(SQLBaseStore):
             for ev in events
         }
 
-        defer.returnValue(SearchResult(
+        defer.returnValue([
             {
-                r["event_id"]: r["rank"]
-                for r in results
-                if r["event_id"] in event_map
-            },
-            event_map,
-            None
-        ))
+                "event": event_map[r["event_id"]],
+                "rank": r["rank"],
+            }
+            for r in results
+            if r["event_id"] in event_map
+        ])
 
     @defer.inlineCallbacks
     def search_room(self, room_id, search_term, keys, limit, pagination_token=None):
@@ -128,7 +115,7 @@ class SearchStore(SQLBaseStore):
             pagination_token (str): A pagination token previously returned
 
         Returns:
-            SearchResult
+            list of dicts
         """
         clauses = []
         args = [search_term, room_id]
@@ -190,18 +177,14 @@ class SearchStore(SQLBaseStore):
             for ev in events
         }
 
-        pagination_token = None
-        if results:
-            topo = results[-1]["topological_ordering"]
-            stream = results[-1]["stream_ordering"]
-            pagination_token = "%s,%s" % (topo, stream)
-
-        defer.returnValue(SearchResult(
+        defer.returnValue([
             {
-                r["event_id"]: r["rank"]
-                for r in results
-                if r["event_id"] in event_map
-            },
-            event_map,
-            pagination_token
-        ))
+                "event": event_map[r["event_id"]],
+                "rank": r["rank"],
+                "pagination_token": "%s,%s" % (
+                    r["topological_ordering"], r["stream_ordering"]
+                ),
+            }
+            for r in results
+            if r["event_id"] in event_map
+        ])
