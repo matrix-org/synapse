@@ -95,7 +95,8 @@ class TagsStore(SQLBaseStore):
         if room_ids:
             tags_by_room = yield self.get_tags_for_user(user_id)
             for room_id in room_ids:
-                results[room_id] = tags_by_room[room_id]
+                if room_id in tags_by_room:
+                    results[room_id] = tags_by_room[room_id]
 
         defer.returnValue(results)
 
