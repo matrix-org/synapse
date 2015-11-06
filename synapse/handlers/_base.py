@@ -29,6 +29,12 @@ logger = logging.getLogger(__name__)
 
 
 class BaseHandler(object):
+    """
+    Common base class for the event handlers.
+
+    :type store: synapse.storage.events.StateStore
+    :type state_handler: synapse.state.StateHandler
+    """
 
     def __init__(self, hs):
         self.store = hs.get_datastore()

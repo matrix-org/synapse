@@ -47,9 +47,9 @@ class TimelineBatch(collections.namedtuple("TimelineBatch", [
 
 
 class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
-    "room_id",
-    "timeline",
-    "state",
+    "room_id",           # str
+    "timeline",          # TimelineBatch
+    "state",             # list[FrozenEvent]
     "ephemeral",
     "private_user_data",
 ])):
@@ -68,9 +68,9 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
 
 
 class ArchivedSyncResult(collections.namedtuple("JoinedSyncResult", [
-    "room_id",
-    "timeline",
-    "state",
+    "room_id",            # str
+    "timeline",           # TimelineBatch
+    "state",              # list[FrozenEvent]
     "private_user_data",
 ])):
     __slots__ = []
@@ -87,8 +87,8 @@ class ArchivedSyncResult(collections.namedtuple("JoinedSyncResult", [
 
 
 class InvitedSyncResult(collections.namedtuple("InvitedSyncResult", [
-    "room_id",
-    "invite",
+    "room_id",   # str
+    "invite",    # FrozenEvent: the invite event
 ])):
     __slots__ = []
 
@@ -268,6 +268,7 @@ class SyncHandler(BaseHandler):
                 room_id, tags_by_room
             ),
         ))
+
 
     def private_user_data_for_room(self, room_id, tags_by_room):
         private_user_data = []
@@ -507,6 +508,9 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def load_filtered_recents(self, room_id, sync_config, now_token,
                               since_token=None):
+        """
+        :returns a Deferred TimelineBatch
+        """
         limited = True
         recents = []
         filtering_factor = 2
@@ -680,8 +684,13 @@ class SyncHandler(BaseHandler):
     def compute_state_delta(self, since_token, previous_state, current_state):
         """ Works out the differnce in state between the current state and the
         state the client got when it last performed a sync.
-        Returns:
-            A list of events.
+
+        :param str since_token: the point we are comparing against
+        :param list[synapse.events.FrozenEvent] previous_state: the state to
+            compare to
+        :param list[synapse.events.FrozenEvent] current_state: the new state
+
+        :returns: A list of events.
         """
         # TODO(mjark) Check if the state events were received by the server
         # after the previous sync, since we need to include those state
@@ -696,6 +705,12 @@ class SyncHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def check_joined_room(self, sync_config, room_id, state_delta):
+        """
+        Check if the user has just joined the given room. If so, return the
+        full state for the room, instead of the delta since the last sync.
+
+        :returns A deferred Tuple (state_delta, limited)
+        """
         joined = False
         limited = False
         for event in state_delta:
