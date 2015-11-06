@@ -18,7 +18,6 @@
  * so that we can join on them in SELECT statements.
  */
 CREATE TABLE IF NOT EXISTS history_visibility(
-    id INTEGER PRIMARY KEY,
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     history_visibility TEXT NOT NULL,
