@@ -272,7 +272,7 @@ class SyncHandler(BaseHandler):
     def private_user_data_for_room(self, room_id, tags_by_room):
         private_user_data = []
         tags = tags_by_room.get(room_id)
-        if tags:
+        if tags is not None:
             private_user_data.append({
                 "type": "m.tag",
                 "content": {"tags": tags},
