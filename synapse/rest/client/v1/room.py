@@ -459,7 +459,6 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 content["medium"],
                 content["address"],
                 content["id_server"],
-                content["display_name"],
                 token_id,
                 txn_id
             )
@@ -494,7 +493,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
     def _has_3pid_invite_keys(self, content):
-        for key in {"id_server", "medium", "address", "display_name"}:
+        for key in {"id_server", "medium", "address"}:
             if key not in content:
                 return False
         return True
