@@ -154,7 +154,7 @@ class SearchStore(SQLBaseStore):
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
-                "SELECT rank(matchinfo(event_search)) as rank, room_id, event_id"
+                "SELECT rank(matchinfo(event_search)) as rank, room_id, event_id,"
                 " topological_ordering, stream_ordering"
                 " FROM event_search"
                 " NATURAL JOIN events"
